@@ -302,6 +302,23 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                     value: order.addressLine ?? order.destinationLabel,
                   ),
                   _InvoiceFact(label: 'Expected', value: order.promise),
+                  if (order.dispatchPromise case final dispatchPromise?)
+                    _InvoiceFact(
+                      label: 'Dispatch promise',
+                      value: dispatchPromise,
+                    ),
+                  if (order.deliveryPartnerName case final partner?)
+                    _InvoiceFact(label: 'Delivery partner', value: partner),
+                  if (order.deliveryServiceLevel case final serviceLevel?)
+                    _InvoiceFact(
+                      label: 'Delivery service',
+                      value: serviceLevel,
+                    ),
+                  if (order.trackingReference case final trackingReference?)
+                    _InvoiceFact(
+                      label: 'Tracking reference',
+                      value: trackingReference,
+                    ),
                   if (order.deliveryInstruction case final instruction?)
                     _InvoiceFact(
                       label: 'Delivery instruction',

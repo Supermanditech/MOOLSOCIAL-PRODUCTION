@@ -1253,6 +1253,21 @@ class BuyV2Session extends ChangeNotifier {
               .whereType<String>()
               .where((label) => label.isNotEmpty)
               .toSet();
+          final dispatchPromises = facts
+              .map((fact) => fact.dispatchPromise?.trim())
+              .whereType<String>()
+              .where((value) => value.isNotEmpty)
+              .toSet();
+          final deliveryProviders = facts
+              .map((fact) => fact.deliveryProviderName?.trim())
+              .whereType<String>()
+              .where((value) => value.isNotEmpty)
+              .toSet();
+          final serviceLevels = facts
+              .map((fact) => fact.deliveryServiceLevel?.trim())
+              .whereType<String>()
+              .where((value) => value.isNotEmpty)
+              .toSet();
           return BuyV2FulfilmentGroup(
             destination: lines.first.product.destination,
             partner: lines.first.product.seller,
@@ -1264,6 +1279,15 @@ class BuyV2Session extends ChangeNotifier {
             promisedByLabel: promisedByLabels.isEmpty
                 ? null
                 : promisedByLabels.join(' · '),
+            dispatchPromise: dispatchPromises.isEmpty
+                ? null
+                : dispatchPromises.join(' · '),
+            deliveryProviderName: deliveryProviders.isEmpty
+                ? null
+                : deliveryProviders.join(' · '),
+            deliveryServiceLevel: serviceLevels.isEmpty
+                ? null
+                : serviceLevels.join(' · '),
             lines: List.unmodifiable(lines),
           );
         })
@@ -2451,7 +2475,13 @@ class BuyV2Session extends ChangeNotifier {
         snapshot.deliveryPromise.trim().isNotEmpty &&
         snapshot.partner.trim().isNotEmpty &&
         snapshot.orderabilityLabel.trim().isNotEmpty &&
-        snapshot.sourceId.trim().isNotEmpty;
+        snapshot.sourceId.trim().isNotEmpty &&
+        (snapshot.dispatchPromise == null ||
+            snapshot.dispatchPromise!.trim().isNotEmpty) &&
+        (snapshot.deliveryProviderName == null ||
+            snapshot.deliveryProviderName!.trim().isNotEmpty) &&
+        (snapshot.deliveryServiceLevel == null ||
+            snapshot.deliveryServiceLevel!.trim().isNotEmpty);
   }
 
   BuyV2SponsoredContent? sponsoredContentFor(
@@ -4115,6 +4145,12 @@ class BuyV2Session extends ChangeNotifier {
       freight: freight,
       deliveryFee: deliveryFee,
       paymentCharge: paymentCharge,
+      dispatchPromise: group.dispatchPromise,
+      deliveryPartnerName: group.deliveryProviderName,
+      deliveryPartnerType: group.deliveryProviderName == null
+          ? null
+          : 'Delivery partner',
+      deliveryServiceLevel: group.deliveryServiceLevel,
     );
   }
 

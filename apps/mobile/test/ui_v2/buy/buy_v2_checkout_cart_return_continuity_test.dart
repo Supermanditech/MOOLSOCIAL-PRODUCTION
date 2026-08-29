@@ -210,6 +210,27 @@ class _CheckoutQuoteAdapter implements BuyV2CheckoutQuoteAdapter {
   }
 }
 
+class _DeliveryPromiseFactsAdapter implements BuyV2ProductFactsAdapter {
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(
+    BuyV2Product product,
+  ) => const BuyV2CatalogueProductFactsAdapter()
+      .snapshotFor(product)
+      .copyWith(
+        promisedByLabel: 'by tomorrow 4:00 PM',
+        dispatchPromise: product.destination == BuyV2Destination.wholesale
+            ? 'Dispatch within one business day'
+            : 'Dispatch after packing',
+        deliveryProviderName: product.destination == BuyV2Destination.wholesale
+            ? 'Rajasthan Freight Network'
+            : 'Mool Local Delivery',
+        deliveryServiceLevel: product.destination == BuyV2Destination.wholesale
+            ? 'Business freight · tracked'
+            : 'Local tracked delivery',
+        sourceId: 'provider-delivery-promise-source',
+      );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -607,6 +628,58 @@ void main() {
     expect(session.checkoutQuoteReviewRequired, isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'provider promise continues from product to Checkout and Tracking',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      final product = productFor(BuyV2Destination.wholesale);
+      session.openDestination(BuyV2Destination.wholesale);
+      expect(session.openProduct(product.id), isTrue);
+
+      await tester.pumpWidget(app(session, textScale: 1.4));
+      await tester.pumpAndSettle();
+      final automatic = find.byKey(
+        ValueKey('buy-automatic-fulfilment-${product.id}'),
+      );
+      await tester.scrollUntilVisible(
+        automatic,
+        220,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Dispatch within one business day'), findsOneWidget);
+      expect(find.text('Rajasthan Freight Network'), findsOneWidget);
+      expect(find.text('Business freight · tracked'), findsOneWidget);
+
+      expect(session.addProduct(product.id), isTrue);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Dispatch · Dispatch within'), findsOneWidget);
+      expect(
+        find.textContaining('Delivery provider · Rajasthan Freight Network'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+
+      expect(await session.submitOrder(), isTrue);
+      final order = session.confirmedOrders.single;
+      expect(order.deliveryPartnerName, 'Rajasthan Freight Network');
+      expect(order.dispatchPromise, 'Dispatch within one business day');
+      expect(session.openTracking(order.id), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.text('Rajasthan Freight Network'), findsOneWidget);
+      expect(find.text('Business freight · tracked'), findsOneWidget);
+      expect(find.text('Dispatch within one business day'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   test(
     'GST profiles restore per account and reject false save success',

@@ -1832,6 +1832,12 @@ void main() {
           paymentMethod: fixture.order.paymentMethod,
           invoiceAvailable: false,
           receiptReference: 'PAY-RECEIPT-1',
+          dispatchPromise: 'Dispatch completed at 2:10 pm',
+          deliveryPartnerName: 'Rajasthan Freight Network',
+          deliveryPartnerType: 'Freight carrier',
+          trackingReference: 'RFN-TRACK-1001',
+          deliveryServiceLevel: 'Business freight · tracked',
+          proofOfDeliveryStatus: 'Required at handover',
         );
         fixture.adapter.orderRefreshResult = BuyV2OrderRefreshResult(
           state: BuyV2CommerceLoadState.ready,
@@ -1843,6 +1849,14 @@ void main() {
         expect(fixture.adapter.orderRefreshCalls, 1);
         expect(fixture.session.orders.first.promise, updated.promise);
         expect(fixture.session.orders.first.invoiceAvailable, isFalse);
+        expect(
+          fixture.session.orders.first.deliveryPartnerName,
+          'Rajasthan Freight Network',
+        );
+        expect(
+          fixture.session.orders.first.trackingReference,
+          'RFN-TRACK-1001',
+        );
 
         fixture.adapter.orderRefreshResult = BuyV2OrderRefreshResult(
           state: BuyV2CommerceLoadState.ready,

@@ -1102,6 +1102,24 @@ class _WholesaleTradeDecisionPanelState
                 value: widget.buyerPromise,
                 valueColor: decision.canAdd ? BuyV2Colors.green : statusColor,
               ),
+              if (facts.dispatchPromise case final dispatchPromise?)
+                _DecisionRow(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Dispatch',
+                  value: dispatchPromise,
+                ),
+              if (facts.deliveryProviderName case final provider?)
+                _DecisionRow(
+                  icon: Icons.local_shipping_outlined,
+                  label: 'Delivery provider',
+                  value: provider,
+                ),
+              if (facts.deliveryServiceLevel case final serviceLevel?)
+                _DecisionRow(
+                  icon: Icons.route_outlined,
+                  label: 'Delivery service',
+                  value: serviceLevel,
+                ),
               _DecisionRow(
                 icon: Icons.storefront_outlined,
                 label: 'Fulfilment',
@@ -1692,6 +1710,24 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                 value: buyerPromise,
                 valueColor: decision.canAdd ? BuyV2Colors.green : statusColor,
               ),
+              if (facts.dispatchPromise case final dispatchPromise?)
+                _DecisionRow(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Dispatch',
+                  value: dispatchPromise,
+                ),
+              if (facts.deliveryProviderName case final provider?)
+                _DecisionRow(
+                  icon: Icons.local_shipping_outlined,
+                  label: 'Delivery provider',
+                  value: provider,
+                ),
+              if (facts.deliveryServiceLevel case final serviceLevel?)
+                _DecisionRow(
+                  icon: Icons.route_outlined,
+                  label: 'Delivery service',
+                  value: serviceLevel,
+                ),
               _DecisionRow(
                 icon: Icons.storefront_outlined,
                 label: 'Fulfilment',
@@ -4767,7 +4803,17 @@ class BuyV2CheckoutView extends StatelessWidget {
                         '${deliveryGroups[index].destination.label} fulfilment · '
                             '${_fulfilmentPromiseSummary(deliveryGroups[index])}',
                         '${deliveryGroups[index].destination.label} · ${buyV2Money(deliveryGroups[index].total)}',
-                        'Fulfiller assigned automatically after placement',
+                        if (deliveryGroups[index].dispatchPromise
+                            case final dispatchPromise?)
+                          'Dispatch · $dispatchPromise',
+                        if (deliveryGroups[index].deliveryProviderName
+                            case final provider?)
+                          'Delivery provider · $provider'
+                        else
+                          'Delivery partner assigned after placement',
+                        if (deliveryGroups[index].deliveryServiceLevel
+                            case final serviceLevel?)
+                          'Service · $serviceLevel',
                         if (session.selectedDeliveryInstructionFor(
                               deliveryGroups[index].destination,
                             )
@@ -6501,6 +6547,17 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
                       value: _orderPromiseSummary(order),
                     ),
                     _OrderDeliveryFact(
+                      icon: Icons.local_shipping_outlined,
+                      label: 'Delivery partner',
+                      value: order.deliveryPartnerName ?? 'Not assigned yet',
+                    ),
+                    if (order.trackingReference case final trackingReference?)
+                      _OrderDeliveryFact(
+                        icon: Icons.pin_outlined,
+                        label: 'Tracking reference',
+                        value: trackingReference,
+                      ),
+                    _OrderDeliveryFact(
                       icon: Icons.assignment_turned_in_outlined,
                       label: 'Recorded instruction',
                       value:
@@ -6826,6 +6883,40 @@ class BuyV2TrackingView extends StatelessWidget {
               label: order.partnerType,
               value: order.partner,
             ),
+            _DecisionRow(
+              icon: Icons.local_shipping_outlined,
+              label: order.deliveryPartnerType ?? 'Delivery partner',
+              value:
+                  order.deliveryPartnerName ??
+                  (order.status == BuyV2OrderStatus.preparing ||
+                          order.status == BuyV2OrderStatus.confirmed
+                      ? 'Not assigned yet'
+                      : 'Details unavailable · Refresh order'),
+            ),
+            if (order.dispatchPromise case final dispatchPromise?)
+              _DecisionRow(
+                icon: Icons.inventory_2_outlined,
+                label: 'Dispatch promise',
+                value: dispatchPromise,
+              ),
+            if (order.deliveryServiceLevel case final serviceLevel?)
+              _DecisionRow(
+                icon: Icons.route_outlined,
+                label: 'Delivery service',
+                value: serviceLevel,
+              ),
+            if (order.trackingReference case final trackingReference?)
+              _DecisionRow(
+                icon: Icons.pin_outlined,
+                label: 'Tracking reference',
+                value: trackingReference,
+              ),
+            if (order.proofOfDeliveryStatus case final proofStatus?)
+              _DecisionRow(
+                icon: Icons.verified_outlined,
+                label: 'Proof of delivery',
+                value: proofStatus,
+              ),
             _DecisionRow(
               icon: Icons.location_on_outlined,
               label: 'Delivering to',

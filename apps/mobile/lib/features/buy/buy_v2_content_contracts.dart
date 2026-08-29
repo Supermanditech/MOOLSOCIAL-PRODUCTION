@@ -13,6 +13,9 @@ class BuyV2ProductFactsSnapshot {
     required this.orderabilityLabel,
     required this.sourceId,
     this.promisedByLabel,
+    this.dispatchPromise,
+    this.deliveryProviderName,
+    this.deliveryServiceLevel,
     this.observedAt,
     this.stale = false,
   }) : assert(
@@ -27,6 +30,9 @@ class BuyV2ProductFactsSnapshot {
   final String orderabilityLabel;
   final String sourceId;
   final String? promisedByLabel;
+  final String? dispatchPromise;
+  final String? deliveryProviderName;
+  final String? deliveryServiceLevel;
   final DateTime? observedAt;
   final bool stale;
 
@@ -39,6 +45,9 @@ class BuyV2ProductFactsSnapshot {
     String? orderabilityLabel,
     String? sourceId,
     String? promisedByLabel,
+    String? dispatchPromise,
+    String? deliveryProviderName,
+    String? deliveryServiceLevel,
     DateTime? observedAt,
     bool? stale,
   }) {
@@ -50,6 +59,9 @@ class BuyV2ProductFactsSnapshot {
       orderabilityLabel: orderabilityLabel ?? this.orderabilityLabel,
       sourceId: sourceId ?? this.sourceId,
       promisedByLabel: promisedByLabel ?? this.promisedByLabel,
+      dispatchPromise: dispatchPromise ?? this.dispatchPromise,
+      deliveryProviderName: deliveryProviderName ?? this.deliveryProviderName,
+      deliveryServiceLevel: deliveryServiceLevel ?? this.deliveryServiceLevel,
       observedAt: observedAt ?? this.observedAt,
       stale: stale ?? this.stale,
     );
@@ -65,6 +77,9 @@ class BuyV2ProductFactsSnapshot {
         other.orderabilityLabel == orderabilityLabel &&
         other.sourceId == sourceId &&
         other.promisedByLabel == promisedByLabel &&
+        other.dispatchPromise == dispatchPromise &&
+        other.deliveryProviderName == deliveryProviderName &&
+        other.deliveryServiceLevel == deliveryServiceLevel &&
         other.observedAt == observedAt &&
         other.stale == stale;
   }
@@ -78,6 +93,9 @@ class BuyV2ProductFactsSnapshot {
     orderabilityLabel,
     sourceId,
     promisedByLabel,
+    dispatchPromise,
+    deliveryProviderName,
+    deliveryServiceLevel,
     observedAt,
     stale,
   );

@@ -199,6 +199,9 @@ class BuyV2FulfilmentGroup {
     required this.promise,
     required this.lines,
     this.promisedByLabel,
+    this.dispatchPromise,
+    this.deliveryProviderName,
+    this.deliveryServiceLevel,
   });
 
   final BuyV2Destination destination;
@@ -207,6 +210,9 @@ class BuyV2FulfilmentGroup {
   final String promise;
   final List<BuyV2CartLine> lines;
   final String? promisedByLabel;
+  final String? dispatchPromise;
+  final String? deliveryProviderName;
+  final String? deliveryServiceLevel;
 
   int get itemCount => lines.fold(0, (total, line) => total + line.quantity);
 
@@ -278,6 +284,12 @@ class BuyV2Order {
     this.freight = 0,
     this.deliveryFee = 0,
     this.paymentCharge = 0,
+    this.dispatchPromise,
+    this.deliveryPartnerName,
+    this.deliveryPartnerType,
+    this.trackingReference,
+    this.deliveryServiceLevel,
+    this.proofOfDeliveryStatus,
     this.invoiceAvailable = true,
     this.receiptReference,
   });
@@ -312,6 +324,12 @@ class BuyV2Order {
   final int freight;
   final int deliveryFee;
   final int paymentCharge;
+  final String? dispatchPromise;
+  final String? deliveryPartnerName;
+  final String? deliveryPartnerType;
+  final String? trackingReference;
+  final String? deliveryServiceLevel;
+  final String? proofOfDeliveryStatus;
   final bool invoiceAvailable;
   final String? receiptReference;
 }

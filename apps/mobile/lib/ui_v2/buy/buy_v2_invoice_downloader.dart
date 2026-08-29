@@ -66,6 +66,14 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
     if (order.recipient case final value?) 'Recipient: ${_invoiceText(value)}',
     'Address: ${_invoiceText(order.addressLine ?? order.destinationLabel)}',
     'Expected: ${_invoiceText(order.promise)}',
+    if (order.dispatchPromise case final value?)
+      'Dispatch promise: ${_invoiceText(value)}',
+    if (order.deliveryPartnerName case final value?)
+      'Delivery partner: ${_invoiceText(value)}',
+    if (order.deliveryServiceLevel case final value?)
+      'Delivery service: ${_invoiceText(value)}',
+    if (order.trackingReference case final value?)
+      'Tracking reference: ${_invoiceText(value)}',
     if (order.deliveryInstruction case final value?)
       'Delivery instruction: ${_invoiceText(value)}',
     '',
