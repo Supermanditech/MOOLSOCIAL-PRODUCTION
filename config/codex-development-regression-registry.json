@@ -44163,6 +44163,16 @@
       "prevention": "Do not retry direct recursive deletion. Use the repository Flutter clean wrapper for exact inactive mobile worktrees, or provide the founder a validated literal-path PowerShell cleanup block if the wrapper cannot reclaim enough space.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md", "scripts/invoke-flutter-with-clean-support.ps1"]
+    },
+    {
+      "id": "REG-20260829-3898-FLUTTER-CLEAN-WRAPPER-MISSING-DART-TOOL-PARENT",
+      "status": "registered_exact_support_restore_required",
+      "appliesTo": ["primary", "coordination", "flutter", "storage", "tooling"],
+      "mistake": "The guarded flutter clean removed the intended 2.25 GiB build output but the wrapper then failed to restore package_config.json and package_graph.json because their .dart_tool parent directory no longer existed.",
+      "rootCause": "invoke-flutter-with-clean-support.ps1 restores tracked support files with WriteAllBytes but does not recreate a support owner's removed parent directory after flutter clean.",
+      "prevention": "Before cleaning another exact worktree, preserve the tracked support bytes, run clean plus pub get inside one guarded invocation so .dart_tool is recreated, and verify exact support-owner bytes afterward. Restore the two affected inactive-worktree owners from its exact Git HEAD before continuing.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/invoke-flutter-with-clean-support.ps1", "apps/mobile/.dart_tool/package_config.json", "apps/mobile/.dart_tool/package_graph.json"]
     }
   ]
 }
