@@ -301,6 +301,10 @@ void main() {
     expect(find.text('Alice News'), findsWidgets);
     expect(find.text('Public discovery post'), findsWidgets);
 
+    await tapVisible(tester, const Key('social-public-like-post-a'));
+    await tester.pumpAndSettle();
+    expect(socialGateway.interactions, [('post-a', 'like')]);
+
     await tapVisible(tester, const Key('social-author-profile-post-a'));
     await tester.pumpAndSettle();
     expect(
@@ -766,6 +770,7 @@ void main() {
 class _PeopleSocialGateway
     implements SocialContentGateway, SocialAuthorGateway {
   final Map<String, bool> followed = {'person-a': false, 'person-b': false};
+  final List<(String, String)> interactions = [];
 
   @override
   Future<SocialFeedPage> feed({String? cursor, int limit = 20}) async {
@@ -818,7 +823,19 @@ class _PeopleSocialGateway
     required String postId,
     required String interaction,
     int? choiceIndex,
-  }) => Future.error(UnsupportedError('Not used by this test.'));
+  }) async {
+    interactions.add((postId, interaction));
+    final isAlice = postId == 'post-a';
+    return _post(
+      postId,
+      isAlice ? 'person-a' : 'person-b',
+      isAlice ? 'Alice News' : 'Bharat Creator',
+      isAlice ? '@alice' : '@bharat',
+    ).copyWith(
+      liked: interaction == 'like',
+      likeCount: interaction == 'like' ? 1 : 0,
+    );
+  }
 
   @override
   Future<SocialPublishedItem> publish(SocialPublishDraft draft) =>
