@@ -40,8 +40,11 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
   _ShopCommerceAdapter({required this.snapshot, required this.placement});
 
   final BuyV2CommerceSnapshot snapshot;
-  final BuyV2OrderPlacementResult placement;
+  BuyV2OrderPlacementResult placement;
+  BuyV2OrderPlacementResult? reconciliation;
   int placementCalls = 0;
+  int reconciliationCalls = 0;
+  final requests = <BuyV2OrderPlacementRequest>[];
 
   @override
   Future<BuyV2CommerceSnapshot> refresh() async => snapshot;
@@ -51,7 +54,17 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
     BuyV2OrderPlacementRequest request,
   ) async {
     placementCalls += 1;
+    requests.add(request);
     return placement;
+  }
+
+  @override
+  Future<BuyV2OrderPlacementResult> reconcileOrder({
+    required String idempotencyKey,
+    required String paymentReference,
+  }) async {
+    reconciliationCalls += 1;
+    return reconciliation ?? placement;
   }
 
   @override
@@ -97,6 +110,119 @@ final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
     this.snapshot = snapshot;
     return true;
   }
+}
+
+final class _MutableCommerceFactsAdapter implements BuyV2ProductFactsAdapter {
+  int? price;
+  String orderabilityLabel = 'Available to add';
+  bool stale = false;
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          price: price ?? product.price,
+          orderabilityLabel: orderabilityLabel,
+          sourceId: 'shop-live-facts',
+          observedAt: DateTime(2026, 8, 29),
+          stale: stale,
+        );
+  }
+}
+
+Future<
+  ({
+    BuyV2Session session,
+    _ShopCommerceAdapter adapter,
+    BuyV2Product product,
+    BuyV2Order order,
+  })
+>
+_openProductionCheckout({
+  required BuyV2OrderPlacementOutcome outcome,
+  Uri? paymentActionUri,
+  String? paymentReference,
+  BuyV2ProductFactsAdapter? factsAdapter,
+  BuyV2CustomerStateStore? customerStateStore,
+}) async {
+  final product = BuyV2Catalogue.products.firstWhere(
+    (candidate) => candidate.destination == BuyV2Destination.shop,
+  );
+  const address = BuyV2Address(
+    id: 'server-home',
+    kind: BuyV2AddressKind.home,
+    label: 'Home',
+    recipient: 'Aarav Sharma',
+    phone: '9000000000',
+    line: '12, Central Avenue',
+    area: 'Sardarpura, Jodhpur',
+    pinCode: '342003',
+    landmark: 'Near the market',
+  );
+  final order = BuyV2Order(
+    id: 'MS-SERVER-1',
+    destination: BuyV2Destination.shop,
+    title: 'Shop order',
+    itemSummary: '1 product',
+    total: product.price,
+    partner: product.seller,
+    partnerType: product.partnerRole,
+    promise: product.deliveryPromise,
+    destinationLabel: address.shortLine,
+    progress: .2,
+    status: BuyV2OrderStatus.preparing,
+    purchaseId: 'BUY-SERVER-1',
+    productIds: [product.id],
+    lines: [BuyV2CartLine(product: product, quantity: 1)],
+    paymentMethod: 'UPI',
+  );
+  final placement = BuyV2OrderPlacementResult(
+    outcome: outcome,
+    customerMessage: switch (outcome) {
+      BuyV2OrderPlacementOutcome.paymentActionRequired =>
+        'Continue to your payment app.',
+      BuyV2OrderPlacementOutcome.paymentPending =>
+        'Payment confirmation is pending.',
+      BuyV2OrderPlacementOutcome.paymentUnknown =>
+        'Payment status could not be confirmed.',
+      BuyV2OrderPlacementOutcome.cancelled => 'Payment was cancelled.',
+      BuyV2OrderPlacementOutcome.failed => 'Payment failed.',
+      BuyV2OrderPlacementOutcome.unavailable => 'Ordering is unavailable.',
+      BuyV2OrderPlacementOutcome.confirmed => 'Your order is confirmed.',
+    },
+    purchaseReference: outcome == BuyV2OrderPlacementOutcome.confirmed
+        ? 'BUY-SERVER-1'
+        : null,
+    paymentReference: paymentReference,
+    paymentActionUri: paymentActionUri,
+    orders: outcome == BuyV2OrderPlacementOutcome.confirmed
+        ? [order]
+        : const [],
+  );
+  final adapter = _ShopCommerceAdapter(
+    snapshot: BuyV2CommerceSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      products: [product],
+      addresses: const [address],
+      selectedAddressId: address.id,
+      paymentMethods: const {'UPI'},
+    ),
+    placement: placement,
+  );
+  final session = BuyV2Session(
+    core: BuySession(),
+    productFactsAdapter:
+        factsAdapter ?? const BuyV2CatalogueProductFactsAdapter(),
+    commerceAdapter: adapter,
+    customerStateStore: customerStateStore,
+    reviewDataEnabled: false,
+  );
+  await session.restoreCommerce();
+  session.addProduct(product.id);
+  session.openCart(scope: BuyV2CartScope.shop);
+  session.openCheckout();
+  return (session: session, adapter: adapter, product: product, order: order);
 }
 
 void main() {
@@ -1342,5 +1468,175 @@ void main() {
         expect(restored.selectedPayment, 'Bank transfer');
       },
     );
+
+    test(
+      'payment handoff locks one attempt and reconciliation confirms once',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
+          paymentActionUri: Uri.parse('upi://pay?pa=merchant@mool'),
+          paymentReference: 'PAY-1',
+        );
+        addTearDown(fixture.session.dispose);
+
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(
+          fixture.session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentActionRequired,
+        );
+        final idempotencyKey = fixture.session.checkoutIdempotencyKey;
+        expect(idempotencyKey, isNotEmpty);
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.placementCalls, 1);
+        fixture.session.increase(fixture.product.id);
+        expect(fixture.session.quantityFor(fixture.product.id), 1);
+
+        Uri? openedUri;
+        expect(
+          await fixture.session.continuePayment((uri) async {
+            openedUri = uri;
+            return true;
+          }),
+          isTrue,
+        );
+        expect(openedUri, Uri.parse('upi://pay?pa=merchant@mool'));
+        expect(
+          fixture.session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentPending,
+        );
+
+        fixture.adapter.reconciliation = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          customerMessage: 'Your order is confirmed.',
+          purchaseReference: 'BUY-SERVER-1',
+          paymentReference: 'PAY-1',
+          orders: [fixture.order],
+        );
+        expect(await fixture.session.reconcilePayment(), isTrue);
+        expect(fixture.adapter.reconciliationCalls, 1);
+        expect(fixture.session.view, BuyV2View.confirmation);
+        expect(fixture.session.confirmedOrders.single.id, 'MS-SERVER-1');
+        expect(fixture.session.checkoutIdempotencyKey, isNull);
+      },
+    );
+
+    test(
+      'failed retry reuses its idempotency key and cannot duplicate',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.failed,
+        );
+        addTearDown(fixture.session.dispose);
+
+        expect(await fixture.session.submitOrder(), isFalse);
+        final firstKey = fixture.adapter.requests.single.idempotencyKey;
+        fixture.adapter.placement = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          customerMessage: 'Your order is confirmed.',
+          purchaseReference: 'BUY-SERVER-1',
+          orders: [fixture.order],
+        );
+
+        expect(await fixture.session.submitOrder(), isTrue);
+        expect(fixture.adapter.requests, hasLength(2));
+        expect(fixture.adapter.requests.last.idempotencyKey, firstKey);
+        expect(fixture.session.confirmedOrders, hasLength(1));
+      },
+    );
+
+    test(
+      'cancelled payment creates a new attempt only after customer retry',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.cancelled,
+        );
+        addTearDown(fixture.session.dispose);
+
+        expect(await fixture.session.submitOrder(), isFalse);
+        final cancelledKey = fixture.adapter.requests.single.idempotencyKey;
+        expect(fixture.session.checkoutIdempotencyKey, isNull);
+        expect(
+          fixture.session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.cancelled,
+        );
+        fixture.adapter.placement = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          customerMessage: 'Your order is confirmed.',
+          purchaseReference: 'BUY-SERVER-1',
+          orders: [fixture.order],
+        );
+
+        expect(await fixture.session.submitOrder(), isTrue);
+        expect(
+          fixture.adapter.requests.last.idempotencyKey,
+          isNot(cancelledKey),
+        );
+      },
+    );
+
+    test(
+      'price change updates the Cart and requires explicit acceptance',
+      () async {
+        final facts = _MutableCommerceFactsAdapter();
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          factsAdapter: facts,
+        );
+        addTearDown(fixture.session.dispose);
+        facts.price = fixture.product.price + 12;
+
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.placementCalls, 0);
+        expect(fixture.session.checkoutPriceReviewRequired, isTrue);
+        expect(
+          fixture.session.checkoutPriceChanges.single.previousPrice,
+          fixture.product.price,
+        );
+        expect(
+          fixture.session.checkoutPayableTotal,
+          fixture.product.price + 12,
+        );
+
+        fixture.session.acceptCheckoutPriceChanges();
+        expect(await fixture.session.submitOrder(), isTrue);
+        expect(fixture.adapter.placementCalls, 1);
+      },
+    );
+
+    test('pending payment survives restart and keeps the Cart locked', () async {
+      final store = _MemoryCustomerStateStore('account-payment');
+      final fixture = await _openProductionCheckout(
+        outcome: BuyV2OrderPlacementOutcome.paymentPending,
+        paymentReference: 'PAY-RESTORE-1',
+        customerStateStore: store,
+      );
+      addTearDown(fixture.session.dispose);
+
+      expect(await fixture.session.submitOrder(), isFalse);
+      await Future<void>.delayed(Duration.zero);
+      final restored = BuyV2Session(
+        core: BuySession(),
+        commerceAdapter: fixture.adapter,
+        customerStateStore: store,
+        reviewDataEnabled: false,
+      );
+      addTearDown(restored.dispose);
+      await restored.restoreCommerce();
+      await restored.restoreCustomerState();
+      restored.openCart(scope: BuyV2CartScope.shop);
+      restored.openCheckout();
+
+      expect(
+        restored.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentPending,
+      );
+      final quantity = restored.quantityFor(fixture.product.id);
+      restored.increase(fixture.product.id);
+      expect(restored.quantityFor(fixture.product.id), quantity);
+      expect(
+        restored.notice,
+        'Check the current payment before changing your Cart or payment method.',
+      );
+    });
   });
 }

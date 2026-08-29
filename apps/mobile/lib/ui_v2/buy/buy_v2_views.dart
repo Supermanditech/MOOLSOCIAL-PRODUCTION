@@ -3769,10 +3769,12 @@ class BuyV2CheckoutView extends StatelessWidget {
     super.key,
     required this.session,
     required this.gstInvoiceController,
+    this.paymentHandoff,
   });
 
   final BuyV2Session session;
   final BuyV2GstInvoiceController gstInvoiceController;
+  final BuyV2PaymentHandoff? paymentHandoff;
 
   @override
   Widget build(BuildContext context) {
@@ -3816,7 +3818,11 @@ class BuyV2CheckoutView extends StatelessWidget {
                 children: [
                   _ReturnAffordance(
                     label: 'Cart',
-                    onTap: () => session.openCart(scope: session.checkoutScope),
+                    onTap: session.checkoutBusy
+                        ? () => session.showNotice(
+                            'Keep Checkout open while your payment status is checked.',
+                          )
+                        : () => session.openCart(scope: session.checkoutScope),
                     tightHitOwner: true,
                     hitOwnerKey: const ValueKey('buy-checkout-return-cart'),
                     minimumHeight: 44,
@@ -3831,7 +3837,10 @@ class BuyV2CheckoutView extends StatelessWidget {
                       session.checkoutSubmissionState !=
                           BuyV2CheckoutSubmissionState.confirmed) ...[
                     const SizedBox(height: 8),
-                    _CheckoutSubmissionStatus(session: session),
+                    _CheckoutSubmissionStatus(
+                      session: session,
+                      paymentHandoff: paymentHandoff,
+                    ),
                   ],
                   const SizedBox(height: 8),
                   _SavedAddressReminder(
@@ -3846,6 +3855,10 @@ class BuyV2CheckoutView extends StatelessWidget {
                       controller: gstInvoiceController,
                     ),
                     const SizedBox(height: 7),
+                  ],
+                  if (session.checkoutPriceReviewRequired) ...[
+                    _CheckoutPriceChangeReview(session: session),
+                    const SizedBox(height: 9),
                   ],
                   if (session.checkoutPromiseReviewRequired) ...[
                     _CheckoutPromiseChangeReview(session: session),
@@ -3983,8 +3996,8 @@ class BuyV2CheckoutView extends StatelessWidget {
                     child: FilledButton(
                       onPressed:
                           session.checkoutBusy ||
-                              session.checkoutSubmissionState ==
-                                  BuyV2CheckoutSubmissionState.paymentPending ||
+                              session.checkoutRequiresResolution ||
+                              session.checkoutPriceReviewRequired ||
                               session.checkoutPromiseReviewRequired
                           ? null
                           : missingDetails.isEmpty
@@ -3998,9 +4011,14 @@ class BuyV2CheckoutView extends StatelessWidget {
                         missingDetails.isEmpty
                             ? switch (session.checkoutSubmissionState) {
                                 BuyV2CheckoutSubmissionState.submitting =>
-                                  'Placing order…',
+                                  'Checking order…',
+                                BuyV2CheckoutSubmissionState
+                                    .paymentActionRequired =>
+                                  'Complete payment above',
                                 BuyV2CheckoutSubmissionState.paymentPending =>
-                                  'Payment pending',
+                                  'Check payment above',
+                                BuyV2CheckoutSubmissionState.paymentUnknown =>
+                                  'Check payment above',
                                 _ => 'Place order',
                               }
                             : 'Add GST details',
@@ -4018,27 +4036,53 @@ class BuyV2CheckoutView extends StatelessWidget {
 }
 
 class _CheckoutSubmissionStatus extends StatelessWidget {
-  const _CheckoutSubmissionStatus({required this.session});
+  const _CheckoutSubmissionStatus({
+    required this.session,
+    required this.paymentHandoff,
+  });
 
   final BuyV2Session session;
+  final BuyV2PaymentHandoff? paymentHandoff;
 
   @override
   Widget build(BuildContext context) {
     final state = session.checkoutSubmissionState;
+    final actionRequired =
+        state == BuyV2CheckoutSubmissionState.paymentActionRequired;
     final pending = state == BuyV2CheckoutSubmissionState.paymentPending;
+    final unknown = state == BuyV2CheckoutSubmissionState.paymentUnknown;
     final submitting = state == BuyV2CheckoutSubmissionState.submitting;
-    final title = submitting
-        ? 'Placing your order'
-        : pending
-        ? 'Payment confirmation is pending'
-        : state == BuyV2CheckoutSubmissionState.unavailable
-        ? 'Ordering is unavailable right now'
-        : 'Your order was not placed';
-    final detail = submitting
-        ? 'Keep this screen open while the latest price, payment and order are confirmed.'
-        : pending
-        ? 'Do not pay again. Check this payment before trying another method.'
-        : 'Your Cart is unchanged. Try again or get help if the issue continues.';
+    final title = switch (state) {
+      BuyV2CheckoutSubmissionState.submitting => 'Checking your order',
+      BuyV2CheckoutSubmissionState.paymentActionRequired =>
+        'Continue securely to payment',
+      BuyV2CheckoutSubmissionState.paymentPending =>
+        'Payment confirmation is pending',
+      BuyV2CheckoutSubmissionState.paymentUnknown =>
+        'Payment status needs checking',
+      BuyV2CheckoutSubmissionState.cancelled => 'Payment was cancelled',
+      BuyV2CheckoutSubmissionState.unavailable =>
+        'Ordering is unavailable right now',
+      BuyV2CheckoutSubmissionState.failed => 'Your order was not placed',
+      BuyV2CheckoutSubmissionState.idle ||
+      BuyV2CheckoutSubmissionState.confirmed => '',
+    };
+    final detail = switch (state) {
+      BuyV2CheckoutSubmissionState.submitting =>
+        'Keep this screen open while the latest price, payment and order are confirmed.',
+      BuyV2CheckoutSubmissionState.paymentActionRequired =>
+        'Your Cart is reserved for this attempt. Complete payment once, then return here.',
+      BuyV2CheckoutSubmissionState.paymentPending ||
+      BuyV2CheckoutSubmissionState.paymentUnknown =>
+        'Do not pay again. Check this payment before trying another method.',
+      BuyV2CheckoutSubmissionState.cancelled ||
+      BuyV2CheckoutSubmissionState.failed ||
+      BuyV2CheckoutSubmissionState.unavailable =>
+        'Your Cart is unchanged. Try again or get help if the issue continues.',
+      BuyV2CheckoutSubmissionState.idle ||
+      BuyV2CheckoutSubmissionState.confirmed => '',
+    };
+    final needsCheck = pending || unknown;
     return Semantics(
       key: ValueKey('buy-checkout-submission-${state.name}'),
       container: true,
@@ -4046,8 +4090,12 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(11),
         decoration: buyV2CardDecoration(
-          color: pending ? BuyV2Colors.softOrange : BuyV2Colors.softBlue,
-          border: pending ? BuyV2Colors.orange : BuyV2Colors.navy,
+          color: actionRequired || needsCheck
+              ? BuyV2Colors.softOrange
+              : BuyV2Colors.softBlue,
+          border: actionRequired || needsCheck
+              ? BuyV2Colors.orange
+              : BuyV2Colors.navy,
           radius: 15,
         ),
         child: Row(
@@ -4060,7 +4108,11 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
               )
             else
               Icon(
-                pending ? Icons.schedule_rounded : Icons.info_outline_rounded,
+                actionRequired
+                    ? Icons.open_in_new_rounded
+                    : needsCheck
+                    ? Icons.schedule_rounded
+                    : Icons.info_outline_rounded,
                 color: BuyV2Colors.navy,
                 size: 22,
               ),
@@ -4073,7 +4125,56 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(detail, style: context.buyMeta),
                   if (!submitting) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 9),
+                    if (actionRequired)
+                      SizedBox(
+                        width: double.infinity,
+                        height: BuyV2Metrics.minimumTap,
+                        child: FilledButton.icon(
+                          key: const ValueKey('buy-checkout-continue-payment'),
+                          onPressed: paymentHandoff == null
+                              ? () {
+                                  if (session.cancelPaymentAttempt()) {
+                                    showBuyV2PaymentSheet(context, session);
+                                  }
+                                }
+                              : () => session.continuePayment(paymentHandoff!),
+                          icon: Icon(
+                            paymentHandoff == null
+                                ? Icons.swap_horiz_rounded
+                                : Icons.open_in_new_rounded,
+                            size: 18,
+                          ),
+                          label: Text(
+                            paymentHandoff == null
+                                ? 'Choose another method'
+                                : 'Open payment app',
+                          ),
+                        ),
+                      )
+                    else if (needsCheck)
+                      SizedBox(
+                        width: double.infinity,
+                        height: BuyV2Metrics.minimumTap,
+                        child: FilledButton.icon(
+                          key: const ValueKey('buy-checkout-check-payment'),
+                          onPressed: session.reconcilePayment,
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Check payment'),
+                        ),
+                      )
+                    else
+                      SizedBox(
+                        width: double.infinity,
+                        height: BuyV2Metrics.minimumTap,
+                        child: OutlinedButton.icon(
+                          key: const ValueKey('buy-checkout-retry-order'),
+                          onPressed: session.submitOrder,
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Try again'),
+                        ),
+                      ),
+                    const SizedBox(height: 4),
                     TextButton.icon(
                       key: const ValueKey('buy-checkout-submission-help'),
                       onPressed: session.openAssist,
@@ -4229,6 +4330,78 @@ class _WholesaleCheckoutReceivingLine extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _CheckoutPriceChangeReview extends StatelessWidget {
+  const _CheckoutPriceChangeReview({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final changes = session.checkoutPriceChanges;
+    return Semantics(
+      key: const ValueKey('buy-checkout-price-change-review'),
+      container: true,
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(11),
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softOrange,
+          border: BuyV2Colors.orange,
+          radius: 15,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Prices changed',
+              style: context.buyTitle.copyWith(fontSize: 15),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Review the updated prices and total before placing this order.',
+              style: context.buyMeta,
+            ),
+            const SizedBox(height: 8),
+            for (final change in changes) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      change.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyBody,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${buyV2Money(change.previousPrice)} → '
+                    '${buyV2Money(change.currentPrice)}',
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.navy,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
+            SizedBox(
+              width: double.infinity,
+              height: BuyV2Metrics.minimumTap,
+              child: FilledButton(
+                key: const ValueKey('buy-checkout-accept-prices'),
+                onPressed: session.acceptCheckoutPriceChanges,
+                child: const Text('Accept updated prices'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

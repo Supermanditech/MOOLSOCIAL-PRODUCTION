@@ -21,6 +21,10 @@ class BuyV2CustomerStateSnapshot {
     this.savedProductKeys = const {},
     this.deliveryInstructionIds = const {},
     this.selectedPayment,
+    this.checkoutIdempotencyKey,
+    this.paymentReference,
+    this.paymentActionUri,
+    this.checkoutSubmissionState,
   });
 
   final Map<String, int> cartQuantities;
@@ -29,6 +33,10 @@ class BuyV2CustomerStateSnapshot {
   final Set<String> savedProductKeys;
   final Map<BuyV2Destination, String> deliveryInstructionIds;
   final String? selectedPayment;
+  final String? checkoutIdempotencyKey;
+  final String? paymentReference;
+  final Uri? paymentActionUri;
+  final String? checkoutSubmissionState;
 }
 
 abstract interface class BuyV2CustomerStateStore {

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/design/mool_design_system.dart';
 import '../../core/design/mool_motion_primitives.dart';
+import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_session.dart';
 import '../../features/journey01/journey_services.dart';
@@ -39,6 +40,7 @@ class BuyV2Screen extends StatefulWidget {
     this.onOpenChat,
     this.onDestinationChanged,
     this.invoiceDownloader = saveBuyV2InvoiceToDevice,
+    this.paymentHandoff,
     this.offersSource = const BuyV2CataloguePublishedOffersSource(),
     this.wholesaleTradeDecisionAdapter =
         const BuyV2UnavailableWholesaleTradeDecisionAdapter(),
@@ -61,6 +63,7 @@ class BuyV2Screen extends StatefulWidget {
   final VoidCallback? onOpenChat;
   final ValueChanged<BuyV2Destination>? onDestinationChanged;
   final BuyV2InvoiceDownloader? invoiceDownloader;
+  final BuyV2PaymentHandoff? paymentHandoff;
   final BuyV2PublishedOffersSource offersSource;
   final BuyV2WholesaleTradeDecisionAdapter wholesaleTradeDecisionAdapter;
 
@@ -767,6 +770,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       BuyV2View.checkout => BuyV2CheckoutView(
         session: session,
         gstInvoiceController: _gstInvoiceController,
+        paymentHandoff: widget.paymentHandoff,
       ),
       BuyV2View.confirmation => BuyV2ConfirmationView(
         session: session,

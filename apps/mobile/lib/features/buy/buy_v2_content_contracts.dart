@@ -89,8 +89,10 @@ abstract interface class BuyV2ProductFactsAdapter {
 enum BuyV2CommerceLoadState { loading, ready, offline, unavailable }
 
 enum BuyV2OrderPlacementOutcome {
+  paymentActionRequired,
   confirmed,
   paymentPending,
+  paymentUnknown,
   cancelled,
   failed,
   unavailable,
@@ -126,12 +128,14 @@ class BuyV2OrderPlacementRequest {
     required this.address,
     required this.paymentMethod,
     required this.total,
+    required this.idempotencyKey,
   });
 
   final List<BuyV2CartLine> lines;
   final BuyV2Address address;
   final String paymentMethod;
   final int total;
+  final String idempotencyKey;
 }
 
 @immutable
@@ -140,12 +144,16 @@ class BuyV2OrderPlacementResult {
     required this.outcome,
     required this.customerMessage,
     this.purchaseReference,
+    this.paymentReference,
+    this.paymentActionUri,
     this.orders = const [],
   });
 
   final BuyV2OrderPlacementOutcome outcome;
   final String customerMessage;
   final String? purchaseReference;
+  final String? paymentReference;
+  final Uri? paymentActionUri;
   final List<BuyV2Order> orders;
 }
 
@@ -173,6 +181,8 @@ class BuyV2AddressRequestResult {
   bool get available => shareUri != null;
 }
 
+typedef BuyV2PaymentHandoff = Future<bool> Function(Uri uri);
+
 abstract interface class BuyV2CommerceAdapter {
   const BuyV2CommerceAdapter();
 
@@ -181,6 +191,11 @@ abstract interface class BuyV2CommerceAdapter {
   Future<BuyV2OrderPlacementResult> placeOrder(
     BuyV2OrderPlacementRequest request,
   );
+
+  Future<BuyV2OrderPlacementResult> reconcileOrder({
+    required String idempotencyKey,
+    required String paymentReference,
+  });
 
   Future<BuyV2MutationResult> submitProductReview({
     required BuyV2Product product,

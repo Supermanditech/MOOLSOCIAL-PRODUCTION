@@ -108,6 +108,41 @@ class BuyV2Product {
   final bool freightIncluded;
   final bool manufacturerVerified;
 
+  BuyV2Product copyWith({
+    int? price,
+    String? deliveryPromise,
+    String? seller,
+    String? sellerType,
+    String? confirmedOn,
+  }) => BuyV2Product(
+    id: id,
+    canonicalId: canonicalId,
+    destination: destination,
+    categoryId: categoryId,
+    brand: brand,
+    title: title,
+    variant: variant,
+    pack: pack,
+    price: price ?? this.price,
+    unitPrice: unitPrice,
+    badge: badge,
+    seller: seller ?? this.seller,
+    sellerType: sellerType ?? this.sellerType,
+    deliveryPromise: deliveryPromise ?? this.deliveryPromise,
+    origin: origin,
+    confirmedOn: confirmedOn ?? this.confirmedOn,
+    visualLabel: visualLabel,
+    visualKind: visualKind,
+    mrp: mrp,
+    requiresPrescription: requiresPrescription,
+    composition: composition,
+    regulatoryNote: regulatoryNote,
+    minimumOrder: minimumOrder,
+    returnPolicy: returnPolicy,
+    freightIncluded: freightIncluded,
+    manufacturerVerified: manufacturerVerified,
+  );
+
   String get partnerRole => buyV2PartnerRoleFor(destination, sellerType);
 
   String? get regulatoryTrustFact =>
@@ -149,8 +184,11 @@ class BuyV2CartLine {
 
   int get total => product.price * quantity;
 
-  BuyV2CartLine copyWith({int? quantity}) =>
-      BuyV2CartLine(product: product, quantity: quantity ?? this.quantity);
+  BuyV2CartLine copyWith({BuyV2Product? product, int? quantity}) =>
+      BuyV2CartLine(
+        product: product ?? this.product,
+        quantity: quantity ?? this.quantity,
+      );
 }
 
 class BuyV2FulfilmentGroup {

@@ -2969,6 +2969,62 @@ void main() {
     },
   );
 
+  testWidgets(
+    'checkout payment recovery states stay actionable at compact size',
+    (tester) async {
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 568);
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      await tester.pumpWidget(app(session, textScale: 1.4));
+      await tester.pumpAndSettle();
+      session.addProduct('s-tomato');
+      session.openCart(scope: BuyV2CartScope.shop);
+      session.openCheckout();
+      await tester.pumpAndSettle();
+
+      for (final state in const [
+        BuyV2CheckoutSubmissionState.submitting,
+        BuyV2CheckoutSubmissionState.paymentActionRequired,
+        BuyV2CheckoutSubmissionState.paymentPending,
+        BuyV2CheckoutSubmissionState.paymentUnknown,
+        BuyV2CheckoutSubmissionState.cancelled,
+        BuyV2CheckoutSubmissionState.failed,
+        BuyV2CheckoutSubmissionState.unavailable,
+      ]) {
+        session.checkoutSubmissionState = state;
+        session.notifyListeners();
+        await tester.pump(const Duration(milliseconds: 120));
+
+        expect(
+          find.byKey(ValueKey('buy-checkout-submission-${state.name}')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull, reason: state.name);
+        if (state == BuyV2CheckoutSubmissionState.submitting) continue;
+        final actionKey = switch (state) {
+          BuyV2CheckoutSubmissionState.paymentActionRequired => const ValueKey(
+            'buy-checkout-continue-payment',
+          ),
+          BuyV2CheckoutSubmissionState.paymentPending ||
+          BuyV2CheckoutSubmissionState.paymentUnknown => const ValueKey(
+            'buy-checkout-check-payment',
+          ),
+          _ => const ValueKey('buy-checkout-retry-order'),
+        };
+        expect(find.byKey(actionKey), findsOneWidget);
+        expect(
+          tester.getSize(find.byKey(actionKey)).height,
+          greaterThanOrEqualTo(44),
+        );
+      }
+    },
+  );
+
   testWidgets('checkout renders only the fulfilment families being purchased', (
     tester,
   ) async {
