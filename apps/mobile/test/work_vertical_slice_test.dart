@@ -172,9 +172,10 @@ void main() {
       expect(work.reviewStage, WorkReviewStage.live);
       expect(work.retailerSetupSaved, isTrue);
       expect(find.text('Shop ready'), findsOneWidget);
-      expect(work.gateway.submissionCalls, 1);
-      expect(work.gateway.reviewCalls, 1);
-      expect(work.gateway.setupCalls, 1);
+      final gateway = work.gateway as ReviewWorkGateway;
+      expect(gateway.submissionCalls, 1);
+      expect(gateway.reviewCalls, 1);
+      expect(gateway.setupCalls, 1);
     },
   );
 
