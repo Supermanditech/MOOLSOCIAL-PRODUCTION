@@ -219,6 +219,7 @@ class ChatSession extends ChangeNotifier {
   final Map<String, String> _threadActionErrors = {};
   final Map<String, String> _threadActionNotices = {};
   final Map<String, Set<String>> _hiddenMessageIdsByThread = {};
+  final Map<String, String> _draftTextByThread = {};
   final Set<String> _readThreads = {};
   final Set<String> _markedUnreadThreads = {};
   final Set<String> _pinnedThreadIds = {};
@@ -601,6 +602,42 @@ class ChatSession extends ChangeNotifier {
   String? threadActionNotice(String threadId) => _threadActionNotices[threadId];
 
   ChatMessage? replyTarget(String threadId) => _replyTargets[threadId];
+
+  String draftTextForSession(String threadId) =>
+      _draftTextByThread[threadId] ?? '';
+
+  bool hasDraftForSession(String threadId) =>
+      draftTextForSession(threadId).trim().isNotEmpty ||
+      replyTarget(threadId) != null ||
+      selectedPhoto(threadId) != null;
+
+  String? draftSummaryForSession(String threadId) {
+    final text = draftTextForSession(threadId).trim();
+    if (text.isNotEmpty) {
+      return text.replaceAll(RegExp(r'\s+'), ' ');
+    }
+    if (selectedPhoto(threadId) != null) return 'Photo ready to send';
+    if (replyTarget(threadId) != null) return 'Reply ready to send';
+    return null;
+  }
+
+  void setDraftTextForSession(String threadId, String value) {
+    final changed = value.isEmpty
+        ? _draftTextByThread.remove(threadId) != null
+        : _draftTextByThread[threadId] != value;
+    if (value.isNotEmpty) {
+      _draftTextByThread[threadId] = value;
+    }
+    if (changed) notifyListeners();
+  }
+
+  void discardDraftForSession(String threadId) {
+    final hadText = _draftTextByThread.remove(threadId) != null;
+    final hadReply = _replyTargets.remove(threadId) != null;
+    final hadPhoto = _pendingPhotos.remove(threadId) != null;
+    final changed = hadText || hadReply || hadPhoto;
+    if (changed) notifyListeners();
+  }
 
   bool get globalChatAvailableForSession => _globalChatAvailableForSession;
 
@@ -1297,6 +1334,7 @@ class ChatSession extends ChangeNotifier {
     _threadActionErrors.clear();
     _threadActionNotices.clear();
     _hiddenMessageIdsByThread.clear();
+    _draftTextByThread.clear();
     _readThreads.clear();
     _markedUnreadThreads.clear();
     _pinnedThreadIds.clear();

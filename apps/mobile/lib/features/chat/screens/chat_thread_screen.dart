@@ -40,13 +40,15 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   final _composerKey = GlobalKey<_ComposerState>();
   final _messageScrollController = ScrollController();
   final Map<String, GlobalKey> _messageKeys = {};
-  final Map<String, String> _draftTextByThread = {};
   int _threadLoadRequest = 0;
   String? _highlightedMessageId;
+  bool _applyingDraftText = false;
 
   @override
   void initState() {
     super.initState();
+    _messageController.addListener(_handleDraftTextChanged);
+    _restoreDraft(widget.threadId);
     _applyInitialDraftIfEmpty(widget.initialMessageDraft);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -61,11 +63,6 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.session, widget.session) ||
         oldWidget.threadId != widget.threadId) {
-      if (identical(oldWidget.session, widget.session)) {
-        _storeDraft(oldWidget.threadId);
-      } else {
-        _draftTextByThread.clear();
-      }
       _restoreDraft(widget.threadId);
       if (_messageScrollController.hasClients) {
         _messageScrollController.jumpTo(0);
@@ -91,21 +88,25 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     );
   }
 
-  void _storeDraft(String threadId) {
-    final draft = _messageController.text;
-    if (draft.isEmpty) {
-      _draftTextByThread.remove(threadId);
-    } else {
-      _draftTextByThread[threadId] = draft;
-    }
+  void _handleDraftTextChanged() {
+    if (_applyingDraftText) return;
+    widget.session.setDraftTextForSession(
+      widget.threadId,
+      _messageController.text,
+    );
   }
 
   void _restoreDraft(String threadId) {
-    final draft = _draftTextByThread[threadId] ?? '';
-    _messageController.value = TextEditingValue(
-      text: draft,
-      selection: TextSelection.collapsed(offset: draft.length),
-    );
+    final draft = widget.session.draftTextForSession(threadId);
+    _applyingDraftText = true;
+    try {
+      _messageController.value = TextEditingValue(
+        text: draft,
+        selection: TextSelection.collapsed(offset: draft.length),
+      );
+    } finally {
+      _applyingDraftText = false;
+    }
   }
 
   Future<void> _sendCurrentMessage() async {
@@ -117,8 +118,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     }
     final sent = await session.send(threadId, draft);
     if (!sent || !identical(session, widget.session)) return;
-    if (_draftTextByThread[threadId] == draft) {
-      _draftTextByThread.remove(threadId);
+    if (session.draftTextForSession(threadId) == draft) {
+      session.setDraftTextForSession(threadId, '');
     }
     if (mounted &&
         threadId == widget.threadId &&
@@ -138,13 +139,32 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     }
     final sent = await session.sendSelectedPhoto(threadId, draft);
     if (!sent || !identical(session, widget.session)) return;
-    if (_draftTextByThread[threadId] == draft) {
-      _draftTextByThread.remove(threadId);
+    if (session.draftTextForSession(threadId) == draft) {
+      session.setDraftTextForSession(threadId, '');
     }
     if (mounted &&
         threadId == widget.threadId &&
         _messageController.text == draft) {
       _messageController.clear();
+    }
+  }
+
+  Future<void> _retryMessage(String messageId) async {
+    final session = widget.session;
+    final threadId = widget.threadId;
+    final failed = session
+        .messages(threadId)
+        .where((message) => message.id == messageId);
+    if (failed.isEmpty) return;
+    final failedText = failed.single.text;
+    final sent = await session.retry(threadId, messageId);
+    if (!sent || !identical(session, widget.session)) return;
+    if (mounted &&
+        threadId == widget.threadId &&
+        _messageController.text == failedText &&
+        session.draftTextForSession(threadId) == failedText) {
+      _messageController.clear();
+      session.discardDraftForSession(threadId);
     }
   }
 
@@ -364,6 +384,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   void dispose() {
     _threadLoadRequest += 1;
     _messageScrollController.dispose();
+    _messageController.removeListener(_handleDraftTextChanged);
     _messageController.dispose();
     super.dispose();
   }
@@ -477,6 +498,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                   scrollController: _messageScrollController,
                   messageKeys: _messageKeys,
                   highlightedMessageId: _highlightedMessageId,
+                  onRetryMessage: _retryMessage,
                 ),
           bottom: ChatFiniteIncomingMotion(
             stateKey: widget.session.chatAvailableForSession(thread.id)
@@ -1258,6 +1280,7 @@ class _ThreadBody extends StatelessWidget {
     required this.scrollController,
     required this.messageKeys,
     required this.highlightedMessageId,
+    required this.onRetryMessage,
   });
 
   final ChatSession session;
@@ -1265,6 +1288,7 @@ class _ThreadBody extends StatelessWidget {
   final ScrollController scrollController;
   final Map<String, GlobalKey> messageKeys;
   final String? highlightedMessageId;
+  final Future<void> Function(String messageId) onRetryMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -1290,6 +1314,7 @@ class _ThreadBody extends StatelessWidget {
             threadId: thread.id,
             session: session,
             highlighted: messages[index].id == highlightedMessageId,
+            onRetry: onRetryMessage,
           ),
         ),
       ),
@@ -1303,12 +1328,14 @@ class _MessageBubble extends StatelessWidget {
     required this.threadId,
     required this.session,
     required this.highlighted,
+    required this.onRetry,
   });
 
   final ChatMessage message;
   final String threadId;
   final ChatSession session;
   final bool highlighted;
+  final Future<void> Function(String messageId) onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -1596,7 +1623,7 @@ class _MessageBubble extends StatelessWidget {
                   key: Key('chat-retry-${message.id}'),
                   onPressed: session.busy
                       ? null
-                      : () => session.retry(threadId, message.id),
+                      : () => unawaited(onRetry(message.id)),
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFFFFB4AB),
                   ),
@@ -2172,6 +2199,16 @@ class _ComposerState extends State<_Composer> {
     return true;
   }
 
+  void _discardDraft() {
+    if (session.busy) return;
+    controller.clear();
+    session.discardDraftForSession(threadId);
+    setState(() {
+      _attachmentsOpen = false;
+      _attachmentNotice = null;
+    });
+  }
+
   Future<void> _chooseAttachment(
     BuildContext context,
     _ChatAttachmentChoice choice,
@@ -2544,6 +2581,22 @@ class _ComposerState extends State<_Composer> {
                                 ),
                               ),
                             ),
+                          ),
+                          ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: controller,
+                            builder: (context, value, _) {
+                              final hasDraft =
+                                  value.text.isNotEmpty ||
+                                  photo != null ||
+                                  reply != null;
+                              if (!hasDraft) return const SizedBox.shrink();
+                              return IconButton(
+                                key: const Key('chat-discard-draft'),
+                                tooltip: 'Discard draft',
+                                onPressed: session.busy ? null : _discardDraft,
+                                icon: const Icon(Icons.delete_outline_rounded),
+                              );
+                            },
                           ),
                           IconButton(
                             key: const Key('chat-attach'),

@@ -703,6 +703,9 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                   thread: threads[index],
                   unread: widget.session.unreadFor(threads[index]),
                   hidePreview: widget.session.hideMessagePreviewsForSession,
+                  draftSummary: widget.session.draftSummaryForSession(
+                    threads[index].id,
+                  ),
                   pinned: widget.session.isPinnedForSession(threads[index].id),
                   reducedAttention: widget.session
                       .hasReducedAttentionForSession(threads[index].id),
@@ -821,6 +824,7 @@ class _ThreadCard extends StatelessWidget {
     required this.thread,
     required this.unread,
     required this.hidePreview,
+    required this.draftSummary,
     required this.pinned,
     required this.reducedAttention,
     required this.onMore,
@@ -830,6 +834,7 @@ class _ThreadCard extends StatelessWidget {
   final ChatThread thread;
   final int unread;
   final bool hidePreview;
+  final String? draftSummary;
   final bool pinned;
   final bool reducedAttention;
   final VoidCallback onMore;
@@ -910,14 +915,23 @@ class _ThreadCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            hidePreview
+                            draftSummary != null
+                                ? hidePreview
+                                      ? 'Draft saved'
+                                      : 'Draft: $draftSummary'
+                                : hidePreview
                                 ? 'Message preview hidden'
                                 : thread.preview,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: MoolColors.muted,
+                            style: TextStyle(
+                              color: draftSummary != null
+                                  ? MoolColors.orange
+                                  : MoolColors.muted,
                               fontSize: 13,
+                              fontWeight: draftSummary != null
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
                             ),
                           ),
                         ),
