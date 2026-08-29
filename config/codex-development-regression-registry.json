@@ -43763,6 +43763,26 @@
       "prevention": "Calculate the bounded index stagger in the oracle, keep the final duration finite and still require every indexed row to resolve to zero under reduced motion.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/widgets/chat_motion.dart", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3850-MOTION-TEST-MATCHED-NESTED-ROW-AND-REACTION-TWEENS",
+      "status": "registered_state_specific_motion_owner_key_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "motion", "chat", "testing"],
+      "mistake": "The first cross-surface motion test searched all tween builders below a message row and matched both the row-entry owner and its nested reaction owner.",
+      "rootCause": "The generic incoming-motion primitive exposed only a structural tween type, not a state-specific test identity.",
+      "prevention": "Key each incoming tween by its real state owner and assert the exact row, reaction, empty or status motion without descendant-count assumptions.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/widgets/chat_motion.dart", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3851-MOTION-TEST-CAST-OWNER-AS-INNER-SWITCHER",
+      "status": "registered_exact_owner_and_animation_key_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "motion", "chat", "testing"],
+      "mistake": "The expanded suite cast the stable Search motion owner key directly to AnimatedSwitcher and also selected a generic descendant switcher after additional motion owners were introduced.",
+      "rootCause": "The tests conflated the semantic/hit owner widget with its inner visual animation and did not give the Chats/People/Discover section switcher an exact identity.",
+      "prevention": "Keep stable owner keys on motion wrappers, inspect their exact visual child when needed and assign a dedicated key to every independently asserted section animation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart", "apps/mobile/test/chat_flow_test.dart"]
     }
   ]
 }

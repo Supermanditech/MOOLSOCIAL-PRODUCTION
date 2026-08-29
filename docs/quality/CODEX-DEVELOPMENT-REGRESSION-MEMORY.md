@@ -3690,3 +3690,9 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3849 rejects asserting a base motion duration for an indexed staggered
   row. Calculate the bounded final duration and still require zero under
   reduced motion.
+- REG3850 rejects finding motion only by nested tween type when a row contains
+  reaction motion. Key every incoming tween by its real state owner and assert
+  that exact identity.
+- REG3851 rejects casting a stable motion owner as its inner switcher or using
+  a generic switcher descendant. Key both the owner and each independently
+  asserted visual animation explicitly.

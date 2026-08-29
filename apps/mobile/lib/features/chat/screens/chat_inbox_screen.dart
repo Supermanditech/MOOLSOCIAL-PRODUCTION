@@ -338,13 +338,13 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
             .where((thread) => entryContext.allowsThread(thread.id))
             .toList(growable: false);
         final people = _visiblePeople();
-        final sectionMotion = MoolMotion.accessible(
+        final sectionMotion = ChatMotion.resolve(
           context,
-          MoolMotion.standard,
+          ChatMotion.stateChange,
         );
-        final reverseSectionMotion = MoolMotion.accessible(
+        final reverseSectionMotion = ChatMotion.resolve(
           context,
-          MoolMotion.quick,
+          ChatMotion.recovery,
         );
         return ChatPageScaffold(
           key: const Key('chat-inbox-screen'),
@@ -411,6 +411,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
             ],
           ),
           body: AnimatedSwitcher(
+            key: const Key('chat-section-motion'),
             duration: sectionMotion,
             reverseDuration: reverseSectionMotion,
             switchInCurve: Curves.easeOutCubic,
@@ -531,6 +532,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                               setState(() {});
                             },
                       icon: ChatActionIconMotion(
+                        key: const Key('chat-search-action-icon-motion'),
                         stateKey: hasSearchQuery ? 'clear' : 'assist',
                         icon: hasSearchQuery
                             ? Icons.close_rounded
@@ -680,21 +682,24 @@ class _FilterStripState extends State<_FilterStrip> {
         separatorBuilder: (_, _) => const SizedBox(width: MoolSpacing.xs),
         itemBuilder: (context, index) => KeyedSubtree(
           key: _anchors[index],
-          child: ChoiceChip(
-            key: Key('chat-filter-${values[index].$1.toLowerCase()}'),
-            label: Text(values[index].$1),
+          child: ChatSelectionMotion(
             selected: values[index].$2,
-            showCheckmark: true,
-            checkmarkColor: values[index].$2 ? Colors.white : MoolColors.navy,
-            selectedColor: MoolColors.navy,
-            backgroundColor: const Color(0xFFF0F1F5),
-            side: BorderSide.none,
-            shape: const StadiumBorder(),
-            labelStyle: TextStyle(
-              color: values[index].$2 ? Colors.white : MoolColors.ink,
-              fontWeight: FontWeight.w700,
+            child: ChoiceChip(
+              key: Key('chat-filter-${values[index].$1.toLowerCase()}'),
+              label: Text(values[index].$1),
+              selected: values[index].$2,
+              showCheckmark: true,
+              checkmarkColor: values[index].$2 ? Colors.white : MoolColors.navy,
+              selectedColor: MoolColors.navy,
+              backgroundColor: const Color(0xFFF0F1F5),
+              side: BorderSide.none,
+              shape: const StadiumBorder(),
+              labelStyle: TextStyle(
+                color: values[index].$2 ? Colors.white : MoolColors.ink,
+                fontWeight: FontWeight.w700,
+              ),
+              onSelected: (_) => values[index].$3(),
             ),
-            onSelected: (_) => values[index].$3(),
           ),
         ),
       ),
@@ -956,15 +961,22 @@ Future<String?> _showSearchAssistance(BuildContext context) {
             const SizedBox(height: MoolSpacing.md),
             Form(
               key: formKey,
-              child: TextFormField(
-                key: const Key('chat-search-assistance-field'),
-                onChanged: (value) => query = value,
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? 'Enter a conversation name.'
-                    : null,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search_rounded),
-                  labelText: 'Conversation name',
+              child: ChatFocusMotion(
+                motionKeyName: 'chat-search-assistance-focus-motion',
+                child: TextFormField(
+                  key: const Key('chat-search-assistance-field'),
+                  onChanged: (value) => query = value,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter a conversation name.'
+                      : null,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search_rounded),
+                    labelText: 'Conversation name',
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                  ),
                 ),
               ),
             ),

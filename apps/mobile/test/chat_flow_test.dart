@@ -197,7 +197,10 @@ void main() {
       find.byKey(const Key('chat-search-focus-motion')),
     );
     AnimatedSwitcher actionMotion() => tester.widget<AnimatedSwitcher>(
-      find.byKey(const Key('chat-search-action-icon-motion')),
+      find.descendant(
+        of: find.byKey(const Key('chat-search-action-icon-motion')),
+        matching: find.byType(AnimatedSwitcher),
+      ),
     );
     TweenAnimationBuilder<double> entryMotion() =>
         tester.widget<TweenAnimationBuilder<double>>(
@@ -231,6 +234,107 @@ void main() {
     expect(focusMotion().duration, Duration.zero);
     expect(actionMotion().duration, Duration.zero);
     expect(entryMotion().duration, Duration.zero);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Inbox, thread and composer motion resolve static when reduced', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/mool',
+      journey: journey,
+      chat: chat,
+    );
+
+    TweenAnimationBuilder<double> routeMotion() =>
+        tester.widget<TweenAnimationBuilder<double>>(
+          find.byKey(const Key('chat-route-entry-tween')),
+        );
+    TweenAnimationBuilder<double> incomingMotion(Object stateKey) =>
+        tester.widget<TweenAnimationBuilder<double>>(
+          find.byKey(ValueKey<Object>('chat-incoming-motion-tween-$stateKey')),
+        );
+
+    expect(routeMotion().duration, ChatMotion.routeChange);
+    for (final scale in tester.widgetList<AnimatedScale>(
+      find.byKey(const Key('chat-selection-motion')),
+    )) {
+      expect(scale.duration, ChatMotion.focus);
+    }
+    expect(
+      incomingMotion('home-basket').duration,
+      Duration(milliseconds: ChatMotion.stateChange.inMilliseconds + 40),
+    );
+
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
+    await tester.pump();
+    expect(routeMotion().duration, Duration.zero);
+    for (final scale in tester.widgetList<AnimatedScale>(
+      find.byKey(const Key('chat-selection-motion')),
+    )) {
+      expect(scale.duration, Duration.zero);
+    }
+    expect(incomingMotion('home-basket').duration, Duration.zero);
+    tester.platformDispatcher.clearAccessibilityFeaturesTestValue();
+    await tester.pump();
+
+    await tapVisible(tester, const Key('chat-open-thread-home-basket'));
+    expect(routeMotion().duration, ChatMotion.routeChange);
+    expect(incomingMotion('m1').duration, ChatMotion.stateChange);
+    final composerIcon = find.descendant(
+      of: find.byKey(const Key('chat-composer-action-icon-motion')),
+      matching: find.byType(AnimatedSwitcher),
+    );
+    expect(
+      tester.widget<AnimatedSwitcher>(composerIcon).duration,
+      ChatMotion.focus,
+    );
+    final attachmentMotion = find.descendant(
+      of: find.byKey(const Key('chat-attachment-expand-motion')),
+      matching: find.byType(AnimatedSize),
+    );
+    expect(
+      tester.widget<AnimatedSize>(attachmentMotion).duration,
+      ChatMotion.stateChange,
+    );
+    await tapVisible(tester, const Key('chat-attach'));
+    expect(find.byKey(const Key('chat-attachment-tray')), findsOneWidget);
+    expect(
+      ChatMotion.sheetStyle(
+        tester.element(find.byKey(const Key('chat-thread-screen'))),
+      ).duration,
+      ChatMotion.routeChange,
+    );
+
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
+    await tester.pump();
+    expect(routeMotion().duration, Duration.zero);
+    expect(incomingMotion('m1').duration, Duration.zero);
+    expect(
+      tester.widget<AnimatedSwitcher>(composerIcon).duration,
+      Duration.zero,
+    );
+    expect(
+      tester.widget<AnimatedSize>(attachmentMotion).duration,
+      Duration.zero,
+    );
+    expect(
+      ChatMotion.sheetStyle(
+        tester.element(find.byKey(const Key('chat-thread-screen'))),
+      ).duration,
+      Duration.zero,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -562,6 +666,25 @@ void main() {
       );
       await tapVisible(tester, const Key('chat-section-discover'));
 
+      expect(
+        tester
+            .widget<AnimatedContainer>(
+              find.byKey(const Key('chat-people-search-focus-motion')),
+            )
+            .duration,
+        ChatMotion.focus,
+      );
+      expect(
+        tester
+            .widget<TweenAnimationBuilder<double>>(
+              find.byKey(
+                const ValueKey<Object>('chat-incoming-motion-tween-person-a'),
+              ),
+            )
+            .duration,
+        ChatMotion.stateChange,
+      );
+
       await tester.enterText(
         find.byKey(const Key('chat-people-search')),
         'Bharat',
@@ -694,10 +817,7 @@ void main() {
     );
 
     final switcher = tester.widget<AnimatedSwitcher>(
-      find.descendant(
-        of: find.byKey(const Key('chat-inbox-screen')),
-        matching: find.byType(AnimatedSwitcher),
-      ),
+      find.byKey(const Key('chat-section-motion')),
     );
     expect(switcher.duration, Duration.zero);
     expect(switcher.reverseDuration, Duration.zero);

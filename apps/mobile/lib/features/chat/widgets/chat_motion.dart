@@ -27,15 +27,17 @@ class ChatSearchFocusMotion extends StatelessWidget {
   const ChatSearchFocusMotion({
     required this.focused,
     required this.child,
+    this.motionKeyName = 'chat-search-focus-motion',
     super.key,
   });
 
   final bool focused;
   final Widget child;
+  final String motionKeyName;
 
   @override
   Widget build(BuildContext context) => AnimatedContainer(
-    key: const Key('chat-search-focus-motion'),
+    key: Key(motionKeyName),
     duration: ChatMotion.resolve(context, ChatMotion.focus),
     curve: MoolMotion.change,
     decoration: BoxDecoration(
@@ -61,20 +63,53 @@ class ChatSearchFocusMotion extends StatelessWidget {
   );
 }
 
+class ChatFocusMotion extends StatefulWidget {
+  const ChatFocusMotion({
+    required this.motionKeyName,
+    required this.child,
+    super.key,
+  });
+
+  final String motionKeyName;
+  final Widget child;
+
+  @override
+  State<ChatFocusMotion> createState() => _ChatFocusMotionState();
+}
+
+class _ChatFocusMotionState extends State<ChatFocusMotion> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) => Focus(
+    onFocusChange: (focused) {
+      if (_focused != focused) setState(() => _focused = focused);
+    },
+    child: ChatSearchFocusMotion(
+      motionKeyName: widget.motionKeyName,
+      focused: _focused,
+      child: widget.child,
+    ),
+  );
+}
+
 class ChatActionIconMotion extends StatelessWidget {
   const ChatActionIconMotion({
     required this.stateKey,
     required this.icon,
+    this.size,
+    this.color,
     super.key,
   });
 
   final Object stateKey;
   final IconData icon;
+  final double? size;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => ClipRect(
     child: AnimatedSwitcher(
-      key: const Key('chat-search-action-icon-motion'),
       duration: ChatMotion.resolve(context, ChatMotion.focus),
       reverseDuration: ChatMotion.resolve(context, ChatMotion.focus),
       switchInCurve: MoolMotion.enter,
@@ -88,9 +123,83 @@ class ChatActionIconMotion extends StatelessWidget {
       ),
       child: ExcludeSemantics(
         key: ValueKey<Object>(stateKey),
-        child: Icon(icon),
+        child: Icon(icon, size: size, color: color),
       ),
     ),
+  );
+}
+
+class ChatRouteEntryMotion extends StatelessWidget {
+  const ChatRouteEntryMotion({
+    required this.stateKey,
+    required this.child,
+    this.forward = true,
+    super.key,
+  });
+
+  final Object stateKey;
+  final bool forward;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    return KeyedSubtree(
+      key: ValueKey<Object>('chat-route-$stateKey'),
+      child: TweenAnimationBuilder<double>(
+        key: const Key('chat-route-entry-tween'),
+        tween: Tween<double>(begin: reduced ? 1 : .7, end: 1),
+        duration: ChatMotion.resolve(context, ChatMotion.routeChange),
+        curve: MoolMotion.enter,
+        child: child,
+        builder: (context, value, child) => Opacity(
+          opacity: value,
+          child: Transform.translate(
+            key: const Key('chat-route-motion-translation'),
+            offset: Offset((1 - value) * (forward ? 20 : -14), 0),
+            transformHitTests: false,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ChatSelectionMotion extends StatelessWidget {
+  const ChatSelectionMotion({
+    required this.selected,
+    required this.child,
+    super.key,
+  });
+
+  final bool selected;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedScale(
+    key: const Key('chat-selection-motion'),
+    scale: selected ? 1 : .985,
+    duration: ChatMotion.resolve(context, ChatMotion.focus),
+    curve: MoolMotion.change,
+    child: child,
+  );
+}
+
+class ChatExpandableMotion extends StatelessWidget {
+  const ChatExpandableMotion({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedSize(
+    key: const Key('chat-expandable-motion'),
+    duration: ChatMotion.resolve(context, ChatMotion.stateChange),
+    reverseDuration: ChatMotion.resolve(context, ChatMotion.recovery),
+    curve: MoolMotion.enter,
+    alignment: Alignment.topCenter,
+    clipBehavior: Clip.hardEdge,
+    child: child,
   );
 }
 
@@ -110,7 +219,7 @@ class ChatFiniteIncomingMotion extends StatelessWidget {
   Widget build(BuildContext context) {
     final reduced = MediaQuery.disableAnimationsOf(context);
     return TweenAnimationBuilder<double>(
-      key: ValueKey<Object>(stateKey),
+      key: ValueKey<Object>('chat-incoming-motion-tween-$stateKey'),
       tween: Tween<double>(begin: reduced ? 1 : .76, end: 1),
       duration: ChatMotion.resolve(context, duration),
       curve: MoolMotion.enter,
