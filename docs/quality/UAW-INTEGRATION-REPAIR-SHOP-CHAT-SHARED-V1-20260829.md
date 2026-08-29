@@ -1,6 +1,6 @@
 # UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829
 
-State: `repair_merge_complete_combined_tests_pending`
+State: `repair_merge_complete_supporting_ancestry_audit_required`
 
 - First parent: tested Buy adapter and cumulative Shop evidence
   `e5720cb86bd2119afc3d84a83d3116018f17f9a3`.
@@ -41,6 +41,17 @@ Repair result:
   `427571d774eada83ea642e8811ee31ec3aa2db44`;
 - unmerged owners: registry and coordination policy;
 - authoritative resolution owners: profile, registry, policy and checker.
+
+Combined-test result:
+
+- focused analysis of 16 shared Chat and Buy owners passed cleanly;
+- the first five-suite shared Chat run stopped at compilation because the
+  cumulative tip lacks the authoritative `share_plus` dependency ancestry and
+  the preserved profile blob lacks helper APIs required by later shared profile
+  destinations;
+- no APK, install or device action was attempted;
+- no speculative source or dependency fix is authorized before exact local
+  supporting-commit ancestry is identified.
 
 Backend, Firebase, Android configuration, OPPO and
 `com.moolsocial.app.runtime` remain excluded.

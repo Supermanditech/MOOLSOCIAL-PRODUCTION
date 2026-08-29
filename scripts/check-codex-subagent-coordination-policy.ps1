@@ -910,7 +910,7 @@ Assert-Coordination (
   [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 1 -and
   (@($integrationRepair.preMergeCoordinationOwners) -join '|') -ceq
     'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md' -and
-  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 1 -and
+  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 2 -and
   (@($integrationRepair.postMergeClosureOwners) -join '|') -ceq
     'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md|scripts/check-codex-subagent-coordination-policy.ps1' -and
   -not [bool]$integrationRepair.directSourceCommitsAllowed -and

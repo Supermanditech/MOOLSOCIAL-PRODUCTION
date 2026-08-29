@@ -44463,6 +44463,16 @@
       "prevention": "Read git rev-parse HEAD independently before every evidence write, bind the exact returned SHA, and include registry, policy, checker and corrected ticket document in the one post-merge closure commit.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3928-SHARED-CHAT-INTEGRATED-TEST-PROFILE-API-AND-SHARE-DEPENDENCY-FAILURE",
+      "status": "registered_authoritative_supporting_ancestry_audit_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "testing", "chat", "profile", "dependency"],
+      "mistake": "The first combined shared Chat test set failed compilation because shared destinations reference profile navigation helpers absent from the preserved Buy profile blob and social_v2_consumer imports share_plus while the cumulative Shop dependency set does not resolve that package.",
+      "rootCause": "The merge combined shared Chat and Buy in isolation without first inventorying the later authoritative profile-helper and Social share runtime ancestry that their full app graph expects.",
+      "prevention": "Before any source or dependency patch, audit exact local refs and commits for the cumulative profile helper stack and Social share runtime, prove which supporting commits are missing from the repair tip, and integrate only authoritative existing owners with complete shared Chat and Buy regression.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart", "apps/mobile/pubspec.yaml", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
     }
   ]
 }
