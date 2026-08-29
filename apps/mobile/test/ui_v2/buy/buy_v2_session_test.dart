@@ -6,6 +6,7 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_catalogue_data.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 
 final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
@@ -33,6 +34,245 @@ final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
           sourceId: 'b01-t01c-delivery-quote',
         );
   }
+}
+
+final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
+  _ShopCommerceAdapter({required this.snapshot, required this.placement});
+
+  final BuyV2CommerceSnapshot snapshot;
+  BuyV2OrderPlacementResult placement;
+  BuyV2OrderPlacementResult? reconciliation;
+  int placementCalls = 0;
+  int reconciliationCalls = 0;
+  int reviewCalls = 0;
+  int reportCalls = 0;
+  int orderRefreshCalls = 0;
+  final requests = <BuyV2OrderPlacementRequest>[];
+  BuyV2MutationResult reviewResult = const BuyV2MutationResult(
+    accepted: true,
+    customerMessage: 'Review added.',
+  );
+  BuyV2MutationResult reportResult = const BuyV2MutationResult(
+    accepted: true,
+    customerMessage: 'Report received.',
+  );
+  BuyV2OrderRefreshResult orderRefreshResult = const BuyV2OrderRefreshResult(
+    state: BuyV2CommerceLoadState.unavailable,
+    customerMessage: 'Order updates are unavailable right now.',
+  );
+  BuyV2OrderAlertsResult alertsResult = const BuyV2OrderAlertsResult(
+    available: true,
+    enabled: false,
+    customerMessage: 'Order alerts are paused.',
+  );
+
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => snapshot;
+
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrder(
+    BuyV2OrderPlacementRequest request,
+  ) async {
+    placementCalls += 1;
+    requests.add(request);
+    return placement;
+  }
+
+  @override
+  Future<BuyV2OrderPlacementResult> reconcileOrder({
+    required String idempotencyKey,
+    required String paymentReference,
+  }) async {
+    reconciliationCalls += 1;
+    return reconciliation ?? placement;
+  }
+
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({
+    required String orderId,
+  }) async {
+    orderRefreshCalls += 1;
+    return orderRefreshResult;
+  }
+
+  @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() async => alertsResult;
+
+  @override
+  Future<BuyV2OrderAlertsResult> setOrderAlerts({required bool enabled}) async {
+    alertsResult = BuyV2OrderAlertsResult(
+      available: true,
+      enabled: enabled,
+      customerMessage: enabled
+          ? 'Order alerts are on.'
+          : 'Order alerts are paused.',
+    );
+    return alertsResult;
+  }
+
+  @override
+  Future<BuyV2AddressRequestResult> createAddressRequest({
+    String recipient = '',
+  }) async => const BuyV2AddressRequestResult(
+    customerMessage: 'Address requests are unavailable right now.',
+  );
+
+  @override
+  Future<BuyV2MutationResult> reportProduct({
+    required BuyV2Product product,
+    required String reason,
+  }) async {
+    reportCalls += 1;
+    return reportResult;
+  }
+
+  @override
+  Future<BuyV2MutationResult> submitProductReview({
+    required BuyV2Product product,
+    required int rating,
+    required String comment,
+  }) async {
+    reviewCalls += 1;
+    return reviewResult;
+  }
+}
+
+final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
+  _MemoryCustomerStateStore(this.ownerScope);
+
+  @override
+  final String ownerScope;
+
+  BuyV2CustomerStateSnapshot? snapshot;
+
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => snapshot;
+
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
+    this.snapshot = snapshot;
+    return true;
+  }
+}
+
+final class _MutableCommerceFactsAdapter implements BuyV2ProductFactsAdapter {
+  int? price;
+  String orderabilityLabel = 'Available to add';
+  bool stale = false;
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          price: price ?? product.price,
+          orderabilityLabel: orderabilityLabel,
+          sourceId: 'shop-live-facts',
+          observedAt: DateTime(2026, 8, 29),
+          stale: stale,
+        );
+  }
+}
+
+Future<
+  ({
+    BuyV2Session session,
+    _ShopCommerceAdapter adapter,
+    BuyV2Product product,
+    BuyV2Order order,
+  })
+>
+_openProductionCheckout({
+  required BuyV2OrderPlacementOutcome outcome,
+  Uri? paymentActionUri,
+  String? paymentReference,
+  BuyV2ProductFactsAdapter? factsAdapter,
+  BuyV2CustomerStateStore? customerStateStore,
+  bool productReportsAvailable = false,
+  bool productReviewAvailable = false,
+  BuyV2BusinessVerificationState businessVerificationState =
+      BuyV2BusinessVerificationState.unavailable,
+}) async {
+  final product = BuyV2Catalogue.products.firstWhere(
+    (candidate) => candidate.destination == BuyV2Destination.shop,
+  );
+  const address = BuyV2Address(
+    id: 'server-home',
+    kind: BuyV2AddressKind.home,
+    label: 'Home',
+    recipient: 'Aarav Sharma',
+    phone: '9000000000',
+    line: '12, Central Avenue',
+    area: 'Sardarpura, Jodhpur',
+    pinCode: '342003',
+    landmark: 'Near the market',
+  );
+  final order = BuyV2Order(
+    id: 'MS-SERVER-1',
+    destination: BuyV2Destination.shop,
+    title: 'Shop order',
+    itemSummary: '1 product',
+    total: product.price,
+    partner: product.seller,
+    partnerType: product.partnerRole,
+    promise: product.deliveryPromise,
+    destinationLabel: address.shortLine,
+    progress: .2,
+    status: BuyV2OrderStatus.preparing,
+    purchaseId: 'BUY-SERVER-1',
+    productIds: [product.id],
+    lines: [BuyV2CartLine(product: product, quantity: 1)],
+    paymentMethod: 'UPI',
+  );
+  final placement = BuyV2OrderPlacementResult(
+    outcome: outcome,
+    customerMessage: switch (outcome) {
+      BuyV2OrderPlacementOutcome.paymentActionRequired =>
+        'Continue to your payment app.',
+      BuyV2OrderPlacementOutcome.paymentPending =>
+        'Payment confirmation is pending.',
+      BuyV2OrderPlacementOutcome.paymentUnknown =>
+        'Payment status could not be confirmed.',
+      BuyV2OrderPlacementOutcome.cancelled => 'Payment was cancelled.',
+      BuyV2OrderPlacementOutcome.failed => 'Payment failed.',
+      BuyV2OrderPlacementOutcome.unavailable => 'Ordering is unavailable.',
+      BuyV2OrderPlacementOutcome.confirmed => 'Your order is confirmed.',
+    },
+    purchaseReference: outcome == BuyV2OrderPlacementOutcome.confirmed
+        ? 'BUY-SERVER-1'
+        : null,
+    paymentReference: paymentReference,
+    paymentActionUri: paymentActionUri,
+    orders: outcome == BuyV2OrderPlacementOutcome.confirmed
+        ? [order]
+        : const [],
+  );
+  final adapter = _ShopCommerceAdapter(
+    snapshot: BuyV2CommerceSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      products: [product],
+      addresses: const [address],
+      selectedAddressId: address.id,
+      paymentMethods: const {'UPI'},
+      businessVerificationState: businessVerificationState,
+      productReportsAvailable: productReportsAvailable,
+      reviewableProductIds: productReviewAvailable ? {product.id} : const {},
+    ),
+    placement: placement,
+  );
+  final session = BuyV2Session(
+    core: BuySession(),
+    productFactsAdapter:
+        factsAdapter ?? const BuyV2CatalogueProductFactsAdapter(),
+    commerceAdapter: adapter,
+    customerStateStore: customerStateStore,
+    reviewDataEnabled: false,
+  );
+  await session.restoreCommerce();
+  session.addProduct(product.id);
+  session.openCart(scope: BuyV2CartScope.shop);
+  session.openCheckout();
+  return (session: session, adapter: adapter, product: product, order: order);
 }
 
 void main() {
@@ -1141,5 +1381,640 @@ void main() {
         expect(session.notice, 'This saved address could not be found.');
       },
     );
+
+    test(
+      'normal runtime starts with no review commerce or customer data',
+      () async {
+        final production = BuyV2Session(
+          core: BuySession(),
+          reviewDataEnabled: false,
+        );
+
+        expect(production.visibleProducts, isEmpty);
+        expect(production.addresses, isEmpty);
+        expect(production.orders, isEmpty);
+        expect(production.businessVerified, isFalse);
+        expect(production.availablePaymentMethods, isEmpty);
+
+        await production.restoreCommerce();
+
+        expect(
+          production.commerceLoadState,
+          BuyV2CommerceLoadState.unavailable,
+        );
+        expect(production.confirmOrder(), isFalse);
+        expect(production.view, isNot(BuyV2View.confirmation));
+        expect(
+          production.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.unavailable,
+        );
+      },
+    );
+
+    test(
+      'authoritative commerce snapshot and order result own production success',
+      () async {
+        final product = BuyV2Catalogue.products.firstWhere(
+          (candidate) => candidate.destination == BuyV2Destination.shop,
+        );
+        const address = BuyV2Address(
+          id: 'server-home',
+          kind: BuyV2AddressKind.home,
+          label: 'Home',
+          recipient: 'Aarav Sharma',
+          phone: '9000000000',
+          line: '12, Central Avenue',
+          area: 'Sardarpura, Jodhpur',
+          pinCode: '342003',
+          landmark: 'Near the market',
+        );
+        final order = BuyV2Order(
+          id: 'MS-SERVER-1',
+          destination: BuyV2Destination.shop,
+          title: 'Shop order',
+          itemSummary: '1 product',
+          total: product.price,
+          partner: product.seller,
+          partnerType: product.partnerRole,
+          promise: product.deliveryPromise,
+          destinationLabel: address.shortLine,
+          progress: .2,
+          status: BuyV2OrderStatus.preparing,
+          purchaseId: 'BUY-SERVER-1',
+          productIds: [product.id],
+          lines: [BuyV2CartLine(product: product, quantity: 1)],
+          paymentMethod: 'UPI',
+        );
+        final adapter = _ShopCommerceAdapter(
+          snapshot: BuyV2CommerceSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            products: [product],
+            addresses: const [address],
+            selectedAddressId: address.id,
+            paymentMethods: const {'UPI'},
+          ),
+          placement: BuyV2OrderPlacementResult(
+            outcome: BuyV2OrderPlacementOutcome.confirmed,
+            customerMessage: 'Your order is confirmed.',
+            purchaseReference: 'BUY-SERVER-1',
+            orders: [order],
+          ),
+        );
+        final production = BuyV2Session(
+          core: BuySession(),
+          commerceAdapter: adapter,
+          reviewDataEnabled: false,
+        );
+
+        await production.restoreCommerce();
+        expect(production.addProduct(product.id), isTrue);
+        production.openCart(scope: BuyV2CartScope.shop);
+        expect(production.openCheckout(), isTrue);
+
+        expect(await production.submitOrder(), isTrue);
+        expect(adapter.placementCalls, 1);
+        expect(production.view, BuyV2View.confirmation);
+        expect(production.confirmedOrders.single.id, order.id);
+        expect(production.itemCount, 0);
+      },
+    );
+
+    test(
+      'customer state restores cart address saved and payment choices',
+      () async {
+        final store = _MemoryCustomerStateStore('account-1');
+        final first = BuyV2Session(
+          core: BuySession(),
+          customerStateStore: store,
+        );
+        final product = first.visibleProducts.first;
+        first.addProduct(product.id);
+        first.toggleSaved(product.id);
+        first.addAddress(
+          const BuyV2Address(
+            id: 'family',
+            kind: BuyV2AddressKind.thirdParty,
+            label: 'Third party',
+            recipient: 'Family recipient',
+            phone: '9000000001',
+            line: '21, Market Road',
+            area: 'Ratanada, Jodhpur',
+            pinCode: '342011',
+            landmark: 'Near the park',
+          ),
+        );
+        first.choosePayment('Bank transfer');
+        await Future<void>.delayed(Duration.zero);
+
+        final restored = BuyV2Session(
+          core: BuySession(),
+          customerStateStore: store,
+        );
+        await restored.restoreCustomerState();
+
+        expect(restored.quantityFor(product.id), product.minimumOrder);
+        expect(restored.isSaved(product.id), isTrue);
+        expect(restored.selectedAddressId, 'family');
+        expect(restored.selectedPayment, 'Bank transfer');
+      },
+    );
+
+    test(
+      'payment handoff locks one attempt and reconciliation confirms once',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
+          paymentActionUri: Uri.parse('upi://pay?pa=merchant@mool'),
+          paymentReference: 'PAY-1',
+        );
+        addTearDown(fixture.session.dispose);
+
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(
+          fixture.session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentActionRequired,
+        );
+        final idempotencyKey = fixture.session.checkoutIdempotencyKey;
+        expect(idempotencyKey, isNotEmpty);
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.placementCalls, 1);
+        fixture.session.increase(fixture.product.id);
+        expect(fixture.session.quantityFor(fixture.product.id), 1);
+
+        Uri? openedUri;
+        expect(
+          await fixture.session.continuePayment((uri) async {
+            openedUri = uri;
+            return true;
+          }),
+          isTrue,
+        );
+        expect(openedUri, Uri.parse('upi://pay?pa=merchant@mool'));
+        expect(
+          fixture.session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentPending,
+        );
+
+        fixture.adapter.reconciliation = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          customerMessage: 'Your order is confirmed.',
+          purchaseReference: 'BUY-SERVER-1',
+          paymentReference: 'PAY-1',
+          orders: [fixture.order],
+        );
+        expect(await fixture.session.reconcilePayment(), isTrue);
+        expect(fixture.adapter.reconciliationCalls, 1);
+        expect(fixture.session.view, BuyV2View.confirmation);
+        expect(fixture.session.confirmedOrders.single.id, 'MS-SERVER-1');
+        expect(fixture.session.checkoutIdempotencyKey, isNull);
+      },
+    );
+
+    test(
+      'failed retry reuses its idempotency key and cannot duplicate',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.failed,
+        );
+        addTearDown(fixture.session.dispose);
+
+        expect(await fixture.session.submitOrder(), isFalse);
+        final firstKey = fixture.adapter.requests.single.idempotencyKey;
+        fixture.adapter.placement = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          customerMessage: 'Your order is confirmed.',
+          purchaseReference: 'BUY-SERVER-1',
+          orders: [fixture.order],
+        );
+
+        expect(await fixture.session.submitOrder(), isTrue);
+        expect(fixture.adapter.requests, hasLength(2));
+        expect(fixture.adapter.requests.last.idempotencyKey, firstKey);
+        expect(fixture.session.confirmedOrders, hasLength(1));
+      },
+    );
+
+    test(
+      'cancelled payment creates a new attempt only after customer retry',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.cancelled,
+        );
+        addTearDown(fixture.session.dispose);
+
+        expect(await fixture.session.submitOrder(), isFalse);
+        final cancelledKey = fixture.adapter.requests.single.idempotencyKey;
+        expect(fixture.session.checkoutIdempotencyKey, isNull);
+        expect(
+          fixture.session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.cancelled,
+        );
+        fixture.adapter.placement = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          customerMessage: 'Your order is confirmed.',
+          purchaseReference: 'BUY-SERVER-1',
+          orders: [fixture.order],
+        );
+
+        expect(await fixture.session.submitOrder(), isTrue);
+        expect(
+          fixture.adapter.requests.last.idempotencyKey,
+          isNot(cancelledKey),
+        );
+      },
+    );
+
+    test(
+      'price change updates the Cart and requires explicit acceptance',
+      () async {
+        final facts = _MutableCommerceFactsAdapter();
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          factsAdapter: facts,
+        );
+        addTearDown(fixture.session.dispose);
+        facts.price = fixture.product.price + 12;
+
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.placementCalls, 0);
+        expect(fixture.session.checkoutPriceReviewRequired, isTrue);
+        expect(
+          fixture.session.checkoutPriceChanges.single.previousPrice,
+          fixture.product.price,
+        );
+        expect(
+          fixture.session.checkoutPayableTotal,
+          fixture.product.price + 12,
+        );
+
+        fixture.session.acceptCheckoutPriceChanges();
+        final currentLine = fixture.session.checkoutLines.single;
+        fixture.adapter.placement = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          customerMessage: 'Your order is confirmed.',
+          purchaseReference: 'BUY-SERVER-1',
+          orders: [
+            BuyV2Order(
+              id: fixture.order.id,
+              destination: fixture.order.destination,
+              title: fixture.order.title,
+              itemSummary: fixture.order.itemSummary,
+              total: currentLine.total,
+              partner: fixture.order.partner,
+              partnerType: fixture.order.partnerType,
+              promise: fixture.order.promise,
+              destinationLabel: fixture.order.destinationLabel,
+              progress: fixture.order.progress,
+              status: fixture.order.status,
+              purchaseId: fixture.order.purchaseId,
+              productIds: [currentLine.product.id],
+              lines: [currentLine],
+              paymentMethod: fixture.order.paymentMethod,
+            ),
+          ],
+        );
+        expect(await fixture.session.submitOrder(), isTrue);
+        expect(fixture.adapter.placementCalls, 1);
+      },
+    );
+
+    test('pending payment survives restart and keeps the Cart locked', () async {
+      final store = _MemoryCustomerStateStore('account-payment');
+      final fixture = await _openProductionCheckout(
+        outcome: BuyV2OrderPlacementOutcome.paymentPending,
+        paymentReference: 'PAY-RESTORE-1',
+        customerStateStore: store,
+      );
+      addTearDown(fixture.session.dispose);
+
+      expect(await fixture.session.submitOrder(), isFalse);
+      await Future<void>.delayed(Duration.zero);
+      final restored = BuyV2Session(
+        core: BuySession(),
+        commerceAdapter: fixture.adapter,
+        customerStateStore: store,
+        reviewDataEnabled: false,
+      );
+      addTearDown(restored.dispose);
+      await restored.restoreCommerce();
+      await restored.restoreCustomerState();
+      restored.openCart(scope: BuyV2CartScope.shop);
+      restored.openCheckout();
+
+      expect(
+        restored.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentPending,
+      );
+      final quantity = restored.quantityFor(fixture.product.id);
+      restored.increase(fixture.product.id);
+      expect(restored.quantityFor(fixture.product.id), quantity);
+      expect(
+        restored.notice,
+        'Check the current payment before changing your Cart or payment method.',
+      );
+    });
+
+    test(
+      'verified purchase review and product report require real acceptance',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.failed,
+          productReportsAvailable: true,
+          productReviewAvailable: true,
+        );
+        addTearDown(fixture.session.dispose);
+
+        expect(
+          await fixture.session.submitProductReviewOnline(
+            productId: fixture.product.id,
+            rating: 5,
+            comment: 'Fresh and packed carefully.',
+          ),
+          isTrue,
+        );
+        expect(fixture.adapter.reviewCalls, 1);
+        expect(
+          fixture.session.customerReviewFor(fixture.product.id)?.rating,
+          5,
+        );
+        expect(
+          await fixture.session.reportProductOnline(
+            productId: fixture.product.id,
+            reason: 'Product information is incorrect',
+          ),
+          isTrue,
+        );
+        expect(fixture.adapter.reportCalls, 1);
+        expect(fixture.session.hasReportedProduct(fixture.product.id), isTrue);
+      },
+    );
+
+    test(
+      'ineligible or rejected feedback never records local success',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.failed,
+          productReportsAvailable: true,
+        );
+        addTearDown(fixture.session.dispose);
+
+        expect(
+          await fixture.session.submitProductReviewOnline(
+            productId: fixture.product.id,
+            rating: 4,
+            comment: 'Useful product.',
+          ),
+          isFalse,
+        );
+        expect(fixture.adapter.reviewCalls, 0);
+        fixture.adapter.reportResult = const BuyV2MutationResult(
+          accepted: false,
+          customerMessage: 'This report could not be sent. Try again.',
+        );
+        expect(
+          await fixture.session.reportProductOnline(
+            productId: fixture.product.id,
+            reason: 'Product image does not match',
+          ),
+          isFalse,
+        );
+        expect(fixture.adapter.reportCalls, 1);
+        expect(fixture.session.hasReportedProduct(fixture.product.id), isFalse);
+        expect(
+          fixture.session.notice,
+          'This report could not be sent. Try again.',
+        );
+      },
+    );
+
+    test(
+      'Workspace verification status remains authoritative for Wholesale',
+      () async {
+        for (final state in const [
+          BuyV2BusinessVerificationState.pending,
+          BuyV2BusinessVerificationState.rejected,
+          BuyV2BusinessVerificationState.unavailable,
+        ]) {
+          final fixture = await _openProductionCheckout(
+            outcome: BuyV2OrderPlacementOutcome.failed,
+            businessVerificationState: state,
+          );
+          addTearDown(fixture.session.dispose);
+          expect(fixture.session.businessVerified, isFalse);
+          expect(fixture.session.businessVerificationState, state);
+        }
+      },
+    );
+
+    test(
+      'order refresh accepts exact identity and preserves last known failure',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+        );
+        addTearDown(fixture.session.dispose);
+        expect(await fixture.session.submitOrder(), isTrue);
+        final updated = BuyV2Order(
+          id: fixture.order.id,
+          destination: fixture.order.destination,
+          title: fixture.order.title,
+          itemSummary: fixture.order.itemSummary,
+          total: fixture.order.total + 90,
+          partner: fixture.order.partner,
+          partnerType: fixture.order.partnerType,
+          promise: 'Arriving today by 6:30 pm',
+          destinationLabel: fixture.order.destinationLabel,
+          progress: .8,
+          status: BuyV2OrderStatus.arriving,
+          purchaseId: fixture.order.purchaseId,
+          productIds: fixture.order.productIds,
+          lines: fixture.order.lines,
+          paymentMethod: fixture.order.paymentMethod,
+          invoiceAvailable: true,
+          receiptReference: 'PAY-RECEIPT-1',
+          dispatchPromise: 'Dispatch completed at 2:10 pm',
+          deliveryPartnerName: 'Rajasthan Freight Network',
+          deliveryPartnerType: 'Freight carrier',
+          trackingReference: 'RFN-TRACK-1001',
+          deliveryServiceLevel: 'Business freight · tracked',
+          proofOfDeliveryStatus: 'Required at handover',
+          tax: 90,
+          taxInvoiceState: BuyV2TaxInvoiceState.corrected,
+          taxInvoiceDetails: BuyV2TaxInvoiceDetails(
+            invoiceNumber: 'TAX-INV-1001-R1',
+            issuedAt: DateTime(2026, 8, 29, 18, 30),
+            sellerLegalName: 'Mool Retail Partner Private Limited',
+            sellerAddress: 'Jodhpur, Rajasthan 342003',
+            sellerGstin: '08ABCDE1234F1Z5',
+            buyerGstin: '08AAAAA0000A1Z5',
+            placeOfSupply: 'Rajasthan (08)',
+            sourceId: 'seller-tax-invoice-source',
+            revisionLabel: 'Corrected seller address',
+            lines: const [
+              BuyV2TaxInvoiceLine(
+                description: 'Shop products',
+                hsnSac: '19059090',
+                taxableValue: 1000,
+                gstRate: 9,
+                cgst: 45,
+                sgst: 45,
+                igst: 0,
+                cess: 0,
+              ),
+            ],
+          ),
+        );
+        fixture.adapter.orderRefreshResult = BuyV2OrderRefreshResult(
+          state: BuyV2CommerceLoadState.ready,
+          customerMessage: 'Order updated.',
+          order: updated,
+        );
+
+        expect(await fixture.session.refreshOrder(fixture.order.id), isTrue);
+        expect(fixture.adapter.orderRefreshCalls, 1);
+        expect(fixture.session.orders.first.promise, updated.promise);
+        expect(fixture.session.orders.first.invoiceAvailable, isTrue);
+        expect(
+          fixture.session.orders.first.deliveryPartnerName,
+          'Rajasthan Freight Network',
+        );
+        expect(
+          fixture.session.orders.first.trackingReference,
+          'RFN-TRACK-1001',
+        );
+        expect(
+          fixture.session.orders.first.taxInvoiceDetails?.invoiceNumber,
+          'TAX-INV-1001-R1',
+        );
+
+        fixture.adapter.orderRefreshResult = BuyV2OrderRefreshResult(
+          state: BuyV2CommerceLoadState.ready,
+          customerMessage: 'Order identity could not be verified.',
+          order: BuyV2Order(
+            id: 'OTHER-ORDER',
+            destination: updated.destination,
+            title: updated.title,
+            itemSummary: updated.itemSummary,
+            total: updated.total,
+            partner: updated.partner,
+            partnerType: updated.partnerType,
+            promise: 'Different promise',
+            destinationLabel: updated.destinationLabel,
+            progress: .9,
+            status: BuyV2OrderStatus.arriving,
+          ),
+        );
+        expect(await fixture.session.refreshOrder(fixture.order.id), isFalse);
+        expect(fixture.session.orders.first.promise, updated.promise);
+        expect(
+          fixture.session.orderRefreshMessage(fixture.order.id),
+          'Order identity could not be verified.',
+        );
+      },
+    );
+
+    test(
+      'order alerts change only after authoritative acknowledgement',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.failed,
+        );
+        addTearDown(fixture.session.dispose);
+
+        await fixture.session.restoreOrderAlerts();
+        expect(fixture.session.trackingAlertsAvailable, isTrue);
+        expect(fixture.session.trackingAlertsEnabled, isFalse);
+
+        expect(await fixture.session.setTrackingAlerts(true), isTrue);
+        expect(fixture.session.trackingAlertsEnabled, isTrue);
+
+        fixture.adapter.alertsResult = const BuyV2OrderAlertsResult(
+          available: false,
+          enabled: false,
+          customerMessage: 'Order alerts are unavailable right now.',
+        );
+        await fixture.session.restoreOrderAlerts();
+        expect(fixture.session.trackingAlertsAvailable, isFalse);
+        expect(fixture.session.trackingAlertsEnabled, isFalse);
+      },
+    );
+
+    test(
+      'stock recovery identifies one product and revalidates without ordering',
+      () async {
+        final facts = _MutableCommerceFactsAdapter()
+          ..orderabilityLabel = 'Out of stock';
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.failed,
+          factsAdapter: facts,
+        );
+        addTearDown(fixture.session.dispose);
+
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.placementCalls, 0);
+        expect(fixture.session.view, BuyV2View.recovery);
+        expect(
+          fixture.session.checkoutAvailabilityIssue?.productId,
+          fixture.product.id,
+        );
+
+        facts
+          ..orderabilityLabel = 'Available to add'
+          ..price = fixture.product.price + 10;
+        expect(fixture.session.retryCheckoutAvailability(), isTrue);
+        expect(fixture.session.view, BuyV2View.checkout);
+        expect(fixture.session.checkoutAvailabilityIssue, isNull);
+        expect(fixture.session.checkoutPriceReviewRequired, isTrue);
+        expect(fixture.adapter.placementCalls, 0);
+      },
+    );
+
+    test(
+      'server stock rejection removes only its exact Cart product',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.unavailable,
+        );
+        addTearDown(fixture.session.dispose);
+        fixture.adapter.placement = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.unavailable,
+          customerMessage: '${fixture.product.title} is out of stock.',
+          failureKind: BuyV2OrderPlacementFailureKind.stockUnavailable,
+          affectedProductId: fixture.product.id,
+        );
+
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.placementCalls, 1);
+        expect(fixture.session.view, BuyV2View.recovery);
+        expect(
+          fixture.session.checkoutAvailabilityIssue?.title,
+          fixture.product.title,
+        );
+        expect(fixture.session.removeCheckoutIssueProduct(), isTrue);
+        expect(fixture.session.cartLines, isEmpty);
+        expect(fixture.session.view, BuyV2View.catalogue);
+      },
+    );
+
+    test('service-area rejection returns to exact Checkout address', () async {
+      final fixture = await _openProductionCheckout(
+        outcome: BuyV2OrderPlacementOutcome.unavailable,
+      );
+      addTearDown(fixture.session.dispose);
+      final addressId = fixture.session.selectedAddress.id;
+      fixture.adapter.placement = const BuyV2OrderPlacementResult(
+        outcome: BuyV2OrderPlacementOutcome.unavailable,
+        customerMessage: 'Delivery is unavailable at this address.',
+        failureKind: BuyV2OrderPlacementFailureKind.serviceAreaUnavailable,
+      );
+
+      expect(await fixture.session.submitOrder(), isFalse);
+      expect(fixture.session.view, BuyV2View.recovery);
+      expect(fixture.session.canResolveCheckoutAddress, isTrue);
+      fixture.session.retryRecovery();
+      expect(fixture.session.view, BuyV2View.checkout);
+      expect(fixture.session.selectedAddress.id, addressId);
+      expect(fixture.session.cartLines, isNotEmpty);
+    });
   });
 }

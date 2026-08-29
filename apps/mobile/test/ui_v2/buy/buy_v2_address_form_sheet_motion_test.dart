@@ -115,6 +115,10 @@ void main() {
   ) async {
     await openChoice(tester, session);
     await tester.tap(
+      find.byKey(ValueKey<String>('buy-address-actions-$addressId')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
       find.byKey(ValueKey<String>('buy-address-edit-$addressId')),
     );
     await tester.pumpAndSettle();
@@ -242,10 +246,10 @@ void main() {
           .height,
       greaterThanOrEqualTo(44),
     );
-    final whatsapp = tester.getSemantics(
-      find.byKey(const ValueKey('buy-address-request-whatsapp')),
+    final share = tester.getSemantics(
+      find.byKey(const ValueKey('buy-address-request-device-share')),
     );
-    expect(whatsapp.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+    expect(share.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
     await expectNamedEditableField(tester, 'Recipient name (optional)');
     expect(find.text('Helps you confirm who the request is for.'), findsOne);
     tester.testTextInput.hide();
@@ -276,52 +280,48 @@ void main() {
     expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
   });
 
-  testWidgets('request copies only the established link and closes once', (
-    tester,
-  ) async {
-    final session = BuyV2Session(core: BuySession());
-    addTearDown(session.dispose);
-    await openRequest(tester, session);
-    String? copiedText;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') {
-          copiedText =
-              (call.arguments as Map<Object?, Object?>)['text'] as String?;
-        }
-        return null;
-      },
-    );
-    addTearDown(
-      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+  testWidgets(
+    'request copies only the established link and stays recoverable',
+    (tester) async {
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      await openRequest(tester, session);
+      String? copiedText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
-        null,
-      ),
-    );
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copiedText =
+                (call.arguments as Map<Object?, Object?>)['text'] as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
 
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-request-recipient')),
-      'Meera',
-    );
-    await tester.tap(
-      find.byKey(const ValueKey('buy-address-request-whatsapp')),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-address-request-recipient')),
+        'Meera',
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-address-request-copy')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-    expect(copiedText, 'https://moolsocial.com/address/request');
-    expect(
-      find.text('Request link copied for Meera. Open WhatsApp to share it.'),
-      findsOne,
-    );
-    expect(
-      find.byKey(const ValueKey('buy-address-request-form-route')),
-      findsNothing,
-    );
-    expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
-    expect(session.selectedAddressId, 'home');
-  });
+      expect(copiedText, 'https://moolsocial.com/address/request');
+      expect(find.text('Address request link copied'), findsOne);
+      expect(
+        find.byKey(const ValueKey('buy-address-request-form-route')),
+        findsOne,
+      );
+      expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
+      expect(session.selectedAddressId, 'home');
+    },
+  );
 
   testWidgets('manual entry nests and Back restores the request form', (
     tester,
@@ -451,6 +451,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
 
+    await tester.tap(find.byKey(const ValueKey('buy-address-actions-work')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('buy-address-edit-work')));
     await tester.pumpAndSettle();
     expect(find.text('Edit Work address'), findsOne);
@@ -501,6 +503,35 @@ void main() {
       find.byKey(const ValueKey('buy-address-add-form-route')),
       findsNothing,
     );
+    expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsNothing);
+  });
+
+  testWidgets('address removal confirms and leaves existing orders unchanged', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final orderCount = session.orders.length;
+    await openChoice(tester, session);
+
+    await tester.tap(find.byKey(const ValueKey('buy-address-actions-work')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-address-delete-work')));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove Work address?'), findsOne);
+    await tester.tap(find.byKey(const ValueKey('buy-address-delete-cancel')));
+    await tester.pumpAndSettle();
+    expect(session.addresses.any((address) => address.id == 'work'), isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('buy-address-actions-work')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-address-delete-work')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-address-delete-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(session.addresses.any((address) => address.id == 'work'), isFalse);
+    expect(session.orders.length, orderCount);
     expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsNothing);
   });
 

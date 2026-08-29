@@ -91,7 +91,7 @@ void main() {
   });
 
   testWidgets(
-    'Wholesale exposes automatic fulfilment without supplier selection',
+    'Wholesale keeps automatic fulfilment and exact supplier continuity',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -102,15 +102,25 @@ void main() {
       final automatic = find.byKey(
         const ValueKey('buy-automatic-fulfilment-w-oil'),
       );
-      await revealSupplierAction(tester, automatic);
-      expect(automatic, findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('buy-wholesale-supplier-action-w-oil')),
-        findsNothing,
+      final supplier = find.byKey(
+        const ValueKey('buy-wholesale-supplier-action-w-oil'),
       );
+      await revealSupplierAction(tester, supplier);
+      expect(automatic, findsOneWidget);
+      expect(supplier, findsOneWidget);
       expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
-      expect(find.text('Surya Oils India'), findsNothing);
+      expect(find.text('Surya Oils India'), findsOneWidget);
       expect(find.textContaining('MoolSocial price'), findsWidgets);
+      await tester.tap(supplier);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-wholesale-supplier-sheet-w-oil')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-wholesale-supplier-sheet-close')),
+      );
+      await tester.pumpAndSettle();
       expect(session.view, BuyV2View.product);
       expect(session.selectedProductId, 'w-oil');
     },
@@ -140,6 +150,34 @@ void main() {
     );
   });
 
+  testWidgets('unverified business sees one Workspace recovery and no Add', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = wholesaleProductSession()..businessVerified = false;
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    final verification = find.byKey(
+      const ValueKey('buy-wholesale-verification-unavailable'),
+    );
+    await revealSupplierAction(tester, verification);
+    expect(verification, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-wholesale-open-workspace')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-wholesale-verify-business-w-oil')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-product-primary-w-oil')),
+      findsNothing,
+    );
+  });
+
   testWidgets('automatic fulfilment is stable at 320px 140 percent', (
     tester,
   ) async {
@@ -152,12 +190,12 @@ void main() {
     final automatic = find.byKey(
       const ValueKey('buy-automatic-fulfilment-w-oil'),
     );
-    await revealSupplierAction(tester, automatic);
-    expect(automatic, findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('buy-wholesale-supplier-action-w-oil')),
-      findsNothing,
+    final supplier = find.byKey(
+      const ValueKey('buy-wholesale-supplier-action-w-oil'),
     );
+    await revealSupplierAction(tester, supplier);
+    expect(automatic, findsOneWidget);
+    expect(supplier, findsOneWidget);
     await tester.pumpAndSettle();
     expect(tester.binding.transientCallbackCount, 0);
     expect(tester.takeException(), isNull);

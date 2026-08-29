@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "contractId": "MOOLSOCIAL-CROSS-AGENT-INCREMENTAL-TICKET-001",
-  "baselineTag": "moolsocial-reconciled-debug-baseline-v7.4.1-gate-ready-20260828",
+  "baselineTag": "moolsocial-buy-chat-profile-r61-48-accepted-20260829",
   "uiFounderReview": {
-    "state": "pending",
+    "state": "accepted",
     "acceptedScopes": [],
     "reachableBuyDestinations": [
       "shop",
@@ -24,7 +24,7 @@
       "branchPrefix": "work/cursor-ui/",
       "packageId": "com.moolsocial.app.cursorreview",
       "deviceSerial": "TG8HCYTGGQT885OF",
-      "minimumVersionCodeExclusive": 2026082798
+      "minimumVersionCodeExclusive": 2026082849
     },
     {
       "id": "codex_ui",

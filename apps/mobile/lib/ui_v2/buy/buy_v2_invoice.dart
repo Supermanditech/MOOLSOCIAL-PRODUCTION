@@ -14,7 +14,12 @@ class BuyV2InvoiceDocument {
 
   String get suggestedFileName => 'MoolSocial-invoice-${order.id}.pdf';
 
-  bool get hasExactLines => order.lines.isNotEmpty;
+  bool get hasExactLines =>
+      order.lines.isNotEmpty &&
+      (order.taxInvoiceState == null ||
+          ((order.taxInvoiceState == BuyV2TaxInvoiceState.ready ||
+                  order.taxInvoiceState == BuyV2TaxInvoiceState.corrected) &&
+              order.taxInvoiceDetails != null));
 }
 
 typedef BuyV2InvoiceDownloader =
@@ -48,7 +53,13 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
   bool _downloading = false;
 
   Future<void> _download() async {
-    if (_downloading) return;
+    final order = widget.order;
+    final legalInvoiceReady =
+        order.taxInvoiceState == null ||
+        ((order.taxInvoiceState == BuyV2TaxInvoiceState.ready ||
+                order.taxInvoiceState == BuyV2TaxInvoiceState.corrected) &&
+            order.taxInvoiceDetails != null);
+    if (_downloading || !legalInvoiceReady) return;
     HapticFeedback.selectionClick();
     setState(() => _downloading = true);
 
@@ -81,6 +92,13 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
+    final taxInvoice = order.taxInvoiceDetails;
+    final legalInvoiceRequired = order.taxInvoiceState != null;
+    final legalInvoiceReady =
+        !legalInvoiceRequired ||
+        ((order.taxInvoiceState == BuyV2TaxInvoiceState.ready ||
+                order.taxInvoiceState == BuyV2TaxInvoiceState.corrected) &&
+            taxInvoice != null);
     final subtotal = order.lines.fold<int>(
       0,
       (total, line) => total + line.total,
@@ -102,9 +120,9 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Order invoice',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+            Text(
+              legalInvoiceRequired ? 'Tax invoice' : 'Order invoice',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
             ),
             Text(
               order.id,
@@ -178,7 +196,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                             ),
                           ),
                           Text(
-                            order.id,
+                            taxInvoice?.invoiceNumber ?? order.id,
                             style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 9,
@@ -200,6 +218,110 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                 ),
               ),
             ),
+            if (legalInvoiceRequired) ...[
+              const SizedBox(height: 9),
+              if (!legalInvoiceReady)
+                Container(
+                  key: ValueKey(
+                    'buy-tax-invoice-${order.taxInvoiceState!.name}',
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  decoration: buyV2CardDecoration(
+                    color: BuyV2Colors.softOrange,
+                    radius: 15,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.receipt_long_outlined,
+                        color: BuyV2Colors.navy,
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              order.taxInvoiceState ==
+                                      BuyV2TaxInvoiceState.pending
+                                  ? 'Tax invoice is being prepared'
+                                  : 'Tax invoice is unavailable',
+                              style: context.buyTitle.copyWith(fontSize: 13),
+                            ),
+                            Text(
+                              order.taxInvoiceState ==
+                                      BuyV2TaxInvoiceState.pending
+                                  ? 'Return after the seller issues the final tax document.'
+                                  : 'The legal tax details have not been provided for this order.',
+                              style: context.buyMeta.copyWith(fontSize: 9),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (legalInvoiceReady && taxInvoice != null) ...[
+                _InvoiceSection(
+                  key: ValueKey('buy-tax-invoice-details-${order.id}'),
+                  title: order.taxInvoiceState == BuyV2TaxInvoiceState.corrected
+                      ? 'Corrected tax invoice'
+                      : 'Tax invoice details',
+                  child: Column(
+                    children: [
+                      _InvoiceFact(
+                        label: 'Invoice number',
+                        value: taxInvoice.invoiceNumber,
+                      ),
+                      _InvoiceFact(
+                        label: 'Invoice date',
+                        value: MaterialLocalizations.of(
+                          context,
+                        ).formatMediumDate(taxInvoice.issuedAt),
+                      ),
+                      _InvoiceFact(
+                        label: 'Seller legal name',
+                        value: taxInvoice.sellerLegalName,
+                      ),
+                      _InvoiceFact(
+                        label: 'Seller address',
+                        value: taxInvoice.sellerAddress,
+                      ),
+                      _InvoiceFact(
+                        label: 'Seller GSTIN',
+                        value: taxInvoice.sellerGstin,
+                      ),
+                      if (taxInvoice.buyerGstin case final buyerGstin?)
+                        _InvoiceFact(label: 'Buyer GSTIN', value: buyerGstin),
+                      _InvoiceFact(
+                        label: 'Place of supply',
+                        value: taxInvoice.placeOfSupply,
+                      ),
+                      if (taxInvoice.revisionLabel case final revision?)
+                        _InvoiceFact(label: 'Correction', value: revision),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 9),
+                _InvoiceSection(
+                  key: ValueKey('buy-tax-breakdown-${order.id}'),
+                  title: 'Tax breakdown',
+                  child: Column(
+                    children: [
+                      for (
+                        var index = 0;
+                        index < taxInvoice.lines.length;
+                        index++
+                      ) ...[
+                        _TaxInvoiceLine(line: taxInvoice.lines[index]),
+                        if (index < taxInvoice.lines.length - 1)
+                          const Divider(height: 14),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ],
             const SizedBox(height: 9),
             _InvoiceSection(
               title: 'Order details',
@@ -214,6 +336,20 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                   _InvoiceFact(label: 'Seller role', value: order.partnerType),
                   if (order.paymentMethod case final payment?)
                     _InvoiceFact(label: 'Payment method', value: payment),
+                  if (order.paymentTermLabel case final term?)
+                    _InvoiceFact(label: 'Payment term', value: term),
+                  if (order.amountPaidNow case final paidNow?)
+                    _InvoiceFact(
+                      label: 'Amount paid now',
+                      value: buyV2Money(paidNow),
+                    ),
+                  if (order.balanceDue > 0)
+                    _InvoiceFact(
+                      label: 'Balance due',
+                      value:
+                          '${buyV2Money(order.balanceDue)} · '
+                          '${order.balanceDueLabel ?? 'Due later'}',
+                    ),
                 ],
               ),
             ),
@@ -245,6 +381,29 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                     ),
                   if (order.tip > 0)
                     _InvoiceAmountRow(label: 'Delivery tip', amount: order.tip),
+                  if (order.discount > 0)
+                    _InvoiceAmountRow(
+                      label: 'Coupon saving',
+                      amount: order.discount,
+                      deduction: true,
+                    ),
+                  if (order.tax > 0)
+                    _InvoiceAmountRow(
+                      label: 'GST and taxes',
+                      amount: order.tax,
+                    ),
+                  if (order.freight > 0)
+                    _InvoiceAmountRow(label: 'Freight', amount: order.freight),
+                  if (order.deliveryFee > 0)
+                    _InvoiceAmountRow(
+                      label: 'Delivery fee',
+                      amount: order.deliveryFee,
+                    ),
+                  if (order.paymentCharge > 0)
+                    _InvoiceAmountRow(
+                      label: 'Payment charge',
+                      amount: order.paymentCharge,
+                    ),
                   _InvoiceAmountRow(
                     label: 'Order total',
                     amount: order.total,
@@ -265,6 +424,23 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                     value: order.addressLine ?? order.destinationLabel,
                   ),
                   _InvoiceFact(label: 'Expected', value: order.promise),
+                  if (order.dispatchPromise case final dispatchPromise?)
+                    _InvoiceFact(
+                      label: 'Dispatch promise',
+                      value: dispatchPromise,
+                    ),
+                  if (order.deliveryPartnerName case final partner?)
+                    _InvoiceFact(label: 'Delivery partner', value: partner),
+                  if (order.deliveryServiceLevel case final serviceLevel?)
+                    _InvoiceFact(
+                      label: 'Delivery service',
+                      value: serviceLevel,
+                    ),
+                  if (order.trackingReference case final trackingReference?)
+                    _InvoiceFact(
+                      label: 'Tracking reference',
+                      value: trackingReference,
+                    ),
                   if (order.deliveryInstruction case final instruction?)
                     _InvoiceFact(
                       label: 'Delivery instruction',
@@ -294,7 +470,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
             height: 48,
             child: FilledButton.icon(
               key: ValueKey('buy-download-invoice-${order.id}'),
-              onPressed: _downloading ? null : _download,
+              onPressed: _downloading || !legalInvoiceReady ? null : _download,
               icon: _downloading
                   ? const SizedBox(
                       width: 18,
@@ -455,16 +631,52 @@ class _InvoiceUnavailableItems extends StatelessWidget {
   }
 }
 
+class _TaxInvoiceLine extends StatelessWidget {
+  const _TaxInvoiceLine({required this.line});
+
+  final BuyV2TaxInvoiceLine line;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(line.description, style: context.buyBody),
+        const SizedBox(height: 3),
+        _InvoiceFact(label: 'HSN/SAC', value: line.hsnSac),
+        _InvoiceFact(
+          label: 'Taxable value',
+          value: buyV2Money(line.taxableValue),
+        ),
+        _InvoiceFact(
+          label: 'GST rate',
+          value: '${line.gstRate.toStringAsFixed(2)}%',
+        ),
+        if (line.cgst > 0)
+          _InvoiceFact(label: 'CGST', value: buyV2Money(line.cgst)),
+        if (line.sgst > 0)
+          _InvoiceFact(label: 'SGST', value: buyV2Money(line.sgst)),
+        if (line.igst > 0)
+          _InvoiceFact(label: 'IGST', value: buyV2Money(line.igst)),
+        if (line.cess > 0)
+          _InvoiceFact(label: 'Cess', value: buyV2Money(line.cess)),
+      ],
+    );
+  }
+}
+
 class _InvoiceAmountRow extends StatelessWidget {
   const _InvoiceAmountRow({
     required this.label,
     required this.amount,
     this.prominent = false,
+    this.deduction = false,
   });
 
   final String label;
   final int amount;
   final bool prominent;
+  final bool deduction;
 
   @override
   Widget build(BuildContext context) {
@@ -481,7 +693,7 @@ class _InvoiceAmountRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(label, style: style)),
-          Text(buyV2Money(amount), style: style),
+          Text('${deduction ? '−' : ''}${buyV2Money(amount)}', style: style),
         ],
       ),
     );

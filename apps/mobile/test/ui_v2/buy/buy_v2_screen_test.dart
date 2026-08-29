@@ -29,6 +29,22 @@ final class _FixedOffersSource implements BuyV2PublishedOffersSource {
   final List<BuyV2PublishedOffer> publishedOffers;
 }
 
+final class _LiveOffersSource implements BuyV2LivePublishedOffersSource {
+  BuyV2PublishedOffersSnapshot snapshot;
+  int calls = 0;
+
+  _LiveOffersSource(this.snapshot);
+
+  @override
+  List<BuyV2PublishedOffer> get publishedOffers => snapshot.offers;
+
+  @override
+  Future<BuyV2PublishedOffersSnapshot> load() async {
+    calls += 1;
+    return snapshot;
+  }
+}
+
 final class _FixedDeliveryPromiseFactsAdapter
     implements BuyV2ProductFactsAdapter {
   const _FixedDeliveryPromiseFactsAdapter(this.deliveryPromise);
@@ -1678,14 +1694,21 @@ void main() {
           find.text('Automatically assigned Mool Partner'),
           findsOneWidget,
         );
-        expect(find.text(product.seller), findsNothing);
+        expect(
+          find.text(product.seller),
+          testCase.destination == BuyV2Destination.wholesale
+              ? findsOneWidget
+              : findsNothing,
+        );
         expect(
           find.byKey(ValueKey('buy-shop-seller-action-${product.id}')),
           findsNothing,
         );
         expect(
           find.byKey(ValueKey('buy-wholesale-supplier-action-${product.id}')),
-          findsNothing,
+          testCase.destination == BuyV2Destination.wholesale
+              ? findsOneWidget
+              : findsNothing,
         );
 
         expect(session.addProduct(product.id), isTrue);
@@ -2969,6 +2992,62 @@ void main() {
     },
   );
 
+  testWidgets(
+    'checkout payment recovery states stay actionable at compact size',
+    (tester) async {
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 568);
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      await tester.pumpWidget(app(session, textScale: 1.4));
+      await tester.pumpAndSettle();
+      session.addProduct('s-tomato');
+      session.openCart(scope: BuyV2CartScope.shop);
+      session.openCheckout();
+      await tester.pumpAndSettle();
+
+      for (final state in const [
+        BuyV2CheckoutSubmissionState.submitting,
+        BuyV2CheckoutSubmissionState.paymentActionRequired,
+        BuyV2CheckoutSubmissionState.paymentPending,
+        BuyV2CheckoutSubmissionState.paymentUnknown,
+        BuyV2CheckoutSubmissionState.cancelled,
+        BuyV2CheckoutSubmissionState.failed,
+        BuyV2CheckoutSubmissionState.unavailable,
+      ]) {
+        session.checkoutSubmissionState = state;
+        session.notifyListeners();
+        await tester.pump(const Duration(milliseconds: 120));
+
+        expect(
+          find.byKey(ValueKey('buy-checkout-submission-${state.name}')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull, reason: state.name);
+        if (state == BuyV2CheckoutSubmissionState.submitting) continue;
+        final actionKey = switch (state) {
+          BuyV2CheckoutSubmissionState.paymentActionRequired => const ValueKey(
+            'buy-checkout-continue-payment',
+          ),
+          BuyV2CheckoutSubmissionState.paymentPending ||
+          BuyV2CheckoutSubmissionState.paymentUnknown => const ValueKey(
+            'buy-checkout-check-payment',
+          ),
+          _ => const ValueKey('buy-checkout-retry-order'),
+        };
+        expect(find.byKey(actionKey), findsOneWidget);
+        expect(
+          tester.getSize(find.byKey(actionKey)).height,
+          greaterThanOrEqualTo(44),
+        );
+      }
+    },
+  );
+
   testWidgets('checkout renders only the fulfilment families being purchased', (
     tester,
   ) async {
@@ -3629,6 +3708,49 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'live Offers recover from offline without static production data',
+    (tester) async {
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      final source = _LiveOffersSource(
+        const BuyV2PublishedOffersSnapshot(
+          state: BuyV2PublishedOffersLoadState.offline,
+          customerMessage: 'Offers could not refresh.',
+        ),
+      );
+      await tester.pumpWidget(app(session, offersSource: source));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Offers could not refresh'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-live-offers-retry')),
+        findsOneWidget,
+      );
+      source.snapshot = const BuyV2PublishedOffersSnapshot(
+        state: BuyV2PublishedOffersLoadState.ready,
+        offers: [
+          BuyV2PublishedOffer(
+            productId: 's-tomato',
+            publisherType: BuyV2OfferPublisherType.retailer,
+            headline: 'Fresh price',
+          ),
+        ],
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-live-offers-retry')));
+      await tester.pumpAndSettle();
+
+      expect(source.calls, 2);
+      expect(
+        find.byKey(const ValueKey('buy-offers-publisher-summary')),
+        findsOneWidget,
+      );
+      expect(find.text('Fresh tomatoes'), findsWidgets);
+    },
+  );
 
   testWidgets('Offers accepts an ordered published catalogue seam', (
     tester,

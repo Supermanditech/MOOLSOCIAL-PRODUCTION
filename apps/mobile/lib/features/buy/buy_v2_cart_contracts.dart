@@ -4,6 +4,35 @@ import 'buy_v2_models.dart';
 
 enum BuyV2CartBenefitKind { coupon, paymentOffer }
 
+enum BuyV2CartBenefitStrategy {
+  timedSale,
+  publishedOffer,
+  minimumOrder,
+  loadBased,
+  financialProduct,
+  partnerCampaign,
+  freeDelivery,
+}
+
+enum BuyV2CartBenefitSponsor {
+  retailer,
+  wholesaler,
+  manufacturer,
+  bank,
+  financialPartner,
+  moolSocial,
+}
+
+enum BuyV2CartBenefitsLoadState { idle, loading, ready, offline, unavailable }
+
+// Founder post-integration owner boundary (2026-08-29): Codex Workspace must
+// publish each supplier's exact commercial terms, MSME classification,
+// booking/balance schedule, regulated-financier offer, delivery partner and
+// dispatch/delivery promise. Cursor Buy then renders and validates those exact
+// choices. Supplier credit for a micro/small enterprise must never exceed the
+// applicable MSMED payment limit; a longer bank/NBFC tenor is a separate
+// regulated credit product, never a supplier-term shortcut.
+
 @immutable
 class BuyV2CartBenefit {
   const BuyV2CartBenefit({
@@ -13,6 +42,17 @@ class BuyV2CartBenefit {
     required this.title,
     required this.detail,
     required this.sourceId,
+    this.strategy = BuyV2CartBenefitStrategy.partnerCampaign,
+    this.sponsor = BuyV2CartBenefitSponsor.moolSocial,
+    this.sponsorName = 'MoolSocial',
+    this.savingAmount = 0,
+    this.validFrom,
+    this.validUntil,
+    this.freeDelivery = false,
+    this.offerId,
+    this.minimumSpend,
+    this.minimumQuantity,
+    this.eligiblePaymentMethods = const {},
   });
 
   final String id;
@@ -21,6 +61,43 @@ class BuyV2CartBenefit {
   final String title;
   final String detail;
   final String sourceId;
+  final BuyV2CartBenefitStrategy strategy;
+  final BuyV2CartBenefitSponsor sponsor;
+  final String sponsorName;
+  final int savingAmount;
+  final DateTime? validFrom;
+  final DateTime? validUntil;
+  final bool freeDelivery;
+  final String? offerId;
+  final int? minimumSpend;
+  final int? minimumQuantity;
+  final Set<String> eligiblePaymentMethods;
+}
+
+@immutable
+class BuyV2CartBenefitsRequest {
+  const BuyV2CartBenefitsRequest({
+    required this.lines,
+    required this.selectedPaymentMethod,
+  });
+
+  final List<BuyV2CartLine> lines;
+  final String selectedPaymentMethod;
+}
+
+@immutable
+class BuyV2CartBenefitsSnapshot {
+  const BuyV2CartBenefitsSnapshot({
+    required this.state,
+    required this.evaluatedAt,
+    this.benefits = const [],
+    this.customerMessage,
+  });
+
+  final BuyV2CartBenefitsLoadState state;
+  final DateTime evaluatedAt;
+  final List<BuyV2CartBenefit> benefits;
+  final String? customerMessage;
 }
 
 abstract interface class BuyV2CartBenefitsAdapter {
@@ -31,6 +108,13 @@ abstract interface class BuyV2CartBenefitsAdapter {
     required Set<BuyV2Destination> destinations,
     required int itemTotal,
   });
+}
+
+abstract interface class BuyV2LiveCartBenefitsAdapter
+    implements BuyV2CartBenefitsAdapter {
+  Future<BuyV2CartBenefitsSnapshot> loadEligibility(
+    BuyV2CartBenefitsRequest request,
+  );
 }
 
 /// Compile-time boundary for founder device-review benefit states.

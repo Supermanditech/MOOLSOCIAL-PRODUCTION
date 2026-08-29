@@ -5,6 +5,16 @@ import '../../features/buy/buy_v2_models.dart';
 class BuyV2ChatRouteAdapter {
   const BuyV2ChatRouteAdapter();
 
+  // Post-integration hold (2026-08-29): actor-specific Buy threads must stay
+  // unwired until shared Chat commit 9ea0a72f is admitted. Then implement, in
+  // order, exact order, seller/supplier, offer-publisher, context-isolation and
+  // safety/recovery parity. Keep shop-assist as MoolSocial support and keep
+  // Medicine under Care. Do not add a Buy-owned Chat shell.
+  // Codex integration must preserve exact Cursor HEAD fa7d07e0 and publish the
+  // combined baseline first. Cursor then immediately completes pre-dispatch
+  // change/cancel and delivered return/replacement/refund handoffs against
+  // that integrated shared Chat owner; neither lane implements them earlier.
+
   String locationFor({
     required BuyV2Destination destination,
     required BuyV2View view,

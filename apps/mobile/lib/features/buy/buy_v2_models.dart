@@ -108,6 +108,41 @@ class BuyV2Product {
   final bool freightIncluded;
   final bool manufacturerVerified;
 
+  BuyV2Product copyWith({
+    int? price,
+    String? deliveryPromise,
+    String? seller,
+    String? sellerType,
+    String? confirmedOn,
+  }) => BuyV2Product(
+    id: id,
+    canonicalId: canonicalId,
+    destination: destination,
+    categoryId: categoryId,
+    brand: brand,
+    title: title,
+    variant: variant,
+    pack: pack,
+    price: price ?? this.price,
+    unitPrice: unitPrice,
+    badge: badge,
+    seller: seller ?? this.seller,
+    sellerType: sellerType ?? this.sellerType,
+    deliveryPromise: deliveryPromise ?? this.deliveryPromise,
+    origin: origin,
+    confirmedOn: confirmedOn ?? this.confirmedOn,
+    visualLabel: visualLabel,
+    visualKind: visualKind,
+    mrp: mrp,
+    requiresPrescription: requiresPrescription,
+    composition: composition,
+    regulatoryNote: regulatoryNote,
+    minimumOrder: minimumOrder,
+    returnPolicy: returnPolicy,
+    freightIncluded: freightIncluded,
+    manufacturerVerified: manufacturerVerified,
+  );
+
   String get partnerRole => buyV2PartnerRoleFor(destination, sellerType);
 
   String? get regulatoryTrustFact =>
@@ -149,8 +184,11 @@ class BuyV2CartLine {
 
   int get total => product.price * quantity;
 
-  BuyV2CartLine copyWith({int? quantity}) =>
-      BuyV2CartLine(product: product, quantity: quantity ?? this.quantity);
+  BuyV2CartLine copyWith({BuyV2Product? product, int? quantity}) =>
+      BuyV2CartLine(
+        product: product ?? this.product,
+        quantity: quantity ?? this.quantity,
+      );
 }
 
 class BuyV2FulfilmentGroup {
@@ -161,6 +199,9 @@ class BuyV2FulfilmentGroup {
     required this.promise,
     required this.lines,
     this.promisedByLabel,
+    this.dispatchPromise,
+    this.deliveryProviderName,
+    this.deliveryServiceLevel,
   });
 
   final BuyV2Destination destination;
@@ -169,6 +210,9 @@ class BuyV2FulfilmentGroup {
   final String promise;
   final List<BuyV2CartLine> lines;
   final String? promisedByLabel;
+  final String? dispatchPromise;
+  final String? deliveryProviderName;
+  final String? deliveryServiceLevel;
 
   int get itemCount => lines.fold(0, (total, line) => total + line.quantity);
 
@@ -208,6 +252,60 @@ class BuyV2Address {
   String get compactLine => '${area.split(',').first.trim()} · $pinCode';
 }
 
+enum BuyV2TaxInvoiceState { pending, ready, corrected, unavailable }
+
+class BuyV2TaxInvoiceLine {
+  const BuyV2TaxInvoiceLine({
+    required this.description,
+    required this.hsnSac,
+    required this.taxableValue,
+    required this.gstRate,
+    required this.cgst,
+    required this.sgst,
+    required this.igst,
+    required this.cess,
+  });
+
+  final String description;
+  final String hsnSac;
+  final int taxableValue;
+  final double gstRate;
+  final int cgst;
+  final int sgst;
+  final int igst;
+  final int cess;
+
+  int get totalTax => cgst + sgst + igst + cess;
+}
+
+class BuyV2TaxInvoiceDetails {
+  const BuyV2TaxInvoiceDetails({
+    required this.invoiceNumber,
+    required this.issuedAt,
+    required this.sellerLegalName,
+    required this.sellerAddress,
+    required this.sellerGstin,
+    required this.placeOfSupply,
+    required this.sourceId,
+    required this.lines,
+    this.buyerGstin,
+    this.revisionLabel,
+  });
+
+  final String invoiceNumber;
+  final DateTime issuedAt;
+  final String sellerLegalName;
+  final String sellerAddress;
+  final String sellerGstin;
+  final String? buyerGstin;
+  final String placeOfSupply;
+  final String sourceId;
+  final List<BuyV2TaxInvoiceLine> lines;
+  final String? revisionLabel;
+
+  int get totalTax => lines.fold(0, (total, line) => total + line.totalTax);
+}
+
 class BuyV2Order {
   const BuyV2Order({
     required this.id,
@@ -231,6 +329,25 @@ class BuyV2Order {
     this.addressLine,
     this.deliveryInstruction,
     this.tip = 0,
+    this.discount = 0,
+    this.paymentTermLabel,
+    this.amountPaidNow,
+    this.balanceDue = 0,
+    this.balanceDueLabel,
+    this.tax = 0,
+    this.freight = 0,
+    this.deliveryFee = 0,
+    this.paymentCharge = 0,
+    this.dispatchPromise,
+    this.deliveryPartnerName,
+    this.deliveryPartnerType,
+    this.trackingReference,
+    this.deliveryServiceLevel,
+    this.proofOfDeliveryStatus,
+    this.taxInvoiceState,
+    this.taxInvoiceDetails,
+    this.invoiceAvailable = true,
+    this.receiptReference,
   });
 
   final String id;
@@ -254,6 +371,25 @@ class BuyV2Order {
   final String? addressLine;
   final String? deliveryInstruction;
   final int tip;
+  final int discount;
+  final String? paymentTermLabel;
+  final int? amountPaidNow;
+  final int balanceDue;
+  final String? balanceDueLabel;
+  final int tax;
+  final int freight;
+  final int deliveryFee;
+  final int paymentCharge;
+  final String? dispatchPromise;
+  final String? deliveryPartnerName;
+  final String? deliveryPartnerType;
+  final String? trackingReference;
+  final String? deliveryServiceLevel;
+  final String? proofOfDeliveryStatus;
+  final BuyV2TaxInvoiceState? taxInvoiceState;
+  final BuyV2TaxInvoiceDetails? taxInvoiceDetails;
+  final bool invoiceAvailable;
+  final String? receiptReference;
 }
 
 class _BuyV2CommerceSeed {
