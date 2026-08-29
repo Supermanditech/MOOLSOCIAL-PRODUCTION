@@ -621,6 +621,12 @@ ChatThread _decodeThread(Map<String, Object?> data) {
       'support' => ChatThreadType.support,
       _ => ChatThreadType.people,
     },
+    safetyTarget: switch (data['safetyTarget']) {
+      'person' => ChatSafetyTarget.person,
+      'business' => ChatSafetyTarget.business,
+      'conversation' => ChatSafetyTarget.conversation,
+      _ => null,
+    },
     unreadCount: _integer(data['unreadCount']),
     verified: data['verified'] == true,
   );

@@ -616,6 +616,12 @@ void main() {
 
   for (final safety in const <(String, String, String, String)>[
     (
+      'task-helper',
+      'Block this person',
+      'chat-block-user-recovery',
+      'Blocking unavailable',
+    ),
+    (
       'mahadev',
       'Block this business',
       'chat-block-business-recovery',
@@ -770,6 +776,42 @@ void main() {
     expect(
       tester.getBottomRight(continueButton).dy,
       lessThanOrEqualTo(exportedClipBottom),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('search assistance clears the OPPO bottom system inset', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+    addTearDown(tester.view.reset);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/chat/inbox?return=/app/mool',
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-search-assistance')));
+    await tester.pumpAndSettle();
+
+    final action = find.byKey(const Key('chat-use-search-assistance'));
+    final safeBottom = 800 - tester.view.viewPadding.bottom;
+    expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
+    expect(tester.getBottomRight(action).dy, lessThanOrEqualTo(safeBottom));
+    expect(
+      find.byKey(const Key('chat-search-assistance-field')),
+      findsOneWidget,
     );
     expect(tester.takeException(), isNull);
   });

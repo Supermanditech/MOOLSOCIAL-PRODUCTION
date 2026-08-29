@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../../shared/shared_session.dart';
 import '../chat_entry_context.dart';
 import '../chat_models.dart';
@@ -868,55 +869,67 @@ void _openThread(
 Future<String?> _showSearchAssistance(BuildContext context) {
   final formKey = GlobalKey<FormState>();
   var query = '';
+  final viewPadding = MediaQuery.viewPaddingOf(context);
+  final bottomInset = viewPadding.bottom;
+  final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
+    viewPadding: viewPadding,
+    platform: Theme.of(context).platform,
+  );
   return showModalBottomSheet<String>(
     context: context,
+    showDragHandle: true,
+    useSafeArea: true,
     isScrollControlled: true,
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        MoolSpacing.sm,
-        MoolSpacing.lg,
-        MediaQuery.viewInsetsOf(sheetContext).bottom + MoolSpacing.lg,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Search conversations',
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          const Text('Type a person, business, order or case.'),
-          const SizedBox(height: MoolSpacing.md),
-          Form(
-            key: formKey,
-            child: TextFormField(
-              key: const Key('chat-search-assistance-field'),
-              onChanged: (value) => query = value,
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Enter a conversation name.'
-                  : null,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search_rounded),
-                labelText: 'Conversation name',
+    builder: (sheetContext) => ChatBottomSheetSafeArea(
+      bottomInset: bottomInset,
+      exportedSemanticsClearance: exportedSemanticsClearance,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          MoolSpacing.lg,
+          MoolSpacing.xs,
+          MoolSpacing.lg,
+          MediaQuery.viewInsetsOf(sheetContext).bottom + MoolSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Search conversations',
+              style: TextStyle(
+                color: MoolColors.ink,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
               ),
             ),
-          ),
-          const SizedBox(height: MoolSpacing.md),
-          FilledButton(
-            key: const Key('chat-use-search-assistance'),
-            onPressed: () {
-              if (!(formKey.currentState?.validate() ?? false)) return;
-              Navigator.of(sheetContext).pop(query.trim());
-            },
-            child: const Text('Search conversations'),
-          ),
-        ],
+            const SizedBox(height: MoolSpacing.xs),
+            const Text('Type a person, business, order or case.'),
+            const SizedBox(height: MoolSpacing.md),
+            Form(
+              key: formKey,
+              child: TextFormField(
+                key: const Key('chat-search-assistance-field'),
+                onChanged: (value) => query = value,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter a conversation name.'
+                    : null,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search_rounded),
+                  labelText: 'Conversation name',
+                ),
+              ),
+            ),
+            const SizedBox(height: MoolSpacing.md),
+            FilledButton(
+              key: const Key('chat-use-search-assistance'),
+              onPressed: () {
+                if (!(formKey.currentState?.validate() ?? false)) return;
+                Navigator.of(sheetContext).pop(query.trim());
+              },
+              child: const Text('Search conversations'),
+            ),
+          ],
+        ),
       ),
     ),
   );

@@ -43733,6 +43733,26 @@
       "prevention": "Use a UAW-CODEX candidate id for Chat RuntimeUiReview APKs, bind it consistently in machine state and runtime defines, and run the direct APK gate before the wrapper.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-apk-regression-gate-state.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/check-apk-regression-gate-state.ps1"]
+    },
+    {
+      "id": "REG-20260829-3847-SEARCH-ASSISTANCE-ACTION-CLIPPED-BY-OPPO-NAVIGATION",
+      "status": "registered_shared_chat_sheet_clearance_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "fitment", "chat", "testing"],
+      "mistake": "On the r61.43 OPPO runtime, Search Assistance rendered truthful copy but its Search conversations action was clipped behind the system navigation bar.",
+      "rootCause": "The inbox-owned modal did not reuse the exported-semantics and bottom-inset clearance already proven for Chat capability and action sheets.",
+      "prevention": "Own one shared ChatBottomSheetSafeArea, apply it to every Chat sheet, keep scrollable keyboard padding inside it and assert the final 44-pixel action above the OPPO safe bottom.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/widgets/chat_widgets.dart", "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3848-TASK-HELPER-SAFETY-MISLABELED-AS-BUSINESS",
+      "status": "registered_explicit_safety_target_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "chat", "safety", "testing"],
+      "mistake": "The r61.43 Work Conversation Info called Ramesh Kumar a business because safety wording was derived only from the thread's operational Business filter type.",
+      "rootCause": "Conversation filtering taxonomy and the real safety target identity were treated as the same concept.",
+      "prevention": "Model an optional person, business or conversation safety target, set the review helper explicitly to person, decode optional backend values and retain a safe type-based fallback.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/chat_models.dart", "apps/mobile/lib/features/chat/chat_session.dart", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
     }
   ]
 }

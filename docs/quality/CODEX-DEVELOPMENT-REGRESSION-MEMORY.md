@@ -3681,3 +3681,9 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3846 rejects using audit shorthand as an APK candidate family. Keep Chat
   RuntimeUiReview candidates under `UAW-CODEX-*`, bind the same id in state and
   runtime defines, and run the direct gate before the wrapper.
+- REG3847 rejects a Chat sheet action clipped behind OPPO navigation. Reuse the
+  shared bottom-sheet clearance owner, retain keyboard scrolling and require
+  the final 44-pixel action to stay above the exported safe bottom.
+- REG3848 rejects deriving safety identity only from the operational filter.
+  Model person/business/conversation separately so an individual helper never
+  receives business-blocking wording.

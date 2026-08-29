@@ -29,6 +29,35 @@ String chatRoute(
   ).toString();
 }
 
+class ChatBottomSheetSafeArea extends StatelessWidget {
+  const ChatBottomSheetSafeArea({
+    required this.bottomInset,
+    required this.exportedSemanticsClearance,
+    required this.child,
+    super.key,
+  });
+
+  final double bottomInset;
+  final double exportedSemanticsClearance;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseBottomPadding = bottomInset > MoolSpacing.md
+        ? bottomInset
+        : MoolSpacing.md;
+    final bottomPadding = baseBottomPadding + exportedSemanticsClearance;
+    return SafeArea(
+      top: false,
+      bottom: false,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomPadding),
+        child: child,
+      ),
+    );
+  }
+}
+
 class ChatPageScaffold extends StatelessWidget {
   const ChatPageScaffold({
     required this.session,

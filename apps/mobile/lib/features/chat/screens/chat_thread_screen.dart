@@ -342,8 +342,8 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
     );
   }
 
-  void _showSafetyRecovery(ChatThreadType type) {
-    final copy = _conversationSafetyCopy(type);
+  void _showSafetyRecovery(ChatThread thread) {
+    final copy = _conversationSafetyCopy(thread);
     unawaited(
       _showUnavailableCapability(
         context,
@@ -362,7 +362,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
         final thread = widget.thread;
         final session = widget.session;
         final chatAvailable = session.chatAvailableForSession(thread.id);
-        final safety = _conversationSafetyCopy(thread.type);
+        final safety = _conversationSafetyCopy(thread);
         return ChatPageScaffold(
           key: const Key('chat-conversation-info-screen'),
           session: session,
@@ -539,7 +539,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                   title: Text(safety.label),
                   subtitle: Text(safety.description),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => _showSafetyRecovery(thread.type),
+                  onTap: () => _showSafetyRecovery(thread),
                 ),
               ),
             ],
@@ -557,8 +557,10 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
   String recoveryTitle,
   String recoveryMessage,
 })
-_conversationSafetyCopy(ChatThreadType type) => switch (type) {
-  ChatThreadType.people => (
+_conversationSafetyCopy(
+  ChatThread thread,
+) => switch (thread.effectiveSafetyTarget) {
+  ChatSafetyTarget.person => (
     label: 'Block this person',
     description: 'Nothing changes without confirmation.',
     recoveryKey: 'chat-block-user-recovery',
@@ -566,7 +568,7 @@ _conversationSafetyCopy(ChatThreadType type) => switch (type) {
     recoveryMessage:
         'Blocking cannot be completed right now. Nothing changed. You can continue in Chat or try again later.',
   ),
-  ChatThreadType.business => (
+  ChatSafetyTarget.business => (
     label: 'Block this business',
     description: 'Nothing changes without confirmation.',
     recoveryKey: 'chat-block-business-recovery',
@@ -574,7 +576,7 @@ _conversationSafetyCopy(ChatThreadType type) => switch (type) {
     recoveryMessage:
         'Business blocking cannot be completed right now. Nothing changed. You can continue in Chat or try again later.',
   ),
-  ChatThreadType.order || ChatThreadType.support => (
+  ChatSafetyTarget.conversation => (
     label: 'Conversation safety',
     description: 'Report this conversation or ask MoolSocial for help.',
     recoveryKey: 'chat-conversation-safety-recovery',
@@ -1231,34 +1233,6 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-class _ChatBottomSheetSafeArea extends StatelessWidget {
-  const _ChatBottomSheetSafeArea({
-    required this.bottomInset,
-    required this.exportedSemanticsClearance,
-    required this.child,
-  });
-
-  final double bottomInset;
-  final double exportedSemanticsClearance;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final baseBottomPadding = bottomInset > MoolSpacing.md
-        ? bottomInset
-        : MoolSpacing.md;
-    final bottomPadding = baseBottomPadding + exportedSemanticsClearance;
-    return SafeArea(
-      top: false,
-      bottom: false,
-      child: Padding(
-        padding: EdgeInsets.only(bottom: bottomPadding),
-        child: child,
-      ),
-    );
-  }
-}
-
 Future<void> _showUnavailableCapability(
   BuildContext context, {
   required String keyName,
@@ -1276,7 +1250,7 @@ Future<void> _showUnavailableCapability(
     showDragHandle: true,
     useSafeArea: true,
     isScrollControlled: true,
-    builder: (sheetContext) => _ChatBottomSheetSafeArea(
+    builder: (sheetContext) => ChatBottomSheetSafeArea(
       bottomInset: bottomInset,
       exportedSemanticsClearance: exportedSemanticsClearance,
       child: Padding(
@@ -1338,7 +1312,7 @@ Future<void> _showMessageActions(
     showDragHandle: true,
     useSafeArea: true,
     isScrollControlled: true,
-    builder: (sheetContext) => _ChatBottomSheetSafeArea(
+    builder: (sheetContext) => ChatBottomSheetSafeArea(
       bottomInset: bottomInset,
       exportedSemanticsClearance: exportedSemanticsClearance,
       child: Column(
@@ -1423,7 +1397,7 @@ Future<void> _chooseForwardTarget(
     showDragHandle: true,
     useSafeArea: true,
     isScrollControlled: true,
-    builder: (sheetContext) => _ChatBottomSheetSafeArea(
+    builder: (sheetContext) => ChatBottomSheetSafeArea(
       bottomInset: bottomInset,
       exportedSemanticsClearance: exportedSemanticsClearance,
       child: Column(

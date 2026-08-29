@@ -1,5 +1,7 @@
 enum ChatThreadType { people, business, order, support }
 
+enum ChatSafetyTarget { person, business, conversation }
+
 enum ChatDeliveryState { sending, delivered, read, failed }
 
 class ChatPhotoAttachment {
@@ -42,6 +44,7 @@ class ChatThread {
     required this.type,
     this.unreadCount = 0,
     this.verified = false,
+    this.safetyTarget,
   });
 
   final String id;
@@ -52,6 +55,16 @@ class ChatThread {
   final ChatThreadType type;
   final int unreadCount;
   final bool verified;
+  final ChatSafetyTarget? safetyTarget;
+
+  ChatSafetyTarget get effectiveSafetyTarget =>
+      safetyTarget ??
+      switch (type) {
+        ChatThreadType.people => ChatSafetyTarget.person,
+        ChatThreadType.business => ChatSafetyTarget.business,
+        ChatThreadType.order ||
+        ChatThreadType.support => ChatSafetyTarget.conversation,
+      };
 }
 
 class ChatMessage {
