@@ -3666,3 +3666,6 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3841 rejects skipping the shared inbox when returning from a Feed author
   conversation. Verify thread → inbox → originating Feed, then continue the
   successful journey through Discover and a second direct Chat.
+- REG3842 rejects confirming a scrolled Conversation Info change only in an
+  offscreen summary card. Keep that summary and also show immediate floating
+  feedback for every session-local Chat or call availability change.

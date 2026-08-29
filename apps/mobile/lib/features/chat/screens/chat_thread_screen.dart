@@ -311,6 +311,16 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
 
   void _confirmLocalChange(String message) {
     setState(() => _statusMessage = message);
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar(reason: SnackBarClosedReason.remove)
+      ..showSnackBar(
+        SnackBar(
+          key: const Key('chat-info-local-feedback'),
+          behavior: SnackBarBehavior.floating,
+          content: Text(message),
+        ),
+      );
   }
 
   void _showAccountSettingRecovery({
@@ -438,6 +448,29 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                       'These choices apply until you close MoolSocial. They do not change account permissions or another person’s settings.',
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _ConversationSettingsSection(
+                title: 'Conversation',
+                child: ListTile(
+                  key: const Key('chat-info-voice-chat'),
+                  minLeadingWidth: 28,
+                  leading: const Icon(Icons.graphic_eq_rounded),
+                  title: const Text('Start a voice chat'),
+                  subtitle: const Text(
+                    'Talk live with this conversation when voice chat is available.',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => unawaited(
+                    _showUnavailableCapability(
+                      context,
+                      keyName: 'chat-voice-chat-recovery',
+                      title: 'Voice chat unavailable',
+                      message:
+                          'Voice chat is not available right now. You can continue with messages or try a voice call.',
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),

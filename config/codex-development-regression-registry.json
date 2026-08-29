@@ -43683,6 +43683,16 @@
       "prevention": "Verify the native hierarchy as thread to shared inbox to originating Feed, then continue through Discover and a second direct conversation without bypassing the existing shared destination.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3842-CONVERSATION-SETTING-CONFIRMATION-OFFSCREEN",
+      "status": "registered_immediate_visible_local_setting_feedback_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "fitment", "chat", "testing"],
+      "mistake": "After scrolling Conversation Info to a call-availability switch, the existing local-change confirmation card could be inserted above the viewport and provide no immediate visible success feedback.",
+      "rootCause": "Session-local setting confirmation was owned only by a summary card near the top of a scrollable settings list.",
+      "prevention": "Keep the durable summary card and also show one floating in-context confirmation for every Chat, voice-call or video-call availability change; prove it at compact size after scrolling.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
     }
   ]
 }
