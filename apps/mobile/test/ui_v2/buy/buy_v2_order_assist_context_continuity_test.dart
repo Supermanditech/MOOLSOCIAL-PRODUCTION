@@ -93,6 +93,44 @@ void main() {
     expect(session.selectedOrder.id, 'PO-240783');
   });
 
+  testWidgets('Assist return route reconstructs its exact order and Back', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = newSession();
+    addTearDown(session.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(
+          session: session,
+          initialDestination: BuyV2Destination.orders,
+          initialView: BuyV2View.assist,
+          orderId: 'PO-240783',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(session.view, BuyV2View.assist);
+    expect(session.assistOrder.id, 'PO-240783');
+    expect(find.textContaining('PO-240783'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('buy-assist-return')));
+    await tester.pumpAndSettle();
+
+    expect(session.view, BuyV2View.tracking);
+    expect(session.selectedOrder.id, 'PO-240783');
+    expect(
+      find.byKey(const PageStorageKey('buy-tracking-PO-240783')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('320px 140% reduced-motion Assist remains stable', (
     tester,
   ) async {

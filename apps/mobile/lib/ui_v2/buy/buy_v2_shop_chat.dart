@@ -45,6 +45,34 @@ class BuyV2ShopChatRouteAdapter {
     ).toString();
   }
 
+  String orderAssistLocationFor({
+    required String orderId,
+    String? intent,
+    String? details,
+  }) {
+    final normalizedOrderId = orderId.trim();
+    final normalizedIntent = intent?.trim();
+    final normalizedDetails = details?.trim();
+    final subject = normalizedIntent == null || normalizedIntent.isEmpty
+        ? 'Help with order $normalizedOrderId'
+        : 'Order $normalizedOrderId — $normalizedIntent';
+    final draft = normalizedDetails == null || normalizedDetails.isEmpty
+        ? subject
+        : '$subject\n$normalizedDetails';
+    final returnRoute = Uri(
+      path: '/app/buy',
+      queryParameters: {
+        'sub': 'orders',
+        'view': 'assist',
+        'order': normalizedOrderId,
+      },
+    ).toString();
+    return Uri(
+      path: '/app/chat/inbox',
+      queryParameters: {'type': 'order', 'draft': draft, 'return': returnRoute},
+    ).toString();
+  }
+
   String _returnRouteFor({
     required String currentRoute,
     required BuyV2Destination destination,
