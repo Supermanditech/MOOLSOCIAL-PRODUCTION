@@ -44413,6 +44413,16 @@
       "prevention": "Patch the policy binding, lane allowlist, selected continuation and repair parent as four separate exact operations, parse and read back each state, and never combine distant policy contexts in this repair.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260829-3923-SHARED-CHAT-BUY-REPAIR-PREMERGE-READY",
+      "status": "active_exact_three_owner_resolution_contract",
+      "appliesTo": ["primary", "coordination", "integration_repair", "git", "chat", "profile"],
+      "mistake": "Shared Chat and tested Buy cannot enter a normal integration merge because merge-tree proves exactly three conflicts requiring an authoritative resolution choice.",
+      "rootCause": "The independent feature tips contain later shared Chat architecture and later approved Buy/profile/governance evolution from the same base.",
+      "prevention": "Permit one two-parent repair merge only: first parent is the qualified cumulative Buy repair baseline, second parent is 30f46145, profile resolves to the tested Buy blob, registry and policy resolve to the cumulative repair blobs, and no fourth owner may differ from the automatic conflict tree.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
     }
   ]
 }
