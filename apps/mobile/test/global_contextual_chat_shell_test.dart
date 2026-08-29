@@ -294,10 +294,25 @@ void main() {
     expect(find.byKey(const Key('chat-document')), findsOneWidget);
     expect(find.byKey(const Key('chat-gallery')), findsOneWidget);
     expect(find.byKey(const Key('chat-camera')), findsOneWidget);
+    expect(find.byKey(const Key('chat-video')), findsOneWidget);
+    for (final key in const [
+      Key('chat-document'),
+      Key('chat-gallery'),
+      Key('chat-camera'),
+      Key('chat-video'),
+    ]) {
+      expect(tester.getSize(find.byKey(key)).width, greaterThanOrEqualTo(44));
+      expect(tester.getSize(find.byKey(key)).height, greaterThanOrEqualTo(44));
+    }
     await tester.tap(find.byKey(const Key('chat-document')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
     expect(find.textContaining('Document sharing'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('chat-video')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
+    expect(find.textContaining('Video sharing'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('chat-composer-camera')));
     await tester.pumpAndSettle();

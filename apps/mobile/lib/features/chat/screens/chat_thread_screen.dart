@@ -1415,7 +1415,7 @@ Future<void> _chooseForwardTarget(
   }
 }
 
-enum _ChatAttachmentChoice { document, gallery, camera }
+enum _ChatAttachmentChoice { document, gallery, camera, video }
 
 class _ChatAttachmentAction extends StatelessWidget {
   const _ChatAttachmentAction({
@@ -1517,6 +1517,12 @@ class _ComposerState extends State<_Composer> {
       case _ChatAttachmentChoice.camera:
         await _selectPhoto(context, ChatPhotoSource.camera);
         return;
+      case _ChatAttachmentChoice.video:
+        setState(() {
+          _attachmentNotice =
+              'Video sharing is not available right now. You can share a photo or continue with a message.';
+        });
+        return;
     }
   }
 
@@ -1613,6 +1619,19 @@ class _ComposerState extends State<_Composer> {
                                 _chooseAttachment(
                                   context,
                                   _ChatAttachmentChoice.camera,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: _ChatAttachmentAction(
+                              keyName: 'chat-video',
+                              icon: Icons.video_library_outlined,
+                              label: 'Video',
+                              onPressed: () => unawaited(
+                                _chooseAttachment(
+                                  context,
+                                  _ChatAttachmentChoice.video,
                                 ),
                               ),
                             ),
