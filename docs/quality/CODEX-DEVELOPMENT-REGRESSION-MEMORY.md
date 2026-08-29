@@ -3545,3 +3545,117 @@ change. It strengthens the gates of otherwise authorized work.
   only the retained failed assertion after gates, fix once and use a new cycle.
 - REG3378 rejects using `$error` as a task variable because it collides with
   PowerShell's read-only `$Error`. Use task-specific failure-event names.
+- REG3802 rejects delegated checkpoint reads that exceed the live thread
+  reader's bounded turn limit. Use the callable parameter contract, request at
+  most 10 turns and page only when a returned cursor proves it is necessary.
+- REG3803 rejects grouped ticket-identity searches that return no usable
+  projection. Search config and quality roots independently, normalize no-match
+  exits separately and accept only explicit bounded counts and exact matches.
+- REG3804 rejects a coordination binding patched with a pending digest
+  placeholder. Recompute the exact registry count and SHA-256 after every
+  append, then copy those scalars directly into one bounded binding update.
+- REG3805 rejects thread-history reads whose per-item output request exceeds
+  the live 20000-character limit. Validate both the 10-turn and 20000-character
+  bounds before the call and reuse them unchanged on every cursor page.
+- REG3806 rejects a ticket-history assertion that hides whether native exit or
+  parent cardinality failed. Capture the git exit immediately, normalize the
+  one parent row separately and assert its exact two-token non-merge shape.
+- REG3807 rejects coupling those parent checks after a valid current-history
+  projection still fails. Assert native exit, row count and token count
+  independently, then assign the parent only after all three pass.
+- REG3808 rejects split-array cardinality as the final parent-history oracle.
+  Match the one native row against the exact child-space-parent SHA pattern,
+  then extract the parent only from that qualified row.
+- REG3809 rejects formatted parent-row regex parsing after valid Git evidence
+  still fails. Resolve the parent with `rev-parse commit^` and independently
+  require an empty `--min-parents=2` probe for the first ticket commit.
+- REG3810 rejects `rev-list --min-parents=2` for commit-local classification
+  because it scans merge ancestors. Project `%P` from the exact commit, require
+  one parent SHA and compare it with `rev-parse commit^`.
+- REG3811 rejects comparing two formatted direct-parent representations when
+  ticket history is the invariant. Resolve the base with `commit^`, then require
+  zero merges only inside the exact `base..HEAD` ticket range.
+- REG3812 rejects an aggregate ticket-range merge result without exact identity.
+  Project only merge commit IDs and parent counts, preserve existing history and
+  use a literal compatibility rule only for a founder-approved retained merge.
+- REG3813 rejects guessed design tokens such as `MoolColors.outline`. Inspect
+  the exact declaring owner, use only a current member and pass focused analysis
+  before running widget behavior.
+- REG3814 rejects any source correction after registry movement and before gate
+  refresh. Replay the implementation regression and existing codex_ui
+  incremental gates immediately after every append and binding update.
+- REG3815 rejects a themed full-width OutlinedButton placed directly inside a
+  Row. Give horizontal action buttons finite local width and a finite minimum
+  height of at least 44 pixels, then render the paused state at compact width.
+- REG3816 rejects `ensureVisible` for an unbuilt lazy Conversation Info child.
+  Use bounded `dragUntilVisible` on the keyed list, then measure the constructed
+  later tile.
+- REG3817 rejects replaying the retired C10D static dock-shape checker against
+  the approved contextual Chat shell. Use the current shell suite, exact-return
+  widget journey and incremental lane gate unless that checker gains a successor mode.
+- REG3818 rejects passing raw Git reverse-diff range hunks into `apply_patch`.
+  Restore generated text from independently read current and HEAD content using
+  the patch tool’s native whole-file update shape.
+- REG3819 rejects grouped RuntimeUiReview build-control searches across scripts
+  and config. Read the exact wrapper and foundation checker independently, then
+  follow only their returned machine-state contract.
+- REG3820 rejects manually completing a short commit into a candidate HEAD.
+  Project `git rev-parse HEAD` immediately before state creation, copy the exact
+  scalar and compare parsed state before any build gate.
+- REG3821 rejects reusing absent candidate-specific premium-motion evidence.
+  Keep the canonical policy and coverage, but bind the candidate contract and
+  disposition to exact existing current-ticket owners before the APK gate.
+- REG3822 rejects PowerShell dot access for UIAutomator attributes such as
+  `content-desc`. Use `GetAttribute` with exact literal names and resume from
+  the retained capture without repeating the device action.
+- REG3823 rejects a third compact conversation-header action after r61.34
+  overflowed by 16 pixels on OPPO. Keep Voice and Video visible, open shared
+  Conversation Info from the identity/title and test final header geometry.
+- REG3824 rejects header corrections based on pre-format source context. Read
+  exact current title and trailing ranges, patch them independently and format
+  only after both bounded changes are verified.
+- REG3825 rejects repeating a conversation tap after r61.35 first showed a
+  blank blue OPPO surface. Preserve the frame and classify activity focus,
+  process, hierarchy ownership and sanitized fatal markers before correction.
+- REG3826 rejects attributing a Shop-specific device defect to the global Chat
+  owner. Identify the visible route/source semantics first; keep Shop Cursor-owned
+  and qualify global Conversation Info from a non-Shop context such as Work.
+- REG3827 rejects a visually 48-pixel Chat recovery button whose OPPO exported
+  bounds are only about 31 logical pixels. Lift shared recovery sheets by the
+  existing Android semantics-clearance token and require at least 44 exported.
+- REG3828 rejects calculating that clearance inside a `useSafeArea` modal after
+  its top inset is removed. Compute from the caller context and pass the exact
+  scalar into the sheet wrapper.
+- REG3829 rejects changing a shared Chat sheet constructor before updating all
+  consumers. Inventory every call site and pass caller-owned clearance through
+  every sheet launch before focused analysis.
+- REG3830 rejects combining regression-memory and incremental pre-build gates
+  in one shell. Run each authoritative gate separately with its own exit before
+  APK state validation and wrapper preflight.
+- REG3831 rejects empty inbox actions that cross the compact navigation boundary
+  by three pixels. Add an asymmetric bottom reserve and require both final 44+
+  pixel controls to remain fully above the fixed NavigationBar.
+- REG3832 rejects a bottom-reserve patch that does not move the actual empty
+  action group. Read the exact `_EmptyInbox` range and bind geometry directly
+  to its keyed controls before retrying the compact rect assertion.
+- REG3833 rejects a hardcoded compact NavigationBar y-coordinate. Compare the
+  action rects to the rendered `chat-native-navigation` rect and require exact
+  non-overlap instead of nominal-height arithmetic.
+- REG3834 rejects an empty action that still overlaps the rendered NavigationBar.
+  Project all three rects, then move the keyed action group by the smallest
+  explicit layout offset that preserves 44-pixel targets and proves zero overlap.
+- REG3835 rejects assuming the empty-inbox Open Feed key for the full journey.
+  Seed one real thread, enter Discover through `chat-new`, then open Feed and
+  return to the loaded people list for connect-to-direct-Chat completion.
+- REG3836 rejects a Discover empty action after people have loaded. Use the
+  persistent Social `chat-more` → `Open public Feed` entry for the complete
+  populated Feed-to-Discover-to-direct-Chat journey.
+- REG3837 rejects an unencoded nested `/app/social?sub=feed` return query. Encode
+  the complete Social URI as one Chat return value before asserting the Social
+  title and persistent Feed menu action.
+- REG3838 rejects restricting the persistent public Feed menu to Social-origin
+  Chat. Expose one shared Feed entry in every context and preserve the exact
+  originating Chat route on native Back.
+- REG3839 rejects assuming Android Back pops a Social root directly to Chat.
+  Preserve Social shell Back ownership, continue through its global Chat action
+  and verify Chat Back returns to Feed within the approved navigation contract.

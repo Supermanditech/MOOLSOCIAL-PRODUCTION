@@ -62,6 +62,16 @@ class ChatSession extends ChangeNotifier {
           mine: false,
         ),
       ],
+      'ride-support': [
+        const ChatMessage(
+          id: 'm9',
+          sender: 'Trip Support',
+          text:
+              'Your Bike Saver trip from Sardarpura pickup gate to Railway Station is ready for coordination.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
       'clinic-care': [
         const ChatMessage(
           id: 'm7',
@@ -76,6 +86,16 @@ class ChatSession extends ChangeNotifier {
           id: 'm8',
           sender: 'Ramesh Kumar',
           text: 'I accepted the task and can see the approved instructions.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'workspace-support': [
+        const ChatMessage(
+          id: 'workspace-review-1',
+          sender: 'Workspace Review',
+          text:
+              'Choose one provider profile and complete only the requested details. Your personal account remains active during review.',
           timeLabel: 'Now',
           mine: false,
         ),
@@ -101,6 +121,9 @@ class ChatSession extends ChangeNotifier {
   final Map<String, String> _forwardRetryKeys = {};
   final Map<String, ChatMessage> _replyTargets = {};
   final Map<String, _PendingChatPhoto> _pendingPhotos = {};
+  final Map<String, bool> _chatAvailableForSession = {};
+  final Map<String, bool> _voiceCallsAvailableForSession = {};
+  final Map<String, bool> _videoCallsAvailableForSession = {};
   int _messageSequence = 10;
 
   static const reviewThreads = <ChatThread>[
@@ -143,6 +166,16 @@ class ChatSession extends ChangeNotifier {
       verified: true,
     ),
     ChatThread(
+      id: 'ride-support',
+      title: 'Trip Support',
+      subtitle: 'Bike Saver · Sardarpura to Railway Station',
+      preview: 'Your trip is ready for coordination.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
+      unreadCount: 1,
+      verified: true,
+    ),
+    ChatThread(
       id: 'clinic-care',
       title: 'Sardarpura Clinic',
       subtitle: 'Verified clinic · Appointment support',
@@ -158,6 +191,15 @@ class ChatSession extends ChangeNotifier {
       preview: 'I can see the approved task instructions.',
       timeLabel: 'Now',
       type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'workspace-support',
+      title: 'Workspace Review',
+      subtitle: 'Setup and application support',
+      preview: 'Complete only the details requested for review.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
       verified: true,
     ),
   ];
@@ -226,6 +268,39 @@ class ChatSession extends ChangeNotifier {
   String? threadActionNotice(String threadId) => _threadActionNotices[threadId];
 
   ChatMessage? replyTarget(String threadId) => _replyTargets[threadId];
+
+  bool chatAvailableForSession(String threadId) =>
+      _chatAvailableForSession[threadId] ?? true;
+
+  bool voiceCallsAvailableForSession(String threadId) =>
+      _voiceCallsAvailableForSession[threadId] ?? true;
+
+  bool videoCallsAvailableForSession(String threadId) =>
+      _videoCallsAvailableForSession[threadId] ?? true;
+
+  void setChatAvailableForSession(String threadId, {required bool available}) {
+    if (chatAvailableForSession(threadId) == available) return;
+    _chatAvailableForSession[threadId] = available;
+    notifyListeners();
+  }
+
+  void setVoiceCallsAvailableForSession(
+    String threadId, {
+    required bool available,
+  }) {
+    if (voiceCallsAvailableForSession(threadId) == available) return;
+    _voiceCallsAvailableForSession[threadId] = available;
+    notifyListeners();
+  }
+
+  void setVideoCallsAvailableForSession(
+    String threadId, {
+    required bool available,
+  }) {
+    if (videoCallsAvailableForSession(threadId) == available) return;
+    _videoCallsAvailableForSession[threadId] = available;
+    notifyListeners();
+  }
 
   bool get photoSharingAvailable =>
       _gateway is ChatPhotoGateway && _photoPicker != null;

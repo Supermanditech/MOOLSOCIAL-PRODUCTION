@@ -211,7 +211,7 @@ function Assert-IntegrationRepairMerge(
   $actualConflictOwners = @($actualConflictOwners | Sort-Object -Unique)
   Assert-Coordination (
     (@($actualConflictOwners | Sort-Object) -join '|') -ceq
-      (@($expectedRepairConflictOwners | Sort-Object) -join '|')
+      (@($expectedRepairUnmergedOwners | Sort-Object) -join '|')
   ) 'integration repair conflict inventory changed.'
 
   $manualDeltaOwners = @(& git -C $root diff --name-only `
@@ -883,6 +883,11 @@ Assert-ExactNames $integrationRepair @(
 $expectedRepairConflictOwners = @(
   'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart',
   'config/codex-development-regression-registry.json',
+  'config/codex-subagent-coordination-policy.json',
+  'scripts/check-codex-subagent-coordination-policy.ps1'
+)
+$expectedRepairUnmergedOwners = @(
+  'config/codex-development-regression-registry.json',
   'config/codex-subagent-coordination-policy.json'
 )
 Assert-Coordination (
@@ -901,7 +906,7 @@ Assert-Coordination (
     'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md' -and
   [int]$integrationRepair.maximumPostMergeClosureCommits -eq 1 -and
   (@($integrationRepair.postMergeClosureOwners) -join '|') -ceq
-    'docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md' -and
+    'docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md|scripts/check-codex-subagent-coordination-policy.ps1' -and
   -not [bool]$integrationRepair.directSourceCommitsAllowed -and
   [bool]$integrationRepair.conflictResolutionAllowed -and
   (@($integrationRepair.exactConflictOwners | Sort-Object) -join '|') -ceq

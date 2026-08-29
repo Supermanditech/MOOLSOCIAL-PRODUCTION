@@ -41,19 +41,13 @@ class GlobalSecurityV2 extends StatelessWidget {
             backgroundColor: palette.canvas,
             surfaceTintColor: Colors.transparent,
             toolbarHeight: 64,
-            leadingWidth: 60,
+            leadingWidth: 56,
             leading: Padding(
-              padding: const EdgeInsets.only(left: MoolSpacing.sm),
-              child: IconButton.outlined(
-                key: const Key('global-security-back'),
-                tooltip: 'Back',
+              padding: const EdgeInsets.only(left: MoolSpacing.xs),
+              child: GlobalProfileBackButtonV2(
+                keyName: 'global-security-back',
+                palette: palette,
                 onPressed: () => _leave(context),
-                style: IconButton.styleFrom(
-                  foregroundColor: palette.ink,
-                  backgroundColor: palette.card,
-                  side: BorderSide(color: palette.border),
-                ),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
               ),
             ),
             titleSpacing: MoolSpacing.xs,
@@ -140,7 +134,7 @@ class GlobalSecurityV2 extends StatelessWidget {
                             detail:
                                 'Manage account recovery and access methods',
                             palette: palette,
-                            onTap: () => context.go('/sign-in'),
+                            onTap: () => _beginSignIn(context),
                           ),
                       ],
                     ),
@@ -192,6 +186,15 @@ class GlobalSecurityV2 extends StatelessWidget {
     }
   }
 
+  void _beginSignIn(BuildContext context) {
+    final securityLocation = GoRouterState.of(context).uri.toString();
+    session.beginSignIn(
+      returnLocation: securityLocation,
+      cancelLocation: securityLocation,
+    );
+    context.go('/sign-in');
+  }
+
   Future<void> _confirmSignOut(
     BuildContext context,
     GlobalProfileSurfacePalette palette,
@@ -241,7 +244,12 @@ class GlobalSecurityV2 extends StatelessWidget {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('/app/work/home');
+      final returnLocation = GoRouterState.of(
+        context,
+      ).uri.queryParameters['return'];
+      context.go(
+        globalProfileSafeReturnLocation(returnLocation) ?? '/app/mool',
+      );
     }
   }
 

@@ -298,7 +298,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('chat-attach')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('chat-attach-sheet')), findsOneWidget);
+    expect(find.byKey(const Key('chat-attachment-tray')), findsOneWidget);
     await tester.tap(find.byKey(const Key('chat-gallery')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-selected-photo')), findsOneWidget);
@@ -329,6 +329,11 @@ void main() {
       find.byKey(const Key('chat-photo-refresh-server-photo-1')),
       findsOneWidget,
     );
+    await tester.longPress(
+      find.byKey(const Key('chat-message-server-photo-1')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-message-actions')), findsOneWidget);
     expect(find.byKey(const Key('chat-reply-server-photo-1')), findsOneWidget);
     expect(find.byKey(const Key('chat-react-server-photo-1')), findsOneWidget);
     expect(find.byKey(const Key('chat-forward-server-photo-1')), findsNothing);

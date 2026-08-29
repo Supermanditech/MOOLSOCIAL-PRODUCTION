@@ -135,14 +135,13 @@ void main() {
       expect(find.byKey(const Key('chat-open-thread-mahadev')), findsOneWidget);
 
       await tapVisible(tester, const Key('chat-new'));
-      expect(find.byKey(const Key('chat-new-open-feed')), findsOneWidget);
-      expect(find.byKey(const Key('chat-new-discover-people')), findsOneWidget);
       expect(
-        find.textContaining('Phone contacts are never uploaded'),
+        find.byKey(const ValueKey('chat-section-body-discover')),
         findsOneWidget,
       );
-      expect(find.byKey(const Key('chat-new-business')), findsNothing);
-      await tapVisible(tester, const Key('chat-new-cancel'));
+      expect(find.byKey(const Key('chat-new-open-feed')), findsNothing);
+      expect(find.byKey(const Key('chat-new-discover-people')), findsNothing);
+      await tapVisible(tester, const Key('chat-section-chats'));
       await tapVisible(tester, const Key('chat-filter-all'));
 
       await tapVisible(tester, const Key('chat-voice-search'));
@@ -169,6 +168,162 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Start conversation opens public Feed discovery inside Chat', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/work/my-work',
+      journey: journey,
+      chat: chat,
+      size: const Size(360, 800),
+    );
+
+    await tapVisible(tester, const Key('chat-new'));
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('chat-new')), findsNothing);
+    await tapVisible(tester, const Key('chat-discover-open-feed'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    expect(find.text('Public Feed unavailable'), findsOneWidget);
+    expect(find.byKey(const Key('chat-feed-retry')), findsOneWidget);
+    expect(find.byKey(const Key('chat-feed-back-to-chats')), findsOneWidget);
+    expect(
+      tester.getBottomRight(find.byKey(const Key('chat-feed-retry'))).dy,
+      lessThanOrEqualTo(728),
+    );
+    expect(
+      tester
+          .getBottomRight(find.byKey(const Key('chat-feed-back-to-chats')))
+          .dy,
+      lessThanOrEqualTo(728),
+    );
+    expect(find.byKey(const Key('chat-new')), findsNothing);
+    expect(find.byKey(const Key('screen04-universal-v2')), findsNothing);
+    await tapVisible(tester, const Key('chat-feed-back-to-chats'));
+    expect(
+      find.byKey(const ValueKey('chat-section-body-chats')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('chat-new')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty inbox separates Open Feed from the Person+ action', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final chat = ChatSession.production(gateway: _PeopleChatGateway());
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/mool',
+      journey: journey,
+      chat: chat,
+      size: const Size(320, 568),
+    );
+    await tester.pumpAndSettle();
+
+    final openFeed = find.byKey(const Key('chat-open-feed'));
+    final startConversation = find.byKey(const Key('chat-empty-start'));
+    expect(openFeed, findsOneWidget);
+    expect(startConversation, findsOneWidget);
+    expect(find.byKey(const Key('chat-new')), findsNothing);
+    final feedRect = tester.getRect(openFeed);
+    final startRect = tester.getRect(startConversation);
+    final navigationRect = tester.getRect(
+      find.byKey(const Key('chat-native-navigation')),
+    );
+    expect(feedRect.overlaps(startRect), isFalse);
+    expect(feedRect.overlaps(navigationRect), isFalse);
+    expect(startRect.overlaps(navigationRect), isFalse);
+    expect(feedRect.width, greaterThanOrEqualTo(44));
+    expect(feedRect.height, greaterThanOrEqualTo(44));
+    expect(startRect.width, greaterThanOrEqualTo(44));
+    expect(startRect.height, greaterThanOrEqualTo(44));
+    expect(feedRect.left, greaterThanOrEqualTo(0));
+    expect(startRect.right, lessThanOrEqualTo(320));
+    expect(feedRect.bottom, lessThanOrEqualTo(navigationRect.top));
+    expect(startRect.bottom, lessThanOrEqualTo(navigationRect.top));
+
+    await tester.tap(startConversation);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Open Feed continues through Social and back into direct Chat', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final socialGateway = _PeopleSocialGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    final chatGateway = _PeopleChatGateway();
+    final chat = ChatSession.production(gateway: chatGateway);
+    addTearDown(journey.dispose);
+    addTearDown(shared.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/work/my-work',
+      journey: journey,
+      chat: chat,
+      sharedSession: shared,
+      size: const Size(360, 800),
+    );
+
+    await tapVisible(tester, const Key('chat-more'));
+    expect(find.text('Open public Feed'), findsOneWidget);
+    await tester.tap(find.text('Open public Feed'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+    expect(find.text('Alice News'), findsWidgets);
+    expect(find.text('Public discovery post'), findsWidgets);
+
+    await tapVisible(tester, const Key('social-global-chat'));
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    await tapVisible(tester, const Key('chat-section-discover'));
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    await tapVisible(tester, const Key('chat-person-connect-person-a'));
+    await tapVisible(tester, const Key('chat-person-message-person-a'));
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(chatGateway.createdTargets, ['person-a']);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'Discover connects MoolSocial people and starts a real direct Chat',
@@ -266,7 +421,7 @@ void main() {
     );
     expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
     expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
-    expect(find.byKey(const Key('chat-inbox-back')), findsNothing);
+    expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
     expect(find.byKey(const Key('chat-native-navigation')), findsOneWidget);
     final addPerson = find.byKey(const Key('chat-new'));
     expect(tester.getSize(addPerson).width, greaterThanOrEqualTo(44));
@@ -367,10 +522,7 @@ void main() {
 
       for (final key in const [
         Key('chat-like-m1'),
-        Key('chat-attach'),
         Key('chat-camera'),
-        Key('chat-thread-call'),
-        Key('chat-thread-video'),
         Key('chat-thread-more'),
         Key('chat-mode-media'),
         Key('chat-mode-poll'),
@@ -379,14 +531,26 @@ void main() {
       ]) {
         expect(find.byKey(key), findsNothing, reason: '$key');
       }
+      expect(find.byKey(const Key('chat-attach')), findsOneWidget);
+      expect(find.byKey(const Key('chat-composer-camera')), findsOneWidget);
+      expect(find.byKey(const Key('chat-thread-call')), findsOneWidget);
+      expect(find.byKey(const Key('chat-thread-video')), findsOneWidget);
+      expect(find.byKey(const Key('chat-voice-message')), findsOneWidget);
 
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-message-actions')), findsOneWidget);
       await tapVisible(tester, const Key('chat-react-m1'));
       expect(chat.messages('home-basket').first.reactionCount, 3);
       expect(chat.messages('home-basket').first.reactedByMe, isTrue);
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
       await tapVisible(tester, const Key('chat-react-m1'));
       expect(chat.messages('home-basket').first.reactionCount, 2);
       expect(chat.messages('home-basket').first.reactedByMe, isFalse);
 
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
       await tapVisible(tester, const Key('chat-reply-m1'));
       expect(
         find.byKey(const Key('chat-composer-reply-context')),
@@ -414,8 +578,12 @@ void main() {
         findsNothing,
       );
 
-      await tapVisible(tester, const Key('chat-send'));
-      expect(find.text('Write a message.'), findsOneWidget);
+      await tapVisible(tester, const Key('chat-voice-message'));
+      expect(
+        find.byKey(const Key('chat-voice-message-recovery')),
+        findsOneWidget,
+      );
+      await tapVisible(tester, const Key('chat-capability-continue'));
       expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
       expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
       expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
@@ -528,7 +696,7 @@ void main() {
       size: const Size(360, 800),
     );
 
-    for (final key in const [Key('chat-back'), Key('chat-send')]) {
+    for (final key in const [Key('chat-back'), Key('chat-voice-message')]) {
       final size = tester.getSize(find.byKey(key));
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
@@ -566,7 +734,7 @@ void main() {
     final safeBottom = media.size.height - media.viewPadding.bottom;
     expect(tester.getBottomRight(field).dy, lessThanOrEqualTo(safeBottom));
     expect(
-      tester.getBottomRight(find.byKey(const Key('chat-send'))).dy,
+      tester.getBottomRight(find.byKey(const Key('chat-voice-message'))).dy,
       lessThanOrEqualTo(safeBottom),
     );
     expect(tester.takeException(), isNull);

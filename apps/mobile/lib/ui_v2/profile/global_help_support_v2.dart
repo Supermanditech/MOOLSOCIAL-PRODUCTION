@@ -25,19 +25,13 @@ class GlobalHelpSupportV2 extends StatelessWidget {
         backgroundColor: palette.canvas,
         surfaceTintColor: Colors.transparent,
         toolbarHeight: 64,
-        leadingWidth: 60,
+        leadingWidth: 56,
         leading: Padding(
-          padding: const EdgeInsets.only(left: MoolSpacing.sm),
-          child: IconButton.outlined(
-            key: const Key('global-help-back'),
-            tooltip: 'Back',
+          padding: const EdgeInsets.only(left: MoolSpacing.xs),
+          child: GlobalProfileBackButtonV2(
+            keyName: 'global-help-back',
+            palette: palette,
             onPressed: () => _leave(context),
-            style: IconButton.styleFrom(
-              foregroundColor: palette.ink,
-              backgroundColor: palette.card,
-              side: BorderSide(color: palette.border),
-            ),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           ),
         ),
         titleSpacing: MoolSpacing.xs,
@@ -93,7 +87,12 @@ class GlobalHelpSupportV2 extends StatelessWidget {
                       title: 'Account access & security',
                       detail: 'Sign-in methods, recovery and app permissions',
                       palette: palette,
-                      onTap: () => context.push('/app/account/security'),
+                      onTap: () => context.push(
+                        globalSecurityLocationForReturn(
+                          GoRouterState.of(context).uri.toString(),
+                          surfaceTone: surfaceTone,
+                        ),
+                      ),
                     ),
                     _HelpAction(
                       keyName: 'global-help-preferences',
@@ -102,15 +101,19 @@ class GlobalHelpSupportV2 extends StatelessWidget {
                       detail:
                           'Language, service area, notifications and privacy',
                       palette: palette,
-                      onTap: () =>
-                          context.push('/app/account/workspaces/preferences'),
+                      onTap: () => context.push(
+                        globalPreferencesLocationForReturn(
+                          GoRouterState.of(context).uri.toString(),
+                          surfaceTone: surfaceTone,
+                        ),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: MoolSpacing.md),
                 _SupportCard(
                   palette: palette,
-                  onPressed: () => context.push(_supportLocation()),
+                  onPressed: () => context.push(_supportLocation(context)),
                 ),
               ],
             ),
@@ -120,16 +123,24 @@ class GlobalHelpSupportV2 extends StatelessWidget {
     );
   }
 
-  String _supportLocation() => Uri(
+  String _supportLocation(BuildContext context) => Uri(
     path: '/app/chat',
-    queryParameters: const {'type': 'support', 'return': '/app/ask'},
+    queryParameters: {
+      'type': 'support',
+      'return': GoRouterState.of(context).uri.toString(),
+    },
   ).toString();
 
   void _leave(BuildContext context) {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('/app/work/home');
+      final returnLocation = GoRouterState.of(
+        context,
+      ).uri.queryParameters['return'];
+      context.go(
+        globalProfileSafeReturnLocation(returnLocation) ?? '/app/mool',
+      );
     }
   }
 }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
 import 'package:moolsocial/ui_v2/work/work_main_v2.dart';
 
@@ -89,6 +91,48 @@ void main() {
     return router;
   }
 
+  Future<JourneySession> pumpReadyGuestApp(WidgetTester tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final journey = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'manual',
+          areaLabel: 'Jodhpur',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(),
+      allowGuestReady: true,
+    );
+    final work = WorkSession();
+    await journey.start();
+    addTearDown(journey.dispose);
+    addTearDown(work.dispose);
+    await tester.pumpWidget(
+      MoolSocialApp(
+        key: UniqueKey(),
+        session: journey,
+        workSession: work,
+        initialLocation: '/app/work/home',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(journey.stage, JourneyStage.ready);
+    expect(journey.isAuthenticated, isFalse);
+    return journey;
+  }
+
+  Future<void> openSecurityFromWork(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('work-main-global-profile')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('global-profile-security')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('global-security-v2')), findsOneWidget);
+  }
+
   testWidgets('Work opens one compact global Security destination', (
     tester,
   ) async {
@@ -156,6 +200,68 @@ void main() {
     await tester.tap(find.byKey(const Key('global-security-sign-in')));
     await tester.pumpAndSettle();
     expect(router.routeInformationProvider.value.uri.path, '/sign-in');
+    expect(journey.stage, JourneyStage.signIn);
+    final returnUri = Uri.parse(journey.returnTo!);
+    expect(returnUri.path, '/app/account/security');
+    expect(returnUri.queryParameters['return'], '/app/work/home');
+  });
+
+  testWidgets('real router keeps Security sign-in open and Back recovers', (
+    tester,
+  ) async {
+    final journey = await pumpReadyGuestApp(tester);
+    await openSecurityFromWork(tester);
+    final securityLocation = GoRouterState.of(
+      tester.element(find.byKey(const Key('global-security-v2'))),
+    ).uri.toString();
+
+    await tester.tap(find.byKey(const Key('global-security-sign-in')));
+    await tester.pumpAndSettle();
+
+    expect(journey.stage, JourneyStage.signIn);
+    expect(journey.returnTo, securityLocation);
+    expect(journey.canCancelSignIn, isTrue);
+    expect(find.byKey(const Key('screen03-login-v5')), findsOneWidget);
+    expect(find.byKey(const Key('sign-in-route-recovery')), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(journey.stage, JourneyStage.ready);
+    expect(find.byKey(const Key('global-security-v2')), findsOneWidget);
+    final recovered = GoRouterState.of(
+      tester.element(find.byKey(const Key('global-security-v2'))),
+    ).uri;
+    expect(recovered.path, '/app/account/security');
+    expect(recovered.queryParameters['return'], '/app/work/home');
+
+    await tester.tap(find.byKey(const Key('global-security-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-main-v2')), findsOneWidget);
+  });
+
+  testWidgets('successful Security sign-in returns to Security then Work', (
+    tester,
+  ) async {
+    final journey = await pumpReadyGuestApp(tester);
+    await openSecurityFromWork(tester);
+
+    await tester.tap(find.byKey(const Key('global-security-sign-in')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen03-login-v5')), findsOneWidget);
+
+    expect(await journey.requestEmailOtp('person@example.com'), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen03-otp-v2')), findsOneWidget);
+    expect(await journey.verifyOtp('123456'), isTrue);
+    await tester.pumpAndSettle();
+
+    expect(journey.stage, JourneyStage.ready);
+    expect(journey.isAuthenticated, isTrue);
+    expect(find.byKey(const Key('global-security-v2')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('global-security-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-main-v2')), findsOneWidget);
   });
 
   testWidgets('sign-out cancellation is safe and confirmation exits once', (
@@ -251,6 +357,103 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('direct Security restore returns to its exact safe origin', (
+    tester,
+  ) async {
+    final journey = JourneySession(store: MemoryJourneyStore());
+    addTearDown(journey.dispose);
+    final router = GoRouter(
+      initialLocation: Uri(
+        path: '/app/account/security',
+        queryParameters: const {'return': '/app/eat/home?cuisine=cafe'},
+      ).toString(),
+      routes: [
+        GoRoute(
+          path: '/app/account/security',
+          builder: (context, state) => GlobalSecurityV2(
+            session: journey,
+            onSignOut: () async => true,
+            openDeviceSettings: () async => true,
+          ),
+        ),
+        GoRoute(
+          path: '/app/eat/home',
+          builder: (context, state) =>
+              const Scaffold(key: Key('eat-origin-return')),
+        ),
+        GoRoute(
+          path: '/app/mool',
+          builder: (context, state) =>
+              const Scaffold(key: Key('global-safe-return')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('global-security-back')));
+    await tester.pumpAndSettle();
+
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/app/eat/home?cuisine=cafe',
+    );
+    expect(find.byKey(const Key('eat-origin-return')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('Social Security keeps its surface and exact return together', () {
+    final uri = Uri.parse(
+      globalSecurityLocationForReturn(
+        '/app/social?sub=videos',
+        surfaceTone: GlobalProfileSurfaceTone.socialDark,
+      ),
+    );
+
+    expect(uri.path, '/app/account/security');
+    expect(uri.queryParameters['return'], '/app/social?sub=videos');
+    expect(uri.queryParameters['surface'], 'social');
+  });
+
+  testWidgets('unsafe Security return uses the neutral Mool destination', (
+    tester,
+  ) async {
+    final journey = JourneySession(store: MemoryJourneyStore());
+    addTearDown(journey.dispose);
+    final router = GoRouter(
+      initialLocation: Uri(
+        path: '/app/account/security',
+        queryParameters: const {'return': 'https://example.com/account'},
+      ).toString(),
+      routes: [
+        GoRoute(
+          path: '/app/account/security',
+          builder: (context, state) => GlobalSecurityV2(
+            session: journey,
+            onSignOut: () async => true,
+            openDeviceSettings: () async => true,
+          ),
+        ),
+        GoRoute(
+          path: '/app/mool',
+          builder: (context, state) =>
+              const Scaffold(key: Key('global-safe-return')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('global-security-back')));
+    await tester.pumpAndSettle();
+
+    expect(router.routeInformationProvider.value.uri.path, '/app/mool');
+    expect(find.byKey(const Key('global-safe-return')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

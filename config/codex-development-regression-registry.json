@@ -44423,6 +44423,36 @@
       "prevention": "Permit one two-parent repair merge only: first parent is the qualified cumulative Buy repair baseline, second parent is 30f46145, profile resolves to the tested Buy blob, registry and policy resolve to the cumulative repair blobs, and no fourth owner may differ from the automatic conflict tree.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3924-MERGE-TREE-CHANGED-IN-BOTH-MISCLASSIFIED-AS-CONFLICT",
+      "status": "registered_exact_unmerged_index_inventory_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "git", "profile", "tooling"],
+      "mistake": "The repair merge expected three conflicts because the classic merge-tree audit counted every changed-in-both block, but the real merge produced conflicts only in registry and policy while profile auto-merged.",
+      "rootCause": "Changed on both tips was treated as equivalent to an unmerged content conflict even when Git could combine the profile changes automatically.",
+      "prevention": "Use git diff --diff-filter=U as the authoritative conflict inventory, bind registry and policy as the two manual conflict owners, and independently compare the auto-merged profile bytes to the tested Buy profile before accepting it.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart"]
+    },
+    {
+      "id": "REG-20260829-3925-AUTO-MERGED-PROFILE-CHECKOUT-OURS-HAD-NO-STAGE",
+      "status": "registered_head_source_restore_for_auto_merge_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "profile", "git"],
+      "mistake": "checkout --ours did not restore the auto-merged profile because the path was not unmerged and therefore had no stage-2 ours entry; the subsequent blob check failed.",
+      "rootCause": "A conflict-only index selector was used on a cleanly auto-merged but authority-sensitive path.",
+      "prevention": "Restore only global_profile_panel_v2.dart from the exact first-parent HEAD source, compare git hash-object to HEAD:path, and stage it as the intentional protected-profile resolution owner.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart"]
+    },
+    {
+      "id": "REG-20260829-3926-REPAIR-GATE-EQUATED-UNMERGED-AND-RESOLUTION-OWNERS",
+      "status": "registered_separate_unmerged_and_resolution_inventories_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "git", "profile", "tooling"],
+      "mistake": "Merge pre_commit rejected the repair because the checker compared Git's two unmerged paths to the four authoritative resolution owners, which also include protected profile restoration and checker governance.",
+      "rootCause": "The legacy repair gate assumed every manual resolution owner must originate as an unmerged index path.",
+      "prevention": "Assert unmerged owners are exactly registry and policy, assert manual delta owners are exactly profile, registry, policy and checker, and retain both independent inventories through handoff.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
     }
   ]
 }

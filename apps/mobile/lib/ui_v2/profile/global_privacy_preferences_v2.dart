@@ -35,19 +35,13 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
           backgroundColor: palette.canvas,
           surfaceTintColor: Colors.transparent,
           toolbarHeight: 64,
-          leadingWidth: 60,
+          leadingWidth: 56,
           leading: Padding(
-            padding: const EdgeInsets.only(left: MoolSpacing.sm),
-            child: IconButton.outlined(
-              key: const Key('global-preferences-back'),
-              tooltip: 'Back',
+            padding: const EdgeInsets.only(left: MoolSpacing.xs),
+            child: GlobalProfileBackButtonV2(
+              keyName: 'global-preferences-back',
+              palette: palette,
               onPressed: () => _leave(context),
-              style: IconButton.styleFrom(
-                foregroundColor: palette.ink,
-                backgroundColor: palette.card,
-                side: BorderSide(color: palette.border),
-              ),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
             ),
           ),
           titleSpacing: MoolSpacing.xs,
@@ -157,8 +151,13 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('/app/work/home');
+      context.go(_safeReturnLocation(context) ?? '/app/mool');
     }
+  }
+
+  String? _safeReturnLocation(BuildContext context) {
+    final raw = GoRouterState.of(context).uri.queryParameters['return'];
+    return globalProfileSafeReturnLocation(raw);
   }
 
   Future<void> _showLanguage(
@@ -167,59 +166,87 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
   ) async {
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       useSafeArea: true,
+      isScrollControlled: true,
       backgroundColor: palette.card,
-      showDragHandle: true,
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.md,
-          MoolSpacing.xs,
-          MoolSpacing.md,
-          MoolSpacing.lg,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Choose language',
-              style: TextStyle(
-                color: palette.ink,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            for (final choice in const [
-              (code: 'en', label: 'English'),
-              (code: 'hi', label: 'हिन्दी'),
-            ])
-              ListTile(
-                key: Key('global-preferences-language-${choice.code}'),
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  session.languageCode == choice.code
-                      ? Icons.check_circle_rounded
-                      : Icons.circle_outlined,
-                  color: palette.accent,
+      showDragHandle: false,
+      clipBehavior: Clip.antiAlias,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        final media = MediaQuery.of(sheetContext);
+        return SingleChildScrollView(
+          key: const Key('global-preferences-language-sheet'),
+          padding: EdgeInsets.fromLTRB(
+            MoolSpacing.md,
+            MoolSpacing.sm,
+            MoolSpacing.md,
+            media.viewPadding.bottom + MoolSpacing.md,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Choose language',
+                style: TextStyle(
+                  color: palette.ink,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
                 ),
-                title: Text(
-                  choice.label,
-                  style: TextStyle(
-                    color: palette.ink,
-                    fontWeight: FontWeight.w800,
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              for (final choice in const [
+                (code: 'en', label: 'English'),
+                (code: 'hi', label: 'हिन्दी'),
+              ])
+                Padding(
+                  padding: EdgeInsets.only(
+                    bottom: choice.code == 'en' ? MoolSpacing.xs : 0,
+                  ),
+                  child: Semantics(
+                    selected: session.languageCode == choice.code,
+                    button: true,
+                    child: ListTile(
+                      key: Key('global-preferences-language-${choice.code}'),
+                      tileColor: palette.control,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(MoolRadii.control),
+                        side: BorderSide(color: palette.border),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: MoolSpacing.sm,
+                      ),
+                      minTileHeight: 56,
+                      leading: Icon(
+                        session.languageCode == choice.code
+                            ? Icons.check_circle_rounded
+                            : Icons.circle_outlined,
+                        color: palette.accent,
+                      ),
+                      title: Text(
+                        choice.label,
+                        style: TextStyle(
+                          color: palette.ink,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      onTap: () async {
+                        final saved = await session.updateLanguage(choice.code);
+                        if (saved && sheetContext.mounted) {
+                          Navigator.pop(sheetContext);
+                        }
+                      },
+                    ),
                   ),
                 ),
-                onTap: () async {
-                  final saved = await session.updateLanguage(choice.code);
-                  if (saved && sheetContext.mounted) {
-                    Navigator.pop(sheetContext);
-                  }
-                },
-              ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -229,10 +256,15 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
   ) async {
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: palette.card,
-      showDragHandle: true,
+      showDragHandle: false,
+      clipBehavior: Clip.antiAlias,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (sheetContext) =>
           _ServiceAreaSheet(session: session, palette: palette),
     );
@@ -297,12 +329,13 @@ class _ServiceAreaSheetState extends State<_ServiceAreaSheet> {
   Widget build(BuildContext context) {
     final session = widget.session;
     final palette = widget.palette;
+    final media = MediaQuery.of(context);
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         MoolSpacing.md,
-        MoolSpacing.xs,
+        MoolSpacing.sm,
         MoolSpacing.md,
-        MediaQuery.viewInsetsOf(context).bottom + MoolSpacing.lg,
+        media.viewInsets.bottom + media.viewPadding.bottom + MoolSpacing.md,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -335,46 +368,77 @@ class _ServiceAreaSheetState extends State<_ServiceAreaSheet> {
             ),
           ],
           const SizedBox(height: MoolSpacing.sm),
-          FilledButton(
-            key: const Key('global-preferences-area-save'),
-            onPressed: () async {
-              final saved = await session.updateArea(
-                AreaChoice.manual,
-                label: _controller.text,
-              );
-              if (saved && context.mounted) {
-                Navigator.pop(context);
-              } else if (context.mounted) {
-                setState(() {});
-              }
-            },
-            child: const Text('Save service area'),
-          ),
-          OutlinedButton.icon(
-            key: const Key('global-preferences-area-current'),
-            onPressed: session.resolvingCurrentArea
-                ? null
-                : () async {
-                    final resolved = await session.resolveCurrentArea();
-                    if (resolved) {
-                      await session.updateArea(AreaChoice.current);
-                    }
-                    if (resolved && context.mounted) {
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  key: const Key('global-preferences-area-save'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: MoolSpacing.xs,
+                    ),
+                  ),
+                  onPressed: () async {
+                    final saved = await session.updateArea(
+                      AreaChoice.manual,
+                      label: _controller.text,
+                    );
+                    if (saved && context.mounted) {
                       Navigator.pop(context);
                     } else if (context.mounted) {
                       setState(() {});
                     }
                   },
-            icon: const Icon(Icons.my_location_rounded),
-            label: const Text('Use current location'),
+                  child: const Text('Save area'),
+                ),
+              ),
+              const SizedBox(width: MoolSpacing.xs),
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('global-preferences-area-current'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: MoolSpacing.xs,
+                    ),
+                  ),
+                  onPressed: session.resolvingCurrentArea
+                      ? null
+                      : () async {
+                          final resolved = await session.resolveCurrentArea();
+                          if (resolved) {
+                            await session.updateArea(AreaChoice.current);
+                          }
+                          if (resolved && context.mounted) {
+                            Navigator.pop(context);
+                          } else if (context.mounted) {
+                            setState(() {});
+                          }
+                        },
+                  icon: const Icon(Icons.my_location_rounded, size: 18),
+                  label: const Text(
+                    'Use my location',
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
           ),
-          TextButton(
+          const SizedBox(height: MoolSpacing.xs),
+          TextButton.icon(
             key: const Key('global-preferences-area-remove'),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+              minimumSize: const Size.fromHeight(48),
+            ),
             onPressed: () async {
               final saved = await session.updateArea(AreaChoice.skipped);
               if (saved && context.mounted) Navigator.pop(context);
             },
-            child: const Text('Remove service area'),
+            icon: const Icon(Icons.location_off_outlined, size: 18),
+            label: const Text('Remove service area'),
           ),
         ],
       ),
@@ -424,7 +488,7 @@ class _PreferencesHero extends StatelessWidget {
               ),
               SizedBox(height: 3),
               Text(
-                'Language and service area apply across every main action.',
+                'Choose your language and service area for a more relevant experience.',
                 style: TextStyle(
                   color: Color(0xFFDADAF3),
                   fontSize: 10,

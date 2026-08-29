@@ -330,6 +330,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byTooltip('Read'), findsOneWidget);
+      expect(find.byKey(const Key('chat-message-actions')), findsNothing);
+      await tester.longPress(
+        find.byKey(const Key('chat-message-message-read')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-message-actions')), findsOneWidget);
       expect(find.byKey(const Key('chat-reply-message-read')), findsOneWidget);
       expect(find.byKey(const Key('chat-react-message-read')), findsOneWidget);
       expect(
@@ -390,6 +396,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.longPress(find.byKey(const Key('chat-message-message-1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat-forward-message-1')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-forward-picker')), findsOneWidget);
@@ -405,6 +413,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(gateway.forwardRequests, isEmpty);
 
+    await tester.longPress(find.byKey(const Key('chat-message-message-1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat-forward-message-1')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat-forward-target-thread-2')));
@@ -541,6 +551,7 @@ void main() {
       find.byKey(const Key('chat-message-field')),
       'Old recipient draft',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const Key('chat-send')));
     await tester.pump();
     expect(session.busy, isTrue);

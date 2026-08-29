@@ -63,6 +63,42 @@ abstract final class MoolMetrics {
   static const double bottomNavigationHeight = 64;
 }
 
+/// One restrained platform-adaptive Back affordance for every app vertical.
+class MoolNativeBackButton extends StatelessWidget {
+  const MoolNativeBackButton({
+    required this.keyName,
+    required this.onPressed,
+    this.foregroundColor = MoolColors.ink,
+    super.key,
+  });
+
+  final String keyName;
+  final VoidCallback onPressed;
+  final Color foregroundColor;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    key: ValueKey(keyName),
+    tooltip: 'Back',
+    onPressed: onPressed,
+    constraints: const BoxConstraints.tightFor(
+      width: MoolMetrics.minimumTapTarget,
+      height: MoolMetrics.minimumTapTarget,
+    ),
+    padding: EdgeInsets.zero,
+    style: IconButton.styleFrom(
+      foregroundColor: foregroundColor,
+      backgroundColor: Colors.transparent,
+      overlayColor: foregroundColor.withValues(alpha: .08),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+      ),
+    ),
+    icon: const BackButtonIcon(),
+  );
+}
+
 abstract final class MoolMotion {
   static const Duration quick = Duration(milliseconds: 160);
   static const Duration standard = Duration(milliseconds: 240);

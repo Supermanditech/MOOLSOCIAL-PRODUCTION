@@ -244,9 +244,22 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/sign-in',
-        builder: (context, state) => legacyPresentationForTestsOnly
-            ? LoginScreenV2(session: session)
-            : LoginScreenV5(session: session),
+        builder: (context, state) {
+          final signIn = legacyPresentationForTestsOnly
+              ? LoginScreenV2(session: session)
+              : LoginScreenV5(session: session);
+          if (!session.canCancelSignIn) return signIn;
+          return PopScope<Object?>(
+            key: const Key('sign-in-route-recovery'),
+            canPop: false,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop && session.canCancelSignIn) {
+                session.cancelSignIn();
+              }
+            },
+            child: signIn,
+          );
+        },
       ),
       GoRoute(
         path: '/verify',

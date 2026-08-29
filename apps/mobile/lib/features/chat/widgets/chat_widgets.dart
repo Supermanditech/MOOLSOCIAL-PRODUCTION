@@ -31,10 +31,13 @@ class ChatPageScaffold extends StatelessWidget {
     required this.returnRoute,
     required this.body,
     this.showContentBack = false,
-    this.backKey = const Key('chat-back'),
-    this.backTooltip = 'Back to conversations',
+    this.backKeyName = 'chat-back',
     this.showMessageBanner = true,
     this.prominentTitle = false,
+    this.titleIcon,
+    this.titleAccent,
+    this.onTitleTap,
+    this.backgroundColor = MoolColors.canvas,
     this.messageThreadId,
     this.trailing,
     this.bottom,
@@ -48,10 +51,13 @@ class ChatPageScaffold extends StatelessWidget {
   final String returnRoute;
   final Widget body;
   final bool showContentBack;
-  final Key backKey;
-  final String backTooltip;
+  final String backKeyName;
   final bool showMessageBanner;
   final bool prominentTitle;
+  final IconData? titleIcon;
+  final Color? titleAccent;
+  final VoidCallback? onTitleTap;
+  final Color backgroundColor;
   final String? messageThreadId;
   final Widget? trailing;
   final Widget? bottom;
@@ -60,9 +66,11 @@ class ChatPageScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
-    final bottomSystemInset = MediaQuery.viewInsetsOf(context).bottom > 0
-        ? 0.0
-        : MediaQuery.viewPaddingOf(context).bottom;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomSystemInset = MediaQuery.viewPaddingOf(context).bottom;
+    final bottomContentInset = keyboardInset > 0
+        ? keyboardInset
+        : bottomSystemInset;
     return PopScope<Object?>(
       canPop: canPop,
       onPopInvokedWithResult: (didPop, _) {
@@ -71,52 +79,94 @@ class ChatPageScaffold extends StatelessWidget {
       child: RepaintBoundary(
         key: const Key('chat-page-surface'),
         child: Scaffold(
+          resizeToAvoidBottomInset: false,
+          backgroundColor: backgroundColor,
           appBar: AppBar(
             automaticallyImplyLeading: false,
-            toolbarHeight: prominentTitle ? 80 : 64,
+            toolbarHeight: prominentTitle ? 76 : 64,
             backgroundColor: MoolColors.canvas,
             surfaceTintColor: Colors.transparent,
             leadingWidth: showContentBack ? 52 : 0,
             leading: showContentBack
-                ? IconButton(
-                    key: backKey,
-                    tooltip: backTooltip,
+                ? MoolNativeBackButton(
+                    keyName: backKeyName,
                     onPressed: () => chatGoBack(context, returnRoute),
-                    icon: const Icon(Icons.arrow_back_rounded),
                   )
                 : null,
             titleSpacing: showContentBack ? 0 : MoolSpacing.md,
             title: Semantics(
               header: true,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: MoolColors.ink,
-                      fontSize: prominentTitle ? 28 : 20,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: prominentTitle ? -.7 : -.35,
-                    ),
+              button: onTitleTap != null,
+              label: onTitleTap == null ? null : '$title. Conversation info',
+              child: InkWell(
+                key: onTitleTap == null
+                    ? null
+                    : const Key('chat-conversation-info'),
+                onTap: onTitleTap,
+                borderRadius: BorderRadius.circular(MoolRadii.control),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: MoolMetrics.minimumTapTarget,
                   ),
-                  if (subtitle.trim().isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: MoolColors.muted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                  child: Row(
+                    children: [
+                      if (titleIcon != null) ...[
+                        Container(
+                          key: const Key('chat-context-icon'),
+                          width: 36,
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: (titleAccent ?? MoolColors.navy).withValues(
+                              alpha: .10,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              MoolRadii.control,
+                            ),
+                          ),
+                          child: Icon(
+                            titleIcon,
+                            size: 20,
+                            color: titleAccent ?? MoolColors.navy,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                      ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: MoolColors.ink,
+                                fontSize: prominentTitle ? 25 : 19,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: prominentTitle ? -.55 : -.25,
+                              ),
+                            ),
+                            if (subtitle.trim().isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: MoolColors.muted,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ],
+                    ],
+                  ),
+                ),
               ),
             ),
             actions: [
@@ -126,6 +176,15 @@ class ChatPageScaffold extends StatelessWidget {
                   child: trailing!,
                 ),
             ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Divider(
+                key: const Key('chat-moolsocial-divider'),
+                height: 1,
+                thickness: 1,
+                color: (titleAccent ?? MoolColors.navy).withValues(alpha: .12),
+              ),
+            ),
           ),
           body: SafeArea(
             top: false,
@@ -150,8 +209,11 @@ class ChatPageScaffold extends StatelessWidget {
           ),
           bottomNavigationBar: bottom == null
               ? null
-              : Padding(
-                  padding: EdgeInsets.only(bottom: bottomSystemInset),
+              : AnimatedPadding(
+                  key: const Key('chat-keyboard-safe-bottom'),
+                  duration: MoolMotion.accessible(context, MoolMotion.quick),
+                  curve: MoolMotion.enter,
+                  padding: EdgeInsets.only(bottom: bottomContentInset),
                   child: bottom,
                 ),
           floatingActionButton: floatingActionButton,

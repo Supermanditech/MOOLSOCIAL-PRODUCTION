@@ -163,14 +163,9 @@ class EatPageScaffold extends StatelessWidget {
           leading: showBack
               ? Padding(
                   padding: const EdgeInsets.only(left: MoolSpacing.sm),
-                  child: IconButton.outlined(
-                    key: const Key('eat-back'),
-                    tooltip: 'Go back',
+                  child: MoolNativeBackButton(
+                    keyName: 'eat-back',
                     onPressed: leaveContentDepth,
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 19,
-                    ),
                   ),
                 )
               : null,
