@@ -4810,7 +4810,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                             case final provider?)
                           'Delivery provider · $provider'
                         else
-                          'Delivery partner assigned after placement',
+                          'Fulfiller assigned automatically after placement',
                         if (deliveryGroups[index].deliveryServiceLevel
                             case final serviceLevel?)
                           'Service · $serviceLevel',
