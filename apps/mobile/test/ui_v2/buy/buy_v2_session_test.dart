@@ -1870,5 +1870,83 @@ void main() {
         expect(fixture.session.trackingAlertsEnabled, isFalse);
       },
     );
+
+    test(
+      'stock recovery identifies one product and revalidates without ordering',
+      () async {
+        final facts = _MutableCommerceFactsAdapter()
+          ..orderabilityLabel = 'Out of stock';
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.failed,
+          factsAdapter: facts,
+        );
+        addTearDown(fixture.session.dispose);
+
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.placementCalls, 0);
+        expect(fixture.session.view, BuyV2View.recovery);
+        expect(
+          fixture.session.checkoutAvailabilityIssue?.productId,
+          fixture.product.id,
+        );
+
+        facts
+          ..orderabilityLabel = 'Available to add'
+          ..price = fixture.product.price + 10;
+        expect(fixture.session.retryCheckoutAvailability(), isTrue);
+        expect(fixture.session.view, BuyV2View.checkout);
+        expect(fixture.session.checkoutAvailabilityIssue, isNull);
+        expect(fixture.session.checkoutPriceReviewRequired, isTrue);
+        expect(fixture.adapter.placementCalls, 0);
+      },
+    );
+
+    test(
+      'server stock rejection removes only its exact Cart product',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.unavailable,
+        );
+        addTearDown(fixture.session.dispose);
+        fixture.adapter.placement = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.unavailable,
+          customerMessage: '${fixture.product.title} is out of stock.',
+          failureKind: BuyV2OrderPlacementFailureKind.stockUnavailable,
+          affectedProductId: fixture.product.id,
+        );
+
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.placementCalls, 1);
+        expect(fixture.session.view, BuyV2View.recovery);
+        expect(
+          fixture.session.checkoutAvailabilityIssue?.title,
+          fixture.product.title,
+        );
+        expect(fixture.session.removeCheckoutIssueProduct(), isTrue);
+        expect(fixture.session.cartLines, isEmpty);
+        expect(fixture.session.view, BuyV2View.catalogue);
+      },
+    );
+
+    test('service-area rejection returns to exact Checkout address', () async {
+      final fixture = await _openProductionCheckout(
+        outcome: BuyV2OrderPlacementOutcome.unavailable,
+      );
+      addTearDown(fixture.session.dispose);
+      final addressId = fixture.session.selectedAddress.id;
+      fixture.adapter.placement = const BuyV2OrderPlacementResult(
+        outcome: BuyV2OrderPlacementOutcome.unavailable,
+        customerMessage: 'Delivery is unavailable at this address.',
+        failureKind: BuyV2OrderPlacementFailureKind.serviceAreaUnavailable,
+      );
+
+      expect(await fixture.session.submitOrder(), isFalse);
+      expect(fixture.session.view, BuyV2View.recovery);
+      expect(fixture.session.canResolveCheckoutAddress, isTrue);
+      fixture.session.retryRecovery();
+      expect(fixture.session.view, BuyV2View.checkout);
+      expect(fixture.session.selectedAddress.id, addressId);
+      expect(fixture.session.cartLines, isNotEmpty);
+    });
   });
 }

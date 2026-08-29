@@ -100,6 +100,8 @@ enum BuyV2OrderPlacementOutcome {
   unavailable,
 }
 
+enum BuyV2OrderPlacementFailureKind { stockUnavailable, serviceAreaUnavailable }
+
 @immutable
 class BuyV2CommerceSnapshot {
   const BuyV2CommerceSnapshot({
@@ -155,6 +157,8 @@ class BuyV2OrderPlacementResult {
     this.paymentReference,
     this.paymentActionUri,
     this.orders = const [],
+    this.failureKind,
+    this.affectedProductId,
   });
 
   final BuyV2OrderPlacementOutcome outcome;
@@ -163,6 +167,8 @@ class BuyV2OrderPlacementResult {
   final String? paymentReference;
   final Uri? paymentActionUri;
   final List<BuyV2Order> orders;
+  final BuyV2OrderPlacementFailureKind? failureKind;
+  final String? affectedProductId;
 }
 
 @immutable

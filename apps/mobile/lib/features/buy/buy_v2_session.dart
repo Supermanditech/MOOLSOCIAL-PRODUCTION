@@ -58,6 +58,12 @@ typedef BuyV2PriceChange = ({
   int currentPrice,
 });
 
+typedef BuyV2CheckoutAvailabilityIssue = ({
+  String productId,
+  String title,
+  String orderabilityLabel,
+});
+
 typedef _BuyV2NavigationSurfaceIdentity = ({
   BuyV2Destination destination,
   BuyV2View view,
@@ -455,6 +461,11 @@ class BuyV2Session extends ChangeNotifier {
     return orderId != null && _orders.any((order) => order.id == orderId);
   }
 
+  bool get canResolveCheckoutAddress =>
+      recoveryKind == BuyV2RecoveryKind.serviceAreaUnavailable &&
+      _recoveryOrigin?.view == BuyV2View.checkout &&
+      selectedAddressOrNull != null;
+
   _BuyV2NavigationSurfaceIdentity get _navigationSurfaceIdentity => (
     destination: destination,
     view: view,
@@ -533,6 +544,7 @@ class BuyV2Session extends ChangeNotifier {
   Map<String, _BuyV2DeliveryPromiseQuote>? _pendingCheckoutPromiseSnapshot;
   List<BuyV2DeliveryPromiseChange> _checkoutDeliveryPromiseChanges = [];
   List<BuyV2PriceChange> _checkoutPriceChanges = [];
+  BuyV2CheckoutAvailabilityIssue? _checkoutAvailabilityIssue;
   String? _confirmedPurchaseId;
   int _confirmedItemCount = 0;
   int _confirmedTotal = 0;
@@ -543,6 +555,9 @@ class BuyV2Session extends ChangeNotifier {
       List.unmodifiable(_checkoutPriceChanges);
 
   bool get checkoutPriceReviewRequired => _checkoutPriceChanges.isNotEmpty;
+
+  BuyV2CheckoutAvailabilityIssue? get checkoutAvailabilityIssue =>
+      _checkoutAvailabilityIssue;
 
   void acceptCheckoutPriceChanges() {
     if (_checkoutPriceChanges.isEmpty) return;
@@ -1247,6 +1262,7 @@ class BuyV2Session extends ChangeNotifier {
     _pendingCheckoutPromiseSnapshot = null;
     _checkoutDeliveryPromiseChanges = [];
     _checkoutPriceChanges = [];
+    _checkoutAvailabilityIssue = null;
   }
 
   int tipForGroup(BuyV2FulfilmentGroup group) =>
@@ -2722,6 +2738,18 @@ class BuyV2Session extends ChangeNotifier {
         notifyListeners();
         return false;
       }
+      final availability = next.orderabilityLabel.toLowerCase();
+      if (availability.contains('unavailable') ||
+          availability.contains('out of stock') ||
+          availability.contains('not available')) {
+        _checkoutAvailabilityIssue = (
+          productId: product.id,
+          title: product.title,
+          orderabilityLabel: next.orderabilityLabel,
+        );
+        openRecovery(BuyV2RecoveryKind.stockUnavailable);
+        return false;
+      }
       _productFacts[product.id] = next;
     }
     final groups = checkoutFulfilmentGroups;
@@ -2781,6 +2809,11 @@ class BuyV2Session extends ChangeNotifier {
       if (availability.contains('unavailable') ||
           availability.contains('out of stock') ||
           availability.contains('not available')) {
+        _checkoutAvailabilityIssue = (
+          productId: product.id,
+          title: product.title,
+          orderabilityLabel: next.orderabilityLabel,
+        );
         openRecovery(BuyV2RecoveryKind.stockUnavailable);
         return false;
       }
@@ -2916,6 +2949,10 @@ class BuyV2Session extends ChangeNotifier {
   }) {
     _paymentReference = placement.paymentReference ?? _paymentReference;
     _paymentActionUri = placement.paymentActionUri;
+    if (placement.outcome != BuyV2OrderPlacementOutcome.confirmed &&
+        _openPlacementRecovery(placement, lines)) {
+      return false;
+    }
     if (placement.outcome != BuyV2OrderPlacementOutcome.confirmed) {
       checkoutSubmissionState = switch (placement.outcome) {
         BuyV2OrderPlacementOutcome.paymentActionRequired
@@ -2966,6 +3003,44 @@ class BuyV2Session extends ChangeNotifier {
               .toList(growable: false);
     _completeConfirmedOrder(previous: previous, lines: lines);
     return true;
+  }
+
+  bool _openPlacementRecovery(
+    BuyV2OrderPlacementResult placement,
+    List<BuyV2CartLine> lines,
+  ) {
+    final failureKind = placement.failureKind;
+    if (failureKind == null) return false;
+    if (failureKind == BuyV2OrderPlacementFailureKind.stockUnavailable) {
+      final productId = placement.affectedProductId?.trim();
+      final line = productId == null
+          ? null
+          : lines
+                .where((candidate) => candidate.product.id == productId)
+                .firstOrNull;
+      if (line == null) return false;
+      _checkoutAvailabilityIssue = (
+        productId: line.product.id,
+        title: line.product.title,
+        orderabilityLabel: placement.customerMessage,
+      );
+      _clearCheckoutPaymentAttempt();
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+      openRecovery(BuyV2RecoveryKind.stockUnavailable);
+      return true;
+    }
+    _checkoutAvailabilityIssue = null;
+    _clearCheckoutPaymentAttempt();
+    checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+    openRecovery(BuyV2RecoveryKind.serviceAreaUnavailable);
+    return true;
+  }
+
+  void _clearCheckoutPaymentAttempt() {
+    _checkoutIdempotencyKey = null;
+    _paymentReference = null;
+    _paymentActionUri = null;
+    _persistCustomerState();
   }
 
   bool _validPaymentAction(BuyV2OrderPlacementResult placement) {
@@ -3244,6 +3319,9 @@ class BuyV2Session extends ChangeNotifier {
 
   void openRecovery(BuyV2RecoveryKind kind) {
     final previous = _navigationSurfaceIdentity;
+    if (kind != BuyV2RecoveryKind.stockUnavailable) {
+      _checkoutAvailabilityIssue = null;
+    }
     if (view != BuyV2View.recovery) {
       _recoveryOrigin = (
         destination: destination,
@@ -3273,6 +3351,109 @@ class BuyV2Session extends ChangeNotifier {
     _restoreRecoveryOrigin();
   }
 
+  bool retryCheckoutAvailability() {
+    final issue = _checkoutAvailabilityIssue;
+    if (recoveryKind != BuyV2RecoveryKind.stockUnavailable || issue == null) {
+      return false;
+    }
+    final product = findProduct(issue.productId);
+    if (product == null) {
+      notice = 'This product could not be found.';
+      notifyListeners();
+      return false;
+    }
+    final next = productFactsAdapter.snapshotFor(product);
+    if (!_validProductFacts(product, next) || next.stale) {
+      notice = 'Availability could not be confirmed. Try again.';
+      notifyListeners();
+      return false;
+    }
+    final availability = next.orderabilityLabel.toLowerCase();
+    if (availability.contains('unavailable') ||
+        availability.contains('out of stock') ||
+        availability.contains('not available')) {
+      _checkoutAvailabilityIssue = (
+        productId: product.id,
+        title: product.title,
+        orderabilityLabel: next.orderabilityLabel,
+      );
+      notice = '${product.title} is still unavailable.';
+      notifyListeners();
+      return false;
+    }
+    final previous = _navigationSurfaceIdentity;
+    final updatedProduct = product.copyWith(
+      price: next.price,
+      deliveryPromise: next.deliveryPromise,
+      seller: next.partner,
+      confirmedOn: 'Checked now',
+    );
+    final catalogueIndex = _catalogueProducts.indexWhere(
+      (candidate) => candidate.id == product.id,
+    );
+    if (catalogueIndex >= 0) {
+      _catalogueProducts[catalogueIndex] = updatedProduct;
+    }
+    final cartLine = _cart[product.id];
+    if (cartLine != null) {
+      _cart[product.id] = cartLine.copyWith(product: updatedProduct);
+    }
+    _productFacts[product.id] = next;
+    if (next.price != product.price) {
+      _checkoutPriceChanges = [
+        (
+          productId: product.id,
+          title: product.title,
+          previousPrice: product.price,
+          currentPrice: next.price,
+        ),
+      ];
+    }
+    _checkoutAvailabilityIssue = null;
+    _restoreRecoveryOrigin(notify: false);
+    notice = next.price == product.price
+        ? '${product.title} is available. Review Checkout to continue.'
+        : 'The current price changed. Review the updated total to continue.';
+    _persistCustomerState();
+    _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
+    return true;
+  }
+
+  bool removeCheckoutIssueProduct() {
+    final issue = _checkoutAvailabilityIssue;
+    if (recoveryKind != BuyV2RecoveryKind.stockUnavailable || issue == null) {
+      return false;
+    }
+    final previous = _navigationSurfaceIdentity;
+    final removed = _cart.remove(issue.productId);
+    if (removed == null) return false;
+    _checkoutAvailabilityIssue = null;
+    _restoreRecoveryOrigin(notify: false);
+    _acknowledgeCart('${removed.product.title} removed');
+    _pruneCartSelections();
+    if (_cart.isEmpty) {
+      destination = removed.product.destination;
+      view = BuyV2View.catalogue;
+      cartScope = BuyV2CartScope.all;
+    } else if (checkoutLines.isEmpty) {
+      view = BuyV2View.cart;
+      cartScope = BuyV2CartScope.all;
+    }
+    _persistCustomerState();
+    _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
+    return true;
+  }
+
+  bool openCheckoutIssueProduct() {
+    final issue = _checkoutAvailabilityIssue;
+    if (recoveryKind != BuyV2RecoveryKind.stockUnavailable || issue == null) {
+      return false;
+    }
+    _restoreRecoveryOrigin(notify: false);
+    _checkoutAvailabilityIssue = null;
+    return openProduct(issue.productId);
+  }
+
   bool openRecoveryOrderHelp() {
     if (!canOpenRecoveryOrderHelp) return false;
     return _restoreRecoveryOrigin();
@@ -3289,6 +3470,7 @@ class BuyV2Session extends ChangeNotifier {
     final origin = _recoveryOrigin;
     recoveryKind = null;
     _recoveryOrigin = null;
+    _checkoutAvailabilityIssue = null;
 
     if (origin == null || origin.view == BuyV2View.recovery) {
       destination = BuyV2Destination.shop;

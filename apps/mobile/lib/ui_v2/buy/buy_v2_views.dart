@@ -5224,6 +5224,12 @@ class BuyV2RecoveryView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final kind = session.recoveryKind ?? BuyV2RecoveryKind.networkInterruption;
+    final availabilityIssue = session.checkoutAvailabilityIssue;
+    final resolvesCartProduct =
+        kind == BuyV2RecoveryKind.stockUnavailable && availabilityIssue != null;
+    final resolvesAddress =
+        kind == BuyV2RecoveryKind.serviceAreaUnavailable &&
+        session.canResolveCheckoutAddress;
     final content = switch (kind) {
       BuyV2RecoveryKind.priceUpdate => (
         Icons.price_change_outlined,
@@ -5286,15 +5292,117 @@ class BuyV2RecoveryView extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: context.buyBody,
               ),
+              if (resolvesCartProduct) ...[
+                const SizedBox(height: 12),
+                Container(
+                  key: const ValueKey('buy-recovery-affected-product'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(11),
+                  decoration: buyV2CardDecoration(
+                    color: BuyV2Colors.softOrange,
+                    radius: 14,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(availabilityIssue.title, style: context.buyBody),
+                      const SizedBox(height: 2),
+                      Text(
+                        availabilityIssue.orderabilityLabel,
+                        style: context.buyMeta,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (resolvesAddress) ...[
+                const SizedBox(height: 12),
+                Container(
+                  key: const ValueKey('buy-recovery-affected-address'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(11),
+                  decoration: buyV2CardDecoration(
+                    color: BuyV2Colors.softBlue,
+                    radius: 14,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        session.selectedAddress.label,
+                        style: context.buyBody,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        session.selectedAddress.shortLine,
+                        style: context.buyMeta,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  key: const ValueKey('buy-recovery-primary'),
+              if (resolvesCartProduct) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    key: const ValueKey('buy-recovery-retry-availability'),
+                    onPressed: session.retryCheckoutAvailability,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Retry availability'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    key: const ValueKey('buy-recovery-remove-product'),
+                    onPressed: session.removeCheckoutIssueProduct,
+                    child: const Text('Remove from Cart'),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextButton(
+                  key: const ValueKey('buy-recovery-view-product'),
+                  onPressed: session.openCheckoutIssueProduct,
+                  child: const Text('View product'),
+                ),
+                TextButton(
+                  key: const ValueKey('buy-recovery-return-checkout'),
                   onPressed: session.retryRecovery,
                   child: Text(session.recoveryReturnLabel),
                 ),
-              ),
+              ] else if (resolvesAddress) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    key: const ValueKey('buy-recovery-change-address'),
+                    onPressed: () {
+                      session.retryRecovery();
+                      showBuyV2AddressSheet(context, session);
+                    },
+                    icon: const Icon(Icons.location_on_outlined),
+                    label: const Text('Change address'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    key: const ValueKey('buy-recovery-return-checkout'),
+                    onPressed: session.retryRecovery,
+                    child: Text(session.recoveryReturnLabel),
+                  ),
+                ),
+              ] else
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    key: const ValueKey('buy-recovery-primary'),
+                    onPressed: session.retryRecovery,
+                    child: Text(session.recoveryReturnLabel),
+                  ),
+                ),
               if (session.canOpenRecoveryOrderHelp) ...[
                 const SizedBox(height: 8),
                 SizedBox(

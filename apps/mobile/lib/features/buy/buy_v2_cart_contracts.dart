@@ -4,6 +4,14 @@ import 'buy_v2_models.dart';
 
 enum BuyV2CartBenefitKind { coupon, paymentOffer }
 
+// Founder post-integration owner boundary (2026-08-29): Codex Workspace must
+// publish each supplier's exact commercial terms, MSME classification,
+// booking/balance schedule, regulated-financier offer, delivery partner and
+// dispatch/delivery promise. Cursor Buy then renders and validates those exact
+// choices. Supplier credit for a micro/small enterprise must never exceed the
+// applicable MSMED payment limit; a longer bank/NBFC tenor is a separate
+// regulated credit product, never a supplier-term shortcut.
+
 @immutable
 class BuyV2CartBenefit {
   const BuyV2CartBenefit({

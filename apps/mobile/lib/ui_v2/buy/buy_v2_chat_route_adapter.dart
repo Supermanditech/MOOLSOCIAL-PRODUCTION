@@ -10,6 +10,10 @@ class BuyV2ChatRouteAdapter {
   // order, exact order, seller/supplier, offer-publisher, context-isolation and
   // safety/recovery parity. Keep shop-assist as MoolSocial support and keep
   // Medicine under Care. Do not add a Buy-owned Chat shell.
+  // Codex integration must preserve exact Cursor HEAD fa7d07e0 and publish the
+  // combined baseline first. Cursor then immediately completes pre-dispatch
+  // change/cancel and delivered return/replacement/refund handoffs against
+  // that integrated shared Chat owner; neither lane implements them earlier.
 
   String locationFor({
     required BuyV2Destination destination,
