@@ -5,16 +5,36 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/chat/chat_session.dart';
+import 'package:moolsocial/features/journey01/journey_services.dart';
+import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_shop_chat.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  Future<JourneySession> readyJourney() async {
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'manual',
+          areaLabel: 'Sardarpura',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+    );
+    await session.start();
+    return session;
+  }
 
   Widget app(
     BuyV2Session session, {
@@ -108,6 +128,28 @@ void main() {
       expect(uri.queryParameters.containsKey('start'), isFalse);
       expect(uri.queryParameters.containsKey('draft'), isFalse);
     }
+  });
+
+  test('order Assist route owns its exact order draft and recovery', () {
+    final uri = Uri.parse(
+      const BuyV2ShopChatRouteAdapter().orderAssistLocationFor(
+        orderId: 'PO-240783',
+        intent: 'Where is my order?',
+        details: 'The delivery time changed',
+      ),
+    );
+
+    expect(uri.path, '/app/chat/inbox');
+    expect(uri.queryParameters['type'], 'order');
+    expect(
+      uri.queryParameters['draft'],
+      'Order PO-240783 — Where is my order?\nThe delivery time changed',
+    );
+    expect(
+      uri.queryParameters['return'],
+      '/app/buy?sub=orders&view=assist&order=PO-240783',
+    );
+    expect(uri.queryParameters.containsKey('start'), isFalse);
   });
 
   testWidgets(
@@ -269,6 +311,106 @@ void main() {
       );
       expect(
         find.byKey(const ValueKey('mool-global-chat-tap')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'order Assist opens shared Shop Chat with draft and exact Back recovery',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final journey = await readyJourney();
+      final chat = ChatSession();
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: '/app/buy?sub=orders&view=tracking&order=PO-240783',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final trackingHelp = find.byKey(const ValueKey('buy-tracking-help'));
+      await tester.scrollUntilVisible(
+        trackingHelp,
+        220,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(trackingHelp);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('PO-240783'), findsOneWidget);
+
+      final intent = find.byKey(
+        const ValueKey('buy-assist-intent-Where is my order?'),
+      );
+      await tester.scrollUntilVisible(
+        intent,
+        220,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(intent);
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-assist-composer-field')),
+        'The delivery time changed',
+      );
+      final inAppChat = find.byKey(
+        const ValueKey('buy-assist-channel-Chat in app'),
+      );
+      await tester.scrollUntilVisible(
+        inAppChat,
+        220,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(inAppChat);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+      expect(find.text('Shop Chat'), findsOneWidget);
+      expect(
+        tester
+            .widget<ChoiceChip>(find.byKey(const Key('chat-filter-orders')))
+            .selected,
+        isTrue,
+      );
+      await tester.tap(find.byKey(const Key('chat-open-thread-shop-order')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('chat-message-field')))
+            .controller
+            ?.text,
+        'Order PO-240783 — Where is my order?\nThe delivery time changed',
+      );
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const PageStorageKey('buy-assist')), findsOneWidget);
+      expect(find.textContaining('PO-240783'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('buy-assist-composer-field')),
+            )
+            .controller
+            ?.text,
+        'The delivery time changed',
+      );
+      expect(
+        find.text(
+          'Where is my order? selected. Add details below or choose a secure channel.',
+        ),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);

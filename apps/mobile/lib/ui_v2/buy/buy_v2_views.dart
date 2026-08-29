@@ -5602,10 +5602,18 @@ class BuyV2TrackingView extends StatelessWidget {
   }
 }
 
+typedef BuyV2AssistChatHandler =
+    void Function({String? intent, String? details});
+
 class BuyV2AssistView extends StatefulWidget {
-  const BuyV2AssistView({super.key, required this.session});
+  const BuyV2AssistView({
+    super.key,
+    required this.session,
+    required this.onOpenChat,
+  });
 
   final BuyV2Session session;
+  final BuyV2AssistChatHandler onOpenChat;
 
   @override
   State<BuyV2AssistView> createState() => _BuyV2AssistViewState();
@@ -6019,7 +6027,11 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
               detail: 'Continue with support',
               onTap: () {
                 HapticFeedback.selectionClick();
-                session.showNotice('In-app support chat selected.');
+                FocusScope.of(context).unfocus();
+                widget.onOpenChat(
+                  intent: _selectedIntent,
+                  details: _composerController.text,
+                );
               },
             );
             final call = _AssistChannel(

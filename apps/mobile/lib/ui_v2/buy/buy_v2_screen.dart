@@ -142,8 +142,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       widget.session.openRecovery(recoveryKind);
     } else if (productId != null) {
       widget.session.openProduct(productId);
-    } else if (orderId != null && widget.initialView == BuyV2View.tracking) {
-      widget.session.openTracking(orderId);
+    } else if (orderId != null &&
+        (widget.initialView == BuyV2View.tracking ||
+            widget.initialView == BuyV2View.assist)) {
+      final orderOpened = widget.session.openTracking(orderId);
+      if (orderOpened && widget.initialView == BuyV2View.assist) {
+        widget.session.openAssist();
+      }
     } else if (widget.initialView == BuyV2View.cart) {
       widget.session.destination = widget.initialDestination;
       widget.session.openCart(scope: widget.initialCartScope);
@@ -673,6 +678,28 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     );
   }
 
+  void _openOrderAssistChat({String? intent, String? details}) {
+    final onOpenChat = widget.onOpenChat;
+    final router = GoRouter.maybeOf(context);
+    if (router == null) {
+      if (onOpenChat != null) {
+        onOpenChat();
+      } else {
+        widget.session.showNotice(
+          'Chat is unavailable right now. Your question stays here.',
+        );
+      }
+      return;
+    }
+    context.push(
+      const BuyV2ShopChatRouteAdapter().orderAssistLocationFor(
+        orderId: widget.session.assistOrder.id,
+        intent: intent,
+        details: details,
+      ),
+    );
+  }
+
   void _handoffShopChatAction(
     BuyV2ShopChatThread thread,
     BuyV2ShopChatAction action,
@@ -915,7 +942,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         invoiceDownloader: widget.invoiceDownloader,
       ),
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
-      BuyV2View.assist => BuyV2AssistView(session: session),
+      BuyV2View.assist => BuyV2AssistView(
+        session: session,
+        onOpenChat: _openOrderAssistChat,
+      ),
       BuyV2View.account => BuyV2AccountView(
         session: session,
         accountIdentity: widget.accountIdentity,
