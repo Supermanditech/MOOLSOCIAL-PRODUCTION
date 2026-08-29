@@ -4229,6 +4229,246 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
   }
 }
 
+String _commercialPaymentTermTitle(BuyV2CommercialPaymentTerm term) =>
+    switch (term.kind) {
+      BuyV2CommercialPaymentTermKind.retailAdvance ||
+      BuyV2CommercialPaymentTermKind.wholesaleAdvance => 'Full advance',
+      BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch =>
+        'Booking amount · balance before dispatch',
+      BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery =>
+        'Booking amount · balance at delivery',
+      BuyV2CommercialPaymentTermKind.supplierCredit =>
+        'Supplier credit · ${term.netDays} days',
+      BuyV2CommercialPaymentTermKind.regulatedCredit =>
+        '${term.financierName} credit · ${term.netDays} days',
+    };
+
+String _commercialPaymentTermDetail(BuyV2CommercialPaymentTerm term) {
+  final amounts = term.balanceDue == 0
+      ? '${buyV2Money(term.amountDueNow)} payable now'
+      : '${buyV2Money(term.amountDueNow)} now · '
+            '${buyV2Money(term.balanceDue)} ${term.balanceDueLabel}';
+  if (term.kind == BuyV2CommercialPaymentTermKind.regulatedCredit) {
+    return '$amounts · APR ${term.annualPercentageRate!.toStringAsFixed(2)}% · '
+        'Key facts from ${term.financierName}';
+  }
+  if (term.kind == BuyV2CommercialPaymentTermKind.supplierCredit) {
+    return '$amounts · Published directly by ${term.supplierName}';
+  }
+  return amounts;
+}
+
+class _CheckoutCommercialPaymentTerms extends StatelessWidget {
+  const _CheckoutCommercialPaymentTerms({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!session.commercialPaymentTermsEnabled) {
+      return const SizedBox.shrink();
+    }
+    if (session.commercialPaymentTermsLoadState !=
+        BuyV2CommerceLoadState.ready) {
+      final loading = session.commercialPaymentTermsBusy;
+      return Container(
+        key: ValueKey(
+          'buy-checkout-payment-terms-'
+          '${session.commercialPaymentTermsLoadState.name}',
+        ),
+        padding: const EdgeInsets.all(11),
+        decoration: buyV2CardDecoration(radius: 15),
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 38,
+              child: loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(
+                      Icons.account_balance_wallet_outlined,
+                      color: BuyV2Colors.navy,
+                    ),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    loading
+                        ? 'Checking payment terms'
+                        : 'Payment terms need a refresh',
+                    style: context.buyTitle.copyWith(fontSize: 13),
+                  ),
+                  Text(
+                    loading
+                        ? 'Matching each delivery with its published terms.'
+                        : session.commercialPaymentTermsMessage ??
+                              'Reconnect and try again.',
+                    style: context.buyMeta.copyWith(fontSize: 9),
+                  ),
+                ],
+              ),
+            ),
+            if (!loading)
+              TextButton(
+                key: const ValueKey('buy-checkout-payment-terms-retry'),
+                onPressed: session.refreshCommercialPaymentTerms,
+                child: const Text('Retry'),
+              ),
+          ],
+        ),
+      );
+    }
+
+    final groups = session.checkoutFulfilmentGroups;
+    return Container(
+      key: const ValueKey('buy-checkout-payment-terms'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Payment terms', style: context.buyTitle.copyWith(fontSize: 16)),
+          const SizedBox(height: 2),
+          Text(
+            'Retail is paid in full. Wholesale terms are published by each supplier.',
+            style: context.buyMeta.copyWith(fontSize: 8.5),
+          ),
+          const SizedBox(height: 8),
+          for (
+            var groupIndex = 0;
+            groupIndex < groups.length;
+            groupIndex++
+          ) ...[
+            _CommercialPaymentTermGroup(
+              session: session,
+              group: groups[groupIndex],
+            ),
+            if (groupIndex < groups.length - 1) const Divider(height: 18),
+          ],
+          const Divider(height: 18),
+          Row(
+            children: [
+              Expanded(child: Text('Pay now', style: context.buyBody)),
+              Text(
+                buyV2Money(session.checkoutAmountDueNow),
+                key: const ValueKey('buy-checkout-amount-due-now'),
+                style: context.buyTitle.copyWith(fontSize: 15),
+              ),
+            ],
+          ),
+          if (session.checkoutBalanceDue > 0) ...[
+            const SizedBox(height: 3),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Balance due later', style: context.buyMeta),
+                ),
+                Text(
+                  buyV2Money(session.checkoutBalanceDue),
+                  key: const ValueKey('buy-checkout-balance-due'),
+                  style: context.buyBody,
+                ),
+              ],
+            ),
+          ],
+          if (session.commercialPaymentTermsMessage case final message?) ...[
+            const SizedBox(height: 6),
+            Text(
+              message,
+              key: const ValueKey('buy-checkout-payment-terms-message'),
+              style: context.buyMeta.copyWith(
+                color: BuyV2Colors.orange,
+                fontSize: 8.5,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CommercialPaymentTermGroup extends StatelessWidget {
+  const _CommercialPaymentTermGroup({
+    required this.session,
+    required this.group,
+  });
+
+  final BuyV2Session session;
+  final BuyV2FulfilmentGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    final terms = session.commercialPaymentTermsFor(group.key);
+    final selected = session.selectedCommercialPaymentTermFor(group.key);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${group.destination.label} · ${group.partner}',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: context.buyBody.copyWith(fontSize: 10.5),
+        ),
+        const SizedBox(height: 4),
+        if (terms.isEmpty)
+          Text(
+            'No payment term is available for this delivery.',
+            key: ValueKey('buy-payment-terms-empty-${group.key}'),
+            style: context.buyMeta.copyWith(
+              color: BuyV2Colors.orange,
+              fontSize: 9,
+            ),
+          )
+        else
+          RadioGroup<String>(
+            groupValue: selected?.id,
+            onChanged: (termId) {
+              final term = terms
+                  .where((candidate) => candidate.id == termId)
+                  .firstOrNull;
+              if (term != null) session.chooseCommercialPaymentTerm(term);
+            },
+            child: Column(
+              children: [
+                for (final term in terms)
+                  Semantics(
+                    selected: selected?.id == term.id,
+                    button: true,
+                    label:
+                        '${_commercialPaymentTermTitle(term)}. '
+                        '${_commercialPaymentTermDetail(term)}',
+                    child: Material(
+                      color: Colors.transparent,
+                      child: RadioListTile<String>(
+                        key: ValueKey('buy-payment-term-${term.id}'),
+                        value: term.id,
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        title: Text(
+                          _commercialPaymentTermTitle(term),
+                          style: context.buyBody.copyWith(fontSize: 10),
+                        ),
+                        subtitle: Text(
+                          _commercialPaymentTermDetail(term),
+                          style: context.buyMeta.copyWith(fontSize: 8.5),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class BuyV2CheckoutView extends StatelessWidget {
   const BuyV2CheckoutView({
     super.key,
@@ -4320,6 +4560,10 @@ class BuyV2CheckoutView extends StatelessWidget {
                       controller: gstInvoiceController,
                     ),
                     const SizedBox(height: 7),
+                  ],
+                  if (session.commercialPaymentTermsEnabled) ...[
+                    _CheckoutCommercialPaymentTerms(session: session),
+                    const SizedBox(height: 9),
                   ],
                   if (session.checkoutBenefitReviewRequired) ...[
                     _CartBenefitEligibilityState(session: session),
@@ -4453,7 +4697,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                           style: context.buyMeta.copyWith(fontSize: 8),
                         ),
                         Text(
-                          buyV2Money(session.checkoutPayableTotal),
+                          buyV2Money(session.checkoutAmountDueNow),
                           style: const TextStyle(
                             color: BuyV2Colors.navy,
                             fontSize: 19,
@@ -4471,6 +4715,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                       onPressed:
                           session.checkoutBusy ||
                               session.checkoutRequiresResolution ||
+                              session.checkoutPaymentTermsReviewRequired ||
                               session.checkoutBenefitReviewRequired ||
                               session.checkoutPriceReviewRequired ||
                               session.checkoutPromiseReviewRequired
@@ -4981,6 +5226,18 @@ class BuyV2ConfirmationView extends StatelessWidget {
                 '${_productCountLabel(session.confirmedItemCount)} · ${buyV2Money(session.confirmedTotal)}',
                 style: context.buyBody,
               ),
+              if (session.confirmedBalanceDue > 0) ...[
+                const SizedBox(height: 3),
+                Text(
+                  'Paid now ${buyV2Money(session.confirmedAmountPaidNow)} · '
+                  'Balance ${buyV2Money(session.confirmedBalanceDue)}',
+                  key: const ValueKey('buy-confirmation-payment-schedule'),
+                  style: context.buyMeta.copyWith(
+                    color: BuyV2Colors.navy,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
               if (session.confirmedPurchaseId case final purchaseId?) ...[
                 const SizedBox(height: 2),
                 Text(
@@ -6435,6 +6692,26 @@ class BuyV2TrackingView extends StatelessWidget {
                 icon: Icons.volunteer_activism_outlined,
                 label: 'Delivery tip',
                 value: buyV2Money(order.tip),
+              ),
+            if (order.paymentTermLabel case final paymentTerm?)
+              _DecisionRow(
+                icon: Icons.account_balance_wallet_outlined,
+                label: 'Payment term',
+                value: paymentTerm,
+              ),
+            if (order.amountPaidNow case final paidNow?)
+              _DecisionRow(
+                icon: Icons.payments_outlined,
+                label: 'Paid now',
+                value: buyV2Money(paidNow),
+              ),
+            if (order.balanceDue > 0)
+              _DecisionRow(
+                icon: Icons.event_available_outlined,
+                label: 'Balance due',
+                value:
+                    '${buyV2Money(order.balanceDue)} · '
+                    '${order.balanceDueLabel ?? 'Due later'}',
               ),
           ],
         ),

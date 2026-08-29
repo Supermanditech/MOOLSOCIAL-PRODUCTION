@@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
@@ -29,6 +30,116 @@ class _MemoryGstInvoiceProfileStore implements BuyV2GstInvoiceProfileStore {
     if (scope == null || !acceptWrites) return false;
     snapshots[scope] = snapshot;
     return true;
+  }
+}
+
+class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
+  BuyV2CommerceLoadState state = BuyV2CommerceLoadState.ready;
+  String? customerMessage;
+
+  @override
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
+    required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod,
+  }) async {
+    if (state != BuyV2CommerceLoadState.ready) {
+      return BuyV2CommercialPaymentTermsSnapshot(
+        state: state,
+        customerMessage: customerMessage,
+      );
+    }
+    return BuyV2CommercialPaymentTermsSnapshot(
+      state: state,
+      terms: [
+        for (final group in groups)
+          if (group.destination != BuyV2Destination.wholesale)
+            BuyV2CommercialPaymentTerm(
+              id: 'retail-advance-${group.destination.name}',
+              fulfilmentKey: group.key,
+              destination: group.destination,
+              supplierName: group.partner,
+              kind: BuyV2CommercialPaymentTermKind.retailAdvance,
+              orderTotal: group.total,
+              amountDueNow: group.total,
+              balanceDue: 0,
+              balanceDueLabel: 'Paid in full',
+              sourceId: 'retail-terms-source',
+            )
+          else ...[
+            BuyV2CommercialPaymentTerm(
+              id: 'wholesale-advance',
+              fulfilmentKey: group.key,
+              destination: group.destination,
+              supplierName: group.partner,
+              kind: BuyV2CommercialPaymentTermKind.wholesaleAdvance,
+              orderTotal: group.total,
+              amountDueNow: group.total,
+              balanceDue: 0,
+              balanceDueLabel: 'Paid in full',
+              sourceId: 'workspace-terms-source',
+              supplierIsMicroOrSmall: true,
+            ),
+            BuyV2CommercialPaymentTerm(
+              id: 'wholesale-booking-delivery',
+              fulfilmentKey: group.key,
+              destination: group.destination,
+              supplierName: group.partner,
+              kind: BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+              orderTotal: group.total,
+              amountDueNow: group.total ~/ 4,
+              balanceDue: group.total - (group.total ~/ 4),
+              balanceDueLabel: 'at delivery',
+              sourceId: 'workspace-terms-source',
+              supplierIsMicroOrSmall: true,
+            ),
+            BuyV2CommercialPaymentTerm(
+              id: 'wholesale-credit-30',
+              fulfilmentKey: group.key,
+              destination: group.destination,
+              supplierName: group.partner,
+              kind: BuyV2CommercialPaymentTermKind.supplierCredit,
+              orderTotal: group.total,
+              amountDueNow: 0,
+              balanceDue: group.total,
+              balanceDueLabel: 'within 30 days of delivery',
+              sourceId: 'workspace-terms-source',
+              supplierIsMicroOrSmall: true,
+              netDays: 30,
+            ),
+            BuyV2CommercialPaymentTerm(
+              id: 'invalid-msme-credit-90',
+              fulfilmentKey: group.key,
+              destination: group.destination,
+              supplierName: group.partner,
+              kind: BuyV2CommercialPaymentTermKind.supplierCredit,
+              orderTotal: group.total,
+              amountDueNow: 0,
+              balanceDue: group.total,
+              balanceDueLabel: 'within 90 days of delivery',
+              sourceId: 'workspace-terms-source',
+              supplierIsMicroOrSmall: true,
+              netDays: 90,
+            ),
+            BuyV2CommercialPaymentTerm(
+              id: 'regulated-credit-90',
+              fulfilmentKey: group.key,
+              destination: group.destination,
+              supplierName: group.partner,
+              kind: BuyV2CommercialPaymentTermKind.regulatedCredit,
+              orderTotal: group.total,
+              amountDueNow: 0,
+              balanceDue: group.total,
+              balanceDueLabel: 'to the financier over 90 days',
+              sourceId: 'regulated-credit-source',
+              supplierIsMicroOrSmall: true,
+              netDays: 90,
+              financierName: 'Partner Bank',
+              annualPercentageRate: 12.5,
+              keyFactsUri: Uri.parse('https://bank.example/kfs/offer-1'),
+            ),
+          ],
+      ],
+    );
   }
 }
 
@@ -228,6 +339,106 @@ void main() {
       find.byKey(const ValueKey('buy-gst-profile-gst-profile-1')),
       findsOneWidget,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Retail advance and Wholesale terms retain exact payment schedule',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final adapter = _PaymentTermsAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        commercialPaymentTermsAdapter: adapter,
+      );
+      addTearDown(session.dispose);
+      final shop = productFor(BuyV2Destination.shop);
+      final wholesale = productFor(BuyV2Destination.wholesale);
+      expect(session.addProduct(shop.id), isTrue);
+      expect(session.addProduct(wholesale.id), isTrue);
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await session.refreshCommercialPaymentTerms();
+
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-checkout-payment-terms')),
+        findsOneWidget,
+      );
+      expect(find.text('Full advance'), findsWidgets);
+      expect(find.textContaining('Supplier credit · 30 days'), findsOneWidget);
+      expect(
+        find.textContaining('Partner Bank credit · 90 days'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Supplier credit · 90 days'), findsNothing);
+      expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+
+      final booking = find.byKey(
+        const ValueKey('buy-payment-term-wholesale-booking-delivery'),
+      );
+      await tester.ensureVisible(booking);
+      await tester.tap(booking);
+      await tester.pumpAndSettle();
+      expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+      expect(session.checkoutBalanceDue, greaterThan(0));
+      expect(
+        find.byKey(const ValueKey('buy-checkout-amount-due-now')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-checkout-balance-due')),
+        findsOneWidget,
+      );
+
+      expect(await session.submitOrder(), isTrue);
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.confirmation);
+      expect(
+        find.byKey(const ValueKey('buy-confirmation-payment-schedule')),
+        findsOneWidget,
+      );
+      final wholesaleOrder = session.confirmedOrders.firstWhere(
+        (order) => order.destination == BuyV2Destination.wholesale,
+      );
+      expect(wholesaleOrder.paymentTermLabel, contains('balance at delivery'));
+      expect(wholesaleOrder.amountPaidNow, greaterThan(0));
+      expect(wholesaleOrder.balanceDue, greaterThan(0));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('payment terms offline state blocks Checkout and retries', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final adapter = _PaymentTermsAdapter()
+      ..state = BuyV2CommerceLoadState.offline
+      ..customerMessage = 'Reconnect to check supplier payment terms.';
+    final session = BuyV2Session(
+      core: BuySession(),
+      commercialPaymentTermsAdapter: adapter,
+    );
+    addTearDown(session.dispose);
+    expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    await session.refreshCommercialPaymentTerms();
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-checkout-payment-terms-offline')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-checkout-payment-terms-retry')),
+      findsOneWidget,
+    );
+    expect(session.checkoutPaymentTermsReviewRequired, isTrue);
     expect(tester.takeException(), isNull);
   });
 

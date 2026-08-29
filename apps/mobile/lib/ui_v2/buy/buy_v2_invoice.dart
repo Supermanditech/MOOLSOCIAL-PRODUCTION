@@ -214,6 +214,20 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                   _InvoiceFact(label: 'Seller role', value: order.partnerType),
                   if (order.paymentMethod case final payment?)
                     _InvoiceFact(label: 'Payment method', value: payment),
+                  if (order.paymentTermLabel case final term?)
+                    _InvoiceFact(label: 'Payment term', value: term),
+                  if (order.amountPaidNow case final paidNow?)
+                    _InvoiceFact(
+                      label: 'Amount paid now',
+                      value: buyV2Money(paidNow),
+                    ),
+                  if (order.balanceDue > 0)
+                    _InvoiceFact(
+                      label: 'Balance due',
+                      value:
+                          '${buyV2Money(order.balanceDue)} · '
+                          '${order.balanceDueLabel ?? 'Due later'}',
+                    ),
                 ],
               ),
             ),

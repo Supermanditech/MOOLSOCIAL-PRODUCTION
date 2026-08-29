@@ -282,6 +282,7 @@ class BuyV2Session extends ChangeNotifier {
     this.savedProductsStore,
     this.customerStateStore,
     this.gstInvoiceProfileStore,
+    this.commercialPaymentTermsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
     bool? reviewDataEnabled,
   }) : cartBenefitsAdapter =
@@ -330,6 +331,7 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2SavedProductsStore? savedProductsStore;
   final BuyV2CustomerStateStore? customerStateStore;
   final BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore;
+  final BuyV2CommercialPaymentTermsAdapter? commercialPaymentTermsAdapter;
   final BuyV2CommerceAdapter commerceAdapter;
   final bool reviewDataEnabled;
 
@@ -545,6 +547,12 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2CartBenefitsLoadState cartBenefitsLoadState =
       BuyV2CartBenefitsLoadState.ready;
   String? cartBenefitsMessage;
+  List<BuyV2CommercialPaymentTerm> _commercialPaymentTerms = [];
+  final Map<String, String> _selectedCommercialPaymentTermIds = {};
+  int _commercialPaymentTermsRequestSequence = 0;
+  BuyV2CommerceLoadState commercialPaymentTermsLoadState =
+      BuyV2CommerceLoadState.ready;
+  String? commercialPaymentTermsMessage;
   final Map<String, int> _tipsByFulfilmentKey = {};
   final Set<String> _savedKeys = {};
   String? _savedProductsOwnerScope;
@@ -561,6 +569,8 @@ class BuyV2Session extends ChangeNotifier {
   String? _confirmedPurchaseId;
   int _confirmedItemCount = 0;
   int _confirmedTotal = 0;
+  int _confirmedAmountPaidNow = 0;
+  int _confirmedBalanceDue = 0;
   int _orderSequence = 1;
   int _purchaseSequence = 1;
 
@@ -1276,6 +1286,7 @@ class BuyV2Session extends ChangeNotifier {
     _checkoutDeliveryPromiseChanges = [];
     _checkoutPriceChanges = [];
     _checkoutAvailabilityIssue = null;
+    _invalidateCommercialPaymentTerms();
   }
 
   int tipForGroup(BuyV2FulfilmentGroup group) =>
@@ -1313,6 +1324,25 @@ class BuyV2Session extends ChangeNotifier {
     (total, destination) => total + couponSavingForDestination(destination),
   );
 
+  Map<String, int> _checkoutGroupPayables() {
+    final remainingDiscount = {
+      for (final destination in checkoutDestinations)
+        destination: couponSavingForDestination(destination),
+    };
+    return Map.unmodifiable({
+      for (final group in checkoutFulfilmentGroups)
+        group.key: () {
+          final beforeDiscount = group.total + tipForGroup(group);
+          final available = remainingDiscount[group.destination] ?? 0;
+          final discount = available > beforeDiscount
+              ? beforeDiscount
+              : available;
+          remainingDiscount[group.destination] = available - discount;
+          return beforeDiscount - discount;
+        }(),
+    });
+  }
+
   int get scopedPayableTotal =>
       (scopedCartTotal + scopedTipTotal - scopedCouponSaving).clamp(
         0,
@@ -1347,6 +1377,10 @@ class BuyV2Session extends ChangeNotifier {
       _tipsByFulfilmentKey.remove(fulfilmentKey);
     } else {
       _tipsByFulfilmentKey[fulfilmentKey] = amount;
+    }
+    _invalidateCommercialPaymentTerms();
+    if (commercialPaymentTermsEnabled) {
+      unawaited(refreshCommercialPaymentTerms());
     }
     notice = null;
     notifyListeners();
@@ -1415,6 +1449,7 @@ class BuyV2Session extends ChangeNotifier {
       _liveCartBenefits = [];
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.ready;
       cartBenefitsMessage = null;
+      _invalidateCommercialPaymentTerms();
       notifyListeners();
       return true;
     }
@@ -1438,6 +1473,10 @@ class BuyV2Session extends ChangeNotifier {
       cartBenefitsMessage = snapshot.customerMessage;
       if (snapshot.state != BuyV2CartBenefitsLoadState.ready) {
         _liveCartBenefits = [];
+        _invalidateCommercialPaymentTerms();
+        if (commercialPaymentTermsEnabled) {
+          unawaited(refreshCommercialPaymentTerms());
+        }
         notifyListeners();
         return !_hasSelectedCartBenefitReference;
       }
@@ -1447,6 +1486,10 @@ class BuyV2Session extends ChangeNotifier {
         cartBenefitsMessage =
             'A selected coupon or offer is no longer eligible. Review the current options.';
       }
+      _invalidateCommercialPaymentTerms();
+      if (commercialPaymentTermsEnabled) {
+        unawaited(refreshCommercialPaymentTerms());
+      }
       notifyListeners();
       return !removedSelection;
     } on Object {
@@ -1455,6 +1498,10 @@ class BuyV2Session extends ChangeNotifier {
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.unavailable;
       cartBenefitsMessage =
           'Coupons and offers could not be checked. Try again.';
+      _invalidateCommercialPaymentTerms();
+      if (commercialPaymentTermsEnabled) {
+        unawaited(refreshCommercialPaymentTerms());
+      }
       notifyListeners();
       return !_hasSelectedCartBenefitReference;
     }
@@ -1566,6 +1613,254 @@ class BuyV2Session extends ChangeNotifier {
     cartBenefitsMessage = null;
   }
 
+  bool get commercialPaymentTermsEnabled =>
+      commercialPaymentTermsAdapter != null;
+
+  bool get commercialPaymentTermsBusy =>
+      commercialPaymentTermsLoadState == BuyV2CommerceLoadState.loading;
+
+  List<BuyV2CommercialPaymentTerm> commercialPaymentTermsFor(
+    String fulfilmentKey,
+  ) => List.unmodifiable(
+    _commercialPaymentTerms.where(
+      (term) => term.fulfilmentKey == fulfilmentKey,
+    ),
+  );
+
+  BuyV2CommercialPaymentTerm? selectedCommercialPaymentTermFor(
+    String fulfilmentKey,
+  ) {
+    final selectedId = _selectedCommercialPaymentTermIds[fulfilmentKey];
+    if (selectedId == null) return null;
+    return _commercialPaymentTerms
+        .where(
+          (term) =>
+              term.fulfilmentKey == fulfilmentKey && term.id == selectedId,
+        )
+        .firstOrNull;
+  }
+
+  bool get checkoutPaymentTermsReviewRequired {
+    if (!commercialPaymentTermsEnabled) return false;
+    if (commercialPaymentTermsLoadState != BuyV2CommerceLoadState.ready) {
+      return true;
+    }
+    return checkoutFulfilmentGroups.any(
+      (group) => selectedCommercialPaymentTermFor(group.key) == null,
+    );
+  }
+
+  int get checkoutAmountDueNow {
+    if (!commercialPaymentTermsEnabled) return checkoutPayableTotal;
+    final selected = [
+      for (final group in checkoutFulfilmentGroups)
+        selectedCommercialPaymentTermFor(group.key),
+    ];
+    if (selected.any((term) => term == null)) return checkoutPayableTotal;
+    return selected.whereType<BuyV2CommercialPaymentTerm>().fold(
+      0,
+      (total, term) => total + term.amountDueNow,
+    );
+  }
+
+  int get checkoutBalanceDue {
+    if (!commercialPaymentTermsEnabled) return 0;
+    return checkoutFulfilmentGroups
+        .map((group) => selectedCommercialPaymentTermFor(group.key))
+        .whereType<BuyV2CommercialPaymentTerm>()
+        .fold(0, (total, term) => total + term.balanceDue);
+  }
+
+  Future<bool> refreshCommercialPaymentTerms() async {
+    final adapter = commercialPaymentTermsAdapter;
+    if (adapter == null) return true;
+    final groups = checkoutFulfilmentGroups;
+    if (groups.isEmpty) {
+      _commercialPaymentTerms = [];
+      _selectedCommercialPaymentTermIds.clear();
+      commercialPaymentTermsLoadState = BuyV2CommerceLoadState.ready;
+      commercialPaymentTermsMessage = null;
+      notifyListeners();
+      return true;
+    }
+    final requestSequence = ++_commercialPaymentTermsRequestSequence;
+    final fingerprint = _commercialPaymentTermsFingerprint(groups);
+    commercialPaymentTermsLoadState = BuyV2CommerceLoadState.loading;
+    commercialPaymentTermsMessage = null;
+    notifyListeners();
+    try {
+      final snapshot = await adapter.loadTerms(
+        groups: List.unmodifiable(groups),
+        selectedPaymentMethod: selectedPayment,
+      );
+      if (requestSequence != _commercialPaymentTermsRequestSequence ||
+          fingerprint != _commercialPaymentTermsFingerprint(groups)) {
+        return false;
+      }
+      commercialPaymentTermsLoadState = snapshot.state;
+      commercialPaymentTermsMessage = snapshot.customerMessage;
+      if (snapshot.state != BuyV2CommerceLoadState.ready) {
+        _commercialPaymentTerms = [];
+        notifyListeners();
+        return false;
+      }
+      _commercialPaymentTerms = _validatedCommercialPaymentTerms(
+        snapshot.terms,
+        groups,
+      );
+      _selectedCommercialPaymentTermIds.removeWhere(
+        (groupKey, selectedId) => !_commercialPaymentTerms.any(
+          (term) => term.fulfilmentKey == groupKey && term.id == selectedId,
+        ),
+      );
+      for (final group in groups) {
+        if (group.destination == BuyV2Destination.wholesale) continue;
+        final retailAdvance = commercialPaymentTermsFor(group.key)
+            .where(
+              (term) =>
+                  term.kind == BuyV2CommercialPaymentTermKind.retailAdvance,
+            )
+            .firstOrNull;
+        if (retailAdvance != null) {
+          _selectedCommercialPaymentTermIds[group.key] = retailAdvance.id;
+        }
+      }
+      if (checkoutPaymentTermsReviewRequired &&
+          commercialPaymentTermsMessage == null) {
+        commercialPaymentTermsMessage =
+            'Choose an available payment term for each Wholesale delivery.';
+      }
+      notifyListeners();
+      return !checkoutPaymentTermsReviewRequired;
+    } on Object {
+      if (requestSequence != _commercialPaymentTermsRequestSequence) {
+        return false;
+      }
+      _commercialPaymentTerms = [];
+      commercialPaymentTermsLoadState = BuyV2CommerceLoadState.unavailable;
+      commercialPaymentTermsMessage =
+          'Payment terms could not be checked. Try again.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  String _commercialPaymentTermsFingerprint(
+    List<BuyV2FulfilmentGroup> groups,
+  ) => groups
+      .map(
+        (group) =>
+            '${group.key}:${group.total}:${tipForGroup(group)}:'
+            '${couponSavingForDestination(group.destination)}',
+      )
+      .followedBy([selectedPayment])
+      .join('|');
+
+  List<BuyV2CommercialPaymentTerm> _validatedCommercialPaymentTerms(
+    List<BuyV2CommercialPaymentTerm> terms,
+    List<BuyV2FulfilmentGroup> groups,
+  ) {
+    final groupByKey = {for (final group in groups) group.key: group};
+    final payableByKey = _checkoutGroupPayables();
+    final identities = <String>{};
+    return List.unmodifiable([
+      for (final term in terms)
+        if (_validCommercialPaymentTerm(
+              term,
+              group: groupByKey[term.fulfilmentKey],
+              expectedTotal: payableByKey[term.fulfilmentKey],
+            ) &&
+            identities.add('${term.fulfilmentKey}|${term.id}'))
+          term,
+    ]);
+  }
+
+  bool _validCommercialPaymentTerm(
+    BuyV2CommercialPaymentTerm term, {
+    required BuyV2FulfilmentGroup? group,
+    required int? expectedTotal,
+  }) {
+    if (group == null ||
+        expectedTotal == null ||
+        term.id.trim().isEmpty ||
+        term.sourceId.trim().isEmpty ||
+        term.supplierName.trim().isEmpty ||
+        term.fulfilmentKey != group.key ||
+        term.destination != group.destination ||
+        term.supplierName != group.partner ||
+        term.orderTotal != expectedTotal ||
+        term.amountDueNow < 0 ||
+        term.balanceDue < 0 ||
+        term.amountDueNow + term.balanceDue != expectedTotal ||
+        term.balanceDueLabel.trim().isEmpty) {
+      return false;
+    }
+    if (group.destination != BuyV2Destination.wholesale) {
+      return term.kind == BuyV2CommercialPaymentTermKind.retailAdvance &&
+          term.amountDueNow == expectedTotal &&
+          term.balanceDue == 0;
+    }
+    return switch (term.kind) {
+      BuyV2CommercialPaymentTermKind.retailAdvance => false,
+      BuyV2CommercialPaymentTermKind.wholesaleAdvance =>
+        term.amountDueNow == expectedTotal && term.balanceDue == 0,
+      BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch ||
+      BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery =>
+        term.amountDueNow > 0 && term.balanceDue > 0,
+      BuyV2CommercialPaymentTermKind.supplierCredit =>
+        term.netDays != null &&
+            term.netDays! >= 1 &&
+            term.netDays! <= (term.supplierIsMicroOrSmall ? 45 : 90) &&
+            term.financierName == null &&
+            term.keyFactsUri == null,
+      BuyV2CommercialPaymentTermKind.regulatedCredit =>
+        term.netDays != null &&
+            term.netDays! >= 1 &&
+            term.netDays! <= 90 &&
+            term.financierName?.trim().isNotEmpty == true &&
+            term.annualPercentageRate != null &&
+            term.annualPercentageRate! >= 0 &&
+            term.keyFactsUri?.scheme == 'https' &&
+            term.keyFactsUri?.host.isNotEmpty == true,
+    };
+  }
+
+  bool chooseCommercialPaymentTerm(BuyV2CommercialPaymentTerm term) {
+    if (commercialPaymentTermsLoadState != BuyV2CommerceLoadState.ready ||
+        !commercialPaymentTermsFor(
+          term.fulfilmentKey,
+        ).any((candidate) => candidate.id == term.id)) {
+      notice = 'This payment term is no longer available.';
+      notifyListeners();
+      return false;
+    }
+    _selectedCommercialPaymentTermIds[term.fulfilmentKey] = term.id;
+    notice = '${_commercialPaymentTermLabel(term.kind)} selected.';
+    notifyListeners();
+    return true;
+  }
+
+  String _commercialPaymentTermLabel(BuyV2CommercialPaymentTermKind kind) =>
+      switch (kind) {
+        BuyV2CommercialPaymentTermKind.retailAdvance ||
+        BuyV2CommercialPaymentTermKind.wholesaleAdvance => 'Full advance',
+        BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch =>
+          'Booking amount with balance before dispatch',
+        BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery =>
+          'Booking amount with balance at delivery',
+        BuyV2CommercialPaymentTermKind.supplierCredit => 'Supplier credit',
+        BuyV2CommercialPaymentTermKind.regulatedCredit =>
+          'Financial partner credit',
+      };
+
+  void _invalidateCommercialPaymentTerms() {
+    if (!commercialPaymentTermsEnabled) return;
+    _commercialPaymentTermsRequestSequence += 1;
+    _commercialPaymentTerms = [];
+    commercialPaymentTermsLoadState = BuyV2CommerceLoadState.loading;
+    commercialPaymentTermsMessage = null;
+  }
+
   List<BuyV2CartBenefit> cartBenefits({
     required BuyV2CartBenefitKind kind,
     BuyV2Destination? destination,
@@ -1673,6 +1968,10 @@ class BuyV2Session extends ChangeNotifier {
       benefitId: current.id,
       sourceId: current.sourceId,
     );
+    _invalidateCommercialPaymentTerms();
+    if (commercialPaymentTermsEnabled) {
+      unawaited(refreshCommercialPaymentTerms());
+    }
     notice =
         current.kind == BuyV2CartBenefitKind.coupon && current.savingAmount > 0
         ? '${current.title} applied. Your total now includes the saving.'
@@ -1689,6 +1988,10 @@ class BuyV2Session extends ChangeNotifier {
       _cartBenefitSelectionKey(destination, kind),
     );
     if (removed == null) return;
+    _invalidateCommercialPaymentTerms();
+    if (commercialPaymentTermsEnabled) {
+      unawaited(refreshCommercialPaymentTerms());
+    }
     notice = kind == BuyV2CartBenefitKind.coupon
         ? 'Coupon removed from Checkout review.'
         : 'Payment offer removed from Checkout review.';
@@ -1859,6 +2162,10 @@ class BuyV2Session extends ChangeNotifier {
   int get confirmedItemCount => _confirmedItemCount;
 
   int get confirmedTotal => _confirmedTotal;
+
+  int get confirmedAmountPaidNow => _confirmedAmountPaidNow;
+
+  int get confirmedBalanceDue => _confirmedBalanceDue;
 
   List<BuyV2Order> get visibleOrders {
     final normalizedQuery = query.trim().toLowerCase();
@@ -2138,6 +2445,10 @@ class BuyV2Session extends ChangeNotifier {
       }
       notice = null;
       _captureCheckoutPromiseSnapshot();
+      _invalidateCommercialPaymentTerms();
+      if (commercialPaymentTermsEnabled) {
+        unawaited(refreshCommercialPaymentTerms());
+      }
     }
     _notifyNavigationIfChanged(
       previous,
@@ -2930,6 +3241,10 @@ class BuyV2Session extends ChangeNotifier {
     if (_cart.isNotEmpty && liveCartBenefitsEnabled) {
       unawaited(refreshCartBenefits());
     }
+    _invalidateCommercialPaymentTerms();
+    if (_cart.isNotEmpty && commercialPaymentTermsEnabled) {
+      unawaited(refreshCommercialPaymentTerms());
+    }
     notice = '$value selected';
     _persistCustomerState();
     notifyListeners();
@@ -3022,23 +3337,36 @@ class BuyV2Session extends ChangeNotifier {
 
   Future<bool> submitOrder() {
     if (reviewDataEnabled) {
-      if (liveCartBenefitsEnabled && _hasSelectedCartBenefitReference) {
-        return _submitReviewOrderWithLiveBenefits();
+      if ((liveCartBenefitsEnabled && _hasSelectedCartBenefitReference) ||
+          commercialPaymentTermsEnabled) {
+        return _submitReviewOrderWithContracts();
       }
       return Future<bool>.value(confirmOrder());
     }
     return _submitOrderAsync();
   }
 
-  Future<bool> _submitReviewOrderWithLiveBenefits() async {
-    final eligible = await refreshCartBenefits();
-    if (!eligible ||
-        cartBenefitsLoadState != BuyV2CartBenefitsLoadState.ready) {
-      notice =
-          cartBenefitsMessage ??
-          'Coupon eligibility could not be confirmed. Review the current options.';
-      notifyListeners();
-      return false;
+  Future<bool> _submitReviewOrderWithContracts() async {
+    if (liveCartBenefitsEnabled && _hasSelectedCartBenefitReference) {
+      final eligible = await refreshCartBenefits();
+      if (!eligible ||
+          cartBenefitsLoadState != BuyV2CartBenefitsLoadState.ready) {
+        notice =
+            cartBenefitsMessage ??
+            'Coupon eligibility could not be confirmed. Review the current options.';
+        notifyListeners();
+        return false;
+      }
+    }
+    if (commercialPaymentTermsEnabled) {
+      await refreshCommercialPaymentTerms();
+      if (checkoutPaymentTermsReviewRequired) {
+        notice =
+            commercialPaymentTermsMessage ??
+            'Choose an available payment term to continue.';
+        notifyListeners();
+        return false;
+      }
     }
     return confirmOrder();
   }
@@ -3137,6 +3465,16 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
     }
+    if (commercialPaymentTermsEnabled) {
+      await refreshCommercialPaymentTerms();
+      if (checkoutPaymentTermsReviewRequired) {
+        notice =
+            commercialPaymentTermsMessage ??
+            'Choose an available payment term to continue.';
+        notifyListeners();
+        return false;
+      }
+    }
     if (!_refreshCheckoutFactsForProduction(lines)) return false;
     final groups = checkoutFulfilmentGroups;
     final refreshedSnapshot = _deliveryPromiseSnapshotFor(groups);
@@ -3188,7 +3526,11 @@ class BuyV2Session extends ChangeNotifier {
         address: address,
         paymentMethod: selectedPayment,
         total: checkoutPayableTotal,
+        amountDueNow: checkoutAmountDueNow,
         idempotencyKey: _checkoutIdempotencyKey!,
+        commercialPaymentTermIds: Map.unmodifiable(
+          _selectedCommercialPaymentTermIds,
+        ),
       ),
     );
     return _handleOrderPlacement(
@@ -3414,6 +3756,8 @@ class BuyV2Session extends ChangeNotifier {
         .toSet();
     _confirmedItemCount = checkoutItemCount;
     _confirmedTotal = checkoutPayableTotal;
+    _confirmedAmountPaidNow = checkoutAmountDueNow;
+    _confirmedBalanceDue = checkoutBalanceDue;
     for (final line in lines) {
       _cart.remove(line.product.id);
     }
@@ -3486,6 +3830,7 @@ class BuyV2Session extends ChangeNotifier {
     final status = group.destination == BuyV2Destination.wholesale
         ? BuyV2OrderStatus.confirmed
         : BuyV2OrderStatus.preparing;
+    final paymentTerm = selectedCommercialPaymentTermFor(group.key);
     return BuyV2Order(
       id: '$prefix-NEW-${sequence.toString().padLeft(2, '0')}',
       destination: group.destination,
@@ -3511,6 +3856,12 @@ class BuyV2Session extends ChangeNotifier {
       )?.label,
       tip: tipForGroup(group),
       discount: discount,
+      paymentTermLabel: paymentTerm == null
+          ? null
+          : _commercialPaymentTermLabel(paymentTerm.kind),
+      amountPaidNow: paymentTerm?.amountDueNow,
+      balanceDue: paymentTerm?.balanceDue ?? 0,
+      balanceDueLabel: paymentTerm?.balanceDueLabel,
     );
   }
 
@@ -3545,6 +3896,10 @@ class BuyV2Session extends ChangeNotifier {
     _invalidateLiveCartBenefits();
     if (_cart.isNotEmpty && liveCartBenefitsEnabled) {
       unawaited(refreshCartBenefits());
+    }
+    _invalidateCommercialPaymentTerms();
+    if (_cart.isNotEmpty && commercialPaymentTermsEnabled) {
+      unawaited(refreshCommercialPaymentTerms());
     }
   }
 

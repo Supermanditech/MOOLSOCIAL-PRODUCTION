@@ -138,14 +138,18 @@ class BuyV2OrderPlacementRequest {
     required this.address,
     required this.paymentMethod,
     required this.total,
+    required this.amountDueNow,
     required this.idempotencyKey,
+    this.commercialPaymentTermIds = const {},
   });
 
   final List<BuyV2CartLine> lines;
   final BuyV2Address address;
   final String paymentMethod;
   final int total;
+  final int amountDueNow;
   final String idempotencyKey;
+  final Map<String, String> commercialPaymentTermIds;
 }
 
 @immutable
@@ -222,6 +226,74 @@ class BuyV2AddressRequestResult {
 }
 
 typedef BuyV2PaymentHandoff = Future<bool> Function(Uri uri);
+
+enum BuyV2CommercialPaymentTermKind {
+  retailAdvance,
+  wholesaleAdvance,
+  bookingBalanceBeforeDispatch,
+  bookingBalanceOnDelivery,
+  supplierCredit,
+  regulatedCredit,
+}
+
+@immutable
+class BuyV2CommercialPaymentTerm {
+  const BuyV2CommercialPaymentTerm({
+    required this.id,
+    required this.fulfilmentKey,
+    required this.destination,
+    required this.supplierName,
+    required this.kind,
+    required this.orderTotal,
+    required this.amountDueNow,
+    required this.balanceDue,
+    required this.balanceDueLabel,
+    required this.sourceId,
+    this.supplierIsMicroOrSmall = false,
+    this.netDays,
+    this.financierName,
+    this.annualPercentageRate,
+    this.keyFactsUri,
+  });
+
+  final String id;
+  final String fulfilmentKey;
+  final BuyV2Destination destination;
+  final String supplierName;
+  final BuyV2CommercialPaymentTermKind kind;
+  final int orderTotal;
+  final int amountDueNow;
+  final int balanceDue;
+  final String balanceDueLabel;
+  final String sourceId;
+  final bool supplierIsMicroOrSmall;
+  final int? netDays;
+  final String? financierName;
+  final double? annualPercentageRate;
+  final Uri? keyFactsUri;
+}
+
+@immutable
+class BuyV2CommercialPaymentTermsSnapshot {
+  const BuyV2CommercialPaymentTermsSnapshot({
+    required this.state,
+    this.terms = const [],
+    this.customerMessage,
+  });
+
+  final BuyV2CommerceLoadState state;
+  final List<BuyV2CommercialPaymentTerm> terms;
+  final String? customerMessage;
+}
+
+abstract interface class BuyV2CommercialPaymentTermsAdapter {
+  const BuyV2CommercialPaymentTermsAdapter();
+
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
+    required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod,
+  });
+}
 
 abstract interface class BuyV2CommerceAdapter {
   const BuyV2CommerceAdapter();

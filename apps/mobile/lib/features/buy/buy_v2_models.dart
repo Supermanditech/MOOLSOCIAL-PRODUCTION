@@ -270,6 +270,10 @@ class BuyV2Order {
     this.deliveryInstruction,
     this.tip = 0,
     this.discount = 0,
+    this.paymentTermLabel,
+    this.amountPaidNow,
+    this.balanceDue = 0,
+    this.balanceDueLabel,
     this.invoiceAvailable = true,
     this.receiptReference,
   });
@@ -296,6 +300,10 @@ class BuyV2Order {
   final String? deliveryInstruction;
   final int tip;
   final int discount;
+  final String? paymentTermLabel;
+  final int? amountPaidNow;
+  final int balanceDue;
+  final String? balanceDueLabel;
   final bool invoiceAvailable;
   final String? receiptReference;
 }
