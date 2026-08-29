@@ -44173,6 +44173,16 @@
       "prevention": "Before cleaning another exact worktree, preserve the tracked support bytes, run clean plus pub get inside one guarded invocation so .dart_tool is recreated, and verify exact support-owner bytes afterward. Restore the two affected inactive-worktree owners from its exact Git HEAD before continuing.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/invoke-flutter-with-clean-support.ps1", "apps/mobile/.dart_tool/package_config.json", "apps/mobile/.dart_tool/package_graph.json"]
+    },
+    {
+      "id": "REG-20260829-3899-DART-TOOL-APPLY-PATCH-LINE-ENDING-MISMATCH",
+      "status": "registered_exact_git_blob_restore_required",
+      "appliesTo": ["primary", "coordination", "flutter", "git", "tooling"],
+      "mistake": "Recreating the two removed .dart_tool JSON owners through apply_patch produced working-tree line-ending/stat differences, and package_graph.json did not compare exact to HEAD.",
+      "rootCause": "apply_patch normalized the Git blob text to LF while this Windows worktree applies its own checkout line-ending rules; the dynamic extraction also removed the blob's terminal newline.",
+      "prevention": "Use Git's exact path-scoped index checkout machinery only for the two proven deleted support owners, after verifying their prior state and HEAD blob identity, then require path-scoped zero diff and zero status before continuing.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/.dart_tool/package_config.json", "apps/mobile/.dart_tool/package_graph.json"]
     }
   ]
 }
