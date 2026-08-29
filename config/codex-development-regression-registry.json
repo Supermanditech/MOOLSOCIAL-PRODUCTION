@@ -44603,6 +44603,16 @@
       "prevention": "Discover the exact current requiredCursorBranch line, patch it independently, patch maximumPostMergeClosureCommits independently, parse policy and rerun remote readback before handoff.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260829-3942-STABLE-SHARED-BRANCH-WORK-ID-TOO-LONG",
+      "status": "registered_short_valid_stable_branch_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "git", "remote", "chat"],
+      "mistake": "The final handoff gate rejected the stable shared implementation branch name because its work-id suffix exceeded the production branch contract, although its remote commit was exactly 30f46145.",
+      "rootCause": "A descriptive immutable alias was created without applying the lane's maximum work-id length before push.",
+      "prevention": "Create and push short branch work/codex-ui/chat-shell-impl-v1-20260829 at the same commit, preserve the long alias, update repair policy/checker, and rerun handoff.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
     }
   ]
 }

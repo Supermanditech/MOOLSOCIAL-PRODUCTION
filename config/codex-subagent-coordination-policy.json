@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3904,
-    "sha256": "20D1B3A82DE6DB3F4ED126A9809F20220BFF447A85054D24ED4E9EE4C7008387"
+    "entryCount": 3905,
+    "sha256": "95533261ABDBD6968A93367B6BCC4A46CA7C6DC78FAC6878A4A73CE6B236F47B"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -1613,7 +1613,7 @@
         "requiredCodexCommit": "011fd09d1d94fce02d0bbc9c7b94c90f742624e6",
         "requiredCodexBranch": "work/integration-repair/shop-chat-shared-v1-base-20260829",
         "requiredCursorCommit": "30f4614574aae3c315d586944636a35ba314873d",
-        "requiredCursorBranch": "work/codex-ui/global-contextual-chat-shell-v1-implementation-20260829",
+        "requiredCursorBranch": "work/codex-ui/chat-shell-impl-v1-20260829",
         "maximumMergeCommits": 1,
         "maximumPreMergeCoordinationCommits": 1,
         "preMergeCoordinationOwners": [
@@ -1621,7 +1621,7 @@
           "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"
         ],
-        "maximumPostMergeClosureCommits": 6,
+        "maximumPostMergeClosureCommits": 7,
         "postMergeClosureOwners": [
           "apps/mobile/lib/features/chat/chat_entry_context.dart",
           "apps/mobile/lib/features/chat/chat_session.dart",
