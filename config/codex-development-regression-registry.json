@@ -44183,6 +44183,16 @@
       "prevention": "Use Git's exact path-scoped index checkout machinery only for the two proven deleted support owners, after verifying their prior state and HEAD blob identity, then require path-scoped zero diff and zero status before continuing.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/.dart_tool/package_config.json", "apps/mobile/.dart_tool/package_graph.json"]
+    },
+    {
+      "id": "REG-20260829-3900-EMPTY-GIT-STATUS-DIGEST-NULL-BYTE-ARRAY",
+      "status": "registered_explicit_empty_byte_array_required",
+      "appliesTo": ["primary", "coordination", "git", "tooling"],
+      "mistake": "The Child 3 cleanliness digest passed an empty git status result directly to UTF8.GetBytes, producing null/overload errors even though Git returned success and the worktree was clean.",
+      "rootCause": "PowerShell represented zero command output as null rather than an empty string, and the digest helper did not normalize that case before hashing.",
+      "prevention": "Capture status output, explicitly bind [byte[]]::new(0) when it is null, and hash only a typed byte array; require bytes zero, records zero and exit zero for a clean worktree.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md"]
     }
   ]
 }
