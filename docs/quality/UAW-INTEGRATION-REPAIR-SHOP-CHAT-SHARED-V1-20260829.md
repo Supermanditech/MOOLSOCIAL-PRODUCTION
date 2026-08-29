@@ -1,6 +1,6 @@
 # UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829
 
-State: `premerge_ready_exact_three_owner_resolution`
+State: `repair_merge_complete_combined_tests_pending`
 
 - First parent: tested Buy adapter and cumulative Shop evidence
   `e5720cb86bd2119afc3d84a83d3116018f17f9a3`.
@@ -32,6 +32,15 @@ Pre-merge readiness:
 - authoritative shared Chat remains
   `30f4614574aae3c315d586944636a35ba314873d`;
 - no source owner is authorized before the two-parent merge.
+
+Repair result:
+
+- merge commit: `fc3019ea483ee725f168957ef17b98daf7ff0517`;
+- second parent: `30f4614574aae3c315d586944636a35ba314873d`;
+- approved profile blob preserved exactly:
+  `427571d774eada83ea642e8811ee31ec3aa2db44`;
+- unmerged owners: registry and coordination policy;
+- authoritative resolution owners: profile, registry, policy and checker.
 
 Backend, Firebase, Android configuration, OPPO and
 `com.moolsocial.app.runtime` remain excluded.

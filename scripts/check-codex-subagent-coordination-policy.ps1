@@ -891,6 +891,12 @@ $expectedRepairUnmergedOwners = @(
   'config/codex-subagent-coordination-policy.json'
 )
 Assert-Coordination (
+  $expectedRepairUnmergedOwners.Count -eq 2 -and
+  @($expectedRepairUnmergedOwners | Where-Object {
+    $expectedRepairConflictOwners -cnotcontains $_
+  }).Count -eq 0
+) 'integration repair unmerged owner contract changed.'
+Assert-Coordination (
   [string]$integrationRepair.lane -ceq 'integration_repair' -and
   [string]$integrationRepair.requiredCodexCommit -ceq
     '011fd09d1d94fce02d0bbc9c7b94c90f742624e6' -and
@@ -906,7 +912,7 @@ Assert-Coordination (
     'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md' -and
   [int]$integrationRepair.maximumPostMergeClosureCommits -eq 1 -and
   (@($integrationRepair.postMergeClosureOwners) -join '|') -ceq
-    'docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md|scripts/check-codex-subagent-coordination-policy.ps1' -and
+    'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md|scripts/check-codex-subagent-coordination-policy.ps1' -and
   -not [bool]$integrationRepair.directSourceCommitsAllowed -and
   [bool]$integrationRepair.conflictResolutionAllowed -and
   (@($integrationRepair.exactConflictOwners | Sort-Object) -join '|') -ceq

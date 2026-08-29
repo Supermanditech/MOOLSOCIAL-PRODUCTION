@@ -44453,6 +44453,16 @@
       "prevention": "Assert unmerged owners are exactly registry and policy, assert manual delta owners are exactly profile, registry, policy and checker, and retain both independent inventories through handoff.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260829-3927-REPAIR-EVIDENCE-GUESSED-FULL-MERGE-SHA",
+      "status": "registered_scalar_rev_parse_before_evidence_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "git", "evidence"],
+      "mistake": "The first post-merge evidence patch expanded the short fc3019ea console prefix into a guessed full SHA instead of reading the exact commit; the guessed value differed from fc3019ea483ee725f168957ef17b98daf7ff0517.",
+      "rootCause": "A display abbreviation was treated as sufficient to author immutable evidence before an independent scalar rev-parse.",
+      "prevention": "Read git rev-parse HEAD independently before every evidence write, bind the exact returned SHA, and include registry, policy, checker and corrected ticket document in the one post-merge closure commit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
     }
   ]
 }

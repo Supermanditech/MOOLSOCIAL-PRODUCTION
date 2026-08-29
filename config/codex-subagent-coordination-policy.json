@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3889,
-    "sha256": "2D84883F5B9A647FDFB0564C7B67D0D77F3F6FF67E70C837AE14E166ACF41E7B"
+    "entryCount": 3890,
+    "sha256": "5A4F6E40C1122BDDCC952647F07859B73CA9CD9D5C56E9DA191DF496D3104ECC"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -1572,6 +1572,8 @@
         ],
         "maximumPostMergeClosureCommits": 1,
         "postMergeClosureOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
