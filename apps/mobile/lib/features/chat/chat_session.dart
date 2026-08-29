@@ -312,6 +312,19 @@ class ChatSession extends ChangeNotifier {
       preview: 'Amit: Add atta, rice and oil.',
       timeLabel: '10:49',
       type: ChatThreadType.people,
+      groupDescription: 'Plan household shopping together.',
+      participants: [
+        ChatParticipant(
+          id: 'current-user',
+          name: 'You',
+          subtitle: 'Group member',
+          isMe: true,
+        ),
+        ChatParticipant(id: 'amit', name: 'Amit', subtitle: 'Group member'),
+        ChatParticipant(id: 'rakesh', name: 'Rakesh', subtitle: 'Group member'),
+        ChatParticipant(id: 'neha', name: 'Neha', subtitle: 'Group member'),
+        ChatParticipant(id: 'priya', name: 'Priya', subtitle: 'Group member'),
+      ],
     ),
     ChatThread(
       id: 'rasoi',

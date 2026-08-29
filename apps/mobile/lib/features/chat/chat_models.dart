@@ -34,6 +34,22 @@ class ChatReplyReference {
   final String text;
 }
 
+class ChatParticipant {
+  const ChatParticipant({
+    required this.id,
+    required this.name,
+    required this.subtitle,
+    this.isMe = false,
+    this.verified = false,
+  });
+
+  final String id;
+  final String name;
+  final String subtitle;
+  final bool isMe;
+  final bool verified;
+}
+
 class ChatThread {
   const ChatThread({
     required this.id,
@@ -46,6 +62,8 @@ class ChatThread {
     this.verified = false,
     this.safetyTarget,
     this.suggestedPrompts = const [],
+    this.participants = const [],
+    this.groupDescription,
   });
 
   final String id;
@@ -58,6 +76,10 @@ class ChatThread {
   final bool verified;
   final ChatSafetyTarget? safetyTarget;
   final List<String> suggestedPrompts;
+  final List<ChatParticipant> participants;
+  final String? groupDescription;
+
+  bool get isGroup => participants.isNotEmpty;
 
   ChatSafetyTarget get effectiveSafetyTarget =>
       safetyTarget ??

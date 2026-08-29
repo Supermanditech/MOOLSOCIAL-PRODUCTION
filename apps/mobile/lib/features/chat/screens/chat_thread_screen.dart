@@ -13,6 +13,7 @@ import '../chat_session.dart';
 import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
 import 'chat_conversation_search_screen.dart';
+import 'chat_group_info_screen.dart';
 import 'chat_settings_screen.dart';
 import 'chat_shared_content_screen.dart';
 
@@ -705,6 +706,28 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                         ),
                       ),
                     ),
+                    if (thread.isGroup) ...[
+                      const Divider(height: 1),
+                      ListTile(
+                        key: const Key('chat-info-group-info'),
+                        minLeadingWidth: 28,
+                        leading: const Icon(Icons.groups_2_outlined),
+                        title: const Text('Group info'),
+                        subtitle: Text(
+                          '${thread.participants.length} members and group controls.',
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ChatGroupInfoScreen(
+                              session: session,
+                              threadId: thread.id,
+                              originReturnRoute: widget.originReturnRoute,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     const Divider(height: 1),
                     ListTile(
                       key: const Key('chat-info-shared-content'),
