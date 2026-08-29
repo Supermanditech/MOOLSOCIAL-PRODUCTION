@@ -217,6 +217,16 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     if (mounted) setState(() => _publicFeedOpened = true);
     _selectSection(ChatHomeSection.discover);
     await _ensurePeopleDirectory(refresh: true);
+    if (!mounted || _peopleDirectoryError != null) return;
+    final social = widget.socialSession;
+    if (social == null || social.socialPublishedItems.isEmpty) return;
+    final chatReturn = GoRouterState.of(context).uri.toString();
+    context.push(
+      Uri(
+        path: '/app/social',
+        queryParameters: {'sub': 'feed', 'return': chatReturn},
+      ).toString(),
+    );
   }
 
   List<ChatPersonEntry> _visiblePeople() {
@@ -345,14 +355,13 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                   title: Text('Refresh'),
                 ),
               ),
-              if (entryContext.id == ChatEntryContextId.social)
-                const PopupMenuItem(
-                  value: 'feed',
-                  child: ListTile(
-                    leading: Icon(Icons.dynamic_feed_outlined),
-                    title: Text('Open public Feed'),
-                  ),
+              const PopupMenuItem(
+                value: 'feed',
+                child: ListTile(
+                  leading: Icon(Icons.dynamic_feed_outlined),
+                  title: Text('Open public Feed'),
                 ),
+              ),
             ],
             icon: const Icon(Icons.more_vert_rounded),
           ),

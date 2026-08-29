@@ -272,6 +272,59 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Open Feed continues through Social and back into direct Chat', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final socialGateway = _PeopleSocialGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    final chatGateway = _PeopleChatGateway();
+    final chat = ChatSession.production(gateway: chatGateway);
+    addTearDown(journey.dispose);
+    addTearDown(shared.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/work/my-work',
+      journey: journey,
+      chat: chat,
+      sharedSession: shared,
+      size: const Size(360, 800),
+    );
+
+    await tapVisible(tester, const Key('chat-more'));
+    expect(find.text('Open public Feed'), findsOneWidget);
+    await tester.tap(find.text('Open public Feed'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+    expect(find.text('Alice News'), findsWidgets);
+    expect(find.text('Public discovery post'), findsWidgets);
+
+    await tapVisible(tester, const Key('social-global-chat'));
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    await tapVisible(tester, const Key('chat-section-discover'));
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    await tapVisible(tester, const Key('chat-person-connect-person-a'));
+    await tapVisible(tester, const Key('chat-person-message-person-a'));
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(chatGateway.createdTargets, ['person-a']);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Discover connects MoolSocial people and starts a real direct Chat',
     (tester) async {
