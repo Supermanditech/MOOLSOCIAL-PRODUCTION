@@ -273,7 +273,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final session = await readySession();
     addTearDown(session.dispose);
-    await openProductionSection(tester, session, 'work');
+    await openProductionSection(tester, session, 'work/earn');
 
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
     expect(find.byKey(const Key('mvp-action-root-work')), findsNothing);

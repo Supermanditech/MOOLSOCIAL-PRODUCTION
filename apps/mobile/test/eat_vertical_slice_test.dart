@@ -326,6 +326,17 @@ void main() {
     );
     expect(find.byKey(const Key('eat-table-qr')), findsOneWidget);
     await tapVisible(tester, const Key('eat-table-directions'));
+    await tapVisible(tester, const Key('eat-table-confirm-chat'));
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(find.text('Spice Darbar'), findsWidgets);
+    await tapVisible(tester, const Key('chat-back'));
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('eat-table-confirmation-screen')),
+      findsOneWidget,
+    );
     await tapVisible(tester, const Key('eat-table-cancel-booking'));
     await tapVisible(tester, const Key('eat-table-keep-booking'));
     expect(eat.tableBookingCancelled, isFalse);

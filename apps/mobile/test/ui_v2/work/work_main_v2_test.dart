@@ -130,7 +130,7 @@ void main() {
     final profileButton = tester.getRect(
       find.byKey(const Key('work-main-global-profile')),
     );
-    expect(profileButton.size, const Size(48, 48));
+    expect(profileButton.size, const Size(44, 44));
     expect(profileButton.center.dx, greaterThan(300));
     expect(
       tester

@@ -422,6 +422,8 @@ void main() {
     await tapVisible(tester, const Key('retailer-order-MS-2841'));
     await tapVisible(tester, const Key('retailer-message-customer'));
     expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(find.text('Amit Sharma'), findsWidgets);
+    expect(find.text('Order MS-2841'), findsOneWidget);
     await tapVisible(tester, const Key('chat-back'));
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
     expect(find.byKey(const Key('chat-back')), findsNothing);

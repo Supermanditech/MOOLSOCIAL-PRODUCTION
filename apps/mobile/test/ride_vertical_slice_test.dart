@@ -107,6 +107,41 @@ void main() {
     expect(find.byKey(const Key('ride-arriving-screen')), findsOneWidget);
   });
 
+  testWidgets('active Ride Chat opens the captain and returns to the trip', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final ride = RideSession(
+      gateway: ReviewRideGateway(latency: Duration.zero),
+    );
+    expect(await ride.bookRide(), isTrue);
+    final tripId = ride.trip!.id;
+    addTearDown(journey.dispose);
+    addTearDown(ride.dispose);
+    await mount(
+      tester,
+      route: '/app/ride/trip/$tripId',
+      journey: journey,
+      ride: ride,
+    );
+
+    await tapVisible(tester, const Key('ride-chat-captain'));
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(find.text('Arjun Singh'), findsWidgets);
+    expect(find.text('Your verified captain'), findsOneWidget);
+    await tapVisible(tester, const Key('chat-back'));
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    expect(
+      find.byKey(const Key('chat-open-thread-ride-captain')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ride-arriving-screen')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'ride completes booking, arrival, live stop, payment, receipt and rating',
     (tester) async {
@@ -460,7 +495,7 @@ void main() {
       await tapVisible(tester, const Key('ride-safety-shortcut'));
       await tapVisible(tester, const Key('ride-safety-report'));
       expect(
-        find.byKey(const Key('chat-open-thread-order-support')),
+        find.byKey(const Key('chat-open-thread-ride-support')),
         findsOneWidget,
       );
     },

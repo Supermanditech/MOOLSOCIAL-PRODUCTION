@@ -121,7 +121,7 @@ void main() {
     }
     expect(
       ChatEntryContext.resolve('/app/ride/book?type=cab').allowedThreadIds,
-      {'ride-support'},
+      {'ride-support', 'ride-captain'},
     );
     expect(ChatEntryContext.resolve('/app/buy?sub=shop').allowedThreadIds, {
       'shop-assist',
@@ -133,6 +133,17 @@ void main() {
       'clinic-care',
       'task-helper',
       'order-support',
+    });
+    expect(ChatEntryContext.resolve('/app/eat/home').allowedThreadIds, {
+      'rasoi',
+      'order-support',
+    });
+    expect(ChatEntryContext.resolve('/app/work/earn').allowedThreadIds, {
+      'work-opportunity',
+      'work-support',
+    });
+    expect(ChatEntryContext.resolve('/app/pay/home').allowedThreadIds, {
+      'pay-support',
     });
     expect(ChatEntryContext.resolve('/app/work/my-work').allowedThreadIds, {
       'workspace-support',
@@ -154,11 +165,151 @@ void main() {
       isTrue,
     );
     expect(
+      ChatEntryContext.resolve('/app/retailer/orders').allowsThread('mahadev'),
+      isTrue,
+    );
+    expect(
       ChatEntryContext.resolve(
         '/app/captain/trips/ride-1',
       ).allowsThread('ride-support'),
       isTrue,
     );
+  });
+
+  for (final entry
+      in const <
+        ({
+          String origin,
+          String title,
+          String threadId,
+          List<String> excludedThreadIds,
+          String returnKey,
+        })
+      >[
+        (
+          origin: '/app/eat/home',
+          title: 'Food Chat',
+          threadId: 'rasoi',
+          excludedThreadIds: ['shop-order'],
+          returnKey: 'eat-home-screen',
+        ),
+        (
+          origin: '/app/work/home',
+          title: 'Work Chat',
+          threadId: 'work-opportunity',
+          excludedThreadIds: ['mahadev', 'shop-partner', 'clinic-care'],
+          returnKey: 'work-main-v2',
+        ),
+        (
+          origin: '/app/pay/home',
+          title: 'Pay Chat',
+          threadId: 'pay-support',
+          excludedThreadIds: [
+            'order-support',
+            'shop-assist',
+            'workspace-support',
+          ],
+          returnKey: 'legacy-route-containment-standalone-pay',
+        ),
+      ]) {
+    testWidgets('${entry.title} exposes only its owned default conversation', (
+      tester,
+    ) async {
+      final journey = await readyJourney();
+      final chat = ChatSession();
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+      final route = Uri(
+        path: '/app/chat/inbox',
+        queryParameters: {'return': entry.origin},
+      ).toString();
+
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: route,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(entry.title), findsOneWidget);
+      expect(
+        find.byKey(ValueKey('chat-open-thread-${entry.threadId}')),
+        findsOneWidget,
+      );
+      for (final threadId in entry.excludedThreadIds) {
+        expect(
+          find.byKey(ValueKey('chat-open-thread-$threadId')),
+          findsNothing,
+          reason: '${entry.origin} must not expose $threadId',
+        );
+      }
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key(entry.returnKey)), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Work support intent stays inside Work support', (tester) async {
+    final journey = await readyJourney();
+    final chat = ChatSession();
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/chat?sub=support&return=/app/work%2Fearn',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Work Chat'), findsOneWidget);
+    expect(chat.selectedFilter, ChatThreadType.support);
+    expect(
+      find.byKey(const Key('chat-open-thread-work-support')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('chat-open-thread-workspace-support')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('chat-open-thread-order-support')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Retailer business intent opens the real supplier thread', (
+    tester,
+  ) async {
+    final journey = await readyJourney();
+    final chat = ChatSession();
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/chat?sub=business&return=/app/retailer%2Forders',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Workspace Chat'), findsOneWidget);
+    expect(chat.selectedFilter, ChatThreadType.business);
+    expect(find.byKey(const Key('chat-open-thread-mahadev')), findsOneWidget);
+    expect(
+      find.byKey(const Key('chat-open-thread-shop-partner')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   for (final entry in const <(String, String, String, ChatThreadType?)>[
@@ -316,7 +467,7 @@ void main() {
   }
 
   for (final destination in const <(String, String, String, ChatThreadType)>[
-    ('/app/pay/home', 'order-support', 'Pay Chat', ChatThreadType.support),
+    ('/app/pay/home', 'pay-support', 'Pay Chat', ChatThreadType.support),
     (
       '/app/retailer/orders/issues',
       'order-support',
