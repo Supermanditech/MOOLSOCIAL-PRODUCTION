@@ -44293,6 +44293,16 @@
       "prevention": "Bind clean Child 7, add the exact focused test owner, and before commit assert the active claim contains buy_v2_screen.dart, buy_v2_shop_chat.dart and buy_v2_shop_chat_test.dart. Pass task_start and implementation before formatting or testing.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD7-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3911-SHOP-CHAT-ADAPTER-CONDITIONAL-MAP-ELEMENT-LINT",
+      "status": "registered_lint_safe_query_map_required",
+      "appliesTo": ["primary", "coordination", "implementation", "buy", "chat", "analysis"],
+      "mistake": "Focused Flutter analysis rejected the adapter's conditional nullable type map entry with use_null_aware_elements at buy_v2_shop_chat.dart line 40.",
+      "rootCause": "The route adapter used an if collection element for a nullable value under an SDK/lint configuration that requires the null-aware collection form.",
+      "prevention": "Bind clean Child 8, construct the query map with the required return value first and add type through a non-null pattern branch, then require focused analysis clean before running tests.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD8-20260829.md"]
     }
   ]
 }
