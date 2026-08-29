@@ -44303,6 +44303,16 @@
       "prevention": "Bind clean Child 8, construct the query map with the required return value first and add type through a non-null pattern branch, then require focused analysis clean before running tests.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD8-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3912-SHOP-CHAT-PRECOMMIT-INVOKED-BEFORE-STAGING",
+      "status": "registered_stage_exact_atomic_set_before_precommit_required",
+      "appliesTo": ["primary", "coordination", "implementation", "buy", "chat", "git"],
+      "mistake": "The Child 8 pre_commit coordination gate was invoked while the three passing Buy owners were unstaged, so it rejected the change set as not fully staged.",
+      "rootCause": "The generic verification sequence ran pre_commit before the gate-specific requirement to stage the complete atomic owner set.",
+      "prevention": "Bind clean Child 9, apply and verify the identical three-owner diff, stage exactly those owners, confirm zero unstaged change for them, then run pre_commit before committing.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart", "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart", "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD9-20260829.md"]
     }
   ]
 }
