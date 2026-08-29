@@ -252,6 +252,60 @@ class BuyV2Address {
   String get compactLine => '${area.split(',').first.trim()} · $pinCode';
 }
 
+enum BuyV2TaxInvoiceState { pending, ready, corrected, unavailable }
+
+class BuyV2TaxInvoiceLine {
+  const BuyV2TaxInvoiceLine({
+    required this.description,
+    required this.hsnSac,
+    required this.taxableValue,
+    required this.gstRate,
+    required this.cgst,
+    required this.sgst,
+    required this.igst,
+    required this.cess,
+  });
+
+  final String description;
+  final String hsnSac;
+  final int taxableValue;
+  final double gstRate;
+  final int cgst;
+  final int sgst;
+  final int igst;
+  final int cess;
+
+  int get totalTax => cgst + sgst + igst + cess;
+}
+
+class BuyV2TaxInvoiceDetails {
+  const BuyV2TaxInvoiceDetails({
+    required this.invoiceNumber,
+    required this.issuedAt,
+    required this.sellerLegalName,
+    required this.sellerAddress,
+    required this.sellerGstin,
+    required this.placeOfSupply,
+    required this.sourceId,
+    required this.lines,
+    this.buyerGstin,
+    this.revisionLabel,
+  });
+
+  final String invoiceNumber;
+  final DateTime issuedAt;
+  final String sellerLegalName;
+  final String sellerAddress;
+  final String sellerGstin;
+  final String? buyerGstin;
+  final String placeOfSupply;
+  final String sourceId;
+  final List<BuyV2TaxInvoiceLine> lines;
+  final String? revisionLabel;
+
+  int get totalTax => lines.fold(0, (total, line) => total + line.totalTax);
+}
+
 class BuyV2Order {
   const BuyV2Order({
     required this.id,
@@ -290,6 +344,8 @@ class BuyV2Order {
     this.trackingReference,
     this.deliveryServiceLevel,
     this.proofOfDeliveryStatus,
+    this.taxInvoiceState,
+    this.taxInvoiceDetails,
     this.invoiceAvailable = true,
     this.receiptReference,
   });
@@ -330,6 +386,8 @@ class BuyV2Order {
   final String? trackingReference;
   final String? deliveryServiceLevel;
   final String? proofOfDeliveryStatus;
+  final BuyV2TaxInvoiceState? taxInvoiceState;
+  final BuyV2TaxInvoiceDetails? taxInvoiceDetails;
   final bool invoiceAvailable;
   final String? receiptReference;
 }

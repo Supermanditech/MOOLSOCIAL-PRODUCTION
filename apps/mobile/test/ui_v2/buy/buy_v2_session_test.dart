@@ -1819,7 +1819,7 @@ void main() {
           destination: fixture.order.destination,
           title: fixture.order.title,
           itemSummary: fixture.order.itemSummary,
-          total: fixture.order.total,
+          total: fixture.order.total + 90,
           partner: fixture.order.partner,
           partnerType: fixture.order.partnerType,
           promise: 'Arriving today by 6:30 pm',
@@ -1830,7 +1830,7 @@ void main() {
           productIds: fixture.order.productIds,
           lines: fixture.order.lines,
           paymentMethod: fixture.order.paymentMethod,
-          invoiceAvailable: false,
+          invoiceAvailable: true,
           receiptReference: 'PAY-RECEIPT-1',
           dispatchPromise: 'Dispatch completed at 2:10 pm',
           deliveryPartnerName: 'Rajasthan Freight Network',
@@ -1838,6 +1838,31 @@ void main() {
           trackingReference: 'RFN-TRACK-1001',
           deliveryServiceLevel: 'Business freight · tracked',
           proofOfDeliveryStatus: 'Required at handover',
+          tax: 90,
+          taxInvoiceState: BuyV2TaxInvoiceState.corrected,
+          taxInvoiceDetails: BuyV2TaxInvoiceDetails(
+            invoiceNumber: 'TAX-INV-1001-R1',
+            issuedAt: DateTime(2026, 8, 29, 18, 30),
+            sellerLegalName: 'Mool Retail Partner Private Limited',
+            sellerAddress: 'Jodhpur, Rajasthan 342003',
+            sellerGstin: '08ABCDE1234F1Z5',
+            buyerGstin: '08AAAAA0000A1Z5',
+            placeOfSupply: 'Rajasthan (08)',
+            sourceId: 'seller-tax-invoice-source',
+            revisionLabel: 'Corrected seller address',
+            lines: const [
+              BuyV2TaxInvoiceLine(
+                description: 'Shop products',
+                hsnSac: '19059090',
+                taxableValue: 1000,
+                gstRate: 9,
+                cgst: 45,
+                sgst: 45,
+                igst: 0,
+                cess: 0,
+              ),
+            ],
+          ),
         );
         fixture.adapter.orderRefreshResult = BuyV2OrderRefreshResult(
           state: BuyV2CommerceLoadState.ready,
@@ -1848,7 +1873,7 @@ void main() {
         expect(await fixture.session.refreshOrder(fixture.order.id), isTrue);
         expect(fixture.adapter.orderRefreshCalls, 1);
         expect(fixture.session.orders.first.promise, updated.promise);
-        expect(fixture.session.orders.first.invoiceAvailable, isFalse);
+        expect(fixture.session.orders.first.invoiceAvailable, isTrue);
         expect(
           fixture.session.orders.first.deliveryPartnerName,
           'Rajasthan Freight Network',
@@ -1856,6 +1881,10 @@ void main() {
         expect(
           fixture.session.orders.first.trackingReference,
           'RFN-TRACK-1001',
+        );
+        expect(
+          fixture.session.orders.first.taxInvoiceDetails?.invoiceNumber,
+          'TAX-INV-1001-R1',
         );
 
         fixture.adapter.orderRefreshResult = BuyV2OrderRefreshResult(

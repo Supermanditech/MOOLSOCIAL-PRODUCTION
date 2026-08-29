@@ -11,6 +11,7 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
 class _MemoryGstInvoiceProfileStore implements BuyV2GstInvoiceProfileStore {
@@ -797,6 +798,85 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('corrected tax invoice exposes exact legal and GST details', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final product = productFor(BuyV2Destination.shop);
+    final line = BuyV2CartLine(product: product, quantity: 1);
+    final order = BuyV2Order(
+      id: 'ORDER-TAX-1',
+      destination: BuyV2Destination.shop,
+      title: 'Shop order',
+      itemSummary: '1 product',
+      total: line.total + 90,
+      partner: product.seller,
+      partnerType: product.partnerRole,
+      promise: product.deliveryPromise,
+      destinationLabel: 'Sardarpura · 342003',
+      progress: 1,
+      status: BuyV2OrderStatus.delivered,
+      lines: [line],
+      tax: 90,
+      taxInvoiceState: BuyV2TaxInvoiceState.corrected,
+      taxInvoiceDetails: BuyV2TaxInvoiceDetails(
+        invoiceNumber: 'TAX-INV-1001-R1',
+        issuedAt: DateTime(2026, 8, 29, 18, 30),
+        sellerLegalName: 'Mool Retail Partner Private Limited',
+        sellerAddress: 'Jodhpur, Rajasthan 342003',
+        sellerGstin: '08ABCDE1234F1Z5',
+        buyerGstin: '08AAAAA0000A1Z5',
+        placeOfSupply: 'Rajasthan (08)',
+        sourceId: 'seller-tax-invoice-source',
+        revisionLabel: 'Corrected seller address',
+        lines: const [
+          BuyV2TaxInvoiceLine(
+            description: 'Shop products',
+            hsnSac: '19059090',
+            taxableValue: 1000,
+            gstRate: 9,
+            cgst: 45,
+            sgst: 45,
+            igst: 0,
+            cess: 0,
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(1.4)),
+          child: child!,
+        ),
+        home: BuyV2InvoicePage(order: order),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Corrected tax invoice'), findsOneWidget);
+    expect(find.text('TAX-INV-1001-R1'), findsWidgets);
+    expect(find.text('08ABCDE1234F1Z5'), findsOneWidget);
+    expect(find.text('08AAAAA0000A1Z5'), findsOneWidget);
+    expect(find.text('Rajasthan (08)'), findsOneWidget);
+    expect(find.text('19059090'), findsOneWidget);
+    expect(find.text('CGST'), findsOneWidget);
+    expect(find.text('SGST'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('buy-download-invoice-ORDER-TAX-1')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   test(
     'GST profiles restore per account and reject false save success',

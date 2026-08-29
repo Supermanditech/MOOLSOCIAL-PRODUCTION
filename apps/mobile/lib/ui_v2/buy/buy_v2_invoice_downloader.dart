@@ -52,6 +52,18 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
   final lines = <String>[
     'MoolSocial order invoice',
     'Order ID: ${_invoiceText(order.id)}',
+    if (order.taxInvoiceDetails case final taxInvoice?) ...[
+      'Invoice number: ${_invoiceText(taxInvoice.invoiceNumber)}',
+      'Invoice date: ${taxInvoice.issuedAt.toIso8601String()}',
+      'Seller legal name: ${_invoiceText(taxInvoice.sellerLegalName)}',
+      'Seller address: ${_invoiceText(taxInvoice.sellerAddress)}',
+      'Seller GSTIN: ${_invoiceText(taxInvoice.sellerGstin)}',
+      if (taxInvoice.buyerGstin case final value?)
+        'Buyer GSTIN: ${_invoiceText(value)}',
+      'Place of supply: ${_invoiceText(taxInvoice.placeOfSupply)}',
+      if (taxInvoice.revisionLabel case final value?)
+        'Correction: ${_invoiceText(value)}',
+    ],
     'Order type: ${_destinationLabel(order.destination)}',
     'Seller: ${_invoiceText(order.partner)}',
     'Seller role: ${_invoiceText(order.partnerType)}',
@@ -81,6 +93,14 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
     for (final line in order.lines)
       '${line.quantity} x ${_invoiceText(line.product.title)} '
           '(${_invoiceText(line.product.pack)}) - INR ${line.total}',
+    if (order.taxInvoiceDetails case final taxInvoice?) ...[
+      '',
+      'Tax breakdown',
+      for (final line in taxInvoice.lines)
+        '${_invoiceText(line.description)} | HSN/SAC ${_invoiceText(line.hsnSac)} | '
+            'Taxable INR ${line.taxableValue} | GST ${line.gstRate.toStringAsFixed(2)}% | '
+            'CGST ${line.cgst} | SGST ${line.sgst} | IGST ${line.igst} | Cess ${line.cess}',
+    ],
     '',
     'Items subtotal: INR $subtotal',
     if (order.tip > 0) 'Delivery tip: INR ${order.tip}',

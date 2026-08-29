@@ -750,7 +750,8 @@ class BuyV2Session extends ChangeNotifier {
           refreshed.progress >= 0 &&
           refreshed.progress <= 1 &&
           refreshed.partner.trim().isNotEmpty &&
-          refreshed.promise.trim().isNotEmpty;
+          refreshed.promise.trim().isNotEmpty &&
+          _validTaxInvoiceForOrder(refreshed);
       if (!valid) {
         _orderRefreshStates[orderId] = result.state;
         _orderRefreshMessages[orderId] = result.customerMessage;
@@ -772,6 +773,45 @@ class BuyV2Session extends ChangeNotifier {
       _orderRefreshBusyIds.remove(orderId);
       notifyListeners();
     }
+  }
+
+  bool _validTaxInvoiceForOrder(BuyV2Order order) {
+    final state = order.taxInvoiceState;
+    final details = order.taxInvoiceDetails;
+    if (state == null) return true;
+    if (state == BuyV2TaxInvoiceState.pending ||
+        state == BuyV2TaxInvoiceState.unavailable) {
+      return details == null;
+    }
+    if (!order.invoiceAvailable ||
+        details == null ||
+        details.invoiceNumber.trim().isEmpty ||
+        details.sellerLegalName.trim().isEmpty ||
+        details.sellerAddress.trim().isEmpty ||
+        details.sellerGstin.trim().length != 15 ||
+        details.placeOfSupply.trim().isEmpty ||
+        details.sourceId.trim().isEmpty ||
+        details.lines.isEmpty ||
+        (state == BuyV2TaxInvoiceState.corrected &&
+            details.revisionLabel?.trim().isNotEmpty != true)) {
+      return false;
+    }
+    for (final line in details.lines) {
+      final intraStateTax = line.cgst > 0 || line.sgst > 0;
+      if (line.description.trim().isEmpty ||
+          line.hsnSac.trim().isEmpty ||
+          line.taxableValue < 0 ||
+          line.gstRate < 0 ||
+          line.gstRate > 100 ||
+          line.cgst < 0 ||
+          line.sgst < 0 ||
+          line.igst < 0 ||
+          line.cess < 0 ||
+          (intraStateTax && line.igst > 0)) {
+        return false;
+      }
+    }
+    return details.totalTax == order.tax;
   }
 
   bool balancePaymentBusy(String orderId) =>
