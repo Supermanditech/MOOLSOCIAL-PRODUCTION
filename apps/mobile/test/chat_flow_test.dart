@@ -144,14 +144,19 @@ void main() {
       await tapVisible(tester, const Key('chat-section-chats'));
       await tapVisible(tester, const Key('chat-filter-all'));
 
-      await tapVisible(tester, const Key('chat-voice-search'));
-      await tapVisible(tester, const Key('chat-use-voice-search'));
+      await tapVisible(tester, const Key('chat-search-assistance'));
+      expect(
+        find.text('Type a person, business, order or case.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Speak'), findsNothing);
+      await tapVisible(tester, const Key('chat-use-search-assistance'));
       expect(find.text('Enter a conversation name.'), findsOneWidget);
       await tester.enterText(
-        find.byKey(const Key('chat-voice-search-field')),
+        find.byKey(const Key('chat-search-assistance-field')),
         'Home Basket',
       );
-      await tapVisible(tester, const Key('chat-use-voice-search'));
+      await tapVisible(tester, const Key('chat-use-search-assistance'));
       expect(
         find.byKey(const Key('chat-open-thread-home-basket')),
         findsOneWidget,

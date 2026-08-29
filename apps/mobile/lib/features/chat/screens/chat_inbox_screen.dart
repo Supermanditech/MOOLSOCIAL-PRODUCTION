@@ -489,15 +489,15 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                     ),
                   ),
                   suffixIcon: IconButton(
-                    key: const Key('chat-voice-search'),
-                    tooltip: 'Voice search',
+                    key: const Key('chat-search-assistance'),
+                    tooltip: 'Search assistance',
                     onPressed: () async {
-                      final query = await _showVoiceSearch(context);
+                      final query = await _showSearchAssistance(context);
                       if (query == null || !mounted) return;
                       _searchController.text = query;
                       setState(() {});
                     },
-                    icon: const Icon(Icons.mic_none_rounded),
+                    icon: const Icon(Icons.manage_search_rounded),
                   ),
                 ),
               ),
@@ -865,7 +865,7 @@ void _openThread(
   );
 }
 
-Future<String?> _showVoiceSearch(BuildContext context) {
+Future<String?> _showSearchAssistance(BuildContext context) {
   final formKey = GlobalKey<FormState>();
   var query = '';
   return showModalBottomSheet<String>(
@@ -883,7 +883,7 @@ Future<String?> _showVoiceSearch(BuildContext context) {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Find a conversation',
+            'Search conversations',
             style: TextStyle(
               color: MoolColors.ink,
               fontSize: 22,
@@ -891,25 +891,25 @@ Future<String?> _showVoiceSearch(BuildContext context) {
             ),
           ),
           const SizedBox(height: MoolSpacing.xs),
-          const Text('Speak or type a person, business, order or case.'),
+          const Text('Type a person, business, order or case.'),
           const SizedBox(height: MoolSpacing.md),
           Form(
             key: formKey,
             child: TextFormField(
-              key: const Key('chat-voice-search-field'),
+              key: const Key('chat-search-assistance-field'),
               onChanged: (value) => query = value,
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'Enter a conversation name.'
                   : null,
               decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.mic_none_rounded),
+                prefixIcon: Icon(Icons.search_rounded),
                 labelText: 'Conversation name',
               ),
             ),
           ),
           const SizedBox(height: MoolSpacing.md),
           FilledButton(
-            key: const Key('chat-use-voice-search'),
+            key: const Key('chat-use-search-assistance'),
             onPressed: () {
               if (!(formKey.currentState?.validate() ?? false)) return;
               Navigator.of(sheetContext).pop(query.trim());
