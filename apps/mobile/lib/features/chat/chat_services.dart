@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart';
 
 import '../shared/social_media_picker.dart';
 import '../shared/social_content_gateway.dart';
@@ -41,12 +41,34 @@ class NativeChatPhotoPicker implements ChatPhotoPicker {
 
   @override
   Future<ChatPickedPhoto?> pick(ChatPhotoSource source) async {
-    final selected = await _picker.pickImage(
-      source == ChatPhotoSource.camera
-          ? SocialMediaSource.camera
-          : SocialMediaSource.gallery,
-    );
-    return selected == null ? null : _load(selected);
+    try {
+      final selected = await _picker.pickImage(
+        source == ChatPhotoSource.camera
+            ? SocialMediaSource.camera
+            : SocialMediaSource.gallery,
+      );
+      return selected == null ? null : _load(selected);
+    } on PlatformException catch (error) {
+      throw switch (error.code) {
+        'camera_access_denied' => const ChatServiceException(
+          'Camera access was denied. Allow camera access in device settings, then try again.',
+          code: 'camera_permission_denied',
+        ),
+        'camera_access_restricted' => const ChatServiceException(
+          'Camera access is restricted on this device. You can choose a photo instead.',
+          code: 'camera_permission_restricted',
+        ),
+        'photo_access_denied' => const ChatServiceException(
+          'Photo access was denied. Allow photo access in device settings, then try again.',
+          code: 'photo_permission_denied',
+        ),
+        'photo_access_restricted' => const ChatServiceException(
+          'Photo access is restricted on this device. You can take a new photo or continue with a message.',
+          code: 'photo_permission_restricted',
+        ),
+        _ => error,
+      };
+    }
   }
 
   @override
