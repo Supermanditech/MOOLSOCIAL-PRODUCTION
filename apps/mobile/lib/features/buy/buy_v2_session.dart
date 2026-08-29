@@ -275,6 +275,7 @@ class BuyV2Session extends ChangeNotifier {
     this.tipPolicy = const BuyV2DisabledTipPolicy(),
     this.savedProductsStore,
     this.customerStateStore,
+    this.gstInvoiceProfileStore,
     BuyV2CommerceAdapter? commerceAdapter,
     bool? reviewDataEnabled,
   }) : cartBenefitsAdapter =
@@ -319,6 +320,7 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2TipPolicy tipPolicy;
   final BuyV2SavedProductsStore? savedProductsStore;
   final BuyV2CustomerStateStore? customerStateStore;
+  final BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore;
   final BuyV2CommerceAdapter commerceAdapter;
   final bool reviewDataEnabled;
 

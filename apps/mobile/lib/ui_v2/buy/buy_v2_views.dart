@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../features/buy/buy_v2_cart_contracts.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
+import '../../features/buy/buy_v2_saved_products_store.dart';
 import '../../features/buy/buy_v2_session.dart';
 import '../../features/journey01/journey_services.dart';
 import 'buy_v2_address_form_sheet_motion.dart';
@@ -84,6 +85,9 @@ class BuyV2GstInvoiceDetails {
 }
 
 class BuyV2GstInvoiceController extends ChangeNotifier {
+  BuyV2GstInvoiceController({this.store});
+
+  final BuyV2GstInvoiceProfileStore? store;
   final Map<BuyV2Destination, bool> _requested = {
     BuyV2Destination.shop: false,
     BuyV2Destination.wholesale: false,
@@ -91,6 +95,12 @@ class BuyV2GstInvoiceController extends ChangeNotifier {
   final Map<BuyV2Destination, BuyV2GstInvoiceDetails> _selected = {};
   final List<BuyV2GstInvoiceDetails> _savedProfiles = [];
   int _nextId = 1;
+  int _mutationRevision = 0;
+  String? _ownerScope;
+  bool _restoring = false;
+  bool _busy = false;
+  bool _disposed = false;
+  String? _message;
 
   bool requestedFor(BuyV2Destination destination) =>
       _requested[destination] ?? false;
@@ -101,6 +111,98 @@ class BuyV2GstInvoiceController extends ChangeNotifier {
   List<BuyV2GstInvoiceDetails> get savedProfiles =>
       List.unmodifiable(_savedProfiles);
 
+  bool get persistenceAvailable => store?.ownerScope != null;
+
+  bool get restoring => _restoring;
+
+  bool get busy => _busy;
+
+  String? get message => _message;
+
+  void clearMessage() {
+    if (_message == null) return;
+    _message = null;
+    _notify();
+  }
+
+  Future<void> restore() async {
+    final profileStore = store;
+    final ownerScope = profileStore?.ownerScope;
+    if (profileStore == null ||
+        ownerScope == null ||
+        ownerScope == _ownerScope ||
+        _restoring) {
+      return;
+    }
+    _ownerScope = ownerScope;
+    _savedProfiles.clear();
+    _selected.clear();
+    _restoring = true;
+    _message = null;
+    final mutationRevision = _mutationRevision;
+    _notify();
+    try {
+      final snapshot = await profileStore.read();
+      if (_disposed ||
+          profileStore.ownerScope != ownerScope ||
+          mutationRevision != _mutationRevision) {
+        return;
+      }
+      final restored = <BuyV2GstInvoiceDetails>[];
+      final seenIds = <String>{};
+      for (final record in snapshot?.profiles ?? const []) {
+        final id = record.id.trim();
+        final legalName = record.legalName.trim();
+        final gstin = record.gstin.trim().toUpperCase();
+        final billingAddress = record.billingAddress.trim();
+        if (id.isEmpty ||
+            legalName.isEmpty ||
+            gstin.isEmpty ||
+            billingAddress.isEmpty ||
+            !seenIds.add(id)) {
+          continue;
+        }
+        restored.add(
+          BuyV2GstInvoiceDetails(
+            id: id,
+            legalName: legalName,
+            gstin: gstin,
+            billingAddress: billingAddress,
+          ),
+        );
+      }
+      _savedProfiles
+        ..clear()
+        ..addAll(restored);
+      _nextId = _nextProfileNumber(restored);
+    } on Object {
+      if (!_disposed && profileStore.ownerScope == ownerScope) {
+        _ownerScope = null;
+        _message = 'Saved GST details could not be loaded. Try again.';
+      }
+    } finally {
+      if (!_disposed) {
+        if (profileStore.ownerScope != ownerScope) {
+          _ownerScope = null;
+          _savedProfiles.clear();
+          _selected.clear();
+        }
+        _restoring = false;
+        _notify();
+      }
+    }
+  }
+
+  int _nextProfileNumber(List<BuyV2GstInvoiceDetails> profiles) {
+    var next = 1;
+    for (final profile in profiles) {
+      final match = RegExp(r'^gst-profile-(\d+)$').firstMatch(profile.id);
+      final value = int.tryParse(match?.group(1) ?? '');
+      if (value != null && value >= next) next = value + 1;
+    }
+    return next;
+  }
+
   void setRequested(BuyV2Destination destination, bool requested) {
     if (destination != BuyV2Destination.shop &&
         destination != BuyV2Destination.wholesale) {
@@ -108,7 +210,8 @@ class BuyV2GstInvoiceController extends ChangeNotifier {
     }
     if (_requested[destination] == requested) return;
     _requested[destination] = requested;
-    notifyListeners();
+    _message = null;
+    _notify();
   }
 
   void selectSaved(
@@ -117,34 +220,125 @@ class BuyV2GstInvoiceController extends ChangeNotifier {
   ) {
     _requested[destination] = true;
     _selected[destination] = details;
-    notifyListeners();
+    _message = null;
+    _notify();
   }
 
-  void save({
+  Future<bool> save({
     required BuyV2Destination destination,
     required String legalName,
     required String gstin,
     required String billingAddress,
     required bool remember,
-  }) {
+  }) async {
+    if (_busy) return false;
+    if (remember && !persistenceAvailable) {
+      _message = 'Saved GST details are unavailable. Try again.';
+      _notify();
+      return false;
+    }
     final current = _selected[destination];
+    final currentIsSaved =
+        current != null &&
+        _savedProfiles.any((profile) => profile.id == current.id);
+    final shouldRemember = remember && persistenceAvailable;
     final details = BuyV2GstInvoiceDetails(
-      id: current?.id ?? 'gst-profile-${_nextId++}',
+      id: shouldRemember
+          ? currentIsSaved
+                ? current.id
+                : 'gst-profile-${_nextId++}'
+          : 'gst-session-${_nextId++}',
       legalName: legalName.trim(),
       gstin: gstin.trim().toUpperCase(),
       billingAddress: billingAddress.trim(),
     );
+    if (shouldRemember) {
+      final candidate = [..._savedProfiles];
+      final index = candidate.indexWhere((item) => item.id == details.id);
+      if (index == -1) {
+        candidate.add(details);
+      } else {
+        candidate[index] = details;
+      }
+      if (!await _writeProfiles(candidate)) return false;
+      _savedProfiles
+        ..clear()
+        ..addAll(candidate);
+    }
     _requested[destination] = true;
     _selected[destination] = details;
-    if (remember) {
-      final index = _savedProfiles.indexWhere((item) => item.id == details.id);
-      if (index == -1) {
-        _savedProfiles.add(details);
-      } else {
-        _savedProfiles[index] = details;
+    _message = shouldRemember ? 'GST details saved.' : null;
+    _notify();
+    return true;
+  }
+
+  Future<bool> removeSaved(BuyV2GstInvoiceDetails details) async {
+    if (_busy || !persistenceAvailable) return false;
+    final candidate = _savedProfiles
+        .where((profile) => profile.id != details.id)
+        .toList(growable: false);
+    if (candidate.length == _savedProfiles.length) return true;
+    if (!await _writeProfiles(candidate)) return false;
+    _savedProfiles
+      ..clear()
+      ..addAll(candidate);
+    _selected.removeWhere((_, selected) => selected.id == details.id);
+    _message = 'GST details removed.';
+    _notify();
+    return true;
+  }
+
+  Future<bool> _writeProfiles(List<BuyV2GstInvoiceDetails> profiles) async {
+    final profileStore = store;
+    final ownerScope = profileStore?.ownerScope;
+    if (profileStore == null || ownerScope == null) return false;
+    _busy = true;
+    _message = null;
+    _mutationRevision += 1;
+    _notify();
+    try {
+      final saved = await profileStore.write(
+        BuyV2GstInvoiceProfileSnapshot(
+          profiles: [
+            for (final profile in profiles)
+              BuyV2GstInvoiceProfileRecord(
+                id: profile.id,
+                legalName: profile.legalName,
+                gstin: profile.gstin,
+                billingAddress: profile.billingAddress,
+              ),
+          ],
+        ),
+      );
+      if (profileStore.ownerScope != ownerScope || !saved) {
+        _message = 'GST details could not be saved. Try again.';
+        return false;
+      }
+      return true;
+    } on Object {
+      if (profileStore.ownerScope == ownerScope) {
+        _message = 'GST details could not be saved. Try again.';
+      }
+      return false;
+    } finally {
+      if (!_disposed) {
+        if (profileStore.ownerScope != ownerScope) {
+          _message = 'GST details could not be saved. Try again.';
+        }
+        _busy = false;
+        _notify();
       }
     }
-    notifyListeners();
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
 
@@ -3629,6 +3823,13 @@ class _GstInvoiceCard extends StatelessWidget {
           ),
           if (requested) ...[
             const SizedBox(height: 9),
+            if (controller.restoring) ...[
+              const LinearProgressIndicator(
+                key: ValueKey('buy-gst-profiles-loading'),
+                minHeight: 2,
+              ),
+              const SizedBox(height: 7),
+            ],
             if (controller.savedProfiles.isNotEmpty) ...[
               Text('Saved GST details', style: context.buyMeta),
               const SizedBox(height: 5),
@@ -3637,12 +3838,22 @@ class _GstInvoiceCard extends StatelessWidget {
                 runSpacing: 6,
                 children: [
                   for (final profile in controller.savedProfiles)
-                    ChoiceChip(
+                    InputChip(
                       key: ValueKey('buy-gst-profile-${profile.id}'),
                       label: Text(profile.legalName),
                       selected: details?.id == profile.id,
-                      onSelected: (_) =>
-                          controller.selectSaved(destination, profile),
+                      onSelected: controller.busy
+                          ? null
+                          : (_) => controller.selectSaved(destination, profile),
+                      onDeleted:
+                          controller.persistenceAvailable && !controller.busy
+                          ? () => _confirmRemoveGstProfile(
+                              context,
+                              controller: controller,
+                              profile: profile,
+                            )
+                          : null,
+                      deleteButtonTooltipMessage: 'Remove GST details',
                     ),
                 ],
               ),
@@ -3698,10 +3909,70 @@ class _GstInvoiceCard extends StatelessWidget {
               'Recipient and delivery details are recorded where GST invoice rules require them.',
               style: context.buyMeta.copyWith(fontSize: 8),
             ),
+            if (controller.message case final message?) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      message,
+                      key: const ValueKey('buy-gst-profile-message'),
+                      style: context.buyMeta.copyWith(
+                        fontSize: 9,
+                        color:
+                            message == 'GST details saved.' ||
+                                message == 'GST details removed.'
+                            ? BuyV2Colors.navy
+                            : const Color(0xFFB42318),
+                      ),
+                    ),
+                  ),
+                  if (message ==
+                          'Saved GST details could not be loaded. Try again.' &&
+                      !controller.restoring)
+                    TextButton(
+                      key: const ValueKey('buy-gst-profiles-retry'),
+                      onPressed: controller.restore,
+                      child: const Text('Retry'),
+                    ),
+                ],
+              ),
+            ],
           ],
         ],
       ),
     );
+  }
+}
+
+Future<void> _confirmRemoveGstProfile(
+  BuildContext context, {
+  required BuyV2GstInvoiceController controller,
+  required BuyV2GstInvoiceDetails profile,
+}) async {
+  final remove = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Remove GST details?'),
+      content: Text(
+        '${profile.legalName} will no longer appear in your saved GST details.',
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('buy-gst-remove-cancel'),
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Keep'),
+        ),
+        FilledButton(
+          key: const ValueKey('buy-gst-remove-confirm'),
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('Remove'),
+        ),
+      ],
+    ),
+  );
+  if (remove == true && context.mounted) {
+    await controller.removeSaved(profile);
   }
 }
 
@@ -3738,7 +4009,7 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
   late final FocusNode _legalNameFocus;
   late final FocusNode _gstinFocus;
   late final FocusNode _billingAddressFocus;
-  bool _remember = true;
+  late bool _remember;
   String? _error;
 
   @override
@@ -3748,6 +4019,7 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
     _legalName = TextEditingController(text: current?.legalName);
     _gstin = TextEditingController(text: current?.gstin);
     _billingAddress = TextEditingController(text: current?.billingAddress);
+    _remember = widget.controller.persistenceAvailable;
     _legalNameFocus = FocusNode(debugLabel: 'GST legal name');
     _gstinFocus = FocusNode(debugLabel: 'GSTIN');
     _billingAddressFocus = FocusNode(debugLabel: 'GST billing address');
@@ -3764,7 +4036,7 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     final legalName = _legalName.text.trim();
     final gstin = _gstin.text.trim().toUpperCase();
     final address = _billingAddress.text.trim();
@@ -3779,14 +4051,24 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
       setState(() => _error = 'Check the 15-character GSTIN format.');
       return;
     }
-    widget.controller.save(
+    setState(() => _error = null);
+    final saved = await widget.controller.save(
       destination: widget.destination,
       legalName: legalName,
       gstin: gstin,
       billingAddress: address,
       remember: _remember,
     );
-    Navigator.pop(context);
+    if (!mounted) return;
+    if (saved) {
+      Navigator.pop(context);
+    } else {
+      final message =
+          widget.controller.message ??
+          'GST details could not be saved. Try again.';
+      widget.controller.clearMessage();
+      setState(() => _error = message);
+    }
   }
 
   @override
@@ -3897,20 +4179,32 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
                             ),
                           ),
                         ),
-                        FocusTraversalOrder(
-                          order: const NumericFocusOrder(4),
-                          child: SwitchListTile.adaptive(
-                            key: const ValueKey('buy-gst-remember'),
-                            contentPadding: EdgeInsets.zero,
-                            value: _remember,
-                            onChanged: (value) =>
-                                setState(() => _remember = value),
-                            title: const Text('Remember these GST details'),
-                            subtitle: const Text(
-                              'Reuse them on a later invoice.',
+                        if (widget.controller.persistenceAvailable)
+                          FocusTraversalOrder(
+                            order: const NumericFocusOrder(4),
+                            child: SwitchListTile.adaptive(
+                              key: const ValueKey('buy-gst-remember'),
+                              contentPadding: EdgeInsets.zero,
+                              value: _remember,
+                              onChanged: widget.controller.busy
+                                  ? null
+                                  : (value) =>
+                                        setState(() => _remember = value),
+                              title: const Text('Remember these GST details'),
+                              subtitle: const Text(
+                                'Reuse them on a later invoice.',
+                              ),
+                            ),
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Text(
+                              'These details will be used for this order only.',
+                              key: const ValueKey('buy-gst-session-only'),
+                              style: context.buyMeta,
                             ),
                           ),
-                        ),
                         if (_error case final error?) ...[
                           Text(
                             error,
@@ -3940,8 +4234,15 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
                         order: const NumericFocusOrder(5),
                         child: FilledButton(
                           key: const ValueKey('buy-gst-save'),
-                          onPressed: _save,
-                          child: const Text('Use GST details'),
+                          onPressed: widget.controller.busy ? null : _save,
+                          child: widget.controller.busy
+                              ? const SizedBox.square(
+                                  dimension: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Use GST details'),
                         ),
                       ),
                     ),

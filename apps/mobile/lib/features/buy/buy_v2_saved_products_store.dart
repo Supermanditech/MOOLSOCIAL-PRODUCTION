@@ -48,3 +48,36 @@ abstract interface class BuyV2CustomerStateStore {
 
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot);
 }
+
+@immutable
+class BuyV2GstInvoiceProfileRecord {
+  const BuyV2GstInvoiceProfileRecord({
+    required this.id,
+    required this.legalName,
+    required this.gstin,
+    required this.billingAddress,
+  });
+
+  final String id;
+  final String legalName;
+  final String gstin;
+  final String billingAddress;
+}
+
+@immutable
+class BuyV2GstInvoiceProfileSnapshot {
+  const BuyV2GstInvoiceProfileSnapshot({this.profiles = const []});
+
+  final List<BuyV2GstInvoiceProfileRecord> profiles;
+}
+
+abstract interface class BuyV2GstInvoiceProfileStore {
+  const BuyV2GstInvoiceProfileStore();
+
+  /// Stable authenticated-account scope. A null scope disables persistence.
+  String? get ownerScope;
+
+  Future<BuyV2GstInvoiceProfileSnapshot?> read();
+
+  Future<bool> write(BuyV2GstInvoiceProfileSnapshot snapshot);
+}

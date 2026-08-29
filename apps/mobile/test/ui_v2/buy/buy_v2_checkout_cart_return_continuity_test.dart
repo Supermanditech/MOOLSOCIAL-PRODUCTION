@@ -6,8 +6,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
+
+class _MemoryGstInvoiceProfileStore implements BuyV2GstInvoiceProfileStore {
+  @override
+  String? ownerScope = 'account-a';
+  bool acceptWrites = true;
+  final Map<String, BuyV2GstInvoiceProfileSnapshot> snapshots = {};
+
+  @override
+  Future<BuyV2GstInvoiceProfileSnapshot?> read() async {
+    final scope = ownerScope;
+    return scope == null ? null : snapshots[scope];
+  }
+
+  @override
+  Future<bool> write(BuyV2GstInvoiceProfileSnapshot snapshot) async {
+    final scope = ownerScope;
+    if (scope == null || !acceptWrites) return false;
+    snapshots[scope] = snapshot;
+    return true;
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -49,8 +72,13 @@ void main() {
             product.destination == destination && !product.requiresPrescription,
       );
 
-  BuyV2Session mixedSession() {
-    final session = BuyV2Session(core: BuySession());
+  BuyV2Session mixedSession({
+    BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore,
+  }) {
+    final session = BuyV2Session(
+      core: BuySession(),
+      gstInvoiceProfileStore: gstInvoiceProfileStore,
+    );
     for (final destination in const [
       BuyV2Destination.shop,
       BuyV2Destination.wholesale,
@@ -157,7 +185,8 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final session = mixedSession();
+    final gstStore = _MemoryGstInvoiceProfileStore();
+    final session = mixedSession(gstInvoiceProfileStore: gstStore);
     addTearDown(session.dispose);
     session.openCart(scope: BuyV2CartScope.shop);
     expect(session.openCheckout(), isTrue);
@@ -202,6 +231,119 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test(
+    'GST profiles restore per account and reject false save success',
+    () async {
+      final store = _MemoryGstInvoiceProfileStore();
+      final first = BuyV2GstInvoiceController(store: store);
+      addTearDown(first.dispose);
+
+      expect(
+        await first.save(
+          destination: BuyV2Destination.wholesale,
+          legalName: 'Shree Balaji Retail',
+          gstin: '08ABCDE1234F1Z5',
+          billingAddress: '12 Market Road, Jodhpur 342003',
+          remember: true,
+        ),
+        isTrue,
+      );
+      expect(first.savedProfiles, hasLength(1));
+
+      final restored = BuyV2GstInvoiceController(store: store);
+      addTearDown(restored.dispose);
+      await restored.restore();
+      expect(restored.savedProfiles.single.legalName, 'Shree Balaji Retail');
+      restored.selectSaved(
+        BuyV2Destination.shop,
+        restored.savedProfiles.single,
+      );
+
+      store.acceptWrites = false;
+      expect(
+        await restored.save(
+          destination: BuyV2Destination.shop,
+          legalName: 'Changed before acknowledgement',
+          gstin: '08ABCDE1234F1Z5',
+          billingAddress: '12 Market Road, Jodhpur 342003',
+          remember: true,
+        ),
+        isFalse,
+      );
+      expect(
+        restored.detailsFor(BuyV2Destination.shop)?.legalName,
+        'Shree Balaji Retail',
+      );
+      expect(restored.message, 'GST details could not be saved. Try again.');
+
+      store.ownerScope = 'account-b';
+      final otherAccount = BuyV2GstInvoiceController(store: store);
+      addTearDown(otherAccount.dispose);
+      await otherAccount.restore();
+      expect(otherAccount.savedProfiles, isEmpty);
+
+      store.ownerScope = 'account-a';
+      store.acceptWrites = true;
+      expect(await restored.removeSaved(restored.savedProfiles.single), isTrue);
+      expect(restored.savedProfiles, isEmpty);
+      expect(restored.detailsFor(BuyV2Destination.shop), isNull);
+    },
+  );
+
+  testWidgets('GST save failure keeps entered details and supports retry', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final store = _MemoryGstInvoiceProfileStore()..acceptWrites = false;
+    final session = mixedSession(gstInvoiceProfileStore: store);
+    addTearDown(session.dispose);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-gst-request-shop')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-gst-add-shop')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-legal-name')),
+      'Shree Balaji Retail',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-gstin')),
+      '08ABCDE1234F1Z5',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-billing-address')),
+      '12 Market Road, Jodhpur 342003',
+    );
+    await tester.ensureVisible(find.byKey(const ValueKey('buy-gst-save')));
+    await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('buy-gst-invoice-sheet')), findsOneWidget);
+    expect(
+      find.text('GST details could not be saved. Try again.'),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('buy-gst-legal-name')))
+          .controller
+          ?.text,
+      'Shree Balaji Retail',
+    );
+
+    store.acceptWrites = true;
+    await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-gst-invoice-sheet')), findsNothing);
+    expect(find.text('Shree Balaji Retail'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('T01B GST action stays reachable across Android and iOS insets', (
     tester,
   ) async {
@@ -240,7 +382,8 @@ void main() {
 
     for (final viewport in viewports) {
       tester.view.physicalSize = viewport.size;
-      final session = mixedSession();
+      final gstStore = _MemoryGstInvoiceProfileStore();
+      final session = mixedSession(gstInvoiceProfileStore: gstStore);
       session.openCart(scope: BuyV2CartScope.wholesale);
       expect(session.openCheckout(), isTrue, reason: viewport.label);
 

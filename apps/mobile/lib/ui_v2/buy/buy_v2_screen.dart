@@ -81,8 +81,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   bool _offersActive = false;
   BuyV2NavigationMotionDirection _surfaceMotionDirection =
       BuyV2NavigationMotionDirection.replace;
-  final BuyV2GstInvoiceController _gstInvoiceController =
-      BuyV2GstInvoiceController();
+  late BuyV2GstInvoiceController _gstInvoiceController;
   late BuyV2Destination _lastSearchDestination;
   late final TextEditingController _searchController = TextEditingController(
     text: widget.session.query,
@@ -91,6 +90,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   @override
   void initState() {
     super.initState();
+    _gstInvoiceController = BuyV2GstInvoiceController(
+      store: widget.session.gstInvoiceProfileStore,
+    );
     _applyInitialState();
     unawaited(_restoreSessionState());
     _lastSearchDestination = widget.session.destination;
@@ -100,11 +102,21 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   @override
   void didUpdateWidget(covariant BuyV2Screen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    var restoreState = false;
     if (oldWidget.session != widget.session) {
       oldWidget.session.removeListener(_sessionChanged);
       widget.session.addListener(_sessionChanged);
-      unawaited(_restoreSessionState());
+      restoreState = true;
     }
+    if (oldWidget.session.gstInvoiceProfileStore !=
+        widget.session.gstInvoiceProfileStore) {
+      _gstInvoiceController.dispose();
+      _gstInvoiceController = BuyV2GstInvoiceController(
+        store: widget.session.gstInvoiceProfileStore,
+      );
+      restoreState = true;
+    }
+    if (restoreState) unawaited(_restoreSessionState());
     if (oldWidget.initialDestination != widget.initialDestination ||
         oldWidget.initialOffersActive != widget.initialOffersActive ||
         oldWidget.initialView != widget.initialView ||
@@ -120,6 +132,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     await widget.session.restoreCommerce();
     await widget.session.restoreCustomerState();
     await widget.session.restoreSavedProducts();
+    await _gstInvoiceController.restore();
   }
 
   void _applyInitialState() {
