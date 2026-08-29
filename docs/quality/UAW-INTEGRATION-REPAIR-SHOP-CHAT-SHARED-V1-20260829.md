@@ -91,5 +91,25 @@ Redmi r61.7 disposition:
   `95` passed, `0` failed;
 - next device candidate must be monotonic r61.8.
 
+Final device qualification:
+
+- r61.8 preflight passed but its one build attempt failed at
+  `mergeDebugNativeLibs` because disk space was exhausted; no APK or install
+  occurred and the candidate is preserved as consumed failed;
+- after generated-cache cleanup raised free space above 6 GiB, monotonic r61.9
+  preflight and build passed;
+- installed Redmi identity: `com.moolsocial.app.cursorreview`,
+  `1.0.0-r61.9-cursorreview`, code `2026082811`;
+- built and installed APK bytes: `206453947`;
+- built and installed SHA-256:
+  `5262CE6011FB15F0D21EB3F8DCA8BDAFB2372914684C02AC2D3AF66F7A377CBB`;
+- cold launch passed;
+- device visuals passed for Shop/Orders `Fresh Basket Order`, Wholesale/Business
+  `Metro Wholesale Partner`, Offers/Support `Shop Offers Support`, and exact
+  Android Back recovery;
+- Redmi is left on the main Shop Chat screen for founder visual approval;
+- OPPO, `com.moolsocial.app.runtime`, Android configuration, Firebase and
+  backend remain untouched.
+
 Backend, Firebase, Android configuration, OPPO and
 `com.moolsocial.app.runtime` remain excluded.

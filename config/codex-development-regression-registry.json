@@ -44492,7 +44492,7 @@
       "rootCause": "The exact failing tests and assertions are retained in the machine JSON reporter and must be classified before any corrective source action or rerun.",
       "prevention": "Parse only build/shop-chat-shared-full-buy.json, join testStart/error/testDone events for the three failed IDs, prove whether each failure belongs to cumulative profile compatibility or Shop Chat routing, then implement the smallest owned correction before one rerun.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-chat-shared-full-buy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/full-buy-cycle1.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
     },
     {
       "id": "REG-20260829-3931-FULL-BUY-FAILURE-PRINT-PARSER-FOREACH-DIRECT-PIPE",
@@ -44502,7 +44502,7 @@
       "rootCause": "The known foreach-to-pipeline parser rule was not applied to the compact diagnostic command.",
       "prevention": "Collect one result row per failing test in an explicit list, then pass the completed list to ConvertTo-Json; do not rerun the full suite for diagnostics.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-chat-shared-full-buy.json"]
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/full-buy-cycle1.json"]
     },
     {
       "id": "REG-20260829-3932-GLOBAL-PROFILE-REQUIRED-GOROUTER-IN-PLAIN-BUY-HOST",
@@ -44512,7 +44512,7 @@
       "rootCause": "The cumulative exact-return helper made GoRouter presence mandatory even though the shared profile API historically supports non-router hosts through its explicit route callback.",
       "prevention": "Resolve the live URI through GoRouter.maybeOf when available, retain a safe customer-origin fallback when absent, change no profile layout or copy, and rerun the three failed tests before the full Buy suite once.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart", "apps/mobile/build/shop-chat-shared-full-buy.json"]
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/full-buy-cycle1.json"]
     },
     {
       "id": "REG-20260829-3933-FLUTTER-PLAIN-NAME-ANCHORED-ALTERNATION-NO-TESTS",
@@ -44573,6 +44573,16 @@
       "prevention": "Inspect the failing test's exact initial and return routes, preserve global/non-Shop Mahadev behavior, keep Redmi Shop default free of Food content, and rerun the one flow plus the complete shared/Buy Chat set.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/chat_flow_test.dart", "apps/mobile/lib/features/chat/chat_entry_context.dart"]
+    },
+    {
+      "id": "REG-20260829-3939-R61-8-BUILD-DISK-EXHAUSTED-MERGE-NATIVE-LIBS",
+      "status": "registered_new_monotonic_candidate_after_cache_reclaim_required",
+      "appliesTo": ["primary", "coordination", "build", "storage", "android", "chat"],
+      "mistake": "The one authorized r61.8 build reached :app:mergeDebugNativeLibs but failed with not enough space on disk; no APK or install occurred.",
+      "rootCause": "Only about 3.3 GiB was free before a clean native debug build, which was insufficient for Flutter, Gradle and merged native libraries alongside retained evidence.",
+      "prevention": "Mark r61.8 consumed failed, preserve its logs/state, reclaim only generated build caches and duplicate sparse checkout artifacts until at least 6 GiB is free, then create a new monotonic r61.9 one-build state; never reuse r61.8 authorization.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/build-buy-device-review.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/apk-regression-gate-state-shop-chat-r61-8.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/prebuild-validation.md"]
     }
   ]
 }
