@@ -16,6 +16,9 @@ import {
   type ChatCallPreferences,
   type ChatCallRecord,
   type ChatPresenceState,
+  type ChatAttachmentKind,
+  type ChatAttachmentStore,
+  type ChatAttachmentUploadGrant,
   type ChatPhotoAttachmentStore,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
@@ -30,6 +33,7 @@ export class FirestoreChatRepository implements ChatRepository {
     private readonly firestore: Firestore,
     private readonly now: () => Date = () => new Date(),
     private readonly photoStore?: ChatPhotoAttachmentStore,
+    private readonly attachmentStore?: ChatAttachmentStore,
   ) {}
 
   async listThreads(userId: string, limit: number): Promise<ChatThreadRecord[]> {
@@ -404,6 +408,165 @@ export class FirestoreChatRepository implements ChatRepository {
         updatedAt: createdAt,
         unreadCounts,
         lastReadAtBy,
+      });
+    });
+    return this.publicMessage(
+      messageId,
+      messageData!,
+      actor.userId,
+      messageThreadData,
+    );
+  }
+
+  async prepareAttachmentUpload(
+    actor: ChatProfile,
+    threadId: string,
+    kind: ChatAttachmentKind,
+    fileName: string,
+    contentType: string,
+    sizeBytes: number,
+    durationMilliseconds?: number,
+  ): Promise<ChatAttachmentUploadGrant> {
+    await this.threadForParticipant(actor.userId, threadId);
+    return this.requireAttachmentStore().prepare({
+      userId: actor.userId,
+      threadId,
+      kind,
+      fileName,
+      contentType,
+      sizeBytes,
+      ...(durationMilliseconds === undefined ? {} : { durationMilliseconds }),
+    });
+  }
+
+  async sendAttachmentMessage(
+    actor: ChatProfile,
+    threadId: string,
+    kind: ChatAttachmentKind,
+    uploadId: string,
+    fileName: string,
+    contentType: string,
+    sizeBytes: number,
+    durationMilliseconds: number | undefined,
+    caption: string,
+    idempotencyKey: string,
+    requestDigest: string,
+    replyToMessageId?: string,
+  ): Promise<ChatMessageRecord> {
+    await this.threadForParticipant(actor.userId, threadId);
+    const validated = await this.requireAttachmentStore().validate({
+      userId: actor.userId,
+      threadId,
+      kind,
+      uploadId,
+      fileName,
+      contentType,
+      sizeBytes,
+      ...(durationMilliseconds === undefined ? {} : { durationMilliseconds }),
+    });
+    const threadRef = this.firestore.collection("chatThreads").doc(threadId);
+    const messageId = digest(`${actor.userId}:${idempotencyKey}`);
+    const messageRef = threadRef.collection("messages").doc(messageId);
+    const replyRef = replyToMessageId
+      ? threadRef.collection("messages").doc(replyToMessageId)
+      : undefined;
+    const receiptRef = threadRef.collection("attachmentReceipts").doc(uploadId);
+    const createdAt = this.now().toISOString();
+    let messageData: DocumentData | undefined;
+    let messageThreadData: DocumentData | undefined;
+    await this.firestore.runTransaction(async (transaction) => {
+      const thread = await transaction.get(threadRef);
+      const existing = await transaction.get(messageRef);
+      const receipt = await transaction.get(receiptRef);
+      const replied = replyRef ? await transaction.get(replyRef) : undefined;
+      assertParticipant(thread.data(), actor.userId);
+      await this.assertTransactionNotBlocked(transaction, actor.userId, thread.data());
+      assertRequestCanSend(thread.data(), actor.userId);
+      if (existing.exists) {
+        if (existing.get("requestDigest") !== requestDigest) {
+          throw new ChatError(
+            "conflict",
+            "That retry key belongs to another attachment.",
+            409,
+          );
+        }
+        messageData = existing.data();
+        messageThreadData = thread.data();
+        return;
+      }
+      if (receipt.exists) {
+        throw new ChatError("conflict", "That attachment was already sent.", 409);
+      }
+      if (replyRef && !replied?.exists) {
+        throw new ChatError(
+          "not_found",
+          "The message you replied to is no longer available.",
+          404,
+        );
+      }
+      const threadData = thread.data()!;
+      const participantIds = participantIdsFrom(threadData);
+      const unreadCounts = numericMap(threadData.unreadCounts);
+      const lastReadAtBy = stringMap(threadData.lastReadAtBy);
+      for (const participantId of participantIds) {
+        unreadCounts[participantId] = participantId === actor.userId
+          ? 0
+          : (unreadCounts[participantId] ?? 0) + 1;
+      }
+      lastReadAtBy[actor.userId] = createdAt;
+      const repliedData = replied?.data();
+      messageData = {
+        schemaVersion: 1,
+        messageType: "attachment",
+        threadId,
+        senderId: actor.userId,
+        senderName: actor.name,
+        text: caption,
+        createdAt,
+        requestDigest,
+        reactions: {},
+        ...(replyToMessageId && repliedData
+          ? {
+              replyTo: {
+                messageId: replyToMessageId,
+                senderName: String(repliedData.senderName ?? "MoolSocial member"),
+                text: messageReplyPreview(repliedData),
+              },
+            }
+          : {}),
+        attachment: {
+          attachmentId: uploadId,
+          kind,
+          displayName: fileName,
+          contentType,
+          sizeBytes,
+          ...(durationMilliseconds === undefined ? {} : { durationMilliseconds }),
+          objectPath: validated.objectPath,
+          generation: validated.generation,
+        },
+      };
+      messageThreadData = { ...threadData, unreadCounts, lastReadAtBy };
+      transaction.create(messageRef, messageData);
+      transaction.create(receiptRef, {
+        schemaVersion: 1,
+        messageId,
+        senderId: actor.userId,
+        createdAt,
+      });
+      const fallback = kind === "voice"
+        ? "Voice message"
+        : kind === "video"
+          ? "Video"
+          : fileName;
+      const preview = caption || fallback;
+      transaction.update(threadRef, {
+        preview: preview.length > 120 ? `${preview.slice(0, 117)}...` : preview,
+        updatedAt: createdAt,
+        unreadCounts,
+        lastReadAtBy,
+        ...(threadData.requestStatus === "pending"
+          ? { requestMessageSent: true }
+          : {}),
       });
     });
     return this.publicMessage(
@@ -977,6 +1140,18 @@ export class FirestoreChatRepository implements ChatRepository {
     return this.photoStore;
   }
 
+  private requireAttachmentStore(): ChatAttachmentStore {
+    if (!this.attachmentStore) {
+      throw new ChatError(
+        "service_unavailable",
+        "Attachment delivery is unavailable right now. Try again later.",
+        503,
+        true,
+      );
+    }
+    return this.attachmentStore;
+  }
+
   private async publicMessage(
     id: string,
     data: DocumentData,
@@ -992,6 +1167,28 @@ export class FirestoreChatRepository implements ChatRepository {
       hiddenReceiptUsers,
     );
     const photo = photoFromDocument(data);
+    const attachment = attachmentFromDocument(data);
+    if (attachment) {
+      const signed = await this.requireAttachmentStore().readUrl({
+        objectPath: attachment.objectPath,
+        generation: attachment.generation,
+      });
+      return {
+        ...message,
+        attachment: {
+          id: attachment.attachmentId,
+          kind: attachment.kind,
+          name: attachment.displayName,
+          contentType: attachment.contentType,
+          sizeBytes: attachment.sizeBytes,
+          ...(attachment.durationMilliseconds === undefined
+            ? {}
+            : { durationMilliseconds: attachment.durationMilliseconds }),
+          readUrl: signed.readUrl,
+          readUrlExpiresAt: signed.expiresAt,
+        },
+      };
+    }
     if (!photo) return message;
     const signed = await this.requirePhotoStore().readUrl({
       objectPath: photo.objectPath,
@@ -1224,6 +1421,59 @@ function photoFromDocument(data: DocumentData): {
   };
   if (Object.values(result).some((value) => value === "")) {
     throw new ChatError("internal", "That photo is unavailable.", 500, true);
+  }
+  return result;
+}
+
+function attachmentFromDocument(data: DocumentData): {
+  attachmentId: string;
+  kind: ChatAttachmentKind;
+  displayName: string;
+  contentType: string;
+  sizeBytes: number;
+  durationMilliseconds?: number;
+  objectPath: string;
+  generation: string;
+} | undefined {
+  if (data.messageType !== "attachment" ||
+      !data.attachment || typeof data.attachment !== "object") return undefined;
+  const value = data.attachment as Record<string, unknown>;
+  const kind = value.kind;
+  if (kind !== "document" && kind !== "video" && kind !== "voice") {
+    throw new ChatError("internal", "That attachment is unavailable.", 500, true);
+  }
+  const sizeBytes = value.sizeBytes;
+  const durationMilliseconds = value.durationMilliseconds;
+  if (!Number.isSafeInteger(sizeBytes) || (sizeBytes as number) < 1 ||
+      (durationMilliseconds !== undefined &&
+        (!Number.isSafeInteger(durationMilliseconds) ||
+          (durationMilliseconds as number) < 1))) {
+    throw new ChatError("internal", "That attachment is unavailable.", 500, true);
+  }
+  const result: {
+    attachmentId: string;
+    kind: ChatAttachmentKind;
+    displayName: string;
+    contentType: string;
+    sizeBytes: number;
+    durationMilliseconds?: number;
+    objectPath: string;
+    generation: string;
+  } = {
+    attachmentId: String(value.attachmentId ?? "").trim(),
+    kind,
+    displayName: String(value.displayName ?? "").trim(),
+    contentType: String(value.contentType ?? "").trim(),
+    sizeBytes: sizeBytes as number,
+    ...(durationMilliseconds === undefined
+      ? {}
+      : { durationMilliseconds: durationMilliseconds as number }),
+    objectPath: String(value.objectPath ?? "").trim(),
+    generation: String(value.generation ?? "").trim(),
+  };
+  if (Object.entries(result).some(([key, value]) =>
+    key !== "durationMilliseconds" && value === "")) {
+    throw new ChatError("internal", "That attachment is unavailable.", 500, true);
   }
   return result;
 }

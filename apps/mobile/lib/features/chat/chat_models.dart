@@ -14,6 +14,30 @@ enum ChatCallAvailabilityStatus { available, offline, callsOff, busy }
 
 enum ChatPresenceState { active, background, offline }
 
+enum ChatAttachmentKind { document, video, voice }
+
+class ChatAttachment {
+  const ChatAttachment({
+    required this.id,
+    required this.kind,
+    required this.name,
+    required this.contentType,
+    required this.sizeBytes,
+    required this.readUrl,
+    required this.readUrlExpiresAt,
+    this.duration,
+  });
+
+  final String id;
+  final ChatAttachmentKind kind;
+  final String name;
+  final String contentType;
+  final int sizeBytes;
+  final Uri readUrl;
+  final DateTime readUrlExpiresAt;
+  final Duration? duration;
+}
+
 class ChatCallPreferences {
   const ChatCallPreferences({
     required this.voiceCallsEnabled,
@@ -253,6 +277,7 @@ class ChatMessage {
     this.readCount = 0,
     this.forwarded = false,
     this.photo,
+    this.attachment,
   });
 
   final String id;
@@ -268,6 +293,7 @@ class ChatMessage {
   final int readCount;
   final bool forwarded;
   final ChatPhotoAttachment? photo;
+  final ChatAttachment? attachment;
 
   ChatMessage copyWith({
     ChatDeliveryState? deliveryState,
@@ -288,6 +314,7 @@ class ChatMessage {
       readCount: readCount,
       forwarded: forwarded,
       photo: photo,
+      attachment: attachment,
     );
   }
 

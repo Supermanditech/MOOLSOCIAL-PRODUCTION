@@ -42,6 +42,9 @@ class _ChatSharedContentScreenState extends State<ChatSharedContentScreen> {
       if (message.attachmentLabel case final attachment?) {
         items.add(_SharedContentItem.file(message, attachment));
       }
+      if (message.attachment case final attachment?) {
+        items.add(_SharedContentItem.attachment(message, attachment));
+      }
       for (final url in _messageUrls(message.text)) {
         items.add(_SharedContentItem.link(message, url));
       }
@@ -50,7 +53,10 @@ class _ChatSharedContentScreenState extends State<ChatSharedContentScreen> {
         .where((item) {
           return switch (_filter) {
             _SharedContentFilter.all => true,
-            _SharedContentFilter.media => item.kind == _SharedContentKind.photo,
+            _SharedContentFilter.media =>
+              item.kind == _SharedContentKind.photo ||
+                  item.kind == _SharedContentKind.video ||
+                  item.kind == _SharedContentKind.voice,
             _SharedContentFilter.files => item.kind == _SharedContentKind.file,
             _SharedContentFilter.links => item.kind == _SharedContentKind.link,
           };
@@ -153,13 +159,45 @@ class _ChatSharedContentScreenState extends State<ChatSharedContentScreen> {
       case _SharedContentKind.photo:
         await _showPhotoPreview(context, item);
       case _SharedContentKind.file:
-        await showChatUnavailableCapability(
-          context,
-          keyName: 'chat-shared-file-recovery',
-          title: 'File opening unavailable',
-          message:
-              'This loaded message contains a file reference, but the file cannot be opened right now. Nothing changed.',
+        if (item.attachment case final attachment?) {
+          final opened = await widget.session.openAttachment(
+            widget.threadId,
+            attachment,
+          );
+          if (!opened && context.mounted) {
+            await showChatUnavailableCapability(
+              context,
+              keyName: 'chat-shared-file-recovery',
+              title: 'File opening unavailable',
+              message:
+                  widget.session.threadActionError(widget.threadId) ??
+                  'This file cannot be opened right now. Nothing changed.',
+            );
+          }
+        } else {
+          await showChatUnavailableCapability(
+            context,
+            keyName: 'chat-shared-file-recovery',
+            title: 'File opening unavailable',
+            message:
+                'This loaded message contains a file reference, but the file cannot be opened right now. Nothing changed.',
+          );
+        }
+      case _SharedContentKind.video || _SharedContentKind.voice:
+        final opened = await widget.session.openAttachment(
+          widget.threadId,
+          item.attachment!,
         );
+        if (!opened && context.mounted) {
+          await showChatUnavailableCapability(
+            context,
+            keyName: 'chat-shared-media-recovery',
+            title: 'Media opening unavailable',
+            message:
+                widget.session.threadActionError(widget.threadId) ??
+                'This media cannot be opened right now.',
+          );
+        }
       case _SharedContentKind.link:
         await _showLinkDetails(context, item.value);
     }
@@ -240,7 +278,7 @@ class _SharedContentEmpty extends StatelessWidget {
   }
 }
 
-enum _SharedContentKind { photo, file, link }
+enum _SharedContentKind { photo, video, voice, file, link }
 
 class _SharedContentItem {
   const _SharedContentItem._({
@@ -250,6 +288,7 @@ class _SharedContentItem {
     required this.keyName,
     required this.icon,
     this.photo,
+    this.attachment,
   });
 
   factory _SharedContentItem.photo(
@@ -273,6 +312,28 @@ class _SharedContentItem {
         icon: Icons.description_outlined,
       );
 
+  factory _SharedContentItem.attachment(
+    ChatMessage message,
+    ChatAttachment attachment,
+  ) => _SharedContentItem._(
+    kind: switch (attachment.kind) {
+      ChatAttachmentKind.document => _SharedContentKind.file,
+      ChatAttachmentKind.video => _SharedContentKind.video,
+      ChatAttachmentKind.voice => _SharedContentKind.voice,
+    },
+    message: message,
+    value: attachment.kind == ChatAttachmentKind.voice
+        ? 'Voice message'
+        : attachment.name,
+    keyName: 'attachment-${message.id}',
+    icon: switch (attachment.kind) {
+      ChatAttachmentKind.document => Icons.description_outlined,
+      ChatAttachmentKind.video => Icons.video_file_outlined,
+      ChatAttachmentKind.voice => Icons.graphic_eq_rounded,
+    },
+    attachment: attachment,
+  );
+
   factory _SharedContentItem.link(ChatMessage message, String value) =>
       _SharedContentItem._(
         kind: _SharedContentKind.link,
@@ -288,6 +349,7 @@ class _SharedContentItem {
   final String keyName;
   final IconData icon;
   final ChatPhotoAttachment? photo;
+  final ChatAttachment? attachment;
 }
 
 Future<void> _showPhotoPreview(BuildContext context, _SharedContentItem item) {

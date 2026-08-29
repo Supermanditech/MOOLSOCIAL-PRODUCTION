@@ -4,7 +4,12 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../shared/social_media_picker.dart';
 import '../shared/social_content_gateway.dart';
@@ -25,6 +30,159 @@ class ChatPickedPhoto {
   final String name;
   final String contentType;
   final Uint8List bytes;
+}
+
+class ChatPickedAttachment {
+  const ChatPickedAttachment({
+    required this.kind,
+    required this.name,
+    required this.contentType,
+    required this.bytes,
+    this.duration,
+  });
+
+  final ChatAttachmentKind kind;
+  final String name;
+  final String contentType;
+  final Uint8List bytes;
+  final Duration? duration;
+}
+
+abstract interface class ChatAttachmentPicker {
+  Future<ChatPickedAttachment?> pick(ChatAttachmentKind kind);
+}
+
+class NativeChatAttachmentPicker implements ChatAttachmentPicker {
+  @override
+  Future<ChatPickedAttachment?> pick(ChatAttachmentKind kind) async {
+    if (kind == ChatAttachmentKind.voice) {
+      throw const ChatServiceException(
+        'Use the microphone button to record a voice message.',
+      );
+    }
+    final file = await FilePicker.pickFile(
+      type: kind == ChatAttachmentKind.video ? FileType.video : FileType.custom,
+      allowedExtensions: kind == ChatAttachmentKind.document
+          ? const ['pdf', 'txt', 'docx']
+          : null,
+    );
+    if (file == null) return null;
+    final bytes = await file.readAsBytes();
+    final contentType = _attachmentContentType(file.name, kind);
+    _validatePickedAttachment(kind, contentType, bytes.length);
+    return ChatPickedAttachment(
+      kind: kind,
+      name: file.name,
+      contentType: contentType,
+      bytes: bytes,
+    );
+  }
+}
+
+abstract interface class ChatVoiceRecorder {
+  Future<void> start();
+  Future<ChatPickedAttachment> stop();
+  Future<void> cancel();
+  void dispose();
+}
+
+class NativeChatVoiceRecorder implements ChatVoiceRecorder {
+  AudioRecorder? _recorder;
+  DateTime? _startedAt;
+
+  AudioRecorder get _activeRecorder => _recorder ??= AudioRecorder();
+
+  @override
+  Future<void> start() async {
+    if (!await _activeRecorder.hasPermission()) {
+      throw const ChatServiceException(
+        'Microphone access was denied. Allow microphone access in device settings, then try again.',
+        code: 'microphone_permission_denied',
+      );
+    }
+    final directory = await getTemporaryDirectory();
+    final path =
+        '${directory.path}/moolsocial-voice-${DateTime.now().microsecondsSinceEpoch}.m4a';
+    await _activeRecorder.start(
+      const RecordConfig(
+        encoder: AudioEncoder.aacLc,
+        bitRate: 64000,
+        sampleRate: 44100,
+      ),
+      path: path,
+    );
+    _startedAt = DateTime.now();
+  }
+
+  @override
+  Future<ChatPickedAttachment> stop() async {
+    final startedAt = _startedAt;
+    final path = await _activeRecorder.stop();
+    _startedAt = null;
+    if (path == null || startedAt == null) {
+      throw const ChatServiceException('Voice recording was not completed.');
+    }
+    final duration = DateTime.now().difference(startedAt);
+    final bytes = await File(path).readAsBytes();
+    _validatePickedAttachment(
+      ChatAttachmentKind.voice,
+      'audio/mp4',
+      bytes.length,
+      duration: duration,
+    );
+    return ChatPickedAttachment(
+      kind: ChatAttachmentKind.voice,
+      name: 'Voice message.m4a',
+      contentType: 'audio/mp4',
+      bytes: bytes,
+      duration: duration,
+    );
+  }
+
+  @override
+  Future<void> cancel() async {
+    _startedAt = null;
+    await _activeRecorder.cancel();
+  }
+
+  @override
+  void dispose() => _recorder?.dispose();
+}
+
+abstract interface class ChatAttachmentPlayback {
+  Future<void> open(ChatAttachment attachment);
+  void dispose();
+}
+
+class NativeChatAttachmentPlayback implements ChatAttachmentPlayback {
+  AudioPlayer? _player;
+
+  AudioPlayer get _activePlayer => _player ??= AudioPlayer();
+
+  @override
+  Future<void> open(ChatAttachment attachment) async {
+    if (attachment.kind == ChatAttachmentKind.voice) {
+      await _activePlayer.setUrl(attachment.readUrl.toString());
+      unawaited(_activePlayer.play());
+      return;
+    }
+    final opened = await launchUrl(
+      attachment.readUrl,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened) {
+      throw const ChatServiceException(
+        'That attachment could not be opened. Try again.',
+        retryable: true,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    final player = _player;
+    if (player != null) unawaited(player.dispose());
+  }
 }
 
 abstract interface class ChatPhotoPicker {
@@ -172,6 +330,16 @@ abstract interface class ChatPhotoGateway {
   });
 }
 
+abstract interface class ChatAttachmentGateway {
+  Future<ChatMessage> sendAttachment({
+    required String threadId,
+    required ChatPickedAttachment attachment,
+    required String caption,
+    required String idempotencyKey,
+    String? replyToMessageId,
+  });
+}
+
 abstract interface class ChatPrivacyGateway {
   Future<ChatPrivacySettings> getPrivacySettings();
 
@@ -309,6 +477,34 @@ class IoChatPhotoUploadTransport implements ChatPhotoUploadTransport {
   }
 }
 
+class IoChatAttachmentUploadTransport implements ChatPhotoUploadTransport {
+  IoChatAttachmentUploadTransport({ChatPhotoUploadTransport? delegate})
+    : _delegate = delegate ?? IoChatPhotoUploadTransport();
+
+  final ChatPhotoUploadTransport _delegate;
+
+  @override
+  Future<void> put({
+    required Uri url,
+    required Map<String, String> headers,
+    required Uint8List bytes,
+  }) async {
+    try {
+      await _delegate.put(url: url, headers: headers, bytes: bytes);
+    } on ChatServiceException catch (error) {
+      throw ChatServiceException(
+        error.code == 'photo_upload_expired'
+            ? 'Attachment upload expired. Try sending it again.'
+            : 'Attachment could not upload. Check your connection and try again.',
+        code: error.code == 'photo_upload_expired'
+            ? 'attachment_upload_expired'
+            : 'attachment_upload_failed',
+        retryable: error.retryable,
+      );
+    }
+  }
+}
+
 ChatGateway buildChatGateway() {
   if (moolSocialChatUrl.trim().isEmpty) {
     return const UnavailableChatGateway();
@@ -436,6 +632,7 @@ class AuthenticatedChatGateway
     implements
         ChatGateway,
         ChatPhotoGateway,
+        ChatAttachmentGateway,
         ChatPrivacyGateway,
         ChatCallGateway {
   AuthenticatedChatGateway({
@@ -443,18 +640,23 @@ class AuthenticatedChatGateway
     required this.credentials,
     required this.transport,
     ChatPhotoUploadTransport? photoUploadTransport,
+    ChatPhotoUploadTransport? attachmentUploadTransport,
     Random? random,
   }) : endpoint = _validateChatEndpoint(endpoint),
        photoUploadTransport =
            photoUploadTransport ?? IoChatPhotoUploadTransport(),
+       attachmentUploadTransport =
+           attachmentUploadTransport ?? IoChatAttachmentUploadTransport(),
        random = random ?? Random.secure();
 
   final Uri endpoint;
   final SocialContentCredentials credentials;
   final SocialContentTransport transport;
   final ChatPhotoUploadTransport photoUploadTransport;
+  final ChatPhotoUploadTransport attachmentUploadTransport;
   final Random random;
   final Map<String, _ChatPhotoUploadState> _photoUploads = {};
+  final Map<String, _ChatAttachmentUploadState> _attachmentUploads = {};
 
   @override
   Future<List<ChatThread>> listThreads({int limit = 30}) async {
@@ -585,6 +787,73 @@ class AuthenticatedChatGateway
       ),
     );
     _photoUploads.remove(idempotencyKey);
+    return delivered;
+  }
+
+  @override
+  Future<ChatMessage> sendAttachment({
+    required String threadId,
+    required ChatPickedAttachment attachment,
+    required String caption,
+    required String idempotencyKey,
+    String? replyToMessageId,
+  }) async {
+    final fingerprint = sha256.convert(attachment.bytes).toString();
+    var state = _attachmentUploads[idempotencyKey];
+    if (state != null && state.fingerprint != fingerprint) {
+      throw const ChatServiceException(
+        'Choose the attachment again before retrying.',
+        code: 'attachment_retry_conflict',
+      );
+    }
+    if (state == null) {
+      final grant = _decodeAttachmentUploadGrant(
+        _map(
+          await _invoke(
+            'prepareAttachmentUpload',
+            limitedUseAppCheck: true,
+            body: _attachmentBody(threadId, attachment),
+          ),
+        ),
+        attachment,
+      );
+      state = _ChatAttachmentUploadState(
+        fingerprint: fingerprint,
+        grant: grant,
+      );
+      _attachmentUploads[idempotencyKey] = state;
+    }
+    if (!state.uploaded) {
+      try {
+        await attachmentUploadTransport.put(
+          url: state.grant.uploadUrl,
+          headers: state.grant.requiredHeaders,
+          bytes: attachment.bytes,
+        );
+        state.uploaded = true;
+      } on ChatServiceException catch (error) {
+        if (error.code == 'attachment_upload_expired') {
+          _attachmentUploads.remove(idempotencyKey);
+        }
+        rethrow;
+      }
+    }
+    final delivered = _decodeMessage(
+      _map(
+        await _invoke(
+          'sendAttachmentMessage',
+          limitedUseAppCheck: true,
+          body: {
+            ..._attachmentBody(threadId, attachment),
+            'uploadId': state.grant.uploadId,
+            if (caption.trim().isNotEmpty) 'caption': caption.trim(),
+            'idempotencyKey': idempotencyKey,
+            'replyToMessageId': ?replyToMessageId,
+          },
+        ),
+      ),
+    );
+    _attachmentUploads.remove(idempotencyKey);
     return delivered;
   }
 
@@ -994,8 +1263,10 @@ ChatCallKind _decodeCallKind(Object? value) =>
 ChatMessage _decodeMessage(Map<String, Object?> data) {
   final mine = data['mine'] == true;
   final photo = _decodePhoto(data['photo']);
+  final attachment = _decodeAttachment(data['attachment']);
   final rawText = data['text'];
-  if (rawText is! String || (rawText.trim().isEmpty && photo == null)) {
+  if (rawText is! String ||
+      (rawText.trim().isEmpty && photo == null && attachment == null)) {
     throw const ChatServiceException(
       'Chat returned an invalid response. Try again.',
       code: 'invalid_response',
@@ -1017,6 +1288,100 @@ ChatMessage _decodeMessage(Map<String, Object?> data) {
     readCount: _integer(data['readCount']),
     forwarded: data['forwarded'] == true,
     photo: photo,
+    attachment: attachment,
+  );
+}
+
+ChatAttachment? _decodeAttachment(Object? value) {
+  if (value == null) return null;
+  final data = _map(value);
+  final kind = switch (_requiredString(data['kind'])) {
+    'document' => ChatAttachmentKind.document,
+    'video' => ChatAttachmentKind.video,
+    'voice' => ChatAttachmentKind.voice,
+    _ => throw const ChatServiceException(
+      'Chat returned an invalid attachment. Try again.',
+      code: 'invalid_response',
+    ),
+  };
+  final sizeBytes = _integer(data['sizeBytes']);
+  final url = Uri.tryParse(_requiredString(data['readUrl']));
+  final expiresAt = DateTime.tryParse(
+    _requiredString(data['readUrlExpiresAt']),
+  );
+  final durationMilliseconds = _integer(data['durationMilliseconds']);
+  if (sizeBytes < 1 || url == null || expiresAt == null) {
+    throw const ChatServiceException(
+      'Chat returned an invalid attachment. Try again.',
+      code: 'invalid_response',
+    );
+  }
+  _requirePrivateStorageUrl(url);
+  return ChatAttachment(
+    id: _requiredString(data['id']),
+    kind: kind,
+    name: _requiredString(data['name']),
+    contentType: _requiredString(data['contentType']),
+    sizeBytes: sizeBytes,
+    readUrl: url,
+    readUrlExpiresAt: expiresAt,
+    duration: durationMilliseconds > 0
+        ? Duration(milliseconds: durationMilliseconds)
+        : null,
+  );
+}
+
+Map<String, Object?> _attachmentBody(
+  String threadId,
+  ChatPickedAttachment attachment,
+) => {
+  'threadId': threadId,
+  'kind': attachment.kind.name,
+  'fileName': attachment.name,
+  'contentType': attachment.contentType,
+  'sizeBytes': attachment.bytes.length,
+  if (attachment.duration != null)
+    'durationMilliseconds': attachment.duration!.inMilliseconds,
+};
+
+_ChatPhotoUploadGrant _decodeAttachmentUploadGrant(
+  Map<String, Object?> data,
+  ChatPickedAttachment attachment,
+) {
+  final uploadUrl = Uri.tryParse(_requiredString(data['uploadUrl']));
+  final expiresAt = DateTime.tryParse(_requiredString(data['expiresAt']));
+  final headers = _stringMap(data['requiredHeaders']);
+  const requiredNames = {
+    'content-type',
+    'content-length',
+    'x-goog-if-generation-match',
+    'x-goog-meta-moolsocial-schema',
+    'x-goog-meta-moolsocial-kind',
+    'x-goog-meta-moolsocial-owner',
+    'x-goog-meta-moolsocial-thread',
+    'x-goog-meta-moolsocial-name',
+    'x-goog-meta-moolsocial-size',
+    'x-goog-meta-moolsocial-duration',
+  };
+  if (uploadUrl == null ||
+      expiresAt == null ||
+      !headers.keys.toSet().containsAll(requiredNames) ||
+      headers.keys.toSet().difference(requiredNames).isNotEmpty ||
+      headers['content-type'] != attachment.contentType ||
+      headers['content-length'] != '${attachment.bytes.length}' ||
+      headers['x-goog-meta-moolsocial-kind'] != attachment.kind.name ||
+      headers['x-goog-if-generation-match'] != '0') {
+    throw const ChatServiceException(
+      'Attachment upload could not be prepared. Choose it again.',
+      code: 'invalid_response',
+    );
+  }
+  _requirePrivateStorageUrl(uploadUrl);
+  return _ChatPhotoUploadGrant(
+    uploadId: _requiredString(data['uploadId']),
+    uploadUrl: uploadUrl,
+    expiresAt: expiresAt,
+    requiredHeaders: headers,
   );
 }
 
@@ -1223,6 +1588,50 @@ String _safePhotoName(String value, String contentType) {
   return clean.length <= 120 ? clean : clean.substring(clean.length - 120);
 }
 
+String _attachmentContentType(String fileName, ChatAttachmentKind kind) {
+  final extension = fileName.split('.').last.toLowerCase();
+  return switch ((kind, extension)) {
+    (ChatAttachmentKind.document, 'pdf') => 'application/pdf',
+    (ChatAttachmentKind.document, 'txt') => 'text/plain',
+    (ChatAttachmentKind.document, 'docx') =>
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    (ChatAttachmentKind.video, 'mov') => 'video/quicktime',
+    (ChatAttachmentKind.video, 'mp4') => 'video/mp4',
+    _ => throw const ChatServiceException(
+      'Choose a supported document or video.',
+      code: 'invalid_attachment',
+    ),
+  };
+}
+
+void _validatePickedAttachment(
+  ChatAttachmentKind kind,
+  String contentType,
+  int sizeBytes, {
+  Duration? duration,
+}) {
+  final maximum = switch (kind) {
+    ChatAttachmentKind.document => 15 * 1024 * 1024,
+    ChatAttachmentKind.video => 50 * 1024 * 1024,
+    ChatAttachmentKind.voice => 10 * 1024 * 1024,
+  };
+  final durationValid =
+      kind != ChatAttachmentKind.voice ||
+      (duration != null &&
+          duration >= const Duration(milliseconds: 500) &&
+          duration <= const Duration(minutes: 5));
+  if (sizeBytes < 1 || sizeBytes > maximum || !durationValid) {
+    throw ChatServiceException(
+      kind == ChatAttachmentKind.document
+          ? 'Choose a PDF, text or DOCX document up to 15 MB.'
+          : kind == ChatAttachmentKind.video
+          ? 'Choose an MP4 or MOV video up to 50 MB.'
+          : 'Record a voice message between 1 second and 5 minutes.',
+      code: 'invalid_attachment',
+    );
+  }
+}
+
 class _ChatPhotoUploadGrant {
   const _ChatPhotoUploadGrant({
     required this.uploadId,
@@ -1239,6 +1648,14 @@ class _ChatPhotoUploadGrant {
 
 class _ChatPhotoUploadState {
   _ChatPhotoUploadState({required this.fingerprint, required this.grant});
+
+  final String fingerprint;
+  final _ChatPhotoUploadGrant grant;
+  bool uploaded = false;
+}
+
+class _ChatAttachmentUploadState {
+  _ChatAttachmentUploadState({required this.fingerprint, required this.grant});
 
   final String fingerprint;
   final _ChatPhotoUploadGrant grant;

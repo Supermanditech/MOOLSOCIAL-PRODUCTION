@@ -5,6 +5,8 @@ import {
   type ChatMessageRecord,
   type ChatMessagePermission,
   type ChatCallKind,
+  type ChatAttachmentKind,
+  type ChatAttachmentUploadGrant,
   type ChatCallPreferences,
   type ChatPresenceState,
   type ChatPhotoContentType,
@@ -152,6 +154,94 @@ export class ChatService {
       fileName,
       contentType,
       sizeBytes,
+      caption,
+      idempotencyKey,
+      requestDigest,
+      replyToMessageId,
+    );
+  }
+
+  async prepareAttachmentUpload(
+    userId: string,
+    raw: unknown,
+  ): Promise<ChatAttachmentUploadGrant> {
+    const body = object(raw);
+    const kind = requiredAttachmentKind(body.kind);
+    const fileName = requiredAttachmentFileName(body);
+    const contentType = requiredText(body, "contentType", 128);
+    const sizeBytes = boundedInteger(
+      body.sizeBytes,
+      0,
+      1,
+      50 * 1024 * 1024,
+      "Attachment size",
+    );
+    const durationMilliseconds = optionalBoundedInteger(
+      body.durationMilliseconds,
+      500,
+      300_000,
+      "Voice duration",
+    );
+    const actor = await this.resolveProfile(userId);
+    return this.requireCapability("prepareAttachmentUpload")(
+      actor,
+      requiredIdentifier(body, "threadId"),
+      kind,
+      fileName,
+      contentType,
+      sizeBytes,
+      durationMilliseconds,
+    );
+  }
+
+  async sendAttachmentMessage(
+    userId: string,
+    raw: unknown,
+  ): Promise<ChatMessageRecord> {
+    const body = object(raw);
+    const threadId = requiredIdentifier(body, "threadId");
+    const kind = requiredAttachmentKind(body.kind);
+    const uploadId = requiredIdentifier(body, "uploadId");
+    const fileName = requiredAttachmentFileName(body);
+    const contentType = requiredText(body, "contentType", 128);
+    const sizeBytes = boundedInteger(
+      body.sizeBytes,
+      0,
+      1,
+      50 * 1024 * 1024,
+      "Attachment size",
+    );
+    const durationMilliseconds = optionalBoundedInteger(
+      body.durationMilliseconds,
+      500,
+      300_000,
+      "Voice duration",
+    );
+    const caption = optionalText(body, "caption", 1_000) ?? "";
+    const replyToMessageId = optionalIdentifier(body, "replyToMessageId");
+    const idempotencyKey = requiredText(body, "idempotencyKey", 128);
+    assertRetryKey(idempotencyKey, "attachment");
+    const actor = await this.resolveProfile(userId);
+    const requestDigest = createHash("sha256").update(JSON.stringify({
+      threadId,
+      kind,
+      uploadId,
+      fileName,
+      contentType,
+      sizeBytes,
+      durationMilliseconds,
+      caption,
+      replyToMessageId,
+    })).digest("hex");
+    return this.requireCapability("sendAttachmentMessage")(
+      actor,
+      threadId,
+      kind,
+      uploadId,
+      fileName,
+      contentType,
+      sizeBytes,
+      durationMilliseconds,
       caption,
       idempotencyKey,
       requestDigest,
@@ -401,6 +491,21 @@ function requiredPhotoFileName(body: Record<string, unknown>): string {
   return fileName;
 }
 
+function requiredAttachmentFileName(body: Record<string, unknown>): string {
+  const fileName = requiredText(body, "fileName", 160);
+  if (/[\\/\u0000-\u001f\u007f]/u.test(fileName)) {
+    throw new ChatError("bad_request", "Attachment name must be valid.", 400);
+  }
+  return fileName;
+}
+
+function requiredAttachmentKind(value: unknown): ChatAttachmentKind {
+  if (value === "document" || value === "video" || value === "voice") {
+    return value;
+  }
+  throw new ChatError("bad_request", "Choose a supported attachment.", 400);
+}
+
 function requiredPhotoContentType(
   body: Record<string, unknown>,
 ): ChatPhotoContentType {
@@ -421,7 +526,7 @@ function requiredPhotoContentType(
 
 function assertRetryKey(
   value: string,
-  label: "forward" | "photo" | "call",
+  label: "forward" | "photo" | "call" | "attachment",
 ): void {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{15,127}$/u.test(value)) {
     throw new ChatError(
@@ -430,6 +535,16 @@ function assertRetryKey(
       400,
     );
   }
+}
+
+function optionalBoundedInteger(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  label: string,
+): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  return boundedInteger(value, minimum, minimum, maximum, label);
 }
 
 function object(value: unknown): Record<string, unknown> {

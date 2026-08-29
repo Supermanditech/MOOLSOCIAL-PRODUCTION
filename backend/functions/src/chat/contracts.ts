@@ -101,6 +101,58 @@ export interface ChatMessageRecord {
   readByOthers: boolean;
   forwarded: boolean;
   photo?: ChatPhotoAttachmentRecord;
+  attachment?: ChatAttachmentRecord;
+}
+
+export type ChatAttachmentKind = "document" | "video" | "voice";
+
+export interface ChatAttachmentRecord {
+  id: string;
+  kind: ChatAttachmentKind;
+  name: string;
+  contentType: string;
+  sizeBytes: number;
+  durationMilliseconds?: number;
+  readUrl: string;
+  readUrlExpiresAt: string;
+}
+
+export interface ChatAttachmentUploadGrant extends ChatPhotoUploadGrant {}
+
+export interface ChatValidatedAttachment {
+  uploadId: string;
+  objectPath: string;
+  generation: string;
+  kind: ChatAttachmentKind;
+  contentType: string;
+  sizeBytes: number;
+  durationMilliseconds?: number;
+}
+
+export interface ChatAttachmentStore {
+  prepare(input: {
+    userId: string;
+    threadId: string;
+    kind: ChatAttachmentKind;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    durationMilliseconds?: number;
+  }): Promise<ChatAttachmentUploadGrant>;
+  validate(input: {
+    userId: string;
+    threadId: string;
+    kind: ChatAttachmentKind;
+    uploadId: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    durationMilliseconds?: number;
+  }): Promise<ChatValidatedAttachment>;
+  readUrl(input: {
+    objectPath: string;
+    generation: string;
+  }): Promise<{ readUrl: string; expiresAt: string }>;
 }
 
 export interface ChatPhotoAttachmentRecord {
@@ -190,6 +242,29 @@ export interface ChatRepository {
     fileName: string,
     contentType: ChatPhotoContentType,
     sizeBytes: number,
+    caption: string,
+    idempotencyKey: string,
+    requestDigest: string,
+    replyToMessageId?: string,
+  ): Promise<ChatMessageRecord>;
+  prepareAttachmentUpload?(
+    actor: ChatProfile,
+    threadId: string,
+    kind: ChatAttachmentKind,
+    fileName: string,
+    contentType: string,
+    sizeBytes: number,
+    durationMilliseconds?: number,
+  ): Promise<ChatAttachmentUploadGrant>;
+  sendAttachmentMessage?(
+    actor: ChatProfile,
+    threadId: string,
+    kind: ChatAttachmentKind,
+    uploadId: string,
+    fileName: string,
+    contentType: string,
+    sizeBytes: number,
+    durationMilliseconds: number | undefined,
     caption: string,
     idempotencyKey: string,
     requestDigest: string,

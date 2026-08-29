@@ -4,9 +4,14 @@ import 'chat_models.dart';
 import 'chat_services.dart';
 
 class ChatSession extends ChangeNotifier {
-  ChatSession({ChatSendGateway? sendGateway, this._photoPicker})
-    : _gateway = null,
-      _reviewSendGateway = sendGateway ?? ReviewChatSendGateway() {
+  ChatSession({
+    ChatSendGateway? sendGateway,
+    this._photoPicker,
+    this._attachmentPicker,
+    this._voiceRecorder,
+    this._attachmentPlayback,
+  }) : _gateway = null,
+       _reviewSendGateway = sendGateway ?? ReviewChatSendGateway() {
     _threads.addAll(reviewThreads);
     _messages.addAll({
       'home-basket': [
@@ -205,14 +210,26 @@ class ChatSession extends ChangeNotifier {
     });
   }
 
-  ChatSession.production({ChatGateway? gateway, ChatPhotoPicker? photoPicker})
-    : _gateway = gateway ?? buildChatGateway(),
-      _reviewSendGateway = null,
-      _photoPicker = photoPicker ?? NativeChatPhotoPicker();
+  ChatSession.production({
+    ChatGateway? gateway,
+    ChatPhotoPicker? photoPicker,
+    ChatAttachmentPicker? attachmentPicker,
+    ChatVoiceRecorder? voiceRecorder,
+    ChatAttachmentPlayback? attachmentPlayback,
+  }) : _gateway = gateway ?? buildChatGateway(),
+       _reviewSendGateway = null,
+       _photoPicker = photoPicker ?? NativeChatPhotoPicker(),
+       _attachmentPicker = attachmentPicker ?? NativeChatAttachmentPicker(),
+       _voiceRecorder = voiceRecorder ?? NativeChatVoiceRecorder(),
+       _attachmentPlayback =
+           attachmentPlayback ?? NativeChatAttachmentPlayback();
 
   final ChatGateway? _gateway;
   final ChatSendGateway? _reviewSendGateway;
   final ChatPhotoPicker? _photoPicker;
+  final ChatAttachmentPicker? _attachmentPicker;
+  final ChatVoiceRecorder? _voiceRecorder;
+  final ChatAttachmentPlayback? _attachmentPlayback;
   final List<ChatThread> _threads = [];
   final Map<String, List<ChatMessage>> _messages = {};
   final Map<String, String> _messageLoadErrors = {};
@@ -229,6 +246,8 @@ class ChatSession extends ChangeNotifier {
   final Map<String, String> _forwardRetryKeys = {};
   final Map<String, ChatMessage> _replyTargets = {};
   final Map<String, _PendingChatPhoto> _pendingPhotos = {};
+  final Map<String, _PendingChatAttachment> _pendingAttachments = {};
+  final Set<String> _recordingThreads = {};
   final Map<String, bool> _chatAvailableForSession = {};
   final Map<String, bool> _voiceCallsAvailableForSession = {};
   final Map<String, bool> _videoCallsAvailableForSession = {};
@@ -642,6 +661,11 @@ class ChatSession extends ChangeNotifier {
       return text.replaceAll(RegExp(r'\s+'), ' ');
     }
     if (selectedPhoto(threadId) != null) return 'Photo ready to send';
+    if (selectedAttachment(threadId) case final attachment?) {
+      return attachment.kind == ChatAttachmentKind.voice
+          ? 'Voice message ready to send'
+          : '${attachment.kind == ChatAttachmentKind.video ? 'Video' : 'Document'} ready to send';
+    }
     if (replyTarget(threadId) != null) return 'Reply ready to send';
     return null;
   }
@@ -660,7 +684,8 @@ class ChatSession extends ChangeNotifier {
     final hadText = _draftTextByThread.remove(threadId) != null;
     final hadReply = _replyTargets.remove(threadId) != null;
     final hadPhoto = _pendingPhotos.remove(threadId) != null;
-    final changed = hadText || hadReply || hadPhoto;
+    final hadAttachment = _pendingAttachments.remove(threadId) != null;
+    final changed = hadText || hadReply || hadPhoto || hadAttachment;
     if (changed) notifyListeners();
   }
 
@@ -678,6 +703,192 @@ class ChatSession extends ChangeNotifier {
   bool get hideMessagePreviewsForSession => _hideMessagePreviewsForSession;
 
   bool get showSuggestedPromptsForSession => _showSuggestedPromptsForSession;
+
+  ChatPickedAttachment? selectedAttachment(String threadId) =>
+      _pendingAttachments[threadId]?.attachment;
+
+  bool get attachmentSelectionAvailable => _attachmentPicker != null;
+  bool get voiceRecordingAvailable => _voiceRecorder != null;
+
+  bool isRecordingVoice(String threadId) =>
+      _recordingThreads.contains(threadId);
+
+  Future<bool> selectAttachment(
+    String threadId,
+    ChatAttachmentKind kind,
+  ) async {
+    final picker = _attachmentPicker;
+    if (busy || picker == null || kind == ChatAttachmentKind.voice) {
+      _threadActionErrors[threadId] =
+          'Attachment selection is unavailable right now.';
+      notifyListeners();
+      return false;
+    }
+    busy = true;
+    _threadActionErrors.remove(threadId);
+    notifyListeners();
+    try {
+      final picked = await picker.pick(kind);
+      if (picked == null) return false;
+      _pendingAttachments[threadId] = _PendingChatAttachment(
+        attachment: picked,
+        idempotencyKey:
+            'chat-attachment-${DateTime.now().microsecondsSinceEpoch}-${++_messageSequence}',
+      );
+      _pendingPhotos.remove(threadId);
+      _threadActionNotices[threadId] =
+          '${kind == ChatAttachmentKind.video ? 'Video' : 'Document'} ready to send.';
+      return true;
+    } on ChatServiceException catch (error) {
+      _threadActionErrors[threadId] = error.userMessage;
+      return false;
+    } on Object {
+      _threadActionErrors[threadId] = 'That attachment could not be opened.';
+      return false;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> startVoiceRecording(String threadId) async {
+    final recorder = _voiceRecorder;
+    if (busy || recorder == null || _recordingThreads.isNotEmpty) {
+      _threadActionErrors[threadId] =
+          'Voice recording is unavailable right now.';
+      notifyListeners();
+      return false;
+    }
+    try {
+      await recorder.start();
+      _recordingThreads.add(threadId);
+      _threadActionErrors.remove(threadId);
+      _threadActionNotices[threadId] = 'Recording voice message…';
+      notifyListeners();
+      return true;
+    } on ChatServiceException catch (error) {
+      _threadActionErrors[threadId] = error.userMessage;
+      notifyListeners();
+      return false;
+    } on Object {
+      _threadActionErrors[threadId] = 'Voice recording could not start.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> stopVoiceRecording(String threadId) async {
+    final recorder = _voiceRecorder;
+    if (recorder == null || !_recordingThreads.contains(threadId)) return false;
+    busy = true;
+    notifyListeners();
+    try {
+      final picked = await recorder.stop();
+      _pendingAttachments[threadId] = _PendingChatAttachment(
+        attachment: picked,
+        idempotencyKey:
+            'chat-voice-${DateTime.now().microsecondsSinceEpoch}-${++_messageSequence}',
+      );
+      _pendingPhotos.remove(threadId);
+      _threadActionNotices[threadId] = 'Voice message ready to send.';
+      return true;
+    } on ChatServiceException catch (error) {
+      _threadActionErrors[threadId] = error.userMessage;
+      return false;
+    } on Object {
+      _threadActionErrors[threadId] = 'Voice recording could not be completed.';
+      return false;
+    } finally {
+      _recordingThreads.remove(threadId);
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> cancelVoiceRecording(String threadId) async {
+    if (!_recordingThreads.remove(threadId)) return;
+    await _voiceRecorder?.cancel();
+    _threadActionNotices.remove(threadId);
+    notifyListeners();
+  }
+
+  void cancelSelectedAttachment(String threadId) {
+    if (_pendingAttachments.remove(threadId) != null) notifyListeners();
+  }
+
+  Future<bool> sendSelectedAttachment(String threadId, String caption) async {
+    if (busy) return false;
+    final pending = _pendingAttachments[threadId];
+    final gateway = _gateway is ChatAttachmentGateway
+        ? _gateway as ChatAttachmentGateway
+        : null;
+    if (pending == null || gateway == null) {
+      _threadActionErrors[threadId] = 'Choose an attachment first.';
+      notifyListeners();
+      return false;
+    }
+    if (!pending.sendLocked) {
+      pending
+        ..caption = caption.trim()
+        ..replyTo = _replyReference(_replyTargets[threadId])
+        ..sendLocked = true;
+    }
+    busy = true;
+    _threadActionErrors.remove(threadId);
+    notifyListeners();
+    try {
+      final delivered = await gateway.sendAttachment(
+        threadId: threadId,
+        attachment: pending.attachment,
+        caption: pending.caption,
+        idempotencyKey: pending.idempotencyKey,
+        replyToMessageId: pending.replyTo?.messageId,
+      );
+      if (delivered.attachment == null) {
+        throw const ChatServiceException(
+          'Chat returned an invalid attachment. Try again.',
+        );
+      }
+      _messages.putIfAbsent(threadId, () => []).add(delivered);
+      _pendingAttachments.remove(threadId);
+      if (_replyTargets[threadId]?.id == pending.replyTo?.messageId) {
+        _replyTargets.remove(threadId);
+      }
+      _threadActionNotices[threadId] =
+          '${pending.attachment.kind == ChatAttachmentKind.voice ? 'Voice message' : 'Attachment'} delivered.';
+      return true;
+    } on ChatServiceException catch (error) {
+      _threadActionErrors[threadId] = error.userMessage;
+      return false;
+    } on Object {
+      _threadActionErrors[threadId] =
+          'Attachment was not sent. Check your connection and retry.';
+      return false;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> openAttachment(
+    String threadId,
+    ChatAttachment attachment,
+  ) async {
+    final playback = _attachmentPlayback;
+    if (playback == null) return false;
+    try {
+      await playback.open(attachment);
+      return true;
+    } on ChatServiceException catch (error) {
+      _threadActionErrors[threadId] = error.userMessage;
+      notifyListeners();
+      return false;
+    } on Object {
+      _threadActionErrors[threadId] = 'That attachment could not be opened.';
+      notifyListeners();
+      return false;
+    }
+  }
 
   ChatPrivacySettings get privacySettings => _privacySettings;
 
@@ -1246,6 +1457,7 @@ class ChatSession extends ChangeNotifier {
         idempotencyKey:
             'chat-photo-${DateTime.now().microsecondsSinceEpoch}-${++_messageSequence}',
       );
+      _pendingAttachments.remove(threadId);
       _threadActionNotices[threadId] = 'Photo ready to send.';
       return true;
     } on ChatServiceException catch (error) {
@@ -1783,6 +1995,8 @@ class ChatSession extends ChangeNotifier {
     _forwardRetryKeys.clear();
     _replyTargets.clear();
     _pendingPhotos.clear();
+    _pendingAttachments.clear();
+    _recordingThreads.clear();
     _chatAvailableForSession.clear();
     _voiceCallsAvailableForSession.clear();
     _videoCallsAvailableForSession.clear();
@@ -1843,6 +2057,10 @@ class ChatSession extends ChangeNotifier {
         ? message.text.trim()
         : message.photo != null
         ? 'Photo'
+        : message.attachment != null
+        ? message.attachment!.kind == ChatAttachmentKind.voice
+              ? 'Voice message'
+              : message.attachment!.name
         : message.attachmentLabel?.trim().isNotEmpty == true
         ? message.attachmentLabel!.trim()
         : 'Message';
@@ -1852,12 +2070,32 @@ class ChatSession extends ChangeNotifier {
       text: text,
     );
   }
+
+  @override
+  void dispose() {
+    _voiceRecorder?.dispose();
+    _attachmentPlayback?.dispose();
+    super.dispose();
+  }
 }
 
 class _PendingChatPhoto {
   _PendingChatPhoto({required this.photo, required this.idempotencyKey});
 
   final ChatPickedPhoto photo;
+  final String idempotencyKey;
+  String caption = '';
+  ChatReplyReference? replyTo;
+  bool sendLocked = false;
+}
+
+class _PendingChatAttachment {
+  _PendingChatAttachment({
+    required this.attachment,
+    required this.idempotencyKey,
+  });
+
+  final ChatPickedAttachment attachment;
   final String idempotencyKey;
   String caption = '';
   ChatReplyReference? replyTo;

@@ -151,6 +151,36 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     }
   }
 
+  Future<void> _sendCurrentAttachment() async {
+    final session = widget.session;
+    final threadId = widget.threadId;
+    final draft = _messageController.text;
+    final selected = session.selectedAttachment(threadId);
+    if (selected == null) return;
+    final label = switch (selected.kind) {
+      ChatAttachmentKind.document => 'Document',
+      ChatAttachmentKind.video => 'Video',
+      ChatAttachmentKind.voice => 'Voice message',
+    };
+    if (!await _confirmSendReview(
+      draft: draft,
+      includesPhoto: false,
+      attachmentLabel: label,
+    )) {
+      return;
+    }
+    final sent = await session.sendSelectedAttachment(threadId, draft);
+    if (!sent || !identical(session, widget.session)) return;
+    if (session.draftTextForSession(threadId) == draft) {
+      session.setDraftTextForSession(threadId, '');
+    }
+    if (mounted &&
+        threadId == widget.threadId &&
+        _messageController.text == draft) {
+      _messageController.clear();
+    }
+  }
+
   Future<void> _retryMessage(String messageId) async {
     final session = widget.session;
     final threadId = widget.threadId;
@@ -173,6 +203,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   Future<bool> _confirmSendReview({
     required String draft,
     required bool includesPhoto,
+    String? attachmentLabel,
   }) async {
     final session = widget.session;
     final threadId = widget.threadId;
@@ -221,10 +252,16 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                   borderRadius: BorderRadius.circular(MoolRadii.control),
                 ),
                 child: Text(
-                  switch ((includesPhoto, trimmedDraft.isEmpty)) {
-                    (true, true) => 'Photo',
-                    (true, false) => 'Photo\n$trimmedDraft',
-                    (false, _) => trimmedDraft,
+                  switch ((
+                    includesPhoto,
+                    attachmentLabel,
+                    trimmedDraft.isEmpty,
+                  )) {
+                    (_, String label, true) => label,
+                    (_, String label, false) => '$label\n$trimmedDraft',
+                    (true, _, true) => 'Photo',
+                    (true, _, false) => 'Photo\n$trimmedDraft',
+                    (false, _, _) => trimmedDraft,
                   },
                   maxLines: 6,
                   overflow: TextOverflow.ellipsis,
@@ -587,6 +624,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                         controller: _messageController,
                         onSend: _sendCurrentMessage,
                         onSendPhoto: _sendCurrentPhoto,
+                        onSendAttachment: _sendCurrentAttachment,
                       ),
                     ],
                   )
@@ -1525,6 +1563,7 @@ class _MessageBubble extends StatelessWidget {
     final failed = message.deliveryState == ChatDeliveryState.failed;
     final reply = message.replyTo;
     final photo = message.photo;
+    final attachment = message.attachment;
     return Align(
       alignment: message.mine ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
@@ -1725,6 +1764,56 @@ class _MessageBubble extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+              ],
+              if (attachment != null) ...[
+                const SizedBox(height: 3),
+                Material(
+                  color: message.mine
+                      ? Colors.white.withValues(alpha: .14)
+                      : const Color(0xFFF0F1F8),
+                  borderRadius: BorderRadius.circular(MoolRadii.control),
+                  child: ListTile(
+                    key: Key('chat-attachment-${message.id}'),
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                    leading: Icon(switch (attachment.kind) {
+                      ChatAttachmentKind.document => Icons.description_outlined,
+                      ChatAttachmentKind.video => Icons.play_circle_outline,
+                      ChatAttachmentKind.voice => Icons.graphic_eq_rounded,
+                    }, color: message.mine ? Colors.white : MoolColors.navy),
+                    title: Text(
+                      attachment.kind == ChatAttachmentKind.voice
+                          ? 'Voice message'
+                          : attachment.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: message.mine ? Colors.white : MoolColors.ink,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    subtitle: Text(
+                      attachment.duration == null
+                          ? _fileSizeLabel(attachment.sizeBytes)
+                          : _durationLabel(attachment.duration!),
+                      style: TextStyle(
+                        color: message.mine
+                            ? Colors.white.withValues(alpha: .75)
+                            : MoolColors.muted,
+                      ),
+                    ),
+                    trailing: Icon(
+                      attachment.kind == ChatAttachmentKind.voice
+                          ? Icons.play_arrow_rounded
+                          : Icons.open_in_new_rounded,
+                      color: message.mine ? Colors.white : MoolColors.navy,
+                    ),
+                    onTap: () =>
+                        unawaited(session.openAttachment(threadId, attachment)),
                   ),
                 ),
                 const SizedBox(height: MoolSpacing.xs),
@@ -2289,6 +2378,19 @@ Future<void> _chooseForwardTarget(
 
 enum _ChatAttachmentChoice { document, gallery, camera, video }
 
+String _durationLabel(Duration value) {
+  final minutes = value.inMinutes;
+  final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
+  return '$minutes:$seconds';
+}
+
+String _fileSizeLabel(int bytes) {
+  if (bytes >= 1024 * 1024) {
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+  return '${(bytes / 1024).ceil()} KB';
+}
+
 class _ChatAttachmentAction extends StatelessWidget {
   const _ChatAttachmentAction({
     required this.keyName,
@@ -2343,6 +2445,7 @@ class _Composer extends StatefulWidget {
     required this.controller,
     required this.onSend,
     required this.onSendPhoto,
+    required this.onSendAttachment,
     super.key,
   });
 
@@ -2351,6 +2454,7 @@ class _Composer extends StatefulWidget {
   final TextEditingController controller;
   final Future<void> Function() onSend;
   final Future<void> Function() onSendPhoto;
+  final Future<void> Function() onSendAttachment;
 
   @override
   State<_Composer> createState() => _ComposerState();
@@ -2365,6 +2469,7 @@ class _ComposerState extends State<_Composer> {
   TextEditingController get controller => widget.controller;
   Future<void> Function() get onSend => widget.onSend;
   Future<void> Function() get onSendPhoto => widget.onSendPhoto;
+  Future<void> Function() get onSendAttachment => widget.onSendAttachment;
 
   void _toggleAttachments() {
     setState(() {
@@ -2398,10 +2503,15 @@ class _ComposerState extends State<_Composer> {
   ) async {
     switch (choice) {
       case _ChatAttachmentChoice.document:
-        setState(() {
-          _attachmentNotice =
-              'Document sharing is not available right now. You can share a photo or continue with a message.';
-        });
+        if (!session.attachmentSelectionAvailable) {
+          setState(() {
+            _attachmentNotice =
+                'Document sharing is not available right now. You can share a photo or continue with a message.';
+          });
+          return;
+        }
+        await session.selectAttachment(threadId, ChatAttachmentKind.document);
+        if (mounted) setState(() => _attachmentsOpen = false);
         return;
       case _ChatAttachmentChoice.gallery:
         await _selectPhoto(context, ChatPhotoSource.gallery);
@@ -2410,10 +2520,15 @@ class _ComposerState extends State<_Composer> {
         await _selectPhoto(context, ChatPhotoSource.camera);
         return;
       case _ChatAttachmentChoice.video:
-        setState(() {
-          _attachmentNotice =
-              'Video sharing is not available right now. You can share a photo or continue with a message.';
-        });
+        if (!session.attachmentSelectionAvailable) {
+          setState(() {
+            _attachmentNotice =
+                'Video sharing is not available right now. You can share a photo or continue with a message.';
+          });
+          return;
+        }
+        await session.selectAttachment(threadId, ChatAttachmentKind.video);
+        if (mounted) setState(() => _attachmentsOpen = false);
         return;
     }
   }
@@ -2443,6 +2558,7 @@ class _ComposerState extends State<_Composer> {
   Widget build(BuildContext context) {
     final reply = session.replyTarget(threadId);
     final photo = session.selectedPhoto(threadId);
+    final attachment = session.selectedAttachment(threadId);
     return SafeArea(
       top: false,
       bottom: false,
@@ -2727,6 +2843,85 @@ class _ComposerState extends State<_Composer> {
                       )
                     : const SizedBox.shrink(),
               ),
+              ChatExpandableMotion(
+                key: const Key('chat-selected-attachment-expand-motion'),
+                child: attachment != null
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            key: const Key('chat-selected-attachment'),
+                            width: double.infinity,
+                            padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F1F8),
+                              borderRadius: BorderRadius.circular(
+                                MoolRadii.control,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(switch (attachment.kind) {
+                                  ChatAttachmentKind.document =>
+                                    Icons.description_outlined,
+                                  ChatAttachmentKind.video =>
+                                    Icons.video_file_outlined,
+                                  ChatAttachmentKind.voice =>
+                                    Icons.graphic_eq_rounded,
+                                }, color: MoolColors.navy),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        switch (attachment.kind) {
+                                          ChatAttachmentKind.document =>
+                                            'Document ready to send',
+                                          ChatAttachmentKind.video =>
+                                            'Video ready to send',
+                                          ChatAttachmentKind.voice =>
+                                            'Voice message ready to send',
+                                        },
+                                        style: const TextStyle(
+                                          color: MoolColors.navy,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      Text(
+                                        attachment.duration == null
+                                            ? attachment.name
+                                            : _durationLabel(
+                                                attachment.duration!,
+                                              ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: MoolColors.muted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  key: const Key('chat-remove-attachment'),
+                                  tooltip: 'Remove attachment',
+                                  onPressed: session.busy
+                                      ? null
+                                      : () => session.cancelSelectedAttachment(
+                                          threadId,
+                                        ),
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: MoolSpacing.xs),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -2751,7 +2946,7 @@ class _ComposerState extends State<_Composer> {
                               minLines: 1,
                               maxLines: 4,
                               decoration: InputDecoration(
-                                hintText: photo == null
+                                hintText: photo == null && attachment == null
                                     ? 'Message'
                                     : 'Add a caption',
                                 filled: false,
@@ -2771,6 +2966,7 @@ class _ComposerState extends State<_Composer> {
                               final hasDraft =
                                   value.text.isNotEmpty ||
                                   photo != null ||
+                                  attachment != null ||
                                   reply != null;
                               if (!hasDraft) return const SizedBox.shrink();
                               return IconButton(
@@ -2811,21 +3007,31 @@ class _ComposerState extends State<_Composer> {
                     valueListenable: controller,
                     builder: (context, value, _) {
                       final hasMessage = value.text.trim().isNotEmpty;
-                      final sendsContent = photo != null || hasMessage;
+                      final recording = session.isRecordingVoice(threadId);
+                      final sendsContent =
+                          photo != null || attachment != null || hasMessage;
                       return SizedBox.square(
                         dimension: 48,
                         child: IconButton.filled(
                           key: Key(
                             photo != null
                                 ? 'chat-send-photo'
+                                : attachment != null
+                                ? 'chat-send-attachment'
                                 : hasMessage
                                 ? 'chat-send'
+                                : recording
+                                ? 'chat-voice-stop'
                                 : 'chat-voice-message',
                           ),
                           tooltip: photo != null
                               ? 'Send photo'
+                              : attachment != null
+                              ? 'Send attachment'
                               : hasMessage
                               ? 'Send message'
+                              : recording
+                              ? 'Stop recording'
                               : 'Voice message',
                           style: IconButton.styleFrom(
                             backgroundColor: MoolColors.navy,
@@ -2835,17 +3041,23 @@ class _ComposerState extends State<_Composer> {
                               ? null
                               : () => unawaited(
                                   sendsContent
-                                      ? photo == null
-                                            ? onSend()
-                                            : onSendPhoto()
-                                      : showChatUnavailableCapability(
+                                      ? photo != null
+                                            ? onSendPhoto()
+                                            : attachment != null
+                                            ? onSendAttachment()
+                                            : onSend()
+                                      : !session.voiceRecordingAvailable
+                                      ? showChatUnavailableCapability(
                                           context,
                                           keyName:
                                               'chat-voice-message-recovery',
                                           title: 'Voice messages unavailable',
                                           message:
                                               'Voice messages are not available right now. You can type a message instead.',
-                                        ),
+                                        )
+                                      : recording
+                                      ? session.stopVoiceRecording(threadId)
+                                      : session.startVoiceRecording(threadId),
                                 ),
                           icon: session.busy
                               ? const SizedBox.square(
@@ -2861,11 +3073,17 @@ class _ComposerState extends State<_Composer> {
                                   ),
                                   stateKey: photo != null
                                       ? 'photo'
+                                      : attachment != null
+                                      ? 'attachment'
                                       : hasMessage
                                       ? 'send'
+                                      : recording
+                                      ? 'recording'
                                       : 'voice',
                                   icon: sendsContent
                                       ? Icons.send_rounded
+                                      : recording
+                                      ? Icons.stop_rounded
                                       : Icons.mic_rounded,
                                 ),
                         ),

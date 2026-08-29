@@ -113,6 +113,7 @@ import type { YouTubeUploadMetadata } from "./youtube/types.js";
 import type { YouTubeUploadFileIdentityInput } from "./youtube/upload_identity.js";
 import { ChatError, type ChatProfile } from "./chat/contracts.js";
 import { GoogleCloudStorageChatPhotoStore } from "./chat/attachment_store.js";
+import { GoogleCloudStorageChatAttachmentStore } from "./chat/media_store.js";
 import { FirestoreChatRepository } from "./chat/firestore_store.js";
 import { ChatService } from "./chat/service.js";
 import { SocialContentError } from "./social/contracts.js";
@@ -382,6 +383,7 @@ function chatService(): ChatService {
       getFirestore(),
       undefined,
       new GoogleCloudStorageChatPhotoStore(getStorage().bucket()),
+      new GoogleCloudStorageChatAttachmentStore(getStorage().bucket()),
     ),
     resolveChatProfile,
   );
@@ -2663,6 +2665,8 @@ export const moolSocialChat = onRequest(
         operation === "startCall" ||
         operation === "respondToCall" ||
         operation === "endCall";
+      const attachmentMutation = operation === "prepareAttachmentUpload" ||
+        operation === "sendAttachmentMessage";
       const ownerUserId = await verifySocialInvocation(
         request.headers,
         {
@@ -2673,7 +2677,7 @@ export const moolSocialChat = onRequest(
             ),
           verifyIdToken: async (token) => getAuth().verifyIdToken(token),
         },
-        mutation || callMutation,
+        mutation || callMutation || attachmentMutation,
         true,
       );
       if (!ownerUserId) {
@@ -2689,8 +2693,12 @@ export const moolSocialChat = onRequest(
             ? await chatService().sendMessage(ownerUserId, body)
             : operation === "preparePhotoUpload"
               ? await chatService().preparePhotoUpload(ownerUserId, body)
+            : operation === "prepareAttachmentUpload"
+              ? await chatService().prepareAttachmentUpload(ownerUserId, body)
               : operation === "sendPhotoMessage"
                 ? await chatService().sendPhotoMessage(ownerUserId, body)
+              : operation === "sendAttachmentMessage"
+                ? await chatService().sendAttachmentMessage(ownerUserId, body)
               : operation === "setReaction"
                 ? await chatService().setReaction(ownerUserId, body)
                 : operation === "forwardMessage"
