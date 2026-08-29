@@ -10654,7 +10654,7 @@
       "rootCause": "The implementation relied on a generated Android library BuildConfig without first enabling that build feature under the current AGP configuration.",
       "prevention": "Any library source that uses BuildConfig explicitly enables android.buildFeatures.buildConfig, and the exact profile Kotlin compile must pass before packaging evidence closes.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-youtube-embedded-player-android.ps1"],
-      "evidence": ["docs/quality/FOUNDER-CORRECTIONS-READONLY-TOOLING-REJECTIONS-20260810.md", "apps/mobile/build/reports/problems/problems-report.html"]
+      "evidence": ["docs/quality/FOUNDER-CORRECTIONS-READONLY-TOOLING-REJECTIONS-20260810.md", "scripts/check-youtube-embedded-player-android.ps1"]
     },
     {
       "id": "REG-20260811-1066-FSC02C-COMPLETION-MANIFEST-HASH-RESEAL-ORDER-FAILURE",
@@ -34029,7 +34029,7 @@
       "rootCause": "The diagnostics report node shape was assumed from a conceptual label instead of projecting exact node types and bounded property names before selecting summary entries.",
       "prevention": "After refreshed generation, inspect only exact node types and bounded property names, locate the literal summary owner, reject empty identifiers/counts, and never infer warning classification from a null projection.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/reports/problems/problems-report.html"]
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
     },
     {
       "id": "REG-20260822-3220-SUBAGENT-RESUME-SUPPLIED-SHORTHAND-REGRESSION-ID",
@@ -44203,6 +44203,26 @@
       "prevention": "Inspect entry 1065 after registration, replace only its missing ephemeral evidence reference with exact durable tracked evidence that retains the same Android BuildConfig prevention, refresh the registry binding, and rerun the gate before source work.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-development-regression-memory.ps1", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3902-ANDROID-BUILDCONFIG-DURABLE-SOURCE-SEARCH-NO-MATCH",
+      "status": "registered_existing_gate_as_durable_evidence_required",
+      "appliesTo": ["primary", "coordination", "implementation", "android", "tooling"],
+      "mistake": "A targeted ripgrep for buildConfig or BuildConfig.DEBUG under apps/mobile/android returned exit 1 with no matches while repairing REG-20260811-1065 evidence.",
+      "rootCause": "The historical prevention is enforced by the dedicated tracked Android gate and its referenced owners, not by a current literal matching source line under the sparse apps/mobile/android tree.",
+      "prevention": "Do not broaden or repeat the source search. Replace only the missing ephemeral report in entry 1065 with scripts/check-youtube-embedded-player-android.ps1, retain its founder-corrections document, refresh policy binding and rerun the memory gate.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-youtube-embedded-player-android.ps1", "docs/quality/FOUNDER-CORRECTIONS-READONLY-TOOLING-REJECTIONS-20260810.md"]
+    },
+    {
+      "id": "REG-20260829-3903-REGISTRY-PRETTY-PRINTED-PATCH-CONTEXT-MISMATCH",
+      "status": "registered_raw_exact_line_context_required",
+      "appliesTo": ["primary", "coordination", "registry", "tooling"],
+      "mistake": "The first entry-1065 evidence correction used the pretty-printed ConvertTo-Json projection as apply_patch context, but the registry stores the evidence array compactly on one line, so verification failed without changing the file.",
+      "rootCause": "Rendered diagnostic formatting was mistaken for the owner's literal on-disk formatting.",
+      "prevention": "Locate the exact raw registry line with a fixed-string search, patch only that literal line, parse the complete JSON and verify entry 1065 independently before refreshing the policy binding.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-youtube-embedded-player-android.ps1"]
     }
   ]
 }
