@@ -43573,6 +43573,46 @@
       "prevention": "Run regression memory, incremental pre-build and APK state validation as three separate shell calls with their own exit metadata before the wrapper preflight.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-cross-agent-incremental-ticket-gate.ps1", "scripts/check-apk-regression-gate-state.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md"]
+    },
+    {
+      "id": "REG-20260829-3831-EMPTY-INBOX-ACTIONS-CROSSED-COMPACT-NAV-BOUNDARY-BY-THREE",
+      "status": "registered_asymmetric_bottom_reserve_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "fitment", "navigation", "testing"],
+      "mistake": "The first Open Feed/Person+ collision test found the separated compact action group ended at y=499 while the 320x568 navigation boundary begins at y=496.",
+      "rootCause": "A centered SliverFillRemaining empty state used symmetric padding and left no rounding reserve above the fixed NavigationBar.",
+      "prevention": "Give the empty inbox content an asymmetric bottom reserve, keep both actions at least 44 pixels, and require their final rects to remain wholly above the compact navigation boundary.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3832-EMPTY-INBOX-BOTTOM-RESERVE-PATCH-DID-NOT-MOVE-ACTIONS",
+      "status": "registered_exact_empty_owner_geometry_fix_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "fitment", "testing"],
+      "mistake": "The first asymmetric-padding correction left the compact empty-inbox action bottom unchanged at y=499, so the exact empty-state geometry owner was not corrected.",
+      "rootCause": "A similar Center/Padding pattern was patched without first proving that the modified range was the _EmptyInbox action owner and that its layout affected the action-group position.",
+      "prevention": "Read the exact _EmptyInbox range, bind a keyed action-group transform or alignment directly to that owner and verify its rect moves above y=496 before the full suite.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3833-COMPACT-NAV-BOUNDARY-TEST-HARDCODED-WRONG-Y",
+      "status": "registered_rendered_navigation_rect_oracle_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "fitment", "testing"],
+      "mistake": "The Open Feed/Person+ test assumed the NavigationBar began at y=496, but the rendered keyed NavigationBar begins at y=499 and the action ends exactly at that boundary.",
+      "rootCause": "A calculated viewport-minus-nominal-height constant replaced the final rendered navigation geometry.",
+      "prevention": "Compare action rects with the actual chat-native-navigation rect, require no overlap with each other or navigation, and remove padding added only to satisfy the false constant.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3834-EMPTY-INBOX-ACTION-OVERLAPPED-RENDERED-NAV-RECT",
+      "status": "registered_exact_action_and_nav_rect_projection_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "fitment", "navigation", "testing"],
+      "mistake": "The rendered-navigation oracle found one empty-inbox action rect still overlaps the live chat NavigationBar at compact size.",
+      "rootCause": "The prior y equality observation did not identify which action rect or the exact navigation top before the strict overlap assertion ran.",
+      "prevention": "Project feed, start and navigation rect scalars in the focused test, then shift the keyed action group by the smallest explicit layout offset that proves zero overlap and stable 44-pixel targets.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart", "apps/mobile/test/chat_flow_test.dart"]
     }
   ]
 }

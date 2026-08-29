@@ -3632,3 +3632,15 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3830 rejects combining regression-memory and incremental pre-build gates
   in one shell. Run each authoritative gate separately with its own exit before
   APK state validation and wrapper preflight.
+- REG3831 rejects empty inbox actions that cross the compact navigation boundary
+  by three pixels. Add an asymmetric bottom reserve and require both final 44+
+  pixel controls to remain fully above the fixed NavigationBar.
+- REG3832 rejects a bottom-reserve patch that does not move the actual empty
+  action group. Read the exact `_EmptyInbox` range and bind geometry directly
+  to its keyed controls before retrying the compact rect assertion.
+- REG3833 rejects a hardcoded compact NavigationBar y-coordinate. Compare the
+  action rects to the rendered `chat-native-navigation` rect and require exact
+  non-overlap instead of nominal-height arithmetic.
+- REG3834 rejects an empty action that still overlaps the rendered NavigationBar.
+  Project all three rects, then move the keyed action group by the smallest
+  explicit layout offset that preserves 44-pixel targets and proves zero overlap.
