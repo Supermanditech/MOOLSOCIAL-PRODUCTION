@@ -10,14 +10,13 @@ import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_session.dart';
 import '../../features/journey01/journey_services.dart';
 import '../profile/global_profile_panel_v2.dart';
-import '../universal/mool_contextual_chat_v2.dart';
 import '../universal/mool_global_navigation_v2.dart';
+import 'buy_v2_chat_route_adapter.dart';
 import 'buy_v2_catalogue.dart';
 import 'buy_v2_design.dart';
 import 'buy_v2_invoice.dart';
 import 'buy_v2_invoice_downloader.dart';
 import 'buy_v2_scanner.dart';
-import 'buy_v2_shop_chat.dart';
 import 'buy_v2_views.dart';
 
 class BuyV2Screen extends StatefulWidget {
@@ -38,14 +37,9 @@ class BuyV2Screen extends StatefulWidget {
     this.onOpenMool,
     this.onOpenMainAction,
     this.onOpenChat,
-    this.onShopChatAction,
-    this.onShopChatHandoff,
     this.onDestinationChanged,
     this.invoiceDownloader = saveBuyV2InvoiceToDevice,
     this.offersSource = const BuyV2CataloguePublishedOffersSource(),
-    this.shopChatSource = const BuyV2SessionShopChatProvisioningSource(),
-    this.contextualChatSource =
-        const MoolDefaultContextualChatProvisioningSource(),
     this.wholesaleTradeDecisionAdapter =
         const BuyV2UnavailableWholesaleTradeDecisionAdapter(),
   });
@@ -65,13 +59,9 @@ class BuyV2Screen extends StatefulWidget {
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec>? onOpenMainAction;
   final VoidCallback? onOpenChat;
-  final BuyV2ShopChatActionHandler? onShopChatAction;
-  final BuyV2ShopChatHandoffHandler? onShopChatHandoff;
   final ValueChanged<BuyV2Destination>? onDestinationChanged;
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final BuyV2PublishedOffersSource offersSource;
-  final BuyV2ShopChatProvisioningSource shopChatSource;
-  final MoolContextualChatProvisioningSource contextualChatSource;
   final BuyV2WholesaleTradeDecisionAdapter wholesaleTradeDecisionAdapter;
 
   @override
@@ -79,7 +69,6 @@ class BuyV2Screen extends StatefulWidget {
 }
 
 class _BuyV2ScreenState extends State<BuyV2Screen> {
-  final GlobalKey<BuyV2ShopChatViewState> _shopChatViewKey = GlobalKey();
   final MoolGlobalNavigationController _moolNavigationController =
       MoolGlobalNavigationController();
   Timer? _noticeTimer;
@@ -87,14 +76,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   bool _scannerBusy = false;
   bool _searchOpen = false;
   bool _offersActive = false;
-  bool _shopChatActive = false;
-  final Map<String, BuyV2ShopChatRetainedState> _shopChatRetainedStates = {};
-  BuyV2ShopChatFilter _shopChatInitialFilter = BuyV2ShopChatFilter.all;
-  String? _shopChatInitialFilterId;
-  BuyV2ShopChatPresentation _shopChatPresentation =
-      BuyV2ShopChatPresentation.shop;
-  String _shopChatOriginLabel = 'Shop';
-  int _shopChatMotionSequence = 0;
   BuyV2NavigationMotionDirection _surfaceMotionDirection =
       BuyV2NavigationMotionDirection.replace;
   final BuyV2GstInvoiceController _gstInvoiceController =
@@ -134,7 +115,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
 
   void _applyInitialState() {
     _offersActive = widget.initialOffersActive;
-    _shopChatActive = false;
     final productId = widget.productId;
     final orderId = widget.orderId;
     final recoveryKind = widget.recoveryKind;
@@ -145,10 +125,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     } else if (orderId != null &&
         (widget.initialView == BuyV2View.tracking ||
             widget.initialView == BuyV2View.assist)) {
-      final orderOpened = widget.session.openTracking(orderId);
-      if (orderOpened && widget.initialView == BuyV2View.assist) {
-        widget.session.openAssist();
-      }
+      widget.session.openTracking(orderId);
     } else if (widget.initialView == BuyV2View.cart) {
       widget.session.destination = widget.initialDestination;
       widget.session.openCart(scope: widget.initialCartScope);
@@ -168,12 +145,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         widget.session.view == BuyV2View.catalogue &&
         widget.session.destination != BuyV2Destination.shop) {
       _offersActive = false;
-    }
-    final careDestination =
-        widget.session.activeDockDestination == BuyV2Destination.medicine;
-    if (_shopChatActive &&
-        ((_shopChatPresentation.familyId == 'book') != careDestination)) {
-      _shopChatActive = false;
     }
     final destinationChanged =
         _lastSearchDestination != widget.session.destination;
@@ -233,7 +204,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     void openShopOrders() {
       setState(() {
         _offersActive = false;
-        _shopChatActive = false;
         _searchOpen = false;
       });
       session.openOrders();
@@ -242,7 +212,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     void openShopCart() {
       setState(() {
         _offersActive = false;
-        _shopChatActive = false;
         _searchOpen = false;
       });
       session.openCart(scope: BuyV2CartScope.shop);
@@ -251,7 +220,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     void openShopCatalogue() {
       setState(() {
         _offersActive = false;
-        _shopChatActive = false;
         _searchOpen = false;
       });
       session.openDestination(BuyV2Destination.shop);
@@ -335,9 +303,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     final session = widget.session;
     final careNavigation =
         session.activeDockDestination == BuyV2Destination.medicine;
-    final surfaceTheme = _shopChatActive
-        ? BuyV2ThemeSpec.resolve(BuyV2Destination.shop, BuyV2View.catalogue)
-        : BuyV2ThemeSpec.resolve(session.destination, session.view);
+    final surfaceTheme = BuyV2ThemeSpec.resolve(
+      session.destination,
+      session.view,
+    );
     return BuyV2ThemeScope(
       spec: surfaceTheme,
       child: PopScope<Object?>(
@@ -347,8 +316,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
             HapticFeedback.selectionClick();
             if (_moolNavigationController.isOpen) {
               unawaited(_moolNavigationController.close());
-            } else if (_shopChatActive) {
-              _handleShopChatBack();
             } else if (_searchOpen) {
               FocusScope.of(context).unfocus();
               setState(() => _searchOpen = false);
@@ -388,8 +355,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                       color: Colors.white.withValues(alpha: .94),
                       child: Column(
                         children: [
-                          if (session.view == BuyV2View.catalogue &&
-                              !_shopChatActive)
+                          if (session.view == BuyV2View.catalogue)
                             _BuySearchBand(
                               session: session,
                               offersActive: _offersActive,
@@ -423,18 +389,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                                 Positioned.fill(
                                   child: _BuyNavigationSurfaceOwner(
                                     key: ObjectKey(session),
-                                    stateKey: Object.hash(
-                                      session.navigationMotionSequence,
-                                      _shopChatMotionSequence,
-                                    ),
+                                    stateKey: session.navigationMotionSequence,
                                     direction: _surfaceMotionDirection,
                                     child: _BuyExpandCollapseOwner(
                                       key: ValueKey(
-                                        _shopChatActive
-                                            ? 'buy-shop-chat-owner-motion'
-                                            : _searchOpen &&
-                                                  session.destination !=
-                                                      BuyV2Destination.orders
+                                        _searchOpen &&
+                                                session.destination !=
+                                                    BuyV2Destination.orders
                                             ? 'buy-search-owner-motion-search'
                                             : 'buy-search-owner-motion-primary',
                                       ),
@@ -459,7 +420,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               ],
                             ),
                           ),
-                          if (!_shopChatActive && _showsMiniCart(session))
+                          if (_showsMiniCart(session))
                             _BuyMiniCartBar(session: session),
                         ],
                       ),
@@ -469,30 +430,28 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
               ),
             ),
           ),
-          bottomNavigationBar: _shopChatActive
-              ? null
-              : MoolDestinationNavigationV2(
-                  activeId: careNavigation ? 'book' : 'buy',
-                  destinationLabel: careNavigation ? 'Care' : 'Shop',
-                  selectedLocalIndex: careNavigation
-                      ? 1
-                      : _offersActive
-                      ? 2
-                      : switch (session.activeDockDestination) {
-                          BuyV2Destination.orders => 1,
-                          _ => 0,
-                        },
-                  localActionCount: 3,
-                  localNavigation: careNavigation
-                      ? _buildCareLocalNavigation()
-                      : _buildBuyLocalNavigation(session),
-                  onOpenMool: _openGlobalMool,
-                  onOpenAction: _openGlobalAction,
-                  onOpenChat: _openShopChat,
-                  moolNavigationController: _moolNavigationController,
-                  onPreviousLocalAction: () => _moveBuyLocal(session, -1),
-                  onNextLocalAction: () => _moveBuyLocal(session, 1),
-                ),
+          bottomNavigationBar: MoolDestinationNavigationV2(
+            activeId: careNavigation ? 'book' : 'buy',
+            destinationLabel: careNavigation ? 'Care' : 'Shop',
+            selectedLocalIndex: careNavigation
+                ? 1
+                : _offersActive
+                ? 2
+                : switch (session.activeDockDestination) {
+                    BuyV2Destination.orders => 1,
+                    _ => 0,
+                  },
+            localActionCount: 3,
+            localNavigation: careNavigation
+                ? _buildCareLocalNavigation()
+                : _buildBuyLocalNavigation(session),
+            onOpenMool: _openGlobalMool,
+            onOpenAction: _openGlobalAction,
+            onOpenChat: _openShopChat,
+            moolNavigationController: _moolNavigationController,
+            onPreviousLocalAction: () => _moveBuyLocal(session, -1),
+            onNextLocalAction: () => _moveBuyLocal(session, 1),
+          ),
         ),
       ),
     );
@@ -536,7 +495,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     HapticFeedback.selectionClick();
     setState(() {
       _offersActive = false;
-      _shopChatActive = false;
       _searchOpen = false;
     });
     if (destination == BuyV2Destination.orders) {
@@ -550,7 +508,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     HapticFeedback.selectionClick();
     setState(() {
       _offersActive = true;
-      _shopChatActive = false;
       _searchOpen = false;
     });
     widget.session.openDestination(BuyV2Destination.shop);
@@ -662,233 +619,41 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     );
   }
 
-  void _openGlobalChat() {
-    final onOpenChat = widget.onOpenChat;
-    if (onOpenChat != null) {
-      onOpenChat();
-      return;
-    }
-    final router = GoRouter.maybeOf(context);
-    final returnRoute = router?.routeInformationProvider.value.uri.toString();
-    context.push(
-      Uri(
-        path: '/app/chat/inbox',
-        queryParameters: {'return': returnRoute ?? '/app/buy'},
-      ).toString(),
-    );
-  }
-
-  void _openOrderAssistChat({String? intent, String? details}) {
+  void _openOrderHelpChat(BuyV2Order order) {
     final onOpenChat = widget.onOpenChat;
     final router = GoRouter.maybeOf(context);
     if (router == null) {
       if (onOpenChat != null) {
         onOpenChat();
       } else {
-        widget.session.showNotice(
-          'Chat is unavailable right now. Your question stays here.',
-        );
+        widget.session.openAssist();
       }
       return;
     }
     context.push(
-      const BuyV2ShopChatRouteAdapter().orderAssistLocationFor(
-        orderId: widget.session.assistOrder.id,
-        intent: intent,
-        details: details,
-      ),
+      const BuyV2ChatRouteAdapter().orderHelpLocationFor(orderId: order.id),
     );
-  }
-
-  void _handoffShopChatAction(
-    BuyV2ShopChatThread thread,
-    BuyV2ShopChatAction action,
-  ) {
-    final externalHandoff = widget.onShopChatHandoff;
-    if (externalHandoff != null) {
-      externalHandoff(thread, action);
-      return;
-    }
-    final onOpenChat = widget.onOpenChat;
-    if (onOpenChat != null) {
-      onOpenChat();
-      return;
-    }
-    final router = GoRouter.maybeOf(context);
-    final currentRoute =
-        router?.routeInformationProvider.value.uri.toString() ?? '/app/buy';
-    final returnRoute = _shopChatReturnRouteFor(thread, currentRoute);
-    final draft = action.kind == BuyV2ShopChatActionKind.sendText
-        ? action.text?.trim()
-        : null;
-    context.push(
-      Uri(
-        path: '/app/chat/inbox',
-        queryParameters: {
-          'type': thread.productionChatType,
-          if (draft != null && draft.isNotEmpty) 'draft': draft,
-          'return': returnRoute,
-        },
-      ).toString(),
-    );
-  }
-
-  String _shopChatReturnRouteFor(
-    BuyV2ShopChatThread thread,
-    String currentRoute,
-  ) {
-    if (_shopChatPresentation.familyId == 'book') {
-      final subAction = thread.resolvedFilterId;
-      if (subAction == 'medicine' && _shopChatInitialFilterId == 'medicine') {
-        return currentRoute;
-      }
-      return Uri(
-        path: '/app/book',
-        queryParameters: {'sub': subAction},
-      ).toString();
-    }
-    final target = thread.commerceTarget;
-    final matchesOrigin = switch (target) {
-      BuyV2ShopChatCommerceTarget.shop =>
-        _shopChatInitialFilter == BuyV2ShopChatFilter.all,
-      BuyV2ShopChatCommerceTarget.wholesale =>
-        _shopChatInitialFilter == BuyV2ShopChatFilter.sellers,
-      BuyV2ShopChatCommerceTarget.orders =>
-        _shopChatInitialFilter == BuyV2ShopChatFilter.orders,
-      BuyV2ShopChatCommerceTarget.offers =>
-        _shopChatInitialFilter == BuyV2ShopChatFilter.offers,
-      null => true,
-    };
-    if (matchesOrigin) return currentRoute;
-    return switch (target) {
-      BuyV2ShopChatCommerceTarget.shop => '/app/buy',
-      BuyV2ShopChatCommerceTarget.wholesale => '/app/buy?sub=wholesale',
-      BuyV2ShopChatCommerceTarget.orders => '/app/buy?sub=orders',
-      BuyV2ShopChatCommerceTarget.offers => '/app/buy?sub=offers',
-      null => currentRoute,
-    };
   }
 
   void _openShopChat() {
     HapticFeedback.selectionClick();
     FocusScope.of(context).unfocus();
     final router = GoRouter.maybeOf(context);
-    if (router != null) {
-      final currentRoute = router.routeInformationProvider.value.uri.toString();
-      context.push(
-        const BuyV2ShopChatRouteAdapter().locationFor(
-          currentRoute: currentRoute,
-          destination: widget.session.activeDockDestination,
-          offersActive: _offersActive,
-        ),
-      );
+    if (router == null) {
+      widget.onOpenChat?.call();
       return;
     }
-    final careChat =
-        widget.session.activeDockDestination == BuyV2Destination.medicine;
-    setState(() {
-      _shopChatPresentation = careChat
-          ? MoolContextualChatCatalog.care
-          : BuyV2ShopChatPresentation.shop;
-      _shopChatInitialFilterId = careChat ? 'medicine' : null;
-      _shopChatOriginLabel = careChat
-          ? 'Medicine'
-          : _offersActive
-          ? 'Offers'
-          : switch (widget.session.activeDockDestination) {
-              BuyV2Destination.orders => 'Orders',
-              BuyV2Destination.wholesale => 'Wholesale',
-              _ => 'Shop',
-            };
-      _shopChatInitialFilter = careChat
-          ? BuyV2ShopChatFilter.sellers
-          : _offersActive
-          ? BuyV2ShopChatFilter.offers
-          : switch (widget.session.activeDockDestination) {
-              BuyV2Destination.orders => BuyV2ShopChatFilter.orders,
-              BuyV2Destination.wholesale => BuyV2ShopChatFilter.sellers,
-              _ => BuyV2ShopChatFilter.all,
-            };
-      _shopChatActive = true;
-      _searchOpen = false;
-      _shopChatMotionSequence += 1;
-      _surfaceMotionDirection = BuyV2NavigationMotionDirection.forward;
-    });
-  }
-
-  void _closeShopChat() {
-    HapticFeedback.selectionClick();
-    setState(() {
-      _shopChatActive = false;
-      _shopChatMotionSequence += 1;
-      _surfaceMotionDirection = BuyV2NavigationMotionDirection.back;
-    });
-  }
-
-  void _handleShopChatBack() {
-    if (_shopChatViewKey.currentState?.handleBack() ?? false) return;
-    _closeShopChat();
-  }
-
-  void _openShopChatCommerce(BuyV2ShopChatCommerceTarget target) {
-    switch (target) {
-      case BuyV2ShopChatCommerceTarget.shop:
-        _openBuyDestination(BuyV2Destination.shop);
-      case BuyV2ShopChatCommerceTarget.wholesale:
-        _openBuyDestination(BuyV2Destination.wholesale);
-      case BuyV2ShopChatCommerceTarget.orders:
-        _openBuyDestination(BuyV2Destination.orders);
-      case BuyV2ShopChatCommerceTarget.offers:
-        _openOffers();
-    }
-  }
-
-  void _openCareChatContext(BuyV2ShopChatThread thread) {
-    final subAction = thread.resolvedFilterId;
-    _closeShopChat();
-    if (subAction == 'medicine') {
-      return;
-    }
-    openMoolConnectedRoute(
-      context,
-      activeFamilyId: 'book',
-      route: Uri(
-        path: '/app/book',
-        queryParameters: {'sub': subAction},
-      ).toString(),
+    final currentRoute = router.routeInformationProvider.value.uri.toString();
+    context.push(
+      const BuyV2ChatRouteAdapter().locationFor(
+        currentRoute: currentRoute,
+        destination: widget.session.activeDockDestination,
+        offersActive: _offersActive,
+      ),
     );
   }
 
   Widget _currentView(BuyV2Session session) {
-    if (_shopChatActive) {
-      final careChat = _shopChatPresentation.familyId == 'book';
-      final retainedStateKey =
-          '${_shopChatPresentation.familyId}|$_shopChatOriginLabel|${_shopChatInitialFilterId ?? _shopChatInitialFilter.name}';
-      return BuyV2ShopChatView(
-        key: _shopChatViewKey,
-        session: session,
-        originLabel: _shopChatOriginLabel,
-        initialFilter: _shopChatInitialFilter,
-        initialFilterId: _shopChatInitialFilterId,
-        presentation: _shopChatPresentation,
-        onBack: _closeShopChat,
-        onOpenProductionChat: _openGlobalChat,
-        provisioningSource: careChat
-            ? MoolContextualChatSourceAdapter(
-                familyId: 'book',
-                source: widget.contextualChatSource,
-              )
-            : widget.shopChatSource,
-        retainedState: _shopChatRetainedStates.putIfAbsent(
-          retainedStateKey,
-          BuyV2ShopChatRetainedState.new,
-        ),
-        onAction: widget.onShopChatAction,
-        onHandoff: _handoffShopChatAction,
-        onOpenCommerce: careChat ? null : _openShopChatCommerce,
-        onOpenThreadContext: careChat ? _openCareChatContext : null,
-      );
-    }
     if (_offersActive && session.view == BuyV2View.catalogue) {
       return BuyV2OffersView(session: session, source: widget.offersSource);
     }
@@ -896,6 +661,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         session.view == BuyV2View.catalogue) {
       return BuyV2OrdersView(
         session: session,
+        onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
         browseProducts: session.visibleProducts.isEmpty
             ? null
@@ -939,19 +705,24 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       ),
       BuyV2View.tracking => BuyV2TrackingView(
         session: session,
+        onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
       ),
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
       BuyV2View.assist => BuyV2AssistView(
         session: session,
-        onOpenChat: _openOrderAssistChat,
+        onOpenChat: ({intent, details}) =>
+            _openOrderHelpChat(session.assistOrder),
       ),
       BuyV2View.account => BuyV2AccountView(
         session: session,
         accountIdentity: widget.accountIdentity,
         accountAuthenticated: widget.accountAuthenticated,
       ),
-      BuyV2View.recovery => BuyV2RecoveryView(session: session),
+      BuyV2View.recovery => BuyV2RecoveryView(
+        session: session,
+        onOpenOrderHelp: _openOrderHelpChat,
+      ),
     };
   }
 }

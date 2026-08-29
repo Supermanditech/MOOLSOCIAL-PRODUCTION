@@ -100,7 +100,12 @@ class ChatEntryContext {
     icon: Icons.shopping_bag_outlined,
     accent: Color(0xFF7A4D10),
     defaultFilter: ChatThreadType.order,
-    allowedThreadIds: {'shop-order', 'shop-partner', 'shop-offers'},
+    allowedThreadIds: {
+      'shop-assist',
+      'shop-order',
+      'shop-partner',
+      'shop-offers',
+    },
   );
 
   static const food = ChatEntryContext(

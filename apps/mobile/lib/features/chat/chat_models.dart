@@ -45,6 +45,7 @@ class ChatThread {
     this.unreadCount = 0,
     this.verified = false,
     this.safetyTarget,
+    this.suggestedPrompts = const [],
   });
 
   final String id;
@@ -56,6 +57,7 @@ class ChatThread {
   final int unreadCount;
   final bool verified;
   final ChatSafetyTarget? safetyTarget;
+  final List<String> suggestedPrompts;
 
   ChatSafetyTarget get effectiveSafetyTarget =>
       safetyTarget ??

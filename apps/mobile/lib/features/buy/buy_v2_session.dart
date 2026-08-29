@@ -2230,9 +2230,7 @@ class BuyV2Session extends ChangeNotifier {
 
   bool openRecoveryOrderHelp() {
     if (!canOpenRecoveryOrderHelp) return false;
-    if (!_restoreRecoveryOrigin(notify: false)) return false;
-    openAssist();
-    return true;
+    return _restoreRecoveryOrigin();
   }
 
   void _clearRecoveryOriginIfActive() {

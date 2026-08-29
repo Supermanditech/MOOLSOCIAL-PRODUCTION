@@ -18,6 +18,7 @@ class ChatThreadScreen extends StatefulWidget {
     required this.threadId,
     required this.returnRoute,
     this.initialMessageDraft,
+    this.returnDirectToOrigin = false,
     super.key,
   });
 
@@ -25,6 +26,7 @@ class ChatThreadScreen extends StatefulWidget {
   final String threadId;
   final String returnRoute;
   final String? initialMessageDraft;
+  final bool returnDirectToOrigin;
 
   @override
   State<ChatThreadScreen> createState() => _ChatThreadScreenState();
@@ -129,6 +131,19 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     }
   }
 
+  void _applySuggestedPrompt(String prompt) {
+    final existing = _messageController.text.trim();
+    final next = existing.isEmpty
+        ? prompt
+        : existing.contains(prompt)
+        ? existing
+        : '$existing\n$prompt';
+    _messageController.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
+  }
+
   Future<void> _recoverInterruptedPhoto(String threadId) async {
     final session = widget.session;
     if (!session.photoSharingAvailable ||
@@ -192,7 +207,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
             returnUri?.pathSegments[0] == 'app' &&
             returnUri?.pathSegments[1] == 'chat' &&
             returnUri?.pathSegments[2] == 'thread';
-        final backRoute = returnsToChatThread
+        final backRoute = widget.returnDirectToOrigin
+            ? widget.returnRoute
+            : returnsToChatThread
             ? widget.returnRoute
             : chatRoute(
                 '/app/chat/inbox',
@@ -285,13 +302,23 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                 ? 'chat-composer-active'
                 : 'chat-composer-paused',
             child: widget.session.chatAvailableForSession(thread.id)
-                ? _Composer(
-                    key: _composerKey,
-                    session: widget.session,
-                    threadId: thread.id,
-                    controller: _messageController,
-                    onSend: _sendCurrentMessage,
-                    onSendPhoto: _sendCurrentPhoto,
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (thread.suggestedPrompts.isNotEmpty)
+                        _SuggestedPromptStrip(
+                          values: thread.suggestedPrompts,
+                          onSelected: _applySuggestedPrompt,
+                        ),
+                      _Composer(
+                        key: _composerKey,
+                        session: widget.session,
+                        threadId: thread.id,
+                        controller: _messageController,
+                        onSend: _sendCurrentMessage,
+                        onSendPhoto: _sendCurrentPhoto,
+                      ),
+                    ],
                   )
                 : _ChatPausedBar(
                     onResume: () => widget.session.setChatAvailableForSession(
@@ -302,6 +329,41 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _SuggestedPromptStrip extends StatelessWidget {
+  const _SuggestedPromptStrip({required this.values, required this.onSelected});
+
+  final List<String> values;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('chat-suggested-prompts'),
+      width: double.infinity,
+      color: MoolColors.canvas,
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 2),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final (index, value) in values.indexed) ...[
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: ActionChip(
+                  key: Key('chat-suggested-prompt-$index'),
+                  label: Text(value),
+                  onPressed: () => onSelected(value),
+                ),
+              ),
+              if (index != values.length - 1) const SizedBox(width: 8),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

@@ -123,6 +123,7 @@ void main() {
       {'ride-support'},
     );
     expect(ChatEntryContext.resolve('/app/buy?sub=shop').allowedThreadIds, {
+      'shop-assist',
       'shop-order',
       'shop-partner',
       'shop-offers',

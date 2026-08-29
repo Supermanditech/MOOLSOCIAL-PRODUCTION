@@ -53,6 +53,16 @@ class ChatSession extends ChangeNotifier {
           mine: false,
         ),
       ],
+      'shop-assist': [
+        const ChatMessage(
+          id: 'shop-assist-1',
+          sender: 'MoolSocial Assist',
+          text:
+              'Choose an order question below or write what you need help with.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
       'rasoi': [
         const ChatMessage(
           id: 'm6',
@@ -136,6 +146,21 @@ class ChatSession extends ChangeNotifier {
       type: ChatThreadType.support,
       unreadCount: 1,
       verified: true,
+    ),
+    ChatThread(
+      id: 'shop-assist',
+      title: 'MoolSocial Assist',
+      subtitle: 'Shop orders and purchase help',
+      preview: 'Choose an order question to continue.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
+      verified: true,
+      suggestedPrompts: [
+        'Where is my order?',
+        'Cancel or change order',
+        'Change delivery',
+        'Problem with an item',
+      ],
     ),
     ChatThread(
       id: 'shop-order',
