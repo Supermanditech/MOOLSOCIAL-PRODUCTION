@@ -44283,6 +44283,16 @@
       "prevention": "Bind clean Child 6 from the Child 5 bootstrap HEAD, add exactly buy_v2_shop_chat.dart to the recorded claim, pass task_start before applying the three retained Buy changes, and require implementation gate success before testing or committing.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD6-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3910-SHOP-CHAT-FOCUSED-TEST-OWNER-OMITTED-FROM-CLAIM",
+      "status": "registered_complete_three_owner_claim_required",
+      "appliesTo": ["primary", "coordination", "implementation", "buy", "chat", "testing", "git"],
+      "mistake": "After adding the adapter source owner, Child 6 implementation gate rejected apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart because the exact focused test was also absent from the inherited claim.",
+      "rootCause": "The correction verified only the first rejected owner instead of asserting that all three intended changed owners were present before creating Child 6.",
+      "prevention": "Bind clean Child 7, add the exact focused test owner, and before commit assert the active claim contains buy_v2_screen.dart, buy_v2_shop_chat.dart and buy_v2_shop_chat_test.dart. Pass task_start and implementation before formatting or testing.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD7-20260829.md"]
     }
   ]
 }
