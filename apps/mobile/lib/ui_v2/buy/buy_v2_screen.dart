@@ -745,6 +745,18 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   void _openShopChat() {
     HapticFeedback.selectionClick();
     FocusScope.of(context).unfocus();
+    final router = GoRouter.maybeOf(context);
+    if (router != null) {
+      final currentRoute = router.routeInformationProvider.value.uri.toString();
+      context.push(
+        const BuyV2ShopChatRouteAdapter().locationFor(
+          currentRoute: currentRoute,
+          destination: widget.session.activeDockDestination,
+          offersActive: _offersActive,
+        ),
+      );
+      return;
+    }
     final careChat =
         widget.session.activeDockDestination == BuyV2Destination.medicine;
     setState(() {

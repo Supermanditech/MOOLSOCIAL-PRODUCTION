@@ -8,6 +8,64 @@ import 'buy_v2_shop_chat_motion.dart';
 
 enum BuyV2ShopChatFilter { all, orders, sellers, offers }
 
+/// Thin Buy-owned entry adapter for the authoritative shared Chat shell.
+///
+/// Shared Chat owns inbox, thread, composer, attachments, people, info,
+/// settings and recovery. Buy contributes only the originating commerce
+/// context and the exact route Android Back must recover.
+@immutable
+class BuyV2ShopChatRouteAdapter {
+  const BuyV2ShopChatRouteAdapter();
+
+  String locationFor({
+    required String currentRoute,
+    required BuyV2Destination destination,
+    required bool offersActive,
+  }) {
+    final returnRoute = _returnRouteFor(
+      currentRoute: currentRoute,
+      destination: destination,
+      offersActive: offersActive,
+    );
+    final type = offersActive
+        ? 'support'
+        : switch (destination) {
+            BuyV2Destination.orders => 'order',
+            BuyV2Destination.wholesale => 'business',
+            BuyV2Destination.medicine => 'business',
+            BuyV2Destination.shop => null,
+          };
+    final queryParameters = <String, String>{'return': returnRoute};
+    if (type != null) {
+      queryParameters['type'] = type;
+    }
+    return Uri(
+      path: '/app/chat/inbox',
+      queryParameters: queryParameters,
+    ).toString();
+  }
+
+  String _returnRouteFor({
+    required String currentRoute,
+    required BuyV2Destination destination,
+    required bool offersActive,
+  }) {
+    final parsed = Uri.tryParse(currentRoute);
+    if (parsed != null &&
+        parsed.path.startsWith('/app/') &&
+        !parsed.path.startsWith('/app/chat')) {
+      return currentRoute;
+    }
+    if (offersActive) return '/app/buy?sub=offers';
+    return switch (destination) {
+      BuyV2Destination.orders => '/app/buy?sub=orders',
+      BuyV2Destination.wholesale => '/app/buy?sub=wholesale',
+      BuyV2Destination.medicine => '/app/book?sub=medicine',
+      BuyV2Destination.shop => '/app/buy',
+    };
+  }
+}
+
 @immutable
 class BuyV2ShopChatFilterSpec {
   const BuyV2ShopChatFilterSpec({

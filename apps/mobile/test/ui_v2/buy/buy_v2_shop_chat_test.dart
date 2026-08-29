@@ -51,6 +51,65 @@ void main() {
     );
   }
 
+  test('Shop Chat route adapter preserves commerce context and return', () {
+    const adapter = BuyV2ShopChatRouteAdapter();
+    const cases =
+        <
+          ({
+            BuyV2Destination destination,
+            bool offersActive,
+            String origin,
+            String? type,
+          })
+        >[
+          (
+            destination: BuyV2Destination.shop,
+            offersActive: false,
+            origin: '/app/buy',
+            type: null,
+          ),
+          (
+            destination: BuyV2Destination.orders,
+            offersActive: false,
+            origin: '/app/buy?sub=orders',
+            type: 'order',
+          ),
+          (
+            destination: BuyV2Destination.wholesale,
+            offersActive: false,
+            origin: '/app/buy?sub=wholesale',
+            type: 'business',
+          ),
+          (
+            destination: BuyV2Destination.shop,
+            offersActive: true,
+            origin: '/app/buy?sub=offers',
+            type: 'support',
+          ),
+          (
+            destination: BuyV2Destination.medicine,
+            offersActive: false,
+            origin: '/app/book?sub=medicine',
+            type: 'business',
+          ),
+        ];
+
+    for (final entry in cases) {
+      final uri = Uri.parse(
+        adapter.locationFor(
+          currentRoute: entry.origin,
+          destination: entry.destination,
+          offersActive: entry.offersActive,
+        ),
+      );
+      expect(uri.path, '/app/chat/inbox', reason: entry.origin);
+      expect(uri.queryParameters['type'], entry.type, reason: entry.origin);
+      expect(uri.queryParameters['return'], entry.origin, reason: entry.origin);
+      expect(uri.queryParameters.containsKey('start'), isFalse);
+      expect(uri.queryParameters.containsKey('draft'), isFalse);
+    }
+  });
+
   testWidgets(
     'Shop Chat opens a conversation and delegates send to production Chat',
     (tester) async {
@@ -153,7 +212,7 @@ void main() {
   );
 
   testWidgets(
-    'Shop Chat handoff carries draft category and exact return route',
+    'Shop Chat opens shared Chat and Android Back restores exact Buy origin',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(390, 844);
@@ -192,29 +251,26 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('mool-global-chat-tap')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-new')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('buy-shop-chat-new-wholesale-partner')),
-      );
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('buy-shop-chat-composer-field')),
-        'Please check local delivery',
-      );
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('buy-shop-chat-send')));
-      await tester.pumpAndSettle();
 
       expect(find.text('Production Chat inbox'), findsOneWidget);
       expect(handoffUri?.path, '/app/chat/inbox');
-      expect(handoffUri?.queryParameters['type'], 'business');
-      expect(
-        handoffUri?.queryParameters['draft'],
-        'Please check local delivery',
-      );
-      expect(handoffUri?.queryParameters['return'], '/app/buy?sub=wholesale');
+      expect(handoffUri?.queryParameters.containsKey('type'), isFalse);
+      expect(handoffUri?.queryParameters['return'], '/app/buy');
       expect(handoffUri?.queryParameters.containsKey('start'), isFalse);
+      expect(handoffUri?.queryParameters.containsKey('draft'), isFalse);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Production Chat inbox'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('buy-local-destination-tabs')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('mool-global-chat-tap')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     },
   );
