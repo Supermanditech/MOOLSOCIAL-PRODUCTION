@@ -147,14 +147,19 @@ void main() {
       await tapVisible(tester, const Key('chat-section-chats'));
       await tapVisible(tester, const Key('chat-filter-all'));
 
-      await tapVisible(tester, const Key('chat-voice-search'));
-      await tapVisible(tester, const Key('chat-use-voice-search'));
+      await tapVisible(tester, const Key('chat-search-assistance'));
+      expect(
+        find.text('Type a person, business, order or case.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Speak'), findsNothing);
+      await tapVisible(tester, const Key('chat-use-search-assistance'));
       expect(find.text('Enter a conversation name.'), findsOneWidget);
       await tester.enterText(
-        find.byKey(const Key('chat-voice-search-field')),
+        find.byKey(const Key('chat-search-assistance-field')),
         'Fresh Basket',
       );
-      await tapVisible(tester, const Key('chat-use-voice-search'));
+      await tapVisible(tester, const Key('chat-use-search-assistance'));
       expect(
         find.byKey(const Key('chat-open-thread-shop-order')),
         findsOneWidget,
@@ -168,6 +173,68 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Android Back dismisses transient Chat surfaces before leaving their owner',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+      await mount(
+        tester,
+        route: '/app/chat/inbox?return=/app/mool',
+        journey: journey,
+        chat: chat,
+      );
+
+      await tapVisible(tester, const Key('chat-search-assistance'));
+      expect(
+        find.byKey(const Key('chat-search-assistance-field')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('chat-search-assistance-field')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-open-thread-home-basket'));
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-message-actions')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-message-actions')), findsNothing);
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-voice-message'));
+      expect(
+        find.byKey(const Key('chat-voice-message-recovery')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('chat-voice-message-recovery')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-thread-video'));
+      expect(find.byKey(const Key('chat-video-recovery')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-video-recovery')), findsNothing);
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -416,6 +483,97 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'People search, clear and disconnect complete without a dead end',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final journey = await readyJourney();
+      final socialGateway = _PeopleSocialGateway();
+      final shared = SharedSession(socialContentGateway: socialGateway);
+      final chat = ChatSession.production(gateway: _PeopleChatGateway());
+      addTearDown(journey.dispose);
+      addTearDown(shared.dispose);
+      addTearDown(chat.dispose);
+
+      await mount(
+        tester,
+        route: '/app/chat/inbox?return=/app/mool',
+        journey: journey,
+        chat: chat,
+        sharedSession: shared,
+      );
+      await tapVisible(tester, const Key('chat-section-discover'));
+
+      await tester.enterText(
+        find.byKey(const Key('chat-people-search')),
+        'Bharat',
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-person-person-a')), findsNothing);
+      expect(find.byKey(const Key('chat-person-person-b')), findsOneWidget);
+      await tapVisible(tester, const Key('chat-people-search-clear'));
+      expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+      expect(find.byKey(const Key('chat-person-person-b')), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-person-connect-person-a'));
+      expect(socialGateway.followed['person-a'], isTrue);
+      await tapVisible(tester, const Key('chat-section-people'));
+      expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+      await tapVisible(tester, const Key('chat-person-connect-person-a'));
+      expect(socialGateway.followed['person-a'], isFalse);
+      expect(find.text('No connected people yet'), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-people-open-discover'));
+      expect(
+        find.byKey(const ValueKey('chat-section-body-discover')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('chat-person-message-person-a')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('People first-load error retries into the completed directory', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final socialGateway = _RetryPeopleSocialGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    final chat = ChatSession.production(gateway: _PeopleChatGateway());
+    addTearDown(journey.dispose);
+    addTearDown(shared.dispose);
+    addTearDown(chat.dispose);
+
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/mool',
+      journey: journey,
+      chat: chat,
+      sharedSession: shared,
+    );
+    await tapVisible(tester, const Key('chat-section-discover'));
+
+    expect(socialGateway.feedCalls, 1);
+    expect(find.byKey(const Key('chat-people-retry')), findsOneWidget);
+    expect(find.byKey(const Key('chat-person-person-a')), findsNothing);
+    await tapVisible(tester, const Key('chat-people-retry'));
+
+    expect(socialGateway.feedCalls, 2);
+    expect(find.byKey(const Key('chat-people-retry')), findsNothing);
+    expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+    expect(find.byKey(const Key('chat-person-person-b')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Chat keeps a high-contrast add-person action on a native root', (
     tester,
@@ -843,6 +1001,19 @@ class _PeopleSocialGateway
   @override
   Future<SocialPublishedItem> publish(SocialPublishDraft draft) =>
       Future.error(UnsupportedError('Not used by this test.'));
+}
+
+class _RetryPeopleSocialGateway extends _PeopleSocialGateway {
+  int feedCalls = 0;
+
+  @override
+  Future<SocialFeedPage> feed({String? cursor, int limit = 20}) async {
+    feedCalls += 1;
+    if (feedCalls == 1) {
+      throw StateError('temporary people directory failure');
+    }
+    return super.feed(cursor: cursor, limit: limit);
+  }
 }
 
 SocialPublishedItem _post(

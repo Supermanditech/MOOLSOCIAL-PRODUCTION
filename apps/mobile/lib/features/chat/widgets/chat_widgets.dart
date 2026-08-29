@@ -13,14 +13,49 @@ void chatGoBack(BuildContext context, String returnRoute) {
   context.go(returnRoute.startsWith('/app/') ? returnRoute : '/app/social');
 }
 
-String chatRoute(String path, {required String returnRoute, String? draft}) {
+String chatRoute(
+  String path, {
+  required String returnRoute,
+  String? draft,
+  String? filter,
+}) {
   return Uri(
     path: path,
     queryParameters: {
       'return': returnRoute,
       if (draft != null && draft.trim().isNotEmpty) 'draft': draft,
+      if (filter != null && filter.trim().isNotEmpty) 'type': filter,
     },
   ).toString();
+}
+
+class ChatBottomSheetSafeArea extends StatelessWidget {
+  const ChatBottomSheetSafeArea({
+    required this.bottomInset,
+    required this.exportedSemanticsClearance,
+    required this.child,
+    super.key,
+  });
+
+  final double bottomInset;
+  final double exportedSemanticsClearance;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseBottomPadding = bottomInset > MoolSpacing.md
+        ? bottomInset
+        : MoolSpacing.md;
+    final bottomPadding = baseBottomPadding + exportedSemanticsClearance;
+    return SafeArea(
+      top: false,
+      bottom: false,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomPadding),
+        child: child,
+      ),
+    );
+  }
 }
 
 class ChatPageScaffold extends StatelessWidget {
