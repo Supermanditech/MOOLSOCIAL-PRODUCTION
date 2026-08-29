@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moolsocial/features/retailer/retailer_models.dart';
 import 'package:moolsocial/features/retailer/retailer_services.dart';
 import 'package:moolsocial/features/retailer/retailer_session.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
@@ -87,6 +88,42 @@ void main() {
     },
   );
 
+  test('production gateway decodes persisted retailer order states', () async {
+    final transport = _RecordingTransport([
+      SocialContentResponse(
+        statusCode: 200,
+        body: jsonEncode({
+          'ok': true,
+          'data': {
+            'orders': [_order(stage: 'returned')],
+          },
+        }),
+      ),
+      SocialContentResponse(
+        statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': _order(stage: 'accepted')}),
+      ),
+    ]);
+    final gateway = AuthenticatedRetailerGateway(
+      endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace',
+      ),
+      credentials: _RecordingCredentials(),
+      transport: transport,
+      random: Random(4),
+    );
+
+    final orders = await gateway.refreshOrders();
+    await gateway.acceptOrder('MS-2841');
+
+    expect(orders.single.stage, RetailerOrderStage.returned);
+    expect(orders.single.lines.single.name, 'Aashirvaad Atta');
+    expect(transport.bodies.map((body) => body['operation']), [
+      'listRetailerOrders',
+      'acceptRetailerOrder',
+    ]);
+  });
+
   test(
     'product save validates margin before sending and then updates stock',
     () async {
@@ -121,6 +158,27 @@ void main() {
       );
       expect(product.stock, 8);
       expect(product.price, 58);
+    },
+  );
+
+  test(
+    'production delivery stops at real captain and OTP boundaries',
+    () async {
+      final gateway = ReviewRetailerGateway();
+      final session = RetailerSession.production(gateway: gateway);
+      addTearDown(session.dispose);
+      await session.loadInitialStore();
+      final order = session.openOrder('MS-2841')
+        ..stage = RetailerOrderStage.packed;
+
+      expect(await session.requestDelivery(), isTrue);
+      expect(order.stage, RetailerOrderStage.deliveryRequested);
+      expect(order.captainName, isNull);
+
+      order.stage = RetailerOrderStage.captainArrived;
+      expect(session.verifyHandoverOtp('2841'), isFalse);
+      expect(order.stage, RetailerOrderStage.captainArrived);
+      expect(session.errorMessage, contains('unavailable right now'));
     },
   );
 }
@@ -180,3 +238,24 @@ SocialContentResponse _store({
     },
   }),
 );
+
+Map<String, Object?> _order({required String stage}) => {
+  'id': 'MS-2841',
+  'customer': 'Amit Sharma',
+  'area': 'Sardarpura · 2.1 km',
+  'payment': 'Paid online · ₹1,240 protected',
+  'fulfilment': 'Home delivery',
+  'deliveryPromise': 'Deliver by 8:15 PM',
+  'amount': 1240,
+  'stage': stage,
+  'lines': [
+    {
+      'id': 'atta',
+      'name': 'Aashirvaad Atta',
+      'detail': '1 kg',
+      'quantity': 2,
+      'amount': 110,
+      'packed': stage != 'received',
+    },
+  ],
+};
