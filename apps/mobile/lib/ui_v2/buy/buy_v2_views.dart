@@ -1631,9 +1631,6 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
     final savings = mrp == null || mrp <= facts.price
         ? null
         : mrp - facts.price;
-    final partnerProducts = product.destination == BuyV2Destination.wholesale
-        ? session.supplierContinuationsFor(product)
-        : session.sellerContinuationsFor(product);
     return Semantics(
       key: ValueKey('buy-product-offer-decision-${product.id}'),
       container: true,
@@ -1698,33 +1695,6 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                 label: 'Fulfilment',
                 value: buyV2AutomaticFulfilmentLabel(product.destination),
               ),
-              if (partnerProducts.isEmpty)
-                _DecisionRow(
-                  icon: Icons.storefront_outlined,
-                  label: product.partnerRole,
-                  value: facts.partner,
-                )
-              else
-                _DecisionActionRow(
-                  key: ValueKey(
-                    product.destination == BuyV2Destination.wholesale
-                        ? 'buy-wholesale-supplier-action-${product.id}'
-                        : 'buy-shop-seller-action-${product.id}',
-                  ),
-                  icon: Icons.storefront_outlined,
-                  label: product.partnerRole,
-                  value: facts.partner,
-                  detail:
-                      '${partnerProducts.length} other current ${product.destination == BuyV2Destination.wholesale ? 'packs' : 'products'}',
-                  semanticLabel:
-                      'View ${partnerProducts.length} more products from ${facts.partner} in the current ${product.destination.label} catalogue',
-                  onTap: () => _showPartnerProductsSheet(
-                    context,
-                    session,
-                    product,
-                    partnerProducts,
-                  ),
-                ),
               _DecisionRow(
                 icon: Icons.location_on_outlined,
                 label: 'Deliver to',
@@ -6095,84 +6065,112 @@ class BuyV2TrackingView extends StatelessWidget {
     if (order == null) {
       return _MissingOrderSelection(session: session);
     }
+    final returnToOrders = IntrinsicWidth(
+      child: _ReturnAffordance(
+        key: const ValueKey('buy-tracking-return-orders'),
+        label: 'Orders',
+        onTap: session.returnToOrders,
+      ),
+    );
+    final orderHeading = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          order.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: context.buyTitle.copyWith(fontSize: 16),
+        ),
+        Text(order.id, style: context.buyMeta.copyWith(fontSize: 8)),
+      ],
+    );
+    final refreshOrder = IconButton(
+      key: ValueKey('buy-tracking-refresh-${order.id}'),
+      tooltip: 'Refresh order',
+      onPressed: session.orderRefreshBusy(order.id)
+          ? null
+          : () => session.refreshOrder(order.id),
+      constraints: const BoxConstraints.tightFor(
+        width: BuyV2Metrics.minimumTap,
+        height: BuyV2Metrics.minimumTap,
+      ),
+      icon: session.orderRefreshBusy(order.id)
+          ? const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.refresh_rounded, size: 20),
+    );
+    final currentStatus = Semantics(
+      label: 'Current order status: ${_trackingStatusLabel(order.status)}',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: BuyV2Colors.softGreen,
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: BuyV2Colors.green,
+                shape: BoxShape.circle,
+              ),
+              child: SizedBox(width: 8, height: 8),
+            ),
+            SizedBox(width: 5),
+            Text(
+              'CURRENT',
+              style: TextStyle(
+                color: BuyV2Colors.green,
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
     return ListView(
       key: PageStorageKey('buy-tracking-${order.id}'),
       padding: const EdgeInsets.fromLTRB(8, 7, 8, 10),
       children: [
-        Row(
-          children: [
-            _ReturnAffordance(
-              key: const ValueKey('buy-tracking-return-orders'),
-              label: 'Orders',
-              onTap: session.returnToOrders,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compactHeader =
+                constraints.maxWidth < 360 ||
+                MediaQuery.textScalerOf(context).scale(10) > 12;
+            if (compactHeader) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    order.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.buyTitle.copyWith(fontSize: 16),
+                  Row(
+                    children: [
+                      returnToOrders,
+                      const Spacer(),
+                      refreshOrder,
+                      const SizedBox(width: 4),
+                      currentStatus,
+                    ],
                   ),
-                  Text(order.id, style: context.buyMeta.copyWith(fontSize: 8)),
+                  const SizedBox(height: 5),
+                  orderHeading,
                 ],
-              ),
-            ),
-            IconButton(
-              key: ValueKey('buy-tracking-refresh-${order.id}'),
-              tooltip: 'Refresh order',
-              onPressed: session.orderRefreshBusy(order.id)
-                  ? null
-                  : () => session.refreshOrder(order.id),
-              constraints: const BoxConstraints.tightFor(
-                width: BuyV2Metrics.minimumTap,
-                height: BuyV2Metrics.minimumTap,
-              ),
-              icon: session.orderRefreshBusy(order.id)
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh_rounded, size: 20),
-            ),
-            const SizedBox(width: 4),
-            Semantics(
-              label:
-                  'Current order status: ${_trackingStatusLabel(order.status)}',
-              excludeSemantics: true,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: BuyV2Colors.softGreen,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: BuyV2Colors.green,
-                        shape: BoxShape.circle,
-                      ),
-                      child: SizedBox(width: 8, height: 8),
-                    ),
-                    SizedBox(width: 5),
-                    Text(
-                      'CURRENT',
-                      style: TextStyle(
-                        color: BuyV2Colors.green,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+              );
+            }
+            return Row(
+              children: [
+                returnToOrders,
+                const SizedBox(width: 8),
+                Expanded(child: orderHeading),
+                refreshOrder,
+                const SizedBox(width: 4),
+                currentStatus,
+              ],
+            );
+          },
         ),
         if (session.orderRefreshState(order.id) case final refreshState?
             when refreshState != BuyV2CommerceLoadState.ready &&
@@ -11657,42 +11655,54 @@ class _OrderCard extends StatelessWidget {
                   style: context.buyMeta.copyWith(fontSize: 8),
                 ),
                 const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 44,
-                        child: OutlinedButton.icon(
-                          key: ValueKey('buy-order-invoice-${order.id}'),
-                          onPressed: () => showBuyV2InvoicePage(
-                            context,
-                            order: order,
-                            downloader: invoiceDownloader,
-                          ),
-                          icon: const Icon(
-                            Icons.receipt_long_outlined,
-                            size: 17,
-                          ),
-                          label: const Text('Invoice'),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stackActions =
+                        constraints.maxWidth < 270 ||
+                        MediaQuery.textScalerOf(context).scale(10) > 12;
+                    final invoiceAction = SizedBox(
+                      height: 44,
+                      child: OutlinedButton.icon(
+                        key: ValueKey('buy-order-invoice-${order.id}'),
+                        onPressed: () => showBuyV2InvoicePage(
+                          context,
+                          order: order,
+                          downloader: invoiceDownloader,
+                        ),
+                        icon: const Icon(Icons.receipt_long_outlined, size: 17),
+                        label: const Text('Invoice'),
+                      ),
+                    );
+                    final primaryAction = SizedBox(
+                      height: 44,
+                      child: FilledButton(
+                        key: ValueKey('buy-order-primary-${order.id}'),
+                        onPressed: activatePrimaryAction,
+                        child: Text(
+                          order.status == BuyV2OrderStatus.delivered
+                              ? 'View order'
+                              : 'Track order',
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: SizedBox(
-                        height: 44,
-                        child: FilledButton(
-                          key: ValueKey('buy-order-primary-${order.id}'),
-                          onPressed: activatePrimaryAction,
-                          child: Text(
-                            order.status == BuyV2OrderStatus.delivered
-                                ? 'View order'
-                                : 'Track order',
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                    );
+                    if (stackActions) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          invoiceAction,
+                          const SizedBox(height: 6),
+                          primaryAction,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: invoiceAction),
+                        const SizedBox(width: 6),
+                        Expanded(child: primaryAction),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),

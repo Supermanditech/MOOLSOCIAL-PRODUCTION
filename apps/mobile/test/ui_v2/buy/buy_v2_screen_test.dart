@@ -1694,14 +1694,21 @@ void main() {
           find.text('Automatically assigned Mool Partner'),
           findsOneWidget,
         );
-        expect(find.text(product.seller), findsNothing);
+        expect(
+          find.text(product.seller),
+          testCase.destination == BuyV2Destination.wholesale
+              ? findsOneWidget
+              : findsNothing,
+        );
         expect(
           find.byKey(ValueKey('buy-shop-seller-action-${product.id}')),
           findsNothing,
         );
         expect(
           find.byKey(ValueKey('buy-wholesale-supplier-action-${product.id}')),
-          findsNothing,
+          testCase.destination == BuyV2Destination.wholesale
+              ? findsOneWidget
+              : findsNothing,
         );
 
         expect(session.addProduct(product.id), isTrue);
