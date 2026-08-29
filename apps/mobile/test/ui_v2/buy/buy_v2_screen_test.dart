@@ -29,6 +29,22 @@ final class _FixedOffersSource implements BuyV2PublishedOffersSource {
   final List<BuyV2PublishedOffer> publishedOffers;
 }
 
+final class _LiveOffersSource implements BuyV2LivePublishedOffersSource {
+  BuyV2PublishedOffersSnapshot snapshot;
+  int calls = 0;
+
+  _LiveOffersSource(this.snapshot);
+
+  @override
+  List<BuyV2PublishedOffer> get publishedOffers => snapshot.offers;
+
+  @override
+  Future<BuyV2PublishedOffersSnapshot> load() async {
+    calls += 1;
+    return snapshot;
+  }
+}
+
 final class _FixedDeliveryPromiseFactsAdapter
     implements BuyV2ProductFactsAdapter {
   const _FixedDeliveryPromiseFactsAdapter(this.deliveryPromise);
@@ -3685,6 +3701,49 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'live Offers recover from offline without static production data',
+    (tester) async {
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      final source = _LiveOffersSource(
+        const BuyV2PublishedOffersSnapshot(
+          state: BuyV2PublishedOffersLoadState.offline,
+          customerMessage: 'Offers could not refresh.',
+        ),
+      );
+      await tester.pumpWidget(app(session, offersSource: source));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Offers could not refresh'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-live-offers-retry')),
+        findsOneWidget,
+      );
+      source.snapshot = const BuyV2PublishedOffersSnapshot(
+        state: BuyV2PublishedOffersLoadState.ready,
+        offers: [
+          BuyV2PublishedOffer(
+            productId: 's-tomato',
+            publisherType: BuyV2OfferPublisherType.retailer,
+            headline: 'Fresh price',
+          ),
+        ],
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-live-offers-retry')));
+      await tester.pumpAndSettle();
+
+      expect(source.calls, 2);
+      expect(
+        find.byKey(const ValueKey('buy-offers-publisher-summary')),
+        findsOneWidget,
+      );
+      expect(find.text('Fresh tomatoes'), findsWidgets);
+    },
+  );
 
   testWidgets('Offers accepts an ordered published catalogue seam', (
     tester,

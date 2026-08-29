@@ -36,6 +36,26 @@ abstract interface class BuyV2PublishedOffersSource {
   List<BuyV2PublishedOffer> get publishedOffers;
 }
 
+enum BuyV2PublishedOffersLoadState { loading, ready, offline, unavailable }
+
+@immutable
+class BuyV2PublishedOffersSnapshot {
+  const BuyV2PublishedOffersSnapshot({
+    required this.state,
+    this.offers = const [],
+    this.customerMessage,
+  });
+
+  final BuyV2PublishedOffersLoadState state;
+  final List<BuyV2PublishedOffer> offers;
+  final String? customerMessage;
+}
+
+abstract interface class BuyV2LivePublishedOffersSource
+    implements BuyV2PublishedOffersSource {
+  Future<BuyV2PublishedOffersSnapshot> load();
+}
+
 final class BuyV2CataloguePublishedOffersSource
     implements BuyV2PublishedOffersSource {
   const BuyV2CataloguePublishedOffersSource();
@@ -167,7 +187,7 @@ final class BuyV2CataloguePublishedOffersSource
   ];
 }
 
-class BuyV2OffersView extends StatelessWidget {
+class BuyV2OffersView extends StatefulWidget {
   const BuyV2OffersView({
     super.key,
     required this.session,
@@ -178,14 +198,72 @@ class BuyV2OffersView extends StatelessWidget {
   final BuyV2PublishedOffersSource source;
 
   @override
+  State<BuyV2OffersView> createState() => _BuyV2OffersViewState();
+}
+
+class _BuyV2OffersViewState extends State<BuyV2OffersView> {
+  BuyV2PublishedOffersSnapshot? _snapshot;
+  var _requestSequence = 0;
+
+  BuyV2Session get session => widget.session;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant BuyV2OffersView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.source != widget.source) _load();
+  }
+
+  Future<void> _load() async {
+    final source = widget.source;
+    if (source is! BuyV2LivePublishedOffersSource) return;
+    final request = ++_requestSequence;
+    setState(() {
+      _snapshot = const BuyV2PublishedOffersSnapshot(
+        state: BuyV2PublishedOffersLoadState.loading,
+      );
+    });
+    try {
+      final snapshot = await source.load();
+      if (!mounted || request != _requestSequence) return;
+      setState(() => _snapshot = snapshot);
+    } on Object {
+      if (!mounted || request != _requestSequence) return;
+      setState(() {
+        _snapshot = const BuyV2PublishedOffersSnapshot(
+          state: BuyV2PublishedOffersLoadState.offline,
+          customerMessage:
+              'Offers could not refresh. Check your connection and try again.',
+        );
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (!session.catalogueAvailable) {
       return _OffersAvailabilityState(session: session);
     }
+    final liveSource = widget.source is BuyV2LivePublishedOffersSource;
+    if (!session.reviewDataEnabled && !liveSource) {
+      return _OffersAvailabilityState(session: session);
+    }
+    final snapshot = _snapshot;
+    if (liveSource && snapshot?.state != BuyV2PublishedOffersLoadState.ready) {
+      return _LiveOffersState(snapshot: snapshot, onRetry: _load);
+    }
+    final publishedOffers = liveSource
+        ? snapshot!.offers
+        : widget.source.publishedOffers;
     final query = session.query.trim().toLowerCase();
     final resolved = <({BuyV2PublishedOffer offer, BuyV2Product product})>[];
     final productIds = <String>{};
-    for (final offer in source.publishedOffers) {
+    for (final offer in publishedOffers) {
       final product = session.findProduct(offer.productId);
       if (product == null || !productIds.add(product.id)) continue;
       if (query.isNotEmpty &&
@@ -323,6 +401,65 @@ class BuyV2OffersView extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _LiveOffersState extends StatelessWidget {
+  const _LiveOffersState({required this.snapshot, required this.onRetry});
+
+  final BuyV2PublishedOffersSnapshot? snapshot;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = snapshot?.state ?? BuyV2PublishedOffersLoadState.loading;
+    final loading = state == BuyV2PublishedOffersLoadState.loading;
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (loading)
+              const SizedBox.square(
+                dimension: 32,
+                child: CircularProgressIndicator(strokeWidth: 3),
+              )
+            else
+              const Icon(
+                Icons.local_offer_outlined,
+                color: BuyV2Colors.navy,
+                size: 34,
+              ),
+            const SizedBox(height: 10),
+            Text(
+              loading ? 'Opening Offers' : 'Offers could not refresh',
+              style: context.buyTitle.copyWith(fontSize: 17),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              snapshot?.customerMessage ??
+                  'Checking current prices and eligibility.',
+              style: context.buyMeta,
+              textAlign: TextAlign.center,
+            ),
+            if (!loading) ...[
+              const SizedBox(height: 14),
+              SizedBox(
+                height: BuyV2Metrics.minimumTap,
+                child: FilledButton.icon(
+                  key: const ValueKey('buy-live-offers-retry'),
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Try again'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
