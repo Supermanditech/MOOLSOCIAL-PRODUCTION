@@ -11,6 +11,7 @@ import '../chat_services.dart';
 import '../chat_session.dart';
 import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
+import 'chat_settings_screen.dart';
 
 class ChatThreadScreen extends StatefulWidget {
   const ChatThreadScreen({
@@ -281,6 +282,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           session: widget.session,
           thread: thread,
           entryContext: entryContext,
+          originReturnRoute: widget.returnRoute,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openChatSettings() {
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatSettingsScreen(
+          session: widget.session,
+          originReturnRoute: widget.returnRoute,
         ),
       ),
     );
@@ -334,7 +347,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                     ? 'Video call'
                     : 'Video calls paused',
                 onPressed: () => unawaited(
-                  _showUnavailableCapability(
+                  showChatUnavailableCapability(
                     context,
                     keyName: 'chat-video-recovery',
                     title:
@@ -355,7 +368,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                     ? 'Voice call'
                     : 'Voice calls paused',
                 onPressed: () => unawaited(
-                  _showUnavailableCapability(
+                  showChatUnavailableCapability(
                     context,
                     keyName: 'chat-call-recovery',
                     title:
@@ -399,7 +412,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                 ? Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (thread.suggestedPrompts.isNotEmpty)
+                      if (thread.suggestedPrompts.isNotEmpty &&
+                          widget.session.showSuggestedPromptsForSession)
                         _SuggestedPromptStrip(
                           values: thread.suggestedPrompts,
                           onSelected: _applySuggestedPrompt,
@@ -415,10 +429,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                     ],
                   )
                 : _ChatPausedBar(
+                    globallyPaused:
+                        !widget.session.globalChatAvailableForSession,
                     onResume: () => widget.session.setChatAvailableForSession(
                       thread.id,
                       available: true,
                     ),
+                    onOpenSettings: () => unawaited(_openChatSettings()),
                   ),
           ),
         );
@@ -467,11 +484,13 @@ class _ConversationInfoScreen extends StatefulWidget {
     required this.session,
     required this.thread,
     required this.entryContext,
+    required this.originReturnRoute,
   });
 
   final ChatSession session;
   final ChatThread thread;
   final ChatEntryContext entryContext;
+  final String originReturnRoute;
 
   @override
   State<_ConversationInfoScreen> createState() =>
@@ -500,7 +519,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
     required String title,
   }) {
     unawaited(
-      _showUnavailableCapability(
+      showChatUnavailableCapability(
         context,
         keyName: keyName,
         title: title,
@@ -513,7 +532,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
   void _showSafetyRecovery(ChatThread thread) {
     final copy = _conversationSafetyCopy(thread);
     unawaited(
-      _showUnavailableCapability(
+      showChatUnavailableCapability(
         context,
         keyName: copy.recoveryKey,
         title: copy.recoveryTitle,
@@ -530,6 +549,12 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
         final thread = widget.thread;
         final session = widget.session;
         final chatAvailable = session.chatAvailableForSession(thread.id);
+        final globalChatAvailable = session.globalChatAvailableForSession;
+        final globalVoiceAvailable =
+            session.globalVoiceCallsAvailableForSession;
+        final globalVideoAvailable =
+            session.globalVideoCallsAvailableForSession;
+        final globalSendReview = session.globalReviewBeforeSendingForSession;
         final safety = _conversationSafetyCopy(thread);
         return ChatPageScaffold(
           key: const Key('chat-conversation-info-screen'),
@@ -550,6 +575,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
               _ConversationIdentityCard(
                 thread: thread,
                 chatAvailable: chatAvailable,
+                globalChatAvailable: globalChatAvailable,
                 accent: widget.entryContext.accent,
               ),
               if (_statusMessage != null) ...[
@@ -561,6 +587,28 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
               ],
               const SizedBox(height: 16),
               _ConversationSettingsSection(
+                title: 'Across Chat',
+                child: ListTile(
+                  key: const Key('chat-info-open-global-settings'),
+                  minLeadingWidth: 28,
+                  leading: const Icon(Icons.tune_rounded),
+                  title: const Text('Chat settings'),
+                  subtitle: const Text(
+                    'Manage messages, calls, peace of mind, privacy and spam controls.',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ChatSettingsScreen(
+                        session: session,
+                        originReturnRoute: widget.originReturnRoute,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _ConversationSettingsSection(
                 title: 'Availability',
                 child: Column(
                   children: [
@@ -570,21 +618,29 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                         horizontal: 14,
                       ),
                       title: const Text('Chat in this app'),
-                      subtitle: const Text(
-                        'Pause or resume the composer for this conversation.',
+                      subtitle: Text(
+                        globalChatAvailable
+                            ? 'Pause or resume the composer for this conversation.'
+                            : 'Paused across Chat. Turn it on in Chat settings first.',
                       ),
-                      value: chatAvailable,
-                      onChanged: (available) {
-                        session.setChatAvailableForSession(
-                          thread.id,
-                          available: available,
-                        );
-                        _confirmLocalChange(
-                          available
-                              ? 'Chat resumed for this app session.'
-                              : 'Chat paused for this app session.',
-                        );
-                      },
+                      value:
+                          globalChatAvailable &&
+                          session.chatAvailableForConversationInSession(
+                            thread.id,
+                          ),
+                      onChanged: !globalChatAvailable
+                          ? null
+                          : (available) {
+                              session.setChatAvailableForSession(
+                                thread.id,
+                                available: available,
+                              );
+                              _confirmLocalChange(
+                                available
+                                    ? 'Chat resumed for this app session.'
+                                    : 'Chat paused for this app session.',
+                              );
+                            },
                     ),
                     const Divider(height: 1),
                     SwitchListTile.adaptive(
@@ -593,21 +649,29 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                         horizontal: 14,
                       ),
                       title: const Text('Voice calls in this app'),
-                      subtitle: const Text(
-                        'Control the voice-call action in this conversation.',
+                      subtitle: Text(
+                        globalVoiceAvailable
+                            ? 'Control the voice-call action in this conversation.'
+                            : 'Paused across Chat. Turn it on in Chat settings first.',
                       ),
-                      value: session.voiceCallsAvailableForSession(thread.id),
-                      onChanged: (available) {
-                        session.setVoiceCallsAvailableForSession(
-                          thread.id,
-                          available: available,
-                        );
-                        _confirmLocalChange(
-                          available
-                              ? 'Voice calls turned on for this app session.'
-                              : 'Voice calls paused for this app session.',
-                        );
-                      },
+                      value:
+                          globalVoiceAvailable &&
+                          session.voiceCallsAvailableForConversationInSession(
+                            thread.id,
+                          ),
+                      onChanged: !globalVoiceAvailable
+                          ? null
+                          : (available) {
+                              session.setVoiceCallsAvailableForSession(
+                                thread.id,
+                                available: available,
+                              );
+                              _confirmLocalChange(
+                                available
+                                    ? 'Voice calls turned on for this app session.'
+                                    : 'Voice calls paused for this app session.',
+                              );
+                            },
                     ),
                     const Divider(height: 1),
                     SwitchListTile.adaptive(
@@ -616,21 +680,29 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                         horizontal: 14,
                       ),
                       title: const Text('Video calls in this app'),
-                      subtitle: const Text(
-                        'Control the video-call action in this conversation.',
+                      subtitle: Text(
+                        globalVideoAvailable
+                            ? 'Control the video-call action in this conversation.'
+                            : 'Paused across Chat. Turn it on in Chat settings first.',
                       ),
-                      value: session.videoCallsAvailableForSession(thread.id),
-                      onChanged: (available) {
-                        session.setVideoCallsAvailableForSession(
-                          thread.id,
-                          available: available,
-                        );
-                        _confirmLocalChange(
-                          available
-                              ? 'Video calls turned on for this app session.'
-                              : 'Video calls paused for this app session.',
-                        );
-                      },
+                      value:
+                          globalVideoAvailable &&
+                          session.videoCallsAvailableForConversationInSession(
+                            thread.id,
+                          ),
+                      onChanged: !globalVideoAvailable
+                          ? null
+                          : (available) {
+                              session.setVideoCallsAvailableForSession(
+                                thread.id,
+                                available: available,
+                              );
+                              _confirmLocalChange(
+                                available
+                                    ? 'Video calls turned on for this app session.'
+                                    : 'Video calls paused for this app session.',
+                              );
+                            },
                     ),
                     const _ConversationScopeNote(
                       'These choices apply until you close MoolSocial. They do not change account permissions or another person’s settings.',
@@ -651,7 +723,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                   ),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => unawaited(
-                    _showUnavailableCapability(
+                    showChatUnavailableCapability(
                       context,
                       keyName: 'chat-voice-chat-recovery',
                       title: 'Voice chat unavailable',
@@ -672,21 +744,29 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                         horizontal: 14,
                       ),
                       title: const Text('Review before sending'),
-                      subtitle: const Text(
-                        'Confirm messages and photos before they are sent.',
+                      subtitle: Text(
+                        globalSendReview
+                            ? 'On across Chat. Change it in Chat settings.'
+                            : 'Confirm messages and photos before they are sent.',
                       ),
-                      value: session.reviewBeforeSendingForSession(thread.id),
-                      onChanged: (enabled) {
-                        session.setReviewBeforeSendingForSession(
-                          thread.id,
-                          enabled: enabled,
-                        );
-                        _confirmLocalChange(
-                          enabled
-                              ? 'Send review turned on for this app session.'
-                              : 'Send review turned off for this app session.',
-                        );
-                      },
+                      value:
+                          globalSendReview ||
+                          session.reviewBeforeSendingForConversationInSession(
+                            thread.id,
+                          ),
+                      onChanged: globalSendReview
+                          ? null
+                          : (enabled) {
+                              session.setReviewBeforeSendingForSession(
+                                thread.id,
+                                enabled: enabled,
+                              );
+                              _confirmLocalChange(
+                                enabled
+                                    ? 'Send review turned on for this app session.'
+                                    : 'Send review turned off for this app session.',
+                              );
+                            },
                     ),
                     const _ConversationScopeNote(
                       'This preference applies to this conversation until you close MoolSocial. It does not change another person’s settings.',
@@ -794,11 +874,13 @@ class _ConversationIdentityCard extends StatelessWidget {
   const _ConversationIdentityCard({
     required this.thread,
     required this.chatAvailable,
+    required this.globalChatAvailable,
     required this.accent,
   });
 
   final ChatThread thread;
   final bool chatAvailable;
+  final bool globalChatAvailable;
   final Color accent;
 
   @override
@@ -867,7 +949,9 @@ class _ConversationIdentityCard extends StatelessWidget {
                       child: Text(
                         chatAvailable
                             ? 'Available in Chat'
-                            : 'Chat paused for this session',
+                            : globalChatAvailable
+                            ? 'Chat paused for this conversation'
+                            : 'Chat paused in Chat settings',
                         style: const TextStyle(
                           color: MoolColors.muted,
                           fontSize: 12,
@@ -985,9 +1069,15 @@ class _ConversationStatusNotice extends StatelessWidget {
 }
 
 class _ChatPausedBar extends StatelessWidget {
-  const _ChatPausedBar({required this.onResume});
+  const _ChatPausedBar({
+    required this.globallyPaused,
+    required this.onResume,
+    required this.onOpenSettings,
+  });
 
+  final bool globallyPaused;
   final VoidCallback onResume;
+  final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -1000,10 +1090,12 @@ class _ChatPausedBar extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Chat is paused for this app session.',
-                  style: TextStyle(
+                  globallyPaused
+                      ? 'Chat is paused in Chat settings.'
+                      : 'Chat is paused for this conversation.',
+                  style: const TextStyle(
                     color: MoolColors.ink,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1014,13 +1106,17 @@ class _ChatPausedBar extends StatelessWidget {
               SizedBox(
                 width: 96,
                 child: OutlinedButton(
-                  key: const Key('chat-resume'),
+                  key: Key(
+                    globallyPaused
+                        ? 'chat-open-settings-from-paused'
+                        : 'chat-resume',
+                  ),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(96, 48),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
-                  onPressed: onResume,
-                  child: const Text('Resume'),
+                  onPressed: globallyPaused ? onOpenSettings : onResume,
+                  child: Text(globallyPaused ? 'Settings' : 'Resume'),
                 ),
               ),
             ],
@@ -1447,62 +1543,6 @@ class _MessageBubble extends StatelessWidget {
       ),
     );
   }
-}
-
-Future<void> _showUnavailableCapability(
-  BuildContext context, {
-  required String keyName,
-  required String title,
-  required String message,
-}) {
-  final viewPadding = MediaQuery.viewPaddingOf(context);
-  final bottomInset = viewPadding.bottom;
-  final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
-    viewPadding: viewPadding,
-    platform: Theme.of(context).platform,
-  );
-  return showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    useSafeArea: true,
-    isScrollControlled: true,
-    sheetAnimationStyle: ChatMotion.sheetStyle(context),
-    builder: (sheetContext) => ChatBottomSheetSafeArea(
-      bottomInset: bottomInset,
-      exportedSemanticsClearance: exportedSemanticsClearance,
-      child: Padding(
-        key: Key(keyName),
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.lg,
-          MoolSpacing.xs,
-          MoolSpacing.lg,
-          MoolSpacing.lg,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: MoolColors.navy,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: MoolSpacing.xs),
-            Text(message, style: const TextStyle(color: MoolColors.muted)),
-            const SizedBox(height: MoolSpacing.md),
-            FilledButton(
-              key: const Key('chat-capability-continue'),
-              onPressed: () => Navigator.of(sheetContext).pop(),
-              child: const Text('Continue in Chat'),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 }
 
 Future<void> _showMessageActions(
@@ -2218,7 +2258,7 @@ class _ComposerState extends State<_Composer> {
                                       ? photo == null
                                             ? onSend()
                                             : onSendPhoto()
-                                      : _showUnavailableCapability(
+                                      : showChatUnavailableCapability(
                                           context,
                                           keyName:
                                               'chat-voice-message-recovery',

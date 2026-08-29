@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../chat_session.dart';
 import 'chat_motion.dart';
 
@@ -28,6 +29,62 @@ String chatRoute(
       if (filter != null && filter.trim().isNotEmpty) 'type': filter,
     },
   ).toString();
+}
+
+Future<void> showChatUnavailableCapability(
+  BuildContext context, {
+  required String keyName,
+  required String title,
+  required String message,
+}) {
+  final viewPadding = MediaQuery.viewPaddingOf(context);
+  final bottomInset = viewPadding.bottom;
+  final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
+    viewPadding: viewPadding,
+    platform: Theme.of(context).platform,
+  );
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    useSafeArea: true,
+    isScrollControlled: true,
+    sheetAnimationStyle: ChatMotion.sheetStyle(context),
+    builder: (sheetContext) => ChatBottomSheetSafeArea(
+      bottomInset: bottomInset,
+      exportedSemanticsClearance: exportedSemanticsClearance,
+      child: Padding(
+        key: Key(keyName),
+        padding: const EdgeInsets.fromLTRB(
+          MoolSpacing.lg,
+          MoolSpacing.xs,
+          MoolSpacing.lg,
+          MoolSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: MoolSpacing.xs),
+            Text(message, style: const TextStyle(color: MoolColors.muted)),
+            const SizedBox(height: MoolSpacing.md),
+            FilledButton(
+              key: const Key('chat-capability-continue'),
+              onPressed: () => Navigator.of(sheetContext).pop(),
+              child: const Text('Continue in Chat'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class ChatBottomSheetSafeArea extends StatelessWidget {

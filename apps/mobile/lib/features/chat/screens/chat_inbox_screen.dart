@@ -13,6 +13,7 @@ import '../chat_session.dart';
 import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
 import 'chat_people_directory.dart';
+import 'chat_settings_screen.dart';
 
 class ChatInboxScreen extends StatefulWidget {
   const ChatInboxScreen({
@@ -307,6 +308,17 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
 
   Future<void> _handleMoreAction(String action) async {
     switch (action) {
+      case 'settings':
+        if (!mounted) return;
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ChatSettingsScreen(
+              session: widget.session,
+              originReturnRoute: widget.returnRoute,
+            ),
+          ),
+        );
+        return;
       case 'refresh':
         if (_section == ChatHomeSection.chats) {
           await widget.session.loadThreads(refresh: true);
@@ -361,6 +373,14 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
             tooltip: 'More Chat options',
             onSelected: (value) => unawaited(_handleMoreAction(value)),
             itemBuilder: (_) => [
+              const PopupMenuItem(
+                key: Key('chat-more-settings'),
+                value: 'settings',
+                child: ListTile(
+                  leading: Icon(Icons.tune_rounded),
+                  title: Text('Chat settings'),
+                ),
+              ),
               const PopupMenuItem(
                 value: 'refresh',
                 child: ListTile(
@@ -594,6 +614,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 child: _ThreadCard(
                   thread: threads[index],
                   unread: widget.session.unreadFor(threads[index]),
+                  hidePreview: widget.session.hideMessagePreviewsForSession,
                   onTap: () => _openThread(
                     context,
                     threads[index].id,
@@ -706,11 +727,13 @@ class _ThreadCard extends StatelessWidget {
   const _ThreadCard({
     required this.thread,
     required this.unread,
+    required this.hidePreview,
     required this.onTap,
   });
 
   final ChatThread thread;
   final int unread;
+  final bool hidePreview;
   final VoidCallback onTap;
 
   @override
@@ -779,7 +802,9 @@ class _ThreadCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            thread.preview,
+                            hidePreview
+                                ? 'Message preview hidden'
+                                : thread.preview,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

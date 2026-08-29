@@ -227,6 +227,12 @@ class ChatSession extends ChangeNotifier {
   final Map<String, bool> _voiceCallsAvailableForSession = {};
   final Map<String, bool> _videoCallsAvailableForSession = {};
   final Map<String, bool> _reviewBeforeSendingForSession = {};
+  bool _globalChatAvailableForSession = true;
+  bool _globalVoiceCallsAvailableForSession = true;
+  bool _globalVideoCallsAvailableForSession = true;
+  bool _globalReviewBeforeSendingForSession = false;
+  bool _hideMessagePreviewsForSession = false;
+  bool _showSuggestedPromptsForSession = true;
   int _messageSequence = 10;
 
   static const reviewThreads = <ChatThread>[
@@ -504,20 +510,87 @@ class ChatSession extends ChangeNotifier {
 
   ChatMessage? replyTarget(String threadId) => _replyTargets[threadId];
 
-  bool chatAvailableForSession(String threadId) =>
+  bool get globalChatAvailableForSession => _globalChatAvailableForSession;
+
+  bool get globalVoiceCallsAvailableForSession =>
+      _globalVoiceCallsAvailableForSession;
+
+  bool get globalVideoCallsAvailableForSession =>
+      _globalVideoCallsAvailableForSession;
+
+  bool get globalReviewBeforeSendingForSession =>
+      _globalReviewBeforeSendingForSession;
+
+  bool get hideMessagePreviewsForSession => _hideMessagePreviewsForSession;
+
+  bool get showSuggestedPromptsForSession => _showSuggestedPromptsForSession;
+
+  bool chatAvailableForConversationInSession(String threadId) =>
       _chatAvailableForSession[threadId] ?? true;
 
-  bool voiceCallsAvailableForSession(String threadId) =>
+  bool voiceCallsAvailableForConversationInSession(String threadId) =>
       _voiceCallsAvailableForSession[threadId] ?? true;
 
-  bool videoCallsAvailableForSession(String threadId) =>
+  bool videoCallsAvailableForConversationInSession(String threadId) =>
       _videoCallsAvailableForSession[threadId] ?? true;
 
-  bool reviewBeforeSendingForSession(String threadId) =>
+  bool reviewBeforeSendingForConversationInSession(String threadId) =>
       _reviewBeforeSendingForSession[threadId] ?? false;
 
+  bool chatAvailableForSession(String threadId) =>
+      globalChatAvailableForSession &&
+      chatAvailableForConversationInSession(threadId);
+
+  bool voiceCallsAvailableForSession(String threadId) =>
+      globalVoiceCallsAvailableForSession &&
+      voiceCallsAvailableForConversationInSession(threadId);
+
+  bool videoCallsAvailableForSession(String threadId) =>
+      globalVideoCallsAvailableForSession &&
+      videoCallsAvailableForConversationInSession(threadId);
+
+  bool reviewBeforeSendingForSession(String threadId) =>
+      globalReviewBeforeSendingForSession ||
+      reviewBeforeSendingForConversationInSession(threadId);
+
+  void setGlobalChatAvailableForSession({required bool available}) {
+    if (globalChatAvailableForSession == available) return;
+    _globalChatAvailableForSession = available;
+    notifyListeners();
+  }
+
+  void setGlobalVoiceCallsAvailableForSession({required bool available}) {
+    if (globalVoiceCallsAvailableForSession == available) return;
+    _globalVoiceCallsAvailableForSession = available;
+    notifyListeners();
+  }
+
+  void setGlobalVideoCallsAvailableForSession({required bool available}) {
+    if (globalVideoCallsAvailableForSession == available) return;
+    _globalVideoCallsAvailableForSession = available;
+    notifyListeners();
+  }
+
+  void setGlobalReviewBeforeSendingForSession({required bool enabled}) {
+    if (globalReviewBeforeSendingForSession == enabled) return;
+    _globalReviewBeforeSendingForSession = enabled;
+    notifyListeners();
+  }
+
+  void setHideMessagePreviewsForSession({required bool hidden}) {
+    if (hideMessagePreviewsForSession == hidden) return;
+    _hideMessagePreviewsForSession = hidden;
+    notifyListeners();
+  }
+
+  void setShowSuggestedPromptsForSession({required bool visible}) {
+    if (showSuggestedPromptsForSession == visible) return;
+    _showSuggestedPromptsForSession = visible;
+    notifyListeners();
+  }
+
   void setChatAvailableForSession(String threadId, {required bool available}) {
-    if (chatAvailableForSession(threadId) == available) return;
+    if (chatAvailableForConversationInSession(threadId) == available) return;
     _chatAvailableForSession[threadId] = available;
     notifyListeners();
   }
@@ -526,7 +599,9 @@ class ChatSession extends ChangeNotifier {
     String threadId, {
     required bool available,
   }) {
-    if (voiceCallsAvailableForSession(threadId) == available) return;
+    if (voiceCallsAvailableForConversationInSession(threadId) == available) {
+      return;
+    }
     _voiceCallsAvailableForSession[threadId] = available;
     notifyListeners();
   }
@@ -535,7 +610,9 @@ class ChatSession extends ChangeNotifier {
     String threadId, {
     required bool available,
   }) {
-    if (videoCallsAvailableForSession(threadId) == available) return;
+    if (videoCallsAvailableForConversationInSession(threadId) == available) {
+      return;
+    }
     _videoCallsAvailableForSession[threadId] = available;
     notifyListeners();
   }
@@ -544,7 +621,9 @@ class ChatSession extends ChangeNotifier {
     String threadId, {
     required bool enabled,
   }) {
-    if (reviewBeforeSendingForSession(threadId) == enabled) return;
+    if (reviewBeforeSendingForConversationInSession(threadId) == enabled) {
+      return;
+    }
     _reviewBeforeSendingForSession[threadId] = enabled;
     notifyListeners();
   }
