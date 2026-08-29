@@ -314,47 +314,17 @@ void main() {
 
   for (final entry in const <(String, String, String, ChatThreadType?)>[
     ('/app/mool', 'Chat', 'All your conversations', null),
-    (
-      '/app/social?sub=feed',
-      'Social Chat',
-      'People and creators',
-      ChatThreadType.people,
-    ),
+    ('/app/social?sub=feed', 'Social Chat', 'People and creators', null),
     ('/app/buy?sub=shop', 'Shop Chat', 'Orders and products', null),
-    (
-      '/app/buy?sub=medicine',
-      'Care Chat',
-      'Appointments and care',
-      ChatThreadType.business,
-    ),
-    ('/app/eat/home', 'Food Chat', 'Orders and tables', ChatThreadType.order),
-    (
-      '/app/ride/book?type=cab',
-      'Travel Chat',
-      'Trips and bookings',
-      ChatThreadType.support,
-    ),
-    (
-      '/app/book/doctor',
-      'Care Chat',
-      'Appointments and care',
-      ChatThreadType.business,
-    ),
-    ('/app/work/earn', 'Work Chat', 'Opportunities', ChatThreadType.business),
-    (
-      '/app/work/my-work',
-      'Workspace Chat',
-      'Setup and review support',
-      ChatThreadType.support,
-    ),
-    (
-      '/app/pay/home',
-      'Pay Chat',
-      'Payments and support',
-      ChatThreadType.support,
-    ),
+    ('/app/buy?sub=medicine', 'Care Chat', 'Appointments and care', null),
+    ('/app/eat/home', 'Food Chat', 'Orders and tables', null),
+    ('/app/ride/book?type=cab', 'Travel Chat', 'Trips and bookings', null),
+    ('/app/book/doctor', 'Care Chat', 'Appointments and care', null),
+    ('/app/work/earn', 'Work Chat', 'Opportunities', null),
+    ('/app/work/my-work', 'Workspace Chat', 'Setup and review support', null),
+    ('/app/pay/home', 'Pay Chat', 'Payments and support', null),
   ]) {
-    testWidgets('${entry.$2} from ${entry.$1} is compact and filter-correct', (
+    testWidgets('${entry.$2} from ${entry.$1} is compact and defaults to All', (
       tester,
     ) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -402,12 +372,10 @@ void main() {
       );
       expect(title.didExceedMaxLines, isFalse);
       expect(subtitle.didExceedMaxLines, isFalse);
-      if (entry.$4 != null && entry.$1 != '/app/social?sub=feed') {
-        final activeFilter = find.byKey(
-          Key('chat-filter-${entry.$4!.label.toLowerCase()}'),
-        );
-        expect(activeFilter, findsOneWidget);
-        final filterRect = tester.getRect(activeFilter);
+      if (find.byKey(const Key('chat-filter-all')).evaluate().isNotEmpty) {
+        final allFilter = find.byKey(const Key('chat-filter-all'));
+        expect(tester.widget<ChoiceChip>(allFilter).selected, isTrue);
+        final filterRect = tester.getRect(allFilter);
         expect(filterRect.left, greaterThanOrEqualTo(0));
         expect(filterRect.right, lessThanOrEqualTo(320));
       }
@@ -436,7 +404,7 @@ void main() {
         );
         expect(
           find.byKey(const Key('chat-open-thread-order-support')),
-          findsNothing,
+          findsOneWidget,
         );
         expect(
           find.byKey(const Key('chat-open-thread-ride-support')),
@@ -546,7 +514,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
         expect(find.text(destination.$3), findsOneWidget);
-        expect(chat.selectedFilter, destination.$4);
+        expect(chat.selectedFilter, isNull);
         expect(
           find.byKey(Key('chat-open-thread-${destination.$2}')),
           findsOneWidget,
@@ -781,6 +749,103 @@ void main() {
     },
   );
 
+  testWidgets(
+    'send review is session-local, preserves the draft and requires confirmation',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: '/app/chat/thread/home-basket?return=/app/work/earn',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('chat-conversation-info')));
+      await tester.pumpAndSettle();
+      final reviewSetting = find.byKey(
+        const Key('chat-info-review-before-send'),
+      );
+      await tester.scrollUntilVisible(
+        reviewSetting,
+        180,
+        scrollable: find.descendant(
+          of: find.byKey(const Key('chat-conversation-info-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await tester.tap(reviewSetting);
+      await tester.pump();
+      expect(chat.reviewBeforeSendingForSession('home-basket'), isTrue);
+      expect(chat.reviewBeforeSendingForSession('rasoi'), isFalse);
+      expect(
+        find.text('Send review turned on for this app session.'),
+        findsOneWidget,
+      );
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('chat-reply-m1')));
+      await tester.pumpAndSettle();
+      expect(chat.replyTarget('home-basket')?.id, 'm1');
+      const draft = 'Please confirm the delivery time.';
+      final messageField = find.byKey(const Key('chat-message-field'));
+      await tester.enterText(messageField, draft);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('chat-send')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('chat-send-review-dialog')), findsOneWidget);
+      expect(find.byKey(const Key('chat-send-review-content')), findsOneWidget);
+      expect(find.text('To Home Basket Group'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('chat-send-review-dialog')),
+          matching: find.text('Replying to Amit'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Nothing is sent until you choose Send now.'),
+        findsOneWidget,
+      );
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-send-review-dialog')), findsNothing);
+      expect(tester.widget<TextField>(messageField).controller!.text, draft);
+      expect(chat.replyTarget('home-basket')?.id, 'm1');
+      expect(
+        chat.messages('home-basket').where((message) => message.text == draft),
+        isEmpty,
+      );
+
+      await tester.tap(find.byKey(const Key('chat-send')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('chat-send-review-confirm')));
+      await tester.pumpAndSettle();
+      expect(
+        chat.messages('home-basket').where((message) => message.text == draft),
+        hasLength(1),
+      );
+      expect(tester.widget<TextField>(messageField).controller!.text, isEmpty);
+      expect(chat.replyTarget('home-basket'), isNull);
+      expect(find.byKey(const Key('chat-send-review-dialog')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final safety in const <(String, String, String, String)>[
     (
       'task-helper',
@@ -832,14 +897,13 @@ void main() {
         await tester.tap(find.byKey(const Key('chat-conversation-info')));
         await tester.pumpAndSettle();
         final safetyAction = find.byKey(const Key('chat-info-block-user'));
-        await tester.scrollUntilVisible(
+        await tester.dragUntilVisible(
           safetyAction,
-          180,
-          scrollable: find.descendant(
-            of: find.byKey(const Key('chat-conversation-info-list')),
-            matching: find.byType(Scrollable),
-          ),
+          find.byKey(const Key('chat-conversation-info-list')),
+          const Offset(0, -180),
         );
+        await tester.ensureVisible(safetyAction);
+        await tester.pumpAndSettle();
         expect(find.text(safety.$2), findsOneWidget);
         await tester.tap(safetyAction);
         await tester.pumpAndSettle();
@@ -929,7 +993,13 @@ void main() {
     await tester.tap(find.byKey(const Key('chat-conversation-info')));
     await tester.pumpAndSettle();
     final lastSeen = find.byKey(const Key('chat-info-last-seen'));
+    await tester.dragUntilVisible(
+      lastSeen,
+      find.byKey(const Key('chat-conversation-info-list')),
+      const Offset(0, -180),
+    );
     await tester.ensureVisible(lastSeen);
+    await tester.pumpAndSettle();
     await tester.tap(lastSeen);
     await tester.pumpAndSettle();
 

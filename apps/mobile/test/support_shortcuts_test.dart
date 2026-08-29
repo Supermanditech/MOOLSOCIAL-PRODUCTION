@@ -29,6 +29,7 @@ void main() {
     required ChatSession chat,
     required String route,
     required Key shortcut,
+    required String expectedThreadId,
   }) async {
     await tester.pumpWidget(
       MoolSocialApp(
@@ -44,7 +45,7 @@ void main() {
     await tester.tap(find.byKey(shortcut));
     await tester.pumpAndSettle();
     expect(
-      find.byKey(const Key('chat-open-thread-order-support')),
+      find.byKey(Key('chat-open-thread-$expectedThreadId')),
       findsOneWidget,
     );
     expect(chat.selectedFilter, ChatThreadType.support);
@@ -66,6 +67,7 @@ void main() {
         chat: chat,
         route: '/app/book/home',
         shortcut: const Key('book-help'),
+        expectedThreadId: 'order-support',
       );
       await verifyShortcut(
         tester,
@@ -73,6 +75,7 @@ void main() {
         chat: chat,
         route: '/app/work/my-work',
         shortcut: const Key('work-help'),
+        expectedThreadId: 'workspace-support',
       );
       await verifyShortcut(
         tester,
@@ -80,6 +83,7 @@ void main() {
         chat: chat,
         route: '/app/pay/home',
         shortcut: const Key('pay-help-shortcut'),
+        expectedThreadId: 'pay-support',
       );
     },
   );

@@ -391,6 +391,69 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'send review preserves a staged photo until explicit confirmation',
+    (tester) async {
+      final gateway = _PhotoChatGateway();
+      final picker = _PhotoPicker(choices: [_pickedPhoto]);
+      final session = ChatSession.production(
+        gateway: gateway,
+        photoPicker: picker,
+      );
+      session.setReviewBeforeSendingForSession('thread-1', enabled: true);
+      addTearDown(session.dispose);
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChatThreadScreen(
+            session: session,
+            threadId: 'thread-1',
+            returnRoute: '/app/chat/inbox',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('chat-attach')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('chat-gallery')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('chat-message-field')),
+        'Market receipt',
+      );
+      final sendPhoto = find.byKey(const Key('chat-send-photo'));
+      await tester.ensureVisible(sendPhoto);
+      await tester.tap(sendPhoto);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('chat-send-review-dialog')), findsOneWidget);
+      expect(find.text('Photo\nMarket receipt'), findsOneWidget);
+      expect(gateway.photoRequests, isEmpty);
+      await tester.tap(find.byKey(const Key('chat-send-review-edit')));
+      await tester.pumpAndSettle();
+      expect(session.selectedPhoto('thread-1'), same(_pickedPhoto));
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('chat-message-field')))
+            .controller!
+            .text,
+        'Market receipt',
+      );
+
+      await tester.tap(sendPhoto);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('chat-send-review-confirm')));
+      await tester.pumpAndSettle();
+      expect(gateway.photoRequests, hasLength(1));
+      expect(session.selectedPhoto('thread-1'), isNull);
+      expect(find.byKey(const Key('chat-send-review-dialog')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('camera permission denial stays in Chat with recovery guidance', (
     tester,
   ) async {
