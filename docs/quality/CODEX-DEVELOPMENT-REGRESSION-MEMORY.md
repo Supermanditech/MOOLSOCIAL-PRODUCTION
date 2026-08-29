@@ -3687,3 +3687,6 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3848 rejects deriving safety identity only from the operational filter.
   Model person/business/conversation separately so an individual helper never
   receives business-blocking wording.
+- REG3849 rejects asserting a base motion duration for an indexed staggered
+  row. Calculate the bounded final duration and still require zero under
+  reduced motion.

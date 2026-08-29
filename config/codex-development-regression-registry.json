@@ -43753,6 +43753,16 @@
       "prevention": "Model an optional person, business or conversation safety target, set the review helper explicitly to person, decode optional backend values and retain a safe type-based fallback.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/chat_models.dart", "apps/mobile/lib/features/chat/chat_session.dart", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3849-SEARCH-MOTION-TEST-IGNORED-ROW-STAGGER",
+      "status": "registered_indexed_finite_duration_oracle_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "motion", "chat", "testing"],
+      "mistake": "The first Search motion test expected the third Home Basket row to use the 240ms base duration even though the approved finite entry policy adds a bounded 20ms stagger per row.",
+      "rootCause": "The test asserted the base motion token instead of the final indexed duration owned by the rendered row.",
+      "prevention": "Calculate the bounded index stagger in the oracle, keep the final duration finite and still require every indexed row to resolve to zero under reduced motion.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/widgets/chat_motion.dart", "apps/mobile/test/chat_flow_test.dart"]
     }
   ]
 }

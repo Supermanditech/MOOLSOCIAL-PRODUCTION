@@ -4,6 +4,7 @@ import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/chat/chat_models.dart';
 import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
+import 'package:moolsocial/features/chat/widgets/chat_motion.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/shared/shared_models.dart';
@@ -173,6 +174,65 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Search motion is finite and reduced motion resolves static', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/mool',
+      journey: journey,
+      chat: chat,
+    );
+
+    AnimatedContainer focusMotion() => tester.widget<AnimatedContainer>(
+      find.byKey(const Key('chat-search-focus-motion')),
+    );
+    AnimatedSwitcher actionMotion() => tester.widget<AnimatedSwitcher>(
+      find.byKey(const Key('chat-search-action-icon-motion')),
+    );
+    TweenAnimationBuilder<double> entryMotion() =>
+        tester.widget<TweenAnimationBuilder<double>>(
+          find.descendant(
+            of: find.byKey(const Key('chat-thread-entry-motion-home-basket')),
+            matching: find.byType(TweenAnimationBuilder<double>),
+          ),
+        );
+
+    expect(focusMotion().duration, ChatMotion.focus);
+    expect(actionMotion().duration, ChatMotion.focus);
+    expect(
+      entryMotion().duration,
+      Duration(milliseconds: ChatMotion.stateChange.inMilliseconds + 40),
+    );
+
+    final field = find.byKey(const Key('chat-search-field'));
+    await tester.tap(field);
+    await tester.enterText(field, 'Home');
+    await tester.pump();
+    expect(find.byKey(const Key('chat-clear-search')), findsOneWidget);
+    expect(find.byKey(const Key('chat-search-assistance')), findsNothing);
+    await tester.tap(find.byKey(const Key('chat-clear-search')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(field).controller?.text, isEmpty);
+    expect(find.byKey(const Key('chat-search-assistance')), findsOneWidget);
+
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
+    await tester.pump();
+    expect(focusMotion().duration, Duration.zero);
+    expect(actionMotion().duration, Duration.zero);
+    expect(entryMotion().duration, Duration.zero);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'Android Back dismisses transient Chat surfaces before leaving their owner',

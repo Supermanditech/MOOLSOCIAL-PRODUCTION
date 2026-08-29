@@ -10,6 +10,7 @@ import '../../shared/shared_session.dart';
 import '../chat_entry_context.dart';
 import '../chat_models.dart';
 import '../chat_session.dart';
+import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
 import 'chat_people_directory.dart';
 
@@ -37,6 +38,7 @@ class ChatInboxScreen extends StatefulWidget {
 
 class _ChatInboxScreenState extends State<ChatInboxScreen> {
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
   final _peopleSearchController = TextEditingController();
   int _routeRequest = 0;
   int _peopleRequest = 0;
@@ -55,9 +57,20 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   @override
   void initState() {
     super.initState();
+    _searchFocusNode.addListener(_handleSearchFocusChange);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _queueRouteApplication();
     });
+  }
+
+  void _handleSearchFocusChange() {
+    if (mounted) setState(() {});
+  }
+
+  void _clearConversationSearch() {
+    if (_searchController.text.isEmpty) return;
+    _searchController.clear();
+    setState(() {});
   }
 
   @override
@@ -149,6 +162,9 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   void dispose() {
     _routeRequest += 1;
     _peopleRequest += 1;
+    _searchFocusNode
+      ..removeListener(_handleSearchFocusChange)
+      ..dispose();
     _searchController.dispose();
     _peopleSearchController.dispose();
     super.dispose();
@@ -449,14 +465,21 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
 
   Widget _buildChats(List<ChatThread> threads) {
     if (widget.session.loadingThreads && !widget.session.threadsLoaded) {
-      return const _ChatLoadingState();
-    }
-    if (widget.session.errorMessage != null && threads.isEmpty) {
-      return _ChatErrorState(
-        message: widget.session.errorMessage!,
-        onRetry: () => widget.session.loadThreads(refresh: true),
+      return const ChatFiniteIncomingMotion(
+        stateKey: 'chat-inbox-loading',
+        child: _ChatLoadingState(),
       );
     }
+    if (widget.session.errorMessage != null && threads.isEmpty) {
+      return ChatFiniteIncomingMotion(
+        stateKey: 'chat-inbox-error',
+        child: _ChatErrorState(
+          message: widget.session.errorMessage!,
+          onRetry: () => widget.session.loadThreads(refresh: true),
+        ),
+      );
+    }
+    final hasSearchQuery = _searchController.text.trim().isNotEmpty;
     return CustomScrollView(
       key: const PageStorageKey('chat-inbox-scroll'),
       slivers: [
@@ -469,36 +492,51 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           ),
           sliver: SliverList.list(
             children: [
-              TextField(
-                key: const Key('chat-search-field'),
-                controller: _searchController,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  hintText: 'Search conversations',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  filled: true,
-                  fillColor: const Color(0xFFF0F1F5),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                    borderSide: const BorderSide(
-                      color: MoolColors.navy,
-                      width: 1.5,
+              ChatSearchFocusMotion(
+                focused: _searchFocusNode.hasFocus,
+                child: TextField(
+                  key: const Key('chat-search-field'),
+                  focusNode: _searchFocusNode,
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: 'Search conversations',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    suffixIcon: IconButton(
+                      key: Key(
+                        hasSearchQuery
+                            ? 'chat-clear-search'
+                            : 'chat-search-assistance',
+                      ),
+                      tooltip: hasSearchQuery
+                          ? 'Clear conversation search'
+                          : 'Search assistance',
+                      onPressed: hasSearchQuery
+                          ? _clearConversationSearch
+                          : () async {
+                              final query = await _showSearchAssistance(
+                                context,
+                              );
+                              if (query == null || !mounted) return;
+                              _searchController.value = TextEditingValue(
+                                text: query,
+                                selection: TextSelection.collapsed(
+                                  offset: query.length,
+                                ),
+                              );
+                              setState(() {});
+                            },
+                      icon: ChatActionIconMotion(
+                        stateKey: hasSearchQuery ? 'clear' : 'assist',
+                        icon: hasSearchQuery
+                            ? Icons.close_rounded
+                            : Icons.manage_search_rounded,
+                      ),
                     ),
-                  ),
-                  suffixIcon: IconButton(
-                    key: const Key('chat-search-assistance'),
-                    tooltip: 'Search assistance',
-                    onPressed: () async {
-                      final query = await _showSearchAssistance(context);
-                      if (query == null || !mounted) return;
-                      _searchController.text = query;
-                      setState(() {});
-                    },
-                    icon: const Icon(Icons.manage_search_rounded),
                   ),
                 ),
               ),
@@ -513,26 +551,31 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         if (threads.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
-            child: _EmptyInbox(
-              hasQuery:
-                  _searchController.text.trim().isNotEmpty ||
-                  (_entryContext.showThreadFilters &&
-                      widget.session.selectedFilter != null) ||
-                  widget.session.unreadOnly,
-              socialOnly: _entryContext.id == ChatEntryContextId.social,
-              onReset: () {
-                _searchController.clear();
-                if (_entryContext.defaultFilter case final filter?) {
-                  widget.session.chooseFilter(filter);
-                } else {
-                  widget.session.chooseAll();
-                }
-                setState(() {});
-              },
-              onDiscover: () => _selectSection(ChatHomeSection.discover),
-              onOpenFeed: () => unawaited(_openPublicFeedDiscovery()),
-              onStartConversation: () =>
-                  _selectSection(ChatHomeSection.discover),
+            child: ChatFiniteIncomingMotion(
+              stateKey: hasSearchQuery
+                  ? 'chat-inbox-no-search-results'
+                  : 'chat-inbox-empty-${widget.session.selectedFilter?.name ?? 'all'}-${widget.session.unreadOnly}',
+              child: _EmptyInbox(
+                hasQuery:
+                    hasSearchQuery ||
+                    (_entryContext.showThreadFilters &&
+                        widget.session.selectedFilter != null) ||
+                    widget.session.unreadOnly,
+                socialOnly: _entryContext.id == ChatEntryContextId.social,
+                onReset: () {
+                  _searchController.clear();
+                  if (_entryContext.defaultFilter case final filter?) {
+                    widget.session.chooseFilter(filter);
+                  } else {
+                    widget.session.chooseAll();
+                  }
+                  setState(() {});
+                },
+                onDiscover: () => _selectSection(ChatHomeSection.discover),
+                onOpenFeed: () => unawaited(_openPublicFeedDiscovery()),
+                onStartConversation: () =>
+                    _selectSection(ChatHomeSection.discover),
+              ),
             ),
           )
         else
@@ -547,14 +590,19 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
               itemCount: threads.length,
               separatorBuilder: (_, _) =>
                   const Divider(height: 1, indent: 61, color: MoolColors.line),
-              itemBuilder: (context, index) => _ThreadCard(
-                thread: threads[index],
-                unread: widget.session.unreadFor(threads[index]),
-                onTap: () => _openThread(
-                  context,
-                  threads[index].id,
-                  widget.returnRoute,
-                  draft: widget.initialMessageDraft,
+              itemBuilder: (context, index) => ChatListEntryMotion(
+                key: ValueKey('chat-thread-entry-motion-${threads[index].id}'),
+                stateKey: threads[index].id,
+                index: index,
+                child: _ThreadCard(
+                  thread: threads[index],
+                  unread: widget.session.unreadFor(threads[index]),
+                  onTap: () => _openThread(
+                    context,
+                    threads[index].id,
+                    widget.returnRoute,
+                    draft: widget.initialMessageDraft,
+                  ),
                 ),
               ),
             ),
@@ -880,6 +928,7 @@ Future<String?> _showSearchAssistance(BuildContext context) {
     showDragHandle: true,
     useSafeArea: true,
     isScrollControlled: true,
+    sheetAnimationStyle: ChatMotion.sheetStyle(context),
     builder: (sheetContext) => ChatBottomSheetSafeArea(
       bottomInset: bottomInset,
       exportedSemanticsClearance: exportedSemanticsClearance,
