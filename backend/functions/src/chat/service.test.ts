@@ -11,6 +11,7 @@ import {
   type ChatAttachmentUploadGrant,
   type ChatGroupInfoRecord,
   type ChatGroupInviteRecord,
+  type ChatNotificationPreferences,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
   type ChatProfile,
@@ -408,6 +409,39 @@ test("binds group membership permissions invites and leave to one thread", async
   assert.deepEqual(repository.groupLeaveInput, [actor.userId, "group-1"]);
 });
 
+test("validates notification categories quiet hours and device registration", async () => {
+  const repository = new FakeChatRepository();
+  const service = createService(repository);
+  const saved = await service.updateNotificationPreferences(actor.userId, {
+    messagesEnabled: true,
+    callsEnabled: true,
+    groupInvitesEnabled: false,
+    showPreview: false,
+    quietHoursEnabled: true,
+    quietStartMinutes: 1320,
+    quietEndMinutes: 420,
+    utcOffsetMinutes: 330,
+  });
+  assert.equal(saved.quietHoursEnabled, true);
+  const token = "a".repeat(64);
+  await service.registerNotificationDevice(actor.userId, {
+    token,
+    platform: "android",
+  });
+  assert.deepEqual(repository.notificationDeviceInput, [
+    actor.userId,
+    token,
+    "android",
+  ]);
+  assert.throws(
+    () => service.registerNotificationDevice(actor.userId, {
+      token: "short",
+      platform: "android",
+    }),
+    (error: unknown) => error instanceof ChatError && error.code === "bad_request",
+  );
+});
+
 function createService(repository: ChatRepository): ChatService {
   return new ChatService(repository, async (userId) => {
     if (userId === actor.userId) return actor;
@@ -461,6 +495,11 @@ class FakeChatRepository implements ChatRepository {
   groupInviteInput?: [ChatProfile, string, ChatProfile];
   groupPermissionInput?: [string, string, "admins" | "members"];
   groupLeaveInput?: [string, string];
+  notificationPreferencesInput?: [
+    string,
+    Omit<ChatNotificationPreferences, "updatedAt">,
+  ];
+  notificationDeviceInput?: [string, string, "android" | "ios"];
 
   async listThreads(userId: string, limit: number): Promise<ChatThreadRecord[]> {
     this.listThreadsInput = [userId, limit];
@@ -746,6 +785,31 @@ class FakeChatRepository implements ChatRepository {
   ) {
     return { inviteId, accepted, threadId: "group-1" };
   }
+
+  async getNotificationPreferences(): Promise<ChatNotificationPreferences> {
+    return notificationPreferences;
+  }
+
+  async updateNotificationPreferences(
+    userId: string,
+    preferences: Omit<ChatNotificationPreferences, "updatedAt">,
+  ): Promise<ChatNotificationPreferences> {
+    this.notificationPreferencesInput = [userId, preferences];
+    return { ...preferences, updatedAt: notificationPreferences.updatedAt };
+  }
+
+  async registerNotificationDevice(
+    userId: string,
+    token: string,
+    platform: "android" | "ios",
+  ) {
+    this.notificationDeviceInput = [userId, token, platform];
+    return { registered: true };
+  }
+
+  async unregisterNotificationDevice() {
+    return { registered: false };
+  }
 }
 
 const privacy: ChatPrivacySettings = {
@@ -833,6 +897,18 @@ const groupInvite: ChatGroupInviteRecord = {
   invitedByUserId: actor.userId,
   invitedByName: actor.name,
   invitedAt: "2026-08-29T05:00:00.000Z",
+};
+
+const notificationPreferences: ChatNotificationPreferences = {
+  messagesEnabled: true,
+  callsEnabled: true,
+  groupInvitesEnabled: true,
+  showPreview: true,
+  quietHoursEnabled: false,
+  quietStartMinutes: 1320,
+  quietEndMinutes: 420,
+  utcOffsetMinutes: 330,
+  updatedAt: "2026-08-29T06:00:00.000Z",
 };
 
 const thread: ChatThreadRecord = {

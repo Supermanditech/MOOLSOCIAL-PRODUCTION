@@ -286,7 +286,7 @@ void main() {
     await tester.tap(find.byKey(const Key('chat-settings-notifications')));
     await tester.pumpAndSettle();
     expect(
-      find.byKey(const Key('chat-notifications-recovery')),
+      find.byKey(const Key('chat-notification-settings-screen')),
       findsOneWidget,
     );
     await tester.binding.handlePopRoute();

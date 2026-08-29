@@ -598,6 +598,35 @@ test("group invitation acceptance permissions and leave update one membership", 
     3);
 });
 
+test("notification preferences and device token lifecycle persist exactly", async () => {
+  const database = chatDatabase();
+  const repository = new FirestoreChatRepository(
+    database as unknown as Firestore,
+    () => new Date("2026-08-29T06:00:00.000Z"),
+  );
+  const saved = await repository.updateNotificationPreferences(actor.userId, {
+    messagesEnabled: false,
+    callsEnabled: true,
+    groupInvitesEnabled: false,
+    showPreview: false,
+    quietHoursEnabled: true,
+    quietStartMinutes: 1320,
+    quietEndMinutes: 420,
+    utcOffsetMinutes: 330,
+  });
+  assert.equal(saved.showPreview, false);
+  assert.deepEqual(await repository.getNotificationPreferences(actor.userId), saved);
+  const token = "token-" + "a".repeat(58);
+  assert.deepEqual(
+    await repository.registerNotificationDevice(actor.userId, token, "android"),
+    { registered: true },
+  );
+  assert.deepEqual(
+    await repository.unregisterNotificationDevice(actor.userId, token),
+    { registered: false },
+  );
+});
+
 function chatDatabase(): FakeFirestore {
   return new FakeFirestore({
     "chatThreads/thread-1": {

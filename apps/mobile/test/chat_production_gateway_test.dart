@@ -522,6 +522,55 @@ void main() {
   });
 
   test(
+    'authenticated gateway transports notifications and quiet hours',
+    () async {
+      final settings = {
+        'messagesEnabled': true,
+        'callsEnabled': true,
+        'groupInvitesEnabled': false,
+        'showPreview': false,
+        'quietHoursEnabled': true,
+        'quietStartMinutes': 1320,
+        'quietEndMinutes': 420,
+        'utcOffsetMinutes': 330,
+        'updatedAt': '2026-08-29T06:00:00.000Z',
+      };
+      final transport = _RecordingTransport([
+        _ok(settings),
+        _ok(settings),
+        _ok({'registered': true}),
+        _ok({'registered': false}),
+      ]);
+      final gateway = AuthenticatedChatGateway(
+        endpoint: Uri.parse(
+          'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat',
+        ),
+        credentials: _RecordingCredentials(),
+        transport: transport,
+        random: Random(6),
+      );
+      final loaded = await gateway.getNotificationPreferences();
+      expect(loaded.quietStartMinutes, 1320);
+      await gateway.updateNotificationPreferences(loaded);
+      final token = List.filled(64, 'a').join();
+      expect(
+        await gateway.registerNotificationDevice(
+          token: token,
+          platform: 'android',
+        ),
+        isTrue,
+      );
+      expect(await gateway.unregisterNotificationDevice(token: token), isFalse);
+      expect(transport.bodies.map((body) => body['operation']), [
+        'getNotificationPreferences',
+        'updateNotificationPreferences',
+        'registerNotificationDevice',
+        'unregisterNotificationDevice',
+      ]);
+    },
+  );
+
+  test(
     'production Chat loads only gateway-owned threads and messages',
     () async {
       final gateway = _ChatGateway();

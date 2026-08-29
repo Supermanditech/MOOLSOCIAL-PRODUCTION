@@ -115,11 +115,12 @@ void main() {
       await tester.tap(notification);
       await tester.pumpAndSettle();
       expect(
-        find.byKey(const Key('chat-notifications-recovery')),
+        find.byKey(const Key('chat-notification-settings-screen')),
         findsOneWidget,
       );
-      expect(find.text('Notification settings unavailable'), findsOneWidget);
-      await closeRecovery(tester);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-settings-screen')), findsOneWidget);
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
