@@ -93,7 +93,7 @@ void main() {
     expect(session.selectedOrder.id, 'PO-240783');
   });
 
-  testWidgets('Assist return route reconstructs its exact order and Back', (
+  testWidgets('retired Assist deep link restores exact order Tracking', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -115,15 +115,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(session.view, BuyV2View.assist);
-    expect(session.assistOrder.id, 'PO-240783');
-    expect(find.textContaining('PO-240783'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('buy-assist-return')));
-    await tester.pumpAndSettle();
-
     expect(session.view, BuyV2View.tracking);
+    expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
     expect(session.selectedOrder.id, 'PO-240783');
+    expect(find.textContaining('PO-240783'), findsOneWidget);
     expect(
       find.byKey(const PageStorageKey('buy-tracking-PO-240783')),
       findsOneWidget,

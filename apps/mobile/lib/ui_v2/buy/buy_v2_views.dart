@@ -4474,9 +4474,14 @@ class _PlacedOrderCard extends StatelessWidget {
 }
 
 class BuyV2RecoveryView extends StatelessWidget {
-  const BuyV2RecoveryView({super.key, required this.session});
+  const BuyV2RecoveryView({
+    super.key,
+    required this.session,
+    required this.onOpenOrderHelp,
+  });
 
   final BuyV2Session session;
+  final ValueChanged<BuyV2Order> onOpenOrderHelp;
 
   @override
   Widget build(BuildContext context) {
@@ -4557,7 +4562,11 @@ class BuyV2RecoveryView extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: session.openRecoveryOrderHelp,
+                    onPressed: () {
+                      if (session.openRecoveryOrderHelp()) {
+                        onOpenOrderHelp(session.selectedOrder);
+                      }
+                    },
                     child: const Text('Get help'),
                   ),
                 ),
@@ -4574,11 +4583,13 @@ class BuyV2OrdersView extends StatelessWidget {
   const BuyV2OrdersView({
     super.key,
     required this.session,
+    required this.onOpenOrderHelp,
     this.invoiceDownloader,
     this.browseProducts,
   });
 
   final BuyV2Session session;
+  final ValueChanged<BuyV2Order> onOpenOrderHelp;
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final Widget? browseProducts;
 
@@ -4639,7 +4650,7 @@ class BuyV2OrdersView extends StatelessWidget {
               IconButton(
                 key: const ValueKey('buy-orders-assist'),
                 tooltip: 'MoolSocial Assist',
-                onPressed: session.openAssist,
+                onPressed: () => onOpenOrderHelp(session.assistOrder),
                 style: IconButton.styleFrom(
                   minimumSize: const Size(44, 44),
                   backgroundColor: BuyV2Colors.softBlue,
@@ -5049,6 +5060,7 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
   BuildContext context,
   BuyV2Session session,
   BuyV2Order order,
+  ValueChanged<BuyV2Order> onOpenOrderHelp,
 ) async {
   final destination = session.destination;
   final view = session.view;
@@ -5225,11 +5237,12 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
                 key: const ValueKey('buy-order-delivery-help'),
                 icon: Icons.chat_outlined,
                 title: 'Get help with this order',
-                detail: '$orderId stays attached to Assist',
+                detail: '$orderId stays attached in Shop Chat',
                 primary: true,
-                onTap: () => continueAfterReverse(sheetContext, () async {
-                  session.openAssist();
-                }),
+                onTap: () => continueAfterReverse(
+                  sheetContext,
+                  () async => onOpenOrderHelp(order),
+                ),
               ),
             ],
           ),
@@ -5243,10 +5256,12 @@ class BuyV2TrackingView extends StatelessWidget {
   const BuyV2TrackingView({
     super.key,
     required this.session,
+    required this.onOpenOrderHelp,
     this.invoiceDownloader,
   });
 
   final BuyV2Session session;
+  final ValueChanged<BuyV2Order> onOpenOrderHelp;
   final BuyV2InvoiceDownloader? invoiceDownloader;
 
   @override
@@ -5538,6 +5553,7 @@ class BuyV2TrackingView extends StatelessWidget {
                   context,
                   session,
                   order,
+                  onOpenOrderHelp,
                 ),
                 icon: Icons.location_on_outlined,
                 label: 'Address',
@@ -5561,7 +5577,7 @@ class BuyV2TrackingView extends StatelessWidget {
                 ),
                 onPressed: order.status == BuyV2OrderStatus.delivered
                     ? () => session.reorder(order)
-                    : session.openAssist,
+                    : () => onOpenOrderHelp(order),
                 icon: order.status == BuyV2OrderStatus.delivered
                     ? Icons.replay_rounded
                     : Icons.chat_outlined,
@@ -5594,7 +5610,7 @@ class BuyV2TrackingView extends StatelessWidget {
             icon: Icons.support_agent_outlined,
             title: 'Get help with this order',
             detail: 'Prepare a return, replacement or refund question',
-            onTap: session.openAssist,
+            onTap: () => onOpenOrderHelp(order),
           ),
         ],
       ],

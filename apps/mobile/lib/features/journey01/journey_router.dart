@@ -593,6 +593,8 @@ GoRouter createJourneyRouter(
           threadId: state.pathParameters['threadId'] ?? 'home-basket',
           initialMessageDraft: state.uri.queryParameters['draft'],
           returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
+          returnDirectToOrigin:
+              state.uri.queryParameters['directReturn'] == 'true',
         ),
       ),
       GoRoute(
@@ -1670,7 +1672,7 @@ BuyV2View _buyV2View(String? value) => switch (value) {
   'review' || 'checkout' => BuyV2View.checkout,
   'confirmation' || 'confirmed' => BuyV2View.confirmation,
   'tracking' => BuyV2View.tracking,
-  'assist' || 'chat' => BuyV2View.assist,
+  'assist' || 'chat' => BuyV2View.catalogue,
   'recovery' => BuyV2View.recovery,
   _ => BuyV2View.catalogue,
 };

@@ -144,10 +144,6 @@ void main() {
       expect(session.recoveryReturnLabel, 'Return to order');
       expect(session.canOpenRecoveryOrderHelp, isTrue);
       expect(session.openRecoveryOrderHelp(), isTrue);
-      expect(session.view, BuyV2View.assist);
-      expect(session.assistOrder.id, 'PO-240783');
-
-      session.closeAssist();
       expect(session.view, origin);
       expect(session.selectedOrder.id, 'PO-240783');
       session.dispose();
