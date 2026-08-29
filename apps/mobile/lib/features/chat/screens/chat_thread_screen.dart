@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
@@ -1656,6 +1657,7 @@ Future<void> _showMessageActions(
   required String threadId,
   required ChatMessage message,
 }) {
+  final copyValue = _copyableMessageValue(message);
   final forwardableContent =
       message.photo == null &&
       message.attachmentLabel == null &&
@@ -1678,67 +1680,304 @@ Future<void> _showMessageActions(
     builder: (sheetContext) => ChatBottomSheetSafeArea(
       bottomInset: bottomInset,
       exportedSemanticsClearance: exportedSemanticsClearance,
-      child: Column(
-        key: const Key('chat-message-actions'),
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const ListTile(
-            title: Text(
-              'Message actions',
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(sheetContext).height * .78,
+        ),
+        child: ListView(
+          key: const Key('chat-message-actions'),
+          shrinkWrap: true,
+          children: [
+            const ListTile(
+              title: Text(
+                'Message actions',
+                style: TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (copyValue != null)
+              ListTile(
+                key: Key('chat-copy-${message.id}'),
+                leading: const Icon(Icons.content_copy_rounded),
+                title: const Text('Copy'),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  await Future<void>.delayed(Duration.zero);
+                  if (!context.mounted) return;
+                  await _copyMessage(context, copyValue);
+                },
+              ),
+            ListTile(
+              key: Key('chat-reply-${message.id}'),
+              leading: const Icon(Icons.reply_rounded),
+              title: const Text('Reply'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                session.startReply(threadId, message.id);
+              },
+            ),
+            ListTile(
+              key: Key('chat-react-${message.id}'),
+              leading: Icon(
+                message.reactedByMe
+                    ? Icons.thumb_up_rounded
+                    : Icons.thumb_up_outlined,
+              ),
+              title: Text(message.reactedByMe ? 'Remove reaction' : 'React'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                unawaited(session.toggleReaction(threadId, message.id));
+              },
+            ),
+            if (forwardableContent)
+              ListTile(
+                key: Key('chat-forward-${message.id}'),
+                leading: const Icon(Icons.forward_rounded),
+                title: const Text('Forward'),
+                enabled: canForward,
+                onTap: !canForward
+                    ? null
+                    : () async {
+                        Navigator.of(sheetContext).pop();
+                        await Future<void>.delayed(Duration.zero);
+                        if (!context.mounted) return;
+                        await _chooseForwardTarget(
+                          context,
+                          session,
+                          threadId,
+                          message,
+                        );
+                      },
+              ),
+            ListTile(
+              key: Key('chat-message-info-action-${message.id}'),
+              leading: const Icon(Icons.info_outline_rounded),
+              title: const Text('Message details'),
+              onTap: () async {
+                Navigator.of(sheetContext).pop();
+                await Future<void>.delayed(Duration.zero);
+                if (!context.mounted) return;
+                await _showMessageInfo(context, message);
+              },
+            ),
+            ListTile(
+              key: Key('chat-remove-message-${message.id}'),
+              leading: const Icon(Icons.visibility_off_outlined),
+              title: const Text('Remove for me'),
+              subtitle: const Text('Hide this message for this app session.'),
+              onTap: () {
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.of(sheetContext).pop();
+                session.setMessageHiddenForSession(
+                  threadId,
+                  message.id,
+                  hidden: true,
+                );
+                messenger
+                  ..hideCurrentSnackBar(reason: SnackBarClosedReason.remove)
+                  ..showSnackBar(
+                    SnackBar(
+                      key: const Key('chat-message-remove-feedback'),
+                      behavior: SnackBarBehavior.floating,
+                      content: const Text(
+                        'Message removed for this app session.',
+                      ),
+                      action: SnackBarAction(
+                        key: const Key('chat-message-remove-undo'),
+                        label: 'Undo',
+                        onPressed: () => session.setMessageHiddenForSession(
+                          threadId,
+                          message.id,
+                          hidden: false,
+                        ),
+                      ),
+                    ),
+                  );
+              },
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 14),
+              child: Text(
+                'Remove for me affects this app session only. It does not delete the message for anyone else.',
+                style: TextStyle(
+                  color: MoolColors.muted,
+                  fontSize: 11.5,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Future<void> _copyMessage(BuildContext context, String value) async {
+  try {
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar(reason: SnackBarClosedReason.remove)
+      ..showSnackBar(
+        const SnackBar(
+          key: Key('chat-message-copy-feedback'),
+          behavior: SnackBarBehavior.floating,
+          content: Text('Message copied.'),
+        ),
+      );
+  } on Object {
+    if (!context.mounted) return;
+    await showChatUnavailableCapability(
+      context,
+      keyName: 'chat-message-copy-recovery',
+      title: 'Copy unavailable',
+      message:
+          'This message could not be copied right now. Nothing changed. You can continue in Chat and try again later.',
+    );
+  }
+}
+
+Future<void> _showMessageInfo(BuildContext context, ChatMessage message) {
+  final viewPadding = MediaQuery.viewPaddingOf(context);
+  final bottomInset = viewPadding.bottom;
+  final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
+    viewPadding: viewPadding,
+    platform: Theme.of(context).platform,
+  );
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    useSafeArea: true,
+    isScrollControlled: true,
+    sheetAnimationStyle: ChatMotion.sheetStyle(context),
+    builder: (sheetContext) => ChatBottomSheetSafeArea(
+      bottomInset: bottomInset,
+      exportedSemanticsClearance: exportedSemanticsClearance,
+      child: SingleChildScrollView(
+        key: const Key('chat-message-info'),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Message details',
               style: TextStyle(
                 color: MoolColors.navy,
-                fontSize: 18,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: MoolSpacing.sm),
+            _MessageInfoRow(
+              keyName: 'chat-message-info-sender',
+              label: message.mine ? 'Sent by' : 'Received from',
+              value: message.sender,
+            ),
+            _MessageInfoRow(
+              keyName: 'chat-message-info-time',
+              label: 'Time',
+              value: message.timeLabel,
+            ),
+            _MessageInfoRow(
+              keyName: 'chat-message-info-type',
+              label: 'Type',
+              value: _messageTypeLabel(message),
+            ),
+            _MessageInfoRow(
+              keyName: 'chat-message-info-status',
+              label: 'Status',
+              value: message.mine
+                  ? _deliveryLabel(message.deliveryState)
+                  : 'Received',
+            ),
+            if (message.forwarded)
+              const _MessageInfoRow(
+                keyName: 'chat-message-info-forwarded',
+                label: 'Forwarded',
+                value: 'Yes',
+              ),
+            if (message.replyTo case final reply?)
+              _MessageInfoRow(
+                keyName: 'chat-message-info-reply',
+                label: 'Replying to',
+                value: reply.sender,
+              ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Details reflect the message currently loaded in Chat. Private reader identities are not shown.',
+                style: TextStyle(color: MoolColors.muted, fontSize: 11.5),
+              ),
+            ),
+            FilledButton(
+              key: const Key('chat-message-info-continue'),
+              onPressed: () => Navigator.of(sheetContext).pop(),
+              child: const Text('Continue in Chat'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _MessageInfoRow extends StatelessWidget {
+  const _MessageInfoRow({
+    required this.keyName,
+    required this.label,
+    required this.value,
+  });
+
+  final String keyName;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: Key(keyName),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: MoolColors.line)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label, style: const TextStyle(color: MoolColors.muted)),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                color: MoolColors.ink,
                 fontWeight: FontWeight.w800,
               ),
             ),
           ),
-          ListTile(
-            key: Key('chat-reply-${message.id}'),
-            leading: const Icon(Icons.reply_rounded),
-            title: const Text('Reply'),
-            onTap: () {
-              Navigator.of(sheetContext).pop();
-              session.startReply(threadId, message.id);
-            },
-          ),
-          ListTile(
-            key: Key('chat-react-${message.id}'),
-            leading: Icon(
-              message.reactedByMe
-                  ? Icons.thumb_up_rounded
-                  : Icons.thumb_up_outlined,
-            ),
-            title: Text(message.reactedByMe ? 'Remove reaction' : 'React'),
-            onTap: () {
-              Navigator.of(sheetContext).pop();
-              unawaited(session.toggleReaction(threadId, message.id));
-            },
-          ),
-          if (forwardableContent)
-            ListTile(
-              key: Key('chat-forward-${message.id}'),
-              leading: const Icon(Icons.forward_rounded),
-              title: const Text('Forward'),
-              enabled: canForward,
-              onTap: !canForward
-                  ? null
-                  : () async {
-                      Navigator.of(sheetContext).pop();
-                      await Future<void>.delayed(Duration.zero);
-                      if (!context.mounted) return;
-                      await _chooseForwardTarget(
-                        context,
-                        session,
-                        threadId,
-                        message,
-                      );
-                    },
-            ),
-          const SizedBox(height: MoolSpacing.xs),
         ],
       ),
-    ),
-  );
+    );
+  }
+}
+
+String? _copyableMessageValue(ChatMessage message) {
+  final text = message.text.trim();
+  if (text.isNotEmpty) return text;
+  final attachment = message.attachmentLabel?.trim();
+  return attachment == null || attachment.isEmpty ? null : attachment;
+}
+
+String _messageTypeLabel(ChatMessage message) {
+  if (message.photo != null) return 'Photo';
+  if (message.attachmentLabel != null) return 'Attachment';
+  return 'Text message';
 }
 
 Future<void> _chooseForwardTarget(

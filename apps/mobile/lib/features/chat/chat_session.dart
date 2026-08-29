@@ -218,6 +218,7 @@ class ChatSession extends ChangeNotifier {
   final Map<String, String> _messageLoadErrors = {};
   final Map<String, String> _threadActionErrors = {};
   final Map<String, String> _threadActionNotices = {};
+  final Map<String, Set<String>> _hiddenMessageIdsByThread = {};
   final Set<String> _readThreads = {};
   final Set<String> _markedUnreadThreads = {};
   final Set<String> _pinnedThreadIds = {};
@@ -564,7 +565,33 @@ class ChatSession extends ChangeNotifier {
   }
 
   List<ChatMessage> messages(String threadId) {
-    return List.unmodifiable(_messages[threadId] ?? const []);
+    final hiddenIds = _hiddenMessageIdsByThread[threadId];
+    final values = _messages[threadId] ?? const [];
+    if (hiddenIds == null || hiddenIds.isEmpty) {
+      return List.unmodifiable(values);
+    }
+    return List.unmodifiable(
+      values.where((message) => !hiddenIds.contains(message.id)),
+    );
+  }
+
+  bool isMessageHiddenForSession(String threadId, String messageId) =>
+      _hiddenMessageIdsByThread[threadId]?.contains(messageId) ?? false;
+
+  void setMessageHiddenForSession(
+    String threadId,
+    String messageId, {
+    required bool hidden,
+  }) {
+    final hiddenIds = _hiddenMessageIdsByThread.putIfAbsent(
+      threadId,
+      () => <String>{},
+    );
+    final changed = hidden
+        ? hiddenIds.add(messageId)
+        : hiddenIds.remove(messageId);
+    if (hiddenIds.isEmpty) _hiddenMessageIdsByThread.remove(threadId);
+    if (changed) notifyListeners();
   }
 
   String? messageLoadError(String threadId) => _messageLoadErrors[threadId];
@@ -1269,6 +1296,7 @@ class ChatSession extends ChangeNotifier {
     _messageLoadErrors.clear();
     _threadActionErrors.clear();
     _threadActionNotices.clear();
+    _hiddenMessageIdsByThread.clear();
     _readThreads.clear();
     _markedUnreadThreads.clear();
     _pinnedThreadIds.clear();
