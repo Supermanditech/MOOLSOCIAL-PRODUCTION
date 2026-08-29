@@ -5820,6 +5820,24 @@ class BuyV2TrackingView extends StatelessWidget {
                 ],
               ),
             ),
+            IconButton(
+              key: ValueKey('buy-tracking-refresh-${order.id}'),
+              tooltip: 'Refresh order',
+              onPressed: session.orderRefreshBusy(order.id)
+                  ? null
+                  : () => session.refreshOrder(order.id),
+              constraints: const BoxConstraints.tightFor(
+                width: BuyV2Metrics.minimumTap,
+                height: BuyV2Metrics.minimumTap,
+              ),
+              icon: session.orderRefreshBusy(order.id)
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded, size: 20),
+            ),
+            const SizedBox(width: 4),
             Semantics(
               label:
                   'Current order status: ${_trackingStatusLabel(order.status)}',
@@ -5855,6 +5873,37 @@ class BuyV2TrackingView extends StatelessWidget {
             ),
           ],
         ),
+        if (session.orderRefreshState(order.id) case final refreshState?
+            when refreshState != BuyV2CommerceLoadState.ready &&
+                refreshState != BuyV2CommerceLoadState.loading) ...[
+          const SizedBox(height: 6),
+          Container(
+            key: ValueKey('buy-tracking-refresh-${refreshState.name}'),
+            padding: const EdgeInsets.all(10),
+            decoration: buyV2CardDecoration(
+              color: BuyV2Colors.softOrange,
+              border: BuyV2Colors.orange,
+              radius: 13,
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.cloud_off_outlined,
+                  color: BuyV2Colors.navy,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    session.orderRefreshMessage(order.id) ??
+                        'Order could not refresh. Last known details are still shown.',
+                    style: context.buyMeta,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.all(10),
@@ -6114,19 +6163,45 @@ class BuyV2TrackingView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        SizedBox(
-          height: 44,
-          child: OutlinedButton.icon(
-            key: ValueKey('buy-tracking-invoice-${order.id}'),
-            onPressed: () => showBuyV2InvoicePage(
-              context,
-              order: order,
-              downloader: invoiceDownloader,
+        if (order.invoiceAvailable)
+          SizedBox(
+            height: 44,
+            child: OutlinedButton.icon(
+              key: ValueKey('buy-tracking-invoice-${order.id}'),
+              onPressed: () => showBuyV2InvoicePage(
+                context,
+                order: order,
+                downloader: invoiceDownloader,
+              ),
+              icon: const Icon(Icons.receipt_long_outlined, size: 18),
+              label: const Text('View invoice'),
             ),
-            icon: const Icon(Icons.receipt_long_outlined, size: 18),
-            label: const Text('View invoice'),
+          )
+        else
+          Container(
+            key: ValueKey('buy-tracking-invoice-pending-${order.id}'),
+            padding: const EdgeInsets.all(10),
+            decoration: buyV2CardDecoration(
+              color: BuyV2Colors.softBlue,
+              radius: 13,
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.receipt_long_outlined,
+                  color: BuyV2Colors.navy,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Invoice is being prepared. Refresh this order for the latest update.',
+                    style: context.buyMeta,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
         if (order.status == BuyV2OrderStatus.delivered) ...[
           const SizedBox(height: 6),
           _OrderDeliveryContinuation(

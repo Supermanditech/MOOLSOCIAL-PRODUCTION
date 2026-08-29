@@ -166,6 +166,19 @@ class BuyV2OrderPlacementResult {
 }
 
 @immutable
+class BuyV2OrderRefreshResult {
+  const BuyV2OrderRefreshResult({
+    required this.state,
+    required this.customerMessage,
+    this.order,
+  });
+
+  final BuyV2CommerceLoadState state;
+  final String customerMessage;
+  final BuyV2Order? order;
+}
+
+@immutable
 class BuyV2MutationResult {
   const BuyV2MutationResult({
     required this.accepted,
@@ -204,6 +217,8 @@ abstract interface class BuyV2CommerceAdapter {
     required String idempotencyKey,
     required String paymentReference,
   });
+
+  Future<BuyV2OrderRefreshResult> refreshOrder({required String orderId});
 
   Future<BuyV2MutationResult> submitProductReview({
     required BuyV2Product product,

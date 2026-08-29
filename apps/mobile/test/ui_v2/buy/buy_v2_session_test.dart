@@ -46,6 +46,7 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
   int reconciliationCalls = 0;
   int reviewCalls = 0;
   int reportCalls = 0;
+  int orderRefreshCalls = 0;
   final requests = <BuyV2OrderPlacementRequest>[];
   BuyV2MutationResult reviewResult = const BuyV2MutationResult(
     accepted: true,
@@ -54,6 +55,10 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
   BuyV2MutationResult reportResult = const BuyV2MutationResult(
     accepted: true,
     customerMessage: 'Report received.',
+  );
+  BuyV2OrderRefreshResult orderRefreshResult = const BuyV2OrderRefreshResult(
+    state: BuyV2CommerceLoadState.unavailable,
+    customerMessage: 'Order updates are unavailable right now.',
   );
 
   @override
@@ -75,6 +80,14 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
   }) async {
     reconciliationCalls += 1;
     return reconciliation ?? placement;
+  }
+
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({
+    required String orderId,
+  }) async {
+    orderRefreshCalls += 1;
+    return orderRefreshResult;
   }
 
   @override
@@ -1745,6 +1758,70 @@ void main() {
           expect(fixture.session.businessVerified, isFalse);
           expect(fixture.session.businessVerificationState, state);
         }
+      },
+    );
+
+    test(
+      'order refresh accepts exact identity and preserves last known failure',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+        );
+        addTearDown(fixture.session.dispose);
+        expect(await fixture.session.submitOrder(), isTrue);
+        final updated = BuyV2Order(
+          id: fixture.order.id,
+          destination: fixture.order.destination,
+          title: fixture.order.title,
+          itemSummary: fixture.order.itemSummary,
+          total: fixture.order.total,
+          partner: fixture.order.partner,
+          partnerType: fixture.order.partnerType,
+          promise: 'Arriving today by 6:30 pm',
+          destinationLabel: fixture.order.destinationLabel,
+          progress: .8,
+          status: BuyV2OrderStatus.arriving,
+          purchaseId: fixture.order.purchaseId,
+          productIds: fixture.order.productIds,
+          lines: fixture.order.lines,
+          paymentMethod: fixture.order.paymentMethod,
+          invoiceAvailable: false,
+          receiptReference: 'PAY-RECEIPT-1',
+        );
+        fixture.adapter.orderRefreshResult = BuyV2OrderRefreshResult(
+          state: BuyV2CommerceLoadState.ready,
+          customerMessage: 'Order updated.',
+          order: updated,
+        );
+
+        expect(await fixture.session.refreshOrder(fixture.order.id), isTrue);
+        expect(fixture.adapter.orderRefreshCalls, 1);
+        expect(fixture.session.orders.first.promise, updated.promise);
+        expect(fixture.session.orders.first.invoiceAvailable, isFalse);
+
+        fixture.adapter.orderRefreshResult = BuyV2OrderRefreshResult(
+          state: BuyV2CommerceLoadState.ready,
+          customerMessage: 'Order identity could not be verified.',
+          order: BuyV2Order(
+            id: 'OTHER-ORDER',
+            destination: updated.destination,
+            title: updated.title,
+            itemSummary: updated.itemSummary,
+            total: updated.total,
+            partner: updated.partner,
+            partnerType: updated.partnerType,
+            promise: 'Different promise',
+            destinationLabel: updated.destinationLabel,
+            progress: .9,
+            status: BuyV2OrderStatus.arriving,
+          ),
+        );
+        expect(await fixture.session.refreshOrder(fixture.order.id), isFalse);
+        expect(fixture.session.orders.first.promise, updated.promise);
+        expect(
+          fixture.session.orderRefreshMessage(fixture.order.id),
+          'Order identity could not be verified.',
+        );
       },
     );
   });

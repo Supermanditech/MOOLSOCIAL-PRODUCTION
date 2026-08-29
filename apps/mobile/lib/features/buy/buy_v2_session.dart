@@ -123,6 +123,14 @@ final class _BuyV2UnavailableCommerceAdapter implements BuyV2CommerceAdapter {
   );
 
   @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({
+    required String orderId,
+  }) async => const BuyV2OrderRefreshResult(
+    state: BuyV2CommerceLoadState.unavailable,
+    customerMessage: 'Order updates are unavailable right now.',
+  );
+
+  @override
   Future<BuyV2MutationResult> submitProductReview({
     required BuyV2Product product,
     required int rating,
@@ -184,6 +192,14 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
   }) async => const BuyV2OrderPlacementResult(
     outcome: BuyV2OrderPlacementOutcome.paymentUnknown,
     customerMessage: 'Payment status could not be confirmed yet.',
+  );
+
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({
+    required String orderId,
+  }) async => const BuyV2OrderRefreshResult(
+    state: BuyV2CommerceLoadState.unavailable,
+    customerMessage: 'Order updates are unavailable right now.',
   );
 
   @override
@@ -456,6 +472,9 @@ class BuyV2Session extends ChangeNotifier {
   final Set<String> _reviewableProductIds = {};
   final Set<String> _productFeedbackBusyIds = {};
   bool _productReportsAvailable = false;
+  final Set<String> _orderRefreshBusyIds = {};
+  final Map<String, BuyV2CommerceLoadState> _orderRefreshStates = {};
+  final Map<String, String> _orderRefreshMessages = {};
   final Map<BuyV2CartScope, double> _cartScrollOffsets = {};
   final Map<BuyV2Destination, String> _deliveryInstructionIds = {};
   final Map<String, _BuyV2CartBenefitSelectionRef> _selectedCartBenefitRefs =
@@ -600,6 +619,67 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2Address> get addresses => List.unmodifiable(_addresses);
 
   List<BuyV2Order> get orders => List.unmodifiable(_orders);
+
+  bool orderRefreshBusy(String orderId) =>
+      _orderRefreshBusyIds.contains(orderId);
+
+  BuyV2CommerceLoadState? orderRefreshState(String orderId) =>
+      _orderRefreshStates[orderId];
+
+  String? orderRefreshMessage(String orderId) => _orderRefreshMessages[orderId];
+
+  Future<bool> refreshOrder(String orderId) async {
+    final index = _orders.indexWhere((order) => order.id == orderId);
+    if (index < 0) {
+      notice = 'This order could not be found.';
+      notifyListeners();
+      return false;
+    }
+    if (reviewDataEnabled) {
+      _orderRefreshStates[orderId] = BuyV2CommerceLoadState.ready;
+      _orderRefreshMessages[orderId] = 'Order is up to date.';
+      notice = 'Order is up to date.';
+      notifyListeners();
+      return true;
+    }
+    if (!_orderRefreshBusyIds.add(orderId)) return false;
+    _orderRefreshStates[orderId] = BuyV2CommerceLoadState.loading;
+    _orderRefreshMessages.remove(orderId);
+    notifyListeners();
+    try {
+      final result = await commerceAdapter.refreshOrder(orderId: orderId);
+      final refreshed = result.order;
+      final valid =
+          result.state == BuyV2CommerceLoadState.ready &&
+          refreshed != null &&
+          refreshed.id == orderId &&
+          refreshed.total >= 0 &&
+          refreshed.progress >= 0 &&
+          refreshed.progress <= 1 &&
+          refreshed.partner.trim().isNotEmpty &&
+          refreshed.promise.trim().isNotEmpty;
+      if (!valid) {
+        _orderRefreshStates[orderId] = result.state;
+        _orderRefreshMessages[orderId] = result.customerMessage;
+        notice = result.customerMessage;
+        return false;
+      }
+      _orders[index] = refreshed;
+      _orderRefreshStates[orderId] = BuyV2CommerceLoadState.ready;
+      _orderRefreshMessages[orderId] = result.customerMessage;
+      notice = result.customerMessage;
+      return true;
+    } on Object {
+      _orderRefreshStates[orderId] = BuyV2CommerceLoadState.offline;
+      _orderRefreshMessages[orderId] =
+          'Order could not refresh. Check your connection and try again.';
+      notice = _orderRefreshMessages[orderId];
+      return false;
+    } finally {
+      _orderRefreshBusyIds.remove(orderId);
+      notifyListeners();
+    }
+  }
 
   String? get selectedOrderId => _selectedOrderId;
 
