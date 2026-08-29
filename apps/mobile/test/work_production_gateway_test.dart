@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
@@ -56,7 +57,10 @@ void main() {
         ),
       );
       final reviewed = await gateway.checkReview('wp-1');
-      expect(await gateway.submitGst('wp-1', '08ABCDE1234F1Z5'), 'gst-1');
+      expect(
+        await gateway.submitGst('wp-1', '08ABCDE1234F1Z5', 'proof-gst-1'),
+        'gst-1',
+      );
       await gateway.finishSetup(
         workspaceId: 'workspace-1',
         quantity: 24,
@@ -87,6 +91,51 @@ void main() {
     },
   );
 
+  test(
+    'proof document is privately uploaded and confirmed before acceptance',
+    () async {
+      final transport = _RecordingTransport([
+        _ok({
+          'uploadId': '00000000-0000-4000-8000-000000000001',
+          'uploadUrl': 'https://storage.googleapis.com/private-upload',
+          'expiresAt': '2099-08-29T09:05:00.000Z',
+          'requiredHeaders': {
+            'content-type': 'application/pdf',
+            'content-length': '8',
+          },
+        }),
+        _ok({'proofReference': 'proof-confirmed-1'}),
+      ]);
+      final upload = _RecordingProofUpload();
+      final gateway = AuthenticatedWorkGateway(
+        endpoint: Uri.parse(
+          'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace',
+        ),
+        credentials: _RecordingCredentials(),
+        transport: transport,
+        proofUploadTransport: upload,
+        random: Random(2),
+      );
+      final proof = WorkPickedProof(
+        fileName: 'shop-front.pdf',
+        contentType: 'application/pdf',
+        bytes: Uint8List.fromList('%PDF-1.7'.codeUnits),
+      );
+
+      expect(await gateway.saveProof('shop-front', proof), 'proof-confirmed-1');
+      expect(transport.bodies.map((body) => body['operation']), [
+        'prepareProofUpload',
+        'confirmProofUpload',
+      ]);
+      expect(upload.puts, 1);
+      expect(upload.bytes, proof.bytes);
+      expect(
+        transport.bodies.last['uploadId'],
+        '00000000-0000-4000-8000-000000000001',
+      );
+    },
+  );
+
   test('pending review never invents a verified Workspace', () async {
     final session = WorkSession.production(gateway: _PendingGateway())
       ..selectedProfile = workProfiles.first
@@ -96,10 +145,33 @@ void main() {
       ..reviewStage = WorkReviewStage.gstPending;
     addTearDown(session.dispose);
 
-    expect(await session.checkReview(), isTrue);
+    expect(await session.checkReview(), isFalse);
     expect(session.reviewStage, WorkReviewStage.gstPending);
     expect(session.activeWorkspace, isNull);
     expect(session.noticeMessage, contains('still in progress'));
+  });
+
+  test('rejected review preserves details for an exact resubmission', () async {
+    final session = WorkSession.production(gateway: _RejectedGateway())
+      ..selectedProfile = workProfiles.first
+      ..selectedFamilyId = workProfiles.first.familyId
+      ..workName = 'Mahadev Fresh Mart'
+      ..workArea = 'Sardarpura, Jodhpur'
+      ..primaryActivity = 'Grocery retail'
+      ..reviewCaseId = 'wp-rejected'
+      ..reviewStage = WorkReviewStage.gstPending;
+    addTearDown(session.dispose);
+
+    expect(await session.checkReview(), isFalse);
+    expect(session.remoteReviewStatus, WorkRemoteReviewStatus.rejected);
+    expect(session.reviewReason, 'Shop-front proof is unclear.');
+    expect(session.activeWorkspace, isNull);
+
+    session.reviseRejectedProfile();
+    expect(session.reviewCaseId, isNull);
+    expect(session.reviewStage, WorkReviewStage.drafting);
+    expect(session.workName, 'Mahadev Fresh Mart');
+    expect(session.workArea, 'Sardarpura, Jodhpur');
   });
 
   test(
@@ -140,6 +212,16 @@ class _PendingGateway extends ReviewWorkGateway {
     caseId: caseId,
     status: WorkRemoteReviewStatus.pending,
     plan: 'free',
+  );
+}
+
+class _RejectedGateway extends ReviewWorkGateway {
+  @override
+  Future<WorkReviewResult> checkReview(String caseId) async => WorkReviewResult(
+    caseId: caseId,
+    status: WorkRemoteReviewStatus.rejected,
+    plan: 'free',
+    reason: 'Shop-front proof is unclear.',
   );
 }
 
@@ -188,6 +270,23 @@ class _RecordingTransport implements SocialContentTransport {
     expect(headers['authorization'], 'Bearer firebase-id-test');
     bodies.add(Map<String, Object?>.from(body));
     return responses.removeAt(0);
+  }
+}
+
+class _RecordingProofUpload implements WorkProofUploadTransport {
+  int puts = 0;
+  Uint8List? bytes;
+
+  @override
+  Future<void> put({
+    required Uri url,
+    required Map<String, String> headers,
+    required Uint8List bytes,
+  }) async {
+    puts += 1;
+    this.bytes = bytes;
+    expect(url.host, 'storage.googleapis.com');
+    expect(headers['content-type'], 'application/pdf');
   }
 }
 

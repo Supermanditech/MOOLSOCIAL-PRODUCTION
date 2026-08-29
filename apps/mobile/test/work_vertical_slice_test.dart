@@ -415,6 +415,7 @@ void main() {
         findsOneWidget,
       );
       await tapVisible(tester, const Key('work-attach-gst'));
+      await tapVisible(tester, const Key('work-gst-source-upload'));
       await tapVisible(tester, const Key('work-submit-gst'));
       expect(
         find.text('GST proof was not submitted. Your review remains active.'),
