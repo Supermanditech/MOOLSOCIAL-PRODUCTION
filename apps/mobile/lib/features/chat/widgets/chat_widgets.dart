@@ -182,7 +182,11 @@ class ChatPageScaffold extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: MoolColors.ink,
-                                fontSize: prominentTitle ? 25 : 19,
+                                fontSize: prominentTitle
+                                    ? 25
+                                    : trailing != null && title.length > 14
+                                    ? 17
+                                    : 19,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: prominentTitle ? -.55 : -.25,
                               ),
