@@ -10,6 +10,10 @@ import {
   type ChatPhotoUploadGrant,
   type ChatProfile,
   type ChatValidatedPhoto,
+  type ChatAttachmentKind,
+  type ChatAttachmentStore,
+  type ChatAttachmentUploadGrant,
+  type ChatValidatedAttachment,
 } from "./contracts.js";
 import { FirestoreChatRepository } from "./firestore_store.js";
 
@@ -503,6 +507,47 @@ test("call availability exposes recipient off and completes call lifecycle", asy
   assert.equal(ended.status, "ended");
 });
 
+test("attachment finalize is private idempotent and signed for reading", async () => {
+  const database = chatDatabase();
+  const media = new FakeAttachmentStore();
+  const repository = new FirestoreChatRepository(
+    database as unknown as Firestore,
+    () => new Date("2026-08-29T04:00:00.000Z"),
+    undefined,
+    media,
+  );
+  const grant = await repository.prepareAttachmentUpload(
+    actor,
+    "thread-1",
+    "voice",
+    "Voice message.m4a",
+    "audio/mp4",
+    4096,
+    2400,
+  );
+  const args = [
+    actor,
+    "thread-1",
+    "voice" as const,
+    grant.uploadId,
+    "Voice message.m4a",
+    "audio/mp4",
+    4096,
+    2400,
+    "Listen when free",
+    "chat-attachment-idempotency-0001",
+    "attachment-request-digest",
+  ] as const;
+  const first = await repository.sendAttachmentMessage(...args);
+  const repeated = await repository.sendAttachmentMessage(...args);
+  assert.equal(first.id, repeated.id);
+  assert.equal(first.attachment?.kind, "voice");
+  assert.equal(first.attachment?.durationMilliseconds, 2400);
+  assert.equal(first.attachment?.readUrl, attachmentReadUrl);
+  assert.equal(JSON.stringify(first).includes("chat-media/v1"), false);
+  assert.equal(media.validateCalls, 2);
+});
+
 function chatDatabase(): FakeFirestore {
   return new FakeFirestore({
     "chatThreads/thread-1": {
@@ -847,6 +892,62 @@ class FakePhotoStore implements ChatPhotoAttachmentStore {
     return {
       readUrl: photoReadUrl,
       expiresAt: "2026-08-15T00:06:00.000Z",
+    };
+  }
+}
+
+const attachmentUploadId = "00000000-0000-4000-8000-000000000002";
+const attachmentReadUrl =
+  `https://storage.googleapis.test/chat-media%2Fv1%2Fvoice%2F${attachmentUploadId}?signed=1`;
+
+class FakeAttachmentStore implements ChatAttachmentStore {
+  validateCalls = 0;
+
+  async prepare(input: {
+    userId: string;
+    threadId: string;
+    kind: ChatAttachmentKind;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    durationMilliseconds?: number;
+  }): Promise<ChatAttachmentUploadGrant> {
+    return {
+      uploadId: attachmentUploadId,
+      uploadUrl: "https://storage.googleapis.test/private-upload?signed=1",
+      expiresAt: "2026-08-29T04:05:00.000Z",
+      requiredHeaders: { "content-type": input.contentType },
+    };
+  }
+
+  async validate(input: {
+    userId: string;
+    threadId: string;
+    kind: ChatAttachmentKind;
+    uploadId: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    durationMilliseconds?: number;
+  }): Promise<ChatValidatedAttachment> {
+    this.validateCalls += 1;
+    return {
+      uploadId: input.uploadId,
+      objectPath: `chat-media/v1/${input.kind}/${input.uploadId}`,
+      generation: "generation-19",
+      kind: input.kind,
+      contentType: input.contentType,
+      sizeBytes: input.sizeBytes,
+      ...(input.durationMilliseconds === undefined
+        ? {}
+        : { durationMilliseconds: input.durationMilliseconds }),
+    };
+  }
+
+  async readUrl() {
+    return {
+      readUrl: attachmentReadUrl,
+      expiresAt: "2026-08-29T04:05:00.000Z",
     };
   }
 }

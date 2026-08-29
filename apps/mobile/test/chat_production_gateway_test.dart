@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -367,6 +368,77 @@ void main() {
       ]);
     },
   );
+
+  test('authenticated gateway finalizes one private attachment', () async {
+    const uploadId = '00000000-0000-4000-8000-000000000002';
+    final headers = {
+      'content-type': 'audio/mp4',
+      'content-length': '4',
+      'x-goog-if-generation-match': '0',
+      'x-goog-meta-moolsocial-schema': 'chat-attachment-v1',
+      'x-goog-meta-moolsocial-kind': 'voice',
+      'x-goog-meta-moolsocial-owner': 'owner-digest',
+      'x-goog-meta-moolsocial-thread': 'thread-digest',
+      'x-goog-meta-moolsocial-name': 'name-digest',
+      'x-goog-meta-moolsocial-size': '4',
+      'x-goog-meta-moolsocial-duration': '2000',
+    };
+    final transport = _RecordingTransport([
+      _ok({
+        'uploadId': uploadId,
+        'uploadUrl': 'https://storage.googleapis.com/private-upload',
+        'expiresAt': '2026-08-29T04:05:00.000Z',
+        'requiredHeaders': headers,
+      }),
+      _ok({
+        'id': 'voice-1',
+        'senderName': 'You',
+        'text': '',
+        'createdAt': '2026-08-29T04:00:00.000Z',
+        'mine': true,
+        'reactionCount': 0,
+        'reactedByMe': false,
+        'attachment': {
+          'id': uploadId,
+          'kind': 'voice',
+          'name': 'Voice message.m4a',
+          'contentType': 'audio/mp4',
+          'sizeBytes': 4,
+          'durationMilliseconds': 2000,
+          'readUrl': 'https://storage.googleapis.com/private-read',
+          'readUrlExpiresAt': '2026-08-29T04:05:00.000Z',
+        },
+      }),
+    ]);
+    final upload = _RecordingAttachmentUploadTransport();
+    final gateway = AuthenticatedChatGateway(
+      endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat',
+      ),
+      credentials: _RecordingCredentials(),
+      transport: transport,
+      attachmentUploadTransport: upload,
+      random: Random(4),
+    );
+    final delivered = await gateway.sendAttachment(
+      threadId: 'thread-1',
+      attachment: ChatPickedAttachment(
+        kind: ChatAttachmentKind.voice,
+        name: 'Voice message.m4a',
+        contentType: 'audio/mp4',
+        bytes: Uint8List.fromList([1, 2, 3, 4]),
+        duration: const Duration(seconds: 2),
+      ),
+      caption: '',
+      idempotencyKey: 'chat-attachment-retry-0001',
+    );
+    expect(delivered.attachment?.kind, ChatAttachmentKind.voice);
+    expect(upload.puts, 1);
+    expect(transport.bodies.map((body) => body['operation']), [
+      'prepareAttachmentUpload',
+      'sendAttachmentMessage',
+    ]);
+  });
 
   test(
     'production Chat loads only gateway-owned threads and messages',
@@ -1168,5 +1240,20 @@ class _RecordingTransport implements SocialContentTransport {
   }) async {
     bodies.add(Map<String, Object?>.from(body));
     return responses.removeAt(0);
+  }
+}
+
+class _RecordingAttachmentUploadTransport implements ChatPhotoUploadTransport {
+  int puts = 0;
+
+  @override
+  Future<void> put({
+    required Uri url,
+    required Map<String, String> headers,
+    required Uint8List bytes,
+  }) async {
+    puts += 1;
+    expect(url.host, 'storage.googleapis.com');
+    expect(headers['content-length'], '${bytes.length}');
   }
 }

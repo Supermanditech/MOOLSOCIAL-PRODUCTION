@@ -7,6 +7,8 @@ import {
   type ChatPrivacySettings,
   type ChatCallPreferences,
   type ChatCallRecord,
+  type ChatAttachmentKind,
+  type ChatAttachmentUploadGrant,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
   type ChatProfile,
@@ -342,6 +344,45 @@ test("validates account call choices presence and exact call actions", async () 
   );
 });
 
+test("binds document video and voice delivery to one validated upload", async () => {
+  const repository = new FakeChatRepository();
+  const service = createService(repository);
+  const grant = await service.prepareAttachmentUpload(actor.userId, {
+    threadId: "thread-1",
+    kind: "voice",
+    fileName: "Voice message.m4a",
+    contentType: "audio/mp4",
+    sizeBytes: 4096,
+    durationMilliseconds: 2400,
+  });
+  assert.equal(grant.uploadId, "00000000-0000-4000-8000-000000000002");
+  const delivered = await service.sendAttachmentMessage(actor.userId, {
+    threadId: "thread-1",
+    kind: "voice",
+    uploadId: grant.uploadId,
+    fileName: "Voice message.m4a",
+    contentType: "audio/mp4",
+    sizeBytes: 4096,
+    durationMilliseconds: 2400,
+    caption: "Listen when free",
+    idempotencyKey: "chat-attachment-retry-0001",
+  });
+  assert.equal(delivered.attachment?.kind, "voice");
+  assert.equal(repository.prepareAttachmentInput?.[2], "voice");
+  assert.equal(repository.sendAttachmentInput?.[2], "voice");
+  assert.match(String(repository.sendAttachmentInput?.[10] ?? ""), /^[a-f0-9]{64}$/u);
+  await assert.rejects(
+    service.prepareAttachmentUpload(actor.userId, {
+      threadId: "thread-1",
+      kind: "archive",
+      fileName: "unsafe.zip",
+      contentType: "application/zip",
+      sizeBytes: 100,
+    }),
+    (error: unknown) => error instanceof ChatError && error.code === "bad_request",
+  );
+});
+
 function createService(repository: ChatRepository): ChatService {
   return new ChatService(repository, async (userId) => {
     if (userId === actor.userId) return actor;
@@ -382,6 +423,16 @@ class FakeChatRepository implements ChatRepository {
   callPreferencesInput?: [string, Omit<ChatCallPreferences, "updatedAt">];
   presenceInput?: [string, "active" | "background" | "offline"];
   startCallInput?: [ChatProfile, string, "voice" | "video", string];
+  prepareAttachmentInput?: [
+    ChatProfile,
+    string,
+    ChatAttachmentKind,
+    string,
+    string,
+    number,
+    number | undefined,
+  ];
+  sendAttachmentInput?: unknown[];
 
   async listThreads(userId: string, limit: number): Promise<ChatThreadRecord[]> {
     this.listThreadsInput = [userId, limit];
@@ -600,6 +651,34 @@ class FakeChatRepository implements ChatRepository {
   async listIncomingCalls(): Promise<ChatCallRecord[]> {
     return [call];
   }
+
+  async prepareAttachmentUpload(
+    selectedActor: ChatProfile,
+    threadId: string,
+    kind: ChatAttachmentKind,
+    fileName: string,
+    contentType: string,
+    sizeBytes: number,
+    durationMilliseconds?: number,
+  ): Promise<ChatAttachmentUploadGrant> {
+    this.prepareAttachmentInput = [
+      selectedActor,
+      threadId,
+      kind,
+      fileName,
+      contentType,
+      sizeBytes,
+      durationMilliseconds,
+    ];
+    return attachmentGrant;
+  }
+
+  async sendAttachmentMessage(
+    ...values: Parameters<NonNullable<ChatRepository["sendAttachmentMessage"]>>
+  ): Promise<ChatMessageRecord> {
+    this.sendAttachmentInput = values;
+    return attachmentMessage;
+  }
 }
 
 const privacy: ChatPrivacySettings = {
@@ -625,6 +704,38 @@ const call: ChatCallRecord = {
   status: "ringing",
   createdAt: "2026-08-29T00:00:00.000Z",
   updatedAt: "2026-08-29T00:00:00.000Z",
+};
+
+const attachmentGrant: ChatAttachmentUploadGrant = {
+  uploadId: "00000000-0000-4000-8000-000000000002",
+  uploadUrl: "https://storage.googleapis.test/private-upload",
+  expiresAt: "2026-08-29T04:05:00.000Z",
+  requiredHeaders: { "content-type": "audio/mp4" },
+};
+
+const attachmentMessage: ChatMessageRecord = {
+  id: "attachment-message-1",
+  threadId: "thread-1",
+  senderId: actor.userId,
+  senderName: actor.name,
+  text: "Listen when free",
+  createdAt: "2026-08-29T04:00:00.000Z",
+  mine: true,
+  reactionCount: 0,
+  reactedByMe: false,
+  readCount: 0,
+  readByOthers: false,
+  forwarded: false,
+  attachment: {
+    id: attachmentGrant.uploadId,
+    kind: "voice",
+    name: "Voice message.m4a",
+    contentType: "audio/mp4",
+    sizeBytes: 4096,
+    durationMilliseconds: 2400,
+    readUrl: "https://storage.googleapis.test/private-read",
+    readUrlExpiresAt: "2026-08-29T04:05:00.000Z",
+  },
 };
 
 const thread: ChatThreadRecord = {
