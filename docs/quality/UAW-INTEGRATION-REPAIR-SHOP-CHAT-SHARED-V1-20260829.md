@@ -78,5 +78,18 @@ Final verification:
   `9EDB1DDA12F1A1681D902BF2E6B473B06AC7F150D85EB099700DEB09F081A0EC`;
 - OPPO, runtime package, backend, Firebase and Android configuration: untouched.
 
+Redmi r61.7 disposition:
+
+- installed package/version and cold launch passed on Redmi
+  `TG8HCYTGGQT885OF`;
+- founder visual handoff rejected before presentation because the Shop Orders
+  filter displayed the Food-only `Rasoi Kitchen Order`;
+- r61.7 is retained as rejected technical evidence and must not be approved;
+- Shop now owns the shared thread set `shop-order`, `shop-partner` and
+  `shop-offers`, while global and Food Chat retain their prior conversations;
+- final shared plus Buy Shop Chat regression after the context correction:
+  `95` passed, `0` failed;
+- next device candidate must be monotonic r61.8.
+
 Backend, Firebase, Android configuration, OPPO and
 `com.moolsocial.app.runtime` remain excluded.

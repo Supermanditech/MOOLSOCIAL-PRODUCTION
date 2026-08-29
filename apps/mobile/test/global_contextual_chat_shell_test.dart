@@ -98,6 +98,11 @@ void main() {
       ChatEntryContext.resolve('/app/ride/book?type=cab').allowedThreadIds,
       {'ride-support'},
     );
+    expect(ChatEntryContext.resolve('/app/buy?sub=shop').allowedThreadIds, {
+      'shop-order',
+      'shop-partner',
+      'shop-offers',
+    });
     expect(ChatEntryContext.resolve('/app/book/doctor').allowedThreadIds, {
       'clinic-care',
     });
@@ -197,6 +202,14 @@ void main() {
         final filterRect = tester.getRect(activeFilter);
         expect(filterRect.left, greaterThanOrEqualTo(0));
         expect(filterRect.right, lessThanOrEqualTo(320));
+      }
+      if (entry.$2 == 'Shop Chat') {
+        expect(
+          find.byKey(const Key('chat-open-thread-shop-order')),
+          findsOneWidget,
+        );
+        expect(find.text('Fresh Basket Order'), findsOneWidget);
+        expect(find.byKey(const Key('chat-open-thread-rasoi')), findsNothing);
       }
       if (entry.$2 == 'Travel Chat') {
         expect(
@@ -612,6 +625,44 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final entry in const <(String, ChatThreadType, String)>[
+    ('business', ChatThreadType.business, 'shop-partner'),
+    ('support', ChatThreadType.support, 'shop-offers'),
+  ]) {
+    testWidgets('Shop ${entry.$1} intent stays in Shop context', (
+      tester,
+    ) async {
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+      final route = Uri(
+        path: '/app/chat/inbox',
+        queryParameters: {
+          'type': entry.$1,
+          'return': '/app/buy?sub=${entry.$1}',
+        },
+      ).toString();
+
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: route,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Shop Chat'), findsOneWidget);
+      expect(chat.selectedFilter, entry.$2);
+      expect(find.byKey(Key('chat-open-thread-${entry.$3}')), findsOneWidget);
+      expect(find.byKey(const Key('chat-open-thread-rasoi')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('an explicit Chat intent overrides the origin default filter', (
     tester,

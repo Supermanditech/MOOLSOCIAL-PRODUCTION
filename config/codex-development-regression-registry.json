@@ -44523,6 +44523,56 @@
       "prevention": "Run the complete buy_v2_screen_test.dart file once with expanded reporting; do not retry a composed plain-name filter.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3934-TWO-CYCLE-SUMMARY-FOREACH-DIRECT-PIPE",
+      "status": "registered_collect_cycle_rows_before_format_required",
+      "appliesTo": ["primary", "coordination", "build", "testing", "tooling"],
+      "mistake": "The first two-cycle summary parser piped directly after foreach and PowerShell rejected it before reading either completed JSON artifact.",
+      "rootCause": "The known Windows PowerShell foreach pipeline rule was repeated in the build-readiness summary.",
+      "prevention": "Collect both cycle summaries in an explicit array, format only after the loop, and do not rerun either passing regression cycle.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/full-buy-cycle1.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/full-buy-cycle2.json"]
+    },
+    {
+      "id": "REG-20260829-3935-R61-7-PREFLIGHT-SPARSE-WORKTREE-OMITTED-BACKEND",
+      "status": "registered_backend_sparse_read_support_required",
+      "appliesTo": ["primary", "coordination", "build", "preflight", "git"],
+      "mistake": "The first r61.7 PreflightOnly run stopped before candidate-gate consumption because test-public-auth-sideload-build-controls could not read backend/functions/src/index.ts from the sparse worktree.",
+      "rootCause": "The build worktree sparse set included mobile, config, docs, scripts and artifacts but omitted backend read dependencies used by the standard build-foundation self-test.",
+      "prevention": "Sparse-add the backend root without editing it, verify backend/functions/src/index.ts exists, and rerun the same PreflightOnly command; do not change source fingerprint or consume build authorization.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/build-buy-device-review.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "backend/functions/src/index.ts", "scripts/test-public-auth-sideload-build-controls.ps1"]
+    },
+    {
+      "id": "REG-20260829-3936-REDMI-SHOP-CHAT-SHOWED-FOOD-ORDER",
+      "status": "registered_rejected_r61_7_shop_context_filter_required",
+      "appliesTo": ["primary", "coordination", "ui", "device", "redmi", "chat", "shop", "context"],
+      "mistake": "The installed r61.7 shared Shop Chat shell selected Orders correctly but displayed Rasoi Kitchen Order and lunch preparation copy from the Food context.",
+      "rootCause": "ChatEntryContext.shop defaulted to the global order type without an allowed Shop thread set, so the universal Rasoi order seed leaked across contextual boundaries.",
+      "prevention": "Reject and preserve r61.7, add a truthful Shop-specific shared thread and restrict Shop context to Shop-relevant allowed thread IDs, cover visible content and exact Back in focused tests, then build one monotonic r61.8 Redmi candidate.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/chat_entry_context.dart", "apps/mobile/lib/features/chat/chat_session.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-shared.png"]
+    },
+    {
+      "id": "REG-20260829-3937-BUILD-EVIDENCE-DIRECTORY-USED-AS-ACTIVE-OWNER",
+      "status": "registered_exact_artifact_file_owners_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "build", "evidence"],
+      "mistake": "The repair implementation gate rejected the r61.7 artifact directory in the active claim because recorded owners must resolve to literal files.",
+      "rootCause": "Directory-root matching behavior was assumed for active owner existence even though the gate requires each recorded owner to be a file.",
+      "prevention": "Replace the directory claim with every existing r61.7 manifest, JSON, Markdown, provenance, APK, PNG and XML file plus the exact machine-state file, then rerun implementation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260829-3938-SHOP-ALLOWLIST-HID-EXISTING-MAHADEV-FLOW-EXPECTATION",
+      "status": "registered_exact_origin_aware_flow_correction_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "testing", "chat", "shop", "context"],
+      "mistake": "The combined shared and Buy Chat run passed 94 tests but one chat_flow test failed because its business-filter step expected chat-open-thread-mahadev and the Shop allowlist hid it.",
+      "rootCause": "The Shop restriction changed a pre-existing shared flow whose exact return origin and filter sequence were not inspected before applying allowedThreadIds.",
+      "prevention": "Inspect the failing test's exact initial and return routes, preserve global/non-Shop Mahadev behavior, keep Redmi Shop default free of Food content, and rerun the one flow plus the complete shared/Buy Chat set.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/chat_flow_test.dart", "apps/mobile/lib/features/chat/chat_entry_context.dart"]
     }
   ]
 }

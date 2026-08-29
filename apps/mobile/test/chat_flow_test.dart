@@ -132,7 +132,10 @@ void main() {
         find.byKey(const Key('chat-open-thread-home-basket')),
         findsNothing,
       );
-      expect(find.byKey(const Key('chat-open-thread-mahadev')), findsOneWidget);
+      expect(
+        find.byKey(const Key('chat-open-thread-shop-order')),
+        findsOneWidget,
+      );
 
       await tapVisible(tester, const Key('chat-new'));
       expect(
@@ -149,15 +152,15 @@ void main() {
       expect(find.text('Enter a conversation name.'), findsOneWidget);
       await tester.enterText(
         find.byKey(const Key('chat-voice-search-field')),
-        'Home Basket',
+        'Fresh Basket',
       );
       await tapVisible(tester, const Key('chat-use-voice-search'));
       expect(
-        find.byKey(const Key('chat-open-thread-home-basket')),
+        find.byKey(const Key('chat-open-thread-shop-order')),
         findsOneWidget,
       );
 
-      await tapVisible(tester, const Key('chat-open-thread-home-basket'));
+      await tapVisible(tester, const Key('chat-open-thread-shop-order'));
       expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
       await tapVisible(tester, const Key('chat-back'));
       expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
