@@ -52,7 +52,13 @@ class ChatEntryContext {
     final uri = Uri.tryParse(returnRoute);
     final path = uri?.path.toLowerCase() ?? '';
     if (path.startsWith('/app/social')) return social;
-    if (path.startsWith('/app/buy')) return shop;
+    if (path.startsWith('/app/buy')) {
+      final sub = uri?.queryParameters['sub']?.toLowerCase();
+      if (path == '/app/buy/medicine' || sub == 'medicine' || sub == 'rx') {
+        return care;
+      }
+      return shop;
+    }
     if (path.startsWith('/app/eat')) return food;
     if (path.startsWith('/app/ride')) return travel;
     if (path.startsWith('/app/book')) return care;
@@ -99,7 +105,6 @@ class ChatEntryContext {
     subtitle: 'Orders and products',
     icon: Icons.shopping_bag_outlined,
     accent: Color(0xFF7A4D10),
-    defaultFilter: ChatThreadType.order,
     allowedThreadIds: {
       'shop-assist',
       'shop-order',

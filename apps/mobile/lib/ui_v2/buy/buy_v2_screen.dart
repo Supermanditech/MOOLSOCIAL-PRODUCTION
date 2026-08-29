@@ -119,9 +119,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     final orderId = widget.orderId;
     final recoveryKind = widget.recoveryKind;
     if (recoveryKind != null) {
+      widget.session.destination = widget.initialDestination;
       widget.session.openRecovery(recoveryKind);
     } else if (productId != null) {
       widget.session.openProduct(productId);
+    } else if (orderId != null && widget.initialView == BuyV2View.orderItems) {
+      widget.session.openOrderItems(orderId);
     } else if (orderId != null &&
         (widget.initialView == BuyV2View.tracking ||
             widget.initialView == BuyV2View.assist)) {
@@ -200,33 +203,69 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     }
   }
 
-  GlobalProfileContextAction _shopProfileContext(BuyV2Session session) {
-    void openShopOrders() {
+  GlobalProfileContextAction _buyProfileContext(BuyV2Session session) {
+    void prepareDestinationChange() {
       setState(() {
         _offersActive = false;
         _searchOpen = false;
       });
+    }
+
+    void openOrders() {
+      prepareDestinationChange();
       session.openOrders();
     }
 
-    void openShopCart() {
-      setState(() {
-        _offersActive = false;
-        _searchOpen = false;
-      });
-      session.openCart(scope: BuyV2CartScope.shop);
+    void openCart(BuyV2Destination destination) {
+      prepareDestinationChange();
+      session.openDestination(destination);
+      session.openCart(
+        scope: switch (destination) {
+          BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+          BuyV2Destination.medicine => BuyV2CartScope.medicine,
+          BuyV2Destination.shop ||
+          BuyV2Destination.orders => BuyV2CartScope.shop,
+        },
+      );
     }
 
-    void openShopCatalogue() {
-      setState(() {
-        _offersActive = false;
-        _searchOpen = false;
-      });
-      session.openDestination(BuyV2Destination.shop);
+    void openCatalogue(BuyV2Destination destination) {
+      prepareDestinationChange();
+      session.openDestination(destination);
+    }
+
+    if (_offersActive) {
+      return GlobalProfileContextAction(
+        id: 'shop-offers',
+        title: 'Shop offers',
+        detail: 'Review current offers and continue with eligible products.',
+        actionLabel: 'Open offers',
+        icon: Icons.local_offer_outlined,
+        accentColor: BuyV2Colors.orange,
+        gradientColors: const [BuyV2Colors.navy, BuyV2Colors.orange],
+        onPressed: _openOffers,
+      );
+    }
+
+    final destination = session.activeDockDestination;
+    if (destination == BuyV2Destination.orders) {
+      final activeOrders = session.activeOrderCount;
+      final deliveredOrders = session.deliveredOrderCount;
+      return GlobalProfileContextAction(
+        id: 'shop-orders',
+        title: 'Your Shop orders',
+        detail:
+            '$activeOrders active · $deliveredOrders delivered orders are ready to review.',
+        actionLabel: 'Open orders',
+        icon: Icons.receipt_long_outlined,
+        accentColor: BuyV2Colors.orange,
+        gradientColors: const [BuyV2Colors.navy, BuyV2Colors.orange],
+        onPressed: openOrders,
+      );
     }
 
     final activeOrders = session.activeOrderCount;
-    if (activeOrders > 0) {
+    if (destination == BuyV2Destination.shop && activeOrders > 0) {
       return GlobalProfileContextAction(
         id: 'shop-active-orders',
         title: activeOrders == 1
@@ -239,48 +278,75 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         icon: Icons.local_shipping_outlined,
         accentColor: BuyV2Colors.orange,
         gradientColors: const [BuyV2Colors.navy, BuyV2Colors.orange],
-        onPressed: openShopOrders,
+        onPressed: openOrders,
       );
     }
 
-    final shopItemCount = session.countForDestination(BuyV2Destination.shop);
-    if (shopItemCount > 0) {
+    final itemCount = session.countForDestination(destination);
+    final accent = switch (destination) {
+      BuyV2Destination.wholesale => BuyV2Colors.royal,
+      BuyV2Destination.medicine => BuyV2Colors.green,
+      BuyV2Destination.shop || BuyV2Destination.orders => BuyV2Colors.orange,
+    };
+    final icon = switch (destination) {
+      BuyV2Destination.wholesale => Icons.inventory_2_outlined,
+      BuyV2Destination.medicine => Icons.medication_outlined,
+      BuyV2Destination.shop ||
+      BuyV2Destination.orders => Icons.shopping_bag_outlined,
+    };
+    if (itemCount > 0) {
       return GlobalProfileContextAction(
-        id: 'shop-cart',
-        title: 'Your Shop cart',
+        id: '${destination.name}-cart',
+        title: 'Your ${destination.label} cart',
         detail:
-            '$shopItemCount ${shopItemCount == 1 ? 'item' : 'items'} · '
-            '${buyV2Money(session.totalForDestination(BuyV2Destination.shop))}',
+            '$itemCount ${itemCount == 1 ? 'item' : 'items'} · '
+            '${buyV2Money(session.totalForDestination(destination))}',
         actionLabel: 'Open cart',
-        icon: Icons.shopping_bag_outlined,
-        accentColor: BuyV2Colors.orange,
-        gradientColors: const [BuyV2Colors.navy, BuyV2Colors.orange],
-        onPressed: openShopCart,
+        icon: icon,
+        accentColor: accent,
+        gradientColors: [BuyV2Colors.navy, accent],
+        onPressed: () => openCart(destination),
       );
     }
 
-    final savedCount = session.savedCountFor(BuyV2Destination.shop);
+    final savedCount = session.savedCountFor(destination);
     return GlobalProfileContextAction(
-      id: 'shop-discovery',
-      title: savedCount > 0 ? 'Continue shopping' : 'Shop everyday needs',
+      id: '${destination.name}-discovery',
+      title: savedCount > 0
+          ? 'Continue ${destination.label}'
+          : switch (destination) {
+              BuyV2Destination.wholesale => 'Source wholesale products',
+              BuyV2Destination.medicine => 'Browse medicine and care',
+              BuyV2Destination.shop ||
+              BuyV2Destination.orders => 'Shop everyday needs',
+            },
       detail: savedCount > 0
           ? '$savedCount saved ${savedCount == 1 ? 'product is' : 'products are'} ready when you return.'
-          : 'Browse retail packs, trusted sellers and delivery promises.',
-      actionLabel: 'Browse Shop',
-      icon: Icons.storefront_outlined,
-      accentColor: BuyV2Colors.orange,
-      gradientColors: const [BuyV2Colors.navy, BuyV2Colors.orange],
-      onPressed: openShopCatalogue,
+          : switch (destination) {
+              BuyV2Destination.wholesale =>
+                'Compare bulk packs, minimum orders and delivery promises.',
+              BuyV2Destination.medicine =>
+                'Review medicine information and prescription requirements.',
+              BuyV2Destination.shop || BuyV2Destination.orders =>
+                'Browse retail packs, trusted sellers and delivery promises.',
+            },
+      actionLabel: 'Browse ${destination.label}',
+      icon: destination == BuyV2Destination.shop
+          ? Icons.storefront_outlined
+          : icon,
+      accentColor: accent,
+      gradientColors: [BuyV2Colors.navy, accent],
+      onPressed: () => openCatalogue(destination),
     );
   }
 
-  void _openShopProfile() {
+  void _openBuyProfile() {
     HapticFeedback.selectionClick();
     setState(() => _searchOpen = false);
     unawaited(
       showGlobalProfilePanelV2(
         context,
-        contextAction: _shopProfileContext(widget.session),
+        contextAction: _buyProfileContext(widget.session),
         onOpenRoute: (route) {
           context.push(route);
         },
@@ -366,21 +432,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               onScan: _scanProduct,
                               onLocation: () =>
                                   showBuyV2AddressSheet(context, session),
-                              onAccount: () {
-                                if (session.destination ==
-                                    BuyV2Destination.shop) {
-                                  _openShopProfile();
-                                } else {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _searchOpen = false);
-                                  session.openAccount();
-                                }
-                              },
-                              accountLabel:
-                                  widget.accountIdentity?.primaryLabel ??
-                                  (widget.accountAuthenticated
-                                      ? 'MoolSocial member'
-                                      : 'MoolSocial guest'),
+                              onAccount: _openBuyProfile,
                               scannerBusy: _scannerBusy,
                             ),
                           Expanded(
@@ -511,6 +563,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       _searchOpen = false;
     });
     widget.session.openDestination(BuyV2Destination.shop);
+    final router = GoRouter.maybeOf(context);
+    if (router != null &&
+        router.routeInformationProvider.value.uri.toString() !=
+            '/app/buy?sub=offers') {
+      router.replace('/app/buy?sub=offers');
+    }
   }
 
   Widget _buildCareLocalNavigation() {
@@ -643,12 +701,17 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       widget.onOpenChat?.call();
       return;
     }
-    final currentRoute = router.routeInformationProvider.value.uri.toString();
+    final session = widget.session;
     context.push(
       const BuyV2ChatRouteAdapter().locationFor(
-        currentRoute: currentRoute,
-        destination: widget.session.activeDockDestination,
+        destination: session.activeDockDestination,
+        view: session.view,
         offersActive: _offersActive,
+        cartScope: session.cartScope,
+        checkoutScope: session.checkoutScope,
+        productId: session.selectedProductId,
+        orderId: session.selectedOrderId,
+        recoveryKind: session.recoveryKind,
       ),
     );
   }
@@ -844,7 +907,6 @@ class _BuySearchBand extends StatelessWidget {
     required this.onScan,
     required this.onLocation,
     required this.onAccount,
-    required this.accountLabel,
     required this.scannerBusy,
   });
 
@@ -856,7 +918,6 @@ class _BuySearchBand extends StatelessWidget {
   final VoidCallback onScan;
   final VoidCallback onLocation;
   final VoidCallback onAccount;
-  final String accountLabel;
   final bool scannerBusy;
 
   @override
@@ -1083,111 +1144,15 @@ class _BuySearchBand extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            if (session.destination == BuyV2Destination.shop)
-              MoolGlobalProfileShortcutV2(
-                keyName: 'buy-open-account',
-                onPressed: onAccount,
-              )
-            else
-              _BuyAccountButton(
-                onPressed: onAccount,
-                accountLabel: accountLabel,
-              ),
+            MoolGlobalProfileShortcutV2(
+              keyName: 'buy-open-account',
+              onPressed: onAccount,
+            ),
           ],
         ],
       ),
     );
   }
-}
-
-class _BuyAccountButton extends StatelessWidget {
-  const _BuyAccountButton({
-    required this.onPressed,
-    required this.accountLabel,
-  });
-
-  final VoidCallback onPressed;
-  final String accountLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Open profile and account',
-      button: true,
-      excludeSemantics: true,
-      child: Material(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: BuyV2Colors.line),
-        ),
-        child: InkWell(
-          key: const ValueKey('buy-open-account'),
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(14),
-          child: SizedBox(
-            width: 44,
-            height: 44,
-            child: Center(
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    key: const ValueKey('buy-profile-avatar'),
-                    width: 32,
-                    height: 32,
-                    alignment: Alignment.center,
-                    decoration: const BoxDecoration(
-                      color: BuyV2Colors.navy,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      _buyAccountInitials(accountLabel),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: -1,
-                    bottom: 1,
-                    child: Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(
-                        color: BuyV2Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-String _buyAccountInitials(String label) {
-  final words = label
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((word) => word.isNotEmpty)
-      .toList(growable: false);
-  if (words.isEmpty) return 'MS';
-  if (words.length > 1) {
-    return words
-        .take(2)
-        .map((word) => String.fromCharCode(word.runes.first))
-        .join()
-        .toUpperCase();
-  }
-  return String.fromCharCodes(words.single.runes.take(2)).toUpperCase();
 }
 
 class _BuyMiniCartBar extends StatelessWidget {

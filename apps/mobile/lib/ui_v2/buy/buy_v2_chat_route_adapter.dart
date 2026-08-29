@@ -6,14 +6,24 @@ class BuyV2ChatRouteAdapter {
   const BuyV2ChatRouteAdapter();
 
   String locationFor({
-    required String currentRoute,
     required BuyV2Destination destination,
+    required BuyV2View view,
     required bool offersActive,
+    BuyV2CartScope cartScope = BuyV2CartScope.all,
+    BuyV2CartScope checkoutScope = BuyV2CartScope.all,
+    String? productId,
+    String? orderId,
+    BuyV2RecoveryKind? recoveryKind,
   }) {
     final returnRoute = _returnRouteFor(
-      currentRoute: currentRoute,
       destination: destination,
+      view: view,
       offersActive: offersActive,
+      cartScope: cartScope,
+      checkoutScope: checkoutScope,
+      productId: productId,
+      orderId: orderId,
+      recoveryKind: recoveryKind,
     );
     final type = offersActive
         ? 'support'
@@ -49,22 +59,87 @@ class BuyV2ChatRouteAdapter {
   }
 
   String _returnRouteFor({
-    required String currentRoute,
     required BuyV2Destination destination,
+    required BuyV2View view,
     required bool offersActive,
+    required BuyV2CartScope cartScope,
+    required BuyV2CartScope checkoutScope,
+    required String? productId,
+    required String? orderId,
+    required BuyV2RecoveryKind? recoveryKind,
   }) {
-    final parsed = Uri.tryParse(currentRoute);
-    if (parsed != null &&
-        parsed.path.startsWith('/app/') &&
-        !parsed.path.startsWith('/app/chat')) {
-      return currentRoute;
-    }
-    if (offersActive) return '/app/buy?sub=offers';
-    return switch (destination) {
-      BuyV2Destination.orders => '/app/buy?sub=orders',
-      BuyV2Destination.wholesale => '/app/buy?sub=wholesale',
-      BuyV2Destination.medicine => '/app/book?sub=medicine',
-      BuyV2Destination.shop => '/app/buy',
+    final query = <String, String>{
+      'sub': offersActive ? 'offers' : destination.name,
     };
+    switch (view) {
+      case BuyV2View.catalogue:
+        break;
+      case BuyV2View.product:
+        if (productId case final value? when value.trim().isNotEmpty) {
+          query
+            ..['view'] = 'product'
+            ..['product'] = value.trim();
+        }
+        break;
+      case BuyV2View.cart:
+        query
+          ..['view'] = 'cart'
+          ..['scope'] = cartScope.name;
+        break;
+      case BuyV2View.checkout:
+        query
+          ..['view'] = 'checkout'
+          ..['scope'] = checkoutScope.name;
+        break;
+      case BuyV2View.confirmation:
+        query
+          ..['view'] = 'confirmation'
+          ..['scope'] = checkoutScope.name;
+        break;
+      case BuyV2View.tracking:
+        if (orderId case final value? when value.trim().isNotEmpty) {
+          query
+            ..['sub'] = BuyV2Destination.orders.name
+            ..['view'] = 'tracking'
+            ..['order'] = value.trim();
+        }
+        break;
+      case BuyV2View.orderItems:
+        if (orderId case final value? when value.trim().isNotEmpty) {
+          query
+            ..['sub'] = BuyV2Destination.orders.name
+            ..['view'] = 'items'
+            ..['order'] = value.trim();
+        }
+        break;
+      case BuyV2View.assist:
+        if (orderId case final value? when value.trim().isNotEmpty) {
+          query
+            ..['sub'] = BuyV2Destination.orders.name
+            ..['view'] = 'tracking'
+            ..['order'] = value.trim();
+        }
+        break;
+      case BuyV2View.account:
+        query['view'] = 'account';
+        break;
+      case BuyV2View.recovery:
+        if (recoveryKind case final value?) {
+          query
+            ..['view'] = 'recovery'
+            ..['recovery'] = _recoveryRouteValue(value);
+        }
+        break;
+    }
+    return Uri(path: '/app/buy', queryParameters: query).toString();
   }
+
+  String _recoveryRouteValue(BuyV2RecoveryKind kind) => switch (kind) {
+    BuyV2RecoveryKind.priceUpdate => 'price-update',
+    BuyV2RecoveryKind.stockUnavailable => 'stock-unavailable',
+    BuyV2RecoveryKind.serviceAreaUnavailable => 'service-area',
+    BuyV2RecoveryKind.paymentFailed => 'payment-failed',
+    BuyV2RecoveryKind.networkInterruption => 'offline',
+    BuyV2RecoveryKind.deliveryDelay => 'delivery-delay',
+  };
 }
