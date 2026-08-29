@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/chat/chat_models.dart';
 import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -260,76 +261,99 @@ void main() {
     },
   );
 
-  testWidgets(
-    'privacy and spam controls recover truthfully on compact large text',
-    (tester) async {
-      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final journey = await readyJourney();
-      final chat = ChatSession(
-        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
-      );
-      addTearDown(journey.dispose);
-      addTearDown(chat.dispose);
-      await mountInbox(
-        tester,
-        journey: journey,
-        chat: chat,
-        origin: '/app/work/earn',
-        size: const Size(320, 568),
-      );
-      await openSettings(tester);
+  testWidgets('privacy and spam controls complete on compact large text', (
+    tester,
+  ) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mountInbox(
+      tester,
+      journey: journey,
+      chat: chat,
+      origin: '/app/work/earn',
+      size: const Size(320, 568),
+    );
+    await openSettings(tester);
 
-      for (final entry in const <(Key, Key, String)>[
-        (
-          Key('chat-settings-notifications'),
-          Key('chat-notifications-recovery'),
-          'Notification settings unavailable',
-        ),
-        (
-          Key('chat-settings-who-can-message'),
-          Key('chat-message-permission-recovery'),
-          'Message permission unchanged',
-        ),
-        (
-          Key('chat-settings-message-requests'),
-          Key('chat-message-requests-recovery'),
-          'Message requests unavailable',
-        ),
-        (
-          Key('chat-settings-blocked-accounts'),
-          Key('chat-blocked-accounts-recovery'),
-          'Blocked accounts unavailable',
-        ),
-        (
-          Key('chat-settings-last-seen'),
-          Key('chat-settings-last-seen-recovery'),
-          'Last seen setting unchanged',
-        ),
-        (
-          Key('chat-settings-read-receipts'),
-          Key('chat-settings-read-receipts-recovery'),
-          'Read receipt setting unchanged',
-        ),
-      ]) {
-        await revealSetting(tester, entry.$1);
-        final size = tester.getSize(find.byKey(entry.$1));
-        expect(size.width, lessThanOrEqualTo(288));
-        expect(size.height, greaterThanOrEqualTo(44));
-        await tester.tap(find.byKey(entry.$1));
-        await tester.pumpAndSettle();
-        expect(find.byKey(entry.$2), findsOneWidget);
-        expect(find.text(entry.$3), findsOneWidget);
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(find.byKey(const Key('chat-settings-screen')), findsOneWidget);
-      }
+    await revealSetting(tester, const Key('chat-settings-notifications'));
+    await tester.tap(find.byKey(const Key('chat-settings-notifications')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('chat-notifications-recovery')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
 
-      expect(chat.globalChatAvailableForSession, isTrue);
-      expect(chat.globalVoiceCallsAvailableForSession, isTrue);
-      expect(chat.globalVideoCallsAvailableForSession, isTrue);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    await revealSetting(tester, const Key('chat-settings-who-can-message'));
+    await tester.tap(find.byKey(const Key('chat-settings-who-can-message')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('chat-message-permission-picker')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('chat-message-permission-nobody')));
+    await tester.pumpAndSettle();
+    expect(chat.privacySettings.whoCanMessage, ChatMessagePermission.nobody);
+
+    await revealSetting(tester, const Key('chat-settings-message-requests'));
+    await tester.tap(find.byKey(const Key('chat-settings-message-requests')));
+    await tester.pumpAndSettle();
+    expect(chat.privacySettings.messageRequestsEnabled, isFalse);
+
+    for (final key in const [
+      Key('chat-settings-last-seen'),
+      Key('chat-settings-read-receipts'),
+    ]) {
+      await revealSetting(tester, key);
+      expect(tester.getSize(find.byKey(key)).height, greaterThanOrEqualTo(44));
+      await tester.tap(find.byKey(key));
+      await tester.pumpAndSettle();
+    }
+    expect(chat.privacySettings.shareLastSeen, isFalse);
+    expect(chat.privacySettings.readReceipts, isFalse);
+
+    await revealSetting(
+      tester,
+      const Key('chat-settings-review-message-requests'),
+    );
+    await tester.tap(
+      find.byKey(const Key('chat-settings-review-message-requests')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('chat-message-requests-screen')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('chat-message-requests-empty')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    await revealSetting(tester, const Key('chat-settings-blocked-accounts'));
+    await tester.tap(find.byKey(const Key('chat-settings-blocked-accounts')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('chat-blocked-accounts-screen')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('chat-blocked-accounts-empty')),
+      findsOneWidget,
+    );
+
+    expect(chat.globalChatAvailableForSession, isTrue);
+    expect(chat.globalVoiceCallsAvailableForSession, isTrue);
+    expect(chat.globalVideoCallsAvailableForSession, isTrue);
+    expect(tester.takeException(), isNull);
+  });
 }

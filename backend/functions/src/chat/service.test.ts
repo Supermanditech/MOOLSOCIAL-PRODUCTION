@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   ChatError,
   type ChatMessageRecord,
+  type ChatPrivacySettings,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
   type ChatProfile,
@@ -250,6 +251,61 @@ test("finalizes a photo with one request digest and optional caption", async () 
   assert.equal(repository.sendPhotoInput?.[9], undefined);
 });
 
+test("persists complete privacy choices without partial or invalid values", async () => {
+  const repository = new FakeChatRepository();
+  const service = createService(repository);
+  const saved = await service.updatePrivacySettings(actor.userId, {
+    whoCanMessage: "connections",
+    messageRequestsEnabled: true,
+    shareLastSeen: false,
+    readReceipts: false,
+  });
+  assert.equal(saved.whoCanMessage, "connections");
+  assert.deepEqual(repository.privacyInput, [actor.userId, {
+    whoCanMessage: "connections",
+    messageRequestsEnabled: true,
+    shareLastSeen: false,
+    readReceipts: false,
+  }]);
+  assert.throws(
+    () => service.updatePrivacySettings(actor.userId, {
+      whoCanMessage: "followers",
+      messageRequestsEnabled: true,
+      shareLastSeen: false,
+      readReceipts: false,
+    }),
+    (error: unknown) => error instanceof ChatError && error.code === "bad_request",
+  );
+});
+
+test("binds blocking and request decisions to the authenticated member", async () => {
+  const repository = new FakeChatRepository();
+  const service = createService(repository);
+  assert.deepEqual(
+    await service.setBlockedAccount(actor.userId, {
+      targetUserId: target.userId,
+      blocked: true,
+    }),
+    { blocked: true },
+  );
+  assert.deepEqual(repository.blockInput, [actor, target, true]);
+  assert.deepEqual(
+    await service.resolveMessageRequest(actor.userId, {
+      threadId: "thread-1",
+      accepted: false,
+    }),
+    { threadId: "thread-1", accepted: false },
+  );
+  assert.deepEqual(repository.requestInput, [actor.userId, "thread-1", false]);
+  await assert.rejects(
+    service.setBlockedAccount(actor.userId, {
+      targetUserId: actor.userId,
+      blocked: true,
+    }),
+    (error: unknown) => error instanceof ChatError && error.code === "bad_request",
+  );
+});
+
 function createService(repository: ChatRepository): ChatService {
   return new ChatService(repository, async (userId) => {
     if (userId === actor.userId) return actor;
@@ -284,6 +340,9 @@ class FakeChatRepository implements ChatRepository {
   reactionInput?: [ChatProfile, string, string, boolean];
   forwardInput?: [ChatProfile, string, string, string, string, string];
   readInput?: [string, string];
+  privacyInput?: [string, Omit<ChatPrivacySettings, "updatedAt">];
+  blockInput?: [ChatProfile, ChatProfile, boolean];
+  requestInput?: [string, string, boolean];
 
   async listThreads(userId: string, limit: number): Promise<ChatThreadRecord[]> {
     this.listThreadsInput = [userId, limit];
@@ -406,7 +465,53 @@ class FakeChatRepository implements ChatRepository {
     this.readInput = [userId, threadId];
     return { threadId, unreadCount: 0 };
   }
+
+  async getPrivacySettings(): Promise<ChatPrivacySettings> {
+    return privacy;
+  }
+
+  async updatePrivacySettings(
+    userId: string,
+    settings: Omit<ChatPrivacySettings, "updatedAt">,
+  ): Promise<ChatPrivacySettings> {
+    this.privacyInput = [userId, settings];
+    return { ...settings, updatedAt: privacy.updatedAt };
+  }
+
+  async listBlockedAccounts() {
+    return [];
+  }
+
+  async setBlockedAccount(
+    selectedActor: ChatProfile,
+    selectedTarget: ChatProfile,
+    blocked: boolean,
+  ) {
+    this.blockInput = [selectedActor, selectedTarget, blocked];
+    return { blocked };
+  }
+
+  async listMessageRequests() {
+    return [];
+  }
+
+  async resolveMessageRequest(
+    userId: string,
+    threadId: string,
+    accepted: boolean,
+  ) {
+    this.requestInput = [userId, threadId, accepted];
+    return { threadId, accepted };
+  }
 }
+
+const privacy: ChatPrivacySettings = {
+  whoCanMessage: "everyone",
+  messageRequestsEnabled: true,
+  shareLastSeen: true,
+  readReceipts: true,
+  updatedAt: "2026-08-29T00:00:00.000Z",
+};
 
 const thread: ChatThreadRecord = {
   id: "thread-1",

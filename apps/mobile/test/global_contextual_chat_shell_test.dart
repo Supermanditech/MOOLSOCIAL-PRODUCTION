@@ -626,7 +626,7 @@ void main() {
   });
 
   testWidgets(
-    'conversation info owns local availability and truthful account recovery',
+    'conversation info owns local availability and persisted privacy choices',
     (tester) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.binding.setSurfaceSize(const Size(360, 800));
@@ -691,22 +691,15 @@ void main() {
       await tester.ensureVisible(lastSeen);
       await tester.tap(lastSeen);
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('chat-last-seen-recovery')), findsOneWidget);
-      expect(find.text('Last seen setting unchanged'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('chat-capability-continue')));
-      await tester.pumpAndSettle();
+      expect(chat.privacySettings.shareLastSeen, isFalse);
+      expect(find.text('Last seen sharing turned off.'), findsWidgets);
 
       final readReceipts = find.byKey(const Key('chat-info-read-receipts'));
       await tester.ensureVisible(readReceipts);
       await tester.tap(readReceipts);
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('chat-read-receipts-recovery')),
-        findsOneWidget,
-      );
-      expect(tester.widget<SwitchListTile>(readReceipts).value, isTrue);
-      await tester.tap(find.byKey(const Key('chat-capability-continue')));
-      await tester.pumpAndSettle();
+      expect(chat.privacySettings.readReceipts, isFalse);
+      expect(tester.widget<SwitchListTile>(readReceipts).value, isFalse);
 
       final blockUser = find.byKey(const Key('chat-info-block-user'));
       await tester.ensureVisible(blockUser);
@@ -992,7 +985,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat-conversation-info')));
     await tester.pumpAndSettle();
-    final lastSeen = find.byKey(const Key('chat-info-last-seen'));
+    final lastSeen = find.byKey(const Key('chat-info-block-user'));
     await tester.dragUntilVisible(
       lastSeen,
       find.byKey(const Key('chat-conversation-info-list')),

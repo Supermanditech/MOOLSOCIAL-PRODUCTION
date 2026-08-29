@@ -368,6 +368,93 @@ test("one uploaded photo cannot be consumed by a second message", async () => {
   );
 });
 
+test("privacy persistence hides disabled read receipts", async () => {
+  const database = chatDatabase();
+  const repository = new FirestoreChatRepository(
+    database as unknown as Firestore,
+    () => new Date("2026-08-29T01:00:00.000Z"),
+  );
+  await repository.updatePrivacySettings("user-member", {
+    whoCanMessage: "connections",
+    messageRequestsEnabled: true,
+    shareLastSeen: false,
+    readReceipts: false,
+  });
+  const sent = await repository.sendMessage(
+    actor,
+    "thread-1",
+    "Private read state",
+    "chat-privacy-receipt-0001",
+    "privacy-receipt-digest",
+  );
+  await repository.markThreadRead("user-member", "thread-1");
+  const loaded = (await repository.listMessages(actor.userId, "thread-1", 20))
+    .find((message) => message.id === sent.id);
+  assert.equal(loaded?.readCount, 0);
+  assert.equal(loaded?.readByOthers, false);
+  assert.equal((await repository.getPrivacySettings("user-member")).shareLastSeen, false);
+});
+
+test("blocking hides and denies the exact direct conversation", async () => {
+  const database = chatDatabase();
+  const repository = new FirestoreChatRepository(database as unknown as Firestore);
+  await repository.setBlockedAccount(
+    actor,
+    { userId: "user-member", name: "Member", handle: "@member" },
+    true,
+  );
+  assert.equal((await repository.listThreads(actor.userId, 10)).length, 1);
+  assert.equal(
+    (await repository.listThreads(actor.userId, 10))[0]?.id,
+    "thread-2",
+  );
+  await assert.rejects(
+    repository.listMessages(actor.userId, "thread-1", 10),
+    (error: unknown) =>
+      error instanceof ChatError && error.code === "permission_denied",
+  );
+  assert.equal((await repository.listBlockedAccounts(actor.userId))[0]?.userId,
+    "user-member");
+  await repository.setBlockedAccount(
+    actor,
+    { userId: "user-member", name: "Member", handle: "@member" },
+    false,
+  );
+  assert.equal((await repository.listBlockedAccounts(actor.userId)).length, 0);
+});
+
+test("pending message request is isolated until its recipient accepts", async () => {
+  const database = chatDatabase();
+  const pendingId = "thread-request";
+  database.create(new FakeDocumentReference(database, `chatThreads/${pendingId}`), {
+    schemaVersion: 1,
+    type: "people",
+    participantIds: [actor.userId, "user-requester"],
+    profiles: {
+      [actor.userId]: { name: actor.name, handle: actor.handle },
+      "user-requester": { name: "Requester", handle: "@requester" },
+    },
+    preview: "Hello",
+    updatedAt: "2026-08-29T02:00:00.000Z",
+    verified: false,
+    requestStatus: "pending",
+    requestedByUserId: "user-requester",
+    requestRecipientId: actor.userId,
+    requestedAt: "2026-08-29T02:00:00.000Z",
+  });
+  const repository = new FirestoreChatRepository(database as unknown as Firestore);
+  assert.equal((await repository.listThreads(actor.userId, 10)).some(
+    (thread) => thread.id === pendingId,
+  ), false);
+  assert.equal((await repository.listMessageRequests(actor.userId))[0]?.thread.id,
+    pendingId);
+  await repository.resolveMessageRequest(actor.userId, pendingId, true);
+  assert.equal((await repository.listMessageRequests(actor.userId)).length, 0);
+  assert.equal((await repository.listThreads(actor.userId, 10)).some(
+    (thread) => thread.id === pendingId,
+  ), true);
+});
+
 function chatDatabase(): FakeFirestore {
   return new FakeFirestore({
     "chatThreads/thread-1": {
@@ -479,6 +566,17 @@ class FakeFirestore {
     }
     Object.assign(current, data);
   }
+
+  set(reference: FakeDocumentReference, data: DocumentData, merge = false): void {
+    const current = this.documents.get(reference.path);
+    this.documents.set(reference.path, merge && current
+      ? { ...current, ...data }
+      : { ...data });
+  }
+
+  delete(reference: FakeDocumentReference): void {
+    this.documents.delete(reference.path);
+  }
 }
 
 class FakeCollectionReference {
@@ -520,6 +618,14 @@ class FakeDocumentReference {
 
   async get(): Promise<FakeDocumentSnapshot> {
     return this.database.snapshot(this);
+  }
+
+  async set(data: DocumentData, options?: { merge?: boolean }): Promise<void> {
+    this.database.set(this, data, options?.merge === true);
+  }
+
+  async delete(): Promise<void> {
+    this.database.delete(this);
   }
 }
 
@@ -586,6 +692,11 @@ class FakeQuery {
         const selected = document.data()?.[field];
         return Array.isArray(selected) && selected.includes(value);
       });
+    }
+    if (this.whereField && this.whereOperator === "==") {
+      const field = this.whereField;
+      const value = this.whereValue;
+      documents = documents.filter((document) => document.data()?.[field] === value);
     }
     if (this.orderField) {
       const field = this.orderField;

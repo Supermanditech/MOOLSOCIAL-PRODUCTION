@@ -172,6 +172,112 @@ void main() {
   );
 
   test(
+    'authenticated gateway transports privacy safety and request state',
+    () async {
+      final transport = _RecordingTransport([
+        _ok({
+          'whoCanMessage': 'everyone',
+          'messageRequestsEnabled': true,
+          'shareLastSeen': true,
+          'readReceipts': true,
+          'updatedAt': '2026-08-29T00:00:00.000Z',
+        }),
+        _ok({
+          'whoCanMessage': 'connections',
+          'messageRequestsEnabled': false,
+          'shareLastSeen': false,
+          'readReceipts': false,
+          'updatedAt': '2026-08-29T00:01:00.000Z',
+        }),
+        _ok([
+          {
+            'userId': 'member-2',
+            'name': 'Member Two',
+            'handle': '@membertwo',
+            'blockedAt': '2026-08-29T00:02:00.000Z',
+          },
+        ]),
+        _ok({'blocked': true}),
+        _ok([
+          {
+            'thread': {
+              'id': 'request-1',
+              'title': 'New member',
+              'subtitle': '@newmember',
+              'preview': 'Hello',
+              'updatedAt': '2026-08-29T00:03:00.000Z',
+              'type': 'people',
+              'unreadCount': 1,
+              'verified': false,
+              'targetUserId': 'member-3',
+              'requestStatus': 'pending',
+            },
+            'requestedByUserId': 'member-3',
+            'requestedAt': '2026-08-29T00:03:00.000Z',
+          },
+        ]),
+        _ok({'threadId': 'request-1', 'accepted': true}),
+      ]);
+      final credentials = _RecordingCredentials();
+      final gateway = AuthenticatedChatGateway(
+        endpoint: Uri.parse(
+          'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat',
+        ),
+        credentials: credentials,
+        transport: transport,
+        random: Random(2),
+      );
+
+      expect(
+        (await gateway.getPrivacySettings()).whoCanMessage,
+        ChatMessagePermission.everyone,
+      );
+      final saved = await gateway.updatePrivacySettings(
+        const ChatPrivacySettings(
+          whoCanMessage: ChatMessagePermission.connections,
+          messageRequestsEnabled: false,
+          shareLastSeen: false,
+          readReceipts: false,
+        ),
+      );
+      expect(saved.whoCanMessage, ChatMessagePermission.connections);
+      expect((await gateway.listBlockedAccounts()).single.userId, 'member-2');
+      expect(
+        await gateway.setBlockedAccount(
+          targetUserId: 'member-2',
+          blocked: true,
+        ),
+        isTrue,
+      );
+      expect(
+        (await gateway.listMessageRequests()).single.thread.id,
+        'request-1',
+      );
+      expect(
+        await gateway.resolveMessageRequest(
+          threadId: 'request-1',
+          accepted: true,
+        ),
+        isTrue,
+      );
+      expect(transport.bodies.map((body) => body['operation']), [
+        'getPrivacySettings',
+        'updatePrivacySettings',
+        'listBlockedAccounts',
+        'setBlockedAccount',
+        'listMessageRequests',
+        'resolveMessageRequest',
+      ]);
+      expect(
+        credentials.modes
+            .where((mode) => mode == SocialAppCheckTokenMode.limitedUse)
+            .length,
+        3,
+      );
+    },
+  );
+
+  test(
     'production Chat loads only gateway-owned threads and messages',
     () async {
       final gateway = _ChatGateway();
@@ -951,6 +1057,11 @@ class _RecordingCredentials implements SocialContentCredentials {
   @override
   Future<String> firebaseIdToken() async => 'test-value';
 }
+
+SocialContentResponse _ok(Object? data) => SocialContentResponse(
+  statusCode: 200,
+  body: jsonEncode({'ok': true, 'data': data}),
+);
 
 class _RecordingTransport implements SocialContentTransport {
   _RecordingTransport(this.responses);
