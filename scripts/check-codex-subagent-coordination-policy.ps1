@@ -225,7 +225,7 @@ function Assert-IntegrationRepairMerge(
   $expectedRepairConflictKeys = @($expectedRepairConflictOwners |
     ForEach-Object { $_.ToLowerInvariant() })
   $repairOwnerClaim = @($claims | Where-Object {
-    [string]$_.task -ceq '/root/repair_social_runtime_chat_20260825'
+    [string]$_.task -ceq '/root/repair_shop_chat_shared_v1_20260829'
   })
   Assert-Coordination ($repairOwnerClaim.Count -eq 1) `
     'integration repair exact owner claim is missing or ambiguous.'
@@ -328,7 +328,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
     Assert-Coordination (
       $LASTEXITCODE -eq 0 -and $preMergeSubject.Count -eq 1 -and
       [string]$preMergeSubject[0] -cmatch
-        '^repair\(social-runtime-chat-conflict-correction-20260825\): .+' -and
+        '^repair\(shop-chat-shared-v1-20260829\): .+' -and
       @($preMergeCommitOwners | Where-Object {
         -not $preMergeAllowedKeys.Contains(([string]$_).ToLowerInvariant())
       }).Count -eq 0
@@ -340,7 +340,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
   Assert-Coordination (
     $LASTEXITCODE -eq 0 -and $repairMergeSubject.Count -eq 1 -and
     [string]$repairMergeSubject[0] -cmatch
-      '^repair\(social-runtime-chat-conflict-correction-20260825\): .+'
+      '^repair\(shop-chat-shared-v1-20260829\): .+'
   ) 'qualified integration repair merge subject changed.'
   $repairMergeTree = (& git -C $root show -s --format='%T' `
       $repairMergeCommit).Trim()
@@ -381,7 +381,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
       Assert-Coordination (
         $LASTEXITCODE -eq 0 -and $postMergeSubject.Count -eq 1 -and
         [string]$postMergeSubject[0] -cmatch
-          '^repair\(social-runtime-chat-conflict-correction-20260825\): .+' -and
+          '^repair\(shop-chat-shared-v1-20260829\): .+' -and
         @($postMergeCommitOwners | Where-Object {
           -not $postMergeAllowedKeys.Contains(
             ([string]$_).ToLowerInvariant()
@@ -561,7 +561,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 54) `
+Assert-Coordination ($continuationBindings.Count -eq 56) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -881,49 +881,42 @@ Assert-ExactNames $integrationRepair @(
   'freshIntegrationWorktreePath','freshIntegrationMergeSubject'
 ) 'integration repair discipline'
 $expectedRepairConflictOwners = @(
-  'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
-  'apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart',
-  'apps/mobile/lib/ui_v2/social/social_v2_consumer.dart',
-  'apps/mobile/lib/ui_v2/universal/mool_contextual_chat_v2.dart',
-  'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart',
-  'apps/mobile/test/ui_v2/social/social_v2_contextual_chat_test.dart',
-  'config/codex-subagent-coordination-policy.json',
-  'docs/quality/UAW-CURSOR-CONTEXTUAL-CHAT-UI-20260824.md',
-  'scripts/check-approved-ui-locks.ps1',
-  'scripts/check-codex-subagent-coordination-policy.ps1'
+  'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart',
+  'config/codex-development-regression-registry.json',
+  'config/codex-subagent-coordination-policy.json'
 )
 Assert-Coordination (
   [string]$integrationRepair.lane -ceq 'integration_repair' -and
   [string]$integrationRepair.requiredCodexCommit -ceq
-    '922c2a9d776f7de96ba9ec9a7ca6175d1cc2fce9' -and
+    'e5720cb86bd2119afc3d84a83d3116018f17f9a3' -and
   [string]$integrationRepair.requiredCodexBranch -ceq
-    'work/codex-auth/social-runtime-core-20260824' -and
+    'work/cursor-ui/shop-chat-v1-implementation-20260829' -and
   [string]$integrationRepair.requiredCursorCommit -ceq
-    '00ce93552091ee51739266c0a8fbe6d207d9f695' -and
+    '30f4614574aae3c315d586944636a35ba314873d' -and
   [string]$integrationRepair.requiredCursorBranch -ceq
-    'work/cursor-ui/shop-chat-ui-20260824' -and
+    'work/codex-ui/global-contextual-chat-shell-v1-20260828' -and
   [int]$integrationRepair.maximumMergeCommits -eq 1 -and
-  [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 4 -and
+  [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 1 -and
   (@($integrationRepair.preMergeCoordinationOwners) -join '|') -ceq
-    'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|config/runtime/moolsocial-production-runtime-tickets-20260825.json|scripts/check-approved-ui-locks.ps1|scripts/check-codex-subagent-coordination-policy.ps1|scripts/test-codex-integration-repair-coordination-policy.ps1' -and
-  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 5 -and
+    'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md' -and
+  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 1 -and
   (@($integrationRepair.postMergeClosureOwners) -join '|') -ceq
-    'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|config/runtime/moolsocial-production-runtime-tickets-20260825.json|docs/quality/UAW-CODEX-SOCIAL-RUNTIME-CHAT-CONFLICT-CORRECTION-20260825.md|docs/quality/UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V3-20260826.md|docs/quality/UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V4-20260826.md|scripts/check-approved-ui-locks.ps1|scripts/check-brand-integrity.ps1|scripts/check-buy-approved-reference.ps1|scripts/check-buy-backend-contract-boundary.ps1|scripts/check-buy-data-egress-boundary.ps1|scripts/check-buy-protected-baseline.ps1|scripts/check-codex-subagent-coordination-policy.ps1|scripts/check-interaction-contracts.ps1|scripts/check-social-protected-baseline.ps1|scripts/check-user-facing-copy.ps1|scripts/test-codex-integration-repair-coordination-policy.ps1' -and
+    'docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md' -and
   -not [bool]$integrationRepair.directSourceCommitsAllowed -and
   [bool]$integrationRepair.conflictResolutionAllowed -and
   (@($integrationRepair.exactConflictOwners | Sort-Object) -join '|') -ceq
     (@($expectedRepairConflictOwners | Sort-Object) -join '|') -and
   [bool]$integrationRepair.remoteRepairBranchMustEqualHeadBeforeAdmission -and
   [string]$integrationRepair.freshIntegrationWorkId -ceq
-    'social-runtime-chat-v4-20260826' -and
+    'shop-chat-shared-v1-20260829' -and
   [string]$integrationRepair.freshIntegrationTicketId -ceq
-    'UAW-INTEGRATION-SOCIAL-RUNTIME-CHAT-V4-20260826' -and
+    'UAW-INTEGRATION-SHOP-CHAT-SHARED-V1-20260829' -and
   [string]$integrationRepair.freshIntegrationBranch -ceq
-    'integration/moolsocial/social-runtime-chat-v4-20260826' -and
+    'integration/moolsocial/shop-chat-shared-v1-20260829' -and
   [string]$integrationRepair.freshIntegrationWorktreePath -ceq
-    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-social-runtime-chat-v4-20260826' -and
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-shop-chat-shared-v1-20260829' -and
   [string]$integrationRepair.freshIntegrationMergeSubject -ceq
-    'merge(social-runtime-chat-v4-20260826): integrate fully-qualified runtime and Chat'
+    'merge(shop-chat-shared-v1-20260829): integrate shared Chat and Buy context'
 ) 'integration repair discipline weakened or changed.'
 Assert-ExactNames $gitDiscipline.promotion @(
   'directFeatureToRemediationAllowed','mainFrozen','founderAuthorizationRequired',
@@ -2124,7 +2117,7 @@ if ($ProductionLane -ceq 'baseline') {
     }
     if ($approvedBranches.Count -eq 1 -and
         [string]$approvedBranches[0] -ceq
-          'work/integration-repair/social-runtime-chat-conflict-correction-20260825') {
+          'work/integration-repair/shop-chat-shared-v1-20260829') {
       $qualifiedRepairCommit = [string]$approvedCommits[0]
       Assert-QualifiedIntegrationRepairTip `
         -RepairCommit $qualifiedRepairCommit

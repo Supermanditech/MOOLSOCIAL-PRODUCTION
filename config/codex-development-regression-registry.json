@@ -44313,6 +44313,76 @@
       "prevention": "Bind clean Child 9, apply and verify the identical three-owner diff, stage exactly those owners, confirm zero unstaged change for them, then run pre_commit before committing.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart", "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart", "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD9-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3913-SHARED-BUY-MERGE-TREE-INLINE-ANCESTRY-PARSER-ERROR",
+      "status": "registered_separate_ancestry_exit_assignments_required",
+      "appliesTo": ["primary", "coordination", "integration", "git", "tooling", "chat"],
+      "mistake": "The first read-only shared-Chat/Buy merge-tree audit embedded git ancestry commands and LASTEXITCODE assignments inside object-property parentheses, and PowerShell rejected the command before Git ran.",
+      "rootCause": "Shell command execution and exit-code capture were composed as inline expressions that PowerShell does not parse inside a hashtable value.",
+      "prevention": "Bind clean Child 10, run merge-base and each ancestry probe as separate statements with separately captured exit codes, run classic merge-tree without an exit-sensitive write-tree operation, and report conflict markers from the retained output.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3914-SHARED-CHAT-BUY-THREE-OWNER-MERGE-CONFLICT",
+      "status": "registered_primary_integration_repair_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "git", "chat", "profile"],
+      "mistake": "The read-only merge-tree audit proved authoritative shared Chat 30f46145 and tested Buy adapter e5720cb8 diverge from 369bb455 and conflict in exactly global_profile_panel_v2.dart, the regression registry and coordination policy.",
+      "rootCause": "Shared Chat and the later approved Shop/profile baseline were developed independently from the same reconciled baseline, so profile evolution and cumulative governance both changed on each tip.",
+      "prevention": "Use one primary-owned two-parent integration-repair merge with first parent 30f46145 and second parent e5720cb8; retain the latest approved Buy-side profile blob, retain the cumulative repair-side registry/policy, forbid every other manual owner, then run shared Chat plus Buy regression before any build.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3915-REPAIR-CLAIM-DYNAMIC-NEWLINE-BOUNDARY-MISS",
+      "status": "registered_actual_newline_boundary_tokens_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "tooling"],
+      "mistake": "The first dynamic apply_patch preparation for pruning the inherited repair claim used literal backslash-n tokens and could not find the claim boundaries, so no file changed.",
+      "rootCause": "JavaScript single-quoted boundary strings encoded escaped characters rather than the policy's actual newline sequence after normalization.",
+      "prevention": "Use template literals containing real newline characters, assert one start and next-task boundary, replace only the exact active-claim block, parse policy and require five unique owners before proceeding.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260829-3916-REPAIR-CLAIM-FULL-POLICY-OUTPUT-TRUNCATED-BEFORE-END",
+      "status": "registered_bounded_claim_window_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "tooling"],
+      "mistake": "The second dynamic claim replacement found the real start at character 14622 but the full-policy shell result was truncated before the next task boundary, so no patch ran.",
+      "rootCause": "A complete policy owner was requested through a bounded tool result even though only the known active-claim line window was required.",
+      "prevention": "Read only lines 185 through one-before the next active task, keep the result below output limits, construct the exact one-owner patch from that bounded block, and verify JSON plus five unique owners.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260829-3917-ACTIVE-CLAIMS-BOUNDED-WINDOW-ENDPOINT-MISMATCH",
+      "status": "registered_exact_first_last_line_probe_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "tooling"],
+      "mistake": "The bounded activeClaims replacement rejected its preimage because the selected endpoint did not end with the expected array delimiter, and no patch ran.",
+      "rootCause": "The conversion from one-based discovered property lines to zero-based slice indices was assumed rather than verified against the first and last exact lines.",
+      "prevention": "Emit only the first and last two indexed lines around activeClaims, correct the inclusive zero-based endpoint, then require the bounded preimage starts and ends on the exact property delimiters before apply_patch.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260829-3918-REPAIR-FIRST-PARENT-OMITTED-CUMULATIVE-BUY-EVIDENCE",
+      "status": "registered_tested_buy_first_parent_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "git", "evidence", "chat"],
+      "mistake": "The first repair worktree used shared Chat 30f46145 as first parent and the current registry consequently found 132 late Shop evidence references absent before bootstrap.",
+      "rootCause": "The repair parent order favored feature naming rather than the cumulative accepted baseline that owns current Shop evidence and profile authority.",
+      "prevention": "Use tested Buy e5720cb8 as repair first parent, merge shared Chat 30f46145 as second parent, keep the same exact three conflict owners, and preserve Buy-side profile plus cumulative repair-side governance.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3919-REPAIR-COORDINATION-BOOTSTRAP-USED-REPAIR-TASK-IDENTITY",
+      "status": "registered_primary_root_bootstrap_identity_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "git"],
+      "mistake": "The repair coordination_bootstrap gate was invoked with the future repair task identity and rejected it because bootstrap requires the canonical primary coordination owner.",
+      "rootCause": "The continuation task identity was applied one phase too early; it becomes active only after the bootstrap commit exists.",
+      "prevention": "Run coordination_bootstrap as AgentRole primary and AgentTask /root at the exact first-parent baseline, commit the declared bootstrap owners, then run task_start under /root/repair_shop_chat_shared_v1_20260829.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
     }
   ]
 }
