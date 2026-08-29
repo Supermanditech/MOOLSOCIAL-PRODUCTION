@@ -31,6 +31,7 @@ class ChatThreadScreen extends StatefulWidget {
 
 class _ChatThreadScreenState extends State<ChatThreadScreen> {
   final _messageController = TextEditingController();
+  final _composerKey = GlobalKey<_ComposerState>();
   final Map<String, String> _draftTextByThread = {};
   int _threadLoadRequest = 0;
 
@@ -206,6 +207,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           onTitleTap: () =>
               unawaited(_openConversationInfo(thread, entryContext)),
           backgroundColor: const Color(0xFFF1F2F6),
+          onBlockedPop: () =>
+              _composerKey.currentState?.closeAttachmentsForBack() ?? false,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -268,6 +271,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
               : _ThreadBody(session: widget.session, thread: thread),
           bottom: widget.session.chatAvailableForSession(thread.id)
               ? _Composer(
+                  key: _composerKey,
                   session: widget.session,
                   threadId: thread.id,
                   controller: _messageController,
@@ -307,6 +311,16 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
 
   void _confirmLocalChange(String message) {
     setState(() => _statusMessage = message);
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar(reason: SnackBarClosedReason.remove)
+      ..showSnackBar(
+        SnackBar(
+          key: const Key('chat-info-local-feedback'),
+          behavior: SnackBarBehavior.floating,
+          content: Text(message),
+        ),
+      );
   }
 
   void _showAccountSettingRecovery({
@@ -434,6 +448,29 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                       'These choices apply until you close MoolSocial. They do not change account permissions or another person’s settings.',
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _ConversationSettingsSection(
+                title: 'Conversation',
+                child: ListTile(
+                  key: const Key('chat-info-voice-chat'),
+                  minLeadingWidth: 28,
+                  leading: const Icon(Icons.graphic_eq_rounded),
+                  title: const Text('Start a voice chat'),
+                  subtitle: const Text(
+                    'Talk live with this conversation when voice chat is available.',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => unawaited(
+                    _showUnavailableCapability(
+                      context,
+                      keyName: 'chat-voice-chat-recovery',
+                      title: 'Voice chat unavailable',
+                      message:
+                          'Voice chat is not available right now. You can continue with messages or try a voice call.',
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -1471,6 +1508,7 @@ class _Composer extends StatefulWidget {
     required this.controller,
     required this.onSend,
     required this.onSendPhoto,
+    super.key,
   });
 
   final ChatSession session;
@@ -1498,6 +1536,15 @@ class _ComposerState extends State<_Composer> {
       _attachmentsOpen = !_attachmentsOpen;
       _attachmentNotice = null;
     });
+  }
+
+  bool closeAttachmentsForBack() {
+    if (!_attachmentsOpen) return false;
+    setState(() {
+      _attachmentsOpen = false;
+      _attachmentNotice = null;
+    });
+    return true;
   }
 
   Future<void> _chooseAttachment(
@@ -1567,6 +1614,10 @@ class _ComposerState extends State<_Composer> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              PopScope<void>(
+                canPop: !_attachmentsOpen,
+                child: const SizedBox.shrink(),
+              ),
               if (_attachmentsOpen) ...[
                 Container(
                   key: const Key('chat-attachment-tray'),

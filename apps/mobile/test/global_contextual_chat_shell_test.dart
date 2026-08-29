@@ -327,6 +327,12 @@ void main() {
     expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
     expect(find.textContaining('Video sharing'), findsOneWidget);
 
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(find.byKey(const Key('chat-attachment-tray')), findsNothing);
+    expect(find.byKey(const Key('chat-attachment-notice')), findsNothing);
+
     await tester.tap(find.byKey(const Key('chat-composer-camera')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
@@ -390,13 +396,30 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.byKey(const Key('chat-info-voice-availability')));
+      final voiceAvailability = find.byKey(
+        const Key('chat-info-voice-availability'),
+      );
+      await tester.ensureVisible(voiceAvailability);
+      await tester.tap(voiceAvailability);
       await tester.pump();
       expect(chat.voiceCallsAvailableForSession('home-basket'), isFalse);
-      expect(find.byKey(const Key('chat-info-local-status')), findsOneWidget);
+      expect(find.byKey(const Key('chat-info-local-feedback')), findsOneWidget);
+      expect(
+        find.text('Voice calls paused for this app session.'),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('chat-info-video-availability')));
       await tester.pump();
       expect(chat.videoCallsAvailableForSession('home-basket'), isFalse);
+
+      final voiceChat = find.byKey(const Key('chat-info-voice-chat'));
+      await tester.ensureVisible(voiceChat);
+      await tester.tap(voiceChat);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-voice-chat-recovery')), findsOneWidget);
+      expect(find.text('Voice chat unavailable'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('chat-capability-continue')));
+      await tester.pumpAndSettle();
 
       final lastSeen = find.byKey(const Key('chat-info-last-seen'));
       await tester.ensureVisible(lastSeen);

@@ -304,6 +304,32 @@ void main() {
     expect(find.text('Alice News'), findsWidgets);
     expect(find.text('Public discovery post'), findsWidgets);
 
+    await tapVisible(tester, const Key('social-public-like-post-a'));
+    await tester.pumpAndSettle();
+    expect(socialGateway.interactions, [('post-a', 'like')]);
+
+    await tapVisible(tester, const Key('social-author-profile-post-a'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('social-author-panel-person-a')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+
+    await tapVisible(tester, const Key('social-message-author-post-a'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(chatGateway.createdTargets, ['person-a']);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+    expect(find.text('Public discovery post'), findsWidgets);
+
     await tapVisible(tester, const Key('social-global-chat'));
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
     await tapVisible(tester, const Key('chat-section-discover'));
@@ -311,10 +337,10 @@ void main() {
       find.byKey(const ValueKey('chat-section-body-discover')),
       findsOneWidget,
     );
-    await tapVisible(tester, const Key('chat-person-connect-person-a'));
-    await tapVisible(tester, const Key('chat-person-message-person-a'));
+    await tapVisible(tester, const Key('chat-person-connect-person-b'));
+    await tapVisible(tester, const Key('chat-person-message-person-b'));
     expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
-    expect(chatGateway.createdTargets, ['person-a']);
+    expect(chatGateway.createdTargets, ['person-a', 'person-b']);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -747,6 +773,7 @@ void main() {
 class _PeopleSocialGateway
     implements SocialContentGateway, SocialAuthorGateway {
   final Map<String, bool> followed = {'person-a': false, 'person-b': false};
+  final List<(String, String)> interactions = [];
 
   @override
   Future<SocialFeedPage> feed({String? cursor, int limit = 20}) async {
@@ -799,7 +826,19 @@ class _PeopleSocialGateway
     required String postId,
     required String interaction,
     int? choiceIndex,
-  }) => Future.error(UnsupportedError('Not used by this test.'));
+  }) async {
+    interactions.add((postId, interaction));
+    final isAlice = postId == 'post-a';
+    return _post(
+      postId,
+      isAlice ? 'person-a' : 'person-b',
+      isAlice ? 'Alice News' : 'Bharat Creator',
+      isAlice ? '@alice' : '@bharat',
+    ).copyWith(
+      liked: interaction == 'like',
+      likeCount: interaction == 'like' ? 1 : 0,
+    );
+  }
 
   @override
   Future<SocialPublishedItem> publish(SocialPublishDraft draft) =>
