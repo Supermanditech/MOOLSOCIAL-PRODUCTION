@@ -278,6 +278,97 @@ void main() {
   );
 
   test(
+    'authenticated gateway transports call availability and lifecycle',
+    () async {
+      final record = {
+        'id': 'call-1',
+        'threadId': 'thread-1',
+        'kind': 'voice',
+        'callerUserId': 'user-1',
+        'recipientUserId': 'user-2',
+        'status': 'ringing',
+        'createdAt': '2026-08-29T03:00:00.000Z',
+        'updatedAt': '2026-08-29T03:00:00.000Z',
+      };
+      final transport = _RecordingTransport([
+        _ok({
+          'voiceCallsEnabled': true,
+          'videoCallsEnabled': false,
+          'updatedAt': '2026-08-29T03:00:00.000Z',
+        }),
+        _ok({
+          'voiceCallsEnabled': false,
+          'videoCallsEnabled': false,
+          'updatedAt': '2026-08-29T03:01:00.000Z',
+        }),
+        _ok({'state': 'active', 'updatedAt': '2026-08-29T03:01:00.000Z'}),
+        _ok({
+          'threadId': 'thread-1',
+          'kind': 'voice',
+          'recipientUserId': 'user-2',
+          'recipientName': 'Member',
+          'canStart': false,
+          'status': 'calls_off',
+          'message': 'Member has turned off voice calls.',
+        }),
+        _ok(record),
+        _ok({...record, 'status': 'accepted'}),
+        _ok({...record, 'status': 'ended'}),
+        _ok([record]),
+      ]);
+      final gateway = AuthenticatedChatGateway(
+        endpoint: Uri.parse(
+          'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat',
+        ),
+        credentials: _RecordingCredentials(),
+        transport: transport,
+        random: Random(3),
+      );
+
+      expect((await gateway.getCallPreferences()).videoCallsEnabled, isFalse);
+      await gateway.updateCallPreferences(
+        const ChatCallPreferences(
+          voiceCallsEnabled: false,
+          videoCallsEnabled: false,
+        ),
+      );
+      await gateway.setPresence(ChatPresenceState.active);
+      final availability = await gateway.getCallAvailability(
+        threadId: 'thread-1',
+        kind: ChatCallKind.voice,
+      );
+      expect(availability.status, ChatCallAvailabilityStatus.callsOff);
+      expect(
+        (await gateway.startCall(
+          threadId: 'thread-1',
+          kind: ChatCallKind.voice,
+          idempotencyKey: 'chat-call-retry-0001',
+        )).status,
+        ChatCallStatus.ringing,
+      );
+      expect(
+        (await gateway.respondToCall(callId: 'call-1', accepted: true)).status,
+        ChatCallStatus.accepted,
+      );
+      expect(
+        (await gateway.endCall(callId: 'call-1')).status,
+        ChatCallStatus.ended,
+      );
+      expect((await gateway.listIncomingCalls()).single.id, 'call-1');
+      expect(transport.bodies.map((body) => body['operation']), [
+        'getCallPreferences',
+        'updateCallPreferences',
+        'setPresence',
+        'getCallAvailability',
+        'startCall',
+        'respondToCall',
+        'endCall',
+        'listIncomingCalls',
+      ]);
+    },
+  );
+
+  test(
     'production Chat loads only gateway-owned threads and messages',
     () async {
       final gateway = _ChatGateway();

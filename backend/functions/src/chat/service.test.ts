@@ -5,6 +5,8 @@ import {
   ChatError,
   type ChatMessageRecord,
   type ChatPrivacySettings,
+  type ChatCallPreferences,
+  type ChatCallRecord,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
   type ChatProfile,
@@ -306,6 +308,40 @@ test("binds blocking and request decisions to the authenticated member", async (
   );
 });
 
+test("validates account call choices presence and exact call actions", async () => {
+  const repository = new FakeChatRepository();
+  const service = createService(repository);
+  await service.updateCallPreferences(actor.userId, {
+    voiceCallsEnabled: false,
+    videoCallsEnabled: true,
+  });
+  await service.setPresence(actor.userId, { state: "active" });
+  await service.startCall(actor.userId, {
+    threadId: "thread-1",
+    kind: "voice",
+    idempotencyKey: "chat-call-retry-0001",
+  });
+  assert.deepEqual(repository.callPreferencesInput, [actor.userId, {
+    voiceCallsEnabled: false,
+    videoCallsEnabled: true,
+  }]);
+  assert.deepEqual(repository.presenceInput, [actor.userId, "active"]);
+  assert.deepEqual(repository.startCallInput, [
+    actor,
+    "thread-1",
+    "voice",
+    "chat-call-retry-0001",
+  ]);
+  await assert.rejects(
+    service.startCall(actor.userId, {
+      threadId: "thread-1",
+      kind: "audio",
+      idempotencyKey: "chat-call-retry-0002",
+    }),
+    (error: unknown) => error instanceof ChatError && error.code === "bad_request",
+  );
+});
+
 function createService(repository: ChatRepository): ChatService {
   return new ChatService(repository, async (userId) => {
     if (userId === actor.userId) return actor;
@@ -343,6 +379,9 @@ class FakeChatRepository implements ChatRepository {
   privacyInput?: [string, Omit<ChatPrivacySettings, "updatedAt">];
   blockInput?: [ChatProfile, ChatProfile, boolean];
   requestInput?: [string, string, boolean];
+  callPreferencesInput?: [string, Omit<ChatCallPreferences, "updatedAt">];
+  presenceInput?: [string, "active" | "background" | "offline"];
+  startCallInput?: [ChatProfile, string, "voice" | "video", string];
 
   async listThreads(userId: string, limit: number): Promise<ChatThreadRecord[]> {
     this.listThreadsInput = [userId, limit];
@@ -503,6 +542,64 @@ class FakeChatRepository implements ChatRepository {
     this.requestInput = [userId, threadId, accepted];
     return { threadId, accepted };
   }
+
+  async getCallPreferences(): Promise<ChatCallPreferences> {
+    return callPreferences;
+  }
+
+  async updateCallPreferences(
+    userId: string,
+    preferences: Omit<ChatCallPreferences, "updatedAt">,
+  ): Promise<ChatCallPreferences> {
+    this.callPreferencesInput = [userId, preferences];
+    return { ...preferences, updatedAt: callPreferences.updatedAt };
+  }
+
+  async setPresence(
+    userId: string,
+    state: "active" | "background" | "offline",
+  ) {
+    this.presenceInput = [userId, state];
+    return { state, updatedAt: callPreferences.updatedAt };
+  }
+
+  async getCallAvailability(
+    userId: string,
+    threadId: string,
+    kind: "voice" | "video",
+  ) {
+    return {
+      threadId,
+      kind,
+      recipientUserId: target.userId,
+      recipientName: target.name,
+      canStart: true,
+      status: "available" as const,
+      message: "Available",
+    };
+  }
+
+  async startCall(
+    selectedActor: ChatProfile,
+    threadId: string,
+    kind: "voice" | "video",
+    idempotencyKey: string,
+  ): Promise<ChatCallRecord> {
+    this.startCallInput = [selectedActor, threadId, kind, idempotencyKey];
+    return call;
+  }
+
+  async respondToCall(): Promise<ChatCallRecord> {
+    return { ...call, status: "accepted" };
+  }
+
+  async endCall(): Promise<ChatCallRecord> {
+    return { ...call, status: "ended" };
+  }
+
+  async listIncomingCalls(): Promise<ChatCallRecord[]> {
+    return [call];
+  }
 }
 
 const privacy: ChatPrivacySettings = {
@@ -510,6 +607,23 @@ const privacy: ChatPrivacySettings = {
   messageRequestsEnabled: true,
   shareLastSeen: true,
   readReceipts: true,
+  updatedAt: "2026-08-29T00:00:00.000Z",
+};
+
+const callPreferences: ChatCallPreferences = {
+  voiceCallsEnabled: true,
+  videoCallsEnabled: true,
+  updatedAt: "2026-08-29T00:00:00.000Z",
+};
+
+const call: ChatCallRecord = {
+  id: "call-1",
+  threadId: "thread-1",
+  kind: "voice",
+  callerUserId: actor.userId,
+  recipientUserId: target.userId,
+  status: "ringing",
+  createdAt: "2026-08-29T00:00:00.000Z",
   updatedAt: "2026-08-29T00:00:00.000Z",
 };
 

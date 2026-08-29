@@ -455,6 +455,54 @@ test("pending message request is isolated until its recipient accepts", async ()
   ), true);
 });
 
+test("call availability exposes recipient off and completes call lifecycle", async () => {
+  const database = chatDatabase();
+  const now = () => new Date("2026-08-29T03:00:00.000Z");
+  const repository = new FirestoreChatRepository(
+    database as unknown as Firestore,
+    now,
+  );
+  await repository.updateCallPreferences("user-member", {
+    voiceCallsEnabled: false,
+    videoCallsEnabled: true,
+  });
+  const disabled = await repository.getCallAvailability(
+    actor.userId,
+    "thread-1",
+    "voice",
+  );
+  assert.equal(disabled.canStart, false);
+  assert.equal(disabled.status, "calls_off");
+  assert.match(disabled.message, /turned off voice calls/u);
+
+  await repository.updateCallPreferences("user-member", {
+    voiceCallsEnabled: true,
+    videoCallsEnabled: true,
+  });
+  await repository.setPresence("user-member", "active");
+  const availability = await repository.getCallAvailability(
+    actor.userId,
+    "thread-1",
+    "voice",
+  );
+  assert.equal(availability.status, "available");
+  const started = await repository.startCall(
+    actor,
+    "thread-1",
+    "voice",
+    "chat-call-lifecycle-0001",
+  );
+  assert.equal(started.status, "ringing");
+  const accepted = await repository.respondToCall(
+    "user-member",
+    started.id,
+    true,
+  );
+  assert.equal(accepted.status, "accepted");
+  const ended = await repository.endCall(actor.userId, started.id);
+  assert.equal(ended.status, "ended");
+});
+
 function chatDatabase(): FakeFirestore {
   return new FakeFirestore({
     "chatThreads/thread-1": {
