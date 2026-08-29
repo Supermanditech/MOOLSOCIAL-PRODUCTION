@@ -44223,6 +44223,16 @@
       "prevention": "Locate the exact raw registry line with a fixed-string search, patch only that literal line, parse the complete JSON and verify entry 1065 independently before refreshing the policy binding.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/check-youtube-embedded-player-android.ps1"]
+    },
+    {
+      "id": "REG-20260829-3904-REGRESSION-GATE-SECOND-BUILD-CACHE-EVIDENCE-MISSING",
+      "status": "registered_complete_missing_evidence_inventory_required",
+      "appliesTo": ["primary", "coordination", "implementation", "storage", "tooling"],
+      "mistake": "After repairing the first two deleted build-cache references, the memory gate stopped at REG-20260828-3816 because its diagnostic JSON under apps/mobile/build was also absent.",
+      "rootCause": "The repair addressed only the first known report filename instead of inventorying every registry evidence path invalidated by authorized generated-build cleanup.",
+      "prevention": "Before another gate retry, scan every registry evidence reference read-only against both the Child 3 and production roots, list all missing paths and owning entries, and rebind the complete cache-dependent set to durable tracked evidence without weakening any prevention text.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-development-regression-memory.ps1", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md"]
     }
   ]
 }
