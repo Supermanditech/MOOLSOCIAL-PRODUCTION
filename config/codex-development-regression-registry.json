@@ -43352,7 +43352,7 @@
       "rootCause": "The retained reporter stream was treated as pure JSONL without first filtering valid protocol event records and accounting for raw diagnostic text.",
       "prevention": "Reuse the retained run, accept only lines that begin with a JSON object marker and parse successfully, inventory non-protocol lines separately, then join testStart, testDone, error and print events without rerunning the suite.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md", "apps/mobile/build/shop-v2-r61-5-buy-cycle1-diagnostic-attempt1.json"]
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-V2-R61-5-BUY-REGRESSION-FIX-20260828.md", "scripts/check-codex-development-regression-memory.ps1"]
     },
     {
       "id": "REG-20260828-3817-SHOP-BUY-GROUPED-GIT-HISTORY-DIAGNOSTIC-TIMED-OUT",
@@ -43412,7 +43412,7 @@
       "rootCause": "Stopping the Start-Process wrapper for flutter.bat did not provide a trustworthy child-tree exit contract, so the orchestration completed without semantic session metadata.",
       "prevention": "Reject the session, inspect only its retained JSON tail and exact scoped process inventory, restore generated owners if required, then diagnose the last completed viewport before selecting a native per-test timeout strategy.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md", "apps/mobile/build/shop-v2-r61-5-golden-scoped-cart-attempt2.json"]
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md", "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"]
     },
     {
       "id": "REG-20260828-3823-SHOP-R58-8-7-CUTOFF-LEFT-FRONTEND-AND-TESTER-CHILDREN",
@@ -43432,7 +43432,7 @@
       "rootCause": "PowerShell Start-Process joined the ArgumentList for a batch file without preserving the intended quoted argument boundary.",
       "prevention": "Do not use Start-Process ArgumentList for spaced Flutter test filters. Invoke Flutter directly through clean-support with an exact file path and no plain-name filter, or use a separately verified escaped command line; retain JSON output and native exit.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-v2-r61-5-golden-scoped-cart-attempt2.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
     },
     {
       "id": "REG-20260828-3825-SHOP-IMAGE-HELPER-SEARCH-INCLUDED-GUESSED-ABSENT-PATHS",
@@ -43462,7 +43462,7 @@
       "rootCause": "Accepted runtime f105195b versioned the test references to isolate the cumulative navigation/UI state but omitted the corresponding c24f capture generation and review transaction.",
       "prevention": "Preserve every original PNG, restore both tests to their intended c24f paths, create new versioned files under exact claims, generate only the R58.8.7 c24f set after liveness is deterministic, visually inspect all new captures, and rerun both tests without update mode before full regressions.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-v2-r61-5-golden-scoped-cart-attempt3.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
     },
     {
       "id": "REG-20260828-3828-C24F-VERSIONED-R58-8-6-GOLDENS-ALSO-REQUIRED",
@@ -43472,7 +43472,7 @@
       "rootCause": "The initial R58.8.6 result used the same unquoted spaced filter later registered in REG3824, so it was not valid evidence that originals matched the intended versioned UI.",
       "prevention": "Generate all five R58.8.6 c24f files under their existing exact claims, visually inspect them, then verify both complete files without update mode; no copied original may remain as current c24f evidence unless its generated hash independently matches.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-v2-r61-5-golden-checkout-final.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
     },
     {
       "id": "REG-20260828-3829-SHOP-CHILD8-CLOSURE-RETAINED-STALE-GOLDEN-EXCLUSION",
@@ -43512,7 +43512,7 @@
       "rootCause": "The JSON protocol's independent skipped boolean was not applied before result classification.",
       "prevention": "For each non-hidden testDone event, count skipped true first; otherwise count result success as pass and every other result as failure, then require the final done.success boolean and native exit zero.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-v2-r61-5-full-buy-cycle1-final.json", "apps/mobile/build/shop-v2-r61-5-full-buy-cycle2-final.json", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-LANDING-V2-CHILD8-BUY-GOLDEN-PATH-20260828.md"]
     },
     {
       "id": "REG-20260828-3833-WORKSPACE-BUILD-CACHE-INVENTORY-HID-GIB-COLUMN",
@@ -44042,7 +44042,7 @@
       "rootCause": "The ignored build evidence was copied from a remembered subset rather than derived from every current registry evidence path.",
       "prevention": "Parse all registry evidence paths under apps/mobile/build, restore every missing byte from the preserved qualified r61.5 worktree with hash verification, refresh candidate HEAD, and rerun preflight only once.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/build-buy-device-review.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-v2-r61-5-golden-checkout-final.json", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-prebuild-validation.md"]
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/build-buy-device-review.ps1", "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-prebuild-validation.md"]
     },
     {
       "id": "REG-20260829-3886-SHOP-R61-6-CLOSURE-STATUS-DIGEST-INLINE-IF-ERROR",
@@ -44102,7 +44102,7 @@
       "rootCause": "The full 63-file suite emits repeated compact progress frames even when a JSON file reporter is also enabled.",
       "prevention": "Treat the complete JSON file reporter as the authoritative result, verify its done event reports success and bind its SHA-256 in the audit evidence; do not rerun the already-passed suite for console completeness.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/invoke-flutter-with-clean-support.ps1"],
-      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/build/shop-chat-v1-full-buy.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD2-20260829.md"]
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD2-20260829.md"]
     },
     {
       "id": "REG-20260829-3892-SHARED-CHAT-SCREEN-INVENTORY-REGEX-QUOTE-PARSER-ERROR",
