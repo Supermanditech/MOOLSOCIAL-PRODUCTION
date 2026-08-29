@@ -356,7 +356,8 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
             ],
             icon: const Icon(Icons.more_vert_rounded),
           ),
-          floatingActionButton: _section == ChatHomeSection.chats
+          floatingActionButton:
+              _section == ChatHomeSection.chats && threads.isNotEmpty
               ? FloatingActionButton(
                   key: const Key('chat-new'),
                   tooltip: 'Start a conversation',
@@ -523,6 +524,8 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
               },
               onDiscover: () => _selectSection(ChatHomeSection.discover),
               onOpenFeed: () => unawaited(_openPublicFeedDiscovery()),
+              onStartConversation: () =>
+                  _selectSection(ChatHomeSection.discover),
             ),
           )
         else
@@ -758,6 +761,7 @@ class _EmptyInbox extends StatelessWidget {
     required this.onReset,
     required this.onDiscover,
     required this.onOpenFeed,
+    required this.onStartConversation,
   });
 
   final bool hasQuery;
@@ -765,6 +769,7 @@ class _EmptyInbox extends StatelessWidget {
   final VoidCallback onReset;
   final VoidCallback onDiscover;
   final VoidCallback onOpenFeed;
+  final VoidCallback onStartConversation;
 
   @override
   Widget build(BuildContext context) {
@@ -802,27 +807,36 @@ class _EmptyInbox extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: MoolSpacing.md),
-            OutlinedButton(
-              key: Key(
-                hasQuery
-                    ? 'chat-reset-search'
-                    : socialOnly
-                    ? 'chat-open-discover'
-                    : 'chat-open-feed',
+            if (hasQuery || socialOnly)
+              OutlinedButton(
+                key: Key(hasQuery ? 'chat-reset-search' : 'chat-open-discover'),
+                onPressed: hasQuery ? onReset : onDiscover,
+                child: Text(hasQuery ? 'Clear search' : 'Discover people'),
+              )
+            else
+              Transform.translate(
+                offset: const Offset(0, -MoolSpacing.sm),
+                child: Wrap(
+                  key: const Key('chat-empty-actions'),
+                  alignment: WrapAlignment.center,
+                  spacing: MoolSpacing.xs,
+                  runSpacing: MoolSpacing.xs,
+                  children: [
+                    OutlinedButton.icon(
+                      key: const Key('chat-open-feed'),
+                      onPressed: onOpenFeed,
+                      icon: const Icon(Icons.dynamic_feed_outlined),
+                      label: const Text('Open Feed'),
+                    ),
+                    FilledButton.icon(
+                      key: const Key('chat-empty-start'),
+                      onPressed: onStartConversation,
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text('Start conversation'),
+                    ),
+                  ],
+                ),
               ),
-              onPressed: hasQuery
-                  ? onReset
-                  : socialOnly
-                  ? onDiscover
-                  : onOpenFeed,
-              child: Text(
-                hasQuery
-                    ? 'Clear search'
-                    : socialOnly
-                    ? 'Discover people'
-                    : 'Open Feed',
-              ),
-            ),
           ],
         ),
       ),

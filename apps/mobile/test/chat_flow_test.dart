@@ -224,6 +224,54 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('empty inbox separates Open Feed from the Person+ action', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final chat = ChatSession.production(gateway: _PeopleChatGateway());
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/mool',
+      journey: journey,
+      chat: chat,
+      size: const Size(320, 568),
+    );
+    await tester.pumpAndSettle();
+
+    final openFeed = find.byKey(const Key('chat-open-feed'));
+    final startConversation = find.byKey(const Key('chat-empty-start'));
+    expect(openFeed, findsOneWidget);
+    expect(startConversation, findsOneWidget);
+    expect(find.byKey(const Key('chat-new')), findsNothing);
+    final feedRect = tester.getRect(openFeed);
+    final startRect = tester.getRect(startConversation);
+    final navigationRect = tester.getRect(
+      find.byKey(const Key('chat-native-navigation')),
+    );
+    expect(feedRect.overlaps(startRect), isFalse);
+    expect(feedRect.overlaps(navigationRect), isFalse);
+    expect(startRect.overlaps(navigationRect), isFalse);
+    expect(feedRect.width, greaterThanOrEqualTo(44));
+    expect(feedRect.height, greaterThanOrEqualTo(44));
+    expect(startRect.width, greaterThanOrEqualTo(44));
+    expect(startRect.height, greaterThanOrEqualTo(44));
+    expect(feedRect.left, greaterThanOrEqualTo(0));
+    expect(startRect.right, lessThanOrEqualTo(320));
+    expect(feedRect.bottom, lessThanOrEqualTo(navigationRect.top));
+    expect(startRect.bottom, lessThanOrEqualTo(navigationRect.top));
+
+    await tester.tap(startConversation);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Discover connects MoolSocial people and starts a real direct Chat',
     (tester) async {
