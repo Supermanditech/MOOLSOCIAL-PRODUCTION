@@ -283,6 +283,7 @@ class BuyV2Session extends ChangeNotifier {
     this.customerStateStore,
     this.gstInvoiceProfileStore,
     this.commercialPaymentTermsAdapter,
+    this.checkoutQuoteAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
     bool? reviewDataEnabled,
   }) : cartBenefitsAdapter =
@@ -332,6 +333,7 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2CustomerStateStore? customerStateStore;
   final BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore;
   final BuyV2CommercialPaymentTermsAdapter? commercialPaymentTermsAdapter;
+  final BuyV2CheckoutQuoteAdapter? checkoutQuoteAdapter;
   final BuyV2CommerceAdapter commerceAdapter;
   final bool reviewDataEnabled;
 
@@ -553,6 +555,11 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2CommerceLoadState commercialPaymentTermsLoadState =
       BuyV2CommerceLoadState.ready;
   String? commercialPaymentTermsMessage;
+  BuyV2CheckoutQuote? _checkoutQuote;
+  String? _checkoutQuoteFingerprint;
+  int _checkoutQuoteRequestSequence = 0;
+  BuyV2CommerceLoadState checkoutQuoteLoadState = BuyV2CommerceLoadState.ready;
+  String? checkoutQuoteMessage;
   final Map<String, int> _tipsByFulfilmentKey = {};
   final Set<String> _savedKeys = {};
   String? _savedProductsOwnerScope;
@@ -585,6 +592,7 @@ class BuyV2Session extends ChangeNotifier {
   void acceptCheckoutPriceChanges() {
     if (_checkoutPriceChanges.isEmpty) return;
     _checkoutPriceChanges = [];
+    _invalidateAndRefreshCheckoutPricingContracts();
     notice = 'Updated prices accepted';
     _persistCustomerState();
     notifyListeners();
@@ -1286,6 +1294,7 @@ class BuyV2Session extends ChangeNotifier {
     _checkoutDeliveryPromiseChanges = [];
     _checkoutPriceChanges = [];
     _checkoutAvailabilityIssue = null;
+    _invalidateCheckoutQuote();
     _invalidateCommercialPaymentTerms();
   }
 
@@ -1324,7 +1333,7 @@ class BuyV2Session extends ChangeNotifier {
     (total, destination) => total + couponSavingForDestination(destination),
   );
 
-  Map<String, int> _checkoutGroupPayables() {
+  Map<String, int> _checkoutGroupCouponSavings() {
     final remainingDiscount = {
       for (final destination in checkoutDestinations)
         destination: couponSavingForDestination(destination),
@@ -1332,14 +1341,27 @@ class BuyV2Session extends ChangeNotifier {
     return Map.unmodifiable({
       for (final group in checkoutFulfilmentGroups)
         group.key: () {
-          final beforeDiscount = group.total + tipForGroup(group);
           final available = remainingDiscount[group.destination] ?? 0;
-          final discount = available > beforeDiscount
-              ? beforeDiscount
-              : available;
+          final discount = available > group.total ? group.total : available;
           remainingDiscount[group.destination] = available - discount;
-          return beforeDiscount - discount;
+          return discount;
         }(),
+    });
+  }
+
+  Map<String, int> _checkoutGroupPayables() {
+    if (checkoutQuoteLoadState == BuyV2CommerceLoadState.ready &&
+        _checkoutQuote != null) {
+      return Map.unmodifiable({
+        for (final line in _checkoutQuote!.lines)
+          line.fulfilmentKey: line.total,
+      });
+    }
+    final discountByKey = _checkoutGroupCouponSavings();
+    return Map.unmodifiable({
+      for (final group in checkoutFulfilmentGroups)
+        group.key:
+            group.total + tipForGroup(group) - (discountByKey[group.key] ?? 0),
     });
   }
 
@@ -1349,11 +1371,19 @@ class BuyV2Session extends ChangeNotifier {
         scopedCartTotal + scopedTipTotal,
       );
 
-  int get checkoutPayableTotal =>
+  int get calculatedCheckoutPayableTotal =>
       (checkoutTotal + checkoutTipTotal - checkoutCouponSaving).clamp(
         0,
         checkoutTotal + checkoutTipTotal,
       );
+
+  BuyV2CheckoutQuote? get checkoutQuote => _checkoutQuote;
+
+  int get checkoutPayableTotal =>
+      checkoutQuoteLoadState == BuyV2CommerceLoadState.ready &&
+          _checkoutQuote != null
+      ? _checkoutQuote!.total
+      : calculatedCheckoutPayableTotal;
 
   List<BuyV2TipOption> tipOptionsFor(BuyV2Destination destination) =>
       List.unmodifiable(tipPolicy.optionsFor(destination));
@@ -1378,10 +1408,7 @@ class BuyV2Session extends ChangeNotifier {
     } else {
       _tipsByFulfilmentKey[fulfilmentKey] = amount;
     }
-    _invalidateCommercialPaymentTerms();
-    if (commercialPaymentTermsEnabled) {
-      unawaited(refreshCommercialPaymentTerms());
-    }
+    _invalidateAndRefreshCheckoutPricingContracts();
     notice = null;
     notifyListeners();
     return true;
@@ -1449,7 +1476,7 @@ class BuyV2Session extends ChangeNotifier {
       _liveCartBenefits = [];
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.ready;
       cartBenefitsMessage = null;
-      _invalidateCommercialPaymentTerms();
+      _invalidateAndRefreshCheckoutPricingContracts();
       notifyListeners();
       return true;
     }
@@ -1473,10 +1500,7 @@ class BuyV2Session extends ChangeNotifier {
       cartBenefitsMessage = snapshot.customerMessage;
       if (snapshot.state != BuyV2CartBenefitsLoadState.ready) {
         _liveCartBenefits = [];
-        _invalidateCommercialPaymentTerms();
-        if (commercialPaymentTermsEnabled) {
-          unawaited(refreshCommercialPaymentTerms());
-        }
+        _invalidateAndRefreshCheckoutPricingContracts();
         notifyListeners();
         return !_hasSelectedCartBenefitReference;
       }
@@ -1486,10 +1510,7 @@ class BuyV2Session extends ChangeNotifier {
         cartBenefitsMessage =
             'A selected coupon or offer is no longer eligible. Review the current options.';
       }
-      _invalidateCommercialPaymentTerms();
-      if (commercialPaymentTermsEnabled) {
-        unawaited(refreshCommercialPaymentTerms());
-      }
+      _invalidateAndRefreshCheckoutPricingContracts();
       notifyListeners();
       return !removedSelection;
     } on Object {
@@ -1498,10 +1519,7 @@ class BuyV2Session extends ChangeNotifier {
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.unavailable;
       cartBenefitsMessage =
           'Coupons and offers could not be checked. Try again.';
-      _invalidateCommercialPaymentTerms();
-      if (commercialPaymentTermsEnabled) {
-        unawaited(refreshCommercialPaymentTerms());
-      }
+      _invalidateAndRefreshCheckoutPricingContracts();
       notifyListeners();
       return !_hasSelectedCartBenefitReference;
     }
@@ -1613,6 +1631,181 @@ class BuyV2Session extends ChangeNotifier {
     cartBenefitsMessage = null;
   }
 
+  bool get checkoutQuoteEnabled => checkoutQuoteAdapter != null;
+
+  bool get checkoutQuoteBusy =>
+      checkoutQuoteLoadState == BuyV2CommerceLoadState.loading;
+
+  bool get checkoutQuoteReviewRequired {
+    if (!checkoutQuoteEnabled) return false;
+    final quote = _checkoutQuote;
+    return checkoutQuoteLoadState != BuyV2CommerceLoadState.ready ||
+        quote == null ||
+        !DateTime.now().isBefore(quote.validUntil) ||
+        _checkoutQuoteFingerprint != _currentCheckoutQuoteFingerprint();
+  }
+
+  int get checkoutQuotedTax =>
+      _checkoutQuote?.lines.fold<int>(0, (total, line) => total + line.tax) ??
+      0;
+
+  int get checkoutQuotedFreight =>
+      _checkoutQuote?.lines.fold<int>(
+        0,
+        (total, line) => total + line.freight,
+      ) ??
+      0;
+
+  int get checkoutQuotedDeliveryFee =>
+      _checkoutQuote?.lines.fold<int>(
+        0,
+        (total, line) => total + line.deliveryFee,
+      ) ??
+      0;
+
+  int get checkoutQuotedPaymentCharge =>
+      _checkoutQuote?.lines.fold<int>(
+        0,
+        (total, line) => total + line.paymentCharge,
+      ) ??
+      0;
+
+  Future<bool> refreshCheckoutQuote() async {
+    final adapter = checkoutQuoteAdapter;
+    final address = selectedAddressOrNull;
+    final groups = checkoutFulfilmentGroups;
+    if (adapter == null) return true;
+    if (address == null || groups.isEmpty) {
+      _checkoutQuote = null;
+      _checkoutQuoteFingerprint = null;
+      checkoutQuoteLoadState = BuyV2CommerceLoadState.unavailable;
+      checkoutQuoteMessage = 'Choose a delivery address to check the total.';
+      notifyListeners();
+      return false;
+    }
+    final requestSequence = ++_checkoutQuoteRequestSequence;
+    final fingerprint = _currentCheckoutQuoteFingerprint();
+    _checkoutQuote = null;
+    _checkoutQuoteFingerprint = null;
+    checkoutQuoteLoadState = BuyV2CommerceLoadState.loading;
+    checkoutQuoteMessage = null;
+    notifyListeners();
+    try {
+      final snapshot = await adapter.loadQuote(
+        groups: List.unmodifiable(groups),
+        address: address,
+        selectedPaymentMethod: selectedPayment,
+        selectedBenefits: selectedCartBenefitsFor(cartDestinations),
+        tipAmountsByFulfilmentKey: {
+          for (final group in groups) group.key: tipForGroup(group),
+        },
+      );
+      if (requestSequence != _checkoutQuoteRequestSequence ||
+          fingerprint != _currentCheckoutQuoteFingerprint()) {
+        return false;
+      }
+      checkoutQuoteLoadState = snapshot.state;
+      checkoutQuoteMessage = snapshot.customerMessage;
+      final quote = snapshot.quote;
+      if (snapshot.state != BuyV2CommerceLoadState.ready ||
+          quote == null ||
+          !_validCheckoutQuote(quote, groups)) {
+        _checkoutQuote = null;
+        _checkoutQuoteFingerprint = null;
+        if (snapshot.state == BuyV2CommerceLoadState.ready) {
+          checkoutQuoteLoadState = BuyV2CommerceLoadState.unavailable;
+          checkoutQuoteMessage = 'The current total could not be verified.';
+        }
+        _invalidateCommercialPaymentTerms();
+        notifyListeners();
+        return false;
+      }
+      _checkoutQuote = quote;
+      _checkoutQuoteFingerprint = fingerprint;
+      _invalidateCommercialPaymentTerms();
+      if (commercialPaymentTermsEnabled) {
+        unawaited(refreshCommercialPaymentTerms());
+      }
+      notifyListeners();
+      return true;
+    } on Object {
+      if (requestSequence != _checkoutQuoteRequestSequence) return false;
+      _checkoutQuote = null;
+      _checkoutQuoteFingerprint = null;
+      checkoutQuoteLoadState = BuyV2CommerceLoadState.unavailable;
+      checkoutQuoteMessage = 'Checkout total could not be checked. Try again.';
+      _invalidateCommercialPaymentTerms();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  bool _validCheckoutQuote(
+    BuyV2CheckoutQuote quote,
+    List<BuyV2FulfilmentGroup> groups,
+  ) {
+    if (quote.id.trim().isEmpty ||
+        quote.sourceId.trim().isEmpty ||
+        !quote.evaluatedAt.isBefore(quote.validUntil) ||
+        !DateTime.now().isBefore(quote.validUntil) ||
+        quote.lines.length != groups.length) {
+      return false;
+    }
+    final groupByKey = {for (final group in groups) group.key: group};
+    final expectedCouponSaving = _checkoutGroupCouponSavings();
+    final seen = <String>{};
+    var total = 0;
+    for (final line in quote.lines) {
+      final group = groupByKey[line.fulfilmentKey];
+      if (group == null ||
+          !seen.add(line.fulfilmentKey) ||
+          line.itemSubtotal != group.total ||
+          line.couponSaving !=
+              (expectedCouponSaving[line.fulfilmentKey] ?? 0) ||
+          line.tip != tipForGroup(group) ||
+          line.tax < 0 ||
+          line.freight < 0 ||
+          line.deliveryFee < 0 ||
+          line.paymentCharge < 0 ||
+          line.total !=
+              line.itemSubtotal -
+                  line.couponSaving +
+                  line.tax +
+                  line.freight +
+                  line.deliveryFee +
+                  line.tip +
+                  line.paymentCharge) {
+        return false;
+      }
+      total += line.total;
+    }
+    return total == quote.total;
+  }
+
+  String _currentCheckoutQuoteFingerprint() {
+    final addressId = selectedAddressOrNull?.id ?? 'no-address';
+    final benefits = selectedCartBenefitsFor(
+      cartDestinations,
+    ).map((benefit) => '${benefit.id}:${benefit.sourceId}').join(',');
+    return checkoutFulfilmentGroups
+        .map(
+          (group) =>
+              '${group.key}:${group.total}:${tipForGroup(group)}:'
+              '${_checkoutGroupCouponSavings()[group.key] ?? 0}',
+        )
+        .followedBy([addressId, selectedPayment, benefits])
+        .join('|');
+  }
+
+  void _invalidateCheckoutQuote() {
+    if (!checkoutQuoteEnabled) return;
+    _checkoutQuoteRequestSequence += 1;
+    _checkoutQuote = null;
+    _checkoutQuoteFingerprint = null;
+    checkoutQuoteLoadState = BuyV2CommerceLoadState.loading;
+    checkoutQuoteMessage = null;
+  }
+
   bool get commercialPaymentTermsEnabled =>
       commercialPaymentTermsAdapter != null;
 
@@ -1692,6 +1885,7 @@ class BuyV2Session extends ChangeNotifier {
       final snapshot = await adapter.loadTerms(
         groups: List.unmodifiable(groups),
         selectedPaymentMethod: selectedPayment,
+        quotedTotalsByFulfilmentKey: _checkoutGroupPayables(),
       );
       if (requestSequence != _commercialPaymentTermsRequestSequence ||
           fingerprint != _commercialPaymentTermsFingerprint(groups)) {
@@ -1861,6 +2055,19 @@ class BuyV2Session extends ChangeNotifier {
     commercialPaymentTermsMessage = null;
   }
 
+  void _invalidateAndRefreshCheckoutPricingContracts() {
+    _invalidateCheckoutQuote();
+    if (_cart.isNotEmpty && checkoutQuoteEnabled) {
+      unawaited(refreshCheckoutQuote());
+    }
+    _invalidateCommercialPaymentTerms();
+    if (_cart.isNotEmpty &&
+        commercialPaymentTermsEnabled &&
+        !checkoutQuoteEnabled) {
+      unawaited(refreshCommercialPaymentTerms());
+    }
+  }
+
   List<BuyV2CartBenefit> cartBenefits({
     required BuyV2CartBenefitKind kind,
     BuyV2Destination? destination,
@@ -1968,10 +2175,7 @@ class BuyV2Session extends ChangeNotifier {
       benefitId: current.id,
       sourceId: current.sourceId,
     );
-    _invalidateCommercialPaymentTerms();
-    if (commercialPaymentTermsEnabled) {
-      unawaited(refreshCommercialPaymentTerms());
-    }
+    _invalidateAndRefreshCheckoutPricingContracts();
     notice =
         current.kind == BuyV2CartBenefitKind.coupon && current.savingAmount > 0
         ? '${current.title} applied. Your total now includes the saving.'
@@ -1988,10 +2192,7 @@ class BuyV2Session extends ChangeNotifier {
       _cartBenefitSelectionKey(destination, kind),
     );
     if (removed == null) return;
-    _invalidateCommercialPaymentTerms();
-    if (commercialPaymentTermsEnabled) {
-      unawaited(refreshCommercialPaymentTerms());
-    }
+    _invalidateAndRefreshCheckoutPricingContracts();
     notice = kind == BuyV2CartBenefitKind.coupon
         ? 'Coupon removed from Checkout review.'
         : 'Payment offer removed from Checkout review.';
@@ -2333,6 +2534,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     _selectedAddressId = id;
+    _invalidateAndRefreshCheckoutPricingContracts();
     notice = null;
     notifyListeners();
     return true;
@@ -2445,10 +2647,7 @@ class BuyV2Session extends ChangeNotifier {
       }
       notice = null;
       _captureCheckoutPromiseSnapshot();
-      _invalidateCommercialPaymentTerms();
-      if (commercialPaymentTermsEnabled) {
-        unawaited(refreshCommercialPaymentTerms());
-      }
+      _invalidateAndRefreshCheckoutPricingContracts();
     }
     _notifyNavigationIfChanged(
       previous,
@@ -3191,6 +3390,7 @@ class BuyV2Session extends ChangeNotifier {
   void addAddress(BuyV2Address address) {
     _addresses.add(address);
     _selectedAddressId = address.id;
+    _invalidateAndRefreshCheckoutPricingContracts();
     notice = 'Delivering to ${address.shortLine}';
     _persistCustomerState();
     notifyListeners();
@@ -3206,6 +3406,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     _addresses[index] = address;
+    _invalidateAndRefreshCheckoutPricingContracts();
     notice = '${address.label} address updated';
     _persistCustomerState();
     notifyListeners();
@@ -3223,6 +3424,7 @@ class BuyV2Session extends ChangeNotifier {
     if (_selectedAddressId == id) {
       _selectedAddressId = _addresses.firstOrNull?.id;
     }
+    _invalidateAndRefreshCheckoutPricingContracts();
     notice = '${removed.label} address removed';
     _persistCustomerState();
     notifyListeners();
@@ -3241,8 +3443,14 @@ class BuyV2Session extends ChangeNotifier {
     if (_cart.isNotEmpty && liveCartBenefitsEnabled) {
       unawaited(refreshCartBenefits());
     }
+    _invalidateCheckoutQuote();
+    if (_cart.isNotEmpty && checkoutQuoteEnabled) {
+      unawaited(refreshCheckoutQuote());
+    }
     _invalidateCommercialPaymentTerms();
-    if (_cart.isNotEmpty && commercialPaymentTermsEnabled) {
+    if (_cart.isNotEmpty &&
+        commercialPaymentTermsEnabled &&
+        !checkoutQuoteEnabled) {
       unawaited(refreshCommercialPaymentTerms());
     }
     notice = '$value selected';
@@ -3338,6 +3546,7 @@ class BuyV2Session extends ChangeNotifier {
   Future<bool> submitOrder() {
     if (reviewDataEnabled) {
       if ((liveCartBenefitsEnabled && _hasSelectedCartBenefitReference) ||
+          checkoutQuoteEnabled ||
           commercialPaymentTermsEnabled) {
         return _submitReviewOrderWithContracts();
       }
@@ -3354,6 +3563,16 @@ class BuyV2Session extends ChangeNotifier {
         notice =
             cartBenefitsMessage ??
             'Coupon eligibility could not be confirmed. Review the current options.';
+        notifyListeners();
+        return false;
+      }
+    }
+    if (checkoutQuoteEnabled) {
+      await refreshCheckoutQuote();
+      if (checkoutQuoteReviewRequired) {
+        notice =
+            checkoutQuoteMessage ??
+            'The current Checkout total could not be confirmed.';
         notifyListeners();
         return false;
       }
@@ -3423,6 +3642,8 @@ class BuyV2Session extends ChangeNotifier {
     if (priceChanges.isNotEmpty) {
       _checkoutPriceChanges = List.unmodifiable(priceChanges);
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+      _invalidateCheckoutQuote();
+      _invalidateCommercialPaymentTerms();
       notice = 'Prices changed. Review the updated total to continue.';
       _persistCustomerState();
       notifyListeners();
@@ -3465,6 +3686,17 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
     }
+    if (!_refreshCheckoutFactsForProduction(lines)) return false;
+    if (checkoutQuoteEnabled) {
+      await refreshCheckoutQuote();
+      if (checkoutQuoteReviewRequired) {
+        notice =
+            checkoutQuoteMessage ??
+            'The current Checkout total could not be confirmed.';
+        notifyListeners();
+        return false;
+      }
+    }
     if (commercialPaymentTermsEnabled) {
       await refreshCommercialPaymentTerms();
       if (checkoutPaymentTermsReviewRequired) {
@@ -3475,7 +3707,6 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
     }
-    if (!_refreshCheckoutFactsForProduction(lines)) return false;
     final groups = checkoutFulfilmentGroups;
     final refreshedSnapshot = _deliveryPromiseSnapshotFor(groups);
     if (_checkoutPromiseSnapshot.isEmpty) {
@@ -3531,6 +3762,7 @@ class BuyV2Session extends ChangeNotifier {
         commercialPaymentTermIds: Map.unmodifiable(
           _selectedCommercialPaymentTermIds,
         ),
+        checkoutQuoteId: _checkoutQuote?.id,
       ),
     );
     return _handleOrderPlacement(
@@ -3784,23 +4016,27 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2Address address,
     String purchaseId,
   ) {
-    final remainingDiscount = {
-      for (final destination
-          in groups.map((group) => group.destination).toSet())
-        destination: couponSavingForDestination(destination),
+    final discountByKey = _checkoutGroupCouponSavings();
+    final quoteLineByKey = {
+      for (final line
+          in _checkoutQuote?.lines ?? const <BuyV2CheckoutQuoteLine>[])
+        line.fulfilmentKey: line,
     };
     return List.unmodifiable([
       for (final group in groups)
         () {
-          final available = remainingDiscount[group.destination] ?? 0;
-          final groupPayable = group.total + tipForGroup(group);
-          final discount = available > groupPayable ? groupPayable : available;
-          remainingDiscount[group.destination] = available - discount;
+          final quoteLine = quoteLineByKey[group.key];
           return _createOrderForGroup(
             group,
             address,
             purchaseId,
-            discount: discount,
+            discount:
+                quoteLine?.couponSaving ?? (discountByKey[group.key] ?? 0),
+            tax: quoteLine?.tax ?? 0,
+            freight: quoteLine?.freight ?? 0,
+            deliveryFee: quoteLine?.deliveryFee ?? 0,
+            paymentCharge: quoteLine?.paymentCharge ?? 0,
+            totalOverride: quoteLine?.total,
           );
         }(),
     ]);
@@ -3811,6 +4047,11 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2Address address,
     String purchaseId, {
     int discount = 0,
+    int tax = 0,
+    int freight = 0,
+    int deliveryFee = 0,
+    int paymentCharge = 0,
+    int? totalOverride,
   }) {
     final sequence = _orderSequence++;
     final prefix = switch (group.destination) {
@@ -3837,7 +4078,15 @@ class BuyV2Session extends ChangeNotifier {
       title: '${group.destination.label} order',
       itemSummary:
           '${group.itemCount} $itemName · ${address.label} · ${address.area}',
-      total: group.total + tipForGroup(group) - discount,
+      total:
+          totalOverride ??
+          group.total +
+              tipForGroup(group) -
+              discount +
+              tax +
+              freight +
+              deliveryFee +
+              paymentCharge,
       partner: group.partner,
       partnerType: group.partnerType,
       promise: group.promise,
@@ -3862,6 +4111,10 @@ class BuyV2Session extends ChangeNotifier {
       amountPaidNow: paymentTerm?.amountDueNow,
       balanceDue: paymentTerm?.balanceDue ?? 0,
       balanceDueLabel: paymentTerm?.balanceDueLabel,
+      tax: tax,
+      freight: freight,
+      deliveryFee: deliveryFee,
+      paymentCharge: paymentCharge,
     );
   }
 
@@ -3897,8 +4150,14 @@ class BuyV2Session extends ChangeNotifier {
     if (_cart.isNotEmpty && liveCartBenefitsEnabled) {
       unawaited(refreshCartBenefits());
     }
+    _invalidateCheckoutQuote();
+    if (_cart.isNotEmpty && checkoutQuoteEnabled) {
+      unawaited(refreshCheckoutQuote());
+    }
     _invalidateCommercialPaymentTerms();
-    if (_cart.isNotEmpty && commercialPaymentTermsEnabled) {
+    if (_cart.isNotEmpty &&
+        commercialPaymentTermsEnabled &&
+        !checkoutQuoteEnabled) {
       unawaited(refreshCommercialPaymentTerms());
     }
   }

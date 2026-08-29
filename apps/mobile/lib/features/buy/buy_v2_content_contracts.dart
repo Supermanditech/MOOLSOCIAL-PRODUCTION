@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'buy_v2_cart_contracts.dart';
 import 'buy_v2_models.dart';
 
 @immutable
@@ -141,6 +142,7 @@ class BuyV2OrderPlacementRequest {
     required this.amountDueNow,
     required this.idempotencyKey,
     this.commercialPaymentTermIds = const {},
+    this.checkoutQuoteId,
   });
 
   final List<BuyV2CartLine> lines;
@@ -150,6 +152,7 @@ class BuyV2OrderPlacementRequest {
   final int amountDueNow;
   final String idempotencyKey;
   final Map<String, String> commercialPaymentTermIds;
+  final String? checkoutQuoteId;
 }
 
 @immutable
@@ -292,6 +295,76 @@ abstract interface class BuyV2CommercialPaymentTermsAdapter {
   Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
     required List<BuyV2FulfilmentGroup> groups,
     required String selectedPaymentMethod,
+    required Map<String, int> quotedTotalsByFulfilmentKey,
+  });
+}
+
+@immutable
+class BuyV2CheckoutQuoteLine {
+  const BuyV2CheckoutQuoteLine({
+    required this.fulfilmentKey,
+    required this.itemSubtotal,
+    required this.couponSaving,
+    required this.tax,
+    required this.freight,
+    required this.deliveryFee,
+    required this.tip,
+    required this.paymentCharge,
+    required this.total,
+  });
+
+  final String fulfilmentKey;
+  final int itemSubtotal;
+  final int couponSaving;
+  final int tax;
+  final int freight;
+  final int deliveryFee;
+  final int tip;
+  final int paymentCharge;
+  final int total;
+}
+
+@immutable
+class BuyV2CheckoutQuote {
+  const BuyV2CheckoutQuote({
+    required this.id,
+    required this.sourceId,
+    required this.evaluatedAt,
+    required this.validUntil,
+    required this.lines,
+    required this.total,
+  });
+
+  final String id;
+  final String sourceId;
+  final DateTime evaluatedAt;
+  final DateTime validUntil;
+  final List<BuyV2CheckoutQuoteLine> lines;
+  final int total;
+}
+
+@immutable
+class BuyV2CheckoutQuoteSnapshot {
+  const BuyV2CheckoutQuoteSnapshot({
+    required this.state,
+    this.quote,
+    this.customerMessage,
+  });
+
+  final BuyV2CommerceLoadState state;
+  final BuyV2CheckoutQuote? quote;
+  final String? customerMessage;
+}
+
+abstract interface class BuyV2CheckoutQuoteAdapter {
+  const BuyV2CheckoutQuoteAdapter();
+
+  Future<BuyV2CheckoutQuoteSnapshot> loadQuote({
+    required List<BuyV2FulfilmentGroup> groups,
+    required BuyV2Address address,
+    required String selectedPaymentMethod,
+    required List<BuyV2CartBenefit> selectedBenefits,
+    required Map<String, int> tipAmountsByFulfilmentKey,
   });
 }
 

@@ -265,6 +265,23 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                       amount: order.discount,
                       deduction: true,
                     ),
+                  if (order.tax > 0)
+                    _InvoiceAmountRow(
+                      label: 'GST and taxes',
+                      amount: order.tax,
+                    ),
+                  if (order.freight > 0)
+                    _InvoiceAmountRow(label: 'Freight', amount: order.freight),
+                  if (order.deliveryFee > 0)
+                    _InvoiceAmountRow(
+                      label: 'Delivery fee',
+                      amount: order.deliveryFee,
+                    ),
+                  if (order.paymentCharge > 0)
+                    _InvoiceAmountRow(
+                      label: 'Payment charge',
+                      amount: order.paymentCharge,
+                    ),
                   _InvoiceAmountRow(
                     label: 'Order total',
                     amount: order.total,

@@ -77,6 +77,10 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
     'Items subtotal: INR $subtotal',
     if (order.tip > 0) 'Delivery tip: INR ${order.tip}',
     if (order.discount > 0) 'Coupon saving: -INR ${order.discount}',
+    if (order.tax > 0) 'GST and taxes: INR ${order.tax}',
+    if (order.freight > 0) 'Freight: INR ${order.freight}',
+    if (order.deliveryFee > 0) 'Delivery fee: INR ${order.deliveryFee}',
+    if (order.paymentCharge > 0) 'Payment charge: INR ${order.paymentCharge}',
     'Order total: INR ${order.total}',
   ];
   return <String, Object>{

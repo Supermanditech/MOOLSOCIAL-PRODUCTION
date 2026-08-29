@@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
@@ -41,6 +42,7 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
   Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
     required List<BuyV2FulfilmentGroup> groups,
     required String selectedPaymentMethod,
+    required Map<String, int> quotedTotalsByFulfilmentKey,
   }) async {
     if (state != BuyV2CommerceLoadState.ready) {
       return BuyV2CommercialPaymentTermsSnapshot(
@@ -48,6 +50,8 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
         customerMessage: customerMessage,
       );
     }
+    int totalFor(BuyV2FulfilmentGroup group) =>
+        quotedTotalsByFulfilmentKey[group.key] ?? group.total;
     return BuyV2CommercialPaymentTermsSnapshot(
       state: state,
       terms: [
@@ -59,8 +63,8 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
               destination: group.destination,
               supplierName: group.partner,
               kind: BuyV2CommercialPaymentTermKind.retailAdvance,
-              orderTotal: group.total,
-              amountDueNow: group.total,
+              orderTotal: totalFor(group),
+              amountDueNow: totalFor(group),
               balanceDue: 0,
               balanceDueLabel: 'Paid in full',
               sourceId: 'retail-terms-source',
@@ -72,8 +76,8 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
               destination: group.destination,
               supplierName: group.partner,
               kind: BuyV2CommercialPaymentTermKind.wholesaleAdvance,
-              orderTotal: group.total,
-              amountDueNow: group.total,
+              orderTotal: totalFor(group),
+              amountDueNow: totalFor(group),
               balanceDue: 0,
               balanceDueLabel: 'Paid in full',
               sourceId: 'workspace-terms-source',
@@ -85,9 +89,9 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
               destination: group.destination,
               supplierName: group.partner,
               kind: BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
-              orderTotal: group.total,
-              amountDueNow: group.total ~/ 4,
-              balanceDue: group.total - (group.total ~/ 4),
+              orderTotal: totalFor(group),
+              amountDueNow: totalFor(group) ~/ 4,
+              balanceDue: totalFor(group) - (totalFor(group) ~/ 4),
               balanceDueLabel: 'at delivery',
               sourceId: 'workspace-terms-source',
               supplierIsMicroOrSmall: true,
@@ -98,9 +102,9 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
               destination: group.destination,
               supplierName: group.partner,
               kind: BuyV2CommercialPaymentTermKind.supplierCredit,
-              orderTotal: group.total,
+              orderTotal: totalFor(group),
               amountDueNow: 0,
-              balanceDue: group.total,
+              balanceDue: totalFor(group),
               balanceDueLabel: 'within 30 days of delivery',
               sourceId: 'workspace-terms-source',
               supplierIsMicroOrSmall: true,
@@ -112,9 +116,9 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
               destination: group.destination,
               supplierName: group.partner,
               kind: BuyV2CommercialPaymentTermKind.supplierCredit,
-              orderTotal: group.total,
+              orderTotal: totalFor(group),
               amountDueNow: 0,
-              balanceDue: group.total,
+              balanceDue: totalFor(group),
               balanceDueLabel: 'within 90 days of delivery',
               sourceId: 'workspace-terms-source',
               supplierIsMicroOrSmall: true,
@@ -126,9 +130,9 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
               destination: group.destination,
               supplierName: group.partner,
               kind: BuyV2CommercialPaymentTermKind.regulatedCredit,
-              orderTotal: group.total,
+              orderTotal: totalFor(group),
               amountDueNow: 0,
-              balanceDue: group.total,
+              balanceDue: totalFor(group),
               balanceDueLabel: 'to the financier over 90 days',
               sourceId: 'regulated-credit-source',
               supplierIsMicroOrSmall: true,
@@ -139,6 +143,69 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
             ),
           ],
       ],
+    );
+  }
+}
+
+class _CheckoutQuoteAdapter implements BuyV2CheckoutQuoteAdapter {
+  BuyV2CommerceLoadState state = BuyV2CommerceLoadState.ready;
+  String? customerMessage;
+
+  @override
+  Future<BuyV2CheckoutQuoteSnapshot> loadQuote({
+    required List<BuyV2FulfilmentGroup> groups,
+    required BuyV2Address address,
+    required String selectedPaymentMethod,
+    required List<BuyV2CartBenefit> selectedBenefits,
+    required Map<String, int> tipAmountsByFulfilmentKey,
+  }) async {
+    if (state != BuyV2CommerceLoadState.ready) {
+      return BuyV2CheckoutQuoteSnapshot(
+        state: state,
+        customerMessage: customerMessage,
+      );
+    }
+    final couponByDestination = {
+      for (final benefit in selectedBenefits)
+        if (benefit.kind == BuyV2CartBenefitKind.coupon)
+          benefit.destination: benefit.savingAmount,
+    };
+    final lines = <BuyV2CheckoutQuoteLine>[];
+    for (final group in groups) {
+      final availableCoupon = couponByDestination[group.destination] ?? 0;
+      final coupon = availableCoupon > group.total
+          ? group.total
+          : availableCoupon;
+      couponByDestination[group.destination] = availableCoupon - coupon;
+      final tax = group.total * 5 ~/ 100;
+      final freight = group.destination == BuyV2Destination.wholesale ? 20 : 0;
+      final deliveryFee = group.destination == BuyV2Destination.shop ? 10 : 0;
+      final tip = tipAmountsByFulfilmentKey[group.key] ?? 0;
+      lines.add(
+        BuyV2CheckoutQuoteLine(
+          fulfilmentKey: group.key,
+          itemSubtotal: group.total,
+          couponSaving: coupon,
+          tax: tax,
+          freight: freight,
+          deliveryFee: deliveryFee,
+          tip: tip,
+          paymentCharge: 0,
+          total: group.total - coupon + tax + freight + deliveryFee + tip,
+        ),
+      );
+    }
+    final evaluatedAt = DateTime.now();
+    return BuyV2CheckoutQuoteSnapshot(
+      state: state,
+      quote: BuyV2CheckoutQuote(
+        id: 'QUOTE-TEST-1',
+        sourceId: 'checkout-quote-source',
+        evaluatedAt: evaluatedAt,
+        validUntil: evaluatedAt.add(const Duration(minutes: 15)),
+        lines: lines,
+        total: lines.fold(0, (total, line) => total + line.total),
+      ),
     );
   }
 }
@@ -439,6 +506,105 @@ void main() {
       findsOneWidget,
     );
     expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('live Checkout quote retains tax freight delivery and total', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final quoteAdapter = _CheckoutQuoteAdapter();
+    final session = BuyV2Session(
+      core: BuySession(),
+      checkoutQuoteAdapter: quoteAdapter,
+      commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+    );
+    addTearDown(session.dispose);
+    expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
+    expect(
+      session.addProduct(productFor(BuyV2Destination.wholesale).id),
+      isTrue,
+    );
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    expect(await session.refreshCheckoutQuote(), isTrue);
+    await session.refreshCommercialPaymentTerms();
+    final wholesaleGroup = session.checkoutFulfilmentGroups.firstWhere(
+      (group) => group.destination == BuyV2Destination.wholesale,
+    );
+    final wholesaleAdvance = session
+        .commercialPaymentTermsFor(wholesaleGroup.key)
+        .firstWhere(
+          (term) =>
+              term.kind == BuyV2CommercialPaymentTermKind.wholesaleAdvance,
+        );
+    expect(session.chooseCommercialPaymentTerm(wholesaleAdvance), isTrue);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-checkout-live-quote')),
+      findsOneWidget,
+    );
+    expect(find.text('GST and taxes'), findsOneWidget);
+    expect(find.text('Freight'), findsOneWidget);
+    expect(find.text('Delivery fee'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-checkout-quote-validity')),
+      findsOneWidget,
+    );
+    final quotedTotal = session.checkoutQuote!.total;
+    expect(quotedTotal, greaterThan(session.checkoutTotal));
+
+    expect(await session.submitOrder(), isTrue);
+    await tester.pumpAndSettle();
+    expect(session.confirmedTotal, quotedTotal);
+    expect(
+      session.confirmedOrders.fold<int>(
+        0,
+        (total, order) => total + order.total,
+      ),
+      quotedTotal,
+    );
+    expect(session.confirmedOrders.any((order) => order.tax > 0), isTrue);
+    expect(session.confirmedOrders.any((order) => order.freight > 0), isTrue);
+    expect(
+      session.confirmedOrders.any((order) => order.deliveryFee > 0),
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Checkout quote offline state blocks payment and retries', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final adapter = _CheckoutQuoteAdapter()
+      ..state = BuyV2CommerceLoadState.offline
+      ..customerMessage = 'Reconnect to check the current total.';
+    final session = BuyV2Session(
+      core: BuySession(),
+      checkoutQuoteAdapter: adapter,
+    );
+    addTearDown(session.dispose);
+    expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(await session.refreshCheckoutQuote(), isFalse);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-checkout-quote-offline')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-checkout-quote-retry')),
+      findsOneWidget,
+    );
+    expect(session.checkoutQuoteReviewRequired, isTrue);
     expect(tester.takeException(), isNull);
   });
 

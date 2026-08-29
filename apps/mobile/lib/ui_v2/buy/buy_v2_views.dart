@@ -4258,6 +4258,156 @@ String _commercialPaymentTermDetail(BuyV2CommercialPaymentTerm term) {
   return amounts;
 }
 
+class _CheckoutQuoteCard extends StatelessWidget {
+  const _CheckoutQuoteCard({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!session.checkoutQuoteEnabled) return const SizedBox.shrink();
+    final quote = session.checkoutQuote;
+    if (session.checkoutQuoteLoadState != BuyV2CommerceLoadState.ready ||
+        quote == null ||
+        session.checkoutQuoteReviewRequired) {
+      final loading = session.checkoutQuoteBusy;
+      return Container(
+        key: ValueKey(
+          'buy-checkout-quote-${session.checkoutQuoteLoadState.name}',
+        ),
+        padding: const EdgeInsets.all(11),
+        decoration: buyV2CardDecoration(radius: 15),
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 38,
+              child: loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(
+                      Icons.receipt_long_outlined,
+                      color: BuyV2Colors.navy,
+                    ),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    loading
+                        ? 'Checking the current total'
+                        : 'Checkout total needs a refresh',
+                    style: context.buyTitle.copyWith(fontSize: 13),
+                  ),
+                  Text(
+                    loading
+                        ? 'Confirming tax, freight, delivery and savings.'
+                        : session.checkoutQuoteMessage ??
+                              'The previous total has expired. Try again.',
+                    style: context.buyMeta.copyWith(fontSize: 9),
+                  ),
+                ],
+              ),
+            ),
+            if (!loading)
+              TextButton(
+                key: const ValueKey('buy-checkout-quote-retry'),
+                onPressed: session.refreshCheckoutQuote,
+                child: const Text('Retry'),
+              ),
+          ],
+        ),
+      );
+    }
+    final itemSubtotal = quote.lines.fold<int>(
+      0,
+      (total, line) => total + line.itemSubtotal,
+    );
+    final couponSaving = quote.lines.fold<int>(
+      0,
+      (total, line) => total + line.couponSaving,
+    );
+    final tip = quote.lines.fold<int>(0, (total, line) => total + line.tip);
+    return Container(
+      key: const ValueKey('buy-checkout-live-quote'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Current Checkout total',
+                  style: context.buyTitle.copyWith(fontSize: 16),
+                ),
+              ),
+              Text(
+                'Checked now',
+                style: context.buyMeta.copyWith(
+                  color: BuyV2Colors.green,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          _CartAmountRow(label: 'Products', value: buyV2Money(itemSubtotal)),
+          if (couponSaving > 0)
+            _CartAmountRow(
+              label: 'Coupon saving',
+              value: '−${buyV2Money(couponSaving)}',
+              valueColor: BuyV2Colors.green,
+            ),
+          if (session.checkoutQuotedTax > 0)
+            _CartAmountRow(
+              label: 'GST and taxes',
+              value: buyV2Money(session.checkoutQuotedTax),
+            ),
+          if (session.checkoutQuotedFreight > 0)
+            _CartAmountRow(
+              label: 'Freight',
+              value: buyV2Money(session.checkoutQuotedFreight),
+            ),
+          if (session.checkoutQuotedDeliveryFee > 0)
+            _CartAmountRow(
+              label: 'Delivery fee',
+              value: buyV2Money(session.checkoutQuotedDeliveryFee),
+            ),
+          if (tip > 0)
+            _CartAmountRow(
+              label: 'Optional delivery tips',
+              value: buyV2Money(tip),
+            ),
+          if (session.checkoutQuotedPaymentCharge > 0)
+            _CartAmountRow(
+              label: 'Payment charge',
+              value: buyV2Money(session.checkoutQuotedPaymentCharge),
+            ),
+          const Divider(height: 16),
+          _CartAmountRow(
+            label: 'Order total',
+            value: buyV2Money(quote.total),
+            strong: true,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Quote ${quote.id} · valid until '
+            '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(quote.validUntil))}',
+            key: const ValueKey('buy-checkout-quote-validity'),
+            style: context.buyMeta.copyWith(fontSize: 8),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CheckoutCommercialPaymentTerms extends StatelessWidget {
   const _CheckoutCommercialPaymentTerms({required this.session});
 
@@ -4561,6 +4711,10 @@ class BuyV2CheckoutView extends StatelessWidget {
                     ),
                     const SizedBox(height: 7),
                   ],
+                  if (session.checkoutQuoteEnabled) ...[
+                    _CheckoutQuoteCard(session: session),
+                    const SizedBox(height: 9),
+                  ],
                   if (session.commercialPaymentTermsEnabled) ...[
                     _CheckoutCommercialPaymentTerms(session: session),
                     const SizedBox(height: 9),
@@ -4715,6 +4869,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                       onPressed:
                           session.checkoutBusy ||
                               session.checkoutRequiresResolution ||
+                              session.checkoutQuoteReviewRequired ||
                               session.checkoutPaymentTermsReviewRequired ||
                               session.checkoutBenefitReviewRequired ||
                               session.checkoutPriceReviewRequired ||
