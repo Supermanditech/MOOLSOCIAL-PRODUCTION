@@ -11,6 +11,7 @@ import '../chat_services.dart';
 import '../chat_session.dart';
 import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
+import 'chat_conversation_search_screen.dart';
 import 'chat_settings_screen.dart';
 
 class ChatThreadScreen extends StatefulWidget {
@@ -36,8 +37,11 @@ class ChatThreadScreen extends StatefulWidget {
 class _ChatThreadScreenState extends State<ChatThreadScreen> {
   final _messageController = TextEditingController();
   final _composerKey = GlobalKey<_ComposerState>();
+  final _messageScrollController = ScrollController();
+  final Map<String, GlobalKey> _messageKeys = {};
   final Map<String, String> _draftTextByThread = {};
   int _threadLoadRequest = 0;
+  String? _highlightedMessageId;
 
   @override
   void initState() {
@@ -62,6 +66,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
         _draftTextByThread.clear();
       }
       _restoreDraft(widget.threadId);
+      if (_messageScrollController.hasClients) {
+        _messageScrollController.jumpTo(0);
+      }
+      _messageKeys.clear();
+      _highlightedMessageId = null;
       _applyInitialDraftIfEmpty(widget.initialMessageDraft);
       unawaited(_recoverInterruptedPhoto(widget.threadId));
       unawaited(_loadThread(widget.threadId));
@@ -299,9 +308,61 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     );
   }
 
+  Future<void> _openMessageSearch() async {
+    final messageId = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => ChatConversationSearchScreen(
+          session: widget.session,
+          threadId: widget.threadId,
+          originReturnRoute: widget.returnRoute,
+        ),
+      ),
+    );
+    if (messageId == null || !mounted) return;
+    await _revealMessage(messageId);
+  }
+
+  Future<void> _revealMessage(String messageId) async {
+    setState(() => _highlightedMessageId = messageId);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    final directContext = _messageKeys[messageId]?.currentContext;
+    final duration = ChatMotion.resolve(context, ChatMotion.routeChange);
+    if (directContext != null && directContext.mounted) {
+      await Scrollable.ensureVisible(
+        directContext,
+        alignment: .5,
+        duration: duration,
+        curve: Curves.easeOutCubic,
+      );
+      return;
+    }
+    final messages = widget.session.messages(widget.threadId);
+    final index = messages.indexWhere((message) => message.id == messageId);
+    if (index < 0 || !_messageScrollController.hasClients) return;
+    final ratio = messages.length <= 1 ? 0.0 : index / (messages.length - 1);
+    await _messageScrollController.animateTo(
+      _messageScrollController.position.maxScrollExtent * ratio,
+      duration: duration,
+      curve: Curves.easeOutCubic,
+    );
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    final resultContext = _messageKeys[messageId]?.currentContext;
+    if (resultContext != null && resultContext.mounted) {
+      await Scrollable.ensureVisible(
+        resultContext,
+        alignment: .5,
+        duration: duration,
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
   @override
   void dispose() {
     _threadLoadRequest += 1;
+    _messageScrollController.dispose();
     _messageController.dispose();
     super.dispose();
   }
@@ -341,6 +402,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                key: const Key('chat-thread-search'),
+                tooltip: 'Search messages',
+                onPressed: () => unawaited(_openMessageSearch()),
+                icon: const Icon(Icons.search_rounded),
+              ),
               IconButton(
                 key: const Key('chat-thread-video'),
                 tooltip: widget.session.videoCallsAvailableForSession(thread.id)
@@ -403,7 +470,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                         widget.session.loadMessages(thread.id, refresh: true),
                   ),
                 )
-              : _ThreadBody(session: widget.session, thread: thread),
+              : _ThreadBody(
+                  session: widget.session,
+                  thread: thread,
+                  scrollController: _messageScrollController,
+                  messageKeys: _messageKeys,
+                  highlightedMessageId: _highlightedMessageId,
+                ),
           bottom: ChatFiniteIncomingMotion(
             stateKey: widget.session.chatAvailableForSession(thread.id)
                 ? 'chat-composer-active'
@@ -1178,16 +1251,26 @@ class _ThreadErrorState extends StatelessWidget {
 }
 
 class _ThreadBody extends StatelessWidget {
-  const _ThreadBody({required this.session, required this.thread});
+  const _ThreadBody({
+    required this.session,
+    required this.thread,
+    required this.scrollController,
+    required this.messageKeys,
+    required this.highlightedMessageId,
+  });
 
   final ChatSession session;
   final ChatThread thread;
+  final ScrollController scrollController;
+  final Map<String, GlobalKey> messageKeys;
+  final String? highlightedMessageId;
 
   @override
   Widget build(BuildContext context) {
     final messages = session.messages(thread.id);
     return ListView.builder(
       key: const Key('chat-message-list'),
+      controller: scrollController,
       padding: const EdgeInsets.fromLTRB(
         MoolSpacing.md,
         MoolSpacing.xs,
@@ -1195,14 +1278,18 @@ class _ThreadBody extends StatelessWidget {
         MoolSpacing.lg,
       ),
       itemCount: messages.length,
-      itemBuilder: (context, index) => ChatListEntryMotion(
-        key: ValueKey('chat-message-entry-motion-${messages[index].id}'),
-        stateKey: messages[index].id,
-        index: index,
-        child: _MessageBubble(
-          message: messages[index],
-          threadId: thread.id,
-          session: session,
+      itemBuilder: (context, index) => KeyedSubtree(
+        key: messageKeys.putIfAbsent(messages[index].id, () => GlobalKey()),
+        child: ChatListEntryMotion(
+          key: ValueKey('chat-message-entry-motion-${messages[index].id}'),
+          stateKey: messages[index].id,
+          index: index,
+          child: _MessageBubble(
+            message: messages[index],
+            threadId: thread.id,
+            session: session,
+            highlighted: messages[index].id == highlightedMessageId,
+          ),
         ),
       ),
     );
@@ -1214,11 +1301,13 @@ class _MessageBubble extends StatelessWidget {
     required this.message,
     required this.threadId,
     required this.session,
+    required this.highlighted,
   });
 
   final ChatMessage message;
   final String threadId;
   final ChatSession session;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -1237,7 +1326,10 @@ class _MessageBubble extends StatelessWidget {
                 message: message,
               )
             : null,
-        child: Container(
+        child: AnimatedContainer(
+          key: Key('chat-message-highlight-${message.id}'),
+          duration: ChatMotion.resolve(context, ChatMotion.focus),
+          curve: Curves.easeOutCubic,
           constraints: const BoxConstraints(maxWidth: 330),
           margin: const EdgeInsets.only(bottom: 5),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1249,7 +1341,20 @@ class _MessageBubble extends StatelessWidget {
               bottomLeft: Radius.circular(message.mine ? 15 : MoolSpacing.xs),
               bottomRight: Radius.circular(message.mine ? MoolSpacing.xs : 15),
             ),
-            border: failed ? Border.all(color: const Color(0xFFD3322F)) : null,
+            border: failed
+                ? Border.all(color: const Color(0xFFD3322F))
+                : highlighted
+                ? Border.all(color: MoolColors.orange, width: 2)
+                : null,
+            boxShadow: highlighted
+                ? [
+                    BoxShadow(
+                      color: MoolColors.orange.withValues(alpha: .18),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
