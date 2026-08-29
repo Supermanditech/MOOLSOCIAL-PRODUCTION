@@ -3678,3 +3678,6 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3845 rejects using a People thread under the Work business filter for a
   shared Back test. Choose an unfiltered origin or a context-compatible thread
   before exercising transient surfaces.
+- REG3846 rejects using audit shorthand as an APK candidate family. Keep Chat
+  RuntimeUiReview candidates under `UAW-CODEX-*`, bind the same id in state and
+  runtime defines, and run the direct gate before the wrapper.

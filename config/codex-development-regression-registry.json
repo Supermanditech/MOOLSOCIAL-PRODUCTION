@@ -43723,6 +43723,16 @@
       "prevention": "Use the unfiltered Mool Chat origin or a thread matching the selected context whenever a test is about shared transient-surface Back behavior rather than filtering.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3846-GLOBAL-CHAT-AUDIT-CANDIDATE-OMITTED-UAW-FAMILY",
+      "status": "registered_authorized_uaw_candidate_family_required",
+      "appliesTo": ["primary", "mobile", "build", "chat", "testing"],
+      "mistake": "The first aggregate r61.43 APK state used a P1-CHAT candidate prefix, which the authoritative APK gate rejected as an unsupported candidate family before any build.",
+      "rootCause": "The audit ticket shorthand was reused as the build candidate id instead of retaining the repository's established UAW candidate family contract.",
+      "prevention": "Use a UAW-CODEX candidate id for Chat RuntimeUiReview APKs, bind it consistently in machine state and runtime defines, and run the direct APK gate before the wrapper.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-apk-regression-gate-state.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-apk-regression-gate-state.ps1"]
     }
   ]
 }
