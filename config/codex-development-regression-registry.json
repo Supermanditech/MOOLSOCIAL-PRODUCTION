@@ -44143,6 +44143,16 @@
       "prevention": "Verify the exact incomplete worktree registration and path, remove only that incomplete worktree, recreate the same Child 3 branch with --no-checkout, enable cone-mode sparse checkout for required repository owners, then checkout the bound bootstrap commit.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md", "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart"]
+    },
+    {
+      "id": "REG-20260829-3896-BULK-BUILD-CACHE-REMOVAL-POLICY-REJECTION",
+      "status": "registered_explicit_target_cleanup_required",
+      "appliesTo": ["primary", "coordination", "storage", "tooling"],
+      "mistake": "A single computed loop attempted to remove every generated apps/mobile/build directory under all worktrees and the execution environment rejected the command before it ran.",
+      "rootCause": "Although the loop validated workspace containment and suffixes, the destructive operation still used a broad computed target set rather than a small explicit literal target.",
+      "prevention": "Measure candidate build directories read-only, select only the largest inactive generated caches, and remove each exact verified literal path in a separate bounded command or provide the founder an explicit PowerShell script when local policy blocks deletion.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md"]
     }
   ]
 }
