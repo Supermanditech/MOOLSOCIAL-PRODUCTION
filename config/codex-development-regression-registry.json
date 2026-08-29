@@ -44383,6 +44383,36 @@
       "prevention": "Run coordination_bootstrap as AgentRole primary and AgentTask /root at the exact first-parent baseline, commit the declared bootstrap owners, then run task_start under /root/repair_shop_chat_shared_v1_20260829.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3920-REPAIR-PROFILE-CONFLICT-OWNER-OUTSIDE-LANE-ALLOWLIST",
+      "status": "registered_exact_profile_allowlist_continuation_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "profile", "git"],
+      "mistake": "Repair task_start rejected global_profile_panel_v2.dart because the integration_repair lane allowlist did not include the exact profile conflict owner required by the machine-bound merge.",
+      "rootCause": "The conflict owner was added to the repair claim and exact conflict set without adding the same literal owner to the lane's allowed owner roots.",
+      "prevention": "Rebind the same repair from clean bootstrap 011fd09d, add only global_profile_panel_v2.dart to the integration_repair allowlist and checker contract, then require task_start before pre-merge or merge action.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart"]
+    },
+    {
+      "id": "REG-20260829-3921-PROFILE-ALLOWLIST-POLICY-MULTI-ANCHOR-MISMATCH",
+      "status": "registered_fixed_string_location_patches_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "profile", "tooling"],
+      "mistake": "The first profile-allowlist continuation policy patch combined four locations and failed because the continuation baseline/subject anchor did not match the on-disk context; no policy byte changed.",
+      "rootCause": "The update reused an assumed adjacent baseline/subject layout instead of discovering each exact fixed-string location after cumulative policy edits.",
+      "prevention": "Discover the exact registry binding, integration_repair lane, continuation baseline/subject and repair parent lines independently; patch one policy owner with verified literal contexts and parse before bootstrap.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260829-3922-PROFILE-ALLOWLIST-COMBINED-POLICY-HUNK-REPEATED-MISMATCH",
+      "status": "registered_one_exact_policy_location_per_operation_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "profile", "tooling"],
+      "mistake": "The corrected profile-allowlist policy patch still combined four distant hunks and failed at the continuation id context, leaving the policy unchanged.",
+      "rootCause": "A repeated heterogeneous multi-location patch made one exact policy owner depend on every distant context matching simultaneously.",
+      "prevention": "Patch the policy binding, lane allowlist, selected continuation and repair parent as four separate exact operations, parse and read back each state, and never combine distant policy contexts in this repair.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
     }
   ]
 }

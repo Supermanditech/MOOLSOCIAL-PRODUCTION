@@ -888,9 +888,9 @@ $expectedRepairConflictOwners = @(
 Assert-Coordination (
   [string]$integrationRepair.lane -ceq 'integration_repair' -and
   [string]$integrationRepair.requiredCodexCommit -ceq
-    'e5720cb86bd2119afc3d84a83d3116018f17f9a3' -and
+    '011fd09d1d94fce02d0bbc9c7b94c90f742624e6' -and
   [string]$integrationRepair.requiredCodexBranch -ceq
-    'work/cursor-ui/shop-chat-v1-implementation-20260829' -and
+    'work/integration-repair/shop-chat-shared-v1-base-20260829' -and
   [string]$integrationRepair.requiredCursorCommit -ceq
     '30f4614574aae3c315d586944636a35ba314873d' -and
   [string]$integrationRepair.requiredCursorBranch -ceq
