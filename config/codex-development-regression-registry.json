@@ -44243,6 +44243,16 @@
       "prevention": "Inspect only the checker block that emits the exact rejection, compare every Child 3 binding value to its literal requirements and the established Child 2 pattern, correct only the invalid machine value, refresh registry binding and rerun task_start.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260829-3906-CHILD3-SPARSE-CHECKOUT-OMITTED-CLAIMED-BACKEND-ROOT",
+      "status": "registered_claim_derived_sparse_roots_required",
+      "appliesTo": ["primary", "coordination", "implementation", "git", "tooling"],
+      "mistake": "After the continuation-state correction, task_start advanced to owner validation and rejected missing backend/functions/src/youtube/adapters.ts because the sparse checkout omitted the recorded backend root.",
+      "rootCause": "The sparse checkout was selected from anticipated Shop work rather than derived from every root represented in the existing recorded owner claim.",
+      "prevention": "Inventory recorded-claim owners whose literal paths are absent, sparse-add only their required repository roots, verify every recorded owner exists, and rerun task_start without editing any excluded owner.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "backend/functions/src/youtube/adapters.ts"]
     }
   ]
 }
