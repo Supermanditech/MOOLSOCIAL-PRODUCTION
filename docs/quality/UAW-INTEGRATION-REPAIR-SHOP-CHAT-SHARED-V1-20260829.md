@@ -119,6 +119,8 @@ Remote implementation binding:
   `work/cursor-ui/chat-shell-impl-v1-20260829`;
 - the advanced Codex branch and both earlier aliases remain preserved without
   force-push or rewrite.
+- qualified-repair validation selects the exact current repair task while
+  retaining historical repair bindings for audit.
 
 Backend, Firebase, Android configuration, OPPO and
 `com.moolsocial.app.runtime` remain excluded.

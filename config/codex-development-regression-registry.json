@@ -44623,6 +44623,16 @@
       "prevention": "Create and push work/cursor-ui/chat-shell-impl-v1-20260829 at exact commit 30f46145, preserve both prior aliases, update repair binding/checker and rerun handoff.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260829-3944-QUALIFIED-REPAIR-SELECTED-ALL-HISTORICAL-REPAIR-BINDINGS",
+      "status": "registered_exact_current_repair_binding_selection_required",
+      "appliesTo": ["primary", "coordination", "integration_repair", "git", "handoff", "tooling"],
+      "mistake": "The handoff gate rejected the qualified repair as ambiguous because Assert-QualifiedIntegrationRepairTip selected every preserved integration_repair continuation by lane instead of the exact current repair task.",
+      "rootCause": "Historical repair continuations are intentionally retained, but the legacy selector assumed only one repair binding could ever exist in policy history.",
+      "prevention": "Select the qualified binding by lane plus exact current task /root/repair_shop_chat_shared_v1_20260829, require one match, and rerun the full handoff gate.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
     }
   ]
 }
