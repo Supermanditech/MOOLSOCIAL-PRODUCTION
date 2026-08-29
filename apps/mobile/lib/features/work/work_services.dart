@@ -1,5 +1,11 @@
 import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
 import 'dart:math';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../shared/social_content_gateway.dart';
 
@@ -8,11 +14,172 @@ const moolSocialWorkspaceUrl = String.fromEnvironment(
 );
 
 class WorkGatewayException implements Exception {
-  const WorkGatewayException(this.message, {this.retryable = false});
+  const WorkGatewayException(
+    this.message, {
+    this.retryable = false,
+    this.cancelled = false,
+  });
   final String message;
   final bool retryable;
+  final bool cancelled;
   @override
   String toString() => message;
+}
+
+enum WorkProofSource { camera, gallery, upload }
+
+class WorkPickedProof {
+  const WorkPickedProof({
+    required this.fileName,
+    required this.contentType,
+    required this.bytes,
+  });
+
+  final String fileName;
+  final String contentType;
+  final Uint8List bytes;
+}
+
+abstract interface class WorkProofPicker {
+  Future<WorkPickedProof?> pick(WorkProofSource source);
+}
+
+class NativeWorkProofPicker implements WorkProofPicker {
+  NativeWorkProofPicker({ImagePicker? imagePicker})
+    : _imagePicker = imagePicker ?? ImagePicker();
+
+  final ImagePicker _imagePicker;
+
+  @override
+  Future<WorkPickedProof?> pick(WorkProofSource source) async {
+    try {
+      if (source == WorkProofSource.upload) {
+        final file = await FilePicker.pickFile(
+          type: FileType.custom,
+          allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+        );
+        if (file == null) return null;
+        final bytes = await file.readAsBytes();
+        return _validateProof(file.name, bytes);
+      }
+      final image = await _imagePicker.pickImage(
+        source: source == WorkProofSource.camera
+            ? ImageSource.camera
+            : ImageSource.gallery,
+        imageQuality: 92,
+        maxWidth: 2400,
+        maxHeight: 2400,
+      );
+      if (image == null) return null;
+      return _validateProof(image.name, await image.readAsBytes());
+    } on WorkGatewayException {
+      rethrow;
+    } on PlatformException catch (error) {
+      final denied =
+          error.code.toLowerCase().contains('denied') ||
+          error.code.toLowerCase().contains('permission');
+      throw WorkGatewayException(
+        denied
+            ? 'Camera or photo access was denied. Allow access in device settings, then try again.'
+            : 'The device could not open that proof source. Try another source.',
+      );
+    } on FileSystemException {
+      throw const WorkGatewayException(
+        'That proof document could not be read. Choose it again.',
+      );
+    } on Object {
+      throw const WorkGatewayException(
+        'The device could not open that proof source. Try another source.',
+      );
+    }
+  }
+}
+
+class ReviewWorkProofPicker implements WorkProofPicker {
+  @override
+  Future<WorkPickedProof?> pick(WorkProofSource source) async =>
+      WorkPickedProof(
+        fileName: source == WorkProofSource.upload
+            ? 'review-proof.pdf'
+            : 'review-proof.jpg',
+        contentType: source == WorkProofSource.upload
+            ? 'application/pdf'
+            : 'image/jpeg',
+        bytes: Uint8List.fromList(const [0xff, 0xd8, 0xff, 0xd9]),
+      );
+}
+
+abstract interface class WorkProofUploadTransport {
+  Future<void> put({
+    required Uri url,
+    required Map<String, String> headers,
+    required Uint8List bytes,
+  });
+}
+
+class IoWorkProofUploadTransport implements WorkProofUploadTransport {
+  IoWorkProofUploadTransport({HttpClient? client})
+    : _client = client ?? HttpClient();
+
+  final HttpClient _client;
+
+  @override
+  Future<void> put({
+    required Uri url,
+    required Map<String, String> headers,
+    required Uint8List bytes,
+  }) async {
+    if (url.scheme != 'https' || !url.host.endsWith('googleapis.com')) {
+      throw const WorkGatewayException(
+        'Proof upload could not be prepared. Choose the document again.',
+      );
+    }
+    try {
+      final request = await _client
+          .putUrl(url)
+          .timeout(const Duration(seconds: 15));
+      request.contentLength = bytes.length;
+      for (final entry in headers.entries) {
+        if (entry.key.toLowerCase() == 'content-length') continue;
+        request.headers.set(entry.key, entry.value);
+      }
+      request.add(bytes);
+      final response = await request.close().timeout(
+        const Duration(seconds: 45),
+      );
+      await response.drain<void>();
+      if ((response.statusCode >= 200 && response.statusCode < 300) ||
+          response.statusCode == HttpStatus.preconditionFailed) {
+        return;
+      }
+      throw WorkGatewayException(
+        response.statusCode == HttpStatus.unauthorized ||
+                response.statusCode == HttpStatus.forbidden
+            ? 'Proof upload expired. Choose the document again.'
+            : 'Proof could not upload. Check your connection and try again.',
+        retryable:
+            response.statusCode == HttpStatus.requestTimeout ||
+            response.statusCode == HttpStatus.tooManyRequests ||
+            response.statusCode >= 500,
+      );
+    } on WorkGatewayException {
+      rethrow;
+    } on TimeoutException {
+      throw const WorkGatewayException(
+        'Proof upload timed out. Check your connection and try again.',
+        retryable: true,
+      );
+    } on SocketException {
+      throw const WorkGatewayException(
+        'Proof could not upload. Check your connection and try again.',
+        retryable: true,
+      );
+    } on Object {
+      throw const WorkGatewayException(
+        'Proof could not upload. Choose the document again.',
+      );
+    }
+  }
 }
 
 class WorkProfileSubmission {
@@ -65,10 +232,10 @@ abstract interface class WorkGateway {
   Future<List<WorkReviewResult>> loadFeed();
   Future<String> apply(String opportunityId);
   Future<void> sendOtp(String mobile);
-  Future<String> saveProof(String proofId, String source);
+  Future<String> saveProof(String proofId, WorkPickedProof proof);
   Future<WorkReviewResult> submitProfile(WorkProfileSubmission submission);
   Future<WorkReviewResult> checkReview(String caseId);
-  Future<String> submitGst(String caseId, String gstin);
+  Future<String> submitGst(String caseId, String gstin, String proofReference);
   Future<void> finishSetup({
     required String workspaceId,
     required int quantity,
@@ -118,7 +285,8 @@ class UnavailableWorkGateway implements WorkGateway {
   @override
   Future<List<WorkReviewResult>> loadFeed() async => throw _error;
   @override
-  Future<String> saveProof(String proofId, String source) async => throw _error;
+  Future<String> saveProof(String proofId, WorkPickedProof proof) async =>
+      throw _error;
   @override
   Future<void> sendOtp(String mobile) async => throw _error;
   @override
@@ -126,7 +294,11 @@ class UnavailableWorkGateway implements WorkGateway {
     WorkProfileSubmission submission,
   ) async => throw _error;
   @override
-  Future<String> submitGst(String caseId, String gstin) async => throw _error;
+  Future<String> submitGst(
+    String caseId,
+    String gstin,
+    String proofReference,
+  ) async => throw _error;
 }
 
 class AuthenticatedWorkGateway implements WorkGateway {
@@ -134,11 +306,15 @@ class AuthenticatedWorkGateway implements WorkGateway {
     required this.endpoint,
     required this.credentials,
     required this.transport,
+    WorkProofUploadTransport? proofUploadTransport,
     Random? random,
-  }) : random = random ?? Random.secure();
+  }) : proofUploadTransport =
+           proofUploadTransport ?? IoWorkProofUploadTransport(),
+       random = random ?? Random.secure();
   final Uri endpoint;
   final SocialContentCredentials credentials;
   final SocialContentTransport transport;
+  final WorkProofUploadTransport proofUploadTransport;
   final Random random;
 
   @override
@@ -166,15 +342,46 @@ class AuthenticatedWorkGateway implements WorkGateway {
   Future<void> sendOtp(String mobile) =>
       _invoke('sendAlternateOtp', {'mobile': mobile}, mutation: true);
   @override
-  Future<String> saveProof(String proofId, String source) async =>
-      _requiredString(
-        _map(
-          await _invoke('saveProofReference', {
-            'proofId': proofId,
-            'source': source,
-          }, mutation: true),
-        )['proofReference'],
+  Future<String> saveProof(String proofId, WorkPickedProof proof) async {
+    final prepared = _map(
+      await _invoke('prepareProofUpload', {
+        'proofId': proofId,
+        'fileName': proof.fileName,
+        'contentType': proof.contentType,
+        'sizeBytes': proof.bytes.length,
+      }, mutation: true),
+    );
+    final uploadUrl = Uri.tryParse(_requiredString(prepared['uploadUrl']));
+    final expiresAt = DateTime.tryParse(_requiredString(prepared['expiresAt']));
+    if (uploadUrl == null ||
+        expiresAt == null ||
+        !expiresAt.isAfter(DateTime.now())) {
+      throw const WorkGatewayException(
+        'Proof upload could not be prepared. Choose the document again.',
+        retryable: true,
       );
+    }
+    final headers = _map(
+      prepared['requiredHeaders'],
+    ).map((key, value) => MapEntry(key, _requiredString(value)));
+    await proofUploadTransport.put(
+      url: uploadUrl,
+      headers: headers,
+      bytes: proof.bytes,
+    );
+    return _requiredString(
+      _map(
+        await _invoke('confirmProofUpload', {
+          'proofId': proofId,
+          'uploadId': _requiredString(prepared['uploadId']),
+          'fileName': proof.fileName,
+          'contentType': proof.contentType,
+          'sizeBytes': proof.bytes.length,
+        }, mutation: true),
+      )['proofReference'],
+    );
+  }
+
   @override
   Future<WorkReviewResult> submitProfile(WorkProfileSubmission value) async =>
       _decodeReview(
@@ -195,15 +402,19 @@ class AuthenticatedWorkGateway implements WorkGateway {
   Future<WorkReviewResult> checkReview(String caseId) async =>
       _decodeReview(_map(await _invoke('reviewStatus', {'caseId': caseId})));
   @override
-  Future<String> submitGst(String caseId, String gstin) async =>
-      _requiredString(
-        _map(
-          await _invoke('submitGst', {
-            'caseId': caseId,
-            'gstin': gstin,
-          }, mutation: true),
-        )['gstReference'],
-      );
+  Future<String> submitGst(
+    String caseId,
+    String gstin,
+    String proofReference,
+  ) async => _requiredString(
+    _map(
+      await _invoke('submitGst', {
+        'caseId': caseId,
+        'gstin': gstin,
+        'proofReference': proofReference,
+      }, mutation: true),
+    )['gstReference'],
+  );
   @override
   Future<void> finishSetup({
     required String workspaceId,
@@ -318,7 +529,7 @@ class ReviewWorkGateway implements WorkGateway {
   }
 
   @override
-  Future<String> saveProof(String proofId, String source) async {
+  Future<String> saveProof(String proofId, WorkPickedProof proof) async {
     proofCalls++;
     await _wait();
     if (failProof) {
@@ -366,7 +577,11 @@ class ReviewWorkGateway implements WorkGateway {
   }
 
   @override
-  Future<String> submitGst(String caseId, String gstin) async {
+  Future<String> submitGst(
+    String caseId,
+    String gstin,
+    String proofReference,
+  ) async {
     gstCalls++;
     await _wait();
     if (failGst) {
@@ -396,6 +611,27 @@ class ReviewWorkGateway implements WorkGateway {
       );
     }
   }
+}
+
+WorkPickedProof _validateProof(String fileName, Uint8List bytes) {
+  final extension = fileName.split('.').last.toLowerCase();
+  final contentType = switch (extension) {
+    'pdf' => 'application/pdf',
+    'jpg' || 'jpeg' => 'image/jpeg',
+    'png' => 'image/png',
+    'webp' => 'image/webp',
+    _ => throw const WorkGatewayException(
+      'Choose a PDF, JPG, PNG or WebP proof document.',
+    ),
+  };
+  if (bytes.isEmpty || bytes.length > 10 * 1024 * 1024) {
+    throw const WorkGatewayException('Choose a proof document up to 10 MB.');
+  }
+  return WorkPickedProof(
+    fileName: fileName,
+    contentType: contentType,
+    bytes: bytes,
+  );
 }
 
 Map<String, Object?> _map(Object? value) {

@@ -6,6 +6,7 @@ import '../../../core/design/mool_service_home.dart';
 import '../../../core/design/mool_theme.dart';
 import '../widgets/work_widgets.dart';
 import '../work_models.dart';
+import '../work_services.dart';
 import '../work_session.dart';
 
 const _workAccent = Color(0xFF4D46A8);
@@ -1252,16 +1253,31 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
             ),
             const SizedBox(height: MoolSpacing.md),
             for (final source in const [
-              ('camera', 'Camera', Icons.camera_alt_outlined),
-              ('upload', 'Upload', Icons.upload_file_outlined),
-              ('number', 'Verify number', Icons.phone_android_outlined),
+              (
+                'camera',
+                'Camera',
+                Icons.camera_alt_outlined,
+                WorkProofSource.camera,
+              ),
+              (
+                'gallery',
+                'Photo library',
+                Icons.photo_library_outlined,
+                WorkProofSource.gallery,
+              ),
+              (
+                'upload',
+                'Upload PDF or image',
+                Icons.upload_file_outlined,
+                WorkProofSource.upload,
+              ),
             ]) ...[
               OutlinedButton.icon(
                 key: Key('work-proof-source-${source.$1}'),
                 onPressed: () async {
                   final added = await widget.session.addProof(
                     proof.id,
-                    source.$2,
+                    source.$4,
                   );
                   if (added && sheetContext.mounted) {
                     Navigator.pop(sheetContext);
@@ -1459,9 +1475,19 @@ class WorkVerificationStatusScreen extends StatelessWidget {
       animation: session,
       builder: (context, _) {
         final approved = session.reviewStage == WorkReviewStage.approved;
+        final rejected =
+            session.remoteReviewStatus == WorkRemoteReviewStatus.rejected;
+        final suspended =
+            session.remoteReviewStatus == WorkRemoteReviewStatus.suspended;
         return WorkPageScaffold(
           session: session,
-          title: approved ? 'Work approved' : 'Work profile review',
+          title: approved
+              ? 'Work approved'
+              : rejected
+              ? 'Changes needed'
+              : suspended
+              ? 'Workspace unavailable'
+              : 'Work profile review',
           subtitle: session.reviewCaseId ?? 'Review status',
           fallbackBackRoute: '/app/work/my-work',
           activeLocalAction: 'workspace',
@@ -1470,6 +1496,24 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                   keyName: 'work-open-ready',
                   label: 'Continue to workspace setup',
                   onPressed: () => context.go('/app/work/ready'),
+                )
+              : rejected
+              ? WorkPrimaryButton(
+                  keyName: 'work-revise-profile',
+                  label: 'Review and resubmit',
+                  onPressed: () {
+                    session.reviseRejectedProfile();
+                    context.go('/app/work/workspace/proof');
+                  },
+                  icon: Icons.edit_outlined,
+                )
+              : suspended
+              ? WorkPrimaryButton(
+                  keyName: 'work-suspended-support',
+                  label: 'Open support Chat',
+                  onPressed: () =>
+                      context.go('/app/chat/inbox?return=/app/work/status'),
+                  icon: Icons.support_agent_rounded,
                 )
               : WorkPrimaryButton(
                   keyName: 'work-check-review',
@@ -1509,13 +1553,27 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                     Icon(
                       approved
                           ? Icons.verified_rounded
+                          : rejected
+                          ? Icons.edit_note_rounded
+                          : suspended
+                          ? Icons.pause_circle_outline_rounded
                           : Icons.hourglass_top_rounded,
                       size: 50,
-                      color: approved ? MoolColors.success : MoolColors.orange,
+                      color: approved
+                          ? MoolColors.success
+                          : rejected || suspended
+                          ? const Color(0xFFB42318)
+                          : MoolColors.orange,
                     ),
                     const SizedBox(height: MoolSpacing.xs),
                     Text(
-                      approved ? 'Review approved' : 'Review in progress',
+                      approved
+                          ? 'Review approved'
+                          : rejected
+                          ? 'Please update this profile'
+                          : suspended
+                          ? 'Workspace temporarily unavailable'
+                          : 'Review in progress',
                       style: const TextStyle(
                         color: MoolColors.ink,
                         fontSize: 21,
@@ -1537,13 +1595,22 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if ((rejected || suspended) &&
+                        session.reviewReason?.isNotEmpty == true) ...[
+                      const SizedBox(height: MoolSpacing.xs),
+                      Text(
+                        session.reviewReason!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: MoolColors.muted),
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(height: MoolSpacing.md),
               const _StatusSteps(),
               const SizedBox(height: MoolSpacing.md),
-              if (!approved)
+              if (!approved && !rejected && !suspended)
                 WorkCard(
                   color: const Color(0xFFFFF4E5),
                   child: Column(
@@ -1683,7 +1750,7 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                 const SizedBox(height: MoolSpacing.sm),
                 OutlinedButton.icon(
                   key: const Key('work-attach-gst'),
-                  onPressed: session.attachGst,
+                  onPressed: () => _showGstProofSource(sheetContext),
                   icon: Icon(
                     session.gstAttachmentAdded
                         ? Icons.check_circle_rounded
@@ -1717,6 +1784,74 @@ class WorkVerificationStatusScreen extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showGstProofSource(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sourceContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(
+          MoolSpacing.lg,
+          0,
+          MoolSpacing.lg,
+          MoolSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Add GST certificate',
+              style: TextStyle(
+                color: MoolColors.ink,
+                fontSize: 21,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: MoolSpacing.md),
+            for (final source in const [
+              (
+                'camera',
+                'Camera',
+                Icons.camera_alt_outlined,
+                WorkProofSource.camera,
+              ),
+              (
+                'gallery',
+                'Photo library',
+                Icons.photo_library_outlined,
+                WorkProofSource.gallery,
+              ),
+              (
+                'upload',
+                'Upload PDF or image',
+                Icons.upload_file_outlined,
+                WorkProofSource.upload,
+              ),
+            ]) ...[
+              OutlinedButton.icon(
+                key: Key('work-gst-source-${source.$1}'),
+                onPressed: () async {
+                  final added = await session.addGstProof(source.$4);
+                  if (added && sourceContext.mounted) {
+                    Navigator.pop(sourceContext);
+                  }
+                },
+                icon: Icon(source.$3),
+                label: Text(source.$2),
+              ),
+              const SizedBox(height: MoolSpacing.xs),
+            ],
+            TextButton(
+              onPressed: () => Navigator.pop(sourceContext),
+              child: const Text('Cancel'),
+            ),
+          ],
         ),
       ),
     );

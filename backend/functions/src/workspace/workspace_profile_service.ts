@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 
 import type { DocumentData, Firestore } from "firebase-admin/firestore";
 
+import type { WorkspaceProofStore } from "./workspace_proof_store.js";
+
 export type WorkspaceProfileStatus =
   | "pending"
   | "approved"
@@ -74,7 +76,38 @@ export class WorkspaceProfileService {
   constructor(
     private readonly repository: WorkspaceProfileRepository,
     private readonly now: () => Date = () => new Date(),
+    private readonly proofStore?: WorkspaceProofStore,
   ) {}
+
+  async prepareProofUpload(
+    ownerUserId: string,
+    body: Readonly<Record<string, unknown>>,
+  ): Promise<object> {
+    const store = this.requiredProofStore();
+    return store.prepare({
+      ownerUserId: identifier(ownerUserId, "owner"),
+      proofId: stringField(body, "proofId", 2, 40),
+      fileName: stringField(body, "fileName", 3, 180),
+      contentType: stringField(body, "contentType", 3, 100),
+      sizeBytes: integerField(body, "sizeBytes", 1, 10 * 1024 * 1024),
+    });
+  }
+
+  async confirmProofUpload(
+    ownerUserId: string,
+    body: Readonly<Record<string, unknown>>,
+  ): Promise<object> {
+    const store = this.requiredProofStore();
+    const proofReference = await store.confirm({
+      ownerUserId: identifier(ownerUserId, "owner"),
+      proofId: stringField(body, "proofId", 2, 40),
+      uploadId: stringField(body, "uploadId", 36, 36),
+      fileName: stringField(body, "fileName", 3, 180),
+      contentType: stringField(body, "contentType", 3, 100),
+      sizeBytes: integerField(body, "sizeBytes", 1, 10 * 1024 * 1024),
+    });
+    return { proofReference };
+  }
 
   async listWorkspaces(ownerUserId: string): Promise<{ workspaces: object[] }> {
     const records = await this.repository.list(identifier(ownerUserId, "owner"));
@@ -99,6 +132,10 @@ export class WorkspaceProfileService {
         throw invalid("Add every required proof before submission.");
       }
     }
+    const proofStore = this.requiredProofStore();
+    await Promise.all(requiredProofIds.map((proofId) =>
+      proofStore.assertOwned(owner, proofId, proofReferences[proofId]!),
+    ));
     const input = {
       familyId,
       profileId,
@@ -155,8 +192,15 @@ export class WorkspaceProfileService {
         409,
       );
     }
+    const proofReference = stringField(body, "proofReference", 8, 256);
+    await this.requiredProofStore().assertOwned(
+      record.ownerUserId,
+      "gst",
+      proofReference,
+    );
     await this.repository.update(caseId, record.ownerUserId, {
       gstin,
+      gstProofReference: proofReference,
       updatedAt: this.now().toISOString(),
     });
     return { gstReference: `gst_${digest(`${record.ownerUserId}:${caseId}:${gstin}`).slice(0, 24)}` };
@@ -200,6 +244,18 @@ export class WorkspaceProfileService {
     const record = await this.repository.read(caseId);
     if (!record || record.ownerUserId !== identifier(ownerUserId, "owner")) throw notFound();
     return record;
+  }
+
+  private requiredProofStore(): WorkspaceProofStore {
+    if (!this.proofStore) {
+      throw new WorkspaceProfileError(
+        "service_unavailable",
+        "Proof upload is unavailable right now. Try again later.",
+        503,
+        true,
+      );
+    }
+    return this.proofStore;
   }
 }
 

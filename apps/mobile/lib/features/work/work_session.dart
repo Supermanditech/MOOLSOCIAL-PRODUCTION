@@ -4,13 +4,16 @@ import 'work_models.dart';
 import 'work_services.dart';
 
 class WorkSession extends ChangeNotifier {
-  WorkSession({WorkGateway? gateway})
-    : gateway = gateway ?? ReviewWorkGateway();
+  WorkSession({WorkGateway? gateway, WorkProofPicker? proofPicker})
+    : gateway = gateway ?? ReviewWorkGateway(),
+      proofPicker = proofPicker ?? ReviewWorkProofPicker();
 
-  WorkSession.production({WorkGateway? gateway})
-    : gateway = gateway ?? buildWorkGateway();
+  WorkSession.production({WorkGateway? gateway, WorkProofPicker? proofPicker})
+    : gateway = gateway ?? buildWorkGateway(),
+      proofPicker = proofPicker ?? NativeWorkProofPicker();
 
   final WorkGateway gateway;
+  final WorkProofPicker proofPicker;
 
   bool busy = false;
   String? errorMessage;
@@ -41,10 +44,12 @@ class WorkSession extends ChangeNotifier {
   String? workspaceId;
   String subscriptionPlan = 'free';
   String? reviewReason;
+  WorkRemoteReviewStatus? remoteReviewStatus;
   String? _profileSubmissionKey;
   bool gstReminder = false;
   String gstin = '';
   bool gstAttachmentAdded = false;
+  String? gstProofReference;
   bool unsupportedRequestSent = false;
   String unsupportedWorkspace = '';
   String unsupportedArea = '';
@@ -232,11 +237,13 @@ class WorkSession extends ChangeNotifier {
     workspaceId = null;
     subscriptionPlan = 'free';
     reviewReason = null;
+    remoteReviewStatus = null;
     _profileSubmissionKey = null;
     reviewStage = WorkReviewStage.drafting;
     gstReminder = false;
     gstin = '';
     gstAttachmentAdded = false;
+    gstProofReference = null;
     clearMessages();
     notifyListeners();
   }
@@ -392,10 +399,24 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> addProof(String proofId, String source) async {
-    return _runBool(() async {
-      addedProofs[proofId] = await gateway.saveProof(proofId, source);
-    }, success: 'Proof added. You can review it before submission.');
+  Future<bool> addProof(String proofId, WorkProofSource source) async {
+    if (busy) return false;
+    busy = true;
+    clearMessages();
+    notifyListeners();
+    try {
+      final proof = await proofPicker.pick(source);
+      if (proof == null) return false;
+      addedProofs[proofId] = await gateway.saveProof(proofId, proof);
+      noticeMessage = 'Proof received. You can review it before submission.';
+      return true;
+    } on WorkGatewayException catch (error) {
+      if (!error.cancelled) errorMessage = error.message;
+      return false;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
   }
 
   void removeProof(String proofId) {
@@ -449,6 +470,7 @@ class WorkSession extends ChangeNotifier {
         reviewCaseId = result.caseId;
         subscriptionPlan = result.plan;
         reviewReason = result.reason;
+        remoteReviewStatus = result.status;
         reviewStage = WorkReviewStage.gstPending;
       },
       success:
@@ -464,10 +486,25 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void attachGst() {
-    gstAttachmentAdded = true;
+  Future<bool> addGstProof(WorkProofSource source) async {
+    if (busy) return false;
+    busy = true;
     clearMessages();
     notifyListeners();
+    try {
+      final proof = await proofPicker.pick(source);
+      if (proof == null) return false;
+      gstProofReference = await gateway.saveProof('gst', proof);
+      gstAttachmentAdded = true;
+      noticeMessage = 'GST certificate received for this review.';
+      return true;
+    } on WorkGatewayException catch (error) {
+      if (!error.cancelled) errorMessage = error.message;
+      return false;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> submitGstProof(String value) async {
@@ -491,7 +528,13 @@ class WorkSession extends ChangeNotifier {
           'Submit the work profile before adding GST proof.',
         );
       }
-      await gateway.submitGst(caseId, normalized);
+      final proofReference = gstProofReference;
+      if (proofReference == null) {
+        throw const WorkGatewayException(
+          'Attach the GST certificate before submission.',
+        );
+      }
+      await gateway.submitGst(caseId, normalized, proofReference);
       gstin = normalized;
       gstReminder = false;
     }, success: 'GST proof added to the active review.');
@@ -511,12 +554,13 @@ class WorkSession extends ChangeNotifier {
       final result = await gateway.checkReview(reviewCaseId!);
       subscriptionPlan = result.plan;
       reviewReason = result.reason;
+      remoteReviewStatus = result.status;
       switch (result.status) {
         case WorkRemoteReviewStatus.pending:
           reviewStage = WorkReviewStage.gstPending;
           noticeMessage =
               'Review is still in progress. Your personal account remains active.';
-          return true;
+          return false;
         case WorkRemoteReviewStatus.rejected:
           errorMessage = result.reason?.trim().isNotEmpty == true
               ? result.reason
@@ -565,6 +609,19 @@ class WorkSession extends ChangeNotifier {
 
   void beginRetailerSetup() {
     reviewStage = WorkReviewStage.setup;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void reviseRejectedProfile() {
+    if (remoteReviewStatus != WorkRemoteReviewStatus.rejected) return;
+    reviewCaseId = null;
+    workspaceId = null;
+    reviewReason = null;
+    remoteReviewStatus = null;
+    _profileSubmissionKey = null;
+    declarationAccepted = false;
+    reviewStage = WorkReviewStage.drafting;
     clearMessages();
     notifyListeners();
   }
@@ -701,9 +758,15 @@ class WorkSession extends ChangeNotifier {
     WorkWorkspace? restoredActive;
     final restoredOthers = <WorkWorkspace>[];
     WorkReviewResult? pending;
+    WorkReviewResult? stopped;
     for (final record in records) {
       if (record.status == WorkRemoteReviewStatus.pending) {
         pending ??= record;
+        continue;
+      }
+      if (record.status == WorkRemoteReviewStatus.rejected ||
+          record.status == WorkRemoteReviewStatus.suspended) {
+        stopped ??= record;
         continue;
       }
       if (record.status != WorkRemoteReviewStatus.approved &&
@@ -739,6 +802,7 @@ class WorkSession extends ChangeNotifier {
         reviewCaseId = record.caseId;
         workspaceId = id;
         subscriptionPlan = record.plan;
+        remoteReviewStatus = record.status;
         reviewStage = record.status == WorkRemoteReviewStatus.live
             ? WorkReviewStage.live
             : WorkReviewStage.approved;
@@ -764,6 +828,23 @@ class WorkSession extends ChangeNotifier {
       primaryActivity = pending.primaryActivity ?? primaryActivity;
       reviewCaseId = pending.caseId;
       subscriptionPlan = pending.plan;
+      remoteReviewStatus = pending.status;
+      reviewStage = WorkReviewStage.gstPending;
+      return;
+    }
+    if (stopped != null) {
+      final option = workProfiles
+          .where((item) => item.id == stopped!.profileId)
+          .firstOrNull;
+      selectedProfile = option;
+      selectedFamilyId = option?.familyId;
+      workName = stopped.name ?? workName;
+      workArea = stopped.area ?? workArea;
+      primaryActivity = stopped.primaryActivity ?? primaryActivity;
+      reviewCaseId = stopped.caseId;
+      subscriptionPlan = stopped.plan;
+      reviewReason = stopped.reason;
+      remoteReviewStatus = stopped.status;
       reviewStage = WorkReviewStage.gstPending;
     }
   }

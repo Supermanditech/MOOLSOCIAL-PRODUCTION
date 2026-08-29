@@ -127,6 +127,7 @@ import {
   WorkspaceProfileError,
   WorkspaceProfileService,
 } from "./workspace/workspace_profile_service.js";
+import { GoogleCloudStorageWorkspaceProofStore } from "./workspace/workspace_proof_store.js";
 
 const youtubeServerApiKey = defineSecret("YOUTUBE_SERVER_API_KEY");
 const youtubeOauthClientId = defineSecret("YOUTUBE_OAUTH_CLIENT_ID");
@@ -403,6 +404,11 @@ function workspaceProfileService(): WorkspaceProfileService {
   if (workspaceProfileRuntimeService) return workspaceProfileRuntimeService;
   workspaceProfileRuntimeService = new WorkspaceProfileService(
     new FirestoreWorkspaceProfileRepository(getFirestore()),
+    undefined,
+    new GoogleCloudStorageWorkspaceProofStore(
+      getStorage().bucket(),
+      getFirestore(),
+    ),
   );
   return workspaceProfileRuntimeService;
 }
@@ -2861,7 +2867,9 @@ export const moolSocialWorkspace = onRequest(
       const operation = typeof body.operation === "string"
         ? body.operation.trim()
         : "";
-      const mutation = operation === "submitProfile" ||
+      const mutation = operation === "prepareProofUpload" ||
+        operation === "confirmProofUpload" ||
+        operation === "submitProfile" ||
         operation === "submitGst" ||
         operation === "finishRetailerSetup";
       const ownerUserId = await verifySocialInvocation(
@@ -2887,8 +2895,12 @@ export const moolSocialWorkspace = onRequest(
       const service = workspaceProfileService();
       const result = operation === "listWorkspaces"
         ? await service.listWorkspaces(ownerUserId)
-        : operation === "submitProfile"
-          ? await service.submitProfile(ownerUserId, body)
+        : operation === "prepareProofUpload"
+          ? await service.prepareProofUpload(ownerUserId, body)
+          : operation === "confirmProofUpload"
+            ? await service.confirmProofUpload(ownerUserId, body)
+            : operation === "submitProfile"
+              ? await service.submitProfile(ownerUserId, body)
           : operation === "reviewStatus"
             ? await service.reviewStatus(ownerUserId, body)
             : operation === "submitGst"
