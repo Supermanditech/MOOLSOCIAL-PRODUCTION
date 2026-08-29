@@ -44263,6 +44263,16 @@
       "prevention": "Bind one clean Child 4 continuation of the same Shop Chat ticket from the repaired Child 3 HEAD, place the refreshed registry, policy, checker count and Child 4 evidence in its single declared bootstrap commit, use sparse checkout from the outset, and run task_start before any later commit or source edit.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD4-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3908-AUTHORITATIVE-CHAT-TEST-GREP-PATH-NO-MATCH",
+      "status": "registered_exact_commit_tree_path_discovery_required",
+      "appliesTo": ["primary", "coordination", "audit", "testing", "chat", "tooling"],
+      "mistake": "A read-only git grep for Shop contextual assertions at commit 30f46145 used an assumed test pathspec and returned exit 1 with no output.",
+      "rootCause": "The query combined remembered test locations with a commit-scoped glob instead of first listing the exact authoritative test paths.",
+      "prevention": "Bind clean Child 5, discover exact test owners with git ls-tree at 30f46145, treat no-match searches explicitly as a successful empty inventory when expected, and continue with bounded exact files only.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD5-20260829.md"]
     }
   ]
 }
