@@ -6636,6 +6636,177 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
   );
 }
 
+class _DeliveryExceptionCard extends StatelessWidget {
+  const _DeliveryExceptionCard({required this.session, required this.order});
+
+  final BuyV2Session session;
+  final BuyV2Order order;
+
+  @override
+  Widget build(BuildContext context) {
+    if (session.deliveryExceptionAdapter == null) {
+      return const SizedBox.shrink();
+    }
+    final snapshot = session.deliveryExceptionFor(order.id);
+    final busy = session.deliveryExceptionBusy(order.id);
+    if (snapshot == null) {
+      return busy
+          ? Container(
+              key: const ValueKey('buy-delivery-exception-loading'),
+              padding: const EdgeInsets.all(12),
+              decoration: buyV2CardDecoration(radius: 15),
+              child: const Row(
+                children: [
+                  SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 9),
+                  Expanded(child: Text('Checking delivery updates…')),
+                ],
+              ),
+            )
+          : const SizedBox.shrink();
+    }
+    if (snapshot.state != BuyV2CommerceLoadState.ready) {
+      return Container(
+        key: ValueKey('buy-delivery-exception-${snapshot.state.name}'),
+        padding: const EdgeInsets.all(12),
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softOrange,
+          radius: 15,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.cloud_off_outlined, color: BuyV2Colors.navy),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(snapshot.customerMessage, style: context.buyMeta),
+            ),
+            TextButton(
+              key: const ValueKey('buy-delivery-exception-retry'),
+              onPressed: busy
+                  ? null
+                  : () => session.restoreDeliveryException(order.id),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+    final kind = snapshot.kind;
+    if (kind == null) return const SizedBox.shrink();
+    final selectedSlot = session.selectedDeliveryRescheduleSlot(order.id);
+    final accent = switch (kind) {
+      BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable ||
+      BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed =>
+        BuyV2Colors.softBlue,
+      _ => BuyV2Colors.softOrange,
+    };
+    return Container(
+      key: ValueKey('buy-delivery-exception-${kind.name}'),
+      padding: const EdgeInsets.all(12),
+      decoration: buyV2CardDecoration(color: accent, radius: 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                kind == BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable ||
+                        kind ==
+                            BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed
+                    ? Icons.verified_outlined
+                    : Icons.warning_amber_rounded,
+                color: BuyV2Colors.navy,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      snapshot.headline!,
+                      style: context.buyTitle.copyWith(fontSize: 14),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(snapshot.detail!, style: context.buyMeta),
+                  ],
+                ),
+              ),
+              if (busy)
+                const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          if (snapshot.proofReference case final proofReference?) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Proof reference · $proofReference',
+              key: const ValueKey('buy-delivery-proof-reference'),
+              style: context.buyBody.copyWith(fontSize: 9.5),
+            ),
+          ],
+          if (snapshot.rescheduleSlots.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Choose a new delivery time', style: context.buyBody),
+            const SizedBox(height: 5),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final slot in snapshot.rescheduleSlots)
+                  ChoiceChip(
+                    key: ValueKey('buy-delivery-slot-$slot'),
+                    label: Text(slot),
+                    selected: selectedSlot == slot,
+                    onSelected: busy
+                        ? null
+                        : (_) => session.chooseDeliveryRescheduleSlot(
+                            order.id,
+                            slot,
+                          ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: BuyV2Metrics.minimumTap,
+              child: FilledButton(
+                key: const ValueKey('buy-delivery-confirm-reschedule'),
+                onPressed: busy || selectedSlot == null
+                    ? null
+                    : () => session.confirmDeliveryReschedule(order.id),
+                child: const Text('Confirm new time'),
+              ),
+            ),
+          ],
+          if (kind == BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: BuyV2Metrics.minimumTap,
+              child: OutlinedButton(
+                key: const ValueKey('buy-delivery-dispute-proof'),
+                onPressed: busy
+                    ? null
+                    : () => session.disputeProofOfDelivery(order.id),
+                child: const Text('Report a delivery problem'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 5),
+          Text(snapshot.customerMessage, style: context.buyMeta),
+        ],
+      ),
+    );
+  }
+}
+
 class _BalancePaymentCard extends StatelessWidget {
   const _BalancePaymentCard({
     required this.session,
@@ -7000,6 +7171,10 @@ class BuyV2TrackingView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
+        if (session.deliveryExceptionAdapter != null) ...[
+          _DeliveryExceptionCard(session: session, order: order),
+          const SizedBox(height: 6),
+        ],
         _DecisionPanel(
           title: 'Fulfilment',
           children: [

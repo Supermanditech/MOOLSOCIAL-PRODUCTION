@@ -280,6 +280,63 @@ class _BalancePaymentAdapter implements BuyV2BalancePaymentAdapter {
   }
 }
 
+class _DeliveryExceptionAdapter implements BuyV2DeliveryExceptionAdapter {
+  BuyV2DeliveryExceptionSnapshot snapshot =
+      const BuyV2DeliveryExceptionSnapshot(
+        state: BuyV2CommerceLoadState.ready,
+        customerMessage: 'Choose another delivery time.',
+        exceptionId: 'DELIVERY-EX-1',
+        kind: BuyV2DeliveryExceptionKind.rescheduleAvailable,
+        headline: 'Delivery needs a new time',
+        detail: 'The previous delivery attempt could not be completed.',
+        rescheduleSlots: ['Tomorrow · 10 am–12 pm', 'Tomorrow · 2–4 pm'],
+      );
+  int rescheduleCalls = 0;
+  int disputeCalls = 0;
+
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> loadException({
+    required String orderId,
+  }) async => snapshot;
+
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> rescheduleDelivery({
+    required String orderId,
+    required String exceptionId,
+    required String slot,
+  }) async {
+    rescheduleCalls += 1;
+    snapshot = BuyV2DeliveryExceptionSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      customerMessage: 'Delivery rescheduled for $slot.',
+      exceptionId: exceptionId,
+      kind: BuyV2DeliveryExceptionKind.dispatchDelayed,
+      headline: 'New delivery time confirmed',
+      detail: slot,
+    );
+    return snapshot;
+  }
+
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> disputeProofOfDelivery({
+    required String orderId,
+    required String exceptionId,
+    required String proofReference,
+  }) async {
+    disputeCalls += 1;
+    snapshot = BuyV2DeliveryExceptionSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      customerMessage: 'Delivery problem reported for review.',
+      exceptionId: exceptionId,
+      kind: BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed,
+      headline: 'Proof of delivery is under review',
+      detail: 'Keep this order available while the delivery is checked.',
+      proofReference: proofReference,
+    );
+    return snapshot;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -874,6 +931,69 @@ void main() {
           )
           .onPressed,
       isNotNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('delivery exception reschedules and disputes proof in place', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final adapter = _DeliveryExceptionAdapter();
+    final session = BuyV2Session(
+      core: BuySession(),
+      deliveryExceptionAdapter: adapter,
+    );
+    addTearDown(session.dispose);
+    final order = session.orders.first;
+    expect(session.openTracking(order.id), isTrue);
+
+    await tester.pumpWidget(app(session, textScale: 1.4));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-delivery-exception-rescheduleAvailable')),
+      findsOneWidget,
+    );
+    const slot = 'Tomorrow · 10 am–12 pm';
+    final slotChoice = find.byKey(const ValueKey('buy-delivery-slot-$slot'));
+    await tester.scrollUntilVisible(
+      slotChoice,
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(slotChoice);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-delivery-confirm-reschedule')),
+    );
+    await tester.pumpAndSettle();
+    expect(adapter.rescheduleCalls, 1);
+    expect(find.text('New delivery time confirmed'), findsOneWidget);
+
+    adapter.snapshot = const BuyV2DeliveryExceptionSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      customerMessage: 'Proof of delivery is available.',
+      exceptionId: 'DELIVERY-EX-2',
+      kind: BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable,
+      headline: 'Delivery marked complete',
+      detail: 'Review the recorded proof if this does not look right.',
+      proofReference: 'POD-REF-1001',
+    );
+    expect(await session.restoreDeliveryException(order.id), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Proof reference · POD-REF-1001'), findsOneWidget);
+    final dispute = find.byKey(const ValueKey('buy-delivery-dispute-proof'));
+    await tester.ensureVisible(dispute);
+    await tester.tap(dispute);
+    await tester.pumpAndSettle();
+    expect(adapter.disputeCalls, 1);
+    expect(find.text('Proof of delivery is under review'), findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey('buy-delivery-exception-proofOfDeliveryDisputed'),
+      ),
+      findsOneWidget,
     );
     expect(tester.takeException(), isNull);
   });

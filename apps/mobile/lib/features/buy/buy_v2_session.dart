@@ -285,6 +285,7 @@ class BuyV2Session extends ChangeNotifier {
     this.commercialPaymentTermsAdapter,
     this.checkoutQuoteAdapter,
     this.balancePaymentAdapter,
+    this.deliveryExceptionAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
     bool? reviewDataEnabled,
   }) : cartBenefitsAdapter =
@@ -336,6 +337,7 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2CommercialPaymentTermsAdapter? commercialPaymentTermsAdapter;
   final BuyV2CheckoutQuoteAdapter? checkoutQuoteAdapter;
   final BuyV2BalancePaymentAdapter? balancePaymentAdapter;
+  final BuyV2DeliveryExceptionAdapter? deliveryExceptionAdapter;
   final BuyV2CommerceAdapter commerceAdapter;
   final bool reviewDataEnabled;
 
@@ -545,6 +547,10 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, BuyV2BalancePaymentResult> _balancePaymentResults = {};
   final Set<String> _balancePaymentBusyOrderIds = {};
   int _balancePaymentAttemptSequence = 0;
+  final Map<String, BuyV2DeliveryExceptionSnapshot>
+  _deliveryExceptionSnapshots = {};
+  final Set<String> _deliveryExceptionBusyOrderIds = {};
+  final Map<String, String> _selectedDeliveryRescheduleSlots = {};
   final Map<BuyV2CartScope, double> _cartScrollOffsets = {};
   final Map<BuyV2Destination, String> _deliveryInstructionIds = {};
   final Map<String, _BuyV2CartBenefitSelectionRef> _selectedCartBenefitRefs =
@@ -996,6 +1002,152 @@ class BuyV2Session extends ChangeNotifier {
       BuyV2BalancePaymentState.offline ||
       BuyV2BalancePaymentState.unavailable => result.amountDue > 0,
     };
+  }
+
+  bool deliveryExceptionBusy(String orderId) =>
+      _deliveryExceptionBusyOrderIds.contains(orderId);
+
+  BuyV2DeliveryExceptionSnapshot? deliveryExceptionFor(String orderId) =>
+      _deliveryExceptionSnapshots[orderId];
+
+  String? selectedDeliveryRescheduleSlot(String orderId) =>
+      _selectedDeliveryRescheduleSlots[orderId];
+
+  Future<bool> restoreDeliveryException(String orderId) async {
+    final adapter = deliveryExceptionAdapter;
+    final orderExists = _orders.any((order) => order.id == orderId);
+    if (adapter == null ||
+        !orderExists ||
+        !_deliveryExceptionBusyOrderIds.add(orderId)) {
+      return false;
+    }
+    notifyListeners();
+    try {
+      final snapshot = await adapter.loadException(orderId: orderId);
+      if (!_validDeliveryExceptionSnapshot(snapshot)) return false;
+      _deliveryExceptionSnapshots[orderId] = snapshot;
+      final selected = _selectedDeliveryRescheduleSlots[orderId];
+      if (selected != null && !snapshot.rescheduleSlots.contains(selected)) {
+        _selectedDeliveryRescheduleSlots.remove(orderId);
+      }
+      return true;
+    } on Object {
+      _deliveryExceptionSnapshots[orderId] =
+          const BuyV2DeliveryExceptionSnapshot(
+            state: BuyV2CommerceLoadState.offline,
+            customerMessage:
+                'Delivery updates could not be checked. Try again.',
+          );
+      return false;
+    } finally {
+      _deliveryExceptionBusyOrderIds.remove(orderId);
+      notifyListeners();
+    }
+  }
+
+  bool chooseDeliveryRescheduleSlot(String orderId, String slot) {
+    final snapshot = _deliveryExceptionSnapshots[orderId];
+    if (snapshot == null || !snapshot.rescheduleSlots.contains(slot)) {
+      notice = 'This delivery time is no longer available.';
+      notifyListeners();
+      return false;
+    }
+    _selectedDeliveryRescheduleSlots[orderId] = slot;
+    notice = '$slot selected.';
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> confirmDeliveryReschedule(String orderId) async {
+    final adapter = deliveryExceptionAdapter;
+    final snapshot = _deliveryExceptionSnapshots[orderId];
+    final exceptionId = snapshot?.exceptionId;
+    final slot = _selectedDeliveryRescheduleSlots[orderId];
+    if (adapter == null ||
+        snapshot == null ||
+        exceptionId == null ||
+        slot == null ||
+        !snapshot.rescheduleSlots.contains(slot) ||
+        !_deliveryExceptionBusyOrderIds.add(orderId)) {
+      return false;
+    }
+    notifyListeners();
+    try {
+      final updated = await adapter.rescheduleDelivery(
+        orderId: orderId,
+        exceptionId: exceptionId,
+        slot: slot,
+      );
+      if (!_validDeliveryExceptionSnapshot(updated)) return false;
+      _deliveryExceptionSnapshots[orderId] = updated;
+      _selectedDeliveryRescheduleSlots.remove(orderId);
+      notice = updated.customerMessage;
+      return true;
+    } on Object {
+      notice = 'Delivery could not be rescheduled. Try again.';
+      return false;
+    } finally {
+      _deliveryExceptionBusyOrderIds.remove(orderId);
+      notifyListeners();
+    }
+  }
+
+  Future<bool> disputeProofOfDelivery(String orderId) async {
+    final adapter = deliveryExceptionAdapter;
+    final snapshot = _deliveryExceptionSnapshots[orderId];
+    final exceptionId = snapshot?.exceptionId;
+    final proofReference = snapshot?.proofReference;
+    if (adapter == null ||
+        snapshot?.kind != BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable ||
+        exceptionId == null ||
+        proofReference == null ||
+        !_deliveryExceptionBusyOrderIds.add(orderId)) {
+      return false;
+    }
+    notifyListeners();
+    try {
+      final updated = await adapter.disputeProofOfDelivery(
+        orderId: orderId,
+        exceptionId: exceptionId,
+        proofReference: proofReference,
+      );
+      if (!_validDeliveryExceptionSnapshot(updated)) return false;
+      _deliveryExceptionSnapshots[orderId] = updated;
+      notice = updated.customerMessage;
+      return updated.kind == BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed;
+    } on Object {
+      notice = 'Proof of delivery could not be reported. Try again.';
+      return false;
+    } finally {
+      _deliveryExceptionBusyOrderIds.remove(orderId);
+      notifyListeners();
+    }
+  }
+
+  bool _validDeliveryExceptionSnapshot(
+    BuyV2DeliveryExceptionSnapshot snapshot,
+  ) {
+    if (snapshot.customerMessage.trim().isEmpty) return false;
+    if (snapshot.state != BuyV2CommerceLoadState.ready) return true;
+    final kind = snapshot.kind;
+    if (kind == null) return true;
+    if (snapshot.exceptionId?.trim().isNotEmpty != true ||
+        snapshot.headline?.trim().isNotEmpty != true ||
+        snapshot.detail?.trim().isNotEmpty != true ||
+        snapshot.rescheduleSlots.any((slot) => slot.trim().isEmpty) ||
+        snapshot.rescheduleSlots.toSet().length !=
+            snapshot.rescheduleSlots.length) {
+      return false;
+    }
+    if (kind == BuyV2DeliveryExceptionKind.rescheduleAvailable &&
+        snapshot.rescheduleSlots.isEmpty) {
+      return false;
+    }
+    if (kind == BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable &&
+        snapshot.proofReference?.trim().isNotEmpty != true) {
+      return false;
+    }
+    return true;
   }
 
   String? get selectedOrderId => _selectedOrderId;
@@ -2987,6 +3139,9 @@ class BuyV2Session extends ChangeNotifier {
     );
     if (balancePaymentAdapter != null) {
       unawaited(restoreBalancePayment(orderId));
+    }
+    if (deliveryExceptionAdapter != null) {
+      unawaited(restoreDeliveryException(orderId));
     }
     return true;
   }

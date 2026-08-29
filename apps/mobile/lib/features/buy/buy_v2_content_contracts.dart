@@ -434,6 +434,60 @@ abstract interface class BuyV2BalancePaymentAdapter {
   });
 }
 
+enum BuyV2DeliveryExceptionKind {
+  carrierChanged,
+  dispatchDelayed,
+  deliveryAttemptFailed,
+  recipientUnavailable,
+  rescheduleAvailable,
+  returnToSender,
+  proofOfDeliveryAvailable,
+  proofOfDeliveryDisputed,
+}
+
+@immutable
+class BuyV2DeliveryExceptionSnapshot {
+  const BuyV2DeliveryExceptionSnapshot({
+    required this.state,
+    required this.customerMessage,
+    this.exceptionId,
+    this.kind,
+    this.headline,
+    this.detail,
+    this.rescheduleSlots = const [],
+    this.proofReference,
+  });
+
+  final BuyV2CommerceLoadState state;
+  final String customerMessage;
+  final String? exceptionId;
+  final BuyV2DeliveryExceptionKind? kind;
+  final String? headline;
+  final String? detail;
+  final List<String> rescheduleSlots;
+  final String? proofReference;
+}
+
+abstract interface class BuyV2DeliveryExceptionAdapter {
+  const BuyV2DeliveryExceptionAdapter();
+
+  Future<BuyV2DeliveryExceptionSnapshot> loadException({
+    required String orderId,
+  });
+
+  Future<BuyV2DeliveryExceptionSnapshot> rescheduleDelivery({
+    required String orderId,
+    required String exceptionId,
+    required String slot,
+  });
+
+  Future<BuyV2DeliveryExceptionSnapshot> disputeProofOfDelivery({
+    required String orderId,
+    required String exceptionId,
+    required String proofReference,
+  });
+}
+
 abstract interface class BuyV2CommerceAdapter {
   const BuyV2CommerceAdapter();
 
