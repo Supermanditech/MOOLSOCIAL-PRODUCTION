@@ -176,9 +176,10 @@ void main() {
       await tapVisible(tester, const Key('retailer-delivery-open-book'));
       expect(find.textContaining('recorded in Business Book'), findsOneWidget);
 
-      final trackingCalls = retailer.gateway.trackingCalls;
+      final reviewGateway = retailer.gateway as ReviewRetailerGateway;
+      final trackingCalls = reviewGateway.trackingCalls;
       expect(await retailer.refreshTracking(), isTrue);
-      expect(retailer.gateway.trackingCalls, trackingCalls);
+      expect(reviewGateway.trackingCalls, trackingCalls);
     },
   );
 
@@ -409,6 +410,7 @@ void main() {
       );
       await tapVisible(tester, const Key('retailer-stock-review'));
       expect(find.textContaining('Stock review is open'), findsOneWidget);
+      await tapVisible(tester, const Key('retailer-product-editor-cancel'));
       await tapVisible(tester, const Key('retailer-dock-wholesale'));
       expect(find.byKey(const Key('wholesale-catalog-screen')), findsOneWidget);
     },

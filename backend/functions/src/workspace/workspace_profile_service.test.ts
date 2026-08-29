@@ -244,4 +244,39 @@ test("retailer setup validates price and fulfilment then activates live state", 
     { workspaceId: "workspace-510001", status: "live", plan: "free" },
   );
   assert.equal(repository.records.get(created.caseId)?.status, "live");
+
+  assert.deepEqual(await subject.retailerStoreState("owner-1"), {
+    workspaceId: "workspace-510001",
+    name: "Mahadev Fresh Mart",
+    area: "Sardarpura, Jodhpur",
+    ordersEnabled: true,
+    products: [{
+      id: "atta",
+      name: "Aashirvaad Whole Wheat Atta",
+      pack: "1 kg",
+      sku: "AAT-1K",
+      price: 120,
+      stock: 20,
+    }],
+  });
+
+  const paused = await subject.setRetailerAvailability("owner-1", {
+    enabled: false,
+  }) as { ordersEnabled: boolean };
+  assert.equal(paused.ordersEnabled, false);
+
+  const changed = await subject.saveRetailerProduct("owner-1", {
+    productId: "atta",
+    stock: 8,
+    buyPrice: 105,
+    sellPrice: 125,
+  }) as { products: Array<{ stock: number; price: number }> };
+  assert.deepEqual(changed.products, [{
+    id: "atta",
+    name: "Aashirvaad Whole Wheat Atta",
+    pack: "1 kg",
+    sku: "AAT-1K",
+    price: 125,
+    stock: 8,
+  }]);
 });
