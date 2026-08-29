@@ -261,6 +261,65 @@ class ChatGroupInvite {
   final DateTime invitedAt;
 }
 
+enum ChatNotificationPermission { unknown, denied, provisional, authorized }
+
+class ChatNotificationPreferences {
+  const ChatNotificationPreferences({
+    required this.messagesEnabled,
+    required this.callsEnabled,
+    required this.groupInvitesEnabled,
+    required this.showPreview,
+    required this.quietHoursEnabled,
+    required this.quietStartMinutes,
+    required this.quietEndMinutes,
+    required this.utcOffsetMinutes,
+    this.updatedAt,
+  });
+
+  static ChatNotificationPreferences defaults() => ChatNotificationPreferences(
+    messagesEnabled: true,
+    callsEnabled: true,
+    groupInvitesEnabled: true,
+    showPreview: true,
+    quietHoursEnabled: false,
+    quietStartMinutes: 22 * 60,
+    quietEndMinutes: 7 * 60,
+    utcOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes.clamp(-840, 840),
+  );
+
+  final bool messagesEnabled;
+  final bool callsEnabled;
+  final bool groupInvitesEnabled;
+  final bool showPreview;
+  final bool quietHoursEnabled;
+  final int quietStartMinutes;
+  final int quietEndMinutes;
+  final int utcOffsetMinutes;
+  final DateTime? updatedAt;
+
+  ChatNotificationPreferences copyWith({
+    bool? messagesEnabled,
+    bool? callsEnabled,
+    bool? groupInvitesEnabled,
+    bool? showPreview,
+    bool? quietHoursEnabled,
+    int? quietStartMinutes,
+    int? quietEndMinutes,
+    int? utcOffsetMinutes,
+    DateTime? updatedAt,
+  }) => ChatNotificationPreferences(
+    messagesEnabled: messagesEnabled ?? this.messagesEnabled,
+    callsEnabled: callsEnabled ?? this.callsEnabled,
+    groupInvitesEnabled: groupInvitesEnabled ?? this.groupInvitesEnabled,
+    showPreview: showPreview ?? this.showPreview,
+    quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
+    quietStartMinutes: quietStartMinutes ?? this.quietStartMinutes,
+    quietEndMinutes: quietEndMinutes ?? this.quietEndMinutes,
+    utcOffsetMinutes: utcOffsetMinutes ?? this.utcOffsetMinutes,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+}
+
 class ChatThread {
   const ChatThread({
     required this.id,

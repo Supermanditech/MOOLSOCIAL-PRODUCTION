@@ -22,6 +22,8 @@ import {
   type ChatGroupInfoRecord,
   type ChatGroupInvitePermission,
   type ChatGroupInviteRecord,
+  type ChatNotificationDispatcher,
+  type ChatNotificationPreferences,
   type ChatPhotoAttachmentStore,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
@@ -37,6 +39,7 @@ export class FirestoreChatRepository implements ChatRepository {
     private readonly now: () => Date = () => new Date(),
     private readonly photoStore?: ChatPhotoAttachmentStore,
     private readonly attachmentStore?: ChatAttachmentStore,
+    private readonly notificationDispatcher?: ChatNotificationDispatcher,
   ) {}
 
   async listThreads(userId: string, limit: number): Promise<ChatThreadRecord[]> {
@@ -257,6 +260,12 @@ export class FirestoreChatRepository implements ChatRepository {
           : {}),
       });
     });
+    await this.dispatchMessageNotification(
+      actor,
+      threadId,
+      messageData!,
+      messageThreadData,
+    );
     return this.publicMessage(
       messageId,
       messageData!,
@@ -413,6 +422,12 @@ export class FirestoreChatRepository implements ChatRepository {
         lastReadAtBy,
       });
     });
+    await this.dispatchMessageNotification(
+      actor,
+      threadId,
+      messageData!,
+      messageThreadData,
+    );
     return this.publicMessage(
       messageId,
       messageData!,
@@ -572,6 +587,12 @@ export class FirestoreChatRepository implements ChatRepository {
           : {}),
       });
     });
+    await this.dispatchMessageNotification(
+      actor,
+      threadId,
+      messageData!,
+      messageThreadData,
+    );
     return this.publicMessage(
       messageId,
       messageData!,
@@ -685,6 +706,12 @@ export class FirestoreChatRepository implements ChatRepository {
         lastReadAtBy,
       });
     });
+    await this.dispatchMessageNotification(
+      actor,
+      targetThreadId,
+      messageData!,
+      messageThreadData,
+    );
     return this.publicMessage(
       messageId,
       messageData!,
@@ -999,6 +1026,13 @@ export class FirestoreChatRepository implements ChatRepository {
       activeCallId: callId,
       updatedAt: createdAt,
     }, { merge: true });
+    await this.dispatchNotification({
+      category: "call",
+      recipientUserIds: [availability.recipientUserId],
+      title: `${actor.name} is calling`,
+      preview: `${kind === "voice" ? "Voice" : "Video"} call`,
+      data: { callId, threadId, kind },
+    });
     return callFromDocument(callId, data);
   }
 
@@ -1129,6 +1163,13 @@ export class FirestoreChatRepository implements ChatRepository {
       else transaction.create(inviteRef, inviteData);
       result = groupInviteFromDocument(inviteId, inviteData);
     });
+    await this.dispatchNotification({
+      category: "group_invite",
+      recipientUserIds: [target.userId],
+      title: result!.groupTitle,
+      preview: `${actor.name} invited you to join.`,
+      data: { inviteId, threadId },
+    });
     return result!;
   }
 
@@ -1204,6 +1245,55 @@ export class FirestoreChatRepository implements ChatRepository {
     return snapshot.docs
       .map((document) => groupInviteFromDocument(document.id, document.data()))
       .sort((left, right) => right.invitedAt.localeCompare(left.invitedAt));
+  }
+
+  async getNotificationPreferences(
+    userId: string,
+  ): Promise<ChatNotificationPreferences> {
+    const snapshot = await this.privacyRef(userId).get();
+    return notificationPreferencesFromData(snapshot.data());
+  }
+
+  async updateNotificationPreferences(
+    userId: string,
+    preferences: Omit<ChatNotificationPreferences, "updatedAt">,
+  ): Promise<ChatNotificationPreferences> {
+    const updatedAt = this.now().toISOString();
+    await this.privacyRef(userId).set({
+      schemaVersion: 1,
+      messagesEnabled: preferences.messagesEnabled,
+      callsEnabled: preferences.callsEnabled,
+      groupInvitesEnabled: preferences.groupInvitesEnabled,
+      showNotificationPreview: preferences.showPreview,
+      quietHoursEnabled: preferences.quietHoursEnabled,
+      quietStartMinutes: preferences.quietStartMinutes,
+      quietEndMinutes: preferences.quietEndMinutes,
+      utcOffsetMinutes: preferences.utcOffsetMinutes,
+      updatedAt,
+    }, { merge: true });
+    return { ...preferences, updatedAt };
+  }
+
+  async registerNotificationDevice(
+    userId: string,
+    token: string,
+    platform: "android" | "ios",
+  ) {
+    await this.firestore.collection("chatNotificationDevices")
+      .doc(digest(`${userId}:${token}`)).set({
+        schemaVersion: 1,
+        userId,
+        token,
+        platform,
+        updatedAt: this.now().toISOString(),
+      }, { merge: true });
+    return { registered: true };
+  }
+
+  async unregisterNotificationDevice(userId: string, token: string) {
+    await this.firestore.collection("chatNotificationDevices")
+      .doc(digest(`${userId}:${token}`)).delete();
+    return { registered: false };
   }
 
   async respondToGroupInvite(
@@ -1408,6 +1498,42 @@ export class FirestoreChatRepository implements ChatRepository {
       ),
     );
   }
+
+  private async dispatchMessageNotification(
+    actor: ChatProfile,
+    threadId: string,
+    messageData: DocumentData,
+    threadData?: DocumentData,
+  ): Promise<void> {
+    const recipients = participantIdsFrom(threadData)
+      .filter((participantId) => participantId !== actor.userId);
+    if (recipients.length === 0) return;
+    const attachment = attachmentFromDocument(messageData);
+    const photo = photoFromDocument(messageData);
+    const preview = String(messageData.text ?? "").trim() ||
+      (attachment?.kind === "voice"
+        ? "Voice message"
+        : attachment?.kind === "video"
+          ? "Video"
+          : attachment?.displayName ?? (photo ? "Photo" : "New message"));
+    await this.dispatchNotification({
+      category: "message",
+      recipientUserIds: recipients,
+      title: actor.name,
+      preview,
+      data: { threadId },
+    });
+  }
+
+  private async dispatchNotification(
+    event: Parameters<ChatNotificationDispatcher["dispatch"]>[0],
+  ): Promise<void> {
+    try {
+      await this.notificationDispatcher?.dispatch(event);
+    } catch {
+      // Notification delivery never rolls back an accepted Chat mutation.
+    }
+  }
 }
 
 function assertParticipant(data: DocumentData | undefined, userId: string): void {
@@ -1508,6 +1634,36 @@ function callPreferencesFromData(
     videoCallsEnabled: data?.videoCallsEnabled !== false,
     updatedAt: String(data?.updatedAt ?? ""),
   };
+}
+
+function notificationPreferencesFromData(
+  data: DocumentData | undefined,
+): ChatNotificationPreferences {
+  return {
+    messagesEnabled: data?.messagesEnabled !== false,
+    callsEnabled: data?.callsEnabled !== false,
+    groupInvitesEnabled: data?.groupInvitesEnabled !== false,
+    showPreview: data?.showNotificationPreview !== false,
+    quietHoursEnabled: data?.quietHoursEnabled === true,
+    quietStartMinutes: boundedClockMinutes(data?.quietStartMinutes, 22 * 60),
+    quietEndMinutes: boundedClockMinutes(data?.quietEndMinutes, 7 * 60),
+    utcOffsetMinutes: boundedUtcOffset(data?.utcOffsetMinutes),
+    updatedAt: String(data?.updatedAt ?? ""),
+  };
+}
+
+function boundedClockMinutes(value: unknown, fallback: number): number {
+  return Number.isSafeInteger(value) && (value as number) >= 0 &&
+      (value as number) < 1440
+    ? value as number
+    : fallback;
+}
+
+function boundedUtcOffset(value: unknown): number {
+  return Number.isSafeInteger(value) && (value as number) >= -840 &&
+      (value as number) <= 840
+    ? value as number
+    : 0;
 }
 
 function callFromDocument(id: string, data: DocumentData): ChatCallRecord {

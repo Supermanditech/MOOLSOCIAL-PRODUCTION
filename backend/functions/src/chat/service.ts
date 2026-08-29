@@ -8,6 +8,7 @@ import {
   type ChatAttachmentKind,
   type ChatAttachmentUploadGrant,
   type ChatGroupInvitePermission,
+  type ChatNotificationPreferences,
   type ChatCallPreferences,
   type ChatPresenceState,
   type ChatPhotoContentType,
@@ -306,6 +307,65 @@ export class ChatService {
     );
   }
 
+  getNotificationPreferences(
+    userId: string,
+    raw: unknown,
+  ): Promise<ChatNotificationPreferences> {
+    object(raw);
+    return this.requireCapability("getNotificationPreferences")(userId);
+  }
+
+  updateNotificationPreferences(
+    userId: string,
+    raw: unknown,
+  ): Promise<ChatNotificationPreferences> {
+    const body = object(raw);
+    return this.requireCapability("updateNotificationPreferences")(userId, {
+      messagesEnabled: requiredBoolean(body, "messagesEnabled"),
+      callsEnabled: requiredBoolean(body, "callsEnabled"),
+      groupInvitesEnabled: requiredBoolean(body, "groupInvitesEnabled"),
+      showPreview: requiredBoolean(body, "showPreview"),
+      quietHoursEnabled: requiredBoolean(body, "quietHoursEnabled"),
+      quietStartMinutes: boundedInteger(
+        body.quietStartMinutes,
+        22 * 60,
+        0,
+        1439,
+        "Quiet start",
+      ),
+      quietEndMinutes: boundedInteger(
+        body.quietEndMinutes,
+        7 * 60,
+        0,
+        1439,
+        "Quiet end",
+      ),
+      utcOffsetMinutes: boundedSignedInteger(
+        body.utcOffsetMinutes,
+        -840,
+        840,
+        "Time-zone offset",
+      ),
+    });
+  }
+
+  registerNotificationDevice(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("registerNotificationDevice")(
+      userId,
+      requiredDeviceToken(body),
+      requiredDevicePlatform(body.platform),
+    );
+  }
+
+  unregisterNotificationDevice(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("unregisterNotificationDevice")(
+      userId,
+      requiredDeviceToken(body),
+    );
+  }
+
   async setReaction(
     userId: string,
     raw: unknown,
@@ -570,6 +630,19 @@ function requiredGroupInvitePermission(
   throw new ChatError("bad_request", "Choose who can invite members.", 400);
 }
 
+function requiredDeviceToken(body: Record<string, unknown>): string {
+  const token = requiredText(body, "token", 4096);
+  if (token.length < 32 || /\s/u.test(token)) {
+    throw new ChatError("bad_request", "A valid notification device is required.", 400);
+  }
+  return token;
+}
+
+function requiredDevicePlatform(value: unknown): "android" | "ios" {
+  if (value === "android" || value === "ios") return value;
+  throw new ChatError("bad_request", "A supported notification device is required.", 400);
+}
+
 function requiredPhotoContentType(
   body: Record<string, unknown>,
 ): ChatPhotoContentType {
@@ -609,6 +682,23 @@ function optionalBoundedInteger(
 ): number | undefined {
   if (value === undefined || value === null) return undefined;
   return boundedInteger(value, minimum, minimum, maximum, label);
+}
+
+function boundedSignedInteger(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  label: string,
+): number {
+  if (!Number.isSafeInteger(value) ||
+      (value as number) < minimum || (value as number) > maximum) {
+    throw new ChatError(
+      "bad_request",
+      `${label} must be between ${minimum} and ${maximum}.`,
+      400,
+    );
+  }
+  return value as number;
 }
 
 function object(value: unknown): Record<string, unknown> {

@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -415,6 +416,50 @@ abstract interface class ChatGroupGateway {
   });
 }
 
+abstract interface class ChatNotificationGateway {
+  Future<ChatNotificationPreferences> getNotificationPreferences();
+  Future<ChatNotificationPreferences> updateNotificationPreferences(
+    ChatNotificationPreferences preferences,
+  );
+  Future<bool> registerNotificationDevice({
+    required String token,
+    required String platform,
+  });
+  Future<bool> unregisterNotificationDevice({required String token});
+}
+
+abstract interface class ChatNotificationClient {
+  Future<ChatNotificationPermission> permission({required bool request});
+  Future<String?> token();
+  String get platform;
+}
+
+class FirebaseChatNotificationClient implements ChatNotificationClient {
+  @override
+  String get platform => Platform.isIOS ? 'ios' : 'android';
+
+  @override
+  Future<ChatNotificationPermission> permission({required bool request}) async {
+    final settings = request
+        ? await FirebaseMessaging.instance.requestPermission(
+            alert: true,
+            badge: true,
+            sound: true,
+          )
+        : await FirebaseMessaging.instance.getNotificationSettings();
+    return switch (settings.authorizationStatus) {
+      AuthorizationStatus.authorized => ChatNotificationPermission.authorized,
+      AuthorizationStatus.provisional => ChatNotificationPermission.provisional,
+      AuthorizationStatus.denied || AuthorizationStatus.deniedPermanently =>
+        ChatNotificationPermission.denied,
+      AuthorizationStatus.notDetermined => ChatNotificationPermission.unknown,
+    };
+  }
+
+  @override
+  Future<String?> token() => FirebaseMessaging.instance.getToken();
+}
+
 abstract interface class ChatPhotoUploadTransport {
   Future<void> put({
     required Uri url,
@@ -544,7 +589,8 @@ class UnavailableChatGateway
         ChatGateway,
         ChatPrivacyGateway,
         ChatCallGateway,
-        ChatGroupGateway {
+        ChatGroupGateway,
+        ChatNotificationGateway {
   const UnavailableChatGateway();
 
   ChatServiceException get _error => const ChatServiceException(
@@ -681,6 +727,25 @@ class UnavailableChatGateway
     required String inviteId,
     required bool accepted,
   }) async => throw _error;
+
+  @override
+  Future<ChatNotificationPreferences> getNotificationPreferences() async =>
+      throw _error;
+
+  @override
+  Future<ChatNotificationPreferences> updateNotificationPreferences(
+    ChatNotificationPreferences preferences,
+  ) async => throw _error;
+
+  @override
+  Future<bool> registerNotificationDevice({
+    required String token,
+    required String platform,
+  }) async => throw _error;
+
+  @override
+  Future<bool> unregisterNotificationDevice({required String token}) async =>
+      throw _error;
 }
 
 class AuthenticatedChatGateway
@@ -690,7 +755,8 @@ class AuthenticatedChatGateway
         ChatAttachmentGateway,
         ChatPrivacyGateway,
         ChatCallGateway,
-        ChatGroupGateway {
+        ChatGroupGateway,
+        ChatNotificationGateway {
   AuthenticatedChatGateway({
     required Uri endpoint,
     required this.credentials,
@@ -1184,6 +1250,52 @@ class AuthenticatedChatGateway
     return value['accepted'] == true;
   }
 
+  @override
+  Future<ChatNotificationPreferences> getNotificationPreferences() async =>
+      _decodeNotificationPreferences(
+        _map(await _invoke('getNotificationPreferences', body: const {})),
+      );
+
+  @override
+  Future<ChatNotificationPreferences> updateNotificationPreferences(
+    ChatNotificationPreferences preferences,
+  ) async => _decodeNotificationPreferences(
+    _map(
+      await _invoke(
+        'updateNotificationPreferences',
+        limitedUseAppCheck: true,
+        body: _encodeNotificationPreferences(preferences),
+      ),
+    ),
+  );
+
+  @override
+  Future<bool> registerNotificationDevice({
+    required String token,
+    required String platform,
+  }) async {
+    final value = _map(
+      await _invoke(
+        'registerNotificationDevice',
+        limitedUseAppCheck: true,
+        body: {'token': token, 'platform': platform},
+      ),
+    );
+    return value['registered'] == true;
+  }
+
+  @override
+  Future<bool> unregisterNotificationDevice({required String token}) async {
+    final value = _map(
+      await _invoke(
+        'unregisterNotificationDevice',
+        limitedUseAppCheck: true,
+        body: {'token': token},
+      ),
+    );
+    return value['registered'] == true;
+  }
+
   Future<Object?> _invoke(
     String operation, {
     required Map<String, Object?> body,
@@ -1337,6 +1449,35 @@ ChatGroupInvite _decodeGroupInvite(Map<String, Object?> data) =>
       invitedByName: _requiredString(data['invitedByName']),
       invitedAt: _requiredDateTime(data['invitedAt']),
     );
+
+ChatNotificationPreferences _decodeNotificationPreferences(
+  Map<String, Object?> data,
+) => ChatNotificationPreferences(
+  messagesEnabled: data['messagesEnabled'] == true,
+  callsEnabled: data['callsEnabled'] == true,
+  groupInvitesEnabled: data['groupInvitesEnabled'] == true,
+  showPreview: data['showPreview'] == true,
+  quietHoursEnabled: data['quietHoursEnabled'] == true,
+  quietStartMinutes: _integer(data['quietStartMinutes']),
+  quietEndMinutes: _integer(data['quietEndMinutes']),
+  utcOffsetMinutes: data['utcOffsetMinutes'] is int
+      ? data['utcOffsetMinutes']! as int
+      : 0,
+  updatedAt: _optionalDateTime(data['updatedAt']),
+);
+
+Map<String, Object?> _encodeNotificationPreferences(
+  ChatNotificationPreferences preferences,
+) => {
+  'messagesEnabled': preferences.messagesEnabled,
+  'callsEnabled': preferences.callsEnabled,
+  'groupInvitesEnabled': preferences.groupInvitesEnabled,
+  'showPreview': preferences.showPreview,
+  'quietHoursEnabled': preferences.quietHoursEnabled,
+  'quietStartMinutes': preferences.quietStartMinutes,
+  'quietEndMinutes': preferences.quietEndMinutes,
+  'utcOffsetMinutes': preferences.utcOffsetMinutes,
+};
 
 ChatPrivacySettings _decodePrivacySettings(Map<String, Object?> data) =>
     ChatPrivacySettings(

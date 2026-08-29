@@ -63,6 +63,32 @@ export interface ChatGroupInviteRecord {
   invitedAt: string;
 }
 
+export interface ChatNotificationPreferences {
+  messagesEnabled: boolean;
+  callsEnabled: boolean;
+  groupInvitesEnabled: boolean;
+  showPreview: boolean;
+  quietHoursEnabled: boolean;
+  quietStartMinutes: number;
+  quietEndMinutes: number;
+  utcOffsetMinutes: number;
+  updatedAt: string;
+}
+
+export type ChatNotificationCategory = "message" | "call" | "group_invite";
+
+export interface ChatNotificationEvent {
+  category: ChatNotificationCategory;
+  recipientUserIds: string[];
+  title: string;
+  preview: string;
+  data: Readonly<Record<string, string>>;
+}
+
+export interface ChatNotificationDispatcher {
+  dispatch(event: ChatNotificationEvent): Promise<void>;
+}
+
 export type ChatMessagePermission = "everyone" | "connections" | "nobody";
 export type ChatMessageRequestStatus = "pending" | "accepted";
 
@@ -323,6 +349,22 @@ export interface ChatRepository {
     inviteId: string,
     accepted: boolean,
   ): Promise<{ inviteId: string; accepted: boolean; threadId: string }>;
+  getNotificationPreferences?(
+    userId: string,
+  ): Promise<ChatNotificationPreferences>;
+  updateNotificationPreferences?(
+    userId: string,
+    preferences: Omit<ChatNotificationPreferences, "updatedAt">,
+  ): Promise<ChatNotificationPreferences>;
+  registerNotificationDevice?(
+    userId: string,
+    token: string,
+    platform: "android" | "ios",
+  ): Promise<{ registered: boolean }>;
+  unregisterNotificationDevice?(
+    userId: string,
+    token: string,
+  ): Promise<{ registered: boolean }>;
   setReaction(
     actor: ChatProfile,
     threadId: string,

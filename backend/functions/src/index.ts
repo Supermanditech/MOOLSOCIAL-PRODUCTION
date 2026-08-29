@@ -6,6 +6,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getDataConnect } from "firebase-admin/data-connect";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
@@ -116,6 +117,7 @@ import { GoogleCloudStorageChatPhotoStore } from "./chat/attachment_store.js";
 import { GoogleCloudStorageChatAttachmentStore } from "./chat/media_store.js";
 import { FirestoreChatRepository } from "./chat/firestore_store.js";
 import { ChatService } from "./chat/service.js";
+import { FirebaseChatNotificationDispatcher } from "./chat/notification_dispatcher.js";
 import { SocialContentError } from "./social/contracts.js";
 import { FirestoreSocialContentRepository } from "./social/firestore_store.js";
 import { verifySocialInvocation } from "./social/request_security.js";
@@ -384,6 +386,7 @@ function chatService(): ChatService {
       undefined,
       new GoogleCloudStorageChatPhotoStore(getStorage().bucket()),
       new GoogleCloudStorageChatAttachmentStore(getStorage().bucket()),
+      new FirebaseChatNotificationDispatcher(getFirestore(), getMessaging()),
     ),
     resolveChatProfile,
   );
@@ -2671,6 +2674,9 @@ export const moolSocialChat = onRequest(
         operation === "updateGroupPermissions" ||
         operation === "leaveGroup" ||
         operation === "respondToGroupInvite";
+      const notificationMutation = operation === "updateNotificationPreferences" ||
+        operation === "registerNotificationDevice" ||
+        operation === "unregisterNotificationDevice";
       const ownerUserId = await verifySocialInvocation(
         request.headers,
         {
@@ -2681,7 +2687,8 @@ export const moolSocialChat = onRequest(
             ),
           verifyIdToken: async (token) => getAuth().verifyIdToken(token),
         },
-        mutation || callMutation || attachmentMutation || groupMutation,
+        mutation || callMutation || attachmentMutation || groupMutation ||
+          notificationMutation,
         true,
       );
       if (!ownerUserId) {
@@ -2715,6 +2722,14 @@ export const moolSocialChat = onRequest(
                 ? await chatService().listGroupInvites(ownerUserId, body)
               : operation === "respondToGroupInvite"
                 ? await chatService().respondToGroupInvite(ownerUserId, body)
+              : operation === "getNotificationPreferences"
+                ? await chatService().getNotificationPreferences(ownerUserId, body)
+              : operation === "updateNotificationPreferences"
+                ? await chatService().updateNotificationPreferences(ownerUserId, body)
+              : operation === "registerNotificationDevice"
+                ? await chatService().registerNotificationDevice(ownerUserId, body)
+              : operation === "unregisterNotificationDevice"
+                ? await chatService().unregisterNotificationDevice(ownerUserId, body)
               : operation === "setReaction"
                 ? await chatService().setReaction(ownerUserId, body)
                 : operation === "forwardMessage"

@@ -11,6 +11,7 @@ import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
 import 'chat_privacy_screens.dart';
 import 'chat_group_invites_screen.dart';
+import 'chat_notification_settings_screen.dart';
 
 class ChatSettingsScreen extends StatefulWidget {
   const ChatSettingsScreen({
@@ -51,21 +52,6 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
           content: Text(message),
         ),
       );
-  }
-
-  void _showAccountRecovery({
-    required String keyName,
-    required String title,
-    required String message,
-  }) {
-    unawaited(
-      showChatUnavailableCapability(
-        context,
-        keyName: keyName,
-        title: title,
-        message: message,
-      ),
-    );
   }
 
   Future<void> _savePrivacy(
@@ -347,13 +333,14 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                       keyName: 'chat-settings-notifications',
                       icon: Icons.notifications_active_outlined,
                       title: 'Notifications and quiet hours',
-                      subtitle:
-                          'Device and account settings · current choices stay unchanged.',
-                      onTap: () => _showAccountRecovery(
-                        keyName: 'chat-notifications-recovery',
-                        title: 'Notification settings unavailable',
-                        message:
-                            'Notifications and quiet hours cannot be opened right now. Your device and account choices stay unchanged. You can still quiet one conversation from the Chat list.',
+                      subtitle: 'Choose alerts, previews and a quiet schedule.',
+                      onTap: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ChatNotificationSettingsScreen(
+                            session: session,
+                            originReturnRoute: widget.originReturnRoute,
+                          ),
+                        ),
                       ),
                     ),
                     const _ChatSettingsScopeNote(

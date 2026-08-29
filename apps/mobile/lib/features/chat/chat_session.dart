@@ -10,6 +10,7 @@ class ChatSession extends ChangeNotifier {
     this._attachmentPicker,
     this._voiceRecorder,
     this._attachmentPlayback,
+    this._notificationClient,
   }) : _gateway = null,
        _reviewSendGateway = sendGateway ?? ReviewChatSendGateway() {
     _threads.addAll(reviewThreads);
@@ -216,13 +217,16 @@ class ChatSession extends ChangeNotifier {
     ChatAttachmentPicker? attachmentPicker,
     ChatVoiceRecorder? voiceRecorder,
     ChatAttachmentPlayback? attachmentPlayback,
+    ChatNotificationClient? notificationClient,
   }) : _gateway = gateway ?? buildChatGateway(),
        _reviewSendGateway = null,
        _photoPicker = photoPicker ?? NativeChatPhotoPicker(),
        _attachmentPicker = attachmentPicker ?? NativeChatAttachmentPicker(),
        _voiceRecorder = voiceRecorder ?? NativeChatVoiceRecorder(),
        _attachmentPlayback =
-           attachmentPlayback ?? NativeChatAttachmentPlayback();
+           attachmentPlayback ?? NativeChatAttachmentPlayback(),
+       _notificationClient =
+           notificationClient ?? FirebaseChatNotificationClient();
 
   final ChatGateway? _gateway;
   final ChatSendGateway? _reviewSendGateway;
@@ -230,6 +234,7 @@ class ChatSession extends ChangeNotifier {
   final ChatAttachmentPicker? _attachmentPicker;
   final ChatVoiceRecorder? _voiceRecorder;
   final ChatAttachmentPlayback? _attachmentPlayback;
+  final ChatNotificationClient? _notificationClient;
   final List<ChatThread> _threads = [];
   final Map<String, List<ChatMessage>> _messages = {};
   final Map<String, String> _messageLoadErrors = {};
@@ -274,6 +279,14 @@ class ChatSession extends ChangeNotifier {
   final List<ChatGroupInvite> _groupInvites = [];
   bool groupLoading = false;
   String? groupError;
+  ChatNotificationPreferences _notificationPreferences =
+      ChatNotificationPreferences.defaults();
+  ChatNotificationPermission notificationPermission =
+      ChatNotificationPermission.unknown;
+  bool notificationLoading = false;
+  bool notificationLoaded = false;
+  String? notificationError;
+  String? _registeredNotificationToken;
   int _messageSequence = 10;
 
   static const reviewThreads = <ChatThread>[
@@ -1494,6 +1507,153 @@ class ChatSession extends ChangeNotifier {
     }
   }
 
+  ChatNotificationGateway? get _notificationGateway =>
+      _gateway is ChatNotificationGateway
+      ? _gateway as ChatNotificationGateway
+      : null;
+
+  ChatNotificationPreferences get notificationPreferences =>
+      _notificationPreferences;
+
+  bool get deviceNotificationsRegistered =>
+      _registeredNotificationToken != null;
+
+  Future<bool> loadNotificationPreferences({bool refresh = false}) async {
+    if (notificationLoading || (notificationLoaded && !refresh)) {
+      return notificationLoaded;
+    }
+    final gateway = _notificationGateway;
+    if (gateway == null) {
+      notificationLoaded = _gateway == null;
+      return notificationLoaded;
+    }
+    notificationLoading = true;
+    notificationError = null;
+    notifyListeners();
+    try {
+      _notificationPreferences = await gateway.getNotificationPreferences();
+      notificationPermission =
+          await _notificationClient?.permission(request: false) ??
+          ChatNotificationPermission.unknown;
+      notificationLoaded = true;
+      return true;
+    } on ChatServiceException catch (error) {
+      notificationError = error.userMessage;
+      return false;
+    } on Object {
+      notificationError = 'Notification settings could not load. Try again.';
+      return false;
+    } finally {
+      notificationLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateNotificationPreferences(
+    ChatNotificationPreferences requested,
+  ) async {
+    if (notificationLoading) return false;
+    final gateway = _notificationGateway;
+    if (gateway == null && _gateway == null) {
+      _notificationPreferences = requested;
+      notificationLoaded = true;
+      notifyListeners();
+      return true;
+    }
+    if (gateway == null) return false;
+    final previous = _notificationPreferences;
+    notificationLoading = true;
+    notificationError = null;
+    notifyListeners();
+    try {
+      _notificationPreferences = await gateway.updateNotificationPreferences(
+        requested,
+      );
+      notificationLoaded = true;
+      return true;
+    } on ChatServiceException catch (error) {
+      _notificationPreferences = previous;
+      notificationError = error.userMessage;
+      return false;
+    } on Object {
+      _notificationPreferences = previous;
+      notificationError =
+          'Notification settings could not update. Nothing changed.';
+      return false;
+    } finally {
+      notificationLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> enableDeviceNotifications() async {
+    final client = _notificationClient;
+    final gateway = _notificationGateway;
+    if (client == null || gateway == null || notificationLoading) return false;
+    notificationLoading = true;
+    notificationError = null;
+    notifyListeners();
+    try {
+      notificationPermission = await client.permission(request: true);
+      if (notificationPermission != ChatNotificationPermission.authorized &&
+          notificationPermission != ChatNotificationPermission.provisional) {
+        notificationError =
+            'Notifications are off in device settings. Your Chat choices remain saved.';
+        return false;
+      }
+      final token = await client.token();
+      if (token == null || token.trim().isEmpty) {
+        throw const ChatServiceException(
+          'This device could not register for notifications. Try again.',
+          retryable: true,
+        );
+      }
+      final registered = await gateway.registerNotificationDevice(
+        token: token,
+        platform: client.platform,
+      );
+      if (!registered) {
+        throw const ChatServiceException(
+          'This device could not register for notifications. Try again.',
+        );
+      }
+      _registeredNotificationToken = token;
+      return true;
+    } on ChatServiceException catch (error) {
+      notificationError = error.userMessage;
+      return false;
+    } on Object {
+      notificationError = 'This device could not enable notifications.';
+      return false;
+    } finally {
+      notificationLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> disableDeviceNotifications() async {
+    final token = _registeredNotificationToken;
+    final gateway = _notificationGateway;
+    if (token == null || gateway == null || notificationLoading) return false;
+    notificationLoading = true;
+    notificationError = null;
+    notifyListeners();
+    try {
+      await gateway.unregisterNotificationDevice(token: token);
+      _registeredNotificationToken = null;
+      return true;
+    } on ChatServiceException catch (error) {
+      notificationError = error.userMessage;
+      return false;
+    } on Object {
+      notificationError = 'This device could not disable notifications.';
+      return false;
+    } finally {
+      notificationLoading = false;
+      notifyListeners();
+    }
+  }
+
   bool chatAvailableForConversationInSession(String threadId) =>
       _chatAvailableForSession[threadId] ?? true;
 
@@ -2213,6 +2373,12 @@ class ChatSession extends ChangeNotifier {
     _groupInvites.clear();
     groupLoading = false;
     groupError = null;
+    _notificationPreferences = ChatNotificationPreferences.defaults();
+    notificationPermission = ChatNotificationPermission.unknown;
+    notificationLoading = false;
+    notificationLoaded = false;
+    notificationError = null;
+    _registeredNotificationToken = null;
     selectedFilter = null;
     unreadOnly = false;
     noticeMessage = null;
