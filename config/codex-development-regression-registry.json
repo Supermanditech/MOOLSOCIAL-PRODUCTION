@@ -44313,6 +44313,16 @@
       "prevention": "Bind clean Child 9, apply and verify the identical three-owner diff, stage exactly those owners, confirm zero unstaged change for them, then run pre_commit before committing.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart", "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart", "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD9-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3913-SHARED-BUY-MERGE-TREE-INLINE-ANCESTRY-PARSER-ERROR",
+      "status": "registered_separate_ancestry_exit_assignments_required",
+      "appliesTo": ["primary", "coordination", "integration", "git", "tooling", "chat"],
+      "mistake": "The first read-only shared-Chat/Buy merge-tree audit embedded git ancestry commands and LASTEXITCODE assignments inside object-property parentheses, and PowerShell rejected the command before Git ran.",
+      "rootCause": "Shell command execution and exit-code capture were composed as inline expressions that PowerShell does not parse inside a hashtable value.",
+      "prevention": "Bind clean Child 10, run merge-base and each ancestry probe as separate statements with separately captured exit codes, run classic merge-tree without an exit-sensitive write-tree operation, and report conflict markers from the retained output.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD10-20260829.md"]
     }
   ]
 }
