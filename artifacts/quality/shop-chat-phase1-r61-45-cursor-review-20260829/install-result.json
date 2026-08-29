@@ -1,0 +1,30 @@
+{
+  "schema": "moolsocial_shop_chat_phase1_r61_45_install_v1",
+  "candidateId": "UAW-SHOP-CHAT-PHASE1-R61.45-CURSOR-UI-REVIEW-20260829",
+  "device": "TG8HCYTGGQT885OF",
+  "package": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r61.45-cursorreview",
+  "versionCode": "2026082847",
+  "builtBytes": 206457919,
+  "installedBytes": 206457919,
+  "builtSha256": "A856DD75E05C26BE3D978E8ACCB9D465123587BC5726A9AF3D3FEFD54F1B0B3F",
+  "installedSha256": "A856DD75E05C26BE3D978E8ACCB9D465123587BC5726A9AF3D3FEFD54F1B0B3F",
+  "byteIdentical": true,
+  "coldLaunch": "passed",
+  "sharedChatCommit": "29aa8efec4b1a2d09881a96871aafe394f506920",
+  "buyCommit": "51c3665837d5a2c84b6862bff0f029fa9c8e6a5a",
+  "integratedHead": "1f4b0ab1822e889c3493890b908214bcde4fe17c",
+  "journey": {
+    "order": "MS-240782",
+    "intent": "Where is my order?",
+    "ordersFilter": "passed",
+    "prefilledDraft": "passed",
+    "threadToInboxBack": "passed",
+    "inboxToExactAssistBack": "passed"
+  },
+  "oppoTouched": false,
+  "runtimePackageTouched": false,
+  "backendTouched": false,
+  "firebaseConfigured": false,
+  "androidConfigurationTouched": false
+}
