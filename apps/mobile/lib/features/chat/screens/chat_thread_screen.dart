@@ -14,6 +14,7 @@ import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
 import 'chat_conversation_search_screen.dart';
 import 'chat_settings_screen.dart';
+import 'chat_shared_content_screen.dart';
 
 class ChatThreadScreen extends StatefulWidget {
   const ChatThreadScreen({
@@ -684,23 +685,47 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
               const SizedBox(height: 16),
               _ConversationSettingsSection(
                 title: 'Across Chat',
-                child: ListTile(
-                  key: const Key('chat-info-open-global-settings'),
-                  minLeadingWidth: 28,
-                  leading: const Icon(Icons.tune_rounded),
-                  title: const Text('Chat settings'),
-                  subtitle: const Text(
-                    'Manage messages, calls, peace of mind, privacy and spam controls.',
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ChatSettingsScreen(
-                        session: session,
-                        originReturnRoute: widget.originReturnRoute,
+                child: Column(
+                  children: [
+                    ListTile(
+                      key: const Key('chat-info-open-global-settings'),
+                      minLeadingWidth: 28,
+                      leading: const Icon(Icons.tune_rounded),
+                      title: const Text('Chat settings'),
+                      subtitle: const Text(
+                        'Manage messages, calls, peace of mind, privacy and spam controls.',
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ChatSettingsScreen(
+                            session: session,
+                            originReturnRoute: widget.originReturnRoute,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const Divider(height: 1),
+                    ListTile(
+                      key: const Key('chat-info-shared-content'),
+                      minLeadingWidth: 28,
+                      leading: const Icon(Icons.perm_media_outlined),
+                      title: const Text('Media, files and links'),
+                      subtitle: const Text(
+                        'Browse content currently loaded in this conversation.',
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ChatSharedContentScreen(
+                            session: session,
+                            threadId: thread.id,
+                            originReturnRoute: widget.originReturnRoute,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),
