@@ -1,0 +1,28 @@
+{
+  "schema":"moolsocial_shop_chat_single_surface_r61_47_install_v1",
+  "candidateId":"UAW-SHOP-CHAT-SINGLE-SURFACE-R61.47-CURSOR-UI-REVIEW-20260829",
+  "device":"TG8HCYTGGQT885OF",
+  "package":"com.moolsocial.app.cursorreview",
+  "versionName":"1.0.0-r61.47-cursorreview",
+  "versionCode":"2026082849",
+  "apkBytes":206455879,
+  "apkSha256":"6E765D50B3A8CEA49F6D572FB44A598CAAD9403EA326A66974D20AE8D0C0442F",
+  "installedByteIdentical":true,
+  "coldLaunch":"passed",
+  "sourceCommit":"46665bbfe642b0d2d96e24544dd6ea7b5b98bad5",
+  "sharedChatBaseline":"29aa8efec4b1a2d09881a96871aafe394f506920",
+  "checks": {
+    "buyDuplicateChatSurface":"absent",
+    "moolSocialAssistInsideSharedChat":"passed",
+    "singleComposer":"passed",
+    "duplicateSearchFrame":"absent",
+    "orderPromptAppend":"passed",
+    "directBackToTracking":"passed",
+    "fullAssistTitleVisible":"passed"
+  },
+  "oppoTouched":false,
+  "runtimePackageTouched":false,
+  "backendTouched":false,
+  "firebaseConfigurationTouched":false,
+  "androidConfigurationTouched":false
+}

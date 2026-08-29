@@ -1,0 +1,15 @@
+CandidateId=UAW-SHOP-CHAT-SINGLE-SURFACE-R61.46-CURSOR-UI-REVIEW-20260829
+RuntimeProfile=CursorUiReview
+RuntimeDefines=CursorUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-SHOP-CHAT-SINGLE-SURFACE-R61.46-CURSOR-UI-REVIEW-20260829;AndroidDebugPackage=cursorreview;Promotable=false
+Version=1.0.0-r61.46
+VersionCode=2026082848
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-chat-single-assist-fix1-20260829\config\apk-regression-gate-state-shop-chat-r61-46.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-chat-single-assist-fix1-20260829\config\apk-regression-gate-state-shop-chat-r61-46.json
+Branch=work/integration-repair/shop-chat-single-assist-fix1-20260829
+HEAD=0815c9ff655460c298edac3f869beb26b4b1751a
+SourceFingerprint=A3FC134C76B2F71C7FF1EB41DEA39E8EC05C93EFD828B33C660833CB180617DE
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-chat-single-assist-fix1-20260829\artifacts\quality\shop-chat-single-surface-r61-46-cursor-review-20260829\uaw-shop-chat-single-surface-r61.46-cursor-ui-review-20260829-device-review-debug.apk
+Bytes=206455999
+SHA256=A8B85DEF622C951C684E27A57962D3C022F7DAA73E3EB2718BB2CD8844CABF8B
+BuiltAt=2026-08-29T13:52:49.9335461+05:30

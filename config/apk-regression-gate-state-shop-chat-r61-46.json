@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "device_rejected_fitment_successor_required",
+  "buildAuthorization": "consumed_passed",
+  "preBuildValidation": {
+    "state": "passed",
+    "evidence": "artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"
+  },
+  "candidate": {
+    "id": "UAW-SHOP-CHAT-SINGLE-SURFACE-R61.46-CURSOR-UI-REVIEW-20260829",
+    "versionName": "1.0.0-r61.46",
+    "versionCode": "2026082848",
+    "buildMode": "debug",
+    "gateProfile": "uaw_cursor_ui_review_debug",
+    "branch": "work/integration-repair/shop-chat-single-assist-fix1-20260829",
+    "head": "0815c9ff655460c298edac3f869beb26b4b1751a"
+  },
+  "source": {
+    "manifestPath": "artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/shop-chat-r61-46-source-manifest.txt",
+    "manifestSha256": "A3FC134C76B2F71C7FF1EB41DEA39E8EC05C93EFD828B33C660833CB180617DE",
+    "fileCount": 641
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-SHOP-CHAT-SINGLE-SURFACE-R61.46-CURSOR-UI-REVIEW-20260829"
+  },
+  "promotion": {"state": "forbidden_non_promotable"},
+  "preBuildGates": [
+    {"id":"branch-head","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"]},
+    {"id":"source-manifest","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/shop-chat-r61-46-source-manifest.txt"]},
+    {"id":"format-analysis","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"]},
+    {"id":"focused-tests","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"]},
+    {"id":"positive-release-gates","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"]},
+    {"id":"protected-boundary-disposition","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"]},
+    {"id":"rejected-candidate-preserved","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"]},
+    {"id":"startup-config-regression-registered","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"]},
+    {"id":"buy-regression-1","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"]},
+    {"id":"buy-regression-2","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"]},
+    {"id":"clean-state-regression","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"]},
+    {"id":"wrapper-self-test","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"]},
+    {"id":"package-isolation","state":"passed","evidence":["artifacts/quality/shop-chat-single-surface-r61-46-cursor-review-20260829/prebuild-validation.md"]}
+  ],
+  "premiumMotionPolicy": {
+    "state": "prewrite_audited_no_motion_change",
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "candidateContract": "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-PHASE1-GAP-V1-20260829.md",
+    "disposition": "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-PHASE1-GAP-V1-20260829.md",
+    "applied": [],
+    "reused": ["authoritative_shared_chat_motion", "approved_buy_navigation_motion"],
+    "dependencyHeld": ["backend_chat_delivery"],
+    "inapplicable": ["duplicate_buy_chat_motion"]
+  }
+}
