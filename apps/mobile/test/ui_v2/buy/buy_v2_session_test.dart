@@ -1648,6 +1648,31 @@ void main() {
         );
 
         fixture.session.acceptCheckoutPriceChanges();
+        final currentLine = fixture.session.checkoutLines.single;
+        fixture.adapter.placement = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          customerMessage: 'Your order is confirmed.',
+          purchaseReference: 'BUY-SERVER-1',
+          orders: [
+            BuyV2Order(
+              id: fixture.order.id,
+              destination: fixture.order.destination,
+              title: fixture.order.title,
+              itemSummary: fixture.order.itemSummary,
+              total: currentLine.total,
+              partner: fixture.order.partner,
+              partnerType: fixture.order.partnerType,
+              promise: fixture.order.promise,
+              destinationLabel: fixture.order.destinationLabel,
+              progress: fixture.order.progress,
+              status: fixture.order.status,
+              purchaseId: fixture.order.purchaseId,
+              productIds: [currentLine.product.id],
+              lines: [currentLine],
+              paymentMethod: fixture.order.paymentMethod,
+            ),
+          ],
+        );
         expect(await fixture.session.submitOrder(), isTrue);
         expect(fixture.adapter.placementCalls, 1);
       },
