@@ -4,10 +4,13 @@ import 'work_models.dart';
 import 'work_services.dart';
 
 class WorkSession extends ChangeNotifier {
-  WorkSession({ReviewWorkGateway? gateway})
+  WorkSession({WorkGateway? gateway})
     : gateway = gateway ?? ReviewWorkGateway();
 
-  final ReviewWorkGateway gateway;
+  WorkSession.production({WorkGateway? gateway})
+    : gateway = gateway ?? buildWorkGateway();
+
+  final WorkGateway gateway;
 
   bool busy = false;
   String? errorMessage;
@@ -36,6 +39,9 @@ class WorkSession extends ChangeNotifier {
   WorkReviewStage reviewStage = WorkReviewStage.none;
   String? reviewCaseId;
   String? workspaceId;
+  String subscriptionPlan = 'free';
+  String? reviewReason;
+  String? _profileSubmissionKey;
   bool gstReminder = false;
   String gstin = '';
   bool gstAttachmentAdded = false;
@@ -54,6 +60,7 @@ class WorkSession extends ChangeNotifier {
   bool retailerHomeDelivery = false;
   bool retailerStoreCollection = false;
   bool retailerSetupSaved = false;
+  bool initialWorkspaceStateLoaded = false;
 
   List<WorkOpportunity> get filteredOpportunities {
     final normalized = searchQuery.trim().toLowerCase();
@@ -141,7 +148,16 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<void> refreshFeed() async {
-    await _run(gateway.loadFeed, success: 'Verified work is up to date.');
+    await _run(() async {
+      final records = await gateway.loadFeed();
+      _restoreWorkspaceState(records);
+      initialWorkspaceStateLoaded = true;
+    }, success: 'Verified work is up to date.');
+  }
+
+  Future<void> loadInitialWorkspaceState() async {
+    if (initialWorkspaceStateLoaded || busy) return;
+    await refreshFeed();
   }
 
   void toggleOpportunity(String id) {
@@ -214,6 +230,9 @@ class WorkSession extends ChangeNotifier {
     declarationAccepted = false;
     reviewCaseId = null;
     workspaceId = null;
+    subscriptionPlan = 'free';
+    reviewReason = null;
+    _profileSubmissionKey = null;
     reviewStage = WorkReviewStage.drafting;
     gstReminder = false;
     gstin = '';
@@ -412,7 +431,24 @@ class WorkSession extends ChangeNotifier {
     }
     return _runBool(
       () async {
-        reviewCaseId = await gateway.submitProfile();
+        final profile = selectedProfile!;
+        _profileSubmissionKey ??=
+            'work-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
+        final result = await gateway.submitProfile(
+          WorkProfileSubmission(
+            familyId: profile.familyId,
+            profileId: profile.id,
+            name: workName,
+            area: workArea,
+            primaryActivity: primaryActivity,
+            proofReferences: Map<String, String>.unmodifiable(addedProofs),
+            alternateMobileVerified: alternateVerified,
+            idempotencyKey: _profileSubmissionKey!,
+          ),
+        );
+        reviewCaseId = result.caseId;
+        subscriptionPlan = result.plan;
+        reviewReason = result.reason;
         reviewStage = WorkReviewStage.gstPending;
       },
       success:
@@ -449,7 +485,13 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     return _runBool(() async {
-      await gateway.submitGst();
+      final caseId = reviewCaseId;
+      if (caseId == null) {
+        throw const WorkGatewayException(
+          'Submit the work profile before adding GST proof.',
+        );
+      }
+      await gateway.submitGst(caseId, normalized);
       gstin = normalized;
       gstReminder = false;
     }, success: 'GST proof added to the active review.');
@@ -461,22 +503,64 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    return _runBool(
-      () async {
-        workspaceId = await gateway.checkReview();
-        reviewStage = WorkReviewStage.approved;
-        activeWorkspace = WorkWorkspace(
-          id: workspaceId!,
-          name: workName,
-          profileLabel: selectedProfile?.label ?? 'Work profile',
-          area: workArea,
-          verified: true,
-          gstReminder: gstReminder && gstin.isEmpty,
-        );
-      },
-      success:
-          'Work profile approved. Finish the exact setup before customers can see it.',
-    );
+    if (busy) return false;
+    busy = true;
+    clearMessages();
+    notifyListeners();
+    try {
+      final result = await gateway.checkReview(reviewCaseId!);
+      subscriptionPlan = result.plan;
+      reviewReason = result.reason;
+      switch (result.status) {
+        case WorkRemoteReviewStatus.pending:
+          reviewStage = WorkReviewStage.gstPending;
+          noticeMessage =
+              'Review is still in progress. Your personal account remains active.';
+          return true;
+        case WorkRemoteReviewStatus.rejected:
+          errorMessage = result.reason?.trim().isNotEmpty == true
+              ? result.reason
+              : 'This work profile needs changes before it can be approved.';
+          return false;
+        case WorkRemoteReviewStatus.suspended:
+          errorMessage = result.reason?.trim().isNotEmpty == true
+              ? result.reason
+              : 'This Workspace is temporarily unavailable. Contact MoolSocial Support.';
+          return false;
+        case WorkRemoteReviewStatus.approved:
+        case WorkRemoteReviewStatus.live:
+          final approvedWorkspaceId = result.workspaceId;
+          if (approvedWorkspaceId == null || approvedWorkspaceId.isEmpty) {
+            throw const WorkGatewayException(
+              'Approval was received without a Workspace. Try checking again.',
+              retryable: true,
+            );
+          }
+          workspaceId = approvedWorkspaceId;
+          reviewStage = result.status == WorkRemoteReviewStatus.live
+              ? WorkReviewStage.live
+              : WorkReviewStage.approved;
+          activeWorkspace = WorkWorkspace(
+            id: approvedWorkspaceId,
+            name: workName,
+            profileLabel: selectedProfile?.label ?? 'Work profile',
+            area: workArea,
+            verified: true,
+            gstReminder: gstReminder && gstin.isEmpty,
+          );
+          noticeMessage = result.status == WorkRemoteReviewStatus.live
+              ? 'Your Workspace is live.'
+              : 'Work profile approved. Finish the exact setup before customers can see it.';
+          return true;
+      }
+    } on WorkGatewayException catch (error) {
+      errorMessage = error.message;
+      noticeMessage = null;
+      return false;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
   }
 
   void beginRetailerSetup() {
@@ -549,7 +633,20 @@ class WorkSession extends ChangeNotifier {
     }
     return _runBool(
       () async {
-        await gateway.finishSetup();
+        final approvedWorkspaceId = workspaceId;
+        if (approvedWorkspaceId == null) {
+          throw const WorkGatewayException(
+            'Wait for Workspace approval before finishing setup.',
+          );
+        }
+        await gateway.finishSetup(
+          workspaceId: approvedWorkspaceId,
+          quantity: retailerQuantity,
+          buyPrice: retailerBuyPrice,
+          sellPrice: retailerSellPrice,
+          homeDelivery: retailerHomeDelivery,
+          storeCollection: retailerStoreCollection,
+        );
         retailerSetupSaved = true;
         reviewStage = WorkReviewStage.live;
       },
@@ -597,6 +694,78 @@ class WorkSession extends ChangeNotifier {
         ),
       ]);
     notifyListeners();
+  }
+
+  void _restoreWorkspaceState(List<WorkReviewResult> records) {
+    if (records.isEmpty) return;
+    WorkWorkspace? restoredActive;
+    final restoredOthers = <WorkWorkspace>[];
+    WorkReviewResult? pending;
+    for (final record in records) {
+      if (record.status == WorkRemoteReviewStatus.pending) {
+        pending ??= record;
+        continue;
+      }
+      if (record.status != WorkRemoteReviewStatus.approved &&
+          record.status != WorkRemoteReviewStatus.live) {
+        continue;
+      }
+      final id = record.workspaceId;
+      final name = record.name;
+      final area = record.area;
+      final profileId = record.profileId;
+      if (id == null || name == null || area == null || profileId == null) {
+        continue;
+      }
+      final option = workProfiles
+          .where((item) => item.id == profileId)
+          .firstOrNull;
+      if (option == null) continue;
+      final workspace = WorkWorkspace(
+        id: id,
+        name: name,
+        profileLabel: option.label,
+        area: area,
+        verified: true,
+      );
+      if (restoredActive == null ||
+          record.status == WorkRemoteReviewStatus.live) {
+        if (restoredActive != null) restoredOthers.add(restoredActive);
+        restoredActive = workspace;
+        selectedProfile = option;
+        workName = name;
+        workArea = area;
+        primaryActivity = record.primaryActivity ?? '';
+        reviewCaseId = record.caseId;
+        workspaceId = id;
+        subscriptionPlan = record.plan;
+        reviewStage = record.status == WorkRemoteReviewStatus.live
+            ? WorkReviewStage.live
+            : WorkReviewStage.approved;
+      } else {
+        restoredOthers.add(workspace);
+      }
+    }
+    if (restoredActive != null) {
+      activeWorkspace = restoredActive;
+      otherWorkspaces
+        ..clear()
+        ..addAll(restoredOthers);
+      return;
+    }
+    if (pending != null) {
+      final option = workProfiles
+          .where((item) => item.id == pending!.profileId)
+          .firstOrNull;
+      selectedProfile = option;
+      selectedFamilyId = option?.familyId;
+      workName = pending.name ?? workName;
+      workArea = pending.area ?? workArea;
+      primaryActivity = pending.primaryActivity ?? primaryActivity;
+      reviewCaseId = pending.caseId;
+      subscriptionPlan = pending.plan;
+      reviewStage = WorkReviewStage.gstPending;
+    }
   }
 
   Future<void> _run(

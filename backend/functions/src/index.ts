@@ -122,6 +122,11 @@ import { SocialContentError } from "./social/contracts.js";
 import { FirestoreSocialContentRepository } from "./social/firestore_store.js";
 import { verifySocialInvocation } from "./social/request_security.js";
 import { SocialContentService } from "./social/service.js";
+import {
+  FirestoreWorkspaceProfileRepository,
+  WorkspaceProfileError,
+  WorkspaceProfileService,
+} from "./workspace/workspace_profile_service.js";
 
 const youtubeServerApiKey = defineSecret("YOUTUBE_SERVER_API_KEY");
 const youtubeOauthClientId = defineSecret("YOUTUBE_OAUTH_CLIENT_ID");
@@ -157,6 +162,7 @@ let providerService: YouTubeProviderService | undefined;
 let providerStores: FirestoreYouTubeStores | undefined;
 let socialContentService: SocialContentService | undefined;
 let chatRuntimeService: ChatService | undefined;
+let workspaceProfileRuntimeService: WorkspaceProfileService | undefined;
 let xAuthRuntimeService: XPublicAuthBroker | undefined;
 let instagramAuthRuntimeService: InstagramPublicAuthBroker | undefined;
 let instagramMetaCallbackRuntimeService:
@@ -391,6 +397,14 @@ function chatService(): ChatService {
     resolveChatProfile,
   );
   return chatRuntimeService;
+}
+
+function workspaceProfileService(): WorkspaceProfileService {
+  if (workspaceProfileRuntimeService) return workspaceProfileRuntimeService;
+  workspaceProfileRuntimeService = new WorkspaceProfileService(
+    new FirestoreWorkspaceProfileRepository(getFirestore()),
+  );
+  return workspaceProfileRuntimeService;
 }
 
 function requiredEnvironment(name: string): string {
@@ -2796,6 +2810,124 @@ export const moolSocialChat = onRequest(
           code: chatError.code,
           message: chatError.message,
           retryable: chatError.retryable,
+        },
+      });
+    }
+  },
+);
+
+export const moolSocialWorkspace = onRequest(
+  {
+    region: "asia-south1",
+    timeoutSeconds: 60,
+    memory: "256MiB",
+    minInstances: 0,
+    maxInstances: 4,
+    concurrency: 40,
+    serviceAccount: socialContentRuntimeServiceAccount,
+  },
+  async (request, response) => {
+    const id = requestId(request.headers);
+    response.setHeader("cache-control", "no-store");
+    response.setHeader("x-content-type-options", "nosniff");
+    response.setHeader("x-request-id", id);
+    try {
+      if (request.method !== "POST") {
+        throw new WorkspaceProfileError(
+          "bad_request",
+          "Only POST requests are supported.",
+          405,
+        );
+      }
+      if (request.rawBody.byteLength > 64 * 1024) {
+        throw new WorkspaceProfileError(
+          "payload_too_large",
+          "The Workspace request is too large.",
+          413,
+        );
+      }
+      if (
+        request.body === null ||
+        typeof request.body !== "object" ||
+        Array.isArray(request.body)
+      ) {
+        throw new WorkspaceProfileError(
+          "bad_request",
+          "A valid request body is required.",
+          400,
+        );
+      }
+      const body = request.body as Record<string, unknown>;
+      const operation = typeof body.operation === "string"
+        ? body.operation.trim()
+        : "";
+      const mutation = operation === "submitProfile" ||
+        operation === "submitGst" ||
+        operation === "finishRetailerSetup";
+      const ownerUserId = await verifySocialInvocation(
+        request.headers,
+        {
+          verifyAppCheck: async (token, consume) =>
+            getAppCheck().verifyToken(
+              token,
+              consume ? { consume: true } : undefined,
+            ),
+          verifyIdToken: async (token) => getAuth().verifyIdToken(token),
+        },
+        mutation,
+        true,
+      );
+      if (!ownerUserId) {
+        throw new WorkspaceProfileError(
+          "authentication_required",
+          "Sign in to use Workspaces.",
+          401,
+        );
+      }
+      const service = workspaceProfileService();
+      const result = operation === "listWorkspaces"
+        ? await service.listWorkspaces(ownerUserId)
+        : operation === "submitProfile"
+          ? await service.submitProfile(ownerUserId, body)
+          : operation === "reviewStatus"
+            ? await service.reviewStatus(ownerUserId, body)
+            : operation === "submitGst"
+              ? await service.submitGst(ownerUserId, body)
+              : operation === "finishRetailerSetup"
+                ? await service.finishRetailerSetup(ownerUserId, body)
+                : (() => {
+                    throw new WorkspaceProfileError(
+                      "bad_request",
+                      "That Workspace action is not available yet.",
+                      400,
+                    );
+                  })();
+      logger.info("MoolSocial Workspace request completed.", {
+        operation,
+        requestId: id,
+      });
+      response.status(200).json({ ok: true, data: result });
+    } catch (error) {
+      const workspaceError = error instanceof WorkspaceProfileError ||
+          error instanceof SocialContentError
+        ? error
+        : new WorkspaceProfileError(
+            "internal",
+            "Workspace could not complete that request.",
+            500,
+            true,
+          );
+      logger.error("MoolSocial Workspace request failed.", {
+        requestId: id,
+        code: workspaceError.code,
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
+      response.status(workspaceError.httpStatus).json({
+        ok: false,
+        error: {
+          code: workspaceError.code,
+          message: workspaceError.message,
+          retryable: workspaceError.retryable,
         },
       });
     }

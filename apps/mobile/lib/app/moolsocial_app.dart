@@ -125,7 +125,8 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   late final RideSession _rideSession = widget.rideSession ?? RideSession();
   late final SharedSession _sharedSession =
       widget.sharedSession ?? SharedSession();
-  late final WorkSession _workSession = widget.workSession ?? WorkSession();
+  late final WorkSession _workSession =
+      widget.workSession ?? WorkSession.production();
   late final LaunchPresentationGate _launchPresentationGate =
       LaunchPresentationGate();
   late final LaunchInterruptionGuard _launchInterruptionGuard =

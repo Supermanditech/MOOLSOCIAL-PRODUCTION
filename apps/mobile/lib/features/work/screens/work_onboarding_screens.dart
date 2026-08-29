@@ -10,10 +10,25 @@ import '../work_session.dart';
 
 const _workAccent = Color(0xFF4D46A8);
 
-class MyWorkScreen extends StatelessWidget {
+class MyWorkScreen extends StatefulWidget {
   const MyWorkScreen({required this.session, super.key});
 
   final WorkSession session;
+
+  @override
+  State<MyWorkScreen> createState() => _MyWorkScreenState();
+}
+
+class _MyWorkScreenState extends State<MyWorkScreen> {
+  WorkSession get session => widget.session;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) session.loadInitialWorkspaceState();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +99,10 @@ class MyWorkScreen extends StatelessWidget {
                 const SizedBox(height: MoolSpacing.md),
               ],
               if (workspace == null)
-                _NewWorkState(session: session)
+                session.reviewStage == WorkReviewStage.gstPending &&
+                        session.reviewCaseId != null
+                    ? _PendingWorkState(session: session)
+                    : _NewWorkState(session: session)
               else ...[
                 _ActiveWorkspaceCard(workspace: workspace),
                 const SizedBox(height: MoolSpacing.md),
@@ -171,6 +189,49 @@ class MyWorkScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _PendingWorkState extends StatelessWidget {
+  const _PendingWorkState({required this.session});
+
+  final WorkSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkCard(
+      color: const Color(0xFFFFF4E5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const WorkPill(
+            label: 'Review in progress',
+            color: MoolColors.orange,
+            icon: Icons.schedule_rounded,
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          Text(
+            session.workName.isEmpty ? 'Work profile' : session.workName,
+            style: const TextStyle(
+              color: MoolColors.ink,
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            'Free plan · ${session.reviewCaseId}',
+            style: const TextStyle(color: MoolColors.muted),
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          WorkPrimaryButton(
+            keyName: 'my-work-open-pending-review',
+            label: 'Check review',
+            onPressed: () => context.go('/app/work/status'),
+            icon: Icons.arrow_forward_rounded,
+          ),
+        ],
+      ),
     );
   }
 }
