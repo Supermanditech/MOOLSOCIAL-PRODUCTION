@@ -30,6 +30,7 @@ import 'features/chat/chat_session.dart';
 import 'features/journey01/journey_services.dart';
 import 'features/journey01/journey_session.dart';
 import 'features/journey01/review_journey_services.dart';
+import 'features/retailer/retailer_session.dart';
 import 'features/shared/social_content_gateway.dart';
 import 'features/shared/social_create_draft_media_store.dart';
 import 'features/shared/social_create_draft_repository.dart';
@@ -37,6 +38,7 @@ import 'features/shared/youtube_public_catalogue_repository.dart';
 import 'features/shared/youtube_public_search_state_repository.dart';
 import 'features/shared/youtube_public_short_state_repository.dart';
 import 'features/shared/youtube_public_watch_state_repository.dart';
+import 'features/work/work_session.dart';
 import 'ui_v2/social/social_v2_youtube_public_runtime.dart';
 
 const _localFirebaseOptions = FirebaseOptions(
@@ -1040,8 +1042,12 @@ Future<void> main() async {
     MoolSocialApp(
       session: session,
       chatSession: ChatSession.production(),
+      retailerSession: RetailerSession.production(),
+      workSession: WorkSession.production(),
       disposeSession: true,
       disposeChatSession: true,
+      disposeRetailerSession: true,
+      disposeWorkSession: true,
       onAuthenticatedBoundary: bindYouTubeSearchStateToCurrentPrincipal,
       initialLocation:
           youtubeInitialLocation ??

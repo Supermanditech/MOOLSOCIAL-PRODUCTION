@@ -11,9 +11,8 @@ import 'package:moolsocial/features/work/work_session.dart';
 
 void main() {
   test('release app defaults to the fail-closed production Work session', () {
-    final source = File('lib/app/moolsocial_app.dart').readAsStringSync();
-    expect(source, contains('widget.workSession ?? WorkSession.production()'));
-    expect(source, isNot(contains('widget.workSession ?? WorkSession();')));
+    final source = File('lib/main.dart').readAsStringSync();
+    expect(source, contains('workSession: WorkSession.production(),'));
   });
 
   test(

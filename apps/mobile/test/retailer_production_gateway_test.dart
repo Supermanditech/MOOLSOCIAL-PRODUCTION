@@ -10,15 +10,8 @@ import 'package:moolsocial/features/shared/social_content_gateway.dart';
 
 void main() {
   test('release app uses fail-closed production retailer state', () {
-    final source = File('lib/app/moolsocial_app.dart').readAsStringSync();
-    expect(
-      source,
-      contains('widget.retailerSession ?? RetailerSession.production()'),
-    );
-    expect(
-      source,
-      isNot(contains('widget.retailerSession ?? RetailerSession();')),
-    );
+    final source = File('lib/main.dart').readAsStringSync();
+    expect(source, contains('retailerSession: RetailerSession.production(),'));
   });
 
   test(
