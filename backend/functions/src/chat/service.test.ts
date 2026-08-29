@@ -9,6 +9,8 @@ import {
   type ChatCallRecord,
   type ChatAttachmentKind,
   type ChatAttachmentUploadGrant,
+  type ChatGroupInfoRecord,
+  type ChatGroupInviteRecord,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
   type ChatProfile,
@@ -383,6 +385,29 @@ test("binds document video and voice delivery to one validated upload", async ()
   );
 });
 
+test("binds group membership permissions invites and leave to one thread", async () => {
+  const repository = new FakeChatRepository();
+  const service = createService(repository);
+  const info = await service.getGroupInfo(actor.userId, { threadId: "group-1" });
+  assert.equal(info.members.length, 3);
+  await service.inviteGroupMember(actor.userId, {
+    threadId: "group-1",
+    targetUserId: target.userId,
+  });
+  await service.updateGroupPermissions(actor.userId, {
+    threadId: "group-1",
+    invitePermission: "members",
+  });
+  await service.leaveGroup(actor.userId, { threadId: "group-1" });
+  assert.deepEqual(repository.groupInviteInput, [actor, "group-1", target]);
+  assert.deepEqual(repository.groupPermissionInput, [
+    actor.userId,
+    "group-1",
+    "members",
+  ]);
+  assert.deepEqual(repository.groupLeaveInput, [actor.userId, "group-1"]);
+});
+
 function createService(repository: ChatRepository): ChatService {
   return new ChatService(repository, async (userId) => {
     if (userId === actor.userId) return actor;
@@ -433,6 +458,9 @@ class FakeChatRepository implements ChatRepository {
     number | undefined,
   ];
   sendAttachmentInput?: unknown[];
+  groupInviteInput?: [ChatProfile, string, ChatProfile];
+  groupPermissionInput?: [string, string, "admins" | "members"];
+  groupLeaveInput?: [string, string];
 
   async listThreads(userId: string, limit: number): Promise<ChatThreadRecord[]> {
     this.listThreadsInput = [userId, limit];
@@ -679,6 +707,45 @@ class FakeChatRepository implements ChatRepository {
     this.sendAttachmentInput = values;
     return attachmentMessage;
   }
+
+  async getGroupInfo(): Promise<ChatGroupInfoRecord> {
+    return groupInfo;
+  }
+
+  async inviteGroupMember(
+    selectedActor: ChatProfile,
+    threadId: string,
+    selectedTarget: ChatProfile,
+  ): Promise<ChatGroupInviteRecord> {
+    this.groupInviteInput = [selectedActor, threadId, selectedTarget];
+    return groupInvite;
+  }
+
+  async updateGroupPermissions(
+    userId: string,
+    threadId: string,
+    permission: "admins" | "members",
+  ): Promise<ChatGroupInfoRecord> {
+    this.groupPermissionInput = [userId, threadId, permission];
+    return { ...groupInfo, invitePermission: permission };
+  }
+
+  async leaveGroup(userId: string, threadId: string) {
+    this.groupLeaveInput = [userId, threadId];
+    return { threadId, left: true };
+  }
+
+  async listGroupInvites(): Promise<ChatGroupInviteRecord[]> {
+    return [groupInvite];
+  }
+
+  async respondToGroupInvite(
+    userId: string,
+    inviteId: string,
+    accepted: boolean,
+  ) {
+    return { inviteId, accepted, threadId: "group-1" };
+  }
 }
 
 const privacy: ChatPrivacySettings = {
@@ -736,6 +803,36 @@ const attachmentMessage: ChatMessageRecord = {
     readUrl: "https://storage.googleapis.test/private-read",
     readUrlExpiresAt: "2026-08-29T04:05:00.000Z",
   },
+};
+
+const groupInfo: ChatGroupInfoRecord = {
+  threadId: "group-1",
+  title: "Home Group",
+  description: "Coordinate together.",
+  members: [actor, target, {
+    userId: "user-3",
+    name: "Third member",
+    handle: "@third",
+  }].map((profile, index) => ({
+    userId: profile.userId,
+    name: profile.name,
+    handle: profile.handle,
+    isAdmin: index === 0,
+    isMe: index === 0,
+  })),
+  invitePermission: "admins",
+  canInvite: true,
+  canManage: true,
+  canLeave: true,
+};
+
+const groupInvite: ChatGroupInviteRecord = {
+  id: "invite-1",
+  threadId: "group-1",
+  groupTitle: "Home Group",
+  invitedByUserId: actor.userId,
+  invitedByName: actor.name,
+  invitedAt: "2026-08-29T05:00:00.000Z",
 };
 
 const thread: ChatThreadRecord = {

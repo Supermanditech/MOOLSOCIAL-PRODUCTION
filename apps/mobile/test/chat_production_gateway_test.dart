@@ -440,6 +440,87 @@ void main() {
     ]);
   });
 
+  test('authenticated gateway transports group membership lifecycle', () async {
+    final info = {
+      'threadId': 'group-1',
+      'title': 'Home Group',
+      'description': 'Coordinate together.',
+      'members': [
+        {
+          'userId': 'user-1',
+          'name': 'You',
+          'handle': '@you',
+          'isAdmin': true,
+          'isMe': true,
+        },
+        {
+          'userId': 'user-2',
+          'name': 'Member',
+          'handle': '@member',
+          'isAdmin': false,
+          'isMe': false,
+        },
+      ],
+      'invitePermission': 'admins',
+      'canInvite': true,
+      'canManage': true,
+      'canLeave': true,
+    };
+    final invite = {
+      'id': 'invite-1',
+      'threadId': 'group-1',
+      'groupTitle': 'Home Group',
+      'invitedByUserId': 'user-1',
+      'invitedByName': 'You',
+      'invitedAt': '2026-08-29T05:00:00.000Z',
+    };
+    final transport = _RecordingTransport([
+      _ok(info),
+      _ok(invite),
+      _ok({...info, 'invitePermission': 'members'}),
+      _ok({'threadId': 'group-1', 'left': true}),
+      _ok([invite]),
+      _ok({'inviteId': 'invite-1', 'accepted': true, 'threadId': 'group-1'}),
+    ]);
+    final gateway = AuthenticatedChatGateway(
+      endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat',
+      ),
+      credentials: _RecordingCredentials(),
+      transport: transport,
+      random: Random(5),
+    );
+    expect((await gateway.getGroupInfo(threadId: 'group-1')).canManage, isTrue);
+    expect(
+      (await gateway.inviteGroupMember(
+        threadId: 'group-1',
+        targetUserId: 'user-3',
+      )).id,
+      'invite-1',
+    );
+    expect(
+      (await gateway.updateGroupPermissions(
+        threadId: 'group-1',
+        invitePermission: ChatGroupInvitePermission.members,
+      )).invitePermission,
+      ChatGroupInvitePermission.members,
+    );
+    expect(await gateway.leaveGroup(threadId: 'group-1'), isTrue);
+    expect((await gateway.listGroupInvites()).single.id, 'invite-1');
+    expect(
+      await gateway.respondToGroupInvite(inviteId: 'invite-1', accepted: true),
+      isTrue,
+    );
+    expect(transport.bodies.map((body) => body['operation']), [
+      'getGroupInfo',
+      'inviteGroupMember',
+      'updateGroupPermissions',
+      'leaveGroup',
+      'listGroupInvites',
+      'respondToGroupInvite',
+    ]);
+  });
+
   test(
     'production Chat loads only gateway-owned threads and messages',
     () async {

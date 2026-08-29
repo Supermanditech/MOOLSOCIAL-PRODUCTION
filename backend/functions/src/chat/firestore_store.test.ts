@@ -548,6 +548,56 @@ test("attachment finalize is private idempotent and signed for reading", async (
   assert.equal(media.validateCalls, 2);
 });
 
+test("group invitation acceptance permissions and leave update one membership", async () => {
+  const database = chatDatabase();
+  database.create(new FakeDocumentReference(database, "chatThreads/group-1"), {
+    schemaVersion: 1,
+    group: true,
+    type: "people",
+    title: "Home Group",
+    groupDescription: "Coordinate together.",
+    participantIds: [actor.userId, "member-2", "member-3"],
+    adminIds: [actor.userId],
+    invitePermission: "admins",
+    profiles: {
+      [actor.userId]: { name: actor.name, handle: actor.handle },
+      "member-2": { name: "Member Two", handle: "@two" },
+      "member-3": { name: "Member Three", handle: "@three" },
+    },
+    preview: "Welcome",
+    updatedAt: "2026-08-29T05:00:00.000Z",
+    unreadCounts: {},
+    lastReadAtBy: {},
+  });
+  const repository = new FirestoreChatRepository(
+    database as unknown as Firestore,
+    () => new Date("2026-08-29T05:00:00.000Z"),
+  );
+  const before = await repository.getGroupInfo(actor.userId, "group-1");
+  assert.equal(before.members.length, 3);
+  assert.equal(before.canManage, true);
+  const invited = await repository.inviteGroupMember(
+    actor,
+    "group-1",
+    { userId: "member-4", name: "Member Four", handle: "@four" },
+  );
+  await repository.respondToGroupInvite("member-4", invited.id, true);
+  const joined = await repository.getGroupInfo("member-4", "group-1");
+  assert.equal(joined.members.length, 4);
+  assert.equal(joined.members.find((member) => member.userId === "member-4")?.name,
+    "Member Four");
+  const permissions = await repository.updateGroupPermissions(
+    actor.userId,
+    "group-1",
+    "members",
+  );
+  assert.equal(permissions.invitePermission, "members");
+  assert.equal(permissions.canInvite, true);
+  await repository.leaveGroup("member-4", "group-1");
+  assert.equal((await repository.getGroupInfo(actor.userId, "group-1")).members.length,
+    3);
+});
+
 function chatDatabase(): FakeFirestore {
   return new FakeFirestore({
     "chatThreads/thread-1": {

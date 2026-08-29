@@ -86,7 +86,7 @@ void main() {
       find.byKey(const Key('chat-group-member-recovery-amit')),
       findsOneWidget,
     );
-    expect(find.text('Amit profile unavailable'), findsOneWidget);
+    expect(find.text('Amit'), findsWidgets);
     await tester.tap(find.byKey(const Key('chat-capability-continue')));
     await tester.pumpAndSettle();
 
@@ -117,7 +117,7 @@ void main() {
       (
         key: 'chat-group-permissions',
         recovery: 'chat-group-permissions-recovery',
-        title: 'Permissions unavailable',
+        title: 'Permissions unchanged',
       ),
       (
         key: 'chat-group-leave',
