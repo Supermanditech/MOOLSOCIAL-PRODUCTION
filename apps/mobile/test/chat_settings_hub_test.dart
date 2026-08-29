@@ -283,6 +283,11 @@ void main() {
 
       for (final entry in const <(Key, Key, String)>[
         (
+          Key('chat-settings-notifications'),
+          Key('chat-notifications-recovery'),
+          'Notification settings unavailable',
+        ),
+        (
           Key('chat-settings-who-can-message'),
           Key('chat-message-permission-recovery'),
           'Message permission unchanged',
