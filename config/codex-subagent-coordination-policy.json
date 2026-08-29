@@ -1413,7 +1413,7 @@
       },
       {
         "id": "cursor_shop_chat_v1_child3_20260829",
-        "state": "founder_authorized_2026_08_29",
+        "state": "founder_authorized_2026_08_28",
         "lane": "cursor_ui",
         "role": "subagent",
         "task": "/root/cursor_shop_chat_v1_child3_20260829",
