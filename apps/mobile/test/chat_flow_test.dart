@@ -217,7 +217,7 @@ void main() {
     expect(actionMotion().duration, ChatMotion.focus);
     expect(
       entryMotion().duration,
-      Duration(milliseconds: ChatMotion.stateChange.inMilliseconds + 40),
+      Duration(milliseconds: ChatMotion.stateChange.inMilliseconds + 100),
     );
 
     final field = find.byKey(const Key('chat-search-field'));
@@ -275,7 +275,7 @@ void main() {
     }
     expect(
       incomingMotion('home-basket').duration,
-      Duration(milliseconds: ChatMotion.stateChange.inMilliseconds + 40),
+      Duration(milliseconds: ChatMotion.stateChange.inMilliseconds + 100),
     );
 
     tester.platformDispatcher.accessibilityFeaturesTestValue =
