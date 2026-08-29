@@ -2658,6 +2658,11 @@ export const moolSocialChat = onRequest(
         operation === "updatePrivacySettings" ||
         operation === "setBlockedAccount" ||
         operation === "resolveMessageRequest";
+      const callMutation = operation === "updateCallPreferences" ||
+        operation === "setPresence" ||
+        operation === "startCall" ||
+        operation === "respondToCall" ||
+        operation === "endCall";
       const ownerUserId = await verifySocialInvocation(
         request.headers,
         {
@@ -2668,7 +2673,7 @@ export const moolSocialChat = onRequest(
             ),
           verifyIdToken: async (token) => getAuth().verifyIdToken(token),
         },
-        mutation,
+        mutation || callMutation,
         true,
       );
       if (!ownerUserId) {
@@ -2704,6 +2709,22 @@ export const moolSocialChat = onRequest(
                   ? await chatService().listMessageRequests(ownerUserId, body)
                 : operation === "resolveMessageRequest"
                   ? await chatService().resolveMessageRequest(ownerUserId, body)
+                : operation === "getCallPreferences"
+                  ? await chatService().getCallPreferences(ownerUserId, body)
+                : operation === "updateCallPreferences"
+                  ? await chatService().updateCallPreferences(ownerUserId, body)
+                : operation === "setPresence"
+                  ? await chatService().setPresence(ownerUserId, body)
+                : operation === "getCallAvailability"
+                  ? await chatService().getCallAvailability(ownerUserId, body)
+                : operation === "startCall"
+                  ? await chatService().startCall(ownerUserId, body)
+                : operation === "respondToCall"
+                  ? await chatService().respondToCall(ownerUserId, body)
+                : operation === "endCall"
+                  ? await chatService().endCall(ownerUserId, body)
+                : operation === "listIncomingCalls"
+                  ? await chatService().listIncomingCalls(ownerUserId, body)
               : (() => {
                   throw new ChatError(
                     "bad_request",

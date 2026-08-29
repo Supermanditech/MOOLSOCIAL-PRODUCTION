@@ -55,6 +55,37 @@ export interface ChatMessageRequestRecord {
   requestedAt: string;
 }
 
+export type ChatCallKind = "voice" | "video";
+export type ChatPresenceState = "active" | "background" | "offline";
+export type ChatCallStatus = "ringing" | "accepted" | "declined" | "ended";
+
+export interface ChatCallPreferences {
+  voiceCallsEnabled: boolean;
+  videoCallsEnabled: boolean;
+  updatedAt: string;
+}
+
+export interface ChatCallAvailability {
+  threadId: string;
+  kind: ChatCallKind;
+  recipientUserId: string;
+  recipientName: string;
+  canStart: boolean;
+  status: "available" | "offline" | "calls_off" | "busy";
+  message: string;
+}
+
+export interface ChatCallRecord {
+  id: string;
+  threadId: string;
+  kind: ChatCallKind;
+  callerUserId: string;
+  recipientUserId: string;
+  status: ChatCallStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ChatMessageRecord {
   id: string;
   threadId: string;
@@ -196,6 +227,33 @@ export interface ChatRepository {
     threadId: string,
     accepted: boolean,
   ): Promise<{ threadId: string; accepted: boolean }>;
+  getCallPreferences?(userId: string): Promise<ChatCallPreferences>;
+  updateCallPreferences?(
+    userId: string,
+    preferences: Omit<ChatCallPreferences, "updatedAt">,
+  ): Promise<ChatCallPreferences>;
+  setPresence?(
+    userId: string,
+    state: ChatPresenceState,
+  ): Promise<{ state: ChatPresenceState; updatedAt: string }>;
+  getCallAvailability?(
+    userId: string,
+    threadId: string,
+    kind: ChatCallKind,
+  ): Promise<ChatCallAvailability>;
+  startCall?(
+    actor: ChatProfile,
+    threadId: string,
+    kind: ChatCallKind,
+    idempotencyKey: string,
+  ): Promise<ChatCallRecord>;
+  respondToCall?(
+    userId: string,
+    callId: string,
+    accepted: boolean,
+  ): Promise<ChatCallRecord>;
+  endCall?(userId: string, callId: string): Promise<ChatCallRecord>;
+  listIncomingCalls?(userId: string): Promise<ChatCallRecord[]>;
 }
 
 export type ChatProfileResolver = (userId: string) => Promise<ChatProfile>;

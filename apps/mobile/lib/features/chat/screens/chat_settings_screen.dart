@@ -32,7 +32,9 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(widget.session.loadPrivacySettings());
+      if (!mounted) return;
+      unawaited(widget.session.loadPrivacySettings());
+      unawaited(widget.session.loadCallPreferences());
     });
   }
 
@@ -135,6 +137,26 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
     );
   }
 
+  Future<void> _saveCallPreferences(
+    ChatCallPreferences requested,
+    String successMessage,
+  ) async {
+    final saved = await widget.session.updateCallPreferences(requested);
+    if (!mounted) return;
+    if (saved) {
+      _confirmSessionChange(successMessage);
+      return;
+    }
+    await showChatUnavailableCapability(
+      context,
+      keyName: 'chat-call-settings-recovery',
+      title: 'Call setting unchanged',
+      message:
+          widget.session.callError ??
+          'This call setting could not update. Nothing changed.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final entryContext = ChatEntryContext.resolve(widget.originReturnRoute);
@@ -203,19 +225,21 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                       ),
                       title: const Text('Voice calls in this app'),
                       subtitle: const Text(
-                        'Pause the voice-call action in every conversation.',
+                        'Let people know whether they can voice call you.',
                       ),
                       value: session.globalVoiceCallsAvailableForSession,
-                      onChanged: (available) {
-                        session.setGlobalVoiceCallsAvailableForSession(
-                          available: available,
-                        );
-                        _confirmSessionChange(
-                          available
-                              ? 'Voice calls turned on for this app session.'
-                              : 'Voice calls paused for this app session.',
-                        );
-                      },
+                      onChanged: session.callLoading
+                          ? null
+                          : (available) => unawaited(
+                              _saveCallPreferences(
+                                session.callPreferences.copyWith(
+                                  voiceCallsEnabled: available,
+                                ),
+                                available
+                                    ? 'Voice calls turned on for your account.'
+                                    : 'Voice calls turned off for your account.',
+                              ),
+                            ),
                     ),
                     const Divider(height: 1),
                     SwitchListTile.adaptive(
@@ -225,22 +249,24 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                       ),
                       title: const Text('Video calls in this app'),
                       subtitle: const Text(
-                        'Pause the video-call action in every conversation.',
+                        'Let people know whether they can video call you.',
                       ),
                       value: session.globalVideoCallsAvailableForSession,
-                      onChanged: (available) {
-                        session.setGlobalVideoCallsAvailableForSession(
-                          available: available,
-                        );
-                        _confirmSessionChange(
-                          available
-                              ? 'Video calls turned on for this app session.'
-                              : 'Video calls paused for this app session.',
-                        );
-                      },
+                      onChanged: session.callLoading
+                          ? null
+                          : (available) => unawaited(
+                              _saveCallPreferences(
+                                session.callPreferences.copyWith(
+                                  videoCallsEnabled: available,
+                                ),
+                                available
+                                    ? 'Video calls turned on for your account.'
+                                    : 'Video calls turned off for your account.',
+                              ),
+                            ),
                     ),
                     const _ChatSettingsScopeNote(
-                      'These controls change this app session only. They do not update another person’s availability or account settings.',
+                      'Chat pause is local to this app session. Voice and video call availability is saved to your account so callers receive the correct status.',
                     ),
                   ],
                 ),

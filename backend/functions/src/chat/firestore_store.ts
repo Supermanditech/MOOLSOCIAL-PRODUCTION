@@ -11,6 +11,11 @@ import {
   type ChatMessageRecord,
   type ChatMessagePermission,
   type ChatMessageRequestRecord,
+  type ChatCallAvailability,
+  type ChatCallKind,
+  type ChatCallPreferences,
+  type ChatCallRecord,
+  type ChatPresenceState,
   type ChatPhotoAttachmentStore,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
@@ -675,6 +680,229 @@ export class FirestoreChatRepository implements ChatRepository {
     return { threadId, accepted };
   }
 
+  async getCallPreferences(userId: string): Promise<ChatCallPreferences> {
+    const snapshot = await this.privacyRef(userId).get();
+    return callPreferencesFromData(snapshot.data());
+  }
+
+  async updateCallPreferences(
+    userId: string,
+    preferences: Omit<ChatCallPreferences, "updatedAt">,
+  ): Promise<ChatCallPreferences> {
+    const updatedAt = this.now().toISOString();
+    await this.privacyRef(userId).set({
+      schemaVersion: 1,
+      ...preferences,
+      updatedAt,
+    }, { merge: true });
+    return { ...preferences, updatedAt };
+  }
+
+  async setPresence(userId: string, state: ChatPresenceState) {
+    const updatedAt = this.now().toISOString();
+    await this.presenceRef(userId).set({
+      schemaVersion: 1,
+      userId,
+      state,
+      updatedAt,
+      ...(state === "offline" ? { activeCallId: null } : {}),
+    }, { merge: true });
+    return { state, updatedAt };
+  }
+
+  async getCallAvailability(
+    userId: string,
+    threadId: string,
+    kind: ChatCallKind,
+  ): Promise<ChatCallAvailability> {
+    const thread = await this.threadForParticipant(userId, threadId);
+    const data = thread.snapshot.data()!;
+    const participants = participantIdsFrom(data);
+    if (participants.length !== 2) {
+      throw new ChatError(
+        "bad_request",
+        "Start group voice chat from Group info.",
+        400,
+      );
+    }
+    const recipientUserId = participants.find((item) => item !== userId)!;
+    const [preferencesSnapshot, presenceSnapshot] = await Promise.all([
+      this.privacyRef(recipientUserId).get(),
+      this.presenceRef(recipientUserId).get(),
+    ]);
+    const preferences = callPreferencesFromData(preferencesSnapshot.data());
+    const enabled = kind === "voice"
+      ? preferences.voiceCallsEnabled
+      : preferences.videoCallsEnabled;
+    const profiles = data.profiles && typeof data.profiles === "object"
+      ? data.profiles as Record<string, DocumentData>
+      : {};
+    const recipientName = String(
+      profiles[recipientUserId]?.name ?? "This member",
+    );
+    if (!enabled) {
+      return {
+        threadId,
+        kind,
+        recipientUserId,
+        recipientName,
+        canStart: false,
+        status: "calls_off",
+        message: `${recipientName} has turned off ${kind} calls.`,
+      };
+    }
+    if (String(presenceSnapshot.get("activeCallId") ?? "").trim()) {
+      return {
+        threadId,
+        kind,
+        recipientUserId,
+        recipientName,
+        canStart: false,
+        status: "busy",
+        message: `${recipientName} is already on another call.`,
+      };
+    }
+    const lastActive = Date.parse(String(presenceSnapshot.get("updatedAt") ?? ""));
+    const recentlyActive = presenceSnapshot.get("state") === "active" &&
+      Number.isFinite(lastActive) &&
+      this.now().getTime() - lastActive <= 90_000;
+    return {
+      threadId,
+      kind,
+      recipientUserId,
+      recipientName,
+      canStart: true,
+      status: recentlyActive ? "available" : "offline",
+      message: recentlyActive
+        ? `${recipientName} is available for a ${kind} call.`
+        : `${recipientName} may be offline. The call request can still be sent.`,
+    };
+  }
+
+  async startCall(
+    actor: ChatProfile,
+    threadId: string,
+    kind: ChatCallKind,
+    idempotencyKey: string,
+  ): Promise<ChatCallRecord> {
+    const availability = await this.getCallAvailability(
+      actor.userId,
+      threadId,
+      kind,
+    );
+    if (!availability.canStart) {
+      throw new ChatError(
+        availability.status === "calls_off"
+          ? "recipient_calls_disabled"
+          : "recipient_busy",
+        availability.message,
+        409,
+      );
+    }
+    const callId = digest(`${actor.userId}:call:${idempotencyKey}`);
+    const ref = this.firestore.collection("chatCalls").doc(callId);
+    const existing = await ref.get();
+    if (existing.exists) {
+      const saved = callFromDocument(existing.id, existing.data()!);
+      if (saved.callerUserId !== actor.userId ||
+          saved.threadId !== threadId || saved.kind !== kind) {
+        throw new ChatError(
+          "conflict",
+          "That call retry belongs to another request.",
+          409,
+        );
+      }
+      return saved;
+    }
+    const createdAt = this.now().toISOString();
+    const data = {
+      schemaVersion: 1,
+      threadId,
+      kind,
+      callerUserId: actor.userId,
+      recipientUserId: availability.recipientUserId,
+      status: "ringing",
+      createdAt,
+      updatedAt: createdAt,
+    };
+    await ref.set(data);
+    await this.presenceRef(actor.userId).set({
+      schemaVersion: 1,
+      userId: actor.userId,
+      state: "active",
+      activeCallId: callId,
+      updatedAt: createdAt,
+    }, { merge: true });
+    return callFromDocument(callId, data);
+  }
+
+  async respondToCall(
+    userId: string,
+    callId: string,
+    accepted: boolean,
+  ): Promise<ChatCallRecord> {
+    const ref = this.firestore.collection("chatCalls").doc(callId);
+    let result: ChatCallRecord | undefined;
+    await this.firestore.runTransaction(async (transaction) => {
+      const call = await transaction.get(ref);
+      if (!call.exists || call.get("recipientUserId") !== userId) {
+        throw new ChatError("not_found", "That call is no longer available.", 404);
+      }
+      if (call.get("status") !== "ringing") {
+        result = callFromDocument(call.id, call.data()!);
+        return;
+      }
+      const updatedAt = this.now().toISOString();
+      const status = accepted ? "accepted" : "declined";
+      transaction.update(ref, { status, updatedAt });
+      result = callFromDocument(call.id, { ...call.data()!, status, updatedAt });
+    });
+    if (accepted) {
+      await this.presenceRef(userId).set({
+        activeCallId: callId,
+        state: "active",
+        updatedAt: this.now().toISOString(),
+      }, { merge: true });
+    }
+    return result!;
+  }
+
+  async endCall(userId: string, callId: string): Promise<ChatCallRecord> {
+    const ref = this.firestore.collection("chatCalls").doc(callId);
+    let result: ChatCallRecord | undefined;
+    await this.firestore.runTransaction(async (transaction) => {
+      const call = await transaction.get(ref);
+      if (!call.exists ||
+          (call.get("callerUserId") !== userId &&
+            call.get("recipientUserId") !== userId)) {
+        throw new ChatError("not_found", "That call is no longer available.", 404);
+      }
+      const updatedAt = this.now().toISOString();
+      transaction.update(ref, { status: "ended", updatedAt });
+      result = callFromDocument(call.id, {
+        ...call.data()!,
+        status: "ended",
+        updatedAt,
+      });
+    });
+    await this.presenceRef(userId).set({
+      activeCallId: null,
+      updatedAt: this.now().toISOString(),
+    }, { merge: true });
+    return result!;
+  }
+
+  async listIncomingCalls(userId: string): Promise<ChatCallRecord[]> {
+    const snapshot = await this.firestore.collection("chatCalls")
+      .where("recipientUserId", "==", userId)
+      .where("status", "==", "ringing")
+      .limit(10)
+      .get();
+    return snapshot.docs
+      .map((document) => callFromDocument(document.id, document.data()))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
   private async threadForParticipant(userId: string, threadId: string) {
     const ref = this.firestore.collection("chatThreads").doc(threadId);
     const snapshot = await ref.get();
@@ -691,6 +919,10 @@ export class FirestoreChatRepository implements ChatRepository {
 
   private privacyRef(userId: string) {
     return this.firestore.collection("chatPrivacySettings").doc(userId);
+  }
+
+  private presenceRef(userId: string) {
+    return this.firestore.collection("chatPresence").doc(userId);
   }
 
   private blockRef(blockerUserId: string, blockedUserId: string) {
@@ -869,6 +1101,34 @@ function privacyFromData(data: DocumentData | undefined): ChatPrivacySettings {
     shareLastSeen: data?.shareLastSeen !== false,
     readReceipts: data?.readReceipts !== false,
     updatedAt: String(data?.updatedAt ?? ""),
+  };
+}
+
+function callPreferencesFromData(
+  data: DocumentData | undefined,
+): ChatCallPreferences {
+  return {
+    voiceCallsEnabled: data?.voiceCallsEnabled !== false,
+    videoCallsEnabled: data?.videoCallsEnabled !== false,
+    updatedAt: String(data?.updatedAt ?? ""),
+  };
+}
+
+function callFromDocument(id: string, data: DocumentData): ChatCallRecord {
+  const kind = data.kind === "video" ? "video" : "voice";
+  const status = data.status === "accepted" || data.status === "declined" ||
+      data.status === "ended"
+    ? data.status
+    : "ringing";
+  return {
+    id,
+    threadId: String(data.threadId),
+    kind,
+    callerUserId: String(data.callerUserId),
+    recipientUserId: String(data.recipientUserId),
+    status,
+    createdAt: String(data.createdAt),
+    updatedAt: String(data.updatedAt),
   };
 }
 

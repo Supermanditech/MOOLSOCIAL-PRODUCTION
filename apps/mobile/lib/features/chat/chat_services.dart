@@ -194,6 +194,36 @@ abstract interface class ChatPrivacyGateway {
   });
 }
 
+abstract interface class ChatCallGateway {
+  Future<ChatCallPreferences> getCallPreferences();
+
+  Future<ChatCallPreferences> updateCallPreferences(
+    ChatCallPreferences preferences,
+  );
+
+  Future<void> setPresence(ChatPresenceState state);
+
+  Future<ChatCallAvailability> getCallAvailability({
+    required String threadId,
+    required ChatCallKind kind,
+  });
+
+  Future<ChatCall> startCall({
+    required String threadId,
+    required ChatCallKind kind,
+    required String idempotencyKey,
+  });
+
+  Future<ChatCall> respondToCall({
+    required String callId,
+    required bool accepted,
+  });
+
+  Future<ChatCall> endCall({required String callId});
+
+  Future<List<ChatCall>> listIncomingCalls();
+}
+
 abstract interface class ChatPhotoUploadTransport {
   Future<void> put({
     required Uri url,
@@ -290,7 +320,8 @@ ChatGateway buildChatGateway() {
   );
 }
 
-class UnavailableChatGateway implements ChatGateway, ChatPrivacyGateway {
+class UnavailableChatGateway
+    implements ChatGateway, ChatPrivacyGateway, ChatCallGateway {
   const UnavailableChatGateway();
 
   ChatServiceException get _error => const ChatServiceException(
@@ -363,10 +394,50 @@ class UnavailableChatGateway implements ChatGateway, ChatPrivacyGateway {
   Future<ChatPrivacySettings> updatePrivacySettings(
     ChatPrivacySettings settings,
   ) async => throw _error;
+
+  @override
+  Future<ChatCallPreferences> getCallPreferences() async => throw _error;
+
+  @override
+  Future<ChatCallPreferences> updateCallPreferences(
+    ChatCallPreferences preferences,
+  ) async => throw _error;
+
+  @override
+  Future<void> setPresence(ChatPresenceState state) async => throw _error;
+
+  @override
+  Future<ChatCallAvailability> getCallAvailability({
+    required String threadId,
+    required ChatCallKind kind,
+  }) async => throw _error;
+
+  @override
+  Future<ChatCall> startCall({
+    required String threadId,
+    required ChatCallKind kind,
+    required String idempotencyKey,
+  }) async => throw _error;
+
+  @override
+  Future<ChatCall> respondToCall({
+    required String callId,
+    required bool accepted,
+  }) async => throw _error;
+
+  @override
+  Future<ChatCall> endCall({required String callId}) async => throw _error;
+
+  @override
+  Future<List<ChatCall>> listIncomingCalls() async => throw _error;
 }
 
 class AuthenticatedChatGateway
-    implements ChatGateway, ChatPhotoGateway, ChatPrivacyGateway {
+    implements
+        ChatGateway,
+        ChatPhotoGateway,
+        ChatPrivacyGateway,
+        ChatCallGateway {
   AuthenticatedChatGateway({
     required Uri endpoint,
     required this.credentials,
@@ -629,6 +700,99 @@ class AuthenticatedChatGateway
     return result['accepted'] == true;
   }
 
+  @override
+  Future<ChatCallPreferences> getCallPreferences() async =>
+      _decodeCallPreferences(
+        _map(await _invoke('getCallPreferences', body: const {})),
+      );
+
+  @override
+  Future<ChatCallPreferences> updateCallPreferences(
+    ChatCallPreferences preferences,
+  ) async => _decodeCallPreferences(
+    _map(
+      await _invoke(
+        'updateCallPreferences',
+        limitedUseAppCheck: true,
+        body: {
+          'voiceCallsEnabled': preferences.voiceCallsEnabled,
+          'videoCallsEnabled': preferences.videoCallsEnabled,
+        },
+      ),
+    ),
+  );
+
+  @override
+  Future<void> setPresence(ChatPresenceState state) async {
+    await _invoke(
+      'setPresence',
+      limitedUseAppCheck: true,
+      body: {'state': state.name},
+    );
+  }
+
+  @override
+  Future<ChatCallAvailability> getCallAvailability({
+    required String threadId,
+    required ChatCallKind kind,
+  }) async => _decodeCallAvailability(
+    _map(
+      await _invoke(
+        'getCallAvailability',
+        body: {'threadId': threadId, 'kind': kind.name},
+      ),
+    ),
+  );
+
+  @override
+  Future<ChatCall> startCall({
+    required String threadId,
+    required ChatCallKind kind,
+    required String idempotencyKey,
+  }) async => _decodeCall(
+    _map(
+      await _invoke(
+        'startCall',
+        limitedUseAppCheck: true,
+        body: {
+          'threadId': threadId,
+          'kind': kind.name,
+          'idempotencyKey': idempotencyKey,
+        },
+      ),
+    ),
+  );
+
+  @override
+  Future<ChatCall> respondToCall({
+    required String callId,
+    required bool accepted,
+  }) async => _decodeCall(
+    _map(
+      await _invoke(
+        'respondToCall',
+        limitedUseAppCheck: true,
+        body: {'callId': callId, 'accepted': accepted},
+      ),
+    ),
+  );
+
+  @override
+  Future<ChatCall> endCall({required String callId}) async => _decodeCall(
+    _map(
+      await _invoke(
+        'endCall',
+        limitedUseAppCheck: true,
+        body: {'callId': callId},
+      ),
+    ),
+  );
+
+  @override
+  Future<List<ChatCall>> listIncomingCalls() async => _list(
+    await _invoke('listIncomingCalls', body: const {}),
+  ).map((item) => _decodeCall(_map(item))).toList(growable: false);
+
   Future<Object?> _invoke(
     String operation, {
     required Map<String, Object?> body,
@@ -776,6 +940,56 @@ ChatMessageRequest _decodeMessageRequest(Map<String, Object?> data) =>
       requestedByUserId: _requiredString(data['requestedByUserId']),
       requestedAt: _requiredDateTime(data['requestedAt']),
     );
+
+ChatCallPreferences _decodeCallPreferences(Map<String, Object?> data) =>
+    ChatCallPreferences(
+      voiceCallsEnabled: data['voiceCallsEnabled'] == true,
+      videoCallsEnabled: data['videoCallsEnabled'] == true,
+      updatedAt: _optionalDateTime(data['updatedAt']),
+    );
+
+ChatCallAvailability _decodeCallAvailability(Map<String, Object?> data) =>
+    ChatCallAvailability(
+      threadId: _requiredString(data['threadId']),
+      kind: _decodeCallKind(data['kind']),
+      recipientUserId: _requiredString(data['recipientUserId']),
+      recipientName: _requiredString(data['recipientName']),
+      canStart: data['canStart'] == true,
+      status: switch (_requiredString(data['status'])) {
+        'available' => ChatCallAvailabilityStatus.available,
+        'offline' => ChatCallAvailabilityStatus.offline,
+        'calls_off' => ChatCallAvailabilityStatus.callsOff,
+        'busy' => ChatCallAvailabilityStatus.busy,
+        _ => throw const ChatServiceException(
+          'Chat returned an invalid call status. Try again.',
+          code: 'invalid_response',
+        ),
+      },
+      message: _requiredString(data['message']),
+    );
+
+ChatCall _decodeCall(Map<String, Object?> data) => ChatCall(
+  id: _requiredString(data['id']),
+  threadId: _requiredString(data['threadId']),
+  kind: _decodeCallKind(data['kind']),
+  callerUserId: _requiredString(data['callerUserId']),
+  recipientUserId: _requiredString(data['recipientUserId']),
+  status: switch (_requiredString(data['status'])) {
+    'accepted' => ChatCallStatus.accepted,
+    'declined' => ChatCallStatus.declined,
+    'ended' => ChatCallStatus.ended,
+    'ringing' => ChatCallStatus.ringing,
+    _ => throw const ChatServiceException(
+      'Chat returned an invalid call status. Try again.',
+      code: 'invalid_response',
+    ),
+  },
+  createdAt: _requiredDateTime(data['createdAt']),
+  updatedAt: _requiredDateTime(data['updatedAt']),
+);
+
+ChatCallKind _decodeCallKind(Object? value) =>
+    _requiredString(value) == 'video' ? ChatCallKind.video : ChatCallKind.voice;
 
 ChatMessage _decodeMessage(Map<String, Object?> data) {
   final mine = data['mine'] == true;

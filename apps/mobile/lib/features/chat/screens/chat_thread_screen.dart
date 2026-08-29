@@ -320,6 +320,94 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     );
   }
 
+  Future<void> _startCall(ChatThread thread, ChatCallKind kind) async {
+    final available = kind == ChatCallKind.voice
+        ? widget.session.voiceCallsAvailableForSession(thread.id)
+        : widget.session.videoCallsAvailableForSession(thread.id);
+    final recoveryKey = kind == ChatCallKind.voice
+        ? 'chat-call-recovery'
+        : 'chat-video-recovery';
+    final label = kind == ChatCallKind.voice ? 'Voice' : 'Video';
+    if (!available) {
+      await showChatUnavailableCapability(
+        context,
+        keyName: recoveryKey,
+        title: '$label calls paused',
+        message:
+            '$label calls are paused for this conversation until you turn them on in Conversation info.',
+      );
+      return;
+    }
+    final call = await widget.session.startCall(thread.id, kind);
+    if (!mounted) return;
+    if (call == null) {
+      await showChatUnavailableCapability(
+        context,
+        keyName: recoveryKey,
+        title: '$label calling unavailable',
+        message:
+            widget.session.callError ??
+            '$label calling is not available right now. You can continue this conversation in Chat.',
+      );
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      sheetAnimationStyle: ChatMotion.sheetStyle(context),
+      builder: (sheetContext) => Padding(
+        key: const Key('chat-call-status'),
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Icon(
+              kind == ChatCallKind.voice
+                  ? Icons.call_outlined
+                  : Icons.videocam_outlined,
+              size: 42,
+              color: MoolColors.navy,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Calling ${thread.title}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '$label call request sent. Waiting for ${thread.title} to answer.',
+              key: const Key('chat-call-status-message'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: MoolColors.muted),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              key: const Key('chat-call-end'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB3261E),
+              ),
+              onPressed: () async {
+                final ended = await widget.session.endCall();
+                if (ended && sheetContext.mounted) {
+                  Navigator.of(sheetContext).pop();
+                }
+              },
+              icon: const Icon(Icons.call_end_rounded),
+              label: const Text('End call'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _openChatSettings() {
     return Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -437,20 +525,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                 tooltip: widget.session.videoCallsAvailableForSession(thread.id)
                     ? 'Video call'
                     : 'Video calls paused',
-                onPressed: () => unawaited(
-                  showChatUnavailableCapability(
-                    context,
-                    keyName: 'chat-video-recovery',
-                    title:
-                        widget.session.videoCallsAvailableForSession(thread.id)
-                        ? 'Video calling unavailable'
-                        : 'Video calls paused',
-                    message:
-                        widget.session.videoCallsAvailableForSession(thread.id)
-                        ? 'Video calling is not available right now. You can continue this conversation in Chat.'
-                        : 'Video calls are paused for this conversation until you turn them on in Conversation info.',
-                  ),
-                ),
+                onPressed: () =>
+                    unawaited(_startCall(thread, ChatCallKind.video)),
                 icon: const Icon(Icons.videocam_outlined),
               ),
               IconButton(
@@ -458,20 +534,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                 tooltip: widget.session.voiceCallsAvailableForSession(thread.id)
                     ? 'Voice call'
                     : 'Voice calls paused',
-                onPressed: () => unawaited(
-                  showChatUnavailableCapability(
-                    context,
-                    keyName: 'chat-call-recovery',
-                    title:
-                        widget.session.voiceCallsAvailableForSession(thread.id)
-                        ? 'Voice calling unavailable'
-                        : 'Voice calls paused',
-                    message:
-                        widget.session.voiceCallsAvailableForSession(thread.id)
-                        ? 'Voice calling is not available right now. You can continue this conversation in Chat.'
-                        : 'Voice calls are paused for this conversation until you turn them on in Conversation info.',
-                  ),
-                ),
+                onPressed: () =>
+                    unawaited(_startCall(thread, ChatCallKind.voice)),
                 icon: const Icon(Icons.call_outlined),
               ),
             ],

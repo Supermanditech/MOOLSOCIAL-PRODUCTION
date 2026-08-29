@@ -245,6 +245,12 @@ class ChatSession extends ChangeNotifier {
   bool privacyLoading = false;
   bool privacyLoaded = false;
   String? privacyError;
+  ChatCallPreferences _callPreferences = ChatCallPreferences.defaults;
+  final List<ChatCall> _incomingCalls = [];
+  ChatCall? _activeCall;
+  bool callLoading = false;
+  bool callPreferencesLoaded = false;
+  String? callError;
   int _messageSequence = 10;
 
   static const reviewThreads = <ChatThread>[
@@ -872,6 +878,217 @@ class ChatSession extends ChangeNotifier {
       return false;
     } finally {
       privacyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  ChatCallPreferences get callPreferences => _callPreferences;
+
+  ChatCall? get activeCall => _activeCall;
+
+  List<ChatCall> get incomingCalls => List.unmodifiable(_incomingCalls);
+
+  ChatCallGateway? get _callGateway =>
+      _gateway is ChatCallGateway ? _gateway as ChatCallGateway : null;
+
+  Future<bool> loadCallPreferences({bool refresh = false}) async {
+    if (callLoading || (callPreferencesLoaded && !refresh)) {
+      return callPreferencesLoaded;
+    }
+    final gateway = _callGateway;
+    if (gateway == null) {
+      callPreferencesLoaded = _gateway == null;
+      return callPreferencesLoaded;
+    }
+    callLoading = true;
+    callError = null;
+    notifyListeners();
+    try {
+      _callPreferences = await gateway.getCallPreferences();
+      _globalVoiceCallsAvailableForSession = _callPreferences.voiceCallsEnabled;
+      _globalVideoCallsAvailableForSession = _callPreferences.videoCallsEnabled;
+      callPreferencesLoaded = true;
+      return true;
+    } on ChatServiceException catch (error) {
+      callError = error.userMessage;
+      return false;
+    } on Object {
+      callError = 'Call settings could not load. Try again.';
+      return false;
+    } finally {
+      callLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateCallPreferences(ChatCallPreferences requested) async {
+    if (callLoading) return false;
+    final gateway = _callGateway;
+    if (gateway == null && _gateway == null) {
+      _callPreferences = requested;
+      _globalVoiceCallsAvailableForSession = requested.voiceCallsEnabled;
+      _globalVideoCallsAvailableForSession = requested.videoCallsEnabled;
+      callPreferencesLoaded = true;
+      notifyListeners();
+      return true;
+    }
+    if (gateway == null) {
+      callError = 'Call settings are unavailable right now.';
+      notifyListeners();
+      return false;
+    }
+    final previous = _callPreferences;
+    callLoading = true;
+    callError = null;
+    notifyListeners();
+    try {
+      _callPreferences = await gateway.updateCallPreferences(requested);
+      _globalVoiceCallsAvailableForSession = _callPreferences.voiceCallsEnabled;
+      _globalVideoCallsAvailableForSession = _callPreferences.videoCallsEnabled;
+      callPreferencesLoaded = true;
+      return true;
+    } on ChatServiceException catch (error) {
+      _callPreferences = previous;
+      callError = error.userMessage;
+      return false;
+    } on Object {
+      _callPreferences = previous;
+      callError = 'Call settings could not update. Nothing changed.';
+      return false;
+    } finally {
+      callLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updatePresence(ChatPresenceState state) async {
+    final gateway = _callGateway;
+    if (gateway == null) return;
+    try {
+      await gateway.setPresence(state);
+    } on Object {
+      // Presence is best-effort. Call actions recheck authoritative state.
+    }
+  }
+
+  Future<ChatCallAvailability?> callAvailability(
+    String threadId,
+    ChatCallKind kind,
+  ) async {
+    final gateway = _callGateway;
+    if (gateway == null) return null;
+    try {
+      return await gateway.getCallAvailability(threadId: threadId, kind: kind);
+    } on ChatServiceException catch (error) {
+      callError = error.userMessage;
+      notifyListeners();
+      return null;
+    } on Object {
+      callError = 'Call availability could not be checked. Try again.';
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<ChatCall?> startCall(String threadId, ChatCallKind kind) async {
+    if (callLoading) return null;
+    final gateway = _callGateway;
+    if (gateway == null) {
+      callError =
+          '${kind == ChatCallKind.voice ? 'Voice' : 'Video'} calling is unavailable right now.';
+      notifyListeners();
+      return null;
+    }
+    callLoading = true;
+    callError = null;
+    notifyListeners();
+    try {
+      final availability = await gateway.getCallAvailability(
+        threadId: threadId,
+        kind: kind,
+      );
+      if (!availability.canStart) {
+        callError = availability.message;
+        return null;
+      }
+      final call = await gateway.startCall(
+        threadId: threadId,
+        kind: kind,
+        idempotencyKey:
+            'chat-call-${DateTime.now().microsecondsSinceEpoch}-${++_messageSequence}',
+      );
+      _activeCall = call;
+      return call;
+    } on ChatServiceException catch (error) {
+      callError = error.userMessage;
+      return null;
+    } on Object {
+      callError = 'The call request could not start. Try again.';
+      return null;
+    } finally {
+      callLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> endCall() async {
+    final call = _activeCall;
+    final gateway = _callGateway;
+    if (call == null || gateway == null || callLoading) return false;
+    callLoading = true;
+    callError = null;
+    notifyListeners();
+    try {
+      _activeCall = await gateway.endCall(callId: call.id);
+      return true;
+    } on ChatServiceException catch (error) {
+      callError = error.userMessage;
+      return false;
+    } on Object {
+      callError = 'The call could not end. Try again.';
+      return false;
+    } finally {
+      callLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loadIncomingCalls() async {
+    final gateway = _callGateway;
+    if (gateway == null || callLoading) return false;
+    try {
+      _incomingCalls
+        ..clear()
+        ..addAll(await gateway.listIncomingCalls());
+      notifyListeners();
+      return true;
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<bool> respondToCall(String callId, {required bool accepted}) async {
+    final gateway = _callGateway;
+    if (gateway == null || callLoading) return false;
+    callLoading = true;
+    callError = null;
+    notifyListeners();
+    try {
+      final call = await gateway.respondToCall(
+        callId: callId,
+        accepted: accepted,
+      );
+      _incomingCalls.removeWhere((item) => item.id == callId);
+      if (accepted) _activeCall = call;
+      return true;
+    } on ChatServiceException catch (error) {
+      callError = error.userMessage;
+      return false;
+    } on Object {
+      callError = 'The incoming call could not update. Nothing changed.';
+      return false;
+    } finally {
+      callLoading = false;
       notifyListeners();
     }
   }
@@ -1582,6 +1799,12 @@ class ChatSession extends ChangeNotifier {
     privacyLoading = false;
     privacyLoaded = false;
     privacyError = null;
+    _callPreferences = ChatCallPreferences.defaults;
+    _incomingCalls.clear();
+    _activeCall = null;
+    callLoading = false;
+    callPreferencesLoaded = false;
+    callError = null;
     selectedFilter = null;
     unreadOnly = false;
     noticeMessage = null;

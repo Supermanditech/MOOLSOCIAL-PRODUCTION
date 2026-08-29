@@ -4,6 +4,9 @@ import {
   ChatError,
   type ChatMessageRecord,
   type ChatMessagePermission,
+  type ChatCallKind,
+  type ChatCallPreferences,
+  type ChatPresenceState,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
   type ChatProfileResolver,
@@ -277,6 +280,74 @@ export class ChatService {
     );
   }
 
+  getCallPreferences(userId: string, raw: unknown): Promise<ChatCallPreferences> {
+    object(raw);
+    return this.requireCapability("getCallPreferences")(userId);
+  }
+
+  updateCallPreferences(
+    userId: string,
+    raw: unknown,
+  ): Promise<ChatCallPreferences> {
+    const body = object(raw);
+    return this.requireCapability("updateCallPreferences")(userId, {
+      voiceCallsEnabled: requiredBoolean(body, "voiceCallsEnabled"),
+      videoCallsEnabled: requiredBoolean(body, "videoCallsEnabled"),
+    });
+  }
+
+  setPresence(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("setPresence")(
+      userId,
+      requiredPresenceState(body.state),
+    );
+  }
+
+  getCallAvailability(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("getCallAvailability")(
+      userId,
+      requiredIdentifier(body, "threadId"),
+      requiredCallKind(body.kind),
+    );
+  }
+
+  async startCall(userId: string, raw: unknown) {
+    const body = object(raw);
+    const idempotencyKey = requiredText(body, "idempotencyKey", 128);
+    assertRetryKey(idempotencyKey, "call");
+    const actor = await this.resolveProfile(userId);
+    return this.requireCapability("startCall")(
+      actor,
+      requiredIdentifier(body, "threadId"),
+      requiredCallKind(body.kind),
+      idempotencyKey,
+    );
+  }
+
+  respondToCall(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("respondToCall")(
+      userId,
+      requiredIdentifier(body, "callId"),
+      requiredBoolean(body, "accepted"),
+    );
+  }
+
+  endCall(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("endCall")(
+      userId,
+      requiredIdentifier(body, "callId"),
+    );
+  }
+
+  listIncomingCalls(userId: string, raw: unknown) {
+    object(raw);
+    return this.requireCapability("listIncomingCalls")(userId);
+  }
+
   private requireCapability<K extends keyof ChatRepository>(
     name: K,
   ): NonNullable<ChatRepository[K]> {
@@ -298,6 +369,18 @@ function requiredMessagePermission(value: unknown): ChatMessagePermission {
     return value;
   }
   throw new ChatError("bad_request", "Choose who can message you.", 400);
+}
+
+function requiredCallKind(value: unknown): ChatCallKind {
+  if (value === "voice" || value === "video") return value;
+  throw new ChatError("bad_request", "Choose voice or video calling.", 400);
+}
+
+function requiredPresenceState(value: unknown): ChatPresenceState {
+  if (value === "active" || value === "background" || value === "offline") {
+    return value;
+  }
+  throw new ChatError("bad_request", "A valid presence state is required.", 400);
 }
 
 function requiredBoolean(
@@ -336,7 +419,10 @@ function requiredPhotoContentType(
   return contentType;
 }
 
-function assertRetryKey(value: string, label: "forward" | "photo"): void {
+function assertRetryKey(
+  value: string,
+  label: "forward" | "photo" | "call",
+): void {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{15,127}$/u.test(value)) {
     throw new ChatError(
       "bad_request",

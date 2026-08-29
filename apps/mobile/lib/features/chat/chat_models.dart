@@ -6,6 +6,83 @@ enum ChatDeliveryState { sending, delivered, read, failed }
 
 enum ChatMessagePermission { everyone, connections, nobody }
 
+enum ChatCallKind { voice, video }
+
+enum ChatCallStatus { ringing, accepted, declined, ended }
+
+enum ChatCallAvailabilityStatus { available, offline, callsOff, busy }
+
+enum ChatPresenceState { active, background, offline }
+
+class ChatCallPreferences {
+  const ChatCallPreferences({
+    required this.voiceCallsEnabled,
+    required this.videoCallsEnabled,
+    this.updatedAt,
+  });
+
+  static const defaults = ChatCallPreferences(
+    voiceCallsEnabled: true,
+    videoCallsEnabled: true,
+  );
+
+  final bool voiceCallsEnabled;
+  final bool videoCallsEnabled;
+  final DateTime? updatedAt;
+
+  ChatCallPreferences copyWith({
+    bool? voiceCallsEnabled,
+    bool? videoCallsEnabled,
+    DateTime? updatedAt,
+  }) => ChatCallPreferences(
+    voiceCallsEnabled: voiceCallsEnabled ?? this.voiceCallsEnabled,
+    videoCallsEnabled: videoCallsEnabled ?? this.videoCallsEnabled,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+}
+
+class ChatCallAvailability {
+  const ChatCallAvailability({
+    required this.threadId,
+    required this.kind,
+    required this.recipientUserId,
+    required this.recipientName,
+    required this.canStart,
+    required this.status,
+    required this.message,
+  });
+
+  final String threadId;
+  final ChatCallKind kind;
+  final String recipientUserId;
+  final String recipientName;
+  final bool canStart;
+  final ChatCallAvailabilityStatus status;
+  final String message;
+}
+
+class ChatCall {
+  const ChatCall({
+    required this.id,
+    required this.threadId,
+    required this.kind,
+    required this.callerUserId,
+    required this.recipientUserId,
+    required this.status,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String threadId;
+  final ChatCallKind kind;
+  final String callerUserId;
+  final String recipientUserId;
+  final ChatCallStatus status;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+}
+
 class ChatPrivacySettings {
   const ChatPrivacySettings({
     required this.whoCanMessage,

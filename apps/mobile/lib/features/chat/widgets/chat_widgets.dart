@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
 import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
+import '../chat_models.dart';
 import '../chat_session.dart';
 import 'chat_motion.dart';
 
@@ -166,167 +169,325 @@ class ChatPageScaffold extends StatelessWidget {
     final bottomContentInset = keyboardInset > 0
         ? keyboardInset
         : bottomSystemInset;
-    return PopScope<Object?>(
-      canPop: canPop,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        if (onBlockedPop?.call() ?? false) return;
-        chatGoBack(context, returnRoute);
-      },
-      child: ChatRouteEntryMotion(
-        key: const Key('chat-route-entry-motion'),
-        stateKey: '$title|$returnRoute',
-        child: RepaintBoundary(
-          key: const Key('chat-page-surface'),
-          child: Scaffold(
-            resizeToAvoidBottomInset: false,
-            backgroundColor: backgroundColor,
-            appBar: AppBar(
-              automaticallyImplyLeading: false,
-              toolbarHeight: prominentTitle ? 76 : 64,
-              backgroundColor: MoolColors.canvas,
-              surfaceTintColor: Colors.transparent,
-              leadingWidth: showContentBack ? 52 : 0,
-              leading: showContentBack
-                  ? MoolNativeBackButton(
-                      keyName: backKeyName,
-                      onPressed: () => chatGoBack(context, returnRoute),
-                    )
-                  : null,
-              titleSpacing: showContentBack ? 0 : MoolSpacing.md,
-              title: Semantics(
-                header: true,
-                button: onTitleTap != null,
-                label: onTitleTap == null ? null : '$title. Conversation info',
-                child: InkWell(
-                  key: onTitleTap == null
+    return _ChatPresenceLifecycle(
+      session: session,
+      child: PopScope<Object?>(
+        canPop: canPop,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          if (onBlockedPop?.call() ?? false) return;
+          chatGoBack(context, returnRoute);
+        },
+        child: ChatRouteEntryMotion(
+          key: const Key('chat-route-entry-motion'),
+          stateKey: '$title|$returnRoute',
+          child: RepaintBoundary(
+            key: const Key('chat-page-surface'),
+            child: Scaffold(
+              resizeToAvoidBottomInset: false,
+              backgroundColor: backgroundColor,
+              appBar: AppBar(
+                automaticallyImplyLeading: false,
+                toolbarHeight: prominentTitle ? 76 : 64,
+                backgroundColor: MoolColors.canvas,
+                surfaceTintColor: Colors.transparent,
+                leadingWidth: showContentBack ? 52 : 0,
+                leading: showContentBack
+                    ? MoolNativeBackButton(
+                        keyName: backKeyName,
+                        onPressed: () => chatGoBack(context, returnRoute),
+                      )
+                    : null,
+                titleSpacing: showContentBack ? 0 : MoolSpacing.md,
+                title: Semantics(
+                  header: true,
+                  button: onTitleTap != null,
+                  label: onTitleTap == null
                       ? null
-                      : const Key('chat-conversation-info'),
-                  onTap: onTitleTap,
-                  borderRadius: BorderRadius.circular(MoolRadii.control),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      minHeight: MoolMetrics.minimumTapTarget,
-                    ),
-                    child: Row(
-                      children: [
-                        if (titleIcon != null) ...[
-                          Container(
-                            key: const Key('chat-context-icon'),
-                            width: 36,
-                            height: 36,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: (titleAccent ?? MoolColors.navy)
-                                  .withValues(alpha: .10),
-                              borderRadius: BorderRadius.circular(
-                                MoolRadii.control,
-                              ),
-                            ),
-                            child: Icon(
-                              titleIcon,
-                              size: 20,
-                              color: titleAccent ?? MoolColors.navy,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                        ],
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: MoolColors.ink,
-                                  fontSize: prominentTitle
-                                      ? 25
-                                      : trailing != null && title.length > 14
-                                      ? 17
-                                      : 19,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: prominentTitle ? -.55 : -.25,
+                      : '$title. Conversation info',
+                  child: InkWell(
+                    key: onTitleTap == null
+                        ? null
+                        : const Key('chat-conversation-info'),
+                    onTap: onTitleTap,
+                    borderRadius: BorderRadius.circular(MoolRadii.control),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minHeight: MoolMetrics.minimumTapTarget,
+                      ),
+                      child: Row(
+                        children: [
+                          if (titleIcon != null) ...[
+                            Container(
+                              key: const Key('chat-context-icon'),
+                              width: 36,
+                              height: 36,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: (titleAccent ?? MoolColors.navy)
+                                    .withValues(alpha: .10),
+                                borderRadius: BorderRadius.circular(
+                                  MoolRadii.control,
                                 ),
                               ),
-                              if (subtitle.trim().isNotEmpty) ...[
-                                const SizedBox(height: 2),
+                              child: Icon(
+                                titleIcon,
+                                size: 20,
+                                color: titleAccent ?? MoolColors.navy,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                          ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
                                 Text(
-                                  subtitle,
+                                  title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: MoolColors.muted,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
+                                  style: TextStyle(
+                                    color: MoolColors.ink,
+                                    fontSize: prominentTitle
+                                        ? 25
+                                        : trailing != null && title.length > 14
+                                        ? 17
+                                        : 19,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: prominentTitle ? -.55 : -.25,
                                   ),
                                 ),
+                                if (subtitle.trim().isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    subtitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: MoolColors.muted,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
-                        ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                actions: [
+                  if (trailing != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: MoolSpacing.sm),
+                      child: trailing!,
+                    ),
+                ],
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(1),
+                  child: Divider(
+                    key: const Key('chat-moolsocial-divider'),
+                    height: 1,
+                    thickness: 1,
+                    color: (titleAccent ?? MoolColors.navy).withValues(
+                      alpha: .12,
+                    ),
+                  ),
+                ),
+              ),
+              body: SafeArea(
+                top: false,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: MoolMetrics.maximumContentWidth,
+                    ),
+                    child: Column(
+                      children: [
+                        if (showMessageBanner)
+                          ChatMessageBanner(
+                            session: session,
+                            threadId: messageThreadId,
+                          ),
+                        if (session.incomingCalls.isNotEmpty)
+                          _ChatIncomingCallBanner(
+                            session: session,
+                            call: session.incomingCalls.first,
+                          ),
+                        if (session.activeCall case final call?
+                            when call.status == ChatCallStatus.accepted)
+                          _ChatActiveCallBanner(session: session, call: call),
+                        Expanded(child: body),
                       ],
                     ),
                   ),
                 ),
               ),
-              actions: [
-                if (trailing != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: MoolSpacing.sm),
-                    child: trailing!,
-                  ),
-              ],
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(1),
-                child: Divider(
-                  key: const Key('chat-moolsocial-divider'),
-                  height: 1,
-                  thickness: 1,
-                  color: (titleAccent ?? MoolColors.navy).withValues(
-                    alpha: .12,
-                  ),
-                ),
-              ),
+              bottomNavigationBar: bottom == null
+                  ? null
+                  : AnimatedPadding(
+                      key: const Key('chat-keyboard-safe-bottom'),
+                      duration: MoolMotion.accessible(
+                        context,
+                        MoolMotion.quick,
+                      ),
+                      curve: MoolMotion.enter,
+                      padding: EdgeInsets.only(bottom: bottomContentInset),
+                      child: bottom,
+                    ),
+              floatingActionButton: floatingActionButton,
             ),
-            body: SafeArea(
-              top: false,
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: MoolMetrics.maximumContentWidth,
-                  ),
-                  child: Column(
-                    children: [
-                      if (showMessageBanner)
-                        ChatMessageBanner(
-                          session: session,
-                          threadId: messageThreadId,
-                        ),
-                      Expanded(child: body),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            bottomNavigationBar: bottom == null
-                ? null
-                : AnimatedPadding(
-                    key: const Key('chat-keyboard-safe-bottom'),
-                    duration: MoolMotion.accessible(context, MoolMotion.quick),
-                    curve: MoolMotion.enter,
-                    padding: EdgeInsets.only(bottom: bottomContentInset),
-                    child: bottom,
-                  ),
-            floatingActionButton: floatingActionButton,
           ),
         ),
       ),
     );
   }
+}
+
+class _ChatPresenceLifecycle extends StatefulWidget {
+  const _ChatPresenceLifecycle({required this.session, required this.child});
+
+  final ChatSession session;
+  final Widget child;
+
+  @override
+  State<_ChatPresenceLifecycle> createState() => _ChatPresenceLifecycleState();
+}
+
+class _ChatIncomingCallBanner extends StatelessWidget {
+  const _ChatIncomingCallBanner({required this.session, required this.call});
+
+  final ChatSession session;
+  final ChatCall call;
+
+  @override
+  Widget build(BuildContext context) {
+    final thread = session.thread(call.threadId);
+    final label = call.kind == ChatCallKind.voice ? 'Voice' : 'Video';
+    return Material(
+      key: const Key('chat-incoming-call'),
+      color: const Color(0xFFEAF7E8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.call_received_rounded,
+                  color: MoolColors.success,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '$label call from ${thread.title}',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  key: const Key('chat-incoming-decline'),
+                  onPressed: session.callLoading
+                      ? null
+                      : () => unawaited(
+                          session.respondToCall(call.id, accepted: false),
+                        ),
+                  child: const Text('Decline'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  key: const Key('chat-incoming-accept'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(88, 44),
+                  ),
+                  onPressed: session.callLoading
+                      ? null
+                      : () => unawaited(
+                          session.respondToCall(call.id, accepted: true),
+                        ),
+                  child: const Text('Answer'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatActiveCallBanner extends StatelessWidget {
+  const _ChatActiveCallBanner({required this.session, required this.call});
+
+  final ChatSession session;
+  final ChatCall call;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    key: const Key('chat-active-call'),
+    color: const Color(0xFFEAF7E8),
+    child: ListTile(
+      dense: true,
+      leading: const Icon(Icons.graphic_eq_rounded, color: MoolColors.success),
+      title: Text(
+        '${call.kind == ChatCallKind.voice ? 'Voice' : 'Video'} call connected',
+      ),
+      trailing: TextButton.icon(
+        key: const Key('chat-active-call-end'),
+        onPressed: session.callLoading
+            ? null
+            : () => unawaited(session.endCall()),
+        icon: const Icon(Icons.call_end_rounded),
+        label: const Text('End'),
+      ),
+    ),
+  );
+}
+
+class _ChatPresenceLifecycleState extends State<_ChatPresenceLifecycle>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(widget.session.updatePresence(ChatPresenceState.active));
+        unawaited(widget.session.loadIncomingCalls());
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final presence = switch (state) {
+      AppLifecycleState.resumed => ChatPresenceState.active,
+      AppLifecycleState.detached => ChatPresenceState.offline,
+      AppLifecycleState.inactive ||
+      AppLifecycleState.hidden ||
+      AppLifecycleState.paused => ChatPresenceState.background,
+    };
+    unawaited(widget.session.updatePresence(presence));
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class ChatMessageBanner extends StatelessWidget {
