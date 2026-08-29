@@ -12,6 +12,7 @@ import '../chat_models.dart';
 import '../chat_session.dart';
 import '../widgets/chat_motion.dart';
 import '../widgets/chat_widgets.dart';
+import 'chat_archived_screen.dart';
 import 'chat_people_directory.dart';
 import 'chat_settings_screen.dart';
 
@@ -308,6 +309,17 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
 
   Future<void> _handleMoreAction(String action) async {
     switch (action) {
+      case 'archived':
+        if (!mounted) return;
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ChatArchivedScreen(
+              session: widget.session,
+              originReturnRoute: widget.returnRoute,
+            ),
+          ),
+        );
+        return;
       case 'settings':
         if (!mounted) return;
         await Navigator.of(context).push<void>(
@@ -330,6 +342,74 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         if (mounted) await _openPublicFeedDiscovery();
         return;
     }
+  }
+
+  Future<void> _showConversationActions(ChatThread thread) async {
+    final action = await _chooseConversationAction(
+      context,
+      session: widget.session,
+      thread: thread,
+    );
+    if (action == null || !mounted) return;
+    String message;
+    switch (action) {
+      case _ConversationAction.pin:
+        final pinned = !widget.session.isPinnedForSession(thread.id);
+        widget.session.setPinnedForSession(thread.id, pinned: pinned);
+        message = pinned
+            ? 'Conversation pinned for this app session.'
+            : 'Conversation unpinned for this app session.';
+      case _ConversationAction.attention:
+        final reduced = !widget.session.hasReducedAttentionForSession(
+          thread.id,
+        );
+        widget.session.setReducedAttentionForSession(
+          thread.id,
+          reduced: reduced,
+        );
+        message = reduced
+            ? 'Attention cues reduced for this app session.'
+            : 'Standard attention cues restored.';
+      case _ConversationAction.read:
+        final markRead = widget.session.unreadFor(thread) > 0;
+        widget.session.setReadForSession(thread.id, read: markRead);
+        message = markRead
+            ? 'Conversation marked read in this app session.'
+            : 'Conversation marked unread in this app session.';
+      case _ConversationAction.archive:
+        widget.session.setArchivedForSession(thread.id, archived: true);
+        final messenger = ScaffoldMessenger.of(context);
+        messenger
+          ..hideCurrentSnackBar(reason: SnackBarClosedReason.remove)
+          ..showSnackBar(
+            SnackBar(
+              key: const Key('chat-archive-feedback'),
+              behavior: SnackBarBehavior.floating,
+              content: const Text(
+                'Conversation archived for this app session.',
+              ),
+              action: SnackBarAction(
+                key: const Key('chat-archive-undo'),
+                label: 'Undo',
+                onPressed: () => widget.session.setArchivedForSession(
+                  thread.id,
+                  archived: false,
+                ),
+              ),
+            ),
+          );
+        return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar(reason: SnackBarClosedReason.remove)
+      ..showSnackBar(
+        SnackBar(
+          key: const Key('chat-conversation-action-feedback'),
+          behavior: SnackBarBehavior.floating,
+          content: Text(message),
+        ),
+      );
   }
 
   @override
@@ -379,6 +459,14 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 child: ListTile(
                   leading: Icon(Icons.tune_rounded),
                   title: Text('Chat settings'),
+                ),
+              ),
+              const PopupMenuItem(
+                key: Key('chat-more-archived'),
+                value: 'archived',
+                child: ListTile(
+                  leading: Icon(Icons.archive_outlined),
+                  title: Text('Archived conversations'),
                 ),
               ),
               const PopupMenuItem(
@@ -615,6 +703,11 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                   thread: threads[index],
                   unread: widget.session.unreadFor(threads[index]),
                   hidePreview: widget.session.hideMessagePreviewsForSession,
+                  pinned: widget.session.isPinnedForSession(threads[index].id),
+                  reducedAttention: widget.session
+                      .hasReducedAttentionForSession(threads[index].id),
+                  onMore: () =>
+                      unawaited(_showConversationActions(threads[index])),
                   onTap: () => _openThread(
                     context,
                     threads[index].id,
@@ -728,12 +821,18 @@ class _ThreadCard extends StatelessWidget {
     required this.thread,
     required this.unread,
     required this.hidePreview,
+    required this.pinned,
+    required this.reducedAttention,
+    required this.onMore,
     required this.onTap,
   });
 
   final ChatThread thread;
   final int unread;
   final bool hidePreview;
+  final bool pinned;
+  final bool reducedAttention;
+  final VoidCallback onMore;
   final VoidCallback onTap;
 
   @override
@@ -743,6 +842,7 @@ class _ThreadCard extends StatelessWidget {
       child: InkWell(
         key: Key('chat-open-thread-${thread.id}'),
         onTap: onTap,
+        onLongPress: onMore,
         overlayColor: WidgetStatePropertyAll(
           MoolColors.navy.withValues(alpha: .06),
         ),
@@ -786,6 +886,14 @@ class _ThreadCard extends StatelessWidget {
                             color: MoolColors.success,
                           ),
                         ],
+                        if (pinned) ...[
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.push_pin_rounded,
+                            size: 15,
+                            color: MoolColors.navy,
+                          ),
+                        ],
                         const SizedBox(width: 8),
                         Text(
                           thread.timeLabel,
@@ -815,15 +923,32 @@ class _ThreadCard extends StatelessWidget {
                         ),
                         if (unread > 0) ...[
                           const SizedBox(width: 8),
-                          Badge(
-                            label: Text('$unread'),
-                            backgroundColor: MoolColors.success,
-                            textColor: Colors.white,
+                          Semantics(
+                            label: reducedAttention
+                                ? '$unread unread messages, attention reduced'
+                                : '$unread unread messages',
+                            child: Badge(
+                              label: Text('$unread'),
+                              backgroundColor: reducedAttention
+                                  ? MoolColors.muted
+                                  : MoolColors.success,
+                              textColor: Colors.white,
+                            ),
                           ),
                         ],
                       ],
                     ),
                   ],
+                ),
+              ),
+              IconButton(
+                key: Key('chat-thread-more-${thread.id}'),
+                tooltip: 'Conversation options',
+                onPressed: onMore,
+                icon: Icon(
+                  reducedAttention
+                      ? Icons.notifications_paused_outlined
+                      : Icons.more_vert_rounded,
                 ),
               ),
             ],
@@ -832,6 +957,115 @@ class _ThreadCard extends StatelessWidget {
       ),
     );
   }
+}
+
+enum _ConversationAction { pin, attention, read, archive }
+
+Future<_ConversationAction?> _chooseConversationAction(
+  BuildContext context, {
+  required ChatSession session,
+  required ChatThread thread,
+}) {
+  final pinned = session.isPinnedForSession(thread.id);
+  final reducedAttention = session.hasReducedAttentionForSession(thread.id);
+  final hasUnread = session.unreadFor(thread) > 0;
+  final viewPadding = MediaQuery.viewPaddingOf(context);
+  final bottomInset = viewPadding.bottom;
+  final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
+    viewPadding: viewPadding,
+    platform: Theme.of(context).platform,
+  );
+  return showModalBottomSheet<_ConversationAction>(
+    context: context,
+    showDragHandle: true,
+    useSafeArea: true,
+    isScrollControlled: true,
+    sheetAnimationStyle: ChatMotion.sheetStyle(context),
+    builder: (sheetContext) => ChatBottomSheetSafeArea(
+      bottomInset: bottomInset,
+      exportedSemanticsClearance: exportedSemanticsClearance,
+      child: Column(
+        key: const Key('chat-conversation-actions'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            title: const Text(
+              'Conversation options',
+              style: TextStyle(
+                color: MoolColors.navy,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            subtitle: Text(
+              thread.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            key: Key('chat-action-pin-${thread.id}'),
+            leading: Icon(
+              pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+            ),
+            title: Text(pinned ? 'Unpin conversation' : 'Pin conversation'),
+            onTap: () =>
+                Navigator.of(sheetContext).pop(_ConversationAction.pin),
+          ),
+          ListTile(
+            key: Key('chat-action-attention-${thread.id}'),
+            leading: Icon(
+              reducedAttention
+                  ? Icons.notifications_active_outlined
+                  : Icons.notifications_paused_outlined,
+            ),
+            title: Text(
+              reducedAttention
+                  ? 'Restore attention cues'
+                  : 'Reduce attention cues',
+            ),
+            subtitle: const Text(
+              'Keep unread state with a quieter visual cue.',
+            ),
+            onTap: () =>
+                Navigator.of(sheetContext).pop(_ConversationAction.attention),
+          ),
+          ListTile(
+            key: Key('chat-action-read-${thread.id}'),
+            leading: Icon(
+              hasUnread
+                  ? Icons.drafts_outlined
+                  : Icons.mark_email_unread_outlined,
+            ),
+            title: Text(hasUnread ? 'Mark as read' : 'Mark as unread'),
+            onTap: () =>
+                Navigator.of(sheetContext).pop(_ConversationAction.read),
+          ),
+          ListTile(
+            key: Key('chat-action-archive-${thread.id}'),
+            leading: const Icon(Icons.archive_outlined),
+            title: const Text('Archive conversation'),
+            subtitle: const Text(
+              'Hide it until you restore it or close MoolSocial.',
+            ),
+            onTap: () =>
+                Navigator.of(sheetContext).pop(_ConversationAction.archive),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 14),
+            child: Text(
+              'Pin, attention, read and archive choices on this screen apply to this app session only.',
+              style: TextStyle(
+                color: MoolColors.muted,
+                fontSize: 11.5,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _EmptyInbox extends StatelessWidget {

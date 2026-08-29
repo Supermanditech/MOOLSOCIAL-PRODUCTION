@@ -219,6 +219,10 @@ class ChatSession extends ChangeNotifier {
   final Map<String, String> _threadActionErrors = {};
   final Map<String, String> _threadActionNotices = {};
   final Set<String> _readThreads = {};
+  final Set<String> _markedUnreadThreads = {};
+  final Set<String> _pinnedThreadIds = {};
+  final Set<String> _reducedAttentionThreadIds = {};
+  final Set<String> _archivedThreadIds = {};
   final Map<String, String> _retryKeys = {};
   final Map<String, String> _forwardRetryKeys = {};
   final Map<String, ChatMessage> _replyTargets = {};
@@ -463,19 +467,80 @@ class ChatSession extends ChangeNotifier {
 
   List<ChatThread> visibleThreads([String query = '']) {
     final normalized = query.trim().toLowerCase();
-    return _threads.where((thread) {
-      final filterMatches =
-          selectedFilter == null || thread.type == selectedFilter;
-      final unreadMatches =
-          !unreadOnly ||
-          (thread.unreadCount > 0 && !_readThreads.contains(thread.id));
-      final queryMatches =
-          normalized.isEmpty ||
-          thread.title.toLowerCase().contains(normalized) ||
-          thread.subtitle.toLowerCase().contains(normalized) ||
-          thread.preview.toLowerCase().contains(normalized);
-      return filterMatches && unreadMatches && queryMatches;
-    }).toList();
+    final matches = _threads
+        .where((thread) {
+          final filterMatches =
+              selectedFilter == null || thread.type == selectedFilter;
+          final unreadMatches = !unreadOnly || unreadFor(thread) > 0;
+          final queryMatches =
+              normalized.isEmpty ||
+              thread.title.toLowerCase().contains(normalized) ||
+              thread.subtitle.toLowerCase().contains(normalized) ||
+              thread.preview.toLowerCase().contains(normalized);
+          return !_archivedThreadIds.contains(thread.id) &&
+              filterMatches &&
+              unreadMatches &&
+              queryMatches;
+        })
+        .toList(growable: false);
+    return [
+      ...matches.where((thread) => _pinnedThreadIds.contains(thread.id)),
+      ...matches.where((thread) => !_pinnedThreadIds.contains(thread.id)),
+    ];
+  }
+
+  List<ChatThread> archivedThreads([String query = '']) {
+    final normalized = query.trim().toLowerCase();
+    return _threads
+        .where((thread) {
+          final queryMatches =
+              normalized.isEmpty ||
+              thread.title.toLowerCase().contains(normalized) ||
+              thread.subtitle.toLowerCase().contains(normalized) ||
+              thread.preview.toLowerCase().contains(normalized);
+          return _archivedThreadIds.contains(thread.id) && queryMatches;
+        })
+        .toList(growable: false);
+  }
+
+  bool isPinnedForSession(String threadId) =>
+      _pinnedThreadIds.contains(threadId);
+
+  bool hasReducedAttentionForSession(String threadId) =>
+      _reducedAttentionThreadIds.contains(threadId);
+
+  bool isArchivedForSession(String threadId) =>
+      _archivedThreadIds.contains(threadId);
+
+  int get archivedConversationCount => _archivedThreadIds.length;
+
+  void setPinnedForSession(String threadId, {required bool pinned}) {
+    final changed = pinned
+        ? _pinnedThreadIds.add(threadId)
+        : _pinnedThreadIds.remove(threadId);
+    if (changed) notifyListeners();
+  }
+
+  void setReducedAttentionForSession(String threadId, {required bool reduced}) {
+    final changed = reduced
+        ? _reducedAttentionThreadIds.add(threadId)
+        : _reducedAttentionThreadIds.remove(threadId);
+    if (changed) notifyListeners();
+  }
+
+  void setArchivedForSession(String threadId, {required bool archived}) {
+    final changed = archived
+        ? _archivedThreadIds.add(threadId)
+        : _archivedThreadIds.remove(threadId);
+    if (!changed) return;
+    notifyListeners();
+  }
+
+  void setReadForSession(String threadId, {required bool read}) {
+    final changed = read
+        ? _readThreads.add(threadId) | _markedUnreadThreads.remove(threadId)
+        : _markedUnreadThreads.add(threadId) | _readThreads.remove(threadId);
+    if (changed) notifyListeners();
   }
 
   List<ChatThread> availableForwardTargets(String sourceThreadId) {
@@ -876,6 +941,7 @@ class ChatSession extends ChangeNotifier {
       final gateway = _gateway;
       if (gateway != null) await gateway.markThreadRead(threadId: threadId);
       _readThreads.add(threadId);
+      _markedUnreadThreads.remove(threadId);
       return true;
     } on ChatServiceException catch (error) {
       _threadActionErrors[threadId] = error.userMessage;
@@ -891,6 +957,9 @@ class ChatSession extends ChangeNotifier {
   }
 
   int unreadFor(ChatThread thread) {
+    if (_markedUnreadThreads.contains(thread.id)) {
+      return thread.unreadCount > 0 ? thread.unreadCount : 1;
+    }
     return _readThreads.contains(thread.id) ? 0 : thread.unreadCount;
   }
 
@@ -1201,10 +1270,24 @@ class ChatSession extends ChangeNotifier {
     _threadActionErrors.clear();
     _threadActionNotices.clear();
     _readThreads.clear();
+    _markedUnreadThreads.clear();
+    _pinnedThreadIds.clear();
+    _reducedAttentionThreadIds.clear();
+    _archivedThreadIds.clear();
     _retryKeys.clear();
     _forwardRetryKeys.clear();
     _replyTargets.clear();
     _pendingPhotos.clear();
+    _chatAvailableForSession.clear();
+    _voiceCallsAvailableForSession.clear();
+    _videoCallsAvailableForSession.clear();
+    _reviewBeforeSendingForSession.clear();
+    _globalChatAvailableForSession = true;
+    _globalVoiceCallsAvailableForSession = true;
+    _globalVideoCallsAvailableForSession = true;
+    _globalReviewBeforeSendingForSession = false;
+    _hideMessagePreviewsForSession = false;
+    _showSuggestedPromptsForSession = true;
     selectedFilter = null;
     unreadOnly = false;
     noticeMessage = null;
