@@ -3675,3 +3675,6 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3844 rejects calling `ensureVisible` before a lazy Conversation Info tile
   exists. Scroll the real keyed list until Safety is rendered, then assert and
   tap the context-specific destination.
+- REG3845 rejects using a People thread under the Work business filter for a
+  shared Back test. Choose an unfiltered origin or a context-compatible thread
+  before exercising transient surfaces.

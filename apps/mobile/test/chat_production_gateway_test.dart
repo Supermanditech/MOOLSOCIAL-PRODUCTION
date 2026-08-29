@@ -406,9 +406,31 @@ void main() {
       find.byKey(const Key('chat-forward-target-thread-2')),
       findsOneWidget,
     );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-forward-picker')), findsNothing);
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(gateway.forwardRequests, isEmpty);
+
+    await tester.longPress(find.byKey(const Key('chat-message-message-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-forward-message-1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat-forward-target-thread-2')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-forward-confirmation')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-forward-confirmation')), findsNothing);
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(gateway.forwardRequests, isEmpty);
+
+    await tester.longPress(find.byKey(const Key('chat-message-message-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-forward-message-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-forward-target-thread-2')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat-forward-cancel')));
     await tester.pumpAndSettle();
     expect(gateway.forwardRequests, isEmpty);

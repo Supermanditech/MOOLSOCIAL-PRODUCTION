@@ -174,6 +174,68 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Android Back dismisses transient Chat surfaces before leaving their owner',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+      await mount(
+        tester,
+        route: '/app/chat/inbox?return=/app/mool',
+        journey: journey,
+        chat: chat,
+      );
+
+      await tapVisible(tester, const Key('chat-search-assistance'));
+      expect(
+        find.byKey(const Key('chat-search-assistance-field')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('chat-search-assistance-field')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-open-thread-home-basket'));
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-message-actions')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-message-actions')), findsNothing);
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-voice-message'));
+      expect(
+        find.byKey(const Key('chat-voice-message-recovery')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('chat-voice-message-recovery')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-thread-video'));
+      expect(find.byKey(const Key('chat-video-recovery')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-video-recovery')), findsNothing);
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('Start conversation opens public Feed discovery inside Chat', (
     tester,
   ) async {

@@ -43713,6 +43713,16 @@
       "prevention": "Scroll the actual keyed Conversation Info Scrollable until the Safety destination is rendered, then assert its context-specific label and tap recovery.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3845-TRANSIENT-BACK-TEST-USED-HIDDEN-WORK-PEOPLE-THREAD",
+      "status": "registered_context_filter_compatible_fixture_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "chat", "testing"],
+      "mistake": "The transient Android Back test entered Work Chat and then tried to open the Home Basket People thread, which the approved Work business filter correctly hides.",
+      "rootCause": "The test fixture selected a conversation that was incompatible with its contextual origin filter before exercising the transient surfaces.",
+      "prevention": "Use the unfiltered Mool Chat origin or a thread matching the selected context whenever a test is about shared transient-surface Back behavior rather than filtering.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/chat_flow_test.dart"]
     }
   ]
 }
