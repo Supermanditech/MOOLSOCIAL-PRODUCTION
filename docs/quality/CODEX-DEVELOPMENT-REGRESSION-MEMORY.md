@@ -3663,3 +3663,6 @@ change. It strengthens the gates of otherwise authorized work.
   attachment tray that consumed Android Back. Close the tray and its notice
   first, keep the conversation mounted and use the route fallback only on the
   next Back action.
+- REG3841 rejects skipping the shared inbox when returning from a Feed author
+  conversation. Verify thread → inbox → originating Feed, then continue the
+  successful journey through Discover and a second direct Chat.

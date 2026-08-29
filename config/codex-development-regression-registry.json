@@ -43673,6 +43673,16 @@
       "prevention": "Let the active child surface consume a blocked pop before ChatPageScaffold uses its route fallback, close the tray and notice atomically, and prove the first Back retains the conversation in a deterministic widget test and on OPPO.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "apps/mobile/lib/features/chat/widgets/chat_widgets.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3841-FEED-AUTHOR-CHAT-TEST-SKIPPED-SHARED-INBOX-BACK",
+      "status": "registered_thread_inbox_origin_back_hierarchy_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "chat", "social", "testing"],
+      "mistake": "The strengthened Feed author-message journey expected one Android Back from the direct conversation to return immediately to Feed.",
+      "rootCause": "The acceptance oracle skipped the shared Chat inbox level that intentionally sits between a direct thread and its originating Feed route.",
+      "prevention": "Verify the native hierarchy as thread to shared inbox to originating Feed, then continue through Discover and a second direct conversation without bypassing the existing shared destination.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/chat_flow_test.dart"]
     }
   ]
 }
