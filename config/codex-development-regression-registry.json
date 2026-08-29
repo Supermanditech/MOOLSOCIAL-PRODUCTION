@@ -44233,6 +44233,16 @@
       "prevention": "Before another gate retry, scan every registry evidence reference read-only against both the Child 3 and production roots, list all missing paths and owning entries, and rebind the complete cache-dependent set to durable tracked evidence without weakening any prevention text.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-development-regression-memory.ps1", "docs/quality/UAW-CURSOR-UI-SHOP-CHAT-V1-CHILD3-20260829.md"]
+    },
+    {
+      "id": "REG-20260829-3905-CHILD3-CONTINUATION-BINDING-GATE-REJECTED",
+      "status": "registered_literal_binding_contract_inspection_required",
+      "appliesTo": ["primary", "coordination", "implementation", "git", "tooling"],
+      "mistake": "The first Child 3 task_start coordination gate rejected the founder-authorized continuation binding as invalid or weakened before any product source action.",
+      "rootCause": "The newly added continuation record was not validated against the checker's complete literal value contract before the bootstrap was committed.",
+      "prevention": "Inspect only the checker block that emits the exact rejection, compare every Child 3 binding value to its literal requirements and the established Child 2 pattern, correct only the invalid machine value, refresh registry binding and rerun task_start.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
     }
   ]
 }
