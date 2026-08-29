@@ -3672,3 +3672,6 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3843 rejects retaining the clinic-only Care allowlist oracle after task
   and support destinations are added. Synchronize the audited set and prove
   each deep thread returns under its actual contextual filter.
+- REG3844 rejects calling `ensureVisible` before a lazy Conversation Info tile
+  exists. Scroll the real keyed list until Safety is rendered, then assert and
+  tap the context-specific destination.

@@ -342,6 +342,18 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
     );
   }
 
+  void _showSafetyRecovery(ChatThreadType type) {
+    final copy = _conversationSafetyCopy(type);
+    unawaited(
+      _showUnavailableCapability(
+        context,
+        keyName: copy.recoveryKey,
+        title: copy.recoveryTitle,
+        message: copy.recoveryMessage,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -350,6 +362,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
         final thread = widget.thread;
         final session = widget.session;
         final chatAvailable = session.chatAvailableForSession(thread.id);
+        final safety = _conversationSafetyCopy(thread.type);
         return ChatPageScaffold(
           key: const Key('chat-conversation-info-screen'),
           session: session,
@@ -523,13 +536,10 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                   key: const Key('chat-info-block-user'),
                   minLeadingWidth: 28,
                   leading: const Icon(Icons.block_outlined),
-                  title: const Text('Block this person'),
-                  subtitle: const Text('Nothing changes without confirmation.'),
+                  title: Text(safety.label),
+                  subtitle: Text(safety.description),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => _showAccountSettingRecovery(
-                    keyName: 'chat-block-user-recovery',
-                    title: 'Blocking unavailable',
-                  ),
+                  onTap: () => _showSafetyRecovery(thread.type),
                 ),
               ),
             ],
@@ -539,6 +549,40 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
     );
   }
 }
+
+({
+  String label,
+  String description,
+  String recoveryKey,
+  String recoveryTitle,
+  String recoveryMessage,
+})
+_conversationSafetyCopy(ChatThreadType type) => switch (type) {
+  ChatThreadType.people => (
+    label: 'Block this person',
+    description: 'Nothing changes without confirmation.',
+    recoveryKey: 'chat-block-user-recovery',
+    recoveryTitle: 'Blocking unavailable',
+    recoveryMessage:
+        'Blocking cannot be completed right now. Nothing changed. You can continue in Chat or try again later.',
+  ),
+  ChatThreadType.business => (
+    label: 'Block this business',
+    description: 'Nothing changes without confirmation.',
+    recoveryKey: 'chat-block-business-recovery',
+    recoveryTitle: 'Business blocking unavailable',
+    recoveryMessage:
+        'Business blocking cannot be completed right now. Nothing changed. You can continue in Chat or try again later.',
+  ),
+  ChatThreadType.order || ChatThreadType.support => (
+    label: 'Conversation safety',
+    description: 'Report this conversation or ask MoolSocial for help.',
+    recoveryKey: 'chat-conversation-safety-recovery',
+    recoveryTitle: 'Conversation safety unavailable',
+    recoveryMessage:
+        'Safety and reporting controls are not available right now. Nothing changed. You can continue in Chat or try again later.',
+  ),
+};
 
 class _ConversationIdentityCard extends StatelessWidget {
   const _ConversationIdentityCard({

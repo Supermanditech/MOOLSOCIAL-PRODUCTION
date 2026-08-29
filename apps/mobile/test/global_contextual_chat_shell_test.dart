@@ -614,6 +614,76 @@ void main() {
     },
   );
 
+  for (final safety in const <(String, String, String, String)>[
+    (
+      'mahadev',
+      'Block this business',
+      'chat-block-business-recovery',
+      'Business blocking unavailable',
+    ),
+    (
+      'rasoi',
+      'Conversation safety',
+      'chat-conversation-safety-recovery',
+      'Conversation safety unavailable',
+    ),
+    (
+      'order-support',
+      'Conversation safety',
+      'chat-conversation-safety-recovery',
+      'Conversation safety unavailable',
+    ),
+  ]) {
+    testWidgets(
+      '${safety.$1} uses context-correct Conversation Info safety wording',
+      (tester) async {
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        final journey = await readyJourney();
+        final chat = ChatSession(
+          sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+        );
+        addTearDown(journey.dispose);
+        addTearDown(chat.dispose);
+
+        await tester.pumpWidget(
+          MoolSocialApp(
+            session: journey,
+            chatSession: chat,
+            initialLocation:
+                '/app/chat/thread/${safety.$1}?return=/app/work/earn',
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('chat-conversation-info')));
+        await tester.pumpAndSettle();
+        final safetyAction = find.byKey(const Key('chat-info-block-user'));
+        await tester.scrollUntilVisible(
+          safetyAction,
+          180,
+          scrollable: find.descendant(
+            of: find.byKey(const Key('chat-conversation-info-list')),
+            matching: find.byType(Scrollable),
+          ),
+        );
+        expect(find.text(safety.$2), findsOneWidget);
+        await tester.tap(safetyAction);
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(Key(safety.$3)), findsOneWidget);
+        expect(find.text(safety.$4), findsOneWidget);
+        await tester.tap(find.byKey(const Key('chat-capability-continue')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('chat-conversation-info-screen')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('conversation info remains reachable on compact large text', (
     tester,
   ) async {

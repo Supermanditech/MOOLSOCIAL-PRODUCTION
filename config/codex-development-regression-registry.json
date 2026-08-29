@@ -43703,6 +43703,16 @@
       "prevention": "Update the resolver allowlist assertion in the same bounded change as new Care destinations and require every allowed deep thread to return visibly under its actual thread-type filter.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/chat_entry_context.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3844-SAFETY-TEST-ENSURE-VISIBLE-BEFORE-LAZY-BUILD",
+      "status": "registered_real_scrollable_reachability_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "fitment", "chat", "testing"],
+      "mistake": "The context-aware safety tests called ensureVisible on a Conversation Info tile that had not yet been built below the compact lazy ListView viewport.",
+      "rootCause": "The test treated a lazily built destination as an offscreen rendered element instead of scrolling the owning Conversation Info list until the tile existed.",
+      "prevention": "Scroll the actual keyed Conversation Info Scrollable until the Safety destination is rendered, then assert its context-specific label and tap recovery.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
     }
   ]
 }
