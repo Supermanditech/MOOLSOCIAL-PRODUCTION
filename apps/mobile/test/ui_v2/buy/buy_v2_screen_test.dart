@@ -895,7 +895,7 @@ void main() {
   );
 
   testWidgets(
-    'installed OPPO baseline removes the header from Shop Wholesale and Orders',
+    'every Buy destination keeps one global profile and exact Back return',
     (tester) async {
       addTearDown(() {
         tester.view.resetPhysicalSize();
@@ -914,6 +914,7 @@ void main() {
       for (final destination in const [
         BuyV2Destination.shop,
         BuyV2Destination.wholesale,
+        BuyV2Destination.medicine,
         BuyV2Destination.orders,
       ]) {
         if (destination == BuyV2Destination.orders) {
@@ -967,31 +968,34 @@ void main() {
 
         await tester.tap(accountAction);
         await tester.pumpAndSettle();
-        if (destination == BuyV2Destination.shop) {
-          expect(session.view, BuyV2View.catalogue);
-          expect(
-            find.byKey(const Key('global-profile-panel-v2')),
-            findsOneWidget,
-          );
-          expect(
-            find.bySemanticsLabel('Open your MoolSocial profile'),
-            findsOneWidget,
-          );
-          expect(find.byKey(const ValueKey('buy-search-band')), findsOneWidget);
-        } else {
-          expect(session.view, BuyV2View.account, reason: destination.name);
-          expect(
-            find.byKey(const ValueKey('buy-account-hub')),
-            findsOneWidget,
-            reason: destination.name,
-          );
-          expect(
-            find.byKey(const ValueKey('buy-search-band')),
-            findsNothing,
-            reason:
-                '${destination.name} Account is a full-page content surface',
-          );
-        }
+        expect(session.view, BuyV2View.catalogue, reason: destination.name);
+        expect(
+          find.byKey(const Key('global-profile-panel-v2')),
+          findsOneWidget,
+          reason: destination.name,
+        );
+        expect(
+          find.bySemanticsLabel('Open your MoolSocial profile'),
+          findsOneWidget,
+          reason: destination.name,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-profile-avatar')),
+          findsNothing,
+          reason: destination.name,
+        );
+        final contextId = switch (destination) {
+          BuyV2Destination.shop => 'shop-active-orders',
+          BuyV2Destination.wholesale => 'wholesale-discovery',
+          BuyV2Destination.medicine => 'medicine-discovery',
+          BuyV2Destination.orders => 'shop-orders',
+        };
+        expect(
+          find.byKey(Key('global-profile-context-$contextId')),
+          findsOneWidget,
+          reason: destination.name,
+        );
+        expect(find.byKey(const ValueKey('buy-search-band')), findsOneWidget);
 
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();

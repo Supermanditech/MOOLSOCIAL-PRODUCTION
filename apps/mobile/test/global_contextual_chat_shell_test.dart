@@ -38,11 +38,12 @@ void main() {
         'Social Chat',
         ChatThreadType.people,
       ),
+      ('/app/buy?sub=shop', ChatEntryContextId.shop, 'Shop Chat', null),
       (
-        '/app/buy?sub=shop',
-        ChatEntryContextId.shop,
-        'Shop Chat',
-        ChatThreadType.order,
+        '/app/buy?sub=medicine',
+        ChatEntryContextId.care,
+        'Care Chat',
+        ChatThreadType.business,
       ),
       (
         '/app/eat/home',
@@ -168,11 +169,12 @@ void main() {
       'People and creators',
       ChatThreadType.people,
     ),
+    ('/app/buy?sub=shop', 'Shop Chat', 'Orders and products', null),
     (
-      '/app/buy?sub=shop',
-      'Shop Chat',
-      'Orders and products',
-      ChatThreadType.order,
+      '/app/buy?sub=medicine',
+      'Care Chat',
+      'Appointments and care',
+      ChatThreadType.business,
     ),
     ('/app/eat/home', 'Food Chat', 'Orders and tables', ChatThreadType.order),
     (
@@ -201,7 +203,7 @@ void main() {
       ChatThreadType.support,
     ),
   ]) {
-    testWidgets('${entry.$2} is compact, contextual and filter-correct', (
+    testWidgets('${entry.$2} from ${entry.$1} is compact and filter-correct', (
       tester,
     ) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
