@@ -181,7 +181,8 @@ class _RetailerOrderScreenState extends State<RetailerOrderScreen> {
                     widget.session.contactCustomer('message');
                     context.go(
                       Uri(
-                        path: '/app/chat/thread/mahadev-business',
+                        path:
+                            '/app/chat/thread/retailer-order-${order.id.toLowerCase()}',
                         queryParameters: {
                           'return': '/app/retailer/orders/${order.id}',
                         },

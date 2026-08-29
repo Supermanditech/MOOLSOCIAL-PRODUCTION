@@ -110,6 +110,98 @@ class ChatSession extends ChangeNotifier {
           mine: false,
         ),
       ],
+      'work-opportunity': [
+        const ChatMessage(
+          id: 'work-opportunity-1',
+          sender: 'MoolSocial Work',
+          text:
+              'Ask about eligibility, timing or the next step for an opportunity.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'work-support': [
+        const ChatMessage(
+          id: 'work-support-1',
+          sender: 'MoolSocial Work Support',
+          text:
+              'Tell us which opportunity or workspace step you need help with.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'pay-support': [
+        const ChatMessage(
+          id: 'pay-support-1',
+          sender: 'MoolSocial Pay Support',
+          text: 'Tell us which payment, request or receipt you need help with.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'retailer-order-ms-2841': [
+        const ChatMessage(
+          id: 'retailer-order-ms-2841-1',
+          sender: 'Amit Sharma',
+          text: 'Please message me here if the delivery time changes.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'retailer-order-ms-2840': [
+        const ChatMessage(
+          id: 'retailer-order-ms-2840-1',
+          sender: 'Neha Jain',
+          text: 'Thank you. The delivered order is complete.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'food-restaurant-spice-darbar': [
+        const ChatMessage(
+          id: 'food-restaurant-spice-darbar-1',
+          sender: 'Spice Darbar',
+          text: 'Your table and food questions can continue here.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'food-restaurant-taj-jodhpur': [
+        const ChatMessage(
+          id: 'food-restaurant-taj-jodhpur-1',
+          sender: 'Taj Jodhpur',
+          text: 'Ask about your table booking or dining visit here.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'food-restaurant-blue-lime': [
+        const ChatMessage(
+          id: 'food-restaurant-blue-lime-1',
+          sender: 'Blue Lime Cafe',
+          text: 'Ask about your table or cafe order here.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'food-restaurant-raas-rooftop': [
+        const ChatMessage(
+          id: 'food-restaurant-raas-rooftop-1',
+          sender: 'Raas Rooftop',
+          text: 'Ask about your booking or arrival details here.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'ride-captain': [
+        const ChatMessage(
+          id: 'ride-captain-1',
+          sender: 'Arjun Singh',
+          text: 'I’m on the way. Message me here about the pickup point.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
     });
   }
 
@@ -254,6 +346,94 @@ class ChatSession extends ChangeNotifier {
       preview: 'Complete only the details requested for review.',
       timeLabel: 'Now',
       type: ChatThreadType.support,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'work-opportunity',
+      title: 'MoolSocial Work',
+      subtitle: 'Opportunity support',
+      preview: 'Ask about eligibility, timing or next steps.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'work-support',
+      title: 'MoolSocial Work Support',
+      subtitle: 'Opportunities and workspace help',
+      preview: 'Get help with an opportunity or workspace step.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'pay-support',
+      title: 'MoolSocial Pay Support',
+      subtitle: 'Payments and receipts',
+      preview: 'Get help with a payment, request or receipt.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'retailer-order-ms-2841',
+      title: 'Amit Sharma',
+      subtitle: 'Order MS-2841',
+      preview: 'Message here if the delivery time changes.',
+      timeLabel: 'Now',
+      type: ChatThreadType.people,
+    ),
+    ChatThread(
+      id: 'retailer-order-ms-2840',
+      title: 'Neha Jain',
+      subtitle: 'Order MS-2840',
+      preview: 'The delivered order is complete.',
+      timeLabel: 'Now',
+      type: ChatThreadType.people,
+    ),
+    ChatThread(
+      id: 'food-restaurant-spice-darbar',
+      title: 'Spice Darbar',
+      subtitle: 'Table bookings and food orders',
+      preview: 'Continue your table or food questions here.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'food-restaurant-taj-jodhpur',
+      title: 'Taj Jodhpur',
+      subtitle: 'Table bookings and dining',
+      preview: 'Ask about your table booking or visit.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'food-restaurant-blue-lime',
+      title: 'Blue Lime Cafe',
+      subtitle: 'Table bookings and cafe orders',
+      preview: 'Ask about your table or cafe order.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'food-restaurant-raas-rooftop',
+      title: 'Raas Rooftop',
+      subtitle: 'Table bookings and arrival',
+      preview: 'Ask about your booking or arrival details.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'ride-captain',
+      title: 'Arjun Singh',
+      subtitle: 'Your verified captain',
+      preview: 'Message about the pickup point.',
+      timeLabel: 'Now',
+      type: ChatThreadType.people,
       verified: true,
     ),
   ];

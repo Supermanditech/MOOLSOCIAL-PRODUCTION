@@ -121,6 +121,8 @@ class ChatEntryContext {
     icon: Icons.restaurant_outlined,
     accent: Color(0xFFF27A1A),
     defaultFilter: ChatThreadType.order,
+    allowedThreadIds: {'rasoi', 'order-support'},
+    allowedThreadPrefixes: {'food-restaurant-'},
   );
 
   static const travel = ChatEntryContext(
@@ -131,7 +133,7 @@ class ChatEntryContext {
     icon: Icons.route_outlined,
     accent: Color(0xFF4C4C8A),
     defaultFilter: ChatThreadType.support,
-    allowedThreadIds: {'ride-support'},
+    allowedThreadIds: {'ride-support', 'ride-captain'},
     allowedThreadPrefixes: {'ride-'},
   );
 
@@ -154,6 +156,7 @@ class ChatEntryContext {
     icon: Icons.work_outline_rounded,
     accent: Color(0xFF2F7A28),
     defaultFilter: ChatThreadType.business,
+    allowedThreadIds: {'work-opportunity', 'work-support'},
   );
 
   static const workspace = ChatEntryContext(
@@ -179,7 +182,9 @@ class ChatEntryContext {
       'workspace-support',
       'order-support',
       'ride-support',
-      'mahadev-business',
+      'mahadev',
+      'retailer-order-ms-2841',
+      'retailer-order-ms-2840',
     },
   );
 
@@ -236,6 +241,7 @@ class ChatEntryContext {
     icon: Icons.account_balance_wallet_outlined,
     accent: Color(0xFF0B6B55),
     defaultFilter: ChatThreadType.support,
+    allowedThreadIds: {'pay-support'},
   );
 
   static const _workspacePrefixes = <String>[

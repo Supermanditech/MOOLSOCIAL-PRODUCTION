@@ -265,7 +265,7 @@ class _CaptainArriving extends StatelessWidget {
                       label: 'Chat',
                       icon: Icons.chat_bubble_outline_rounded,
                       onPressed: () => context.go(
-                        '/app/chat/thread/ride-$tripId?return=/app/ride/trip/$tripId',
+                        '/app/chat/thread/ride-captain?return=/app/ride/trip/$tripId',
                       ),
                     ),
                     const SizedBox(width: MoolSpacing.xs),
@@ -478,7 +478,7 @@ class _LiveTrip extends StatelessWidget {
                       label: 'Chat',
                       icon: Icons.chat_bubble_outline_rounded,
                       onPressed: () => context.go(
-                        '/app/chat/thread/ride-$tripId?return=/app/ride/trip/$tripId',
+                        '/app/chat/thread/ride-captain?return=/app/ride/trip/$tripId',
                       ),
                     ),
                     const SizedBox(width: MoolSpacing.xs),
