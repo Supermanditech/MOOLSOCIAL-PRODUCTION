@@ -39,6 +39,7 @@ class ChatPageScaffold extends StatelessWidget {
     this.onTitleTap,
     this.backgroundColor = MoolColors.canvas,
     this.messageThreadId,
+    this.onBlockedPop,
     this.trailing,
     this.bottom,
     this.floatingActionButton,
@@ -59,6 +60,7 @@ class ChatPageScaffold extends StatelessWidget {
   final VoidCallback? onTitleTap;
   final Color backgroundColor;
   final String? messageThreadId;
+  final bool Function()? onBlockedPop;
   final Widget? trailing;
   final Widget? bottom;
   final Widget? floatingActionButton;
@@ -74,7 +76,9 @@ class ChatPageScaffold extends StatelessWidget {
     return PopScope<Object?>(
       canPop: canPop,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) chatGoBack(context, returnRoute);
+        if (didPop) return;
+        if (onBlockedPop?.call() ?? false) return;
+        chatGoBack(context, returnRoute);
       },
       child: RepaintBoundary(
         key: const Key('chat-page-surface'),

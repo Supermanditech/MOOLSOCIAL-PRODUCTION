@@ -3659,3 +3659,7 @@ change. It strengthens the gates of otherwise authorized work.
 - REG3839 rejects assuming Android Back pops a Social root directly to Chat.
   Preserve Social shell Back ownership, continue through its global Chat action
   and verify Chat Back returns to Feed within the approved navigation contract.
+- REG3840 rejects letting the shared Chat exact-return fallback override an
+  attachment tray that consumed Android Back. Close the tray and its notice
+  first, keep the conversation mounted and use the route fallback only on the
+  next Back action.

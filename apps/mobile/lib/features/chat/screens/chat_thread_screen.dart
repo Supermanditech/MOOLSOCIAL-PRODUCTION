@@ -31,6 +31,7 @@ class ChatThreadScreen extends StatefulWidget {
 
 class _ChatThreadScreenState extends State<ChatThreadScreen> {
   final _messageController = TextEditingController();
+  final _composerKey = GlobalKey<_ComposerState>();
   final Map<String, String> _draftTextByThread = {};
   int _threadLoadRequest = 0;
 
@@ -206,6 +207,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           onTitleTap: () =>
               unawaited(_openConversationInfo(thread, entryContext)),
           backgroundColor: const Color(0xFFF1F2F6),
+          onBlockedPop: () =>
+              _composerKey.currentState?.closeAttachmentsForBack() ?? false,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -268,6 +271,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
               : _ThreadBody(session: widget.session, thread: thread),
           bottom: widget.session.chatAvailableForSession(thread.id)
               ? _Composer(
+                  key: _composerKey,
                   session: widget.session,
                   threadId: thread.id,
                   controller: _messageController,
@@ -1471,6 +1475,7 @@ class _Composer extends StatefulWidget {
     required this.controller,
     required this.onSend,
     required this.onSendPhoto,
+    super.key,
   });
 
   final ChatSession session;
@@ -1498,6 +1503,15 @@ class _ComposerState extends State<_Composer> {
       _attachmentsOpen = !_attachmentsOpen;
       _attachmentNotice = null;
     });
+  }
+
+  bool closeAttachmentsForBack() {
+    if (!_attachmentsOpen) return false;
+    setState(() {
+      _attachmentsOpen = false;
+      _attachmentNotice = null;
+    });
+    return true;
   }
 
   Future<void> _chooseAttachment(
@@ -1567,6 +1581,10 @@ class _ComposerState extends State<_Composer> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              PopScope<void>(
+                canPop: !_attachmentsOpen,
+                child: const SizedBox.shrink(),
+              ),
               if (_attachmentsOpen) ...[
                 Container(
                   key: const Key('chat-attachment-tray'),

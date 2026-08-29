@@ -43663,6 +43663,16 @@
       "prevention": "Preserve Social Back ownership, use the visible Social global Chat action as the forward continuation into messaging, then verify Chat Back returns to the Feed and the intent remains escapable through approved global navigation.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/chat_flow_test.dart"],
       "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/chat_flow_test.dart"]
+    },
+    {
+      "id": "REG-20260829-3840-ATTACHMENT-TRAY-BACK-EXITED-CONVERSATION",
+      "status": "registered_child_pop_interception_before_route_fallback_required",
+      "appliesTo": ["primary", "mobile", "ui_ux", "navigation", "chat", "testing"],
+      "mistake": "On the r61.40 OPPO review runtime, Android Back from the open attachment tray exited the conversation instead of dismissing the tray first.",
+      "rootCause": "The composer PopScope blocked the route pop, but the shared ChatPageScaffold treated every blocked pop as a request for its exact-return fallback and navigated to the inbox.",
+      "prevention": "Let the active child surface consume a blocked pop before ChatPageScaffold uses its route fallback, close the tray and notice atomically, and prove the first Back retains the conversation in a deterministic widget test and on OPPO.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart", "apps/mobile/lib/features/chat/widgets/chat_widgets.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"]
     }
   ]
 }

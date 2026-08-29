@@ -314,6 +314,12 @@ void main() {
     expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
     expect(find.textContaining('Video sharing'), findsOneWidget);
 
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(find.byKey(const Key('chat-attachment-tray')), findsNothing);
+    expect(find.byKey(const Key('chat-attachment-notice')), findsNothing);
+
     await tester.tap(find.byKey(const Key('chat-composer-camera')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
