@@ -269,12 +269,12 @@ void main() {
       find.byKey(const ValueKey('buy-address-selected-home')),
       findsOneWidget,
     );
-    final edit = tester.getSemantics(
-      find.byKey(const ValueKey('buy-address-edit-semantics-home')),
+    final manage = tester.getSemantics(
+      find.byKey(const ValueKey('buy-address-actions-home')),
     );
-    expect(edit.label, 'Edit Home address');
-    expect(edit.flagsCollection.isButton, isTrue);
-    expect(edit.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+    expect(manage.label, contains('Manage Home address'));
+    expect(manage.flagsCollection.isButton, isTrue);
+    expect(manage.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
     expect(
       tester.getSize(find.byKey(const ValueKey('buy-address-home'))).height,
       greaterThanOrEqualTo(76),
@@ -284,7 +284,7 @@ void main() {
       greaterThanOrEqualTo(44),
     );
     expect(
-      tester.getSize(find.byKey(const ValueKey('buy-address-edit-home'))),
+      tester.getSize(find.byKey(const ValueKey('buy-address-actions-home'))),
       const Size(48, 48),
     );
     semantics.dispose();

@@ -86,6 +86,116 @@ abstract interface class BuyV2ProductFactsAdapter {
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product);
 }
 
+enum BuyV2CommerceLoadState { loading, ready, offline, unavailable }
+
+enum BuyV2OrderPlacementOutcome {
+  confirmed,
+  paymentPending,
+  cancelled,
+  failed,
+  unavailable,
+}
+
+@immutable
+class BuyV2CommerceSnapshot {
+  const BuyV2CommerceSnapshot({
+    required this.state,
+    this.products = const [],
+    this.addresses = const [],
+    this.orders = const [],
+    this.paymentMethods = const {},
+    this.selectedAddressId,
+    this.businessVerified = false,
+    this.customerMessage,
+  });
+
+  final BuyV2CommerceLoadState state;
+  final List<BuyV2Product> products;
+  final List<BuyV2Address> addresses;
+  final List<BuyV2Order> orders;
+  final Set<String> paymentMethods;
+  final String? selectedAddressId;
+  final bool businessVerified;
+  final String? customerMessage;
+}
+
+@immutable
+class BuyV2OrderPlacementRequest {
+  const BuyV2OrderPlacementRequest({
+    required this.lines,
+    required this.address,
+    required this.paymentMethod,
+    required this.total,
+  });
+
+  final List<BuyV2CartLine> lines;
+  final BuyV2Address address;
+  final String paymentMethod;
+  final int total;
+}
+
+@immutable
+class BuyV2OrderPlacementResult {
+  const BuyV2OrderPlacementResult({
+    required this.outcome,
+    required this.customerMessage,
+    this.purchaseReference,
+    this.orders = const [],
+  });
+
+  final BuyV2OrderPlacementOutcome outcome;
+  final String customerMessage;
+  final String? purchaseReference;
+  final List<BuyV2Order> orders;
+}
+
+@immutable
+class BuyV2MutationResult {
+  const BuyV2MutationResult({
+    required this.accepted,
+    required this.customerMessage,
+  });
+
+  final bool accepted;
+  final String customerMessage;
+}
+
+@immutable
+class BuyV2AddressRequestResult {
+  const BuyV2AddressRequestResult({
+    required this.customerMessage,
+    this.shareUri,
+  });
+
+  final Uri? shareUri;
+  final String customerMessage;
+
+  bool get available => shareUri != null;
+}
+
+abstract interface class BuyV2CommerceAdapter {
+  const BuyV2CommerceAdapter();
+
+  Future<BuyV2CommerceSnapshot> refresh();
+
+  Future<BuyV2OrderPlacementResult> placeOrder(
+    BuyV2OrderPlacementRequest request,
+  );
+
+  Future<BuyV2MutationResult> submitProductReview({
+    required BuyV2Product product,
+    required int rating,
+    required String comment,
+  });
+
+  Future<BuyV2MutationResult> reportProduct({
+    required BuyV2Product product,
+    required String reason,
+  });
+
+  Future<BuyV2AddressRequestResult> createAddressRequest({String recipient});
+}
+
 final class BuyV2CatalogueProductFactsAdapter
     implements BuyV2ProductFactsAdapter {
   const BuyV2CatalogueProductFactsAdapter();

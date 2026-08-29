@@ -6,6 +6,7 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_catalogue_data.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 
 final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
@@ -32,6 +33,69 @@ final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
           promisedByLabel: quote?.$2,
           sourceId: 'b01-t01c-delivery-quote',
         );
+  }
+}
+
+final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
+  _ShopCommerceAdapter({required this.snapshot, required this.placement});
+
+  final BuyV2CommerceSnapshot snapshot;
+  final BuyV2OrderPlacementResult placement;
+  int placementCalls = 0;
+
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => snapshot;
+
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrder(
+    BuyV2OrderPlacementRequest request,
+  ) async {
+    placementCalls += 1;
+    return placement;
+  }
+
+  @override
+  Future<BuyV2AddressRequestResult> createAddressRequest({
+    String recipient = '',
+  }) async => const BuyV2AddressRequestResult(
+    customerMessage: 'Address requests are unavailable right now.',
+  );
+
+  @override
+  Future<BuyV2MutationResult> reportProduct({
+    required BuyV2Product product,
+    required String reason,
+  }) async => const BuyV2MutationResult(
+    accepted: true,
+    customerMessage: 'Report received.',
+  );
+
+  @override
+  Future<BuyV2MutationResult> submitProductReview({
+    required BuyV2Product product,
+    required int rating,
+    required String comment,
+  }) async => const BuyV2MutationResult(
+    accepted: true,
+    customerMessage: 'Review added.',
+  );
+}
+
+final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
+  _MemoryCustomerStateStore(this.ownerScope);
+
+  @override
+  final String ownerScope;
+
+  BuyV2CustomerStateSnapshot? snapshot;
+
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => snapshot;
+
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
+    this.snapshot = snapshot;
+    return true;
   }
 }
 
@@ -1139,6 +1203,143 @@ void main() {
         expect(session.chooseAddress('missing-address'), isFalse);
         expect(session.selectedAddressId, 'work');
         expect(session.notice, 'This saved address could not be found.');
+      },
+    );
+
+    test(
+      'normal runtime starts with no review commerce or customer data',
+      () async {
+        final production = BuyV2Session(
+          core: BuySession(),
+          reviewDataEnabled: false,
+        );
+
+        expect(production.visibleProducts, isEmpty);
+        expect(production.addresses, isEmpty);
+        expect(production.orders, isEmpty);
+        expect(production.businessVerified, isFalse);
+        expect(production.availablePaymentMethods, isEmpty);
+
+        await production.restoreCommerce();
+
+        expect(
+          production.commerceLoadState,
+          BuyV2CommerceLoadState.unavailable,
+        );
+        expect(production.confirmOrder(), isFalse);
+        expect(production.view, isNot(BuyV2View.confirmation));
+        expect(
+          production.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.unavailable,
+        );
+      },
+    );
+
+    test(
+      'authoritative commerce snapshot and order result own production success',
+      () async {
+        final product = BuyV2Catalogue.products.firstWhere(
+          (candidate) => candidate.destination == BuyV2Destination.shop,
+        );
+        const address = BuyV2Address(
+          id: 'server-home',
+          kind: BuyV2AddressKind.home,
+          label: 'Home',
+          recipient: 'Aarav Sharma',
+          phone: '9000000000',
+          line: '12, Central Avenue',
+          area: 'Sardarpura, Jodhpur',
+          pinCode: '342003',
+          landmark: 'Near the market',
+        );
+        final order = BuyV2Order(
+          id: 'MS-SERVER-1',
+          destination: BuyV2Destination.shop,
+          title: 'Shop order',
+          itemSummary: '1 product',
+          total: product.price,
+          partner: product.seller,
+          partnerType: product.partnerRole,
+          promise: product.deliveryPromise,
+          destinationLabel: address.shortLine,
+          progress: .2,
+          status: BuyV2OrderStatus.preparing,
+          purchaseId: 'BUY-SERVER-1',
+          productIds: [product.id],
+          lines: [BuyV2CartLine(product: product, quantity: 1)],
+          paymentMethod: 'UPI',
+        );
+        final adapter = _ShopCommerceAdapter(
+          snapshot: BuyV2CommerceSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            products: [product],
+            addresses: const [address],
+            selectedAddressId: address.id,
+            paymentMethods: const {'UPI'},
+          ),
+          placement: BuyV2OrderPlacementResult(
+            outcome: BuyV2OrderPlacementOutcome.confirmed,
+            customerMessage: 'Your order is confirmed.',
+            purchaseReference: 'BUY-SERVER-1',
+            orders: [order],
+          ),
+        );
+        final production = BuyV2Session(
+          core: BuySession(),
+          commerceAdapter: adapter,
+          reviewDataEnabled: false,
+        );
+
+        await production.restoreCommerce();
+        expect(production.addProduct(product.id), isTrue);
+        production.openCart(scope: BuyV2CartScope.shop);
+        expect(production.openCheckout(), isTrue);
+
+        expect(await production.submitOrder(), isTrue);
+        expect(adapter.placementCalls, 1);
+        expect(production.view, BuyV2View.confirmation);
+        expect(production.confirmedOrders.single.id, order.id);
+        expect(production.itemCount, 0);
+      },
+    );
+
+    test(
+      'customer state restores cart address saved and payment choices',
+      () async {
+        final store = _MemoryCustomerStateStore('account-1');
+        final first = BuyV2Session(
+          core: BuySession(),
+          customerStateStore: store,
+        );
+        final product = first.visibleProducts.first;
+        first.addProduct(product.id);
+        first.toggleSaved(product.id);
+        first.addAddress(
+          const BuyV2Address(
+            id: 'family',
+            kind: BuyV2AddressKind.thirdParty,
+            label: 'Third party',
+            recipient: 'Family recipient',
+            phone: '9000000001',
+            line: '21, Market Road',
+            area: 'Ratanada, Jodhpur',
+            pinCode: '342011',
+            landmark: 'Near the park',
+          ),
+        );
+        first.choosePayment('Bank transfer');
+        await Future<void>.delayed(Duration.zero);
+
+        final restored = BuyV2Session(
+          core: BuySession(),
+          customerStateStore: store,
+        );
+        await restored.restoreCustomerState();
+
+        expect(restored.quantityFor(product.id), product.minimumOrder);
+        expect(restored.isSaved(product.id), isTrue);
+        expect(restored.selectedAddressId, 'family');
+        expect(restored.selectedPayment, 'Bank transfer');
       },
     );
   });

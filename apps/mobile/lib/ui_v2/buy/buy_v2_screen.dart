@@ -89,7 +89,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   void initState() {
     super.initState();
     _applyInitialState();
-    unawaited(widget.session.restoreSavedProducts());
+    unawaited(_restoreSessionState());
     _lastSearchDestination = widget.session.destination;
     widget.session.addListener(_sessionChanged);
   }
@@ -100,7 +100,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     if (oldWidget.session != widget.session) {
       oldWidget.session.removeListener(_sessionChanged);
       widget.session.addListener(_sessionChanged);
-      unawaited(widget.session.restoreSavedProducts());
+      unawaited(_restoreSessionState());
     }
     if (oldWidget.initialDestination != widget.initialDestination ||
         oldWidget.initialOffersActive != widget.initialOffersActive ||
@@ -111,6 +111,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         oldWidget.recoveryKind != widget.recoveryKind) {
       _applyInitialState();
     }
+  }
+
+  Future<void> _restoreSessionState() async {
+    await widget.session.restoreCommerce();
+    await widget.session.restoreCustomerState();
+    await widget.session.restoreSavedProducts();
   }
 
   void _applyInitialState() {

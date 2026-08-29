@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../features/buy/buy_v2_cart_contracts.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
@@ -490,10 +491,12 @@ class BuyV2ProductView extends StatelessWidget {
               _ProductReviewsPanel(
                 product: product,
                 review: review,
-                onReview: () =>
-                    _showProductReviewSheet(context, session, product),
-                onReport: () =>
-                    _showProductReportSheet(context, session, product),
+                onReview: session.productFeedbackAvailable
+                    ? () => _showProductReviewSheet(context, session, product)
+                    : null,
+                onReport: session.productFeedbackAvailable
+                    ? () => _showProductReportSheet(context, session, product)
+                    : null,
                 reported: session.hasReportedProduct(product.id),
               ),
               const SizedBox(height: 10),
@@ -2318,8 +2321,8 @@ class _ProductReviewsPanel extends StatelessWidget {
 
   final BuyV2Product product;
   final BuyV2CustomerReview? review;
-  final VoidCallback onReview;
-  final VoidCallback onReport;
+  final VoidCallback? onReview;
+  final VoidCallback? onReport;
   final bool reported;
 
   @override
@@ -2390,32 +2393,40 @@ class _ProductReviewsPanel extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  key: ValueKey('buy-review-product-${product.id}'),
-                  onPressed: onReview,
-                  icon: const Icon(Icons.rate_review_outlined, size: 17),
-                  label: Text(review == null ? 'Write review' : 'Edit review'),
-                ),
-              ),
-              const SizedBox(width: 7),
-              Expanded(
-                child: TextButton.icon(
-                  key: ValueKey('buy-report-product-${product.id}'),
-                  onPressed: reported ? null : onReport,
-                  icon: Icon(
-                    reported
-                        ? Icons.check_circle_outline_rounded
-                        : Icons.flag_outlined,
-                    size: 17,
+          if (onReview != null || onReport != null)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: ValueKey('buy-review-product-${product.id}'),
+                    onPressed: onReview,
+                    icon: const Icon(Icons.rate_review_outlined, size: 17),
+                    label: Text(
+                      review == null ? 'Write review' : 'Edit review',
+                    ),
                   ),
-                  label: Text(reported ? 'Reported' : 'Report issue'),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: TextButton.icon(
+                    key: ValueKey('buy-report-product-${product.id}'),
+                    onPressed: reported ? null : onReport,
+                    icon: Icon(
+                      reported
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.flag_outlined,
+                      size: 17,
+                    ),
+                    label: Text(reported ? 'Reported' : 'Report issue'),
+                  ),
+                ),
+              ],
+            )
+          else
+            Text(
+              'Reviews and product reports will be available after Shop reconnects.',
+              style: context.buyMeta.copyWith(fontSize: 9),
+            ),
         ],
       ),
     );
@@ -3815,6 +3826,13 @@ class BuyV2CheckoutView extends StatelessWidget {
                     'Review order',
                     style: context.buyTitle.copyWith(fontSize: 19),
                   ),
+                  if (session.checkoutSubmissionState !=
+                          BuyV2CheckoutSubmissionState.idle &&
+                      session.checkoutSubmissionState !=
+                          BuyV2CheckoutSubmissionState.confirmed) ...[
+                    const SizedBox(height: 8),
+                    _CheckoutSubmissionStatus(session: session),
+                  ],
                   const SizedBox(height: 8),
                   _SavedAddressReminder(
                     address: address,
@@ -3963,10 +3981,14 @@ class BuyV2CheckoutView extends StatelessWidget {
                     width: 176,
                     height: 44,
                     child: FilledButton(
-                      onPressed: session.checkoutPromiseReviewRequired
+                      onPressed:
+                          session.checkoutBusy ||
+                              session.checkoutSubmissionState ==
+                                  BuyV2CheckoutSubmissionState.paymentPending ||
+                              session.checkoutPromiseReviewRequired
                           ? null
                           : missingDetails.isEmpty
-                          ? session.confirmOrder
+                          ? session.submitOrder
                           : () => showBuyV2GstInvoiceSheet(
                               context,
                               controller: gstInvoiceController,
@@ -3974,7 +3996,13 @@ class BuyV2CheckoutView extends StatelessWidget {
                             ),
                       child: Text(
                         missingDetails.isEmpty
-                            ? 'Place order'
+                            ? switch (session.checkoutSubmissionState) {
+                                BuyV2CheckoutSubmissionState.submitting =>
+                                  'Placing order…',
+                                BuyV2CheckoutSubmissionState.paymentPending =>
+                                  'Payment pending',
+                                _ => 'Place order',
+                              }
                             : 'Add GST details',
                       ),
                     ),
@@ -3985,6 +4013,80 @@ class BuyV2CheckoutView extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _CheckoutSubmissionStatus extends StatelessWidget {
+  const _CheckoutSubmissionStatus({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = session.checkoutSubmissionState;
+    final pending = state == BuyV2CheckoutSubmissionState.paymentPending;
+    final submitting = state == BuyV2CheckoutSubmissionState.submitting;
+    final title = submitting
+        ? 'Placing your order'
+        : pending
+        ? 'Payment confirmation is pending'
+        : state == BuyV2CheckoutSubmissionState.unavailable
+        ? 'Ordering is unavailable right now'
+        : 'Your order was not placed';
+    final detail = submitting
+        ? 'Keep this screen open while the latest price, payment and order are confirmed.'
+        : pending
+        ? 'Do not pay again. Check this payment before trying another method.'
+        : 'Your Cart is unchanged. Try again or get help if the issue continues.';
+    return Semantics(
+      key: ValueKey('buy-checkout-submission-${state.name}'),
+      container: true,
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(11),
+        decoration: buyV2CardDecoration(
+          color: pending ? BuyV2Colors.softOrange : BuyV2Colors.softBlue,
+          border: pending ? BuyV2Colors.orange : BuyV2Colors.navy,
+          radius: 15,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (submitting)
+              const SizedBox.square(
+                dimension: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              )
+            else
+              Icon(
+                pending ? Icons.schedule_rounded : Icons.info_outline_rounded,
+                color: BuyV2Colors.navy,
+                size: 22,
+              ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: context.buyBody),
+                  const SizedBox(height: 2),
+                  Text(detail, style: context.buyMeta),
+                  if (!submitting) ...[
+                    const SizedBox(height: 6),
+                    TextButton.icon(
+                      key: const ValueKey('buy-checkout-submission-help'),
+                      onPressed: session.openAssist,
+                      icon: const Icon(Icons.chat_outlined, size: 17),
+                      label: const Text('Get order help'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -4635,8 +4737,7 @@ class BuyV2OrdersView extends StatelessWidget {
                         Flexible(
                           child: Text(
                             '${session.activeOrderCount} active · '
-                            '${session.deliveredOrderCount} delivered · '
-                            'next Wed, 29 Jul',
+                            '${session.deliveredOrderCount} delivered',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: context.buyMeta.copyWith(fontSize: 8),
@@ -4688,7 +4789,9 @@ class BuyV2OrdersView extends StatelessWidget {
         const SizedBox(height: 7),
         BuyV2FiniteIncomingTransition(
           stateKey: session.ordersTab,
-          child: visibleOrders.isEmpty
+          child: !session.catalogueAvailable
+              ? _OrdersAvailabilityState(session: session)
+              : visibleOrders.isEmpty
               ? _OrdersEmptyState(query: session.query, tab: session.ordersTab)
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4939,6 +5042,62 @@ class BuyV2OrderItemsView extends StatelessWidget {
               ),
             ),
       ],
+    );
+  }
+}
+
+class _OrdersAvailabilityState extends StatelessWidget {
+  const _OrdersAvailabilityState({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final loading = session.commerceLoadState == BuyV2CommerceLoadState.loading;
+    return Container(
+      key: ValueKey('buy-orders-${session.commerceLoadState.name}'),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      decoration: buyV2CardDecoration(radius: 15),
+      child: Column(
+        children: [
+          if (loading)
+            const SizedBox.square(
+              dimension: 28,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            )
+          else
+            const Icon(
+              Icons.receipt_long_outlined,
+              color: BuyV2Colors.navy,
+              size: 28,
+            ),
+          const SizedBox(height: 8),
+          Text(
+            loading ? 'Opening Orders' : 'Orders could not refresh',
+            textAlign: TextAlign.center,
+            style: context.buyTitle.copyWith(fontSize: 14),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            session.commerceMessage ??
+                'Try again shortly. Existing order details remain unchanged.',
+            textAlign: TextAlign.center,
+            style: context.buyMeta,
+          ),
+          if (!loading) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: BuyV2Metrics.minimumTap,
+              child: FilledButton.icon(
+                key: const ValueKey('buy-orders-retry'),
+                onPressed: session.retryCommerce,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Try again'),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -6688,7 +6847,7 @@ Future<void> showBuyV2PaymentSheet(
   final destination = session.destination;
   final view = session.view;
   final selectedPayment = session.selectedPayment;
-  const choices = [
+  final choices = const [
     (
       'UPI',
       Icons.qr_code_rounded,
@@ -6704,7 +6863,7 @@ Future<void> showBuyV2PaymentSheet(
       Icons.receipt_long_outlined,
       'Choose for an eligible business workspace',
     ),
-  ];
+  ].where((choice) => session.availablePaymentMethods.contains(choice.$1));
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -6775,6 +6934,20 @@ Future<void> showBuyV2PaymentSheet(
                 ],
               ),
               const SizedBox(height: 12),
+              if (choices.isEmpty)
+                Container(
+                  key: const ValueKey('buy-payment-unavailable'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: buyV2CardDecoration(
+                    color: BuyV2Colors.softOrange,
+                    border: BuyV2Colors.orange,
+                    radius: 14,
+                  ),
+                  child: Text(
+                    'Payment methods are unavailable right now. Return to Checkout and try again.',
+                    style: sheetContext.buyMeta,
+                  ),
+                ),
               for (final choice in choices)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -7170,6 +7343,39 @@ Future<void> showBuyV2AddressSheet(
                         session,
                         existingAddress: address,
                       ),
+                      onDelete: () async {
+                        final remove = await showDialog<bool>(
+                          context: sheetContext,
+                          builder: (dialogContext) => AlertDialog(
+                            title: Text('Remove ${address.label} address?'),
+                            content: const Text(
+                              'Existing orders stay unchanged. You can add this address again later.',
+                            ),
+                            actions: [
+                              TextButton(
+                                key: const ValueKey(
+                                  'buy-address-delete-cancel',
+                                ),
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(false),
+                                child: const Text('Keep address'),
+                              ),
+                              FilledButton(
+                                key: const ValueKey(
+                                  'buy-address-delete-confirm',
+                                ),
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(true),
+                                child: const Text('Remove'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (remove != true || !sheetContext.mounted) return;
+                        if (session.removeAddress(address.id)) {
+                          Navigator.of(sheetContext).pop();
+                        }
+                      },
                     ),
                   ),
               const SizedBox(height: 4),
@@ -7209,12 +7415,14 @@ class _BuyV2AddressChoice extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final BuyV2Address address;
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -7230,6 +7438,7 @@ class _BuyV2AddressChoice extends StatelessWidget {
       BuyV2AddressKind.thirdParty => Icons.group_outlined,
       BuyV2AddressKind.other => Icons.location_on_outlined,
     };
+    final actionsKey = GlobalKey<PopupMenuButtonState<String>>();
     return Material(
       color: selected ? BuyV2Colors.softBlue : Colors.white,
       shape: RoundedRectangleBorder(
@@ -7359,23 +7568,46 @@ class _BuyV2AddressChoice extends StatelessWidget {
               ),
             ),
             Semantics(
-              key: ValueKey('buy-address-edit-semantics-${address.id}'),
+              key: ValueKey('buy-address-actions-${address.id}'),
               button: true,
-              label: 'Edit ${address.label} address',
-              onTap: onEdit,
-              child: ExcludeSemantics(
-                child: IconButton(
-                  key: ValueKey('buy-address-edit-${address.id}'),
-                  tooltip: 'Edit ${address.label} address',
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined, size: 19),
-                  color: BuyV2Colors.navy,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 48,
-                    height: 48,
+              label: 'Manage ${address.label} address',
+              onTap: () => actionsKey.currentState?.showButtonMenu(),
+              child: PopupMenuButton<String>(
+                key: actionsKey,
+                tooltip: 'Manage ${address.label} address',
+                constraints: const BoxConstraints(minWidth: 170),
+                onSelected: (action) {
+                  if (action == 'edit') {
+                    onEdit();
+                  } else if (action == 'delete') {
+                    onDelete();
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem<String>(
+                    key: ValueKey('buy-address-edit-${address.id}'),
+                    value: 'edit',
+                    child: const Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 19),
+                        SizedBox(width: 9),
+                        Text('Edit address'),
+                      ],
+                    ),
                   ),
-                  padding: EdgeInsets.zero,
-                ),
+                  PopupMenuItem<String>(
+                    key: ValueKey('buy-address-delete-${address.id}'),
+                    value: 'delete',
+                    child: const Row(
+                      children: [
+                        Icon(Icons.delete_outline_rounded, size: 19),
+                        SizedBox(width: 9),
+                        Text('Remove address'),
+                      ],
+                    ),
+                  ),
+                ],
+                icon: const Icon(Icons.more_vert_rounded, size: 20),
               ),
             ),
           ],
@@ -7465,6 +7697,7 @@ class _BuyV2AddressRequestForm extends StatefulWidget {
 
 class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
   final recipientController = TextEditingController();
+  bool requestBusy = false;
 
   @override
   void dispose() {
@@ -7472,12 +7705,56 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
     super.dispose();
   }
 
-  Future<void> copyRequest(String channel) async {
-    await _copyAddressRequest(
-      context,
-      channel,
-      recipient: recipientController.text.trim(),
+  Future<void> requestAddress({required bool copyOnly}) async {
+    if (requestBusy) return;
+    FocusScope.of(context).unfocus();
+    setState(() => requestBusy = true);
+    final result = await widget.session.createAddressRequest(
+      recipient: recipientController.text,
     );
+    if (!mounted) return;
+    final shareUri = result.shareUri;
+    if (shareUri == null) {
+      setState(() => requestBusy = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.customerMessage)));
+      return;
+    }
+    if (copyOnly) {
+      await Clipboard.setData(ClipboardData(text: shareUri.toString()));
+      if (!mounted) return;
+      setState(() => requestBusy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Address request link copied')),
+      );
+      return;
+    }
+    final renderBox = context.findRenderObject() as RenderBox?;
+    final origin = renderBox == null
+        ? const Rect.fromLTWH(0, 0, 1, 1)
+        : renderBox.localToGlobal(Offset.zero) & renderBox.size;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          uri: shareUri,
+          title: 'Send delivery address',
+          subject: 'MoolSocial delivery address request',
+          sharePositionOrigin: origin,
+          downloadFallbackEnabled: false,
+          mailToFallbackEnabled: false,
+        ),
+      );
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sharing is unavailable. Copy the link instead.'),
+          ),
+        );
+      }
+    }
+    if (mounted) setState(() => requestBusy = false);
   }
 
   @override
@@ -7509,7 +7786,7 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
               _AddressFormHeader(
                 title: 'Request an address',
                 body:
-                    'Copy a secure request link and send it to the person receiving the order.',
+                    'Create a secure request link and send it to the person receiving the order.',
                 closeKey: const ValueKey('buy-address-request-form-close'),
               ),
               const SizedBox(height: 12),
@@ -7527,24 +7804,17 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
               Row(
                 children: [
                   _ShareChoice(
-                    key: const ValueKey('buy-address-request-whatsapp'),
-                    label: 'For WhatsApp',
-                    icon: Icons.call_outlined,
-                    onTap: () => copyRequest('WhatsApp'),
-                  ),
-                  const SizedBox(width: 7),
-                  _ShareChoice(
-                    key: const ValueKey('buy-address-request-moolsocial'),
-                    label: 'For MoolSocial',
-                    icon: Icons.chat_outlined,
-                    onTap: () => copyRequest('MoolSocial'),
-                  ),
-                  const SizedBox(width: 7),
-                  _ShareChoice(
                     key: const ValueKey('buy-address-request-device-share'),
-                    label: 'Copy link',
+                    label: requestBusy ? 'Preparing…' : 'Share request',
                     icon: Icons.ios_share_outlined,
-                    onTap: () => copyRequest('link'),
+                    onTap: () => requestAddress(copyOnly: false),
+                  ),
+                  const SizedBox(width: 7),
+                  _ShareChoice(
+                    key: const ValueKey('buy-address-request-copy'),
+                    label: 'Copy link',
+                    icon: Icons.link_rounded,
+                    onTap: () => requestAddress(copyOnly: true),
                   ),
                 ],
               ),
@@ -11441,23 +11711,4 @@ class _ShareChoiceState extends State<_ShareChoice> {
       ),
     );
   }
-}
-
-Future<void> _copyAddressRequest(
-  BuildContext context,
-  String channel, {
-  String recipient = '',
-}) async {
-  await Clipboard.setData(
-    const ClipboardData(text: 'https://moolsocial.com/address/request'),
-  );
-  if (!context.mounted) return;
-  final navigator = Navigator.of(context);
-  final messenger = ScaffoldMessenger.of(context);
-  final recipientCopy = recipient.isEmpty ? '' : ' for $recipient';
-  final message = channel == 'link'
-      ? 'Request link copied$recipientCopy. Ready to share.'
-      : 'Request link copied$recipientCopy. Open $channel to share it.';
-  navigator.pop();
-  messenger.showSnackBar(SnackBar(content: Text(message)));
 }

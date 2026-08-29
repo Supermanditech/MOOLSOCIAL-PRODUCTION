@@ -72,6 +72,114 @@ typedef _BuyV2RecoveryOrigin = ({
   String? orderId,
 });
 
+enum BuyV2CheckoutSubmissionState {
+  idle,
+  submitting,
+  paymentPending,
+  confirmed,
+  failed,
+  unavailable,
+}
+
+final class _BuyV2UnavailableCommerceAdapter implements BuyV2CommerceAdapter {
+  const _BuyV2UnavailableCommerceAdapter();
+
+  static const _unavailable =
+      'Shop is unavailable right now. Try again shortly.';
+
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => const BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.unavailable,
+    customerMessage: _unavailable,
+  );
+
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrder(
+    BuyV2OrderPlacementRequest request,
+  ) async => const BuyV2OrderPlacementResult(
+    outcome: BuyV2OrderPlacementOutcome.unavailable,
+    customerMessage:
+        'Ordering is unavailable right now. Your Cart has not changed.',
+  );
+
+  @override
+  Future<BuyV2MutationResult> submitProductReview({
+    required BuyV2Product product,
+    required int rating,
+    required String comment,
+  }) async => const BuyV2MutationResult(
+    accepted: false,
+    customerMessage: 'Reviews are unavailable right now. Try again later.',
+  );
+
+  @override
+  Future<BuyV2MutationResult> reportProduct({
+    required BuyV2Product product,
+    required String reason,
+  }) async => const BuyV2MutationResult(
+    accepted: false,
+    customerMessage:
+        'Product reporting is unavailable right now. Try again later.',
+  );
+
+  @override
+  Future<BuyV2AddressRequestResult> createAddressRequest({
+    String recipient = '',
+  }) async => const BuyV2AddressRequestResult(
+    customerMessage:
+        'Address requests are unavailable right now. Enter the address yourself.',
+  );
+}
+
+final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
+  const _BuyV2DeviceReviewCommerceAdapter();
+
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: BuyV2Catalogue.products,
+    paymentMethods: BuyV2Session.paymentMethods,
+    businessVerified: true,
+  );
+
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrder(
+    BuyV2OrderPlacementRequest request,
+  ) async => BuyV2OrderPlacementResult(
+    outcome: BuyV2OrderPlacementOutcome.confirmed,
+    customerMessage: 'Your order is confirmed.',
+    purchaseReference:
+        'MS-${DateTime.now().microsecondsSinceEpoch.toString().substring(8)}',
+  );
+
+  @override
+  Future<BuyV2MutationResult> submitProductReview({
+    required BuyV2Product product,
+    required int rating,
+    required String comment,
+  }) async => const BuyV2MutationResult(
+    accepted: true,
+    customerMessage: 'Your review was added.',
+  );
+
+  @override
+  Future<BuyV2MutationResult> reportProduct({
+    required BuyV2Product product,
+    required String reason,
+  }) async => const BuyV2MutationResult(
+    accepted: true,
+    customerMessage: 'Report received. We will review the product details.',
+  );
+
+  @override
+  Future<BuyV2AddressRequestResult> createAddressRequest({
+    String recipient = '',
+  }) async => BuyV2AddressRequestResult(
+    shareUri: Uri.parse('https://moolsocial.com/address/request'),
+    customerMessage: 'Choose an app to send the address request.',
+  );
+}
+
 class BuyV2Session extends ChangeNotifier {
   BuyV2Session({
     required this.core,
@@ -80,11 +188,34 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2CartBenefitsAdapter? cartBenefitsAdapter,
     this.tipPolicy = const BuyV2DisabledTipPolicy(),
     this.savedProductsStore,
+    this.customerStateStore,
+    BuyV2CommerceAdapter? commerceAdapter,
+    bool? reviewDataEnabled,
   }) : cartBenefitsAdapter =
            cartBenefitsAdapter ??
            (buyV2DeviceReviewBenefitSeedsEnabled
                ? const BuyV2SeededCartBenefitsAdapter()
-               : const BuyV2DisabledCartBenefitsAdapter());
+               : const BuyV2DisabledCartBenefitsAdapter()),
+       reviewDataEnabled =
+           reviewDataEnabled ??
+           (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled),
+       commerceAdapter =
+           commerceAdapter ??
+           ((reviewDataEnabled ??
+                   (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
+               ? const _BuyV2DeviceReviewCommerceAdapter()
+               : const _BuyV2UnavailableCommerceAdapter()) {
+    _catalogueProducts.addAll(BuyV2Catalogue.products);
+    if (!this.reviewDataEnabled) {
+      _catalogueProducts.clear();
+      _addresses.clear();
+      _orders.clear();
+      _selectedAddressId = null;
+      businessVerified = false;
+      availablePaymentMethods = const {};
+      commerceLoadState = BuyV2CommerceLoadState.loading;
+    }
+  }
 
   final BuySession core;
   final BuyV2ProductFactsAdapter productFactsAdapter;
@@ -92,6 +223,9 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2CartBenefitsAdapter cartBenefitsAdapter;
   final BuyV2TipPolicy tipPolicy;
   final BuyV2SavedProductsStore? savedProductsStore;
+  final BuyV2CustomerStateStore? customerStateStore;
+  final BuyV2CommerceAdapter commerceAdapter;
+  final bool reviewDataEnabled;
 
   static const bool sponsoredContentActivationApproved = false;
   static const BuyV2CatalogueProductFactsAdapter _catalogueFactsFallback =
@@ -102,6 +236,22 @@ class BuyV2Session extends ChangeNotifier {
     'Bank transfer',
     'Purchase order',
   };
+
+  BuyV2CommerceLoadState commerceLoadState = BuyV2CommerceLoadState.ready;
+  BuyV2CheckoutSubmissionState checkoutSubmissionState =
+      BuyV2CheckoutSubmissionState.idle;
+  Set<String> availablePaymentMethods = paymentMethods;
+  String? commerceMessage;
+
+  bool get catalogueAvailable =>
+      commerceLoadState == BuyV2CommerceLoadState.ready;
+
+  bool get productFeedbackAvailable => reviewDataEnabled;
+
+  bool get addressRequestsAvailable => reviewDataEnabled;
+
+  bool get checkoutBusy =>
+      checkoutSubmissionState == BuyV2CheckoutSubmissionState.submitting;
 
   BuyV2Destination destination = BuyV2Destination.shop;
   BuyV2View view = BuyV2View.catalogue;
@@ -226,6 +376,7 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2Destination _productReturnDestination = BuyV2Destination.shop;
   BuyV2View _productReturnView = BuyV2View.catalogue;
 
+  final List<BuyV2Product> _catalogueProducts = [];
   final Map<String, BuyV2CartLine> _cart = {};
   final Map<String, BuyV2ProductFactsSnapshot> _productFacts = {};
   final Map<String, int> _prescriptionApprovedQuantities = {};
@@ -239,6 +390,8 @@ class BuyV2Session extends ChangeNotifier {
   final Set<String> _savedKeys = {};
   String? _savedProductsOwnerScope;
   int _savedProductsMutationRevision = 0;
+  String? _customerStateOwnerScope;
+  int _customerStateMutationRevision = 0;
   Set<BuyV2Destination> _confirmedDestinations = {};
   List<BuyV2Order> _confirmedOrders = [];
   Map<String, _BuyV2DeliveryPromiseQuote> _checkoutPromiseSnapshot = {};
@@ -255,9 +408,9 @@ class BuyV2Session extends ChangeNotifier {
       id: 'home',
       kind: BuyV2AddressKind.home,
       label: 'Home',
-      recipient: 'Dharmendra Choudhary',
-      phone: '9251893684',
-      line: '12, Central Residency',
+      recipient: 'Aarav Sharma',
+      phone: '9000000000',
+      line: '12, Central Avenue',
       area: 'Sardarpura, Jodhpur',
       pinCode: '342003',
       landmark: 'Near Sardarpura circle',
@@ -266,9 +419,9 @@ class BuyV2Session extends ChangeNotifier {
       id: 'work',
       kind: BuyV2AddressKind.work,
       label: 'Work',
-      recipient: 'Dharmendra Choudhary',
-      phone: '9251893684',
-      line: 'Supermandi Tech Private Limited',
+      recipient: 'Aarav Sharma',
+      phone: '9000000000',
+      line: 'Business receiving desk',
       area: 'Basni, Jodhpur',
       pinCode: '342005',
       landmark: 'Near industrial area gate',
@@ -364,6 +517,59 @@ class BuyV2Session extends ChangeNotifier {
 
   String? get selectedAddressId => _selectedAddressId;
 
+  Future<void> restoreCommerce() async {
+    if (reviewDataEnabled) {
+      commerceLoadState = BuyV2CommerceLoadState.ready;
+      commerceMessage = null;
+      return;
+    }
+    commerceLoadState = BuyV2CommerceLoadState.loading;
+    commerceMessage = null;
+    notifyListeners();
+    try {
+      final snapshot = await commerceAdapter.refresh();
+      _catalogueProducts
+        ..clear()
+        ..addAll(snapshot.products);
+      _addresses
+        ..clear()
+        ..addAll(snapshot.addresses);
+      _orders
+        ..clear()
+        ..addAll(snapshot.orders);
+      businessVerified = snapshot.businessVerified;
+      availablePaymentMethods = Set.unmodifiable(snapshot.paymentMethods);
+      _selectedAddressId = snapshot.selectedAddressId;
+      if (_selectedAddressId != null &&
+          !_addresses.any((address) => address.id == _selectedAddressId)) {
+        _selectedAddressId = null;
+      }
+      if (!availablePaymentMethods.contains(selectedPayment)) {
+        selectedPayment = availablePaymentMethods.firstOrNull ?? '';
+      }
+      commerceLoadState = snapshot.state;
+      commerceMessage = snapshot.customerMessage;
+    } on Object {
+      commerceLoadState = BuyV2CommerceLoadState.offline;
+      commerceMessage =
+          'Shop could not refresh. Check your connection and try again.';
+    }
+    notifyListeners();
+  }
+
+  Future<void> retryCommerce() => restoreCommerce();
+
+  Future<BuyV2AddressRequestResult> createAddressRequest({
+    String recipient = '',
+  }) async {
+    final result = await commerceAdapter.createAddressRequest(
+      recipient: recipient.trim(),
+    );
+    notice = result.customerMessage;
+    notifyListeners();
+    return result;
+  }
+
   List<BuyV2Category> get categories => switch (destination) {
     BuyV2Destination.shop => BuyV2Catalogue.shopCategories,
     BuyV2Destination.wholesale => BuyV2Catalogue.wholesaleCategories,
@@ -384,7 +590,7 @@ class BuyV2Session extends ChangeNotifier {
         ? BuyV2Destination.shop
         : destination;
     final category = selectedCategoryId;
-    final candidates = BuyV2Catalogue.products.where((product) {
+    final candidates = _catalogueProducts.where((product) {
       if (product.destination != filterDestination) return false;
       final matchesCategory =
           category == 'all' ||
@@ -467,7 +673,7 @@ class BuyV2Session extends ChangeNotifier {
     final destination = value == BuyV2Destination.orders
         ? BuyV2Destination.shop
         : value;
-    return BuyV2Catalogue.products
+    return _catalogueProducts
         .where(
           (product) =>
               product.destination == destination &&
@@ -499,6 +705,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     _savedProductsMutationRevision += 1;
     _persistSavedProducts();
+    _persistCustomerState();
     notifyListeners();
   }
 
@@ -514,6 +721,7 @@ class BuyV2Session extends ChangeNotifier {
     _savedProductsMutationRevision += 1;
     notice = '${destination.label} Saved products cleared.';
     _persistSavedProducts();
+    _persistCustomerState();
     notifyListeners();
   }
 
@@ -535,7 +743,7 @@ class BuyV2Session extends ChangeNotifier {
           mutationRevision != _savedProductsMutationRevision) {
         return;
       }
-      final validKeys = BuyV2Catalogue.products.map(_buyV2SavedKey).toSet();
+      final validKeys = _catalogueProducts.map(_buyV2SavedKey).toSet();
       _savedKeys
         ..clear()
         ..addAll(stored.where(validKeys.contains));
@@ -564,6 +772,91 @@ class BuyV2Session extends ChangeNotifier {
           })
           .catchError((Object _) {
             notice = 'Saved products could not be retained. Try again.';
+            notifyListeners();
+          }),
+    );
+  }
+
+  Future<void> restoreCustomerState() async {
+    final store = customerStateStore;
+    final ownerScope = store?.ownerScope;
+    if (store == null ||
+        ownerScope == null ||
+        ownerScope == _customerStateOwnerScope) {
+      return;
+    }
+    _customerStateOwnerScope = ownerScope;
+    final mutationRevision = _customerStateMutationRevision;
+    try {
+      final snapshot = await store.read();
+      if (snapshot == null ||
+          store.ownerScope != ownerScope ||
+          mutationRevision != _customerStateMutationRevision) {
+        return;
+      }
+      _cart.clear();
+      for (final entry in snapshot.cartQuantities.entries) {
+        final product = findProduct(entry.key);
+        if (product == null || entry.value < product.minimumOrder) continue;
+        _cart[product.id] = BuyV2CartLine(
+          product: product,
+          quantity: entry.value,
+        );
+      }
+      _addresses
+        ..clear()
+        ..addAll(snapshot.addresses);
+      _selectedAddressId = snapshot.selectedAddressId;
+      if (_selectedAddressId != null &&
+          !_addresses.any((address) => address.id == _selectedAddressId)) {
+        _selectedAddressId = null;
+      }
+      final validSavedKeys = _catalogueProducts.map(_buyV2SavedKey).toSet();
+      _savedKeys
+        ..clear()
+        ..addAll(snapshot.savedProductKeys.where(validSavedKeys.contains));
+      _deliveryInstructionIds
+        ..clear()
+        ..addAll(snapshot.deliveryInstructionIds);
+      final storedPayment = snapshot.selectedPayment;
+      if (storedPayment != null &&
+          availablePaymentMethods.contains(storedPayment)) {
+        selectedPayment = storedPayment;
+      }
+      _pruneCartSelections();
+      notifyListeners();
+    } on Object {
+      if (store.ownerScope == ownerScope) _customerStateOwnerScope = null;
+      notice = 'Your Shop choices could not be restored. Try again.';
+      notifyListeners();
+    }
+  }
+
+  void _persistCustomerState() {
+    final store = customerStateStore;
+    if (store == null || store.ownerScope == null) return;
+    _customerStateMutationRevision += 1;
+    final snapshot = BuyV2CustomerStateSnapshot(
+      cartQuantities: Map.unmodifiable({
+        for (final line in _cart.values) line.product.id: line.quantity,
+      }),
+      addresses: List.unmodifiable(_addresses),
+      selectedAddressId: _selectedAddressId,
+      savedProductKeys: Set.unmodifiable(_savedKeys),
+      deliveryInstructionIds: Map.unmodifiable(_deliveryInstructionIds),
+      selectedPayment: selectedPayment.isEmpty ? null : selectedPayment,
+    );
+    unawaited(
+      store
+          .write(snapshot)
+          .then((saved) {
+            if (!saved) {
+              notice = 'Your Shop choices could not be retained. Try again.';
+              notifyListeners();
+            }
+          })
+          .catchError((Object _) {
+            notice = 'Your Shop choices could not be retained. Try again.';
             notifyListeners();
           }),
     );
@@ -784,6 +1077,7 @@ class BuyV2Session extends ChangeNotifier {
     if (instructionId == null) {
       _deliveryInstructionIds.remove(destination);
       notice = null;
+      _persistCustomerState();
       notifyListeners();
       return true;
     }
@@ -799,6 +1093,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     _deliveryInstructionIds[destination] = instructionId;
     notice = null;
+    _persistCustomerState();
     notifyListeners();
     return true;
   }
@@ -951,7 +1246,7 @@ class BuyV2Session extends ChangeNotifier {
       return value;
     }
 
-    final candidates = BuyV2Catalogue.products
+    final candidates = _catalogueProducts
         .where(
           (product) =>
               product.destination == destination &&
@@ -989,7 +1284,7 @@ class BuyV2Session extends ChangeNotifier {
       return value;
     }
 
-    final candidates = BuyV2Catalogue.products
+    final candidates = _catalogueProducts
         .where(
           (product) =>
               product.destination == current.destination &&
@@ -1019,7 +1314,7 @@ class BuyV2Session extends ChangeNotifier {
       return const [];
     }
 
-    final candidates = BuyV2Catalogue.products
+    final candidates = _catalogueProducts
         .where(
           (product) =>
               product.destination == BuyV2Destination.wholesale &&
@@ -1051,7 +1346,7 @@ class BuyV2Session extends ChangeNotifier {
         current.destination == BuyV2Destination.medicine;
     if (!supportedDestination || limit <= 0) return const [];
 
-    final candidates = BuyV2Catalogue.products
+    final candidates = _catalogueProducts
         .where(
           (product) =>
               product.destination == current.destination &&
@@ -1116,7 +1411,7 @@ class BuyV2Session extends ChangeNotifier {
       .length;
 
   BuyV2Product? findProduct(String id) {
-    for (final product in BuyV2Catalogue.products) {
+    for (final product in _catalogueProducts) {
       if (product.id == id) return product;
     }
     return null;
@@ -1357,6 +1652,7 @@ class BuyV2Session extends ChangeNotifier {
     } else {
       checkoutScope = cartScope;
       view = BuyV2View.checkout;
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
       notice = null;
       _captureCheckoutPromiseSnapshot();
     }
@@ -1757,6 +2053,7 @@ class BuyV2Session extends ChangeNotifier {
     );
     final unitLabel = itemCount == 1 ? 'item' : 'items';
     _acknowledgeCart('${item.title} added · $itemCount $unitLabel');
+    _persistCustomerState();
     notifyListeners();
     return true;
   }
@@ -1813,7 +2110,7 @@ class BuyV2Session extends ChangeNotifier {
       _prescriptionApprovedQuantities.length;
 
   List<BuyV2Product> get matchedPrescriptionProducts => List.unmodifiable(
-    BuyV2Catalogue.products.where(
+    _catalogueProducts.where(
       (product) =>
           product.destination == BuyV2Destination.medicine &&
           _prescriptionApprovedQuantities.containsKey(product.id),
@@ -1840,6 +2137,7 @@ class BuyV2Session extends ChangeNotifier {
     _acknowledgeCart(
       '${current.product.title} · ${current.quantity + 1} in cart',
     );
+    _persistCustomerState();
     notifyListeners();
   }
 
@@ -1863,6 +2161,7 @@ class BuyV2Session extends ChangeNotifier {
       cartScope = BuyV2CartScope.all;
     }
     _pruneCartSelections();
+    _persistCustomerState();
     if (_cart.isEmpty) {
       _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
     } else {
@@ -1881,6 +2180,7 @@ class BuyV2Session extends ChangeNotifier {
       cartScope = BuyV2CartScope.all;
     }
     _pruneCartSelections();
+    _persistCustomerState();
     if (_cart.isEmpty) {
       _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
     } else {
@@ -1908,6 +2208,7 @@ class BuyV2Session extends ChangeNotifier {
     cartScope = BuyV2CartScope.all;
     notice = null;
     cartAcknowledgement = null;
+    _persistCustomerState();
     _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
   }
 
@@ -1924,6 +2225,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     _selectedAddressId = id;
     notice = 'Delivering to ${selectedAddress.shortLine}';
+    _persistCustomerState();
     notifyListeners();
     return true;
   }
@@ -1932,6 +2234,7 @@ class BuyV2Session extends ChangeNotifier {
     _addresses.add(address);
     _selectedAddressId = address.id;
     notice = 'Delivering to ${address.shortLine}';
+    _persistCustomerState();
     notifyListeners();
   }
 
@@ -1946,23 +2249,48 @@ class BuyV2Session extends ChangeNotifier {
     }
     _addresses[index] = address;
     notice = '${address.label} address updated';
+    _persistCustomerState();
+    notifyListeners();
+    return true;
+  }
+
+  bool removeAddress(String id) {
+    final index = _addresses.indexWhere((address) => address.id == id);
+    if (index < 0) {
+      notice = 'This saved address is no longer available.';
+      notifyListeners();
+      return false;
+    }
+    final removed = _addresses.removeAt(index);
+    if (_selectedAddressId == id) {
+      _selectedAddressId = _addresses.firstOrNull?.id;
+    }
+    notice = '${removed.label} address removed';
+    _persistCustomerState();
     notifyListeners();
     return true;
   }
 
   bool choosePayment(String value) {
-    if (!paymentMethods.contains(value)) {
+    if (!availablePaymentMethods.contains(value)) {
       notice = 'This payment method is not available.';
       notifyListeners();
       return false;
     }
     selectedPayment = value;
     notice = '$value selected';
+    _persistCustomerState();
     notifyListeners();
     return true;
   }
 
   bool confirmOrder() {
+    if (!reviewDataEnabled) {
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.unavailable;
+      notice = 'Ordering is unavailable right now. Your Cart has not changed.';
+      notifyListeners();
+      return false;
+    }
     final previous = _navigationSurfaceIdentity;
     final lines = checkoutLines;
     if (lines.isEmpty) {
@@ -2026,6 +2354,125 @@ class BuyV2Session extends ChangeNotifier {
     _confirmedOrders = groups
         .map((group) => _createOrderForGroup(group, address, purchaseId))
         .toList(growable: false);
+    _completeConfirmedOrder(previous: previous, lines: lines);
+    return true;
+  }
+
+  Future<bool> submitOrder() {
+    if (reviewDataEnabled) return Future<bool>.value(confirmOrder());
+    return _submitOrderAsync();
+  }
+
+  Future<bool> _submitOrderAsync() async {
+    if (checkoutBusy) return false;
+    final previous = _navigationSurfaceIdentity;
+    final lines = checkoutLines;
+    if (lines.isEmpty) {
+      returnToCatalogue();
+      return false;
+    }
+    final address = selectedAddressOrNull;
+    if (address == null) {
+      view = BuyV2View.cart;
+      notice = 'Choose a delivery address to continue.';
+      _notifyNavigationIfChanged(
+        previous,
+        BuyV2NavigationMotionDirection.replace,
+      );
+      return false;
+    }
+    if (checkoutPromiseReviewRequired) {
+      notice = 'Review and accept the updated delivery times to continue.';
+      notifyListeners();
+      return false;
+    }
+    for (final product in lines.map((line) => line.product).toSet()) {
+      final next = productFactsAdapter.snapshotFor(product);
+      if (!_validProductFacts(product, next)) {
+        notice = 'Delivery times could not be confirmed. Try again.';
+        notifyListeners();
+        return false;
+      }
+      _productFacts[product.id] = next;
+    }
+    final groups = checkoutFulfilmentGroups;
+    final refreshedSnapshot = _deliveryPromiseSnapshotFor(groups);
+    if (_checkoutPromiseSnapshot.isEmpty) {
+      _checkoutPromiseSnapshot = refreshedSnapshot;
+    }
+    if (!mapEquals(_checkoutPromiseSnapshot, refreshedSnapshot)) {
+      final changedKeys = {
+        ..._checkoutPromiseSnapshot.keys,
+        ...refreshedSnapshot.keys,
+      }.where((key) => _checkoutPromiseSnapshot[key] != refreshedSnapshot[key]);
+      _checkoutDeliveryPromiseChanges = [
+        for (final key in changedKeys)
+          (
+            groupKey: key,
+            previousPromise:
+                _checkoutPromiseSnapshot[key]?.promise ?? 'Not quoted',
+            previousPromisedByLabel:
+                _checkoutPromiseSnapshot[key]?.promisedByLabel,
+            currentPromise: refreshedSnapshot[key]?.promise ?? 'Unavailable',
+            currentPromisedByLabel: refreshedSnapshot[key]?.promisedByLabel,
+          ),
+      ];
+      _pendingCheckoutPromiseSnapshot = refreshedSnapshot;
+      notice = 'Delivery times changed. Review the updated plan.';
+      notifyListeners();
+      return false;
+    }
+    checkoutSubmissionState = BuyV2CheckoutSubmissionState.submitting;
+    notice = null;
+    notifyListeners();
+    final placement = await commerceAdapter.placeOrder(
+      BuyV2OrderPlacementRequest(
+        lines: List.unmodifiable(lines),
+        address: address,
+        paymentMethod: selectedPayment,
+        total: checkoutPayableTotal,
+      ),
+    );
+    if (placement.outcome != BuyV2OrderPlacementOutcome.confirmed) {
+      checkoutSubmissionState = switch (placement.outcome) {
+        BuyV2OrderPlacementOutcome.paymentPending =>
+          BuyV2CheckoutSubmissionState.paymentPending,
+        BuyV2OrderPlacementOutcome.unavailable =>
+          BuyV2CheckoutSubmissionState.unavailable,
+        BuyV2OrderPlacementOutcome.cancelled ||
+        BuyV2OrderPlacementOutcome.failed =>
+          BuyV2CheckoutSubmissionState.failed,
+        BuyV2OrderPlacementOutcome.confirmed =>
+          BuyV2CheckoutSubmissionState.confirmed,
+      };
+      notice = placement.customerMessage;
+      notifyListeners();
+      return false;
+    }
+    if (!reviewDataEnabled && placement.orders.isEmpty) {
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
+      notice =
+          'Order confirmation could not be verified. Your Cart has not changed.';
+      notifyListeners();
+      return false;
+    }
+    final purchaseId =
+        placement.purchaseReference ??
+        'BUY-NEW-${(_purchaseSequence++).toString().padLeft(2, '0')}';
+    _confirmedPurchaseId = purchaseId;
+    _confirmedOrders = placement.orders.isNotEmpty
+        ? List.unmodifiable(placement.orders)
+        : groups
+              .map((group) => _createOrderForGroup(group, address, purchaseId))
+              .toList(growable: false);
+    _completeConfirmedOrder(previous: previous, lines: lines);
+    return true;
+  }
+
+  void _completeConfirmedOrder({
+    required _BuyV2NavigationSurfaceIdentity previous,
+    required List<BuyV2CartLine> lines,
+  }) {
     _orders.insertAll(0, _confirmedOrders);
     _confirmedDestinations = _confirmedOrders
         .map((order) => order.destination)
@@ -2040,13 +2487,14 @@ class BuyV2Session extends ChangeNotifier {
     checkoutScope = BuyV2CartScope.all;
     destination = BuyV2Destination.orders;
     view = BuyV2View.confirmation;
+    checkoutSubmissionState = BuyV2CheckoutSubmissionState.confirmed;
     notice = null;
     _clearCheckoutPromiseSnapshot();
+    _persistCustomerState();
     _notifyNavigationIfChanged(
       previous,
       BuyV2NavigationMotionDirection.forward,
     );
-    return true;
   }
 
   BuyV2Order _createOrderForGroup(
