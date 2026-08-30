@@ -236,100 +236,76 @@ class _LoginScreenV2State extends State<LoginScreenV2> {
       screenKey: const Key('screen03-login-v2'),
       child: AnimatedBuilder(
         animation: widget.session,
-        builder: (context, _) {
-          final socialCreate =
-              widget.session.authenticationPurpose ==
-              JourneyAuthenticationPurpose.socialCreate;
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (widget.session.canCancelSignIn)
-                  IconButton.outlined(
-                    key: const Key('sign-in-context-back'),
-                    tooltip: 'Back',
-                    onPressed: widget.session.cancelSignIn,
-                    icon: const Icon(Icons.arrow_back_rounded),
-                  ),
-                if (widget.session.canCancelSignIn) const SizedBox(height: 8),
-                Text(
-                  socialCreate ? 'Create on MoolSocial' : 'Sign in',
-                  style: Screen03Text.title,
+        builder: (context, _) => SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Sign in', style: Screen03Text.title),
+              const SizedBox(height: 8),
+              const Text(
+                'Choose one method to continue.',
+                style: Screen03Text.body,
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Screen03Colors.navy),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  socialCreate
-                      ? 'Sign in to create a post. After sign-in, you will return to Create with your intent retained.'
-                      : 'Choose one method to continue.',
-                  key: socialCreate
-                      ? const Key('sign-in-social-create-context')
-                      : null,
-                  style: Screen03Text.body,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('SOCIAL ACCOUNT', style: Screen03Text.cardLabel),
+                    const SizedBox(height: 12),
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 3,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: 1.08,
+                      children: [
+                        for (final provider in SocialAuthProvider.values)
+                          _ProviderButton(
+                            provider: provider,
+                            pending:
+                                widget.session.busy &&
+                                widget.session.socialAuthProvider == provider,
+                            enabled: !widget.session.busy,
+                            onTap: () => _startProvider(provider),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 14),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Screen03Colors.navy),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'SOCIAL ACCOUNT',
-                        style: Screen03Text.cardLabel,
-                      ),
-                      const SizedBox(height: 12),
-                      GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 3,
-                        mainAxisSpacing: 6,
-                        crossAxisSpacing: 8,
-                        childAspectRatio: 1.32,
-                        children: [
-                          for (final provider in SocialAuthProvider.values)
-                            _ProviderButton(
-                              provider: provider,
-                              pending:
-                                  widget.session.busy &&
-                                  widget.session.socialAuthProvider == provider,
-                              enabled: !widget.session.busy,
-                              onTap: () => _startProvider(provider),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 9),
-                _MethodButton(
-                  key: const Key('email-otp-method'),
-                  title: 'Email OTP',
-                  subtitle: 'Use any email address',
-                  icon: const _EmailArtwork(),
-                  onTap: widget.session.busy
-                      ? null
-                      : () => _showOtpTarget(OtpChannel.email),
-                ),
-                const SizedBox(height: 9),
-                _MethodButton(
-                  key: const Key('mobile-otp-method'),
-                  title: 'Mobile OTP',
-                  subtitle: 'Use mobile number',
-                  icon: const _MobileArtwork(),
-                  onTap: widget.session.busy
-                      ? null
-                      : () => _showOtpTarget(OtpChannel.mobile),
-                ),
-              ],
-            ),
-          );
-        },
+              ),
+              const SizedBox(height: 9),
+              _MethodButton(
+                key: const Key('email-otp-method'),
+                title: 'Email OTP',
+                subtitle: 'Use any email address',
+                icon: const _EmailArtwork(),
+                onTap: widget.session.busy
+                    ? null
+                    : () => _showOtpTarget(OtpChannel.email),
+              ),
+              const SizedBox(height: 9),
+              _MethodButton(
+                key: const Key('mobile-otp-method'),
+                title: 'Mobile OTP',
+                subtitle: 'Use mobile number',
+                icon: const _MobileArtwork(),
+                onTap: widget.session.busy
+                    ? null
+                    : () => _showOtpTarget(OtpChannel.mobile),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
