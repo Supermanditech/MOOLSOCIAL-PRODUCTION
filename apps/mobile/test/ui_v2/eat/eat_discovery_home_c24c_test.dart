@@ -125,6 +125,35 @@ void main() {
     expect(sessions.eat.selectedRestaurantId, 'spice-darbar');
   });
 
+  testWidgets('Food search owns first Android Back while keyboard is open', (
+    tester,
+  ) async {
+    final sessions = await _mount(
+      tester,
+      route: '/app/eat/home',
+      size: const Size(360, 800),
+    );
+    addTearDown(sessions.dispose);
+
+    final search = find.byKey(const Key('eat-home-search'));
+    await tester.tap(search);
+    await tester.enterText(search, 'Spice');
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(search).focusNode?.hasFocus, isTrue);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('eat-home-screen')), findsOneWidget);
+    expect(tester.widget<TextField>(search).controller?.text, 'Spice');
+    expect(tester.widget<TextField>(search).focusNode?.hasFocus, isFalse);
+    expect(
+      find.byKey(const Key('eat-restaurant-spice-darbar')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('C24C Book Table keeps truthful choices and direct booking', (
     tester,
   ) async {
