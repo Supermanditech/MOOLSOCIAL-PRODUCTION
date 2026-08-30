@@ -368,7 +368,7 @@ class _LoginScreenV5State extends State<LoginScreenV5> {
           title: 'Email link',
           subtitle: widget.session.emailLinkAvailable
               ? 'Use any email address'
-              : 'Not available on this build',
+              : 'Choose another sign-in method',
           icon: const _EmailArtwork(),
           onTap: widget.session.busy || !widget.session.emailLinkAvailable
               ? null

@@ -1088,7 +1088,8 @@ void main() {
     );
     expect(emailLink.onTap, isNull);
     expect(find.byKey(const Key('mobile-otp-method')), findsNothing);
-    expect(find.text('Not available on this build'), findsOneWidget);
+    expect(find.text('Choose another sign-in method'), findsOneWidget);
+    expect(find.textContaining('build'), findsNothing);
   });
 
   testWidgets('login legal actions open only exact public destinations', (
