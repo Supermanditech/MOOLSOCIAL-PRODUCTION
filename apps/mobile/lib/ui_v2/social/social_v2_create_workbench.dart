@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -603,6 +605,139 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     }
   }
 
+  void _insertComposerText(String value) {
+    final current = _body.value;
+    final selection = current.selection.isValid
+        ? current.selection
+        : TextSelection.collapsed(offset: current.text.length);
+    final replacement = current.text.replaceRange(
+      selection.start,
+      selection.end,
+      value,
+    );
+    _body.value = TextEditingValue(
+      text: replacement,
+      selection: TextSelection.collapsed(
+        offset: selection.start + value.length,
+      ),
+    );
+    _bodyFocus.requestFocus();
+  }
+
+  Future<void> _openEmojiPalette() async {
+    final emoji = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Add a feeling',
+                style: TextStyle(
+                  color: SocialV2Colors.navy,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Choose one or use your keyboard for every emoji.',
+                style: TextStyle(color: SocialV2Colors.muted),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final value in const [
+                    '✨',
+                    '❤️',
+                    '👏',
+                    '😊',
+                    '🎉',
+                    '💡',
+                    '🌱',
+                    '🙏',
+                  ])
+                    Semantics(
+                      button: true,
+                      label: 'Insert $value',
+                      child: InkWell(
+                        key: Key('screen04-create-emoji-$value'),
+                        onTap: () => Navigator.pop(sheetContext, value),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          width: 56,
+                          height: 56,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF4F1FF),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            value,
+                            style: const TextStyle(fontSize: 26),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || emoji == null) return;
+    _insertComposerText(emoji);
+  }
+
+  void _showGifAvailability() {
+    showSocialV2Message(
+      context,
+      'GIF search will appear here when the approved media service is connected. Your draft is unchanged.',
+    );
+  }
+
+  Future<void> _openPreview() async {
+    if (!_hasDraftContent) {
+      showSocialV2Message(
+        context,
+        'Add a thought, photo, poll or quiz before opening Preview.',
+      );
+      _bodyFocus.requestFocus();
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: FractionallySizedBox(
+          heightFactor: .86,
+          child: _CreateFeedPreview(
+            authorName: widget.authorName,
+            authorHandle: widget.authorHandle,
+            body: _body.text,
+            format: _format,
+            tool: _postTool,
+            media: _media,
+            imagePollMedia: _imagePollMedia,
+            choices: [
+              for (final controller in _choiceControllers) controller.text,
+            ],
+            onClose: () => Navigator.pop(sheetContext),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _openReelSourcePicker() {
     HapticFeedback.selectionClick();
     setState(() {
@@ -992,54 +1127,110 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
   };
 
   Widget _buildWorkbenchCard() {
-    return SocialV2Card(
-      key: const Key('screen04-create-workbench'),
-      padding: const EdgeInsets.all(10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'MoolSocial post',
-                      style: TextStyle(
-                        color: SocialV2Colors.navy,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Share text, photos, polls or a quiz in Feed',
-                      style: TextStyle(
-                        color: SocialV2Colors.muted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _PublicBadge(),
-            ],
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        key: const Key('screen04-create-workbench'),
+        padding: const EdgeInsets.all(11),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFF7F4FF), Color(0xFFFFFBF4)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          const SizedBox(height: 9),
-          if (_draft.quotedPost case final quotedPost?) ...[
-            SocialQuotedPostPreviewV2(
-              key: const Key('social-create-quoted-post'),
-              quotedPost: quotedPost,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFDCD5FF)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x12000050),
+              blurRadius: 16,
+              offset: Offset(0, 7),
             ),
-            const SizedBox(height: 9),
           ],
-          _buildPost(),
-        ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7C3AED), SocialV2Colors.navy],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Create canvas',
+                        style: TextStyle(
+                          color: SocialV2Colors.navy,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _canvasGuidance,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: SocialV2Colors.muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const _PublicBadge(),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _CreateCanvasStageRail(onPreview: _openPreview),
+            const SizedBox(height: 10),
+            if (_draft.quotedPost case final quotedPost?) ...[
+              SocialQuotedPostPreviewV2(
+                key: const Key('social-create-quoted-post'),
+                quotedPost: quotedPost,
+              ),
+              const SizedBox(height: 9),
+            ],
+            _buildPost(),
+          ],
+        ),
       ),
     );
   }
+
+  String get _canvasGuidance => switch ((_format, _postTool)) {
+    (SocialCreateFormatV2.carousel, _) =>
+      'Arrange a swipe story, then add the thread that connects it.',
+    (SocialCreateFormatV2.reel, _) =>
+      'Shape the opening moment before you share the full story.',
+    (SocialCreateFormatV2.post, _SocialPostTool.image) =>
+      'Let one strong image lead and give people useful context.',
+    (SocialCreateFormatV2.post, _SocialPostTool.imagePoll) =>
+      'Make each visual choice clear before inviting a vote.',
+    (SocialCreateFormatV2.post, _SocialPostTool.quickPoll) =>
+      'Ask one focused question that people can answer quickly.',
+    (SocialCreateFormatV2.post, _SocialPostTool.quiz) =>
+      'Build curiosity, then reveal the right answer clearly.',
+    _ => 'Write an insight people will want to read and respond to.',
+  };
 
   Widget _buildFormatActions() {
     return Row(
@@ -1104,42 +1295,151 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       key: const ValueKey('screen04-create-post-workbench'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const CircleAvatar(
-              radius: 20,
-              backgroundColor: SocialV2Colors.navy,
-              foregroundColor: Colors.white,
-              child: Icon(Icons.person_rounded, size: 20),
-            ),
-            const SizedBox(width: 9),
-            Expanded(
-              child: TextField(
-                key: const Key('screen04-create-post-text'),
-                controller: _body,
-                focusNode: _bodyFocus,
-                minLines: 2,
-                maxLines: 5,
-                maxLength: 1200,
-                style: const TextStyle(fontSize: 13, height: 1.3),
-                decoration: InputDecoration(
-                  hintText: switch (_format) {
-                    SocialCreateFormatV2.reel => 'Add a Reel caption',
-                    SocialCreateFormatV2.carousel => 'Add a carousel caption',
-                    SocialCreateFormatV2.post =>
-                      question
-                          ? _postTool == _SocialPostTool.quiz
-                                ? 'Ask a question'
-                                : 'What would you like to ask?'
-                          : 'Share publicly',
-                  },
-                  counterText: '',
-                  hintStyle: const TextStyle(fontSize: 13),
+        Container(
+          key: const Key('screen04-create-writing-canvas'),
+          padding: const EdgeInsets.fromLTRB(12, 11, 12, 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFFDADBE8)),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const CircleAvatar(
+                      radius: 19,
+                      backgroundColor: SocialV2Colors.navy,
+                      foregroundColor: Colors.white,
+                      child: Icon(Icons.person_rounded, size: 19),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.authorName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: SocialV2Colors.navy,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          Text(
+                            widget.authorHandle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: SocialV2Colors.muted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.public_rounded,
+                      color: SocialV2Colors.green,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Public',
+                      style: TextStyle(
+                        color: SocialV2Colors.green,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 8),
+                TextField(
+                  key: const Key('screen04-create-post-text'),
+                  controller: _body,
+                  focusNode: _bodyFocus,
+                  minLines: 4,
+                  maxLines: 10,
+                  maxLength: 1200,
+                  textCapitalization: TextCapitalization.sentences,
+                  keyboardAppearance: Brightness.light,
+                  style: const TextStyle(
+                    color: SocialV2Colors.navy,
+                    fontSize: 16,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: switch (_format) {
+                      SocialCreateFormatV2.reel =>
+                        'Give people a reason to watch…',
+                      SocialCreateFormatV2.carousel =>
+                        'What connects this swipe story?',
+                      SocialCreateFormatV2.post =>
+                        question
+                            ? _postTool == _SocialPostTool.quiz
+                                  ? 'What will make people curious?'
+                                  : 'Ask one clear, useful question…'
+                            : 'Share a moment, insight or question…',
+                    },
+                    counterText: '',
+                    hintStyle: const TextStyle(
+                      color: Color(0xFF8B8DA4),
+                      fontSize: 16,
+                      height: 1.35,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const Divider(height: 14),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _CreateCanvasInlineAction(
+                        key: const Key('screen04-create-inline-emoji'),
+                        icon: Icons.emoji_emotions_outlined,
+                        label: 'Emoji',
+                        onTap: () => unawaited(_openEmojiPalette()),
+                      ),
+                      const SizedBox(width: 6),
+                      _CreateCanvasInlineAction(
+                        key: const Key('screen04-create-inline-mention'),
+                        icon: Icons.alternate_email_rounded,
+                        label: 'Mention',
+                        onTap: () => _insertComposerText('@'),
+                      ),
+                      const SizedBox(width: 6),
+                      _CreateCanvasInlineAction(
+                        key: const Key('screen04-create-inline-topic'),
+                        icon: Icons.tag_rounded,
+                        label: 'Topic',
+                        onTap: () => _insertComposerText('#'),
+                      ),
+                      const SizedBox(width: 6),
+                      _CreateCanvasInlineAction(
+                        key: const Key('screen04-create-inline-gif'),
+                        icon: Icons.gif_box_outlined,
+                        label: 'GIF',
+                        onTap: _showGifAvailability,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
         if (_postTool == _SocialPostTool.image && _media.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -1465,6 +1765,362 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       ),
     );
   }
+}
+
+class _CreateFeedPreview extends StatelessWidget {
+  const _CreateFeedPreview({
+    required this.authorName,
+    required this.authorHandle,
+    required this.body,
+    required this.format,
+    required this.tool,
+    required this.media,
+    required this.imagePollMedia,
+    required this.choices,
+    required this.onClose,
+  });
+
+  final String authorName;
+  final String authorHandle;
+  final String body;
+  final SocialCreateFormatV2 format;
+  final _SocialPostTool tool;
+  final List<SocialPickedMedia> media;
+  final List<SocialPickedMedia?> imagePollMedia;
+  final List<String> choices;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleChoices = choices
+        .where((choice) => choice.trim().isNotEmpty)
+        .toList(growable: false);
+    return ListView(
+      key: const Key('screen04-create-feed-preview'),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Preview in Feed',
+                    style: TextStyle(
+                      color: SocialV2Colors.navy,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    'Check the reading experience before publishing.',
+                    style: TextStyle(color: SocialV2Colors.muted),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              key: const Key('screen04-create-preview-close'),
+              tooltip: 'Close Preview',
+              onPressed: onClose,
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: SocialV2Colors.line),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x13000050),
+                blurRadius: 18,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const CircleAvatar(
+                      backgroundColor: SocialV2Colors.navy,
+                      foregroundColor: Colors.white,
+                      child: Icon(Icons.person_rounded),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            authorName,
+                            style: const TextStyle(
+                              color: SocialV2Colors.navy,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          Text(
+                            '$authorHandle · Now · Public',
+                            style: const TextStyle(
+                              color: SocialV2Colors.muted,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.more_horiz_rounded),
+                  ],
+                ),
+              ),
+              if (body.trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  child: Text(
+                    body.trim(),
+                    style: const TextStyle(
+                      color: SocialV2Colors.ink,
+                      fontSize: 15,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              if (media.isNotEmpty)
+                AspectRatio(
+                  aspectRatio: format == SocialCreateFormatV2.carousel
+                      ? 1.03
+                      : 4 / 3,
+                  child: SocialMediaPreviewV2(
+                    path: media.first.path,
+                    isAsset: media.first.isAsset,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              if (tool == _SocialPostTool.imagePoll &&
+                  imagePollMedia.any((item) => item != null))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final item
+                          in imagePollMedia.whereType<SocialPickedMedia>())
+                        SizedBox(
+                          width: 132,
+                          height: 120,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: SocialMediaPreviewV2(
+                              path: item.path,
+                              isAsset: item.isAsset,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              if (visibleChoices.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  child: Column(
+                    children: [
+                      for (final choice in visibleChoices)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 13,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF7F6FC),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: SocialV2Colors.line),
+                            ),
+                            child: Text(
+                              choice,
+                              style: const TextStyle(
+                                color: SocialV2Colors.navy,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              const Divider(height: 1),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Icon(Icons.favorite_border_rounded),
+                    Icon(Icons.chat_bubble_outline_rounded),
+                    Icon(Icons.repeat_rounded),
+                    Icon(Icons.share_outlined),
+                    Icon(Icons.bookmark_border_rounded),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        const SocialV2Notice(
+          title: 'Preview only',
+          detail:
+              'No reaction, reply, share or publish action is performed from Preview.',
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          key: const Key('screen04-create-preview-back-to-editing'),
+          onPressed: onClose,
+          icon: const Icon(Icons.edit_outlined),
+          label: const Text('Back to editing'),
+        ),
+      ],
+    );
+  }
+}
+
+class _CreateCanvasStageRail extends StatelessWidget {
+  const _CreateCanvasStageRail({required this.onPreview});
+
+  final VoidCallback onPreview;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('screen04-create-stage-rail'),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: .82),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(
+      children: [
+        const _CreateCanvasStage(
+          icon: Icons.edit_note_rounded,
+          label: 'Build',
+          active: true,
+        ),
+        const _CreateCanvasStageLine(),
+        _CreateCanvasStage(
+          key: const Key('screen04-create-open-preview'),
+          icon: Icons.visibility_outlined,
+          label: 'Preview',
+          onTap: onPreview,
+        ),
+        const _CreateCanvasStageLine(),
+        const _CreateCanvasStage(icon: Icons.public_rounded, label: 'Publish'),
+      ],
+    ),
+  );
+}
+
+class _CreateCanvasStage extends StatelessWidget {
+  const _CreateCanvasStage({
+    required this.icon,
+    required this.label,
+    this.active = false,
+    this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: active || onTap != null
+                    ? const Color(0xFF6D4AFF)
+                    : SocialV2Colors.muted,
+                size: 16,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: active || onTap != null
+                      ? SocialV2Colors.navy
+                      : SocialV2Colors.muted,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _CreateCanvasStageLine extends StatelessWidget {
+  const _CreateCanvasStageLine();
+
+  @override
+  Widget build(BuildContext context) => const Expanded(
+    child: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 7),
+      child: Divider(color: Color(0xFFD8D7E5)),
+    ),
+  );
+}
+
+class _CreateCanvasInlineAction extends StatelessWidget {
+  const _CreateCanvasInlineAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => ActionChip(
+    avatar: Icon(icon, size: 17, color: SocialV2Colors.navy),
+    label: Text(label),
+    onPressed: onTap,
+    backgroundColor: const Color(0xFFF5F3FF),
+    side: const BorderSide(color: Color(0xFFE1DCFF)),
+    labelStyle: const TextStyle(
+      color: SocialV2Colors.navy,
+      fontSize: 10.5,
+      fontWeight: FontWeight.w800,
+    ),
+  );
 }
 
 class _PublicBadge extends StatelessWidget {

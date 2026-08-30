@@ -448,11 +448,11 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const Key('screen04-moolsocial-feed-brand')),
-          matching: find.text('Feed'),
+          matching: find.text('MoolSocial Feed'),
         ),
         findsOneWidget,
       );
-      expect(find.text('Public MoolSocial posts'), findsOneWidget);
+      expect(find.text('Public posts chosen for relevance'), findsOneWidget);
       expect(find.text('No posts yet'), findsOneWidget);
       expect(
         find.byKey(const Key('screen04-feed-create-post')),
@@ -464,8 +464,9 @@ void main() {
       );
       expect(
         find.byKey(const Key('screen04-feed-start-conversation')),
-        findsOneWidget,
+        findsNothing,
       );
+      expect(find.byKey(const Key('social-global-chat')), findsOneWidget);
       expect(find.byKey(const Key('screen04-quick-post-feed')), findsNothing);
 
       await tester.tap(find.byKey(const Key('screen04-feed-discover-people')));
@@ -481,21 +482,6 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(
-        find.byKey(const Key('screen04-feed-start-conversation')),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('chat-section-body-chats')),
-        findsOneWidget,
-      );
-      expect(find.text('All'), findsOneWidget);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
-        findsOneWidget,
-      );
       expect(tester.takeException(), isNull);
     });
 
@@ -541,11 +527,63 @@ void main() {
           find.byKey(const Key('screen04-create-preview-notice')),
           findsOneWidget,
         );
+        expect(
+          find.byKey(const Key('screen04-create-writing-canvas')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('screen04-create-stage-rail')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('screen04-create-inline-emoji')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('screen04-create-inline-gif')),
+          findsOneWidget,
+        );
         expect(find.text('Sign in to post'), findsOneWidget);
         await tester.enterText(
           find.byKey(const Key('screen04-create-post-text')),
           'Preview draft',
         );
+        await tester.tap(find.byKey(const Key('screen04-create-open-preview')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('screen04-create-feed-preview')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('screen04-create-feed-preview')),
+            matching: find.text('Preview draft'),
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(const Key('screen04-create-preview-back-to-editing')),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('screen04-create-inline-emoji')));
+        await tester.pumpAndSettle();
+        expect(find.text('Add a feeling'), findsOneWidget);
+        await tester.tap(find.text('✨'));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<TextField>(
+                find.byKey(const Key('screen04-create-post-text')),
+              )
+              .controller!
+              .text,
+          'Preview draft✨',
+        );
+
+        await tester.tap(find.byKey(const Key('screen04-create-inline-gif')));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('approved media service'), findsOneWidget);
         await tester.tap(find.byKey(const Key('screen04-create-publish-post')));
         await tester.pumpAndSettle();
 

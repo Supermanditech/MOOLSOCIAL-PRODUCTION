@@ -109,6 +109,10 @@ void main() {
     );
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('screen04-create-draft-entry')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('screen04-create-draft-entry')));
     await tester.pumpAndSettle();
     expect(find.text('New quick poll'), findsOneWidget);
@@ -128,6 +132,10 @@ void main() {
       findsOneWidget,
     );
     await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('screen04-create-draft-entry')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('screen04-create-draft-entry')));
     await tester.pumpAndSettle();

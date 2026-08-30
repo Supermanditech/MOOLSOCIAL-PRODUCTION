@@ -395,14 +395,11 @@ void main() {
       owners.shared.socialPublishedItems.single.body,
       'Jodhpur makers meet this Saturday.',
     );
-    final post = find.byKey(
-      Key('social-public-post-${owners.shared.socialPublishedItems.single.id}'),
+    expect(
+      find.byKey(const Key('screen04-feed-post-cta-after-timeline')),
+      findsNothing,
     );
-    final postCta = find.byKey(
-      const Key('screen04-feed-post-cta-after-timeline'),
-    );
-    expect(postCta, findsOneWidget);
-    expect(tester.getTopLeft(post).dy, lessThan(tester.getTopLeft(postCta).dy));
+    expect(find.byKey(const Key('screen04-rail-create')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -471,7 +468,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Feed renders real public posts before its post CTA', (
+  testWidgets('Feed renders real public posts without a repeated Create CTA', (
     tester,
   ) async {
     final owners = _Owners();
@@ -493,14 +490,14 @@ void main() {
     await _pump(tester, owners.consumer(sub: 'feed'));
 
     final post = find.byKey(Key('social-public-post-${publicPost.id}'));
-    final postCta = find.byKey(
-      const Key('screen04-feed-post-cta-after-timeline'),
-    );
     expect(post, findsOneWidget);
     expect(find.text('Riya Sharma'), findsOneWidget);
-    expect(postCta, findsOneWidget);
-    expect(tester.getTopLeft(post).dy, lessThan(tester.getTopLeft(postCta).dy));
-    expect(find.byKey(const Key('screen04-feed-create-post')), findsOneWidget);
+    expect(
+      find.byKey(const Key('screen04-feed-post-cta-after-timeline')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('screen04-feed-create-post')), findsNothing);
+    expect(find.byKey(const Key('screen04-rail-create')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

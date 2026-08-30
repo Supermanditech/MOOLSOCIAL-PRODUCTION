@@ -174,6 +174,22 @@ class _SocialV2RetainedState {
   List<_VideoData> youtubeSearchResults = const [];
 }
 
+enum _MoolSocialFeedMode { forYou, following, latest }
+
+extension on _MoolSocialFeedMode {
+  String get label => switch (this) {
+    _MoolSocialFeedMode.forYou => 'For you',
+    _MoolSocialFeedMode.following => 'Following',
+    _MoolSocialFeedMode.latest => 'Latest',
+  };
+
+  IconData get icon => switch (this) {
+    _MoolSocialFeedMode.forYou => Icons.auto_awesome_outlined,
+    _MoolSocialFeedMode.following => Icons.people_outline_rounded,
+    _MoolSocialFeedMode.latest => Icons.schedule_rounded,
+  };
+}
+
 class SocialUniversalV2 extends StatefulWidget {
   const SocialUniversalV2({
     required this.session,
@@ -303,6 +319,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   late final TextEditingController _feedSearchController;
   bool _feedSearchOpen = false;
   String _feedQuery = '';
+  _MoolSocialFeedMode _feedMode = _MoolSocialFeedMode.forYou;
   final Set<String> _pendingFeedMessageRequests = <String>{};
   late final SocialMediaPicker _mediaPicker;
   SocialCreateDraftV2 get _createDraft => _retainedState.createDraft;
@@ -2977,6 +2994,17 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                   item.body.toLowerCase().contains(normalizedFeedQuery),
             )
             .toList();
+        if (_feedMode == _MoolSocialFeedMode.following) {
+          publishedItems.removeWhere((item) {
+            final authorId = item.authorId;
+            return authorId == null ||
+                session.socialAuthorProfile(authorId)?.followed != true;
+          });
+        } else if (_feedMode == _MoolSocialFeedMode.latest) {
+          publishedItems.sort(
+            (left, right) => right.publishedAt.compareTo(left.publishedAt),
+          );
+        }
         final sharedItemIndex = _feedLinkContextActive
             ? publishedItems.indexWhere(
                 (item) => item.id == _resolvedFeedLinkItem,
@@ -3031,7 +3059,6 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                 onOpenAuthor: _openAuthor,
                 onReply: () => _openComments(item),
                 onShare: () => _openShare(item),
-                onMessageAuthor: _startChatWithAuthor,
                 onAuthenticationRequired: widget.session.isAuthenticated
                     ? null
                     : (intent) => _requireFeedAuthentication(item, intent),
@@ -3051,6 +3078,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           searchOpen: _feedSearchOpen,
           searchController: _feedSearchController,
           query: _feedQuery,
+          mode: _feedMode,
+          onModeChanged: (mode) => setState(() => _feedMode = mode),
+          reviewPreview: widget.enableCreateReviewPreview,
           onSearchChanged: (value) => setState(() => _feedQuery = value),
           onSearch: () => setState(() {
             _feedSearchOpen = !_feedSearchOpen;
@@ -3063,7 +3093,6 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           onProfile: _openAccount,
           onCreate: _openCreationGateway,
           onDiscover: () => _openFeedChatSection('discover'),
-          onStartConversation: () => _openFeedChatSection('chats'),
           onRetry: () {
             if (_feedState != 'empty') {
               setState(() => _feedState = 'empty');
@@ -3123,6 +3152,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           sourceItem: item,
           session: widget.sharedSession,
           authenticated: widget.session.isAuthenticated,
+          onRequestMessage: () {
+            Navigator.of(context).pop();
+            unawaited(_startChatWithAuthor(item));
+          },
           onAuthenticationRequired: () {
             Navigator.of(context).pop();
             widget.session.beginSignIn(
@@ -3328,10 +3361,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         ],
         Container(
           key: const Key('screen04-create-hub-header'),
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF090057), Color(0xFF5B3FD0)],
+              colors: [Color(0xFF14006B), Color(0xFF7C3AED)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -3341,23 +3374,33 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Create something worth sharing',
+                'Turn an idea into a conversation',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 24,
+                  fontSize: 22,
                   height: 1.08,
                   fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Start with a thought, photo, carousel, poll or quiz. Your work stays private until you publish.',
+                'Start simple, shape it visually and preview the experience before anything becomes public.',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 13,
                   height: 1.35,
                   fontWeight: FontWeight.w600,
                 ),
+              ),
+              const SizedBox(height: 12),
+              const Row(
+                children: [
+                  _CreateJourneyStep(number: '1', label: 'Spark'),
+                  _CreateJourneyLine(),
+                  _CreateJourneyStep(number: '2', label: 'Shape'),
+                  _CreateJourneyLine(),
+                  _CreateJourneyStep(number: '3', label: 'Preview'),
+                ],
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
@@ -3366,7 +3409,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                     ? null
                     : () => _openCreateEditor('post'),
                 icon: const Icon(Icons.edit_note_rounded),
-                label: const Text('Start writing'),
+                label: const Text('Start from a thought'),
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: SocialV2Colors.navy,
@@ -3378,7 +3421,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         ),
         const SizedBox(height: 18),
         const Text(
-          'Choose a format',
+          'Choose how it comes alive',
           style: TextStyle(
             color: SocialV2Colors.navy,
             fontSize: 18,
@@ -3387,7 +3430,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         ),
         const SizedBox(height: 4),
         const Text(
-          'Each format opens a focused editor with a clear preview before publishing.',
+          'Every format opens the same creative canvas with tools that match the idea.',
           style: TextStyle(
             color: SocialV2Colors.muted,
             fontSize: 12,
@@ -3408,8 +3451,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                   child: _SocialCreateFormatTile(
                     key: const Key('screen04-create-photo-entry'),
                     title: 'Photo',
-                    detail: 'One image with context',
+                    detail: 'Frame a moment and add the story behind it',
                     icon: Icons.add_photo_alternate_outlined,
+                    accent: Color(0xFFE54878),
+                    badge: 'Moment',
                     enabled: !hasUserContent,
                     onTap: () => _openCreateEditor('image'),
                   ),
@@ -3419,8 +3464,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                   child: _SocialCreateFormatTile(
                     key: const Key('screen04-create-carousel-entry'),
                     title: 'Carousel',
-                    detail: 'Tell a story in slides',
+                    detail: 'Build a swipeable story, step by step',
                     icon: Icons.view_carousel_outlined,
+                    accent: Color(0xFF6D4AFF),
+                    badge: 'Story',
                     enabled: !hasUserContent,
                     onTap: () => _openCreateEditor('carousel'),
                   ),
@@ -3430,8 +3477,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                   child: _SocialCreateFormatTile(
                     key: const Key('screen04-create-poll-entry'),
                     title: 'Poll',
-                    detail: 'Ask and collect votes',
+                    detail: 'Invite people into a useful live choice',
                     icon: Icons.poll_outlined,
+                    accent: Color(0xFF07856A),
+                    badge: 'Conversation',
                     enabled: !hasUserContent,
                     onTap: () => _openCreateEditor('quick-poll'),
                   ),
@@ -3441,8 +3490,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                   child: _SocialCreateFormatTile(
                     key: const Key('screen04-create-quiz-entry'),
                     title: 'Quiz',
-                    detail: 'Make learning interactive',
+                    detail: 'Turn curiosity into an interactive reveal',
                     icon: Icons.quiz_outlined,
+                    accent: Color(0xFFD06A00),
+                    badge: 'Play',
                     enabled: !hasUserContent,
                     onTap: () => _openCreateEditor('quiz'),
                   ),
@@ -3499,12 +3550,6 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
               ),
             ],
           ),
-        ),
-        TextButton.icon(
-          key: const Key('screen04-create-open-feed'),
-          onPressed: () => _selectChoice('feed'),
-          icon: const Icon(Icons.dynamic_feed_outlined),
-          label: const Text('Return to Feed'),
         ),
       ],
     );
@@ -3994,11 +4039,65 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   }
 }
 
+class _CreateJourneyStep extends StatelessWidget {
+  const _CreateJourneyStep({required this.number, required this.label});
+
+  final String number;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 24,
+        height: 24,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: Text(
+          number,
+          style: const TextStyle(
+            color: SocialV2Colors.navy,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+      const SizedBox(width: 5),
+      Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    ],
+  );
+}
+
+class _CreateJourneyLine extends StatelessWidget {
+  const _CreateJourneyLine();
+
+  @override
+  Widget build(BuildContext context) => const Expanded(
+    child: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 6),
+      child: Divider(color: Colors.white38, thickness: 1),
+    ),
+  );
+}
+
 class _SocialCreateFormatTile extends StatelessWidget {
   const _SocialCreateFormatTile({
     required this.title,
     required this.detail,
     required this.icon,
+    required this.accent,
+    required this.badge,
     required this.enabled,
     required this.onTap,
     super.key,
@@ -4007,6 +4106,8 @@ class _SocialCreateFormatTile extends StatelessWidget {
   final String title;
   final String detail;
   final IconData icon;
+  final Color accent;
+  final String badge;
   final bool enabled;
   final VoidCallback onTap;
 
@@ -4017,10 +4118,10 @@ class _SocialCreateFormatTile extends StatelessWidget {
     label: '$title. $detail',
     excludeSemantics: true,
     child: Material(
-      color: Colors.white,
+      color: accent.withValues(alpha: .055),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: Color(0xFFE1E0EC)),
+        side: BorderSide(color: accent.withValues(alpha: .24)),
       ),
       child: InkWell(
         onTap: enabled ? onTap : null,
@@ -4032,12 +4133,51 @@ class _SocialCreateFormatTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  icon,
-                  color: enabled ? SocialV2Colors.navy : SocialV2Colors.muted,
-                  size: 27,
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: .13),
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: enabled ? accent : SocialV2Colors.muted,
+                        size: 23,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            badge,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: enabled ? accent : SocialV2Colors.muted,
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 Text(
                   title,
                   style: TextStyle(
@@ -4049,7 +4189,7 @@ class _SocialCreateFormatTile extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   detail,
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: SocialV2Colors.muted,
@@ -4074,13 +4214,15 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
     required this.searchOpen,
     required this.searchController,
     required this.query,
+    required this.mode,
+    required this.onModeChanged,
+    required this.reviewPreview,
     required this.onSearchChanged,
     required this.onSearch,
     required this.onNotifications,
     required this.onProfile,
     required this.onCreate,
     required this.onDiscover,
-    required this.onStartConversation,
     required this.onRetry,
   });
 
@@ -4089,13 +4231,15 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
   final bool searchOpen;
   final TextEditingController searchController;
   final String query;
+  final _MoolSocialFeedMode mode;
+  final ValueChanged<_MoolSocialFeedMode> onModeChanged;
+  final bool reviewPreview;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onSearch;
   final VoidCallback onNotifications;
   final VoidCallback onProfile;
   final VoidCallback onCreate;
   final VoidCallback onDiscover;
-  final VoidCallback onStartConversation;
   final VoidCallback onRetry;
 
   @override
@@ -4119,11 +4263,19 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
         'Try again later or open Create to prepare your next MoolSocial post.',
       ),
       _ => (
-        Icons.forum_outlined,
-        query.trim().isEmpty ? 'No posts yet' : 'No matching posts',
-        query.trim().isEmpty
-            ? 'Create a post, discover people or start a conversation while new public posts arrive.'
-            : 'Try another search or discover people to continue.',
+        mode == _MoolSocialFeedMode.following
+            ? Icons.people_outline_rounded
+            : Icons.forum_outlined,
+        query.trim().isNotEmpty
+            ? 'No matching posts'
+            : mode == _MoolSocialFeedMode.following
+            ? 'Your Following feed is ready to grow'
+            : 'No posts yet',
+        query.trim().isNotEmpty
+            ? 'Try another search or discover people to continue.'
+            : mode == _MoolSocialFeedMode.following
+            ? 'Follow people from their public profiles to shape this feed.'
+            : 'Create a post or discover people while new public posts arrive.',
       ),
     };
 
@@ -4131,53 +4283,60 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
       key: ValueKey('screen04-moolsocial-feed-state-$state'),
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 18),
       children: [
-        Container(
+        SocialV2Card(
           key: const Key('screen04-moolsocial-feed-brand'),
-          padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF090057), SocialV2Colors.navy],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
+          padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
           child: Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 42,
+                height: 42,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF5B3FD0), SocialV2Colors.navy],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(
-                  Icons.dynamic_feed_rounded,
-                  color: SocialV2Colors.navy,
-                  size: 22,
+                  Icons.blur_on_rounded,
+                  color: Colors.white,
+                  size: 23,
                 ),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'Feed',
+                    const Text(
+                      'MoolSocial Feed',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white,
+                        color: SocialV2Colors.navy,
                         fontSize: 18,
                         height: 1,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     Text(
-                      'Public MoolSocial posts',
-                      style: TextStyle(
-                        color: Colors.white70,
+                      switch (mode) {
+                        _MoolSocialFeedMode.forYou =>
+                          'Public posts chosen for relevance',
+                        _MoolSocialFeedMode.following =>
+                          'Public posts from people you follow',
+                        _MoolSocialFeedMode.latest =>
+                          'Newest public posts first',
+                      },
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: SocialV2Colors.muted,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                       ),
@@ -4189,7 +4348,7 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                 key: const Key('screen04-feed-search-toggle'),
                 tooltip: searchOpen ? 'Close Feed search' : 'Search Feed',
                 onPressed: onSearch,
-                color: Colors.white,
+                color: SocialV2Colors.navy,
                 icon: Icon(
                   searchOpen ? Icons.close_rounded : Icons.search_rounded,
                 ),
@@ -4198,19 +4357,41 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                 key: const Key('screen04-feed-notifications'),
                 tooltip: 'Notifications',
                 onPressed: onNotifications,
-                color: Colors.white,
+                color: SocialV2Colors.navy,
                 icon: const Icon(Icons.notifications_none_rounded),
               ),
               IconButton(
                 key: const Key('screen04-feed-profile'),
                 tooltip: 'Open your MoolSocial profile',
                 onPressed: onProfile,
-                color: Colors.white,
+                color: SocialV2Colors.navy,
                 icon: const Icon(Icons.account_circle_outlined),
               ),
             ],
           ),
         ),
+        SingleChildScrollView(
+          key: const Key('screen04-feed-mode-selector'),
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final value in _MoolSocialFeedMode.values) ...[
+                _MoolSocialFeedModeButton(
+                  mode: value,
+                  selected: mode == value,
+                  onPressed: () => onModeChanged(value),
+                ),
+                if (value != _MoolSocialFeedMode.values.last)
+                  const SizedBox(width: 8),
+              ],
+            ],
+          ),
+        ),
+        if (reviewPreview && content.isNotEmpty)
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: _FeedPreviewLabel(),
+          ),
         if (searchOpen)
           TextField(
             key: const Key('screen04-feed-search-input'),
@@ -4236,45 +4417,54 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
           ),
         if (showStatus)
           SocialV2Card(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
             child: Semantics(
               liveRegion: true,
               label: title,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F0FA),
-                        borderRadius: BorderRadius.circular(14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F0FA),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(icon, color: SocialV2Colors.navy, size: 23),
                       ),
-                      child: Icon(icon, color: SocialV2Colors.navy, size: 23),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: SocialV2Colors.navy,
-                      fontSize: 19,
-                      height: 1.08,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    detail,
-                    style: const TextStyle(
-                      color: SocialV2Colors.muted,
-                      fontSize: 13,
-                      height: 1.4,
-                      fontWeight: FontWeight.w600,
-                    ),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                color: SocialV2Colors.navy,
+                                fontSize: 16,
+                                height: 1.1,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              detail,
+                              style: const TextStyle(
+                                color: SocialV2Colors.muted,
+                                fontSize: 12,
+                                height: 1.35,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                   if (loading) ...[
                     const SizedBox(height: 14),
@@ -4284,20 +4474,22 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                       borderRadius: BorderRadius.all(Radius.circular(99)),
                     ),
                   ] else ...[
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                     if (state == 'empty') ...[
-                      FilledButton.icon(
-                        key: const Key('screen04-feed-create-post'),
-                        onPressed: onCreate,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                        ),
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Create a post'),
-                      ),
-                      const SizedBox(height: 8),
                       Row(
                         children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              key: const Key('screen04-feed-create-post'),
+                              onPressed: onCreate,
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                              ),
+                              icon: const Icon(Icons.add_rounded),
+                              label: const Text('Create a post'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: OutlinedButton.icon(
                               key: const Key('screen04-feed-discover-people'),
@@ -4309,29 +4501,16 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                               label: const Text('Discover'),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              key: const Key(
-                                'screen04-feed-start-conversation',
-                              ),
-                              onPressed: onStartConversation,
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(48),
-                              ),
-                              icon: const Icon(
-                                Icons.chat_bubble_outline_rounded,
-                              ),
-                              label: const Text('Chat'),
-                            ),
-                          ),
                         ],
                       ),
-                      TextButton.icon(
-                        key: const Key('screen04-feed-refresh-empty'),
-                        onPressed: onRetry,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Refresh Feed'),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          key: const Key('screen04-feed-refresh-empty'),
+                          onPressed: onRetry,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Check for new posts'),
+                        ),
                       ),
                     ] else ...[
                       FilledButton.icon(
@@ -4361,47 +4540,70 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
           )
         else
           ...content,
-        if (content.isNotEmpty)
-          SocialV2Card(
-            key: const Key('screen04-feed-post-cta-after-timeline'),
-            padding: const EdgeInsets.all(15),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Share with MoolSocial',
-                  style: TextStyle(
-                    color: SocialV2Colors.navy,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Post text, photos, a carousel, a poll or a quiz to Feed.',
-                  style: TextStyle(
-                    color: SocialV2Colors.muted,
-                    fontSize: 12,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  key: const Key('screen04-feed-create-post'),
-                  onPressed: onCreate,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
-                  ),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Create a post'),
-                ),
-              ],
-            ),
-          ),
       ],
     );
   }
+}
+
+class _MoolSocialFeedModeButton extends StatelessWidget {
+  const _MoolSocialFeedModeButton({
+    required this.mode,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final _MoolSocialFeedMode mode;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    selected: selected,
+    label: '${mode.label} Feed',
+    child: SizedBox(
+      height: 48,
+      child: FilterChip(
+        key: Key('screen04-feed-mode-${mode.name}'),
+        selected: selected,
+        showCheckmark: false,
+        avatar: Icon(mode.icon, size: 18),
+        label: Text(mode.label),
+        onSelected: (_) => onPressed(),
+        selectedColor: const Color(0xFFE9E5FF),
+        side: BorderSide(
+          color: selected ? const Color(0xFF7C5CFF) : SocialV2Colors.line,
+        ),
+        labelStyle: TextStyle(
+          color: selected ? SocialV2Colors.navy : SocialV2Colors.muted,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    ),
+  );
+}
+
+class _FeedPreviewLabel extends StatelessWidget {
+  const _FeedPreviewLabel();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('screen04-feed-review-preview-label'),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF4DE),
+      borderRadius: BorderRadius.circular(99),
+      border: Border.all(color: const Color(0xFFFFD18A)),
+    ),
+    child: const Text(
+      'UI review content · Read-only',
+      style: TextStyle(
+        color: Color(0xFF6A3A00),
+        fontSize: 10.5,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  );
 }
 
 class _SourcePill extends StatelessWidget {
@@ -6655,12 +6857,14 @@ class _SocialAuthorPanelV2 extends StatefulWidget {
     required this.sourceItem,
     required this.session,
     required this.authenticated,
+    required this.onRequestMessage,
     required this.onAuthenticationRequired,
   });
 
   final SocialPublishedItem sourceItem;
   final SharedSession session;
   final bool authenticated;
+  final VoidCallback onRequestMessage;
   final VoidCallback onAuthenticationRequired;
 
   @override
@@ -6795,20 +6999,44 @@ class _SocialAuthorPanelV2State extends State<_SocialAuthorPanelV2> {
                   ),
                   if (!profile.isSelf) ...[
                     const SizedBox(height: 12),
-                    FilledButton(
-                      key: Key('social-author-follow-$_authorId'),
-                      onPressed: followBusy
-                          ? null
-                          : () => _toggleFollow(profile),
-                      child: Text(
-                        followBusy
-                            ? 'Updating…'
-                            : profile.followed
-                            ? 'Unfollow'
-                            : widget.authenticated
-                            ? 'Follow'
-                            : 'Sign in to follow',
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton(
+                            key: Key('social-author-follow-$_authorId'),
+                            onPressed: followBusy
+                                ? null
+                                : () => _toggleFollow(profile),
+                            child: Text(
+                              followBusy
+                                  ? 'Updating…'
+                                  : profile.followed
+                                  ? 'Unfollow'
+                                  : widget.authenticated
+                                  ? 'Follow'
+                                  : 'Sign in to follow',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            key: Key(
+                              'social-author-message-request-$_authorId',
+                            ),
+                            onPressed: widget.onRequestMessage,
+                            icon: const Icon(
+                              Icons.mark_chat_unread_outlined,
+                              size: 18,
+                            ),
+                            label: Text(
+                              widget.authenticated
+                                  ? 'Request chat'
+                                  : 'Sign in to message',
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ],

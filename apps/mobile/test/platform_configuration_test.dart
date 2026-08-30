@@ -122,6 +122,7 @@ void main() {
     expect(reviewSource, contains("initialLocation: '/app/buy'"));
     expect(reviewSource, contains('allowGuestReady: true'));
     expect(reviewSource, contains('uiReviewOnly: true'));
+    expect(reviewSource, contains('UiReviewSocialContentGateway()'));
   });
 
   test('profile device-review builds retain candidate provenance markers', () {

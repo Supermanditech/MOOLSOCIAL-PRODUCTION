@@ -42,6 +42,93 @@ void main() {
     },
   );
 
+  testWidgets(
+    'UI review Feed uses the real contract and keeps messaging on profiles',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final journey = JourneySession(
+        store: MemoryJourneyStore(snapshot: readySnapshot),
+        allowGuestReady: true,
+      );
+      final creator = CreatorSession();
+      final retailer = RetailerSession();
+      final shared = SharedSession(
+        socialContentGateway: UiReviewSocialContentGateway(
+          now: () => DateTime(2026, 8, 31, 12),
+        ),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(creator.dispose);
+      addTearDown(retailer.dispose);
+      addTearDown(shared.dispose);
+      await journey.start();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SocialUniversalV2(
+            session: journey,
+            creatorSession: creator,
+            retailerSession: retailer,
+            sharedSession: shared,
+            initialSubAction: 'feed',
+            enableCreateReviewPreview: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(shared.socialPublishedItems, hasLength(3));
+      expect(
+        find.byKey(const Key('screen04-feed-review-preview-label')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('screen04-feed-mode-forYou')),
+        findsOneWidget,
+      );
+      expect(find.text('Asha Verma'), findsOneWidget);
+      expect(find.text('Rohan Mehta'), findsOneWidget);
+      expect(
+        find.byKey(const Key('social-message-author-UI-REVIEW-FEED-001')),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const Key('screen04-feed-mode-following')));
+      await tester.pumpAndSettle();
+      expect(find.text('Your Following feed is ready to grow'), findsOneWidget);
+      expect(find.text('Asha Verma'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('screen04-feed-mode-forYou')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('social-author-profile-UI-REVIEW-FEED-001')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Sign in to message'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test('UI review Feed adapter rejects every write', () async {
+    final gateway = UiReviewSocialContentGateway(
+      now: () => DateTime(2026, 8, 31, 12),
+    );
+    final page = await gateway.feed();
+    expect(page.items, hasLength(3));
+    expect(
+      () => gateway.interact(postId: page.items.first.id, interaction: 'like'),
+      throwsA(
+        isA<SocialContentGatewayException>().having(
+          (error) => error.code,
+          'code',
+          'ui_review_read_only',
+        ),
+      ),
+    );
+  });
+
   testWidgets('C30T Feed Create uses the authenticated creation gateway', (
     tester,
   ) async {
@@ -778,12 +865,23 @@ void main() {
         await tester.pump();
       }
 
-      await tester.tap(
+      expect(
         find.byKey(const Key('social-message-author-public-action-truth')),
+        findsNothing,
       );
-      await tester.pump();
-      expect(journey.stage, JourneyStage.signIn);
-      expect(journey.returnTo, '/app/social?sub=feed&item=public-action-truth');
+      await tester.tap(
+        find.byKey(const Key('social-author-profile-public-action-truth')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('social-author-panel-public-author-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('social-author-message-request-public-author-1')),
+        findsNothing,
+      );
+      expect(journey.stage, JourneyStage.ready);
       expect(socialGateway.interactions, isEmpty);
       expect(tester.takeException(), isNull);
     },
