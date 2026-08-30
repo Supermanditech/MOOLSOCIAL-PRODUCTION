@@ -250,6 +250,15 @@ class _MoolHomeDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final content = FadeTransition(
+      opacity: CurvedAnimation(parent: arrival, curve: MoolMotion.enter),
+      child: MoolMainDomainMenu(
+        keyPrefix: 'mool-home',
+        onOpenFamily: (family) => onOpenRoute?.call(family.route),
+      ),
+    );
+    final landscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     return Padding(
       key: const Key('mool-home-dashboard'),
       padding: const EdgeInsets.fromLTRB(
@@ -260,13 +269,13 @@ class _MoolHomeDashboard extends StatelessWidget {
       ),
       child: Align(
         alignment: Alignment.topCenter,
-        child: FadeTransition(
-          opacity: CurvedAnimation(parent: arrival, curve: MoolMotion.enter),
-          child: MoolMainDomainMenu(
-            keyPrefix: 'mool-home',
-            onOpenFamily: (family) => onOpenRoute?.call(family.route),
-          ),
-        ),
+        child: landscape
+            ? SingleChildScrollView(
+                key: const Key('mool-home-dashboard-scroll'),
+                primary: false,
+                child: content,
+              )
+            : content,
       ),
     );
   }
