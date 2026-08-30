@@ -18,6 +18,7 @@ import '../../features/journey01/journey_session.dart';
 import '../../features/retailer/retailer_session.dart';
 import '../../features/shared/shared_models.dart';
 import '../../features/shared/shared_session.dart';
+import '../../features/shared/social_content_gateway.dart';
 import '../../features/shared/social_media_picker.dart';
 import '../../features/shared/social_create_draft_media_store.dart';
 import '../../features/shared/social_create_draft_repository.dart';
@@ -944,6 +945,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         }
       case SocialProtectedAction.follow:
         await _toggleFeedFollow(item, followed: true);
+      case SocialProtectedAction.report:
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) unawaited(_startPostReport(item));
+        });
     }
   }
 
@@ -3059,6 +3064,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                 item: item,
                 session: session,
                 onOpenAuthor: _openAuthor,
+                onMore: _openPostActions,
                 onOpenPost: _openPostDetail,
                 onRelationship: (item) => unawaited(_toggleFeedFollow(item)),
                 followed: item.authorId == null
@@ -3140,6 +3146,12 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
             Navigator.of(context).pop();
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) _openAuthor(item);
+            });
+          },
+          onMore: () {
+            Navigator.of(context).pop();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _openPostActions(item);
             });
           },
           onRelationship: () {
@@ -3713,6 +3725,103 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       return '@member$suffix';
     }
     return '@moolsocial';
+  }
+
+  void _openPostActions(SocialPublishedItem item) {
+    final reported = widget.sharedSession.socialPostReported(item.id);
+    final busy = widget.sharedSession.socialReportBusy(item.id);
+    showSocialV2Sheet(
+      context,
+      title: 'Post options',
+      subtitle: '${item.authorHandle} · Choose what you want to do',
+      children: [
+        SocialV2ListTile(
+          key: Key('social-report-post-${item.id}'),
+          icon: reported
+              ? Icons.check_circle_outline_rounded
+              : Icons.flag_outlined,
+          title: reported
+              ? 'Report sent'
+              : busy
+              ? 'Sending report…'
+              : 'Report post',
+          detail: reported
+              ? 'MoolSocial has received your report.'
+              : 'Tell MoolSocial privately why this post needs review',
+          onTap: reported || busy
+              ? null
+              : () {
+                  Navigator.of(context).pop();
+                  unawaited(_startPostReport(item));
+                },
+        ),
+      ],
+    );
+  }
+
+  Future<void> _startPostReport(SocialPublishedItem item) async {
+    if (!widget.session.isAuthenticated) {
+      _requireFeedAuthentication(
+        item,
+        const SocialProtectedActionIntent(action: SocialProtectedAction.report),
+      );
+      return;
+    }
+    final reason = await showDialog<SocialReportReason>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        key: Key('social-report-reason-dialog-${item.id}'),
+        title: const Text('Why are you reporting this post?'),
+        children: [
+          for (final value in SocialReportReason.values)
+            SimpleDialogOption(
+              key: Key('social-report-reason-${value.name}'),
+              onPressed: () => Navigator.pop(dialogContext, value),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(value.label),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (!mounted || reason == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: Key('social-report-confirm-${item.id}'),
+        title: const Text('Send this report?'),
+        content: Text(
+          '${reason.label}. Your report is private and does not remove the post before review.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            key: const Key('social-report-send'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Send report'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    final sent = await widget.sharedSession.reportSocialPost(item.id, reason);
+    if (!mounted) return;
+    if (!sent) {
+      showSocialV2Message(
+        context,
+        widget.sharedSession.socialReportError(item.id) ??
+            'The report could not be sent. Nothing changed.',
+      );
+      return;
+    }
+    showSocialV2Message(
+      context,
+      'Report sent. Thank you for helping keep MoolSocial safe.',
+    );
   }
 
   void _openShare(SocialPublishedItem item) {
@@ -6978,6 +7087,7 @@ class _SocialPostDetailV2 extends StatefulWidget {
     required this.authenticated,
     required this.focusReplies,
     required this.onOpenAuthor,
+    required this.onMore,
     required this.onRelationship,
     required this.onShare,
     required this.onAuthenticationRequired,
@@ -6988,6 +7098,7 @@ class _SocialPostDetailV2 extends StatefulWidget {
   final bool authenticated;
   final bool focusReplies;
   final VoidCallback onOpenAuthor;
+  final VoidCallback onMore;
   final VoidCallback onRelationship;
   final VoidCallback onShare;
   final ValueChanged<SocialProtectedActionIntent> onAuthenticationRequired;
@@ -7037,6 +7148,7 @@ class _SocialPostDetailV2State extends State<_SocialPostDetailV2> {
             item: item,
             session: widget.session,
             onOpenAuthor: (_) => widget.onOpenAuthor(),
+            onMore: (_) => widget.onMore(),
             onRelationship: (_) => widget.onRelationship(),
             followed: authorId == null
                 ? null

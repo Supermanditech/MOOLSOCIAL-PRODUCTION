@@ -91,6 +91,24 @@ class SocialReplyResult {
   final SocialPublishedItem post;
 }
 
+enum SocialReportReason {
+  spam,
+  harassment,
+  falseInformation,
+  harmfulOrIllegal,
+  other,
+}
+
+extension SocialReportReasonCopy on SocialReportReason {
+  String get label => switch (this) {
+    SocialReportReason.spam => 'Spam or misleading promotion',
+    SocialReportReason.harassment => 'Harassment or abuse',
+    SocialReportReason.falseInformation => 'False or deceptive information',
+    SocialReportReason.harmfulOrIllegal => 'Harmful or illegal content',
+    SocialReportReason.other => 'Something else',
+  };
+}
+
 abstract interface class SocialContentGateway {
   Future<SocialPublishedItem> publish(SocialPublishDraft draft);
 
@@ -126,6 +144,14 @@ abstract interface class SocialAuthorGateway {
   });
 }
 
+abstract interface class SocialModerationGateway {
+  Future<void> reportPost({
+    required String postId,
+    required SocialReportReason reason,
+    required String idempotencyKey,
+  });
+}
+
 SocialContentGateway buildSocialContentGateway() {
   if (moolSocialContentUrl.trim().isEmpty) {
     return const UnavailableSocialContentGateway();
@@ -138,7 +164,11 @@ SocialContentGateway buildSocialContentGateway() {
 }
 
 class UnavailableSocialContentGateway
-    implements SocialContentGateway, SocialCommentGateway, SocialAuthorGateway {
+    implements
+        SocialContentGateway,
+        SocialCommentGateway,
+        SocialAuthorGateway,
+        SocialModerationGateway {
   const UnavailableSocialContentGateway();
 
   @override
@@ -180,6 +210,13 @@ class UnavailableSocialContentGateway
     required bool followed,
   }) => Future<SocialAuthorProfile>.error(_unavailable());
 
+  @override
+  Future<void> reportPost({
+    required String postId,
+    required SocialReportReason reason,
+    required String idempotencyKey,
+  }) => Future<void>.error(_unavailable());
+
   static SocialContentGatewayException _unavailable() =>
       const SocialContentGatewayException(
         code: 'service_unavailable',
@@ -195,7 +232,11 @@ class UnavailableSocialContentGateway
 /// Feed layout and navigation can be reviewed on a device without inventing a
 /// backend success. Every write still fails closed.
 class UiReviewSocialContentGateway
-    implements SocialContentGateway, SocialCommentGateway, SocialAuthorGateway {
+    implements
+        SocialContentGateway,
+        SocialCommentGateway,
+        SocialAuthorGateway,
+        SocialModerationGateway {
   UiReviewSocialContentGateway({DateTime Function()? now})
     : _now = now ?? DateTime.now {
     final current = _now();
@@ -354,6 +395,13 @@ class UiReviewSocialContentGateway
     required bool followed,
   }) => Future<SocialAuthorProfile>.error(_writeUnavailable());
 
+  @override
+  Future<void> reportPost({
+    required String postId,
+    required SocialReportReason reason,
+    required String idempotencyKey,
+  }) => Future<void>.error(_writeUnavailable());
+
   static SocialContentGatewayException _writeUnavailable() =>
       const SocialContentGatewayException(
         code: 'ui_review_read_only',
@@ -505,7 +553,11 @@ class IoSocialContentTransport implements SocialContentTransport {
 }
 
 class AuthenticatedSocialContentGateway
-    implements SocialContentGateway, SocialCommentGateway, SocialAuthorGateway {
+    implements
+        SocialContentGateway,
+        SocialCommentGateway,
+        SocialAuthorGateway,
+        SocialModerationGateway {
   AuthenticatedSocialContentGateway({
     required Uri endpoint,
     required this._credentials,
@@ -663,6 +715,31 @@ class AuthenticatedSocialContentGateway
     );
     _validateAuthorProfileOwner(profile, authorId);
     return profile;
+  }
+
+  @override
+  Future<void> reportPost({
+    required String postId,
+    required SocialReportReason reason,
+    required String idempotencyKey,
+  }) async {
+    final data = _map(
+      await _invoke(
+        'report',
+        limitedUseAppCheck: true,
+        body: {
+          'postId': postId,
+          'reason': reason.name,
+          'idempotencyKey': idempotencyKey,
+        },
+      ),
+    );
+    if (data['reported'] != true || _requiredString(data['postId']) != postId) {
+      throw const SocialContentGatewayException(
+        code: 'invalid_response',
+        message: 'MoolSocial could not confirm this report.',
+      );
+    }
   }
 
   Future<Object?> _invoke(

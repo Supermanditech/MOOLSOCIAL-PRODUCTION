@@ -706,6 +706,138 @@ void main() {
     },
   );
 
+  testWidgets('C30T guest Report preserves the exact post action', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final journey = JourneySession(
+      store: MemoryJourneyStore(snapshot: readySnapshot),
+      allowGuestReady: true,
+    );
+    final creator = CreatorSession();
+    final retailer = RetailerSession();
+    final socialGateway = ReviewSocialContentGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    addTearDown(journey.dispose);
+    addTearDown(creator.dispose);
+    addTearDown(retailer.dispose);
+    addTearDown(shared.dispose);
+    final item = await socialGateway.publish(
+      const SocialPublishDraft(
+        idempotencyKey: 'guest-report-return',
+        type: SocialPublishedContentType.post,
+        authorName: 'Riya Sharma',
+        authorHandle: '@riyasharma',
+        body: 'A public post with report controls.',
+        audience: 'Public',
+        mediaPaths: <String>[],
+        mediaAreAssets: false,
+        choices: <SocialPublishedChoice>[],
+      ),
+    );
+    await journey.start();
+    await shared.loadSocialFeed(refresh: true);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SocialUniversalV2(
+          session: journey,
+          creatorSession: creator,
+          retailerSession: retailer,
+          sharedSession: shared,
+          initialSubAction: 'feed',
+          youtubePublicAccessOverride: false,
+          youtubeCreatorAccessOverride: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('social-post-more-${item.id}')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('social-report-post-${item.id}')));
+    await tester.pump();
+
+    expect(journey.stage, JourneyStage.signIn);
+    expect(
+      journey.returnTo,
+      '/app/social?sub=feed&item=${item.id}&action=report',
+    );
+    expect(socialGateway.reports, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('C30T authenticated Report waits for durable confirmation', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final journey = JourneySession(
+      store: MemoryJourneyStore(snapshot: readySnapshot),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+    );
+    final creator = CreatorSession();
+    final retailer = RetailerSession();
+    final socialGateway = ReviewSocialContentGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    addTearDown(journey.dispose);
+    addTearDown(creator.dispose);
+    addTearDown(retailer.dispose);
+    addTearDown(shared.dispose);
+    final item = await socialGateway.publish(
+      const SocialPublishDraft(
+        idempotencyKey: 'authenticated-report',
+        type: SocialPublishedContentType.post,
+        authorName: 'Riya Sharma',
+        authorHandle: '@riyasharma',
+        body: 'Report this post only after confirmation.',
+        audience: 'Public',
+        mediaPaths: <String>[],
+        mediaAreAssets: false,
+        choices: <SocialPublishedChoice>[],
+      ),
+    );
+    await journey.start();
+    await shared.loadSocialFeed(refresh: true);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SocialUniversalV2(
+          session: journey,
+          creatorSession: creator,
+          retailerSession: retailer,
+          sharedSession: shared,
+          initialSubAction: 'feed',
+          youtubePublicAccessOverride: false,
+          youtubeCreatorAccessOverride: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('social-post-more-${item.id}')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('social-report-post-${item.id}')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(Key('social-report-reason-dialog-${item.id}')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('social-report-reason-spam')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(Key('social-report-confirm-${item.id}')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('social-report-send')));
+    await tester.pumpAndSettle();
+
+    expect(socialGateway.reports, hasLength(1));
+    expect(socialGateway.reports.single.$1, item.id);
+    expect(socialGateway.reports.single.$2, SocialReportReason.spam);
+    expect(shared.socialPostReported(item.id), isTrue);
+    expect(find.textContaining('Report sent'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'C30T post-sign-in author return reopens the exact public author',
     (tester) async {

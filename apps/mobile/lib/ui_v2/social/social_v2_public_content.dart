@@ -7,7 +7,7 @@ import '../../features/shared/shared_models.dart';
 import '../../features/shared/shared_session.dart';
 import 'social_v2_design.dart';
 
-enum SocialProtectedAction { like, reply, repost, save, vote, follow }
+enum SocialProtectedAction { like, reply, repost, save, vote, follow, report }
 
 @immutable
 class SocialProtectedActionIntent {
@@ -61,6 +61,7 @@ class SocialPublishedContentCardV2 extends StatelessWidget {
     required this.onShare,
     this.onOpenPost,
     this.onRelationship,
+    this.onMore,
     this.followed,
     this.relationshipBusy = false,
     this.onMessageAuthor,
@@ -75,6 +76,7 @@ class SocialPublishedContentCardV2 extends StatelessWidget {
   final VoidCallback onShare;
   final ValueChanged<SocialPublishedItem>? onOpenPost;
   final ValueChanged<SocialPublishedItem>? onRelationship;
+  final ValueChanged<SocialPublishedItem>? onMore;
   final bool? followed;
   final bool relationshipBusy;
   final ValueChanged<SocialPublishedItem>? onMessageAuthor;
@@ -98,6 +100,7 @@ class SocialPublishedContentCardV2 extends StatelessWidget {
             onRelationship: onRelationship == null
                 ? null
                 : () => onRelationship!(item),
+            onMore: onMore == null ? null : () => onMore!(item),
             followed: followed,
             relationshipBusy: relationshipBusy,
           ),
@@ -558,6 +561,7 @@ class _PublicAuthorLine extends StatelessWidget {
     this.onOpen,
     this.onMessage,
     this.onRelationship,
+    this.onMore,
     this.followed,
     this.relationshipBusy = false,
   });
@@ -566,6 +570,7 @@ class _PublicAuthorLine extends StatelessWidget {
   final VoidCallback? onOpen;
   final VoidCallback? onMessage;
   final VoidCallback? onRelationship;
+  final VoidCallback? onMore;
   final bool? followed;
   final bool relationshipBusy;
 
@@ -653,6 +658,15 @@ class _PublicAuthorLine extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
+            ),
+          if (onMore != null)
+            IconButton(
+              key: Key('social-post-more-${item.id}'),
+              onPressed: onMore,
+              tooltip: 'More options for this post',
+              constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.more_horiz_rounded, size: 20),
             ),
           if (item.authorId != null &&
               onMessage != null &&

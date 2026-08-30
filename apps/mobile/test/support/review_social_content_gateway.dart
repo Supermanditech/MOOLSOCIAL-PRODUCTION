@@ -4,7 +4,11 @@ import 'package:moolsocial/features/shared/shared_models.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 
 class ReviewSocialContentGateway
-    implements SocialContentGateway, SocialCommentGateway, SocialAuthorGateway {
+    implements
+        SocialContentGateway,
+        SocialCommentGateway,
+        SocialAuthorGateway,
+        SocialModerationGateway {
   ReviewSocialContentGateway({DateTime Function()? now})
     : _now = now ?? DateTime.now;
 
@@ -16,6 +20,7 @@ class ReviewSocialContentGateway
   final Map<String, int> _followerCounts = {};
   int _sequence = 0;
   int _commentSequence = 0;
+  final List<(String, SocialReportReason, String)> reports = [];
 
   String? get latestItemId => _items.firstOrNull?.id;
 
@@ -188,6 +193,18 @@ class ReviewSocialContentGateway
       _followedAuthors[authorId] = followed;
     }
     return author(authorId: authorId, authenticated: true);
+  }
+
+  @override
+  Future<void> reportPost({
+    required String postId,
+    required SocialReportReason reason,
+    required String idempotencyKey,
+  }) async {
+    if (!_items.any((item) => item.id == postId)) throw _notFound();
+    if (!reports.any((entry) => entry.$3 == idempotencyKey)) {
+      reports.add((postId, reason, idempotencyKey));
+    }
   }
 
   SocialPublishedItem _vote(SocialPublishedItem item, int? choiceIndex) {

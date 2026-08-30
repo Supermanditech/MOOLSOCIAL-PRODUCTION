@@ -71,6 +71,12 @@ class SharedSession extends ChangeNotifier {
   final Set<String> _socialAuthorsLoading = {};
   final Set<String> _socialFollowsInFlight = {};
   final Map<String, String> _socialAuthorErrors = {};
+  final Set<String> _socialReportsInFlight = {};
+  final Map<String, String> _socialReportErrors = {};
+  final Set<String> _reportedSocialPosts = {};
+  final Map<String, String> _pendingSocialReportFingerprints = {};
+  final Map<String, String> _pendingSocialReportKeys = {};
+  int _socialReportSequence = 0;
 
   List<SocialPublishedItem> get socialPublishedItems =>
       List<SocialPublishedItem>.unmodifiable(_socialPublishedItems);
@@ -86,6 +92,11 @@ class SharedSession extends ChangeNotifier {
   SocialAuthorGateway? get _socialAuthorGateway =>
       _socialContentGateway is SocialAuthorGateway
       ? _socialContentGateway as SocialAuthorGateway
+      : null;
+
+  SocialModerationGateway? get _socialModerationGateway =>
+      _socialContentGateway is SocialModerationGateway
+      ? _socialContentGateway as SocialModerationGateway
       : null;
 
   bool socialInteractionBusy(String postId) =>
@@ -123,6 +134,14 @@ class SharedSession extends ChangeNotifier {
       _socialFollowsInFlight.contains(authorId);
 
   String? socialAuthorError(String authorId) => _socialAuthorErrors[authorId];
+
+  bool socialReportBusy(String postId) =>
+      _socialReportsInFlight.contains(postId);
+
+  String? socialReportError(String postId) => _socialReportErrors[postId];
+
+  bool socialPostReported(String postId) =>
+      _reportedSocialPosts.contains(postId);
 
   void saveSocialReplyDraft(String postId, String value) {
     if (value.isEmpty) {
@@ -402,6 +421,71 @@ class SharedSession extends ChangeNotifier {
     }
   }
 
+  Future<bool> reportSocialPost(
+    String postId,
+    SocialReportReason reason,
+  ) async {
+    if (_reportedSocialPosts.contains(postId)) return true;
+    if (_socialReportsInFlight.contains(postId)) return false;
+    if (!online) {
+      _socialReportErrors[postId] =
+          'You are offline. The report was not sent. Reconnect and try again.';
+      notifyListeners();
+      return false;
+    }
+    if (!authorized) {
+      _socialReportErrors[postId] = 'Sign in again before sending this report.';
+      notifyListeners();
+      return false;
+    }
+    if (!_socialPublishedItems.any((item) => item.id == postId)) {
+      _socialReportErrors[postId] =
+          'This post is no longer available. The report was not sent.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialModerationGateway;
+    if (gateway == null) {
+      _socialReportErrors[postId] =
+          'Reporting is unavailable right now. Nothing was sent.';
+      notifyListeners();
+      return false;
+    }
+    final fingerprint = '$postId\u001f${reason.name}';
+    if (_pendingSocialReportFingerprints[postId] != fingerprint ||
+        _pendingSocialReportKeys[postId] == null) {
+      _socialReportSequence += 1;
+      _pendingSocialReportFingerprints[postId] = fingerprint;
+      _pendingSocialReportKeys[postId] =
+          'social-report-${DateTime.now().microsecondsSinceEpoch}-$_socialReportSequence';
+    }
+    _socialReportsInFlight.add(postId);
+    _socialReportErrors.remove(postId);
+    notifyListeners();
+    try {
+      await gateway.reportPost(
+        postId: postId,
+        reason: reason,
+        idempotencyKey: _pendingSocialReportKeys[postId]!,
+      );
+      _reportedSocialPosts.add(postId);
+      _pendingSocialReportFingerprints.remove(postId);
+      _pendingSocialReportKeys.remove(postId);
+      _socialReportErrors.remove(postId);
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      _socialReportErrors[postId] = error.message;
+      return false;
+    } on Object {
+      _socialReportErrors[postId] =
+          'The report could not be sent. Nothing changed. Please try again.';
+      return false;
+    } finally {
+      _socialReportsInFlight.remove(postId);
+      notifyListeners();
+    }
+  }
+
   String filterFor(SharedScreenSpec spec) =>
       filters[spec.screen] ?? spec.filters.first;
 
@@ -450,6 +534,12 @@ class SharedSession extends ChangeNotifier {
     _socialAuthorsLoading.clear();
     _socialFollowsInFlight.clear();
     _socialAuthorErrors.clear();
+    _socialReportsInFlight.clear();
+    _socialReportErrors.clear();
+    _reportedSocialPosts.clear();
+    _pendingSocialReportFingerprints.clear();
+    _pendingSocialReportKeys.clear();
+    _socialReportSequence = 0;
     notifyListeners();
   }
 

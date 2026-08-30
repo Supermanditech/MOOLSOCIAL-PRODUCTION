@@ -458,6 +458,38 @@ void main() {
     );
   });
 
+  test('Report sends the exact private moderation contract', () async {
+    final credentials = _Credentials();
+    final transport = _Transport((body) {
+      expect(body, {
+        'operation': 'report',
+        'postId': 'post-1',
+        'reason': 'harassment',
+        'idempotencyKey': 'social-report-0001',
+      });
+      return jsonEncode({
+        'ok': true,
+        'data': {'postId': 'post-1', 'reported': true},
+      });
+    });
+    final gateway = AuthenticatedSocialContentGateway(
+      endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialContent',
+      ),
+      credentials: credentials,
+      transport: transport,
+    );
+
+    await gateway.reportPost(
+      postId: 'post-1',
+      reason: SocialReportReason.harassment,
+      idempotencyKey: 'social-report-0001',
+    );
+
+    expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse]);
+    expect(transport.headers.single['authorization'], 'Bearer id-token');
+  });
+
   test('reply rejects an acknowledged post owned by another request', () async {
     final gateway = AuthenticatedSocialContentGateway(
       endpoint: Uri.parse(
