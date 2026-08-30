@@ -139,7 +139,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
         top: false,
         child: ListView(
           key: ValueKey('buy-invoice-scroll-${order.id}'),
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 18),
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 96),
           children: [
             Semantics(
               container: true,
@@ -457,6 +457,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
             ),
             const SizedBox(height: 9),
             Text(
+              key: ValueKey('buy-invoice-record-notice-${order.id}'),
               'Keep this invoice with your order records. Download availability depends on the invoice issued for this order.',
               textAlign: TextAlign.center,
               style: context.buyMeta.copyWith(fontSize: 9),
