@@ -56,4 +56,49 @@ void main() {
     expect(source, isNot(contains("id: 'ask'")));
     expect(source, isNot(contains("title: 'Help and support'")));
   });
+
+  testWidgets('context action clears the OPPO exported bottom inset', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.centerRight,
+            child: GlobalProfilePanelV2(
+              onClose: () {},
+              onOpenRoute: (_) {},
+              contextAction: GlobalProfileContextAction(
+                id: 'orders',
+                title: 'Your Shop orders',
+                detail: '3 active and 3 delivered orders are ready to review.',
+                actionLabel: 'Open orders',
+                icon: Icons.receipt_long_outlined,
+                onPressed: () {},
+              ),
+              onContextAction: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final action = find.byKey(
+      const Key('global-profile-context-action-orders'),
+    );
+    final rect = tester.getRect(action);
+    expect(
+      find.byKey(const Key('global-profile-bottom-safe-area')),
+      findsOneWidget,
+    );
+    expect(rect.height, greaterThanOrEqualTo(42));
+    expect(rect.bottom, lessThanOrEqualTo(756));
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -305,12 +306,23 @@ class GlobalProfilePanelV2 extends StatelessWidget {
     final effectiveScale = media.textScaler.scale(1).clamp(.9, 1.15);
     final width = math.min(media.size.width * .74, 320.0);
     final palette = GlobalProfileSurfacePalette.forTone(surfaceTone);
+    final view = View.of(context);
+    final exportedBottomClearance =
+        defaultTargetPlatform == TargetPlatform.android
+        ? view.viewPadding.bottom / view.devicePixelRatio
+        : 0.0;
     return _GlobalProfilePaletteScope(
       palette: palette,
       child: MediaQuery(
         data: media.copyWith(textScaler: TextScaler.linear(effectiveScale)),
         child: SafeArea(
-          minimum: const EdgeInsets.symmetric(vertical: MoolSpacing.xs),
+          key: const Key('global-profile-bottom-safe-area'),
+          minimum: EdgeInsets.fromLTRB(
+            0,
+            MoolSpacing.xs,
+            0,
+            math.max(MoolSpacing.xs, exportedBottomClearance),
+          ),
           child: Material(
             key: const Key('global-profile-panel-v2'),
             color: palette.canvas,
