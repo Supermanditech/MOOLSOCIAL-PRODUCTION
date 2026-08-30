@@ -225,6 +225,11 @@ void main() {
         matching: find.byType(Scrollable),
       ),
     );
+    await tester.drag(
+      find.byKey(const Key('chat-message-list')),
+      const Offset(0, -96),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(retry);
     await tester.pumpAndSettle();
     expect(chat.messages('home-basket').last.text, draft);

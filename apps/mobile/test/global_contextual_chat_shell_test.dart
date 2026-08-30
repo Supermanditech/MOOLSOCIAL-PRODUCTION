@@ -598,6 +598,7 @@ void main() {
     expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
     expect(find.byKey(const Key('chat-attachment-tray')), findsNothing);
     expect(find.byKey(const Key('chat-attachment-notice')), findsNothing);
+    expect(find.byKey(const Key('chat-composer-surface')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('chat-composer-camera')));
     await tester.pumpAndSettle();
@@ -1118,6 +1119,72 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.getBottomRight(composer).dy, greaterThan(500));
       expect(tester.getBottomRight(composer).dy, lessThanOrEqualTo(756));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Assist draft keeps full-width text above fixed controls and Back restores the composer',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+      tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+      final route = Uri(
+        path: '/app/chat/thread/shop-assist',
+        queryParameters: {
+          'return': '/app/buy?sub=orders',
+          'draft': 'Help with order PO-240783',
+        },
+      ).toString();
+
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: route,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('chat-message-field'));
+      final controls = find.byKey(const Key('chat-composer-control-row'));
+      expect(
+        tester.widget<TextField>(field).controller?.text,
+        'Help with order PO-240783',
+      );
+      final textField = tester.widget<TextField>(field);
+      final padding = textField.decoration?.contentPadding as EdgeInsets?;
+      expect(padding?.bottom, greaterThanOrEqualTo(44));
+      expect(tester.getRect(controls).height, greaterThanOrEqualTo(44));
+      expect(tester.getRect(field).width, greaterThan(220));
+
+      await tester.tap(field);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getBottomRight(find.byKey(const Key('chat-composer-surface')))
+            .dy,
+        lessThanOrEqualTo(500),
+      );
+
+      await tester.tap(find.byKey(const Key('chat-attach')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-attachment-tray')), findsOneWidget);
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-attachment-tray')), findsNothing);
+      expect(find.byKey(const Key('chat-composer-surface')), findsOneWidget);
+      expect(find.byKey(const Key('chat-message-field')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

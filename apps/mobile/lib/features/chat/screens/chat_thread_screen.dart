@@ -612,7 +612,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (thread.suggestedPrompts.isNotEmpty &&
-                          widget.session.showSuggestedPromptsForSession)
+                          widget.session.showSuggestedPromptsForSession &&
+                          MediaQuery.viewInsetsOf(context).bottom == 0)
                         _SuggestedPromptStrip(
                           values: thread.suggestedPrompts,
                           onSelected: _applySuggestedPrompt,
@@ -1521,7 +1522,7 @@ class _ThreadBody extends StatelessWidget {
         MoolSpacing.md,
         MoolSpacing.xs,
         MoolSpacing.md,
-        MoolSpacing.lg,
+        112,
       ),
       itemCount: messages.length,
       itemBuilder: (context, index) => KeyedSubtree(
@@ -2936,67 +2937,94 @@ class _ComposerState extends State<_Composer> {
                           color: MoolColors.navy.withValues(alpha: .10),
                         ),
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                      child: Stack(
                         children: [
-                          Expanded(
-                            child: TextField(
-                              key: const Key('chat-message-field'),
-                              controller: controller,
-                              minLines: 1,
-                              maxLines: 4,
-                              decoration: InputDecoration(
-                                hintText: photo == null && attachment == null
-                                    ? 'Message'
-                                    : 'Add a caption',
-                                filled: false,
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: MoolSpacing.xs,
-                                  vertical: MoolSpacing.sm,
-                                ),
+                          TextField(
+                            key: const Key('chat-message-field'),
+                            controller: controller,
+                            minLines: 1,
+                            maxLines: 2,
+                            scrollPadding: const EdgeInsets.only(bottom: 112),
+                            decoration: InputDecoration(
+                              hintText: photo == null && attachment == null
+                                  ? 'Message'
+                                  : 'Add a caption',
+                              filled: false,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.fromLTRB(
+                                MoolSpacing.sm,
+                                8,
+                                MoolSpacing.sm,
+                                48,
                               ),
                             ),
                           ),
-                          ValueListenableBuilder<TextEditingValue>(
-                            valueListenable: controller,
-                            builder: (context, value, _) {
-                              final hasDraft =
-                                  value.text.isNotEmpty ||
-                                  photo != null ||
-                                  attachment != null ||
-                                  reply != null;
-                              if (!hasDraft) return const SizedBox.shrink();
-                              return IconButton(
-                                key: const Key('chat-discard-draft'),
-                                tooltip: 'Discard draft',
-                                onPressed: session.busy ? null : _discardDraft,
-                                icon: const Icon(Icons.delete_outline_rounded),
-                              );
-                            },
-                          ),
-                          IconButton(
-                            key: const Key('chat-attach'),
-                            tooltip: _attachmentsOpen
-                                ? 'Close attachments'
-                                : 'Attach a file',
-                            onPressed: session.busy ? null : _toggleAttachments,
-                            icon: const Icon(Icons.attach_file_rounded),
-                          ),
-                          IconButton(
-                            key: const Key('chat-composer-camera'),
-                            tooltip: 'Camera',
-                            onPressed: session.busy
-                                ? null
-                                : () => unawaited(
-                                    _selectPhoto(
-                                      context,
-                                      ChatPhotoSource.camera,
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: SizedBox(
+                              height: MoolMetrics.minimumTapTarget,
+                              child: Row(
+                                key: const Key('chat-composer-control-row'),
+                                children: [
+                                  ValueListenableBuilder<TextEditingValue>(
+                                    valueListenable: controller,
+                                    builder: (context, value, _) {
+                                      final hasDraft =
+                                          value.text.isNotEmpty ||
+                                          photo != null ||
+                                          attachment != null ||
+                                          reply != null;
+                                      if (!hasDraft) {
+                                        return const SizedBox(
+                                          width: MoolMetrics.minimumTapTarget,
+                                        );
+                                      }
+                                      return IconButton(
+                                        key: const Key('chat-discard-draft'),
+                                        tooltip: 'Discard draft',
+                                        onPressed: session.busy
+                                            ? null
+                                            : _discardDraft,
+                                        icon: const Icon(
+                                          Icons.delete_outline_rounded,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const Spacer(),
+                                  IconButton(
+                                    key: const Key('chat-attach'),
+                                    tooltip: _attachmentsOpen
+                                        ? 'Close attachments'
+                                        : 'Attach a file',
+                                    onPressed: session.busy
+                                        ? null
+                                        : _toggleAttachments,
+                                    icon: const Icon(Icons.attach_file_rounded),
+                                  ),
+                                  IconButton(
+                                    key: const Key('chat-composer-camera'),
+                                    tooltip: 'Camera',
+                                    onPressed: session.busy
+                                        ? null
+                                        : () => unawaited(
+                                            _selectPhoto(
+                                              context,
+                                              ChatPhotoSource.camera,
+                                            ),
+                                          ),
+                                    icon: const Icon(
+                                      Icons.photo_camera_outlined,
                                     ),
                                   ),
-                            icon: const Icon(Icons.photo_camera_outlined),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
