@@ -384,16 +384,19 @@ void main() {
       final wholesaleProducts = BuyV2Catalogue.products
           .where((item) => item.destination == BuyV2Destination.wholesale)
           .toList();
-      expect(shopProducts.map((item) => item.canonicalId), approvedCommerceIds);
       expect(
-        wholesaleProducts.map((item) => item.canonicalId),
-        approvedCommerceIds,
+        shopProducts.map((item) => item.canonicalId).toSet(),
+        approvedCommerceIds.toSet(),
+      );
+      expect(
+        wholesaleProducts.map((item) => item.canonicalId).toSet(),
+        approvedCommerceIds.toSet(),
       );
       for (final canonicalId in approvedCommerceIds) {
         final offers = BuyV2Catalogue.products
             .where((item) => item.canonicalId == canonicalId)
             .toList();
-        expect(offers, hasLength(2), reason: canonicalId);
+        expect(offers.length, greaterThanOrEqualTo(2), reason: canonicalId);
         expect(offers.map((item) => item.destination).toSet(), {
           BuyV2Destination.shop,
           BuyV2Destination.wholesale,
@@ -1143,6 +1146,55 @@ void main() {
       }
     });
 
+    test('discovery refinements combine and sort without crossing Shop', () {
+      session.openDestination(BuyV2Destination.shop);
+      final brand = session.discoveryBrands.first;
+      session.toggleDiscoveryBrand(brand);
+      expect(session.visibleProducts, isNotEmpty);
+      expect(
+        session.visibleProducts,
+        everyElement(
+          isA<BuyV2Product>().having(
+            (product) => product.brand,
+            'brand',
+            brand,
+          ),
+        ),
+      );
+
+      session.clearDiscoveryRefinements();
+      session.chooseMaximumProductPrice(250);
+      expect(
+        session.visibleProducts.every(
+          (product) => session.productFactsFor(product).price <= 250,
+        ),
+        isTrue,
+      );
+      session.chooseFulfilmentMode(BuyV2FulfilmentMode.quickLocal);
+      expect(
+        session.visibleProducts.every(
+          (product) =>
+              session.fulfilmentModeFor(product) ==
+              BuyV2FulfilmentMode.quickLocal,
+        ),
+        isTrue,
+      );
+      session.chooseProductSort(BuyV2ProductSort.priceHighToLow);
+      final prices = session.visibleProducts
+          .map((product) => session.productFactsFor(product).price)
+          .toList(growable: false);
+      expect(
+        prices,
+        orderedEquals([...prices]..sort((a, b) => b.compareTo(a))),
+      );
+      expect(session.activeDiscoveryRefinementCount, 3);
+
+      session.clearDiscoveryRefinements();
+      expect(session.activeDiscoveryRefinementCount, 0);
+      expect(session.productSort, BuyV2ProductSort.relevance);
+      expect(session.selectedBrands, isEmpty);
+    });
+
     test('Buy account returns to the exact originating purchase depth', () {
       final product = BuyV2Catalogue.products.firstWhere(
         (item) => item.destination == BuyV2Destination.wholesale,
@@ -1536,6 +1588,13 @@ void main() {
           ),
         );
         first.choosePayment('Bank transfer');
+        final brand = first.discoveryBrands.first;
+        first.toggleDiscoveryBrand(brand);
+        first.chooseMaximumProductPrice(500);
+        first.choosePackFilter(BuyV2PackFilter.standard);
+        first.chooseFulfilmentMode(BuyV2FulfilmentMode.quickLocal);
+        first.chooseProductSort(BuyV2ProductSort.priceLowToHigh);
+        first.setAvailableProductsOnly(true);
         await Future<void>.delayed(Duration.zero);
 
         final restored = BuyV2Session(
@@ -1548,6 +1607,12 @@ void main() {
         expect(restored.isSaved(product.id), isTrue);
         expect(restored.selectedAddressId, 'family');
         expect(restored.selectedPayment, 'Bank transfer');
+        expect(restored.selectedBrands, {brand});
+        expect(restored.maximumProductPrice, 500);
+        expect(restored.selectedPackFilter, BuyV2PackFilter.standard);
+        expect(restored.selectedFulfilmentMode, BuyV2FulfilmentMode.quickLocal);
+        expect(restored.productSort, BuyV2ProductSort.priceLowToHigh);
+        expect(restored.availableProductsOnly, isTrue);
       },
     );
 

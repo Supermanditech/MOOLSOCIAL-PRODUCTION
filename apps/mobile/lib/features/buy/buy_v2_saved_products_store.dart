@@ -28,6 +28,12 @@ class BuyV2CustomerStateSnapshot {
     this.bankTransferInstructions,
     this.shoppingIntent,
     this.checkoutSubmissionState,
+    this.selectedBrands = const {},
+    this.maximumPrice,
+    this.packFilter,
+    this.fulfilmentMode,
+    this.productSort,
+    this.availableOnly = false,
   });
 
   final Map<String, int> cartQuantities;
@@ -42,6 +48,12 @@ class BuyV2CustomerStateSnapshot {
   final BuyV2BankTransferInstructions? bankTransferInstructions;
   final String? shoppingIntent;
   final String? checkoutSubmissionState;
+  final Set<String> selectedBrands;
+  final int? maximumPrice;
+  final String? packFilter;
+  final String? fulfilmentMode;
+  final String? productSort;
+  final bool availableOnly;
 }
 
 abstract interface class BuyV2CustomerStateStore {

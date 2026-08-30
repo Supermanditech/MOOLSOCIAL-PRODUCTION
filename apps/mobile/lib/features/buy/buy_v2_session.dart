@@ -460,6 +460,13 @@ class BuyV2Session extends ChangeNotifier {
   String? notice;
   String? cartAcknowledgement;
   String? selectedFilter;
+  final Set<String> _selectedBrands = {};
+  Set<String> get selectedBrands => Set.unmodifiable(_selectedBrands);
+  int? maximumProductPrice;
+  BuyV2PackFilter? selectedPackFilter;
+  BuyV2FulfilmentMode? selectedFulfilmentMode;
+  BuyV2ProductSort productSort = BuyV2ProductSort.relevance;
+  bool availableProductsOnly = false;
   BuyV2ShoppingIntent? activeShoppingIntent;
   bool businessVerified = true;
   BuyV2BusinessVerificationState _businessVerificationState =
@@ -1312,6 +1319,31 @@ class BuyV2Session extends ChangeNotifier {
       productFactsFor(product).fulfilmentMode ??
       buyV2CatalogueFulfilmentModeFor(product);
 
+  BuyV2PackFilter packFilterFor(BuyV2Product product) {
+    final pack = product.pack.toLowerCase();
+    if (product.destination == BuyV2Destination.wholesale ||
+        product.minimumOrder > 1 ||
+        RegExp(r'case|carton|crate|sack|pallet|lot|trade').hasMatch(pack)) {
+      return BuyV2PackFilter.bulk;
+    }
+    if (RegExp(r'pack of\s*[2-9]|[2-9]\s*[×x]').hasMatch(pack)) {
+      return BuyV2PackFilter.multipack;
+    }
+    return BuyV2PackFilter.standard;
+  }
+
+  bool _availableForDiscovery(BuyV2Product product) {
+    final facts = productFactsFor(product);
+    final orderability = facts.orderabilityLabel.toLowerCase();
+    return !facts.stale &&
+        facts.storeOperatingState != BuyV2StoreOperatingState.closed &&
+        !orderability.contains('unavailable') &&
+        !orderability.contains('not available') &&
+        !orderability.contains('out of stock') &&
+        !orderability.contains('checking') &&
+        !orderability.contains('loading');
+  }
+
   List<BuyV2Product> get visibleProducts {
     final normalized = query.trim().toLowerCase();
     final filterDestination = destination == BuyV2Destination.orders
@@ -1375,11 +1407,60 @@ class BuyV2Session extends ChangeNotifier {
         'otc' => !product.requiresPrescription,
         _ => true,
       };
-      return matchesCategory && matchesFilter;
+      final matchesBrands =
+          _selectedBrands.isEmpty || _selectedBrands.contains(product.brand);
+      final matchesPrice =
+          maximumProductPrice == null ||
+          productFactsFor(product).price <= maximumProductPrice!;
+      final matchesPack =
+          selectedPackFilter == null ||
+          packFilterFor(product) == selectedPackFilter;
+      final matchesFulfilment =
+          selectedFulfilmentMode == null ||
+          fulfilmentModeFor(product) == selectedFulfilmentMode;
+      final matchesAvailability =
+          !availableProductsOnly || _availableForDiscovery(product);
+      return matchesCategory &&
+          matchesFilter &&
+          matchesBrands &&
+          matchesPrice &&
+          matchesPack &&
+          matchesFulfilment &&
+          matchesAvailability;
     }).toList();
     final products = normalized.isEmpty
         ? candidates
         : BuyV2SearchRelevance.rankProducts(candidates, query);
+    switch (productSort) {
+      case BuyV2ProductSort.relevance:
+        break;
+      case BuyV2ProductSort.priceLowToHigh:
+        products.sort(
+          (left, right) => productFactsFor(
+            left,
+          ).price.compareTo(productFactsFor(right).price),
+        );
+      case BuyV2ProductSort.priceHighToLow:
+        products.sort(
+          (left, right) => productFactsFor(
+            right,
+          ).price.compareTo(productFactsFor(left).price),
+        );
+      case BuyV2ProductSort.deliveryFastest:
+        int priority(BuyV2Product product) =>
+            switch (fulfilmentModeFor(product)) {
+              BuyV2FulfilmentMode.quickLocal => 0,
+              BuyV2FulfilmentMode.standardCourier => 1,
+              BuyV2FulfilmentMode.bulkFreight => 2,
+            };
+        products.sort((left, right) {
+          final fulfilment = priority(left).compareTo(priority(right));
+          if (fulfilment != 0) return fulfilment;
+          return productFactsFor(
+            left,
+          ).price.compareTo(productFactsFor(right).price);
+        });
+    }
     if (category == 'all' && normalized.isEmpty && products.length > 18) {
       return products.take(18).toList();
     }
@@ -1389,7 +1470,9 @@ class BuyV2Session extends ChangeNotifier {
   bool get hasNarrowedProductSearchScope =>
       destination != BuyV2Destination.orders &&
       query.trim().isNotEmpty &&
-      (selectedCategoryId != 'all' || selectedFilter != null);
+      (selectedCategoryId != 'all' ||
+          selectedFilter != null ||
+          activeDiscoveryRefinementCount > 0);
 
   /// Truthful, replaceable search-discovery boundary for the active vertical.
   ///
@@ -1573,6 +1656,28 @@ class BuyV2Session extends ChangeNotifier {
       activeShoppingIntent = BuyV2ShoppingIntent.values
           .where((intent) => intent.name == snapshot.shoppingIntent)
           .firstOrNull;
+      final validBrands = _catalogueProducts
+          .map((product) => product.brand)
+          .toSet();
+      _selectedBrands
+        ..clear()
+        ..addAll(snapshot.selectedBrands.where(validBrands.contains));
+      final storedMaximumPrice = snapshot.maximumPrice;
+      maximumProductPrice = storedMaximumPrice != null && storedMaximumPrice > 0
+          ? storedMaximumPrice
+          : null;
+      selectedPackFilter = BuyV2PackFilter.values
+          .where((value) => value.name == snapshot.packFilter)
+          .firstOrNull;
+      selectedFulfilmentMode = BuyV2FulfilmentMode.values
+          .where((value) => value.name == snapshot.fulfilmentMode)
+          .firstOrNull;
+      productSort =
+          BuyV2ProductSort.values
+              .where((value) => value.name == snapshot.productSort)
+              .firstOrNull ??
+          BuyV2ProductSort.relevance;
+      availableProductsOnly = snapshot.availableOnly;
       final storedSubmissionState = BuyV2CheckoutSubmissionState.values
           .where((state) => state.name == snapshot.checkoutSubmissionState)
           .firstOrNull;
@@ -1613,6 +1718,12 @@ class BuyV2Session extends ChangeNotifier {
       bankTransferInstructions: _bankTransferInstructions,
       shoppingIntent: activeShoppingIntent?.name,
       checkoutSubmissionState: checkoutSubmissionState.name,
+      selectedBrands: Set.unmodifiable(_selectedBrands),
+      maximumPrice: maximumProductPrice,
+      packFilter: selectedPackFilter?.name,
+      fulfilmentMode: selectedFulfilmentMode?.name,
+      productSort: productSort.name,
+      availableOnly: availableProductsOnly,
     );
     unawaited(
       store
@@ -3148,6 +3259,7 @@ class BuyV2Session extends ChangeNotifier {
         : BuyV2View.catalogue;
     query = '';
     selectedFilter = null;
+    _clearDiscoveryRefinements();
     activeShoppingIntent = null;
     notice = null;
     _notifyNavigationIfChanged(
@@ -3788,6 +3900,100 @@ class BuyV2Session extends ChangeNotifier {
   void chooseFilter(String? value) {
     selectedFilter = value;
     notifyListeners();
+  }
+
+  List<String> get discoveryBrands {
+    if (destination == BuyV2Destination.orders) return const [];
+    final brands =
+        _catalogueProducts
+            .where((product) => product.destination == destination)
+            .map((product) => product.brand)
+            .toSet()
+            .toList(growable: false)
+          ..sort();
+    return List.unmodifiable(brands.take(10));
+  }
+
+  List<int> get discoveryPriceLimits => switch (destination) {
+    BuyV2Destination.shop => const [100, 250, 500, 1000],
+    BuyV2Destination.wholesale => const [2000, 5000, 10000],
+    BuyV2Destination.medicine => const [100, 250, 500, 1000],
+    BuyV2Destination.orders => const [],
+  };
+
+  int get activeDiscoveryRefinementCount =>
+      _selectedBrands.length +
+      (maximumProductPrice == null ? 0 : 1) +
+      (selectedPackFilter == null ? 0 : 1) +
+      (selectedFulfilmentMode == null ? 0 : 1) +
+      (productSort == BuyV2ProductSort.relevance ? 0 : 1) +
+      (availableProductsOnly ? 1 : 0);
+
+  String get discoveryRefinementSignature => [
+    productSort.name,
+    maximumProductPrice?.toString() ?? 'any-price',
+    selectedPackFilter?.name ?? 'any-pack',
+    selectedFulfilmentMode?.name ?? 'any-delivery',
+    availableProductsOnly ? 'available' : 'all-stock',
+    ...(_selectedBrands.toList()..sort()),
+  ].join('|');
+
+  void toggleDiscoveryBrand(String brand) {
+    final value = brand.trim();
+    if (value.isEmpty || !discoveryBrands.contains(value)) return;
+    if (!_selectedBrands.remove(value)) _selectedBrands.add(value);
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void chooseMaximumProductPrice(int? value) {
+    if (value != null &&
+        (value <= 0 || !discoveryPriceLimits.contains(value))) {
+      return;
+    }
+    maximumProductPrice = value;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void choosePackFilter(BuyV2PackFilter? value) {
+    selectedPackFilter = value;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void chooseFulfilmentMode(BuyV2FulfilmentMode? value) {
+    selectedFulfilmentMode = value;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void chooseProductSort(BuyV2ProductSort value) {
+    productSort = value;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void setAvailableProductsOnly(bool value) {
+    availableProductsOnly = value;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void clearDiscoveryRefinements() {
+    if (activeDiscoveryRefinementCount == 0) return;
+    _clearDiscoveryRefinements();
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void _clearDiscoveryRefinements() {
+    _selectedBrands.clear();
+    maximumProductPrice = null;
+    selectedPackFilter = null;
+    selectedFulfilmentMode = null;
+    productSort = BuyV2ProductSort.relevance;
+    availableProductsOnly = false;
   }
 
   void chooseShoppingIntent(BuyV2ShoppingIntent intent) {

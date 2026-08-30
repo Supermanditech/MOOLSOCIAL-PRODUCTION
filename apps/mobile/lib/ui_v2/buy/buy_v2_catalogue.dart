@@ -860,6 +860,7 @@ class BuyV2SearchResultsView extends StatelessWidget {
           'buy-query-results-${session.destination.name}-'
           '${session.selectedCategoryId}-'
           '${session.selectedFilter ?? 'none'}-'
+          '${session.discoveryRefinementSignature}-'
           '${query.toLowerCase()}',
       child: query.isEmpty
           ? _SearchReadyState(
@@ -2018,6 +2019,7 @@ class _CatalogueToolsMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final filterOptions = _filterOptionsFor(session.destination);
+    final refinementCount = session.activeDiscoveryRefinementCount;
     void openSheet() {
       HapticFeedback.selectionClick();
       showBuyV2FilterSheet(
@@ -2058,7 +2060,8 @@ class _CatalogueToolsMenu extends StatelessWidget {
     return Semantics(
       label:
           'Open ${session.destination.label} tools and filters. '
-          'Current ${_filterLabel(filterOptions, session.selectedFilter)}',
+          'Current ${_filterLabel(filterOptions, session.selectedFilter)}. '
+          '$refinementCount additional ${refinementCount == 1 ? 'filter' : 'filters'} selected',
       button: true,
       excludeSemantics: true,
       onTap: openSheet,
@@ -2069,7 +2072,8 @@ class _CatalogueToolsMenu extends StatelessWidget {
         style: IconButton.styleFrom(
           minimumSize: const Size(44, 44),
           maximumSize: const Size(44, 44),
-          backgroundColor: session.selectedFilter == null
+          backgroundColor:
+              session.selectedFilter == null && refinementCount == 0
               ? Colors.white
               : BuyV2Colors.softOrange,
           foregroundColor: BuyV2Colors.navy,
@@ -2079,7 +2083,7 @@ class _CatalogueToolsMenu extends StatelessWidget {
           ),
         ),
         icon: Badge(
-          isLabelVisible: session.selectedFilter != null,
+          isLabelVisible: session.selectedFilter != null || refinementCount > 0,
           backgroundColor: BuyV2Colors.orange,
           child: const Icon(
             Icons.more_horiz_rounded,

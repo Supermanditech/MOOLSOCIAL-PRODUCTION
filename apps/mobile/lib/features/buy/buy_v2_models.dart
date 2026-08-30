@@ -31,6 +31,15 @@ enum BuyV2View {
 
 enum BuyV2CartScope { all, shop, wholesale, medicine }
 
+enum BuyV2ProductSort {
+  relevance,
+  priceLowToHigh,
+  priceHighToLow,
+  deliveryFastest,
+}
+
+enum BuyV2PackFilter { standard, multipack, bulk }
+
 enum BuyV2AddressKind { home, work, thirdParty, other }
 
 enum BuyV2OrderStatus { preparing, confirmed, dispatched, arriving, delivered }
