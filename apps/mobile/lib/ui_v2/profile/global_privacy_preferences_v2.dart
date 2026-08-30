@@ -1,6 +1,3 @@
-import 'dart:math' as math;
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -11,21 +8,6 @@ import '../../features/journey01/journey_session.dart';
 import 'global_profile_panel_v2.dart';
 
 final _privacyPolicyUri = Uri.parse('https://moolsocial.com/privacy/');
-
-double _preferencesSheetBottomInset(BuildContext context) {
-  final mediaBottom = MediaQuery.viewPaddingOf(context).bottom;
-  final view = View.of(context);
-  final rawTop = view.viewPadding.top / view.devicePixelRatio;
-  final rawBottom = view.viewPadding.bottom / view.devicePixelRatio;
-  const exportedTargetOverflow = 14.0;
-  final exportedClearance = defaultTargetPlatform == TargetPlatform.android
-      ? (rawTop - exportedTargetOverflow).clamp(0, double.infinity).toDouble()
-      : 0.0;
-  return math.max(
-    24.0,
-    math.max(mediaBottom, math.max(rawBottom, exportedClearance)),
-  );
-}
 
 class GlobalPrivacyPreferencesV2 extends StatelessWidget {
   const GlobalPrivacyPreferencesV2({
@@ -279,19 +261,26 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
     BuildContext context,
     GlobalProfileSurfacePalette palette,
   ) async {
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
       useRootNavigator: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: palette.card,
-      showDragHandle: false,
-      clipBehavior: Clip.antiAlias,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      builder: (dialogContext) => Dialog(
+        key: const Key('global-preferences-area-sheet'),
+        insetPadding: const EdgeInsets.symmetric(
+          horizontal: MoolSpacing.lg,
+          vertical: 48,
+        ),
+        backgroundColor: palette.card,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(MoolRadii.floating),
+          side: BorderSide(color: palette.border),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420, maxHeight: 520),
+          child: _ServiceAreaSheet(session: session, palette: palette),
+        ),
       ),
-      builder: (sheetContext) =>
-          _ServiceAreaSheet(session: session, palette: palette),
     );
   }
 
@@ -354,14 +343,12 @@ class _ServiceAreaSheetState extends State<_ServiceAreaSheet> {
   Widget build(BuildContext context) {
     final session = widget.session;
     final palette = widget.palette;
-    final media = MediaQuery.of(context);
-    final bottomSafeInset = _preferencesSheetBottomInset(context);
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
+      padding: const EdgeInsets.fromLTRB(
         MoolSpacing.md,
-        MoolSpacing.sm,
         MoolSpacing.md,
-        media.viewInsets.bottom + bottomSafeInset + MoolSpacing.md,
+        MoolSpacing.md,
+        MoolSpacing.md,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
