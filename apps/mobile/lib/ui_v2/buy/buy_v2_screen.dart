@@ -677,7 +677,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   bool _showsMiniCart(BuyV2Session session) =>
-      session.itemCount > 0 &&
+      (session.activeDockDestination == BuyV2Destination.medicine
+              ? session.countForDestination(BuyV2Destination.medicine)
+              : session.itemCount) >
+          0 &&
       (session.view == BuyV2View.product ||
           session.view == BuyV2View.catalogue);
 
@@ -1197,15 +1200,26 @@ class _BuyMiniCartBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final itemCount = session.itemCount;
-    final total = session.cartTotal;
+    final medicineScoped =
+        session.activeDockDestination == BuyV2Destination.medicine;
+    final itemCount = medicineScoped
+        ? session.countForDestination(BuyV2Destination.medicine)
+        : session.itemCount;
+    final total = medicineScoped
+        ? session.totalForDestination(BuyV2Destination.medicine)
+        : session.cartTotal;
     final itemLabel = itemCount == 1 ? 'item' : 'items';
-    final cartMessage =
-        session.cartAcknowledgement ?? '$itemCount $itemLabel ready';
+    final cartMessage = medicineScoped
+        ? '$itemCount $itemLabel ready'
+        : session.cartAcknowledgement ?? '$itemCount $itemLabel ready';
     const title = 'Cart';
     void activate() {
       HapticFeedback.selectionClick();
-      session.openCart();
+      session.openCart(
+        scope: medicineScoped
+            ? BuyV2CartScope.medicine
+            : BuyV2CartScope.all,
+      );
     }
 
     return Semantics(

@@ -2452,6 +2452,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Care Medicine never exposes an unrelated Shop basket', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    final shop = BuyV2Catalogue.products.firstWhere(
+      (item) => item.destination == BuyV2Destination.shop,
+    );
+    final medicine = BuyV2Catalogue.products.firstWhere(
+      (item) =>
+          item.destination == BuyV2Destination.medicine &&
+          !item.requiresPrescription,
+    );
+    session.addProduct(shop.id);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    session.openDestination(BuyV2Destination.medicine);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('buy-compact-cart-indicator')),
+      findsNothing,
+    );
+
+    session.addProduct(medicine.id);
+    await tester.pumpAndSettle();
+    final miniCart = find.byKey(
+      const ValueKey('buy-compact-cart-indicator'),
+    );
+    expect(miniCart, findsOneWidget);
+    expect(
+      tester.getSemantics(miniCart).label,
+      contains(buyV2Money(medicine.price)),
+    );
+    expect(
+      tester.getSemantics(miniCart).label,
+      isNot(contains(buyV2Money(shop.price + medicine.price))),
+    );
+
+    await tester.tap(miniCart);
+    await tester.pumpAndSettle();
+    expect(session.cartScope, BuyV2CartScope.medicine);
+    expect(session.cartLines, hasLength(1));
+    expect(session.cartLines.single.product.id, medicine.id);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'compact Buy surface and Cart total remain whole at 320 and 140 percent',
     (tester) async {
