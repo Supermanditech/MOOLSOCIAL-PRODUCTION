@@ -583,9 +583,9 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
       bottomNavigationBar: SafeArea(
         key: const ValueKey('buy-invoice-bottom-safe-area'),
         top: false,
-        minimum: EdgeInsets.only(bottom: exportedBottomClearance),
+        bottom: false,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          padding: EdgeInsets.fromLTRB(10, 8, 10, 8 + exportedBottomClearance),
           decoration: const BoxDecoration(
             color: Colors.white,
             border: Border(top: BorderSide(color: BuyV2Colors.line)),

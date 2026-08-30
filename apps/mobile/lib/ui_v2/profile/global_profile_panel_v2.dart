@@ -330,12 +330,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
         data: media.copyWith(textScaler: TextScaler.linear(effectiveScale)),
         child: SafeArea(
           key: const Key('global-profile-bottom-safe-area'),
-          minimum: EdgeInsets.fromLTRB(
-            0,
-            MoolSpacing.xs,
-            0,
-            math.max(MoolSpacing.xs, exportedBottomClearance),
-          ),
+          minimum: EdgeInsets.fromLTRB(0, MoolSpacing.xs, 0, 0),
           child: Material(
             key: const Key('global-profile-panel-v2'),
             color: palette.canvas,
@@ -385,11 +380,11 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                         SliverFillRemaining(
                           hasScrollBody: false,
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(
+                            padding: EdgeInsets.fromLTRB(
                               MoolSpacing.sm,
                               MoolSpacing.md,
                               MoolSpacing.sm,
-                              MoolSpacing.md,
+                              MoolSpacing.md + exportedBottomClearance,
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.end,
