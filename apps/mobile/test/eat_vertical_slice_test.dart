@@ -315,10 +315,12 @@ void main() {
     addTearDown(eat.dispose);
     await mount(tester, route: '/app/eat/table', journey: journey, eat: eat);
 
-    await tapVisible(tester, const Key('eat-table-people-6'));
-    await tapVisible(tester, const Key('eat-table-time-800PM'));
-    await tapVisible(tester, const Key('eat-table-choice-family-dining'));
     await tapVisible(tester, const Key('eat-book-table'));
+    expect(find.byKey(const Key('eat-table-review-sheet')), findsOneWidget);
+    await tapVisible(tester, const Key('eat-table-people-6'));
+    await tapVisible(tester, const Key('eat-table-time-In30min'));
+    await tapVisible(tester, const Key('eat-table-choice-family-dining'));
+    await tapVisible(tester, const Key('eat-table-confirm-booking'));
 
     expect(
       find.byKey(const Key('eat-table-confirmation-screen')),
@@ -366,10 +368,14 @@ void main() {
     expect(find.textContaining('no tables today'), findsOneWidget);
     await tapVisible(tester, const Key('dismiss-eat-message'));
 
+    eat.chooseTablePeople('4');
+    eat.chooseTableTime('Next available');
+    eat.chooseTableType('Standard table', 0);
     await tapVisible(tester, const Key('eat-book-table'));
+    await tapVisible(tester, const Key('eat-table-confirm-booking'));
     expect(eat.tableReceipt, isNull);
     expect(find.textContaining('just taken'), findsOneWidget);
-    await tapVisible(tester, const Key('eat-book-table'));
+    await tapVisible(tester, const Key('eat-table-confirm-booking'));
     expect(eat.tableReceipt, isNotNull);
     expect(
       find.byKey(const Key('eat-table-confirmation-screen')),

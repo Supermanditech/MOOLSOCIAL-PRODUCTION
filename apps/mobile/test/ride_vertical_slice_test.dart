@@ -209,6 +209,11 @@ void main() {
       expect(ride.fare, 138);
       await tapVisible(tester, const Key('ride-payment-upi'));
       await tapVisible(tester, const Key('ride-book'));
+      expect(
+        find.byKey(const Key('ride-booking-review-sheet')),
+        findsOneWidget,
+      );
+      await tapVisible(tester, const Key('ride-confirm-booking'));
       expect(gateway.bookingCalls, 1);
       expect(find.byKey(const Key('ride-arriving-screen')), findsOneWidget);
       expect(find.text('Arjun Singh'), findsOneWidget);
@@ -323,11 +328,13 @@ void main() {
     await mount(tester, route: '/app/ride/book', journey: journey, ride: ride);
 
     await tapVisible(tester, const Key('ride-book'));
+    await tapVisible(tester, const Key('ride-confirm-booking'));
     expect(find.textContaining('No captain accepted yet'), findsOneWidget);
     expect(find.textContaining('No payment was taken'), findsOneWidget);
     expect(ride.trip, isNull);
     expect(gateway.paymentCalls, 0);
     await tapVisible(tester, const Key('ride-book'));
+    await tapVisible(tester, const Key('ride-confirm-booking'));
     expect(ride.trip, isNotNull);
     expect(gateway.bookingCalls, 2);
     expect(find.byKey(const Key('ride-arriving-screen')), findsOneWidget);

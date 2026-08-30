@@ -96,7 +96,7 @@ class _EatHomeScreenState extends State<EatHomeScreen> {
                   fieldKey: const Key('eat-home-search'),
                   controller: _searchController,
                   focusNode: _searchFocusNode,
-                  hintText: 'Search food, cuisine or restaurant',
+                  hintText: 'Search food or restaurants',
                   semanticLabel: 'Search food and restaurants',
                   onChanged: (_) => setState(() {}),
                   trailing: _searchController.text.isEmpty

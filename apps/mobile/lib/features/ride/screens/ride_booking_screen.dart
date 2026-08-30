@@ -264,6 +264,78 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
     context.go('/app/ride/trip/${session.trip!.id}');
   }
 
+  Future<void> _reviewAndBook() async {
+    FocusScope.of(context).unfocus();
+    final package = session.selectedPackage;
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => SingleChildScrollView(
+        key: const Key('ride-booking-review-sheet'),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Review this ride',
+              style: TextStyle(
+                color: MoolColors.ink,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Nothing is booked or charged until you confirm.',
+              style: TextStyle(color: MoolColors.muted),
+            ),
+            const SizedBox(height: 14),
+            MoolServiceCard(
+              key: const Key('ride-booking-review-summary'),
+              title: '${package.type.label} · ${package.name}',
+              subtitle: '${session.pickup} → ${session.drop}',
+              icon: Icons.route_outlined,
+              accent: _rideAccent,
+              metadata: [
+                MoolServiceMeta(
+                  icon: Icons.currency_rupee_rounded,
+                  label: rideMoney(session.fare),
+                ),
+                MoolServiceMeta(
+                  icon: Icons.schedule_rounded,
+                  label: session.rideTime.label,
+                ),
+                MoolServiceMeta(
+                  icon: Icons.people_outline_rounded,
+                  label: package.capacity,
+                ),
+                MoolServiceMeta(
+                  icon: Icons.payment_outlined,
+                  label: session.paymentMethod.label,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            FilledButton(
+              key: const Key('ride-confirm-booking'),
+              onPressed: () => Navigator.pop(sheetContext, true),
+              child: Text(
+                'Confirm ${package.name} · ${rideMoney(session.fare)}',
+              ),
+            ),
+            TextButton(
+              key: const Key('ride-booking-review-cancel'),
+              onPressed: () => Navigator.pop(sheetContext, false),
+              child: const Text('Change ride details'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed == true && mounted) await _book();
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -293,7 +365,7 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
               fontWeight: FontWeight.w900,
             ),
           ),
-          onPressed: session.busy ? null : _book,
+          onPressed: session.busy ? null : _reviewAndBook,
           icon: session.busy
               ? const SizedBox.square(
                   dimension: 18,
@@ -306,7 +378,7 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
           label: Text(
             session.busy
                 ? 'Finding a captain…'
-                : 'Book ${session.selectedPackage.name} · ${rideMoney(session.fare)}',
+                : 'Review ${session.selectedPackage.name} · ${rideMoney(session.fare)}',
           ),
         ),
         body: ColoredBox(

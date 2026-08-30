@@ -24,7 +24,7 @@ class EatSession extends ChangeNotifier {
       bookingPrice: 0,
       bookingPriceLabel: 'booking',
       depositRule: 'No deposit',
-      cancellationRule: 'Cancel free till 7:00 PM',
+      cancellationRule: 'Free cancellation until 30 minutes before',
       confirmationRule: 'Instant confirmation',
     ),
     EatRestaurant(
@@ -34,14 +34,14 @@ class EatSession extends ChangeNotifier {
       area: 'Circuit House Road',
       distance: '3.8 km',
       rating: 4.8,
-      status: '7:30 PM available',
+      status: 'Next available today',
       orderStartingPrice: 320,
       deliveryTime: '30–45 min',
       offer: 'Dining points',
       bookingPrice: 1500,
       bookingPriceLabel: 'cover',
       depositRule: 'Cover adjusted in your bill',
-      cancellationRule: 'Cancel free till 6:30 PM',
+      cancellationRule: 'Free cancellation until 60 minutes before',
       confirmationRule: 'Instant confirmation',
     ),
     EatRestaurant(
@@ -58,7 +58,7 @@ class EatSession extends ChangeNotifier {
       bookingPrice: 0,
       bookingPriceLabel: 'booking',
       depositRule: 'No deposit',
-      cancellationRule: 'Cancel free till 7:30 PM',
+      cancellationRule: 'Free cancellation until 30 minutes before',
       confirmationRule: 'Instant confirmation',
     ),
     EatRestaurant(
@@ -75,7 +75,7 @@ class EatSession extends ChangeNotifier {
       bookingPrice: 500,
       bookingPriceLabel: 'hold',
       depositRule: 'Hold amount adjusted in your bill',
-      cancellationRule: 'Cancel free till 6:45 PM',
+      cancellationRule: 'Free cancellation until 45 minutes before',
       confirmationRule: 'Quick confirmation',
     ),
     EatRestaurant(
@@ -240,9 +240,9 @@ class EatSession extends ChangeNotifier {
   int foodRating = 0;
 
   String tableRestaurantId = restaurants.first.id;
-  String tablePeople = '4';
-  String tableTime = '7:30 PM';
-  String tableChoice = 'Standard table';
+  String tablePeople = '';
+  String tableTime = '';
+  String tableChoice = '';
   int tableChoicePrice = 0;
   TableBookingReceipt? tableReceipt;
   bool tableBookingCancelled = false;

@@ -315,7 +315,7 @@ class BookPageScaffold extends StatelessWidget {
         bottomNavigationBar: MoolDestinationNavigationV2(
           activeId: navigationFamilyId,
           destinationLabel: travelNavigation ? 'Travel' : 'Care',
-          familyRootSelected: !travelNavigation && activeSubAction == 'doctor',
+          familyRootSelected: false,
           selectedLocalIndex: travelNavigation
               ? 3
               : activeSubAction == 'salon'

@@ -20,6 +20,97 @@ class EatTableScreen extends StatefulWidget {
 class _EatTableScreenState extends State<EatTableScreen> {
   final _searchController = TextEditingController();
 
+  Future<void> _reviewTableBooking() async {
+    final booked = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => AnimatedBuilder(
+        animation: widget.session,
+        builder: (context, _) {
+          final session = widget.session;
+          final complete =
+              session.tablePeople.isNotEmpty &&
+              session.tableTime.isNotEmpty &&
+              session.tableChoice.isNotEmpty;
+          final restaurant = session.tableRestaurant;
+          final total = restaurant.bookingPrice + session.tableChoicePrice;
+          return SingleChildScrollView(
+            key: const Key('eat-table-review-sheet'),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Review ${restaurant.name}',
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Choose every detail before requesting a table.',
+                  style: TextStyle(color: MoolColors.muted),
+                ),
+                const SizedBox(height: 12),
+                _TableChoices(session: session),
+                const SizedBox(height: 12),
+                if (complete)
+                  EatSurfaceCard(
+                    child: Text(
+                      '${session.tablePeople} people · ${session.tableTime} · ${session.tableChoice} · ${total == 0 ? 'Free booking' : eatMoney(total)}',
+                      key: const Key('eat-table-review-summary'),
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  )
+                else
+                  const Text(
+                    'Choose people, time and table type to continue.',
+                    key: Key('eat-table-review-incomplete'),
+                    style: TextStyle(
+                      color: _eatTableAccent,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  key: const Key('eat-table-confirm-booking'),
+                  onPressed: !complete || session.busy
+                      ? null
+                      : () async {
+                          final confirmed = await session.bookTable();
+                          if (confirmed && sheetContext.mounted) {
+                            Navigator.pop(sheetContext, true);
+                          }
+                        },
+                  child: session.busy
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Confirm table request'),
+                ),
+                TextButton(
+                  key: const Key('eat-table-review-cancel'),
+                  onPressed: () => Navigator.pop(sheetContext, false),
+                  child: const Text('Keep browsing'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    if (booked == true && mounted) {
+      context.go('/app/eat/table/${widget.session.tableReceipt!.id}');
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -35,8 +126,6 @@ class _EatTableScreenState extends State<EatTableScreen> {
           _searchController.text,
         );
         final restaurant = widget.session.tableRestaurant;
-        final bookingTotal =
-            restaurant.bookingPrice + widget.session.tableChoicePrice;
         return EatPageScaffold(
           key: const Key('eat-table-screen'),
           session: widget.session,
@@ -131,25 +220,20 @@ class _EatTableScreenState extends State<EatTableScreen> {
                     ),
                   ),
                 const SizedBox(height: MoolSpacing.sm),
-                _TableChoices(session: widget.session),
-                const SizedBox(height: MoolSpacing.sm),
                 EatSurfaceCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${restaurant.name} · ${widget.session.tablePeople} at ${widget.session.tableTime}',
+                        '${restaurant.name} selected',
                         style: const TextStyle(
                           color: MoolColors.ink,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      Text(
-                        '${widget.session.tableChoice} · ${restaurant.confirmationRule}.',
-                        style: const TextStyle(
-                          color: MoolColors.muted,
-                          fontSize: 12,
-                        ),
+                      const Text(
+                        'Review party size, time, table type, cost and cancellation before confirming.',
+                        style: TextStyle(color: MoolColors.muted, fontSize: 12),
                       ),
                       const SizedBox(height: MoolSpacing.sm),
                       EatTrustStrip(
@@ -161,9 +245,9 @@ class _EatTableScreenState extends State<EatTableScreen> {
                       ),
                       const SizedBox(height: MoolSpacing.sm),
                       Text(
-                        bookingTotal == 0
+                        restaurant.bookingPrice == 0
                             ? 'Free booking'
-                            : '${eatMoney(bookingTotal)} ${restaurant.bookingPriceLabel}',
+                            : '${eatMoney(restaurant.bookingPrice)} ${restaurant.bookingPriceLabel}',
                         style: const TextStyle(
                           color: MoolColors.ink,
                           fontSize: 17,
@@ -191,16 +275,7 @@ class _EatTableScreenState extends State<EatTableScreen> {
                       borderRadius: BorderRadius.circular(MoolRadii.card),
                     ),
                   ),
-                  onPressed: widget.session.busy
-                      ? null
-                      : () async {
-                          final booked = await widget.session.bookTable();
-                          if (booked && context.mounted) {
-                            context.go(
-                              '/app/eat/table/${widget.session.tableReceipt!.id}',
-                            );
-                          }
-                        },
+                  onPressed: widget.session.busy ? null : _reviewTableBooking,
                   child: widget.session.busy
                       ? const SizedBox.square(
                           dimension: 22,
@@ -209,11 +284,7 @@ class _EatTableScreenState extends State<EatTableScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : Text(
-                          bookingTotal == 0
-                              ? 'Book table'
-                              : 'Book table · ${eatMoney(bookingTotal)}',
-                        ),
+                      : const Text('Review table'),
                 ),
         );
       },
@@ -325,19 +396,20 @@ class _TableChoices extends StatelessWidget {
           ),
           Wrap(
             spacing: MoolSpacing.xs,
-            children: ['Now', '7:30 PM', '8:00 PM', '8:30 PM']
-                .map(
-                  (value) => MoolServiceChoice(
-                    key: Key(
-                      'eat-table-time-${value.replaceAll(RegExp(r'[^A-Za-z0-9]'), '')}',
-                    ),
-                    selected: session.tableTime == value,
-                    label: value,
-                    onSelected: (_) => session.chooseTableTime(value),
-                    accent: _eatTableAccent,
-                  ),
-                )
-                .toList(),
+            children:
+                ['Next available', 'In 30 min', 'In 60 min', 'Tomorrow evening']
+                    .map(
+                      (value) => MoolServiceChoice(
+                        key: Key(
+                          'eat-table-time-${value.replaceAll(RegExp(r'[^A-Za-z0-9]'), '')}',
+                        ),
+                        selected: session.tableTime == value,
+                        label: value,
+                        onSelected: (_) => session.chooseTableTime(value),
+                        accent: _eatTableAccent,
+                      ),
+                    )
+                    .toList(),
           ),
           const SizedBox(height: MoolSpacing.sm),
           const Text(
