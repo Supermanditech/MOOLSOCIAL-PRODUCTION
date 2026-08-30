@@ -177,16 +177,18 @@ void main() {
       await tester.tap(find.byKey(const Key('chat-attach')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('chat-attachment-tray')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('chat-document')));
-      await tester.pumpAndSettle();
       expect(
-        find.textContaining('Document sharing is not available'),
-        findsOneWidget,
+        tester.widget<InkWell>(find.byKey(const Key('chat-document'))).onTap,
+        isNull,
       );
-      await tester.tap(find.byKey(const Key('chat-video')));
-      await tester.pumpAndSettle();
       expect(
-        find.textContaining('Video sharing is not available'),
+        tester.widget<InkWell>(find.byKey(const Key('chat-video'))).onTap,
+        isNull,
+      );
+      expect(
+        find.textContaining(
+          'Document, photo, camera and video sharing are unavailable',
+        ),
         findsOneWidget,
       );
 

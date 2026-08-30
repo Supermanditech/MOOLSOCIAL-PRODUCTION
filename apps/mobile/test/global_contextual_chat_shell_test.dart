@@ -583,15 +583,30 @@ void main() {
       expect(tester.getSize(find.byKey(key)).width, greaterThanOrEqualTo(44));
       expect(tester.getSize(find.byKey(key)).height, greaterThanOrEqualTo(44));
     }
-    await tester.tap(find.byKey(const Key('chat-document')));
-    await tester.pumpAndSettle();
+    expect(
+      tester.widget<InkWell>(find.byKey(const Key('chat-document'))).onTap,
+      isNull,
+    );
+    expect(
+      tester.widget<InkWell>(find.byKey(const Key('chat-gallery'))).onTap,
+      isNull,
+    );
+    expect(
+      tester.widget<InkWell>(find.byKey(const Key('chat-camera'))).onTap,
+      isNull,
+    );
+    expect(
+      tester.widget<InkWell>(find.byKey(const Key('chat-video'))).onTap,
+      isNull,
+    );
     expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
-    expect(find.textContaining('Document sharing'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('chat-video')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
-    expect(find.textContaining('Video sharing'), findsOneWidget);
+    expect(
+      find.textContaining(
+        'Document, photo, camera and video sharing are unavailable',
+      ),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('Camera unavailable'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();

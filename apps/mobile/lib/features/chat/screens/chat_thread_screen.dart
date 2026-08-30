@@ -2410,42 +2410,52 @@ class _ChatAttachmentAction extends StatelessWidget {
     required this.keyName,
     required this.icon,
     required this.label,
-    required this.onPressed,
+    this.onPressed,
   });
 
   final String keyName;
   final IconData icon;
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    key: Key(keyName),
-    onTap: onPressed,
-    borderRadius: BorderRadius.circular(MoolRadii.control),
-    overlayColor: WidgetStatePropertyAll(
-      MoolColors.navy.withValues(alpha: .06),
-    ),
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 64),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: MoolColors.navy, size: 23),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+  Widget build(BuildContext context) => Semantics(
+    label: onPressed == null ? '$label unavailable' : label,
+    button: true,
+    enabled: onPressed != null,
+    excludeSemantics: true,
+    child: InkWell(
+      key: Key(keyName),
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(MoolRadii.control),
+      overlayColor: WidgetStatePropertyAll(
+        MoolColors.navy.withValues(alpha: .06),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 64),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: onPressed == null ? MoolColors.muted : MoolColors.navy,
+                size: 23,
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: onPressed == null ? MoolColors.muted : MoolColors.ink,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     ),
@@ -2488,8 +2498,25 @@ class _ComposerState extends State<_Composer> {
   void _toggleAttachments() {
     setState(() {
       _attachmentsOpen = !_attachmentsOpen;
-      _attachmentNotice = null;
+      _attachmentNotice = _attachmentsOpen
+          ? _sharingAvailabilityNotice()
+          : null;
     });
+  }
+
+  String? _sharingAvailabilityNotice() {
+    final filesAvailable = session.attachmentSelectionAvailable;
+    final photosAvailable = session.photoSharingAvailable;
+    if (!filesAvailable && !photosAvailable) {
+      return 'Document, photo, camera and video sharing are unavailable right now. You can continue with a message.';
+    }
+    if (!filesAvailable) {
+      return 'Document and video sharing are unavailable right now. Photos and camera remain available.';
+    }
+    if (!photosAvailable) {
+      return 'Photo and camera sharing are unavailable right now. Documents and videos remain available.';
+    }
+    return null;
   }
 
   bool closeAttachmentsForBack() {
@@ -2524,14 +2551,32 @@ class _ComposerState extends State<_Composer> {
           });
           return;
         }
-        await session.selectAttachment(threadId, ChatAttachmentKind.document);
-        if (mounted) setState(() => _attachmentsOpen = false);
+        final selected = await session.selectAttachment(
+          threadId,
+          ChatAttachmentKind.document,
+        );
+        if (!mounted) return;
+        setState(() {
+          _attachmentsOpen = !selected;
+          _attachmentNotice = selected
+              ? null
+              : session.threadActionError(threadId) ??
+                    'No document was selected. Choose a document or continue with a message.';
+        });
         return;
       case _ChatAttachmentChoice.gallery:
-        await _selectPhoto(context, ChatPhotoSource.gallery);
+        await _selectPhoto(
+          context,
+          ChatPhotoSource.gallery,
+          keepTrayOpenOnFailure: true,
+        );
         return;
       case _ChatAttachmentChoice.camera:
-        await _selectPhoto(context, ChatPhotoSource.camera);
+        await _selectPhoto(
+          context,
+          ChatPhotoSource.camera,
+          keepTrayOpenOnFailure: true,
+        );
         return;
       case _ChatAttachmentChoice.video:
         if (!session.attachmentSelectionAvailable) {
@@ -2541,16 +2586,27 @@ class _ComposerState extends State<_Composer> {
           });
           return;
         }
-        await session.selectAttachment(threadId, ChatAttachmentKind.video);
-        if (mounted) setState(() => _attachmentsOpen = false);
+        final selected = await session.selectAttachment(
+          threadId,
+          ChatAttachmentKind.video,
+        );
+        if (!mounted) return;
+        setState(() {
+          _attachmentsOpen = !selected;
+          _attachmentNotice = selected
+              ? null
+              : session.threadActionError(threadId) ??
+                    'No video was selected. Choose a video or continue with a message.';
+        });
         return;
     }
   }
 
   Future<void> _selectPhoto(
     BuildContext context,
-    ChatPhotoSource source,
-  ) async {
+    ChatPhotoSource source, {
+    bool keepTrayOpenOnFailure = false,
+  }) async {
     if (!session.photoSharingAvailable) {
       if (!mounted) return;
       setState(() {
@@ -2560,11 +2616,16 @@ class _ComposerState extends State<_Composer> {
       });
       return;
     }
-    await session.selectPhoto(threadId, source);
+    final selected = await session.selectPhoto(threadId, source);
     if (!mounted) return;
     setState(() {
-      _attachmentsOpen = false;
-      _attachmentNotice = null;
+      _attachmentsOpen = !selected && keepTrayOpenOnFailure;
+      _attachmentNotice = selected || !keepTrayOpenOnFailure
+          ? null
+          : session.threadActionError(threadId) ??
+                (source == ChatPhotoSource.camera
+                    ? 'Camera did not return a photo. Try again or choose Photos.'
+                    : 'No photo was selected. Try again or continue with a message.');
     });
   }
 
@@ -2622,12 +2683,16 @@ class _ComposerState extends State<_Composer> {
                                         keyName: 'chat-document',
                                         icon: Icons.insert_drive_file_outlined,
                                         label: 'Document',
-                                        onPressed: () => unawaited(
-                                          _chooseAttachment(
-                                            context,
-                                            _ChatAttachmentChoice.document,
-                                          ),
-                                        ),
+                                        onPressed:
+                                            session.attachmentSelectionAvailable
+                                            ? () => unawaited(
+                                                _chooseAttachment(
+                                                  context,
+                                                  _ChatAttachmentChoice
+                                                      .document,
+                                                ),
+                                              )
+                                            : null,
                                       ),
                                     ),
                                     Expanded(
@@ -2635,12 +2700,14 @@ class _ComposerState extends State<_Composer> {
                                         keyName: 'chat-gallery',
                                         icon: Icons.photo_library_outlined,
                                         label: 'Photos',
-                                        onPressed: () => unawaited(
-                                          _chooseAttachment(
-                                            context,
-                                            _ChatAttachmentChoice.gallery,
-                                          ),
-                                        ),
+                                        onPressed: session.photoSharingAvailable
+                                            ? () => unawaited(
+                                                _chooseAttachment(
+                                                  context,
+                                                  _ChatAttachmentChoice.gallery,
+                                                ),
+                                              )
+                                            : null,
                                       ),
                                     ),
                                     Expanded(
@@ -2648,12 +2715,14 @@ class _ComposerState extends State<_Composer> {
                                         keyName: 'chat-camera',
                                         icon: Icons.photo_camera_outlined,
                                         label: 'Camera',
-                                        onPressed: () => unawaited(
-                                          _chooseAttachment(
-                                            context,
-                                            _ChatAttachmentChoice.camera,
-                                          ),
-                                        ),
+                                        onPressed: session.photoSharingAvailable
+                                            ? () => unawaited(
+                                                _chooseAttachment(
+                                                  context,
+                                                  _ChatAttachmentChoice.camera,
+                                                ),
+                                              )
+                                            : null,
                                       ),
                                     ),
                                     Expanded(
@@ -2661,12 +2730,15 @@ class _ComposerState extends State<_Composer> {
                                         keyName: 'chat-video',
                                         icon: Icons.video_library_outlined,
                                         label: 'Video',
-                                        onPressed: () => unawaited(
-                                          _chooseAttachment(
-                                            context,
-                                            _ChatAttachmentChoice.video,
-                                          ),
-                                        ),
+                                        onPressed:
+                                            session.attachmentSelectionAvailable
+                                            ? () => unawaited(
+                                                _chooseAttachment(
+                                                  context,
+                                                  _ChatAttachmentChoice.video,
+                                                ),
+                                              )
+                                            : null,
                                       ),
                                     ),
                                   ],
