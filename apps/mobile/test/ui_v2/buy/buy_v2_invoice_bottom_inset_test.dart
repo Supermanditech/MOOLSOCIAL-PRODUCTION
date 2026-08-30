@@ -65,4 +65,30 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'invoice uses OPPO top inset when bottom padding is not exported',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      tester.view.viewPadding = const FakeViewPadding(top: 41);
+      addTearDown(tester.view.reset);
+      final session = BuyV2Session(core: BuySession());
+      final order = session.orders.first;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: BuyV2InvoicePage(order: order),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final download = find.byKey(ValueKey('buy-download-invoice-${order.id}'));
+      final rect = tester.getRect(download);
+      expect(rect.height, greaterThanOrEqualTo(48));
+      expect(rect.bottom, lessThanOrEqualTo(773));
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

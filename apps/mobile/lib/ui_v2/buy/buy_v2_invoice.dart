@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../features/buy/buy_v2_models.dart';
+import '../universal/mool_global_navigation_v2.dart';
 import 'buy_v2_design.dart';
 
 enum BuyV2InvoiceDownloadOutcome { saved, cancelled, unavailable, failed }
@@ -94,9 +97,19 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
   Widget build(BuildContext context) {
     final order = widget.order;
     final view = View.of(context);
+    final viewPadding = EdgeInsets.fromViewPadding(
+      view.viewPadding,
+      view.devicePixelRatio,
+    );
     final exportedBottomClearance =
         defaultTargetPlatform == TargetPlatform.android
-        ? view.viewPadding.bottom / view.devicePixelRatio
+        ? math.max(
+            viewPadding.bottom,
+            moolAndroidExportedSemanticsClearance(
+              viewPadding: viewPadding,
+              platform: defaultTargetPlatform,
+            ),
+          )
         : 0.0;
     final taxInvoice = order.taxInvoiceDetails;
     final legalInvoiceRequired = order.taxInvoiceState != null;
