@@ -40,6 +40,7 @@ import '../eat/eat_session.dart';
 import '../eat/screens/eat_basket_screen.dart';
 import '../eat/screens/eat_completed_screen.dart';
 import '../eat/screens/eat_home_screen.dart';
+import '../eat/screens/eat_invoice_screen.dart';
 import '../eat/screens/eat_order_screen.dart';
 import '../eat/screens/eat_review_screen.dart';
 import '../eat/screens/eat_table_confirmation_screen.dart';
@@ -521,6 +522,13 @@ GoRouter createJourneyRouter(
       GoRoute(
         path: '/app/eat/order/:orderId/completed',
         builder: (context, state) => EatCompletedScreen(
+          session: eatSession,
+          orderId: state.pathParameters['orderId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/app/eat/order/:orderId/invoice',
+        builder: (context, state) => EatInvoiceScreen(
           session: eatSession,
           orderId: state.pathParameters['orderId'] ?? '',
         ),
