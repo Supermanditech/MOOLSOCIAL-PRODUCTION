@@ -101,7 +101,9 @@ void main() {
           final wholesaleActionLabel =
               'Add minimum order of ${product.minimumOrder} packs of '
               '${product.title} to Cart for '
-              '${buyV2Money(product.price * product.minimumOrder)}';
+              '${buyV2Money(product.price * product.minimumOrder)}. '
+              '${buyV2FulfilmentModeLabel(session.fulfilmentModeFor(product))} · '
+              '${buyV2BuyerDeliveryPromise(session.productFactsFor(product))}';
           final semanticAction = find.byWidgetPredicate(
             (widget) =>
                 widget is Semantics &&

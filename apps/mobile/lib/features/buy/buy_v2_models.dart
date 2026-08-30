@@ -95,6 +95,7 @@ class BuyV2Product {
     this.returnPolicy,
     this.freightIncluded = false,
     this.manufacturerVerified = false,
+    this.catalogueListing = true,
   }) : canonicalId = canonicalId ?? id;
 
   final String id;
@@ -123,6 +124,7 @@ class BuyV2Product {
   final String? returnPolicy;
   final bool freightIncluded;
   final bool manufacturerVerified;
+  final bool catalogueListing;
 
   BuyV2Product copyWith({
     String? id,
@@ -137,6 +139,7 @@ class BuyV2Product {
     String? sellerType,
     String? confirmedOn,
     int? minimumOrder,
+    bool? catalogueListing,
   }) => BuyV2Product(
     id: id ?? this.id,
     canonicalId: canonicalId ?? this.canonicalId,
@@ -164,6 +167,7 @@ class BuyV2Product {
     returnPolicy: returnPolicy,
     freightIncluded: freightIncluded,
     manufacturerVerified: manufacturerVerified,
+    catalogueListing: catalogueListing ?? this.catalogueListing,
   );
 
   String get partnerRole => buyV2PartnerRoleFor(destination, sellerType);
@@ -763,8 +767,12 @@ abstract final class BuyV2Catalogue {
       _commerceProduct(seed, BuyV2Destination.shop),
     for (final seed in _commerceSeeds)
       _commerceProduct(seed, BuyV2Destination.wholesale),
-    ..._commerceVariantProducts,
     ..._medicineProducts,
+  ];
+
+  static final allProducts = <BuyV2Product>[
+    ...products,
+    ..._commerceVariantProducts,
   ];
 
   static BuyV2Product _commerceVariant({
@@ -788,6 +796,7 @@ abstract final class BuyV2Catalogue {
       unitPrice: unitPrice,
       badge: badge,
       minimumOrder: minimumOrder,
+      catalogueListing: false,
     );
   }
 

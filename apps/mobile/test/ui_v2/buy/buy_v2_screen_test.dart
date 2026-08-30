@@ -3028,7 +3028,7 @@ void main() {
       expect(promisedMinutes, isNotNull);
       final promise = find.descendant(
         of: card,
-        matching: find.text('${promisedMinutes!.group(1)} min'),
+        matching: find.textContaining('${promisedMinutes!.group(1)} min'),
       );
 
       expect(add, findsOneWidget);

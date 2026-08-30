@@ -94,6 +94,8 @@ void main() {
     expect(find.text('4.6 from 328 ratings'), findsNothing);
 
     adapter.available = true;
+    await tester.ensureVisible(retry);
+    await tester.pumpAndSettle();
     await tester.tap(retry);
     await tester.pumpAndSettle();
     expect(

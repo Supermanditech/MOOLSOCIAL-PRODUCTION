@@ -117,6 +117,8 @@ void main() {
       findsOneWidget,
     );
     adapter.available = true;
+    await tester.ensureVisible(retry);
+    await tester.pumpAndSettle();
     await tester.tap(retry);
     await tester.pumpAndSettle();
     expect(

@@ -2807,6 +2807,7 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
                     hasMultipleMedia ? 35 : 9,
                   ),
                   child: DecoratedBox(
+                    key: ValueKey('buy-product-gallery-image-$index'),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),

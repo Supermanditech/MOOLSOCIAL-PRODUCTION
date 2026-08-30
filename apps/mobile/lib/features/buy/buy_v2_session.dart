@@ -188,12 +188,12 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
   @override
   Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
     state: BuyV2CommerceLoadState.ready,
-    products: BuyV2Catalogue.products,
+    products: BuyV2Catalogue.allProducts,
     paymentMethods: BuyV2Session.paymentMethods,
     businessVerified: true,
     businessVerificationState: BuyV2BusinessVerificationState.verified,
     productReportsAvailable: true,
-    reviewableProductIds: BuyV2Catalogue.products
+    reviewableProductIds: BuyV2Catalogue.allProducts
         .map((product) => product.id)
         .toSet(),
   );
@@ -352,12 +352,12 @@ class BuyV2Session extends ChangeNotifier {
     if (cartBenefitsAdapter is BuyV2LiveCartBenefitsAdapter) {
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.idle;
     }
-    _catalogueProducts.addAll(BuyV2Catalogue.products);
+    _catalogueProducts.addAll(BuyV2Catalogue.allProducts);
     if (this.reviewDataEnabled) {
       _businessVerificationState = BuyV2BusinessVerificationState.verified;
       _productReportsAvailable = true;
       _reviewableProductIds.addAll(
-        BuyV2Catalogue.products.map((product) => product.id),
+        BuyV2Catalogue.allProducts.map((product) => product.id),
       );
     }
     if (!this.reviewDataEnabled) {
@@ -1371,6 +1371,7 @@ class BuyV2Session extends ChangeNotifier {
         : null;
     final candidates = _catalogueProducts.where((product) {
       if (product.destination != filterDestination) return false;
+      if (!product.catalogueListing) return false;
       if (intentProductIds != null && !intentProductIds.contains(product.id)) {
         return false;
       }
@@ -3012,6 +3013,7 @@ class BuyV2Session extends ChangeNotifier {
         .where(
           (product) =>
               product.destination == destination &&
+              product.catalogueListing &&
               !cartProductIds.contains(product.id) &&
               !excludedProductIds.contains(product.id) &&
               (!specialOffersOnly || hasOffer(product)),
@@ -3109,6 +3111,7 @@ class BuyV2Session extends ChangeNotifier {
         .where(
           (product) =>
               product.destination == current.destination &&
+              product.catalogueListing &&
               product.canonicalId != current.canonicalId,
         )
         .toList(growable: false);
@@ -3139,6 +3142,7 @@ class BuyV2Session extends ChangeNotifier {
         .where(
           (product) =>
               product.destination == BuyV2Destination.wholesale &&
+              product.catalogueListing &&
               product.id != current.id &&
               product.seller == current.seller,
         )
@@ -3171,6 +3175,7 @@ class BuyV2Session extends ChangeNotifier {
         .where(
           (product) =>
               product.destination == current.destination &&
+              product.catalogueListing &&
               product.id != current.id &&
               product.seller == current.seller,
         )
