@@ -245,6 +245,8 @@ void main() {
       expect(find.byKey(const Key('bus-request-ready-screen')), findsOneWidget);
       expect(find.text('Booking request ready'), findsOneWidget);
       expect(find.text('No payment or ticket yet'), findsOneWidget);
+      expect(find.textContaining('temporarily unavailable'), findsOneWidget);
+      expect(find.textContaining('UI review'), findsNothing);
       expect(find.text('₹0 charged'), findsOneWidget);
       expect(sessions.book.noticeMessage, contains('No payment was taken'));
       expect(sessions.book.noticeMessage, contains('no ticket was issued'));

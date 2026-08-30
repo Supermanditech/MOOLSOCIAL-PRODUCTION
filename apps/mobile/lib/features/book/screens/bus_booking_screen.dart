@@ -410,7 +410,7 @@ class _BusRequestReady extends StatelessWidget {
         key: const Key('bus-request-boundary'),
         title: 'No payment or ticket yet',
         subtitle:
-            'Live checkout is unavailable in this UI review. Your route and preferences are retained so you can continue when seat, fare and payment services are available.',
+            'Live checkout is temporarily unavailable. Your route and preferences are retained so you can continue when seat, fare and payment services are available.',
         icon: Icons.info_outline_rounded,
         accent: accent,
         metadata: const [
