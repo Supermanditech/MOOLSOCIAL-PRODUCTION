@@ -1,5 +1,6 @@
 import 'dart:ui' show Tristate;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
@@ -324,4 +325,67 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('landscape rails clear OPPO side semantics symmetrically', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 360);
+    tester.view.viewPadding = const FakeViewPadding(left: 41, right: 44);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          bottomNavigationBar: MoolDestinationNavigationV2(
+            activeId: 'buy',
+            destinationLabel: 'Shop',
+            selectedLocalIndex: 1,
+            localActionCount: 3,
+            onOpenMool: () {},
+            onOpenAction: (_) {},
+            onOpenChat: () {},
+            localNavigation: MoolLocalNavigationRail(
+              familyId: 'buy',
+              semanticLabel: 'Shop choices',
+              activeId: 'orders',
+              actions: const [
+                MoolLocalNavigationAction(
+                  keyName: 'side-wholesale',
+                  id: 'wholesale',
+                  label: 'Wholesale',
+                  icon: Icons.inventory_2_outlined,
+                ),
+                MoolLocalNavigationAction(
+                  keyName: 'side-orders',
+                  id: 'orders',
+                  label: 'Orders',
+                  icon: Icons.receipt_long_outlined,
+                ),
+                MoolLocalNavigationAction(
+                  keyName: 'side-offers',
+                  id: 'offers',
+                  label: 'Offers',
+                  icon: Icons.local_offer_outlined,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    debugDefaultTargetPlatformOverride = null;
+
+    final mool = tester.getRect(find.byKey(const Key('mool-compact-launcher')));
+    final chat = tester.getRect(find.byKey(const Key('mool-global-chat')));
+    expect(mool.left, greaterThanOrEqualTo(30));
+    expect(chat.right, lessThanOrEqualTo(770));
+    expect(mool.width, closeTo(chat.width, .01));
+    expect(mool.height, greaterThanOrEqualTo(44));
+    expect(chat.height, greaterThanOrEqualTo(44));
+    expect(tester.takeException(), isNull);
+  });
 }

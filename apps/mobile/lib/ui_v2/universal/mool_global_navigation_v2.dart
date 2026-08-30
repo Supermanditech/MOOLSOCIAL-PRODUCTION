@@ -335,6 +335,14 @@ double moolAndroidExportedSemanticsClearance({
       .toDouble();
 }
 
+double moolAndroidExportedHorizontalSemanticsClearance({
+  required EdgeInsets viewPadding,
+  required TargetPlatform platform,
+}) => MoolLocalNavigationTokens.androidExportedSideClearance(
+  viewPadding: viewPadding,
+  platform: platform,
+);
+
 /// Keeps destination-local choices visibly connected to the selected global
 /// action without placing a panel between the customer and destination content.
 class MoolGlobalChatShortcut extends StatelessWidget {
@@ -462,6 +470,14 @@ class _MoolDestinationNavigationV2State
       ),
       platform: defaultTargetPlatform,
     );
+    final horizontalSemanticsClearance =
+        moolAndroidExportedHorizontalSemanticsClearance(
+          viewPadding: EdgeInsets.fromViewPadding(
+            view.viewPadding,
+            view.devicePixelRatio,
+          ),
+          platform: defaultTargetPlatform,
+        );
     return RepaintBoundary(
       key: const Key('moolsocial-single-home-launcher-shell'),
       child: DecoratedBox(
@@ -478,7 +494,12 @@ class _MoolDestinationNavigationV2State
           color: Colors.transparent,
           child: Padding(
             key: const Key('moolsocial-android-exported-semantics-clearance'),
-            padding: EdgeInsets.only(bottom: exportedSemanticsClearance),
+            padding: EdgeInsets.fromLTRB(
+              horizontalSemanticsClearance,
+              0,
+              horizontalSemanticsClearance,
+              exportedSemanticsClearance,
+            ),
             child: SafeArea(
               top: false,
               maintainBottomViewPadding: true,

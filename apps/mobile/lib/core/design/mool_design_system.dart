@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -405,6 +406,19 @@ abstract final class MoolLocalNavigationTokens {
       viewportWidth <= destinationCompactWidthBreakpoint
       ? destinationMinimumFixedCellWidth
       : destinationFixedCellWidth;
+
+  static double androidExportedSideClearance({
+    required EdgeInsets viewPadding,
+    required TargetPlatform platform,
+  }) {
+    if (platform != TargetPlatform.android) return 0;
+    final sideInset = viewPadding.left > viewPadding.right
+        ? viewPadding.left
+        : viewPadding.right;
+    final availableOverflow =
+        destinationRailHeight - MoolMetrics.minimumTapTarget;
+    return (sideInset - availableOverflow).clamp(0, double.infinity).toDouble();
+  }
 
   static const double destinationPreferredLocalCellWidth = 72;
   static const double destinationItemGap = MoolSpacing.xs;
@@ -1293,73 +1307,87 @@ class MoolOutcomeDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final view = View.of(context);
+    final viewPadding = EdgeInsets.fromViewPadding(
+      view.viewPadding,
+      view.devicePixelRatio,
+    );
+    final sideClearance =
+        MoolLocalNavigationTokens.androidExportedSideClearance(
+          viewPadding: viewPadding,
+          platform: defaultTargetPlatform,
+        );
     return SafeArea(
       top: false,
-      child: SizedBox(
-        key: const Key('mool-outcome-dock-surface'),
-        height: MoolLocalNavigationTokens.destinationRailHeight,
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            color: MoolLocalNavigationTokens.destinationCanvas,
-            border: Border(
-              top: BorderSide(
-                color: MoolLocalNavigationTokens.destinationDivider,
+      child: Padding(
+        key: const Key('mool-outcome-dock-side-clearance'),
+        padding: EdgeInsets.symmetric(horizontal: sideClearance),
+        child: SizedBox(
+          key: const Key('mool-outcome-dock-surface'),
+          height: MoolLocalNavigationTokens.destinationRailHeight,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: MoolLocalNavigationTokens.destinationCanvas,
+              border: Border(
+                top: BorderSide(
+                  color: MoolLocalNavigationTokens.destinationDivider,
+                ),
               ),
             ),
-          ),
-          child: Semantics(
-            container: true,
-            explicitChildNodes: true,
-            label: semanticLabel,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final cellCount = actions.length + 2;
-                final minimumWidth = MoolMetrics.minimumTapTarget * cellCount;
-                final overflow = minimumWidth > constraints.maxWidth;
-                final cellWidth = overflow
-                    ? MoolMetrics.minimumTapTarget
-                    : constraints.maxWidth / cellCount;
-                final cells = <Widget>[
-                  _MoolEdgeDockAction(
-                    action: mool,
-                    selected: activeId == mool.id,
-                    isMool: true,
-                  ),
-                  for (final action in actions)
-                    _MoolMiddleDockAction(
-                      action: action,
-                      selected: activeId == action.id,
+            child: Semantics(
+              container: true,
+              explicitChildNodes: true,
+              label: semanticLabel,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final cellCount = actions.length + 2;
+                  final minimumWidth = MoolMetrics.minimumTapTarget * cellCount;
+                  final overflow = minimumWidth > constraints.maxWidth;
+                  final cellWidth = overflow
+                      ? MoolMetrics.minimumTapTarget
+                      : constraints.maxWidth / cellCount;
+                  final cells = <Widget>[
+                    _MoolEdgeDockAction(
+                      action: mool,
+                      selected: activeId == mool.id,
+                      isMool: true,
                     ),
-                  _MoolEdgeDockAction(
-                    action: chat,
-                    selected: activeId == chat.id,
-                  ),
-                ];
-                final row = KeyedSubtree(
-                  key: actionsKey,
-                  child: SizedBox(
-                    width: overflow ? minimumWidth : constraints.maxWidth,
-                    height: MoolLocalNavigationTokens.destinationRailHeight,
-                    child: Row(
-                      children: [
-                        for (final cell in cells)
-                          SizedBox(
-                            width: cellWidth,
-                            height:
-                                MoolLocalNavigationTokens.destinationRailHeight,
-                            child: cell,
-                          ),
-                      ],
+                    for (final action in actions)
+                      _MoolMiddleDockAction(
+                        action: action,
+                        selected: activeId == action.id,
+                      ),
+                    _MoolEdgeDockAction(
+                      action: chat,
+                      selected: activeId == chat.id,
                     ),
-                  ),
-                );
-                if (!overflow) return row;
-                return SingleChildScrollView(
-                  key: const Key('mool-outcome-dock-overflow'),
-                  scrollDirection: Axis.horizontal,
-                  child: row,
-                );
-              },
+                  ];
+                  final row = KeyedSubtree(
+                    key: actionsKey,
+                    child: SizedBox(
+                      width: overflow ? minimumWidth : constraints.maxWidth,
+                      height: MoolLocalNavigationTokens.destinationRailHeight,
+                      child: Row(
+                        children: [
+                          for (final cell in cells)
+                            SizedBox(
+                              width: cellWidth,
+                              height: MoolLocalNavigationTokens
+                                  .destinationRailHeight,
+                              child: cell,
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                  if (!overflow) return row;
+                  return SingleChildScrollView(
+                    key: const Key('mool-outcome-dock-overflow'),
+                    scrollDirection: Axis.horizontal,
+                    child: row,
+                  );
+                },
+              ),
             ),
           ),
         ),

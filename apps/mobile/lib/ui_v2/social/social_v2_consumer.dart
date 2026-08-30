@@ -4008,9 +4008,22 @@ class _SocialOwnershipDock extends StatelessWidget {
       ),
       platform: defaultTargetPlatform,
     );
+    final horizontalSemanticsClearance =
+        moolAndroidExportedHorizontalSemanticsClearance(
+          viewPadding: EdgeInsets.fromViewPadding(
+            view.viewPadding,
+            view.devicePixelRatio,
+          ),
+          platform: defaultTargetPlatform,
+        );
     return Padding(
       key: const Key('social-android-exported-semantics-clearance'),
-      padding: EdgeInsets.only(bottom: exportedSemanticsClearance),
+      padding: EdgeInsets.fromLTRB(
+        horizontalSemanticsClearance,
+        0,
+        horizontalSemanticsClearance,
+        exportedSemanticsClearance,
+      ),
       child: Material(
         key: const Key('moolsocial-compact-destination-rail'),
         color: const Color(0xFF0F0F0F),
