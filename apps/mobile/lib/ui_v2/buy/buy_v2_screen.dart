@@ -730,6 +730,21 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     );
   }
 
+  void _openProductQuestion(BuyV2Product product) {
+    HapticFeedback.selectionClick();
+    FocusScope.of(context).unfocus();
+    final router = GoRouter.maybeOf(context);
+    if (router == null) {
+      widget.onOpenChat?.call();
+      return;
+    }
+    context.push(
+      const BuyV2ChatRouteAdapter().productQuestionLocationFor(
+        product: product,
+      ),
+    );
+  }
+
   void _openShopChat() {
     HapticFeedback.selectionClick();
     FocusScope.of(context).unfocus();
@@ -778,6 +793,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       BuyV2View.product => BuyV2ProductView(
         session: session,
         returnLabel: _offersActive ? 'Offers' : null,
+        onAskSeller: _openProductQuestion,
         wholesaleTradeDecisionAdapter: widget.wholesaleTradeDecisionAdapter,
       ),
       BuyV2View.cart => BuyV2CartView(

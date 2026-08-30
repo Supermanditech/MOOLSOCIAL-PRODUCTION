@@ -607,6 +607,9 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2View _assistReturnView = BuyV2View.catalogue;
   BuyV2Destination _productReturnDestination = BuyV2Destination.shop;
   BuyV2View _productReturnView = BuyV2View.catalogue;
+  bool _cartProductReturnActive = false;
+  BuyV2Destination _cartProductReturnDestination = BuyV2Destination.shop;
+  String? _cartProductReturnId;
 
   final List<BuyV2Product> _catalogueProducts = [];
   final Map<String, BuyV2CartLine> _cart = {};
@@ -3543,6 +3546,8 @@ class BuyV2Session extends ChangeNotifier {
     selectedFilter = null;
     _clearDiscoveryRefinements();
     activeShoppingIntent = null;
+    _cartProductReturnActive = false;
+    _cartProductReturnId = null;
     notice = null;
     _notifyNavigationIfChanged(
       previous,
@@ -3615,7 +3620,17 @@ class BuyV2Session extends ChangeNotifier {
 
   void openCart({BuyV2CartScope scope = BuyV2CartScope.all}) {
     final previous = _navigationSurfaceIdentity;
+    if (view == BuyV2View.product && selectedProductId != null) {
+      _cartProductReturnActive = true;
+      _cartProductReturnDestination = destination;
+      _cartProductReturnId = selectedProductId;
+    } else if (view != BuyV2View.checkout && view != BuyV2View.cart) {
+      _cartProductReturnActive = false;
+      _cartProductReturnId = null;
+    }
     if (_cart.isEmpty) {
+      _cartProductReturnActive = false;
+      _cartProductReturnId = null;
       destination = switch (scope) {
         BuyV2CartScope.shop => BuyV2Destination.shop,
         BuyV2CartScope.wholesale => BuyV2Destination.wholesale,
@@ -3640,6 +3655,24 @@ class BuyV2Session extends ChangeNotifier {
       previous,
       BuyV2NavigationMotionDirection.forward,
     );
+  }
+
+  bool buyProductNow(String productId) {
+    final product = findProduct(productId);
+    if (product == null || product.destination == BuyV2Destination.orders) {
+      notice = 'This product could not be found.';
+      notifyListeners();
+      return false;
+    }
+    if (quantityFor(product.id) == 0 && !addProduct(product.id)) return false;
+    final scope = switch (product.destination) {
+      BuyV2Destination.shop => BuyV2CartScope.shop,
+      BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+      BuyV2Destination.medicine => BuyV2CartScope.medicine,
+      BuyV2Destination.orders => BuyV2CartScope.all,
+    };
+    openCart(scope: scope);
+    return openCheckout();
   }
 
   bool openCheckout() {
@@ -3953,7 +3986,11 @@ class BuyV2Session extends ChangeNotifier {
         case BuyV2View.product:
           closeProduct();
         case BuyV2View.cart:
-          returnToCatalogue();
+          if (_cartProductReturnActive) {
+            _returnToCartProduct();
+          } else {
+            returnToCatalogue();
+          }
         case BuyV2View.checkout:
           openCart(scope: checkoutScope);
         case BuyV2View.confirmation:
@@ -4000,6 +4037,27 @@ class BuyV2Session extends ChangeNotifier {
       view = BuyV2View.catalogue;
     }
     selectedProductId = null;
+    _cartProductReturnActive = false;
+    _cartProductReturnId = null;
+    notice = null;
+    _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
+  }
+
+  void _returnToCartProduct() {
+    final previous = _navigationSurfaceIdentity;
+    final product = _cartProductReturnId == null
+        ? null
+        : findProduct(_cartProductReturnId!);
+    _cartProductReturnActive = false;
+    _cartProductReturnId = null;
+    if (product == null ||
+        product.destination != _cartProductReturnDestination) {
+      returnToCatalogue();
+      return;
+    }
+    destination = product.destination;
+    selectedProductId = product.id;
+    view = BuyV2View.product;
     notice = null;
     _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
   }
