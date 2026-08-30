@@ -549,12 +549,12 @@ void main() {
     expect(find.byKey(const Key('chat-attachment-tray')), findsOneWidget);
     expect(find.byKey(const Key('chat-document')), findsOneWidget);
     expect(find.byKey(const Key('chat-gallery')), findsOneWidget);
-    expect(find.byKey(const Key('chat-camera')), findsOneWidget);
+    expect(find.byKey(const Key('chat-camera')), findsNothing);
+    expect(find.byKey(const Key('chat-composer-camera')), findsOneWidget);
     expect(find.byKey(const Key('chat-video')), findsOneWidget);
     for (final key in const [
       Key('chat-document'),
       Key('chat-gallery'),
-      Key('chat-camera'),
       Key('chat-video'),
     ]) {
       expect(tester.getSize(find.byKey(key)).width, greaterThanOrEqualTo(44));
@@ -569,10 +569,6 @@ void main() {
       isNull,
     );
     expect(
-      tester.widget<InkWell>(find.byKey(const Key('chat-camera'))).onTap,
-      isNull,
-    );
-    expect(
       tester.widget<InkWell>(find.byKey(const Key('chat-video'))).onTap,
       isNull,
     );
@@ -583,7 +579,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.bySemanticsLabel('Camera unavailable'), findsOneWidget);
+    expect(find.byTooltip('Camera'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -1065,11 +1061,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('chat-attachment-tray')), findsOneWidget);
-    final camera = find.byKey(const Key('chat-camera'));
-    expect(camera, findsOneWidget);
-    final rect = tester.getRect(camera);
+    expect(find.byKey(const Key('chat-camera')), findsNothing);
+    final video = find.byKey(const Key('chat-video'));
+    expect(video, findsOneWidget);
+    final rect = tester.getRect(video);
     expect(rect.height, greaterThanOrEqualTo(44));
     expect(rect.bottom, lessThanOrEqualTo(756));
+    expect(find.byKey(const Key('chat-composer-camera')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

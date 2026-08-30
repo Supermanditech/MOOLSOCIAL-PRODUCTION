@@ -1886,18 +1886,45 @@ class _MessageBubble extends StatelessWidget {
                   ),
                   if (message.mine) ...[
                     const SizedBox(width: 4),
-                    Tooltip(
-                      message: _deliveryLabel(message.deliveryState),
-                      child: ChatActionIconMotion(
-                        key: Key('chat-delivery-icon-motion-${message.id}'),
-                        stateKey: message.deliveryState,
-                        icon: _deliveryIcon(message.deliveryState),
-                        color: failed
-                            ? const Color(0xFFFFB4AB)
-                            : message.deliveryState == ChatDeliveryState.read
-                            ? MoolColors.orange
-                            : Colors.white.withValues(alpha: .82),
-                        size: 14,
+                    Semantics(
+                      label:
+                          'Message status: ${_deliveryLabel(message.deliveryState)}',
+                      child: Container(
+                        key: Key('chat-delivery-status-${message.id}'),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ChatActionIconMotion(
+                              key: Key(
+                                'chat-delivery-icon-motion-${message.id}',
+                              ),
+                              stateKey: message.deliveryState,
+                              icon: _deliveryIcon(message.deliveryState),
+                              color: failed
+                                  ? const Color(0xFFFFB4AB)
+                                  : message.deliveryState ==
+                                        ChatDeliveryState.read
+                                  ? MoolColors.orange
+                                  : Colors.white.withValues(alpha: .82),
+                              size: 13,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              _deliveryLabel(message.deliveryState),
+                              key: Key('chat-delivery-label-${message.id}'),
+                              style: TextStyle(
+                                color: failed
+                                    ? const Color(0xFFFFB4AB)
+                                    : message.deliveryState ==
+                                          ChatDeliveryState.read
+                                    ? MoolColors.orange
+                                    : Colors.white.withValues(alpha: .76),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -2392,7 +2419,7 @@ Future<void> _chooseForwardTarget(
   }
 }
 
-enum _ChatAttachmentChoice { document, gallery, camera, video }
+enum _ChatAttachmentChoice { document, gallery, video }
 
 String _durationLabel(Duration value) {
   final minutes = value.inMinutes;
@@ -2573,13 +2600,6 @@ class _ComposerState extends State<_Composer> {
           keepTrayOpenOnFailure: true,
         );
         return;
-      case _ChatAttachmentChoice.camera:
-        await _selectPhoto(
-          context,
-          ChatPhotoSource.camera,
-          keepTrayOpenOnFailure: true,
-        );
-        return;
       case _ChatAttachmentChoice.video:
         if (!session.attachmentSelectionAvailable) {
           setState(() {
@@ -2707,21 +2727,6 @@ class _ComposerState extends State<_Composer> {
                                                 _chooseAttachment(
                                                   context,
                                                   _ChatAttachmentChoice.gallery,
-                                                ),
-                                              )
-                                            : null,
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: _ChatAttachmentAction(
-                                        keyName: 'chat-camera',
-                                        icon: Icons.photo_camera_outlined,
-                                        label: 'Camera',
-                                        onPressed: session.photoSharingAvailable
-                                            ? () => unawaited(
-                                                _chooseAttachment(
-                                                  context,
-                                                  _ChatAttachmentChoice.camera,
                                                 ),
                                               )
                                             : null,
@@ -3231,7 +3236,7 @@ IconData _deliveryIcon(ChatDeliveryState state) => switch (state) {
 
 String _deliveryLabel(ChatDeliveryState state) => switch (state) {
   ChatDeliveryState.sending => 'Sending',
-  ChatDeliveryState.delivered => 'Delivered',
-  ChatDeliveryState.read => 'Read',
+  ChatDeliveryState.delivered => 'Delivered · unread',
+  ChatDeliveryState.read => 'Seen',
   ChatDeliveryState.failed => 'Not sent',
 };

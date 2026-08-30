@@ -728,7 +728,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byTooltip('Read'), findsOneWidget);
+      expect(
+        find.byKey(const Key('chat-delivery-status-message-read')),
+        findsOneWidget,
+      );
+      expect(find.text('Seen'), findsOneWidget);
       expect(find.byKey(const Key('chat-message-actions')), findsNothing);
       await tester.longPress(
         find.byKey(const Key('chat-message-message-read')),
@@ -1022,7 +1026,7 @@ void main() {
           .text,
       isEmpty,
     );
-    expect(find.text('Message delivered.'), findsOneWidget);
+    expect(find.text('Message delivered.'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

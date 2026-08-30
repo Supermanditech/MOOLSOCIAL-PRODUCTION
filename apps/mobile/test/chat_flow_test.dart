@@ -930,7 +930,7 @@ void main() {
         'Please add rice to the household list.',
       );
       await tapVisible(tester, const Key('chat-send'));
-      expect(find.text('Message delivered.'), findsOneWidget);
+      expect(find.text('Message delivered.'), findsNothing);
       expect(
         chat.messages('home-basket').last.text,
         'Please add rice to the household list.',
@@ -939,6 +939,13 @@ void main() {
         chat.messages('home-basket').last.deliveryState,
         ChatDeliveryState.delivered,
       );
+      expect(
+        find.byKey(
+          Key('chat-delivery-status-${chat.messages('home-basket').last.id}'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Delivered · unread'), findsWidgets);
       expect(chat.messages('home-basket').last.replyTo?.messageId, 'm1');
       expect(
         find.byKey(const Key('chat-composer-reply-context')),
@@ -999,7 +1006,12 @@ void main() {
         .toList();
     expect(replayed, hasLength(1), reason: 'Retry must not duplicate messages');
     expect(replayed.single.deliveryState, ChatDeliveryState.delivered);
-    expect(find.text('Message delivered.'), findsOneWidget);
+    expect(find.text('Message delivered.'), findsNothing);
+    expect(
+      find.byKey(Key('chat-delivery-status-${replayed.single.id}')),
+      findsOneWidget,
+    );
+    expect(find.text('Delivered · unread'), findsWidgets);
 
     expect(find.byKey(const Key('chat-mode-details')), findsNothing);
     expect(find.byKey(const Key('chat-mode-updates')), findsNothing);

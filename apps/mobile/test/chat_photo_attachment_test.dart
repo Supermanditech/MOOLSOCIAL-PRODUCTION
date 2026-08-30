@@ -373,9 +373,14 @@ void main() {
           'notice=${session.threadActionNotice('thread-1')}; '
           'pending=${session.selectedPhoto('thread-1') != null}',
     );
-    expect(find.text('Photo delivered.'), findsOneWidget);
+    expect(find.text('Photo delivered.'), findsNothing);
     expect(find.byKey(const Key('chat-selected-photo')), findsNothing);
     expect(find.byKey(const Key('chat-photo-server-photo-1')), findsOneWidget);
+    expect(
+      find.byKey(const Key('chat-delivery-status-server-photo-1')),
+      findsOneWidget,
+    );
+    expect(find.text('Delivered · unread'), findsWidgets);
     expect(
       find.byKey(const Key('chat-photo-refresh-server-photo-1')),
       findsOneWidget,
@@ -391,7 +396,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('camera denial stays in the tray with exact device recovery', (
+  testWidgets('camera exists only in the composer with exact device recovery', (
     tester,
   ) async {
     final gateway = _PhotoChatGateway();
@@ -417,11 +422,15 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat-attach')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('chat-camera')));
+    expect(find.byKey(const Key('chat-camera')), findsNothing);
+    expect(find.byKey(const Key('chat-composer-camera')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat-attach')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-composer-camera')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('chat-attachment-tray')), findsOneWidget);
-    expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
+    expect(find.byKey(const Key('chat-attachment-tray')), findsNothing);
+    expect(find.byKey(const Key('chat-error')), findsOneWidget);
     expect(
       find.textContaining(
         'Camera access was denied. Allow camera access in device settings',

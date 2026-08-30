@@ -871,8 +871,7 @@ class ChatSession extends ChangeNotifier {
       if (_replyTargets[threadId]?.id == pending.replyTo?.messageId) {
         _replyTargets.remove(threadId);
       }
-      _threadActionNotices[threadId] =
-          '${pending.attachment.kind == ChatAttachmentKind.voice ? 'Voice message' : 'Attachment'} delivered.';
+      _threadActionNotices.remove(threadId);
       return true;
     } on ChatServiceException catch (error) {
       _threadActionErrors[threadId] = error.userMessage;
@@ -1877,7 +1876,7 @@ class ChatSession extends ChangeNotifier {
       if (_replyTargets[threadId]?.id == pending.replyTo?.messageId) {
         _replyTargets.remove(threadId);
       }
-      _threadActionNotices[threadId] = 'Photo delivered.';
+      _threadActionNotices.remove(threadId);
       return true;
     } on ChatServiceException catch (error) {
       _threadActionErrors[threadId] = error.userMessage;
@@ -2090,7 +2089,7 @@ class ChatSession extends ChangeNotifier {
       if (_replyTargets[threadId]?.id == selectedReply?.messageId) {
         _replyTargets.remove(threadId);
       }
-      _threadActionNotices[threadId] = 'Message delivered.';
+      _threadActionNotices.remove(threadId);
       return true;
     } on ChatServiceException catch (error) {
       _replaceMessage(
