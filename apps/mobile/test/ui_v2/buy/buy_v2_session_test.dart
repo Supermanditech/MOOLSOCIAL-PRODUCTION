@@ -1089,7 +1089,6 @@ void main() {
         ],
         BuyV2Destination.medicine: [
           'fast',
-          'today',
           'lowest',
           'otc',
           'nearby',
