@@ -312,18 +312,19 @@ class GlobalProfilePanelV2 extends StatelessWidget {
       view.devicePixelRatio,
     );
     const exportedTargetOverflow = 14.0;
-    final exportedBottomClearance =
+    final exportedBottomClearance = math.max(
+      defaultTargetPlatform == TargetPlatform.android
+          ? 24.0
+          : viewPadding.bottom,
+      math.max(
+        viewPadding.bottom,
         defaultTargetPlatform == TargetPlatform.android
-        ? math.max(
-            24.0,
-            math.max(
-              viewPadding.bottom,
-              (viewPadding.top - exportedTargetOverflow)
+            ? (viewPadding.top - exportedTargetOverflow)
                   .clamp(0, double.infinity)
-                  .toDouble(),
-            ),
-          )
-        : 0.0;
+                  .toDouble()
+            : 0.0,
+      ),
+    );
     return _GlobalProfilePaletteScope(
       palette: palette,
       child: MediaQuery(

@@ -101,19 +101,18 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
       view.viewPadding,
       view.devicePixelRatio,
     );
-    final exportedBottomClearance =
-        defaultTargetPlatform == TargetPlatform.android
-        ? math.max(
-            36.0,
-            math.max(
-              viewPadding.bottom,
-              moolAndroidExportedSemanticsClearance(
-                viewPadding: viewPadding,
-                platform: defaultTargetPlatform,
-              ),
-            ),
-          )
-        : 0.0;
+    final exportedBottomClearance = math.max(
+      defaultTargetPlatform == TargetPlatform.android
+          ? 36.0
+          : viewPadding.bottom,
+      math.max(
+        viewPadding.bottom,
+        moolAndroidExportedSemanticsClearance(
+          viewPadding: viewPadding,
+          platform: defaultTargetPlatform,
+        ),
+      ),
+    );
     final taxInvoice = order.taxInvoiceDetails;
     final legalInvoiceRequired = order.taxInvoiceState != null;
     final legalInvoiceReady =
@@ -580,10 +579,9 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
           ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
+      bottomNavigationBar: SizedBox(
         key: const ValueKey('buy-invoice-bottom-safe-area'),
-        top: false,
-        bottom: false,
+        height: 66 + exportedBottomClearance,
         child: Container(
           padding: EdgeInsets.fromLTRB(10, 8, 10, 8 + exportedBottomClearance),
           decoration: const BoxDecoration(
