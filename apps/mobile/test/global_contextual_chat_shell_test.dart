@@ -574,9 +574,7 @@ void main() {
     );
     expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
     expect(
-      find.textContaining(
-        'Document, photo, camera and video sharing are unavailable',
-      ),
+      find.textContaining('Document, photo and video sharing are unavailable'),
       findsOneWidget,
     );
     expect(find.byTooltip('Camera'), findsOneWidget);

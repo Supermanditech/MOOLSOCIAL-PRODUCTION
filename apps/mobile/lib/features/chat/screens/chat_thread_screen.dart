@@ -1101,7 +1101,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                       ),
                       title: const Text('Share last seen'),
                       subtitle: const Text(
-                        'Let eligible people see when you last used Chat.',
+                        'Choose whether people can see when you last used Chat.',
                       ),
                       value: session.privacySettings.shareLastSeen,
                       onChanged: session.privacyLoading
@@ -1125,7 +1125,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                       ),
                       title: const Text('Read receipts'),
                       subtitle: const Text(
-                        'Share and receive read status where permitted.',
+                        'Choose whether chats show when messages are read.',
                       ),
                       value: session.privacySettings.readReceipts,
                       onChanged: session.privacyLoading
@@ -2537,13 +2537,13 @@ class _ComposerState extends State<_Composer> {
     final filesAvailable = session.attachmentSelectionAvailable;
     final photosAvailable = session.photoSharingAvailable;
     if (!filesAvailable && !photosAvailable) {
-      return 'Document, photo, camera and video sharing are unavailable right now. You can continue with a message.';
+      return 'Document, photo and video sharing are unavailable right now. Camera remains in the composer and shows its own availability. You can continue with a message.';
     }
     if (!filesAvailable) {
-      return 'Document and video sharing are unavailable right now. Photos and camera remain available.';
+      return 'Document and video sharing are unavailable right now. Photos remain available here; camera stays in the composer.';
     }
     if (!photosAvailable) {
-      return 'Photo and camera sharing are unavailable right now. Documents and videos remain available.';
+      return 'Photo sharing is unavailable right now. Documents and videos remain available here; camera stays in the composer.';
     }
     return null;
   }

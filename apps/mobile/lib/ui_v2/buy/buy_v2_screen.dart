@@ -371,6 +371,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     unawaited(
       showGlobalProfilePanelV2(
         context,
+        accountAuthenticated: widget.accountAuthenticated,
         contextAction: _buyProfileContext(widget.session),
         onOpenRoute: (route) {
           context.push(route);
@@ -1216,9 +1217,7 @@ class _BuyMiniCartBar extends StatelessWidget {
     void activate() {
       HapticFeedback.selectionClick();
       session.openCart(
-        scope: medicineScoped
-            ? BuyV2CartScope.medicine
-            : BuyV2CartScope.all,
+        scope: medicineScoped ? BuyV2CartScope.medicine : BuyV2CartScope.all,
       );
     }
 

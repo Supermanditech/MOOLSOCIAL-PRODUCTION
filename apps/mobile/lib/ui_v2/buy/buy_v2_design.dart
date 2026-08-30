@@ -36,7 +36,8 @@ String buyV2BuyerDeliveryPromiseSource(String value) {
   final source = value.trim();
   final normalized = source.toLowerCase();
   if (normalized.startsWith('delivered ') ||
-      normalized.startsWith('delivery ')) {
+      normalized.startsWith('delivery ') ||
+      normalized.contains('delivery schedule')) {
     return source;
   }
   final minutes = RegExp(
@@ -1407,7 +1408,7 @@ class _BuyV2PromotionCardState extends State<BuyV2PromotionCard>
                                     const SizedBox(height: 3),
                                     Text(
                                       widget.detail,
-                                      maxLines: 3,
+                                      maxLines: 4,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: BuyV2Colors.muted,

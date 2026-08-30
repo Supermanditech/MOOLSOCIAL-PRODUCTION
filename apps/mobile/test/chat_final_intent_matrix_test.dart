@@ -187,7 +187,7 @@ void main() {
       );
       expect(
         find.textContaining(
-          'Document, photo, camera and video sharing are unavailable',
+          'Document, photo and video sharing are unavailable',
         ),
         findsOneWidget,
       );

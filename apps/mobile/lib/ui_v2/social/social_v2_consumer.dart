@@ -2139,6 +2139,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     final socialContext = _world == 'social';
     showGlobalProfilePanelV2(
       context,
+      accountAuthenticated: authenticated,
       surfaceTone: socialContext
           ? GlobalProfileSurfaceTone.socialDark
           : GlobalProfileSurfaceTone.light,

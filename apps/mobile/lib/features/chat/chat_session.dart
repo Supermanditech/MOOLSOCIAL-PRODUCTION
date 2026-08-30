@@ -69,6 +69,33 @@ class ChatSession extends ChangeNotifier {
           mine: false,
         ),
       ],
+      'shop-order': [
+        const ChatMessage(
+          id: 'shop-order-1',
+          sender: 'Fresh Basket Order',
+          text: 'Your grocery order is being packed.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'shop-partner': [
+        const ChatMessage(
+          id: 'shop-partner-1',
+          sender: 'Metro Wholesale Partner',
+          text: 'Your bulk quote is ready to review.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'shop-offers': [
+        const ChatMessage(
+          id: 'shop-offers-1',
+          sender: 'Shop Offers Support',
+          text: 'Tell us which Shop offer you need help with.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
       'rasoi': [
         const ChatMessage(
           id: 'm6',

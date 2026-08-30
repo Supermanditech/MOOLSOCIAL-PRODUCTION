@@ -127,6 +127,15 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('No matching conversations'), findsOneWidget);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+      await tester.pumpAndSettle();
+      final emptyTitle = tester.getRect(find.text('No matching conversations'));
+      final navigation = tester.getRect(
+        find.byKey(const Key('chat-native-navigation')),
+      );
+      expect(emptyTitle.bottom, lessThanOrEqualTo(navigation.top));
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.pumpAndSettle();
       await tapVisible(tester, const Key('chat-reset-search'));
 
       await tapVisible(tester, const Key('chat-filter-unread'));
@@ -169,6 +178,7 @@ void main() {
 
       await tapVisible(tester, const Key('chat-open-thread-shop-order'));
       expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+      expect(find.text('Your grocery order is being packed.'), findsOneWidget);
       await tapVisible(tester, const Key('chat-back'));
       expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
       expect(find.byKey(const Key('chat-back')), findsNothing);

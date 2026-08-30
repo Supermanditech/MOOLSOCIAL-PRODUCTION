@@ -76,6 +76,7 @@ class _GlobalProfilePanelResult {
 Future<void> showGlobalProfilePanelV2(
   BuildContext context, {
   required ValueChanged<String> onOpenRoute,
+  bool accountAuthenticated = false,
   GlobalProfileWorkspaceContext? activeWorkspace,
   bool applicationInProgress = false,
   GlobalProfileSurfaceTone surfaceTone = GlobalProfileSurfaceTone.light,
@@ -93,6 +94,7 @@ Future<void> showGlobalProfilePanelV2(
     pageBuilder: (dialogContext, _, _) => Align(
       alignment: Alignment.centerRight,
       child: GlobalProfilePanelV2(
+        accountAuthenticated: accountAuthenticated,
         activeWorkspace: activeWorkspace,
         applicationInProgress: applicationInProgress,
         surfaceTone: surfaceTone,
@@ -284,6 +286,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
   const GlobalProfilePanelV2({
     required this.onClose,
     required this.onOpenRoute,
+    this.accountAuthenticated = false,
     this.activeWorkspace,
     this.applicationInProgress = false,
     this.surfaceTone = GlobalProfileSurfaceTone.light,
@@ -294,6 +297,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
 
   final VoidCallback onClose;
   final ValueChanged<String> onOpenRoute;
+  final bool accountAuthenticated;
   final GlobalProfileWorkspaceContext? activeWorkspace;
   final bool applicationInProgress;
   final GlobalProfileSurfaceTone surfaceTone;
@@ -346,6 +350,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                   _ProfileHeader(
                     onClose: onClose,
                     workspaceRoleLabel: activeWorkspace?.roleLabel,
+                    accountAuthenticated: accountAuthenticated,
                   ),
                   Expanded(
                     child: CustomScrollView(
@@ -494,10 +499,12 @@ class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader({
     required this.onClose,
     required this.workspaceRoleLabel,
+    required this.accountAuthenticated,
   });
 
   final VoidCallback onClose;
   final String? workspaceRoleLabel;
+  final bool accountAuthenticated;
 
   @override
   Widget build(BuildContext context) {
@@ -543,7 +550,7 @@ class _ProfileHeader extends StatelessWidget {
                   width: 11,
                   height: 11,
                   decoration: BoxDecoration(
-                    color: _profileGreen,
+                    color: accountAuthenticated ? _profileGreen : palette.muted,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
@@ -597,16 +604,20 @@ class _ProfileHeader extends StatelessWidget {
                         Container(
                           width: 5,
                           height: 5,
-                          decoration: const BoxDecoration(
-                            color: _profileGreen,
+                          decoration: BoxDecoration(
+                            color: accountAuthenticated
+                                ? _profileGreen
+                                : palette.muted,
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 4),
-                        const Text(
-                          'Active',
+                        Text(
+                          accountAuthenticated ? 'Active' : 'Sign in',
                           style: TextStyle(
-                            color: _profileGreen,
+                            color: accountAuthenticated
+                                ? _profileGreen
+                                : palette.muted,
                             fontSize: 9,
                             fontWeight: FontWeight.w900,
                           ),

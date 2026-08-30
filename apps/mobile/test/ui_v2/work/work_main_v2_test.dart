@@ -148,7 +148,7 @@ void main() {
     expect(panel.right, closeTo(390, 1));
     expect(panel.left, greaterThan(90));
     expect(panel.top, greaterThanOrEqualTo(8));
-    expect(panel.bottom, lessThanOrEqualTo(836));
+    expect(panel.bottom, lessThanOrEqualTo(844));
     expect(panel.height, greaterThan(800));
     expect(find.text('Your MoolSocial profile'), findsOne);
     expect(find.byKey(const Key('global-profile-access-card')), findsNothing);
@@ -205,6 +205,25 @@ void main() {
       findsOne,
     );
   });
+
+  testWidgets(
+    'OPPO first fold keeps both primary Work actions above the rail',
+    (tester) async {
+      final session = WorkSession();
+      addTearDown(session.dispose);
+      await pumpWorkMain(tester, session, size: const Size(360, 800));
+
+      final workspace = tester.getRect(
+        find.byKey(const Key('work-main-workspace')),
+      );
+      final rail = tester.getRect(
+        find.byKey(const Key('moolsocial-single-home-launcher-shell')),
+      );
+      expect(workspace.bottom, lessThanOrEqualTo(rail.top));
+      expect(workspace.height, greaterThanOrEqualTo(100));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('workspace controls appear only after live activation', (
     tester,

@@ -457,7 +457,7 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                       secondary: const Icon(Icons.schedule_outlined),
                       title: const Text('Share last seen'),
                       subtitle: const Text(
-                        'Let eligible people see when you last used Chat.',
+                        'Choose whether people can see when you last used Chat.',
                       ),
                       value: session.privacySettings.shareLastSeen,
                       onChanged: session.privacyLoading
@@ -482,7 +482,7 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                       secondary: const Icon(Icons.done_all_rounded),
                       title: const Text('Read receipts'),
                       subtitle: const Text(
-                        'Share and receive read status where permitted.',
+                        'Choose whether chats show when messages are read.',
                       ),
                       value: session.privacySettings.readReceipts,
                       onChanged: session.privacyLoading

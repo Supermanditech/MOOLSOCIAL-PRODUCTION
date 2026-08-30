@@ -25,6 +25,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Personal account'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Active'), findsNothing);
     expect(find.text('Account settings'), findsOneWidget);
     expect(find.byKey(const Key('global-profile-identity')), findsOneWidget);
     expect(find.byKey(const Key('global-profile-preferences')), findsOneWidget);
@@ -46,6 +48,29 @@ void main() {
       await tester.pump();
       expect(routes.last, entry.$2);
     }
+  });
+
+  testWidgets('global profile shows Active only for an authenticated account', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.centerRight,
+            child: GlobalProfilePanelV2(
+              accountAuthenticated: true,
+              onClose: () {},
+              onOpenRoute: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Active'), findsOneWidget);
+    expect(find.text('Sign in'), findsNothing);
   });
 
   test('profile source cannot reintroduce a public Help destination', () {

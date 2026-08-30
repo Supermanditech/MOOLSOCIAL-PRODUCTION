@@ -106,34 +106,47 @@ class WorkMainV2 extends StatelessWidget {
               detail: 'Review opportunities or manage provider access',
             ),
             const SizedBox(height: MoolSpacing.sm),
-            _WorkActionCard(
-              keyName: 'work-main-earn',
-              icon: Icons.bolt_rounded,
-              title: 'Find paid opportunities',
-              detail:
-                  'See pay, eligibility, location and timing before you apply.',
-              actionLabel: 'Open Earn Today',
-              accent: const Color(0xFFF59E0B),
-              onTap: () => context.go('/app/work/earn'),
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            _WorkActionCard(
-              keyName: 'work-main-workspace',
-              icon: Icons.dashboard_customize_outlined,
-              title: session.activeWorkspace == null
-                  ? 'Create a provider workspace'
-                  : session.activeWorkspace!.name,
-              detail: session.activeWorkspace == null
-                  ? 'Choose your provider type and submit the required information for review.'
-                  : '${session.activeWorkspace!.profileLabel} · ${session.activeWorkspace!.area}',
-              actionLabel: session.activeWorkspace == null
-                  ? 'Start Workspace setup'
-                  : 'Open Workspace',
-              accent: _workViolet,
-              onTap: () {
-                session.startMyWork();
-                context.go('/app/work/my-work');
-              },
+            SizedBox(
+              height: 190,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _WorkActionCard(
+                      compact: true,
+                      keyName: 'work-main-earn',
+                      icon: Icons.bolt_rounded,
+                      title: 'Find paid opportunities',
+                      detail: 'Review pay, eligibility and timing.',
+                      actionLabel: 'Earn Today',
+                      accent: const Color(0xFFF59E0B),
+                      onTap: () => context.go('/app/work/earn'),
+                    ),
+                  ),
+                  const SizedBox(width: MoolSpacing.sm),
+                  Expanded(
+                    child: _WorkActionCard(
+                      compact: true,
+                      keyName: 'work-main-workspace',
+                      icon: Icons.dashboard_customize_outlined,
+                      title: session.activeWorkspace == null
+                          ? 'Create a provider workspace'
+                          : session.activeWorkspace!.name,
+                      detail: session.activeWorkspace == null
+                          ? 'Choose a provider type and submit details.'
+                          : '${session.activeWorkspace!.profileLabel} · ${session.activeWorkspace!.area}',
+                      actionLabel: session.activeWorkspace == null
+                          ? 'Set up Workspace'
+                          : 'Open Workspace',
+                      accent: _workViolet,
+                      onTap: () {
+                        session.startMyWork();
+                        context.go('/app/work/my-work');
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
             if (session.savedOpportunity case final saved?) ...[
               const SizedBox(height: MoolSpacing.lg),
@@ -280,21 +293,24 @@ class _WorkHero extends StatelessWidget {
             ),
           ),
           const SizedBox(height: MoolSpacing.sm),
-          Wrap(
-            spacing: MoolSpacing.xs,
-            runSpacing: MoolSpacing.xs,
+          Row(
             children: [
-              _HeroFact(
-                icon: Icons.account_circle_outlined,
-                label: 'One global profile',
+              const Expanded(
+                child: _HeroFact(
+                  icon: Icons.account_circle_outlined,
+                  label: 'One global profile',
+                ),
               ),
-              _HeroFact(
-                icon: workspaceReady
-                    ? Icons.verified_rounded
-                    : Icons.add_business_outlined,
-                label: workspaceReady
-                    ? 'Provider workspace verified'
-                    : 'Set up provider access',
+              const SizedBox(width: MoolSpacing.xs),
+              Expanded(
+                child: _HeroFact(
+                  icon: workspaceReady
+                      ? Icons.verified_rounded
+                      : Icons.add_business_outlined,
+                  label: workspaceReady
+                      ? 'Workspace verified'
+                      : 'Set up provider access',
+                ),
               ),
             ],
           ),
@@ -347,6 +363,7 @@ class _WorkActionCard extends StatelessWidget {
     required this.actionLabel,
     required this.accent,
     required this.onTap,
+    this.compact = false,
   });
 
   final String keyName;
@@ -356,60 +373,118 @@ class _WorkActionCard extends StatelessWidget {
   final String actionLabel;
   final Color accent;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => WorkCard(
     keyName: keyName,
     onTap: onTap,
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: .12),
-            borderRadius: BorderRadius.circular(MoolRadii.control),
-          ),
-          child: Icon(icon, color: accent),
-        ),
-        const SizedBox(width: MoolSpacing.sm),
-        Expanded(
-          child: Column(
+    padding: EdgeInsets.all(compact ? MoolSpacing.sm : MoolSpacing.md),
+    child: compact
+        ? Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                detail,
-                style: const TextStyle(
-                  color: MoolColors.muted,
-                  fontSize: 12,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
-                ),
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(MoolRadii.control),
+                    ),
+                    child: Icon(icon, color: accent, size: 21),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.arrow_forward_rounded, color: accent, size: 21),
+                ],
               ),
               const SizedBox(height: MoolSpacing.xs),
               Text(
+                title,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 15,
+                  height: 1.08,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                detail,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MoolColors.muted,
+                  fontSize: 10.5,
+                  height: 1.25,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Text(
                 actionLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: accent,
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w900,
                 ),
               ),
             ],
+          )
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(MoolRadii.control),
+                ),
+                child: Icon(icon, color: accent),
+              ),
+              const SizedBox(width: MoolSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      detail,
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 12,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: MoolSpacing.xs),
+                    Text(
+                      actionLabel,
+                      style: TextStyle(
+                        color: accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_rounded, color: accent),
+            ],
           ),
-        ),
-        Icon(Icons.arrow_forward_rounded, color: accent),
-      ],
-    ),
   );
 }

@@ -3560,7 +3560,7 @@ class _CataloguePromotionRail extends StatelessWidget {
     };
     return SizedBox(
       key: const ValueKey('buy-catalogue-promotions'),
-      height: accessibleText ? 156 : 140,
+      height: accessibleText ? 164 : 148,
       child: Padding(
         key: PageStorageKey(
           'buy-catalogue-promotions-${session.destination.name}',
@@ -3962,7 +3962,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                                 Expanded(
                                   child: Text(
                                     automaticFulfilment
-                                        ? buyerPromise
+                                        ? _compactDeliveryPromise(buyerPromise)
                                         : '${facts.partner} · '
                                               '${_compactDeliveryPromise(facts.deliveryPromise)}',
                                     maxLines: 1,
@@ -4127,7 +4127,7 @@ class _FeaturedProductAction extends StatelessWidget {
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: SizedBox(
-                    width: BuyV2Metrics.minimumTap,
+                    width: 62,
                     height: BuyV2Metrics.minimumTap,
                     child: Center(
                       child: rxBlocked
@@ -4139,14 +4139,30 @@ class _FeaturedProductAction extends StatelessWidget {
                                 fontWeight: FontWeight.w900,
                               ),
                             )
-                          : Icon(
-                              requiresOfferReview
-                                  ? Icons.info_outline_rounded
-                                  : Icons.add_rounded,
-                              color: requiresOfferReview
-                                  ? BuyV2Colors.orange
-                                  : BuyV2Colors.navy,
+                          : requiresOfferReview
+                          ? const Icon(
+                              Icons.info_outline_rounded,
+                              color: BuyV2Colors.orange,
                               size: 23,
+                            )
+                          : const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.add_rounded,
+                                  color: BuyV2Colors.navy,
+                                  size: 19,
+                                ),
+                                SizedBox(width: 2),
+                                Text(
+                                  'Add',
+                                  style: TextStyle(
+                                    color: BuyV2Colors.navy,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
                             ),
                     ),
                   ),
@@ -4341,7 +4357,9 @@ class BuyV2ProductCard extends StatelessWidget {
                                               ? requiresOfferReview
                                                     ? offerDecision!.statusLabel
                                                     : automaticFulfilment
-                                                    ? buyerPromise
+                                                    ? _compactDeliveryPromise(
+                                                        buyerPromise,
+                                                      )
                                                     : '${facts.partner} · '
                                                           '${_compactDeliveryPromise(facts.deliveryPromise)}'
                                               : buyerPromise,

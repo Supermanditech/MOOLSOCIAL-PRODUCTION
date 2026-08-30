@@ -1145,9 +1145,16 @@ class _EmptyInbox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    return Align(
+      alignment: keyboardVisible ? Alignment.topCenter : Alignment.center,
       child: Padding(
-        padding: const EdgeInsets.all(MoolSpacing.xl),
+        padding: EdgeInsets.fromLTRB(
+          MoolSpacing.xl,
+          keyboardVisible ? MoolSpacing.sm : MoolSpacing.xl,
+          MoolSpacing.xl,
+          MoolSpacing.xl,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

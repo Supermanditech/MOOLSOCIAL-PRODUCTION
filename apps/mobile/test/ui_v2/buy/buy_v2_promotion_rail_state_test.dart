@@ -19,6 +19,12 @@ void main() {
         ),
         'Delivery schedule confirmed at checkout',
       );
+      expect(
+        buyV2BuyerDeliveryPromiseSource(
+          'Supplier delivery schedule awaiting confirmation',
+        ),
+        'Supplier delivery schedule awaiting confirmation',
+      );
     },
   );
 
@@ -70,7 +76,7 @@ void main() {
       'Browse retail packs sized for home',
     ]) {
       final text = tester.widget<Text>(find.text(copy));
-      expect(text.maxLines, 3);
+      expect(text.maxLines, 4);
     }
     expect(tester.takeException(), isNull);
   });
