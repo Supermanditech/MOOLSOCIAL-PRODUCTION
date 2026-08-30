@@ -73,6 +73,52 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final vehicle in const [
+    (
+      type: RideType.bike,
+      packageId: 'bike-saver',
+      label: 'Blue Bike · RJ19 AB 2841',
+    ),
+    (
+      type: RideType.auto,
+      packageId: 'auto',
+      label: 'White Auto · RJ19 AB 2841',
+    ),
+    (
+      type: RideType.cab,
+      packageId: 'cab-mini',
+      label: 'White Mini cab · RJ19 AB 2841',
+    ),
+  ]) {
+    testWidgets('${vehicle.type.name} trip keeps the booked vehicle identity', (
+      tester,
+    ) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final journey = await readyJourney();
+      final ride = RideSession(
+        gateway: ReviewRideGateway(latency: Duration.zero),
+      );
+      ride.chooseType(vehicle.type);
+      ride.choosePackage(vehicle.packageId);
+      expect(await ride.bookRide(), isTrue);
+      addTearDown(journey.dispose);
+      addTearDown(ride.dispose);
+      await mount(
+        tester,
+        route: '/app/ride/trip/${ride.trip!.id}',
+        journey: journey,
+        ride: ride,
+      );
+
+      expect(find.text(vehicle.label), findsOneWidget);
+      expect(
+        find.text('White Auto · RJ19 AB 2841'),
+        vehicle.type == RideType.auto ? findsOneWidget : findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('Travel profile resumes the active ride over discovery', (
     tester,
   ) async {
