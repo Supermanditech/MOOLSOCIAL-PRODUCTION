@@ -91,6 +91,48 @@ class SocialReplyResult {
   final SocialPublishedItem post;
 }
 
+enum SocialNotificationKind { reply, reaction, follow, messageRequest }
+
+class SocialNotificationItem {
+  const SocialNotificationItem({
+    required this.id,
+    required this.kind,
+    required this.title,
+    required this.preview,
+    required this.publishedAt,
+    required this.read,
+    this.postId,
+    this.authorId,
+  });
+
+  final String id;
+  final SocialNotificationKind kind;
+  final String title;
+  final String preview;
+  final DateTime publishedAt;
+  final bool read;
+  final String? postId;
+  final String? authorId;
+
+  SocialNotificationItem copyWith({bool? read}) => SocialNotificationItem(
+    id: id,
+    kind: kind,
+    title: title,
+    preview: preview,
+    publishedAt: publishedAt,
+    read: read ?? this.read,
+    postId: postId,
+    authorId: authorId,
+  );
+}
+
+class SocialNotificationPage {
+  const SocialNotificationPage({required this.items, this.nextCursor});
+
+  final List<SocialNotificationItem> items;
+  final String? nextCursor;
+}
+
 enum SocialReportReason {
   spam,
   harassment,
@@ -156,6 +198,15 @@ abstract interface class SocialSavedGateway {
   Future<SocialFeedPage> saved({String? cursor, int limit = 20});
 }
 
+abstract interface class SocialNotificationGateway {
+  Future<SocialNotificationPage> notifications({
+    String? cursor,
+    int limit = 30,
+  });
+
+  Future<void> markNotificationRead(String notificationId);
+}
+
 SocialContentGateway buildSocialContentGateway() {
   if (moolSocialContentUrl.trim().isEmpty) {
     return const UnavailableSocialContentGateway();
@@ -173,7 +224,8 @@ class UnavailableSocialContentGateway
         SocialCommentGateway,
         SocialAuthorGateway,
         SocialModerationGateway,
-        SocialSavedGateway {
+        SocialSavedGateway,
+        SocialNotificationGateway {
   const UnavailableSocialContentGateway();
 
   @override
@@ -226,6 +278,16 @@ class UnavailableSocialContentGateway
   Future<SocialFeedPage> saved({String? cursor, int limit = 20}) =>
       Future<SocialFeedPage>.error(_unavailable());
 
+  @override
+  Future<SocialNotificationPage> notifications({
+    String? cursor,
+    int limit = 30,
+  }) => Future<SocialNotificationPage>.error(_unavailable());
+
+  @override
+  Future<void> markNotificationRead(String notificationId) =>
+      Future<void>.error(_unavailable());
+
   static SocialContentGatewayException _unavailable() =>
       const SocialContentGatewayException(
         code: 'service_unavailable',
@@ -246,7 +308,8 @@ class UiReviewSocialContentGateway
         SocialCommentGateway,
         SocialAuthorGateway,
         SocialModerationGateway,
-        SocialSavedGateway {
+        SocialSavedGateway,
+        SocialNotificationGateway {
   UiReviewSocialContentGateway({DateTime Function()? now})
     : _now = now ?? DateTime.now {
     final current = _now();
@@ -322,11 +385,43 @@ class UiReviewSocialContentGateway
         ),
       ],
     };
+    _notifications = <SocialNotificationItem>[
+      SocialNotificationItem(
+        id: 'UI-REVIEW-NOTIFICATION-001',
+        kind: SocialNotificationKind.reply,
+        title: 'Neha replied to a post',
+        preview: 'A shared book shelf at our community centre.',
+        publishedAt: current.subtract(const Duration(minutes: 5)),
+        read: false,
+        postId: 'UI-REVIEW-FEED-001',
+        authorId: 'ui-review-neha',
+      ),
+      SocialNotificationItem(
+        id: 'UI-REVIEW-NOTIFICATION-002',
+        kind: SocialNotificationKind.follow,
+        title: 'Asha followed your public updates',
+        preview: 'Open her public profile.',
+        publishedAt: current.subtract(const Duration(hours: 1)),
+        read: false,
+        authorId: 'ui-review-asha',
+      ),
+      SocialNotificationItem(
+        id: 'UI-REVIEW-NOTIFICATION-003',
+        kind: SocialNotificationKind.reaction,
+        title: 'Rohan liked a post',
+        preview: 'A simple morning market guide for choosing fresher produce.',
+        publishedAt: current.subtract(const Duration(hours: 2)),
+        read: true,
+        postId: 'UI-REVIEW-FEED-002',
+        authorId: 'ui-review-rohan',
+      ),
+    ];
   }
 
   final DateTime Function() _now;
   late final List<SocialPublishedItem> _items;
   late final Map<String, List<SocialComment>> _comments;
+  late final List<SocialNotificationItem> _notifications;
 
   @override
   Future<SocialFeedPage> feed({String? cursor, int limit = 20}) async {
@@ -415,6 +510,26 @@ class UiReviewSocialContentGateway
   @override
   Future<SocialFeedPage> saved({String? cursor, int limit = 20}) async =>
       const SocialFeedPage(items: <SocialPublishedItem>[]);
+
+  @override
+  Future<SocialNotificationPage> notifications({
+    String? cursor,
+    int limit = 30,
+  }) async {
+    final offset = cursor == null ? 0 : int.tryParse(cursor) ?? 0;
+    final safeOffset = offset.clamp(0, _notifications.length).toInt();
+    final end = min(safeOffset + limit, _notifications.length);
+    return SocialNotificationPage(
+      items: List<SocialNotificationItem>.unmodifiable(
+        _notifications.sublist(safeOffset, end),
+      ),
+      nextCursor: end < _notifications.length ? '$end' : null,
+    );
+  }
+
+  @override
+  Future<void> markNotificationRead(String notificationId) =>
+      Future<void>.error(_writeUnavailable());
 
   static SocialContentGatewayException _writeUnavailable() =>
       const SocialContentGatewayException(
@@ -572,7 +687,8 @@ class AuthenticatedSocialContentGateway
         SocialCommentGateway,
         SocialAuthorGateway,
         SocialModerationGateway,
-        SocialSavedGateway {
+        SocialSavedGateway,
+        SocialNotificationGateway {
   AuthenticatedSocialContentGateway({
     required Uri endpoint,
     required this._credentials,
@@ -643,6 +759,41 @@ class AuthenticatedSocialContentGateway
       items: List.unmodifiable(items),
       nextCursor: _optionalString(data['nextCursor']),
     );
+  }
+
+  @override
+  Future<SocialNotificationPage> notifications({
+    String? cursor,
+    int limit = 30,
+  }) async {
+    final data = _map(
+      await _invoke('notifications', body: {'limit': limit, 'cursor': ?cursor}),
+    );
+    final items = _list(
+      data['items'],
+    ).map((item) => _decodeNotification(_map(item))).toList(growable: false);
+    return SocialNotificationPage(
+      items: List.unmodifiable(items),
+      nextCursor: _optionalString(data['nextCursor']),
+    );
+  }
+
+  @override
+  Future<void> markNotificationRead(String notificationId) async {
+    final data = _map(
+      await _invoke(
+        'notificationRead',
+        limitedUseAppCheck: true,
+        body: {'notificationId': notificationId},
+      ),
+    );
+    if (data['read'] != true ||
+        _requiredString(data['notificationId']) != notificationId) {
+      throw const SocialContentGatewayException(
+        code: 'invalid_response',
+        message: 'MoolSocial could not confirm this notification.',
+      );
+    }
   }
 
   @override
@@ -929,6 +1080,27 @@ SocialComment _decodeComment(Map<String, Object?> data) => SocialComment(
   body: _requiredString(data['body']),
   publishedAt: DateTime.parse(_requiredString(data['publishedAt'])),
 );
+
+SocialNotificationItem _decodeNotification(Map<String, Object?> data) =>
+    SocialNotificationItem(
+      id: _requiredString(data['id']),
+      kind: switch (_requiredString(data['kind'])) {
+        'reply' => SocialNotificationKind.reply,
+        'reaction' => SocialNotificationKind.reaction,
+        'follow' => SocialNotificationKind.follow,
+        'messageRequest' => SocialNotificationKind.messageRequest,
+        _ => throw const SocialContentGatewayException(
+          code: 'invalid_response',
+          message: 'MoolSocial returned an unknown notification type.',
+        ),
+      },
+      title: _requiredString(data['title']),
+      preview: _requiredString(data['preview'], allowEmpty: true),
+      publishedAt: DateTime.parse(_requiredString(data['publishedAt'])),
+      read: data['read'] == true,
+      postId: _optionalString(data['postId']),
+      authorId: _optionalString(data['authorId']),
+    );
 
 SocialAuthorProfile _decodeAuthorProfile(Map<String, Object?> data) =>
     SocialAuthorProfile(

@@ -83,6 +83,13 @@ class SharedSession extends ChangeNotifier {
   bool socialSavedLoaded = false;
   bool socialSavedHasMore = false;
   String? socialSavedError;
+  final List<SocialNotificationItem> _socialNotifications = [];
+  String? _socialNotificationCursor;
+  bool socialNotificationsLoading = false;
+  bool socialNotificationsLoaded = false;
+  bool socialNotificationsHasMore = false;
+  String? socialNotificationsError;
+  final Set<String> _socialNotificationsReading = {};
 
   List<SocialPublishedItem> get socialPublishedItems =>
       List<SocialPublishedItem>.unmodifiable(_socialPublishedItems);
@@ -108,6 +115,11 @@ class SharedSession extends ChangeNotifier {
   SocialSavedGateway? get _socialSavedGateway =>
       _socialContentGateway is SocialSavedGateway
       ? _socialContentGateway as SocialSavedGateway
+      : null;
+
+  SocialNotificationGateway? get _socialNotificationGateway =>
+      _socialContentGateway is SocialNotificationGateway
+      ? _socialContentGateway as SocialNotificationGateway
       : null;
 
   bool socialInteractionBusy(String postId) =>
@@ -156,6 +168,12 @@ class SharedSession extends ChangeNotifier {
 
   List<SocialPublishedItem> get socialSavedPosts =>
       List<SocialPublishedItem>.unmodifiable(_socialSavedPosts);
+
+  List<SocialNotificationItem> get socialNotifications =>
+      List<SocialNotificationItem>.unmodifiable(_socialNotifications);
+
+  bool socialNotificationReading(String notificationId) =>
+      _socialNotificationsReading.contains(notificationId);
 
   void saveSocialReplyDraft(String postId, String value) {
     if (value.isEmpty) {
@@ -549,6 +567,94 @@ class SharedSession extends ChangeNotifier {
     }
   }
 
+  Future<bool> loadSocialNotifications({bool refresh = false}) async {
+    if (socialNotificationsLoading) return false;
+    if (!online) {
+      socialNotificationsError =
+          'You are offline. Previously loaded notifications remain available.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialNotificationGateway;
+    if (gateway == null) {
+      socialNotificationsError =
+          'Notifications are unavailable right now. Try again later.';
+      notifyListeners();
+      return false;
+    }
+    socialNotificationsLoading = true;
+    socialNotificationsError = null;
+    notifyListeners();
+    try {
+      final page = await gateway.notifications(
+        cursor: refresh ? null : _socialNotificationCursor,
+      );
+      if (refresh) _socialNotifications.clear();
+      for (final item in page.items) {
+        final index = _socialNotifications.indexWhere(
+          (candidate) => candidate.id == item.id,
+        );
+        if (index >= 0) {
+          _socialNotifications[index] = item;
+        } else {
+          _socialNotifications.add(item);
+        }
+      }
+      _socialNotificationCursor = page.nextCursor;
+      socialNotificationsHasMore = page.nextCursor != null;
+      socialNotificationsLoaded = true;
+      socialNotificationsError = null;
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      socialNotificationsError = error.message;
+      return false;
+    } on Object {
+      socialNotificationsError =
+          'Notifications could not load. Check your connection and try again.';
+      return false;
+    } finally {
+      socialNotificationsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> markSocialNotificationRead(String notificationId) async {
+    final index = _socialNotifications.indexWhere(
+      (item) => item.id == notificationId,
+    );
+    if (index < 0 || _socialNotifications[index].read) return index >= 0;
+    if (_socialNotificationsReading.contains(notificationId)) return false;
+    if (!online || !authorized) {
+      socialNotificationsError = !online
+          ? 'You are offline. This notification remains unread.'
+          : 'Sign in again before changing notification status.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialNotificationGateway;
+    if (gateway == null) return false;
+    _socialNotificationsReading.add(notificationId);
+    socialNotificationsError = null;
+    notifyListeners();
+    try {
+      await gateway.markNotificationRead(notificationId);
+      _socialNotifications[index] = _socialNotifications[index].copyWith(
+        read: true,
+      );
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      socialNotificationsError = error.message;
+      return false;
+    } on Object {
+      socialNotificationsError =
+          'Notification status could not update. The content can still open.';
+      return false;
+    } finally {
+      _socialNotificationsReading.remove(notificationId);
+      notifyListeners();
+    }
+  }
+
   String filterFor(SharedScreenSpec spec) =>
       filters[spec.screen] ?? spec.filters.first;
 
@@ -609,6 +715,13 @@ class SharedSession extends ChangeNotifier {
     socialSavedLoaded = false;
     socialSavedHasMore = false;
     socialSavedError = null;
+    _socialNotifications.clear();
+    _socialNotificationCursor = null;
+    socialNotificationsLoading = false;
+    socialNotificationsLoaded = false;
+    socialNotificationsHasMore = false;
+    socialNotificationsError = null;
+    _socialNotificationsReading.clear();
     notifyListeners();
   }
 

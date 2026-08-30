@@ -402,6 +402,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   String? _unavailableFeedLinkItem;
   String? _openedInitialAuthorItem;
   bool _openedInitialSaved = false;
+  bool _openedInitialNotifications = false;
   String? _handledInitialFeedActionToken;
   static SocialV2Tab _tabFor(String? subAction) => switch (subAction) {
     'shorts' => SocialV2Tab.shorts,
@@ -680,6 +681,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         unawaited(_resolveSharedFeedItem());
       } else {
         _maybeOpenInitialSaved();
+        _maybeOpenInitialNotifications();
       }
     }
   }
@@ -815,6 +817,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     await widget.sharedSession.loadSocialFeed(refresh: true);
     await _resolveSharedFeedItem();
     _maybeOpenInitialSaved();
+    _maybeOpenInitialNotifications();
   }
 
   void _maybeOpenInitialSaved() {
@@ -828,6 +831,19 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     _openedInitialSaved = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _openSavedPosts();
+    });
+  }
+
+  void _maybeOpenInitialNotifications() {
+    if (_openedInitialNotifications ||
+        !mounted ||
+        widget.initialState != 'notifications' ||
+        !widget.session.isAuthenticated) {
+      return;
+    }
+    _openedInitialNotifications = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openUniversalNotifications();
     });
   }
 
@@ -2219,15 +2235,26 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   }
 
   void _openUniversalNotifications() {
+    final previewOnly =
+        widget.enableCreateReviewPreview && !widget.session.isAuthenticated;
+    if (!widget.session.isAuthenticated && !previewOnly) {
+      widget.session.beginSignIn(
+        returnLocation: '/app/social?sub=${_tab.name}&state=notifications',
+        cancelLocation: '/app/social?sub=${_tab.name}',
+      );
+      return;
+    }
     showSocialV2Sheet(
       context,
       title: 'Notifications',
       subtitle: 'Your recent activity',
       children: [
-        const SocialV2Notice(
-          title: 'You’re all caught up',
-          detail:
-              'New account, order, work and Social updates will appear here.',
+        _SocialNotificationsPanelV2(
+          session: widget.sharedSession,
+          previewOnly: previewOnly,
+          onOpen: (item) => unawaited(
+            _openSocialNotification(item, previewOnly: previewOnly),
+          ),
         ),
         OutlinedButton.icon(
           onPressed: _openNotificationSettings,
@@ -2236,6 +2263,54 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         ),
       ],
     );
+  }
+
+  Future<void> _openSocialNotification(
+    SocialNotificationItem notification, {
+    required bool previewOnly,
+  }) async {
+    if (!previewOnly && !notification.read) {
+      await widget.sharedSession.markSocialNotificationRead(notification.id);
+      if (!mounted) return;
+    }
+    Navigator.of(context).pop();
+    if (notification.kind == SocialNotificationKind.messageRequest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openFeedChatSection('discover');
+      });
+      return;
+    }
+    final post = notification.postId == null
+        ? null
+        : widget.sharedSession.socialPublishedItems
+              .where((item) => item.id == notification.postId)
+              .firstOrNull;
+    final authorPost = notification.authorId == null
+        ? null
+        : widget.sharedSession.socialPublishedItems
+              .where((item) => item.authorId == notification.authorId)
+              .firstOrNull;
+    setState(() {
+      _choiceByWorld['social'] = 'feed';
+      _tab = SocialV2Tab.feed;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (post != null) {
+        _openPostDetail(post);
+      } else if (authorPost != null) {
+        _openAuthor(authorPost);
+      } else {
+        showSocialV2Message(
+          context,
+          'This notification’s content is no longer available.',
+        );
+      }
+      final error = widget.sharedSession.socialNotificationsError;
+      if (!previewOnly && error != null) {
+        showSocialV2Message(context, error);
+      }
+    });
   }
 
   void _openAccount() {
@@ -7136,6 +7211,117 @@ class _VideoChannelIdentity extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SocialNotificationsPanelV2 extends StatefulWidget {
+  const _SocialNotificationsPanelV2({
+    required this.session,
+    required this.previewOnly,
+    required this.onOpen,
+  });
+
+  final SharedSession session;
+  final bool previewOnly;
+  final ValueChanged<SocialNotificationItem> onOpen;
+
+  @override
+  State<_SocialNotificationsPanelV2> createState() =>
+      _SocialNotificationsPanelV2State();
+}
+
+class _SocialNotificationsPanelV2State
+    extends State<_SocialNotificationsPanelV2> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(widget.session.loadSocialNotifications(refresh: true));
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.session,
+    builder: (context, _) {
+      final items = widget.session.socialNotifications;
+      final loading = widget.session.socialNotificationsLoading;
+      final error = widget.session.socialNotificationsError;
+      return Column(
+        key: const Key('social-notifications-panel'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.previewOnly) ...[
+            const SocialV2Notice(
+              title: 'Notification preview',
+              detail:
+                  'Open each destination for review. Read status changes only after sign-in and server confirmation.',
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (loading && items.isEmpty)
+            const Center(child: CircularProgressIndicator.adaptive())
+          else if (items.isEmpty)
+            const SocialV2Notice(
+              title: 'You’re all caught up',
+              detail: 'New Social activity will appear here.',
+            )
+          else
+            for (final item in items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SocialV2ListTile(
+                  key: Key('social-notification-${item.id}'),
+                  icon: switch (item.kind) {
+                    SocialNotificationKind.reply =>
+                      Icons.chat_bubble_outline_rounded,
+                    SocialNotificationKind.reaction =>
+                      Icons.favorite_border_rounded,
+                    SocialNotificationKind.follow =>
+                      Icons.person_add_alt_1_rounded,
+                    SocialNotificationKind.messageRequest =>
+                      Icons.mark_chat_unread_outlined,
+                  },
+                  title: item.title,
+                  detail:
+                      '${item.preview} · ${socialPublishedAgeLabel(item.publishedAt)}',
+                  badge: item.read ? 'Read' : 'New',
+                  onTap: widget.session.socialNotificationReading(item.id)
+                      ? null
+                      : () => widget.onOpen(item),
+                ),
+              ),
+          if (error != null) ...[
+            SocialV2Notice(
+              title: 'Notifications did not refresh',
+              detail: error,
+              warning: true,
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (error != null && items.isEmpty)
+            OutlinedButton.icon(
+              key: const Key('social-notifications-retry'),
+              onPressed: loading
+                  ? null
+                  : () => widget.session.loadSocialNotifications(refresh: true),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Retry notifications'),
+            ),
+          if (items.isNotEmpty && widget.session.socialNotificationsHasMore)
+            OutlinedButton.icon(
+              key: const Key('social-notifications-load-more'),
+              onPressed: loading
+                  ? null
+                  : widget.session.loadSocialNotifications,
+              icon: const Icon(Icons.expand_more_rounded),
+              label: Text(loading ? 'Loading updates' : 'Load more'),
+            ),
+        ],
+      );
+    },
+  );
 }
 
 class _SocialSavedPostsPanelV2 extends StatefulWidget {

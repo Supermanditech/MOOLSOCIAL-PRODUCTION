@@ -109,6 +109,24 @@ void main() {
       expect(find.text('Like'), findsWidgets);
       expect(find.text('Comment'), findsWidgets);
 
+      await tester.tap(find.byKey(const Key('screen04-feed-notifications')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('social-notifications-panel')),
+        findsOneWidget,
+      );
+      expect(find.text('Notification preview'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('social-notification-UI-REVIEW-NOTIFICATION-001')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('social-post-detail-UI-REVIEW-FEED-001')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+
       await tester.tap(find.byKey(const Key('screen04-feed-mode-following')));
       await tester.pumpAndSettle();
       expect(find.text('Your Following feed is ready to grow'), findsOneWidget);
@@ -157,6 +175,37 @@ void main() {
       ),
     );
   });
+
+  test(
+    'notification read status changes only after gateway acknowledgement',
+    () async {
+      final gateway = ReviewSocialContentGateway();
+      final session = SharedSession(socialContentGateway: gateway);
+      addTearDown(session.dispose);
+      await gateway.publish(
+        const SocialPublishDraft(
+          idempotencyKey: 'notification-read-owner',
+          type: SocialPublishedContentType.post,
+          authorName: 'Riya Sharma',
+          authorHandle: '@riyasharma',
+          body: 'Open this notification destination.',
+          audience: 'Public',
+          mediaPaths: <String>[],
+          mediaAreAssets: false,
+          choices: <SocialPublishedChoice>[],
+        ),
+      );
+
+      expect(await session.loadSocialNotifications(refresh: true), isTrue);
+      expect(session.socialNotifications.single.read, isFalse);
+      expect(
+        await session.markSocialNotificationRead('TEST-NOTIFICATION-0001'),
+        isTrue,
+      );
+      expect(session.socialNotifications.single.read, isTrue);
+      expect(gateway.readNotifications, contains('TEST-NOTIFICATION-0001'));
+    },
+  );
 
   testWidgets('C30T Feed Create uses the authenticated creation gateway', (
     tester,

@@ -111,6 +111,63 @@ void main() {
     expect(transport.headers.single['authorization'], 'Bearer id-token');
   });
 
+  test(
+    'notifications preserve preview targets and acknowledged read state',
+    () async {
+      final credentials = _Credentials();
+      var call = 0;
+      final transport = _Transport((body) {
+        call += 1;
+        if (call == 1) {
+          expect(body, {'operation': 'notifications', 'limit': 30});
+          return jsonEncode({
+            'ok': true,
+            'data': {
+              'items': [
+                {
+                  'id': 'notification-1',
+                  'kind': 'reply',
+                  'title': 'A new reply',
+                  'preview': 'A useful public reply',
+                  'publishedAt': '2026-08-31T00:00:00.000Z',
+                  'read': false,
+                  'postId': 'post-1',
+                  'authorId': 'author-1',
+                },
+              ],
+            },
+          });
+        }
+        expect(body, {
+          'operation': 'notificationRead',
+          'notificationId': 'notification-1',
+        });
+        return jsonEncode({
+          'ok': true,
+          'data': {'notificationId': 'notification-1', 'read': true},
+        });
+      });
+      final gateway = AuthenticatedSocialContentGateway(
+        endpoint: Uri.parse(
+          'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialContent',
+        ),
+        credentials: credentials,
+        transport: transport,
+      );
+
+      final page = await gateway.notifications();
+      await gateway.markNotificationRead(page.items.single.id);
+
+      expect(page.items.single.postId, 'post-1');
+      expect(page.items.single.authorId, 'author-1');
+      expect(page.items.single.read, isFalse);
+      expect(credentials.modes, [
+        SocialAppCheckTokenMode.standard,
+        SocialAppCheckTokenMode.limitedUse,
+      ]);
+    },
+  );
+
   test('quoted publish and repost map only server-acknowledged truth', () async {
     final credentials = _Credentials();
     var call = 0;

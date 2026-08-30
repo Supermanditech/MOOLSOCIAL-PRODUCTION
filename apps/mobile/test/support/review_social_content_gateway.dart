@@ -9,7 +9,8 @@ class ReviewSocialContentGateway
         SocialCommentGateway,
         SocialAuthorGateway,
         SocialModerationGateway,
-        SocialSavedGateway {
+        SocialSavedGateway,
+        SocialNotificationGateway {
   ReviewSocialContentGateway({DateTime Function()? now})
     : _now = now ?? DateTime.now;
 
@@ -22,6 +23,7 @@ class ReviewSocialContentGateway
   int _sequence = 0;
   int _commentSequence = 0;
   final List<(String, SocialReportReason, String)> reports = [];
+  final Set<String> readNotifications = {};
 
   String? get latestItemId => _items.firstOrNull?.id;
 
@@ -91,6 +93,36 @@ class ReviewSocialContentGateway
       items: List.unmodifiable(savedItems.sublist(offset, end)),
       nextCursor: end < savedItems.length ? '$end' : null,
     );
+  }
+
+  @override
+  Future<SocialNotificationPage> notifications({
+    String? cursor,
+    int limit = 30,
+  }) async {
+    if (_items.isEmpty || cursor != null) {
+      return const SocialNotificationPage(items: []);
+    }
+    final item = _items.first;
+    return SocialNotificationPage(
+      items: [
+        SocialNotificationItem(
+          id: 'TEST-NOTIFICATION-0001',
+          kind: SocialNotificationKind.reaction,
+          title: '${item.authorName} liked a post',
+          preview: item.body,
+          publishedAt: _now(),
+          read: readNotifications.contains('TEST-NOTIFICATION-0001'),
+          postId: item.id,
+          authorId: item.authorId,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<void> markNotificationRead(String notificationId) async {
+    readNotifications.add(notificationId);
   }
 
   @override
