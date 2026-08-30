@@ -4,10 +4,23 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'delivery label is not duplicated when the source is already labelled',
+    () {
+      expect(
+        buyV2BuyerDeliveryPromiseSource(
+          'Delivery schedule confirmed at checkout',
+        ),
+        'Delivery schedule confirmed at checkout',
+      );
+    },
+  );
 
   testWidgets('both promotion intents fit without horizontal clipping', (
     tester,
@@ -52,6 +65,13 @@ void main() {
       ValueKey('buy-promotion-wholesale-restock'),
       ValueKey('buy-promotion-wholesale-shop'),
     ]);
+    for (final copy in const [
+      'Compare products with lower minimum packs',
+      'Browse retail packs sized for home',
+    ]) {
+      final text = tester.widget<Text>(find.text(copy));
+      expect(text.maxLines, 3);
+    }
     expect(tester.takeException(), isNull);
   });
 }

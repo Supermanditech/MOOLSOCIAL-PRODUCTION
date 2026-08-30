@@ -3560,7 +3560,7 @@ class _CataloguePromotionRail extends StatelessWidget {
     };
     return SizedBox(
       key: const ValueKey('buy-catalogue-promotions'),
-      height: accessibleText ? 138 : 122,
+      height: accessibleText ? 156 : 140,
       child: Padding(
         key: PageStorageKey(
           'buy-catalogue-promotions-${session.destination.name}',

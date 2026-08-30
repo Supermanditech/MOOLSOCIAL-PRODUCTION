@@ -34,7 +34,11 @@ String buyV2BuyerDeliveryPromise(BuyV2ProductFactsSnapshot facts) {
 
 String buyV2BuyerDeliveryPromiseSource(String value) {
   final source = value.trim();
-  if (source.toLowerCase().startsWith('delivered ')) return source;
+  final normalized = source.toLowerCase();
+  if (normalized.startsWith('delivered ') ||
+      normalized.startsWith('delivery ')) {
+    return source;
+  }
   final minutes = RegExp(
     r'(\d+)\s*(?:min|minute)s?',
     caseSensitive: false,
@@ -1403,7 +1407,7 @@ class _BuyV2PromotionCardState extends State<BuyV2PromotionCard>
                                     const SizedBox(height: 3),
                                     Text(
                                       widget.detail,
-                                      maxLines: 2,
+                                      maxLines: 3,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: BuyV2Colors.muted,
