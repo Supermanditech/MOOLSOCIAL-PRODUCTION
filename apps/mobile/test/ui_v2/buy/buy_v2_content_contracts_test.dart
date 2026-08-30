@@ -52,6 +52,13 @@ void main() {
       expect(content.highlights, isNotEmpty);
       expect(content.specifications, isNotEmpty);
       expect(content.description, isNotEmpty);
+
+      final trust = session.marketplaceTrustFor(product);
+      expect(trust.state, BuyV2MarketplaceTrustState.ready);
+      expect(trust.sourceId, 'approved-buy-catalogue');
+      expect(trust.partnerName, product.seller);
+      expect(trust.partnerType, product.partnerRole);
+      expect(trust.productRating, isNull);
     });
 
     test('catalogue fulfilment modes remain contextual and explicit', () {

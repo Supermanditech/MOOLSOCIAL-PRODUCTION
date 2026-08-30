@@ -402,6 +402,7 @@ class BuyV2ProductView extends StatelessWidget {
     final review = session.customerReviewFor(product.id);
     final facts = session.productFactsFor(product);
     final content = session.productContentFor(product);
+    final trust = session.marketplaceTrustFor(product);
     final variants = session.productVariantsFor(product);
     final automaticFulfilment =
         product.destination == BuyV2Destination.shop ||
@@ -542,11 +543,18 @@ class BuyV2ProductView extends StatelessWidget {
                   children: [
                     _ProductTrustPill(
                       icon: Icons.star_rounded,
-                      label: review == null
-                          ? 'Be the first to review'
-                          : '${review.rating}.0 · Your review',
+                      label: trust.productRating == null
+                          ? 'No verified ratings yet'
+                          : '${trust.productRating!.toStringAsFixed(1)} · '
+                                '${trust.productRatingCount ?? 0} ratings',
                       color: BuyV2Colors.orange,
                     ),
+                    if (review != null)
+                      _ProductTrustPill(
+                        icon: Icons.rate_review_outlined,
+                        label: '${review.rating}.0 · Your review',
+                        color: BuyV2Colors.navy,
+                      ),
                     if (!automaticFulfilment)
                       const _ProductTrustPill(
                         icon: Icons.schedule_rounded,
@@ -729,6 +737,12 @@ class BuyV2ProductView extends StatelessWidget {
                 session: session,
                 product: product,
                 content: content,
+              ),
+              const SizedBox(height: 10),
+              _MarketplaceTrustPanel(
+                session: session,
+                product: product,
+                trust: trust,
               ),
               const SizedBox(height: 10),
               _ProductReviewsPanel(
@@ -3097,6 +3111,121 @@ class _ProductTrustPill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MarketplaceTrustPanel extends StatelessWidget {
+  const _MarketplaceTrustPanel({
+    required this.session,
+    required this.product,
+    required this.trust,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final BuyV2MarketplaceTrustSnapshot trust;
+
+  @override
+  Widget build(BuildContext context) {
+    if (trust.state != BuyV2MarketplaceTrustState.ready) {
+      final loading = trust.state == BuyV2MarketplaceTrustState.loading;
+      return Container(
+        key: ValueKey(
+          'buy-marketplace-trust-${trust.state.name}-${product.id}',
+        ),
+        padding: const EdgeInsets.all(12),
+        decoration: buyV2CardDecoration(
+          color: loading ? BuyV2Colors.softBlue : BuyV2Colors.softOrange,
+          radius: 15,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              loading ? 'Loading ratings and seller' : 'Ratings unavailable',
+              style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              trust.customerMessage ??
+                  'Ratings and seller performance are unavailable right now.',
+              style: context.buyMeta,
+            ),
+            if (!loading) ...[
+              const SizedBox(height: 9),
+              OutlinedButton.icon(
+                key: ValueKey('buy-marketplace-trust-retry-${product.id}'),
+                onPressed: () => session.refreshMarketplaceTrust(product.id),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Try again'),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    final productRating = trust.productRating;
+    final partnerRating = trust.partnerRating;
+    return _DecisionPanel(
+      key: ValueKey('buy-marketplace-trust-ready-${product.id}'),
+      title: 'Ratings and seller',
+      children: [
+        _DecisionRow(
+          icon: Icons.star_rounded,
+          label: 'Customer rating',
+          value: productRating == null
+              ? 'No verified ratings yet'
+              : '${productRating.toStringAsFixed(1)} from '
+                    '${trust.productRatingCount ?? 0} ratings',
+          valueColor: productRating == null
+              ? BuyV2Colors.muted
+              : BuyV2Colors.green,
+        ),
+        if (trust.verifiedBuyerRatingCount case final count?)
+          _DecisionRow(
+            icon: Icons.verified_outlined,
+            label: 'Verified buyer ratings',
+            value: '$count',
+          ),
+        _DecisionRow(
+          icon: Icons.storefront_outlined,
+          label: trust.partnerType,
+          value: trust.partnerName,
+        ),
+        if (partnerRating case final rating?)
+          _DecisionRow(
+            icon: Icons.workspace_premium_outlined,
+            label: 'Seller rating',
+            value: rating.toStringAsFixed(1),
+            valueColor: BuyV2Colors.green,
+          ),
+        if (trust.partnerLocation case final location?)
+          _DecisionRow(
+            icon: Icons.location_on_outlined,
+            label: 'Seller location',
+            value: location,
+          ),
+        if (trust.partnerOrderCount case final orderCount?)
+          _DecisionRow(
+            icon: Icons.inventory_2_outlined,
+            label: 'Orders fulfilled',
+            value: '$orderCount',
+          ),
+        if (trust.serviceReliabilityLabel case final reliability?)
+          _DecisionRow(
+            icon: Icons.local_shipping_outlined,
+            label: 'Fulfilment record',
+            value: reliability,
+          ),
+        if (trust.returnSummary case final returnSummary?)
+          _DecisionRow(
+            icon: Icons.assignment_return_outlined,
+            label: 'Return or replacement',
+            value: returnSummary,
+          ),
+      ],
     );
   }
 }

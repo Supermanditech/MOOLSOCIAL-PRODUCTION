@@ -315,6 +315,8 @@ class BuyV2Session extends ChangeNotifier {
     required this.core,
     this.productFactsAdapter = const BuyV2CatalogueProductFactsAdapter(),
     this.productContentAdapter = const BuyV2CatalogueProductContentAdapter(),
+    this.marketplaceTrustAdapter =
+        const BuyV2CatalogueMarketplaceTrustAdapter(),
     this.sponsoredContentAdapter = const BuyV2DisabledSponsoredContentAdapter(),
     BuyV2CartBenefitsAdapter? cartBenefitsAdapter,
     this.tipPolicy = const BuyV2DisabledTipPolicy(),
@@ -374,6 +376,7 @@ class BuyV2Session extends ChangeNotifier {
   final BuySession core;
   final BuyV2ProductFactsAdapter productFactsAdapter;
   final BuyV2ProductContentAdapter productContentAdapter;
+  final BuyV2MarketplaceTrustAdapter marketplaceTrustAdapter;
   final BuyV2SponsoredContentAdapter sponsoredContentAdapter;
   final BuyV2CartBenefitsAdapter cartBenefitsAdapter;
   final BuyV2TipPolicy tipPolicy;
@@ -392,6 +395,8 @@ class BuyV2Session extends ChangeNotifier {
       BuyV2CatalogueProductFactsAdapter();
   static const BuyV2CatalogueProductContentAdapter _catalogueContentFallback =
       BuyV2CatalogueProductContentAdapter();
+  static const BuyV2CatalogueMarketplaceTrustAdapter _catalogueTrustFallback =
+      BuyV2CatalogueMarketplaceTrustAdapter();
 
   static const Set<String> paymentMethods = {
     'UPI',
@@ -607,6 +612,7 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, BuyV2CartLine> _cart = {};
   final Map<String, BuyV2ProductFactsSnapshot> _productFacts = {};
   final Map<String, BuyV2ProductContentSnapshot> _productContent = {};
+  final Map<String, BuyV2MarketplaceTrustSnapshot> _marketplaceTrust = {};
   final Map<String, int> _prescriptionApprovedQuantities = {};
   final Map<String, BuyV2CustomerReview> _customerReviews = {};
   final Map<String, String> _reportedProductReasons = {};
@@ -3157,6 +3163,78 @@ class BuyV2Session extends ChangeNotifier {
     }
     if ((snapshot.state == BuyV2ProductContentState.offline ||
             snapshot.state == BuyV2ProductContentState.unavailable) &&
+        snapshot.customerMessage?.trim().isNotEmpty != true) {
+      return false;
+    }
+    return true;
+  }
+
+  BuyV2MarketplaceTrustSnapshot marketplaceTrustFor(BuyV2Product product) {
+    return _marketplaceTrust.putIfAbsent(product.id, () {
+      final next = marketplaceTrustAdapter.snapshotFor(product);
+      return _validMarketplaceTrust(product, next)
+          ? next
+          : _catalogueTrustFallback.snapshotFor(product);
+    });
+  }
+
+  bool refreshMarketplaceTrust(String productId) {
+    final product = findProduct(productId);
+    if (product == null) {
+      notice = 'This product could not be found.';
+      notifyListeners();
+      return false;
+    }
+    final next = marketplaceTrustAdapter.snapshotFor(product);
+    if (!_validMarketplaceTrust(product, next)) {
+      notice = 'Ratings and seller details could not be refreshed.';
+      notifyListeners();
+      return false;
+    }
+    final previous = _marketplaceTrust[product.id];
+    _marketplaceTrust[product.id] = next;
+    if (!identical(previous, next)) notifyListeners();
+    return true;
+  }
+
+  bool _validMarketplaceTrust(
+    BuyV2Product product,
+    BuyV2MarketplaceTrustSnapshot snapshot,
+  ) {
+    final facts = productFactsFor(product);
+    if (snapshot.productId != product.id ||
+        snapshot.sourceId.trim().isEmpty ||
+        snapshot.partnerName.trim().isEmpty ||
+        snapshot.partnerName != facts.partner ||
+        snapshot.partnerType.trim().isEmpty) {
+      return false;
+    }
+    bool validRating(double? rating) =>
+        rating == null || (rating >= 1 && rating <= 5);
+    if (!validRating(snapshot.productRating) ||
+        !validRating(snapshot.partnerRating) ||
+        (snapshot.productRatingCount != null &&
+            snapshot.productRatingCount! < 0) ||
+        (snapshot.verifiedBuyerRatingCount != null &&
+            snapshot.verifiedBuyerRatingCount! < 0) ||
+        (snapshot.productRatingCount != null &&
+            snapshot.verifiedBuyerRatingCount != null &&
+            snapshot.verifiedBuyerRatingCount! >
+                snapshot.productRatingCount!) ||
+        (snapshot.partnerOrderCount != null &&
+            snapshot.partnerOrderCount! < 0)) {
+      return false;
+    }
+    if ([
+      snapshot.partnerLocation,
+      snapshot.serviceReliabilityLabel,
+      snapshot.returnSummary,
+      snapshot.customerMessage,
+    ].whereType<String>().any((value) => value.trim().isEmpty)) {
+      return false;
+    }
+    if ((snapshot.state == BuyV2MarketplaceTrustState.offline ||
+            snapshot.state == BuyV2MarketplaceTrustState.unavailable) &&
         snapshot.customerMessage?.trim().isNotEmpty != true) {
       return false;
     }

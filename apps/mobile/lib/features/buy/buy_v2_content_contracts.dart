@@ -212,6 +212,49 @@ abstract interface class BuyV2ProductContentAdapter {
   BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product);
 }
 
+enum BuyV2MarketplaceTrustState { ready, loading, offline, unavailable }
+
+@immutable
+class BuyV2MarketplaceTrustSnapshot {
+  const BuyV2MarketplaceTrustSnapshot({
+    required this.productId,
+    required this.state,
+    required this.sourceId,
+    required this.partnerName,
+    required this.partnerType,
+    this.productRating,
+    this.productRatingCount,
+    this.verifiedBuyerRatingCount,
+    this.partnerRating,
+    this.partnerOrderCount,
+    this.partnerLocation,
+    this.serviceReliabilityLabel,
+    this.returnSummary,
+    this.customerMessage,
+    this.observedAt,
+  });
+
+  final String productId;
+  final BuyV2MarketplaceTrustState state;
+  final String sourceId;
+  final String partnerName;
+  final String partnerType;
+  final double? productRating;
+  final int? productRatingCount;
+  final int? verifiedBuyerRatingCount;
+  final double? partnerRating;
+  final int? partnerOrderCount;
+  final String? partnerLocation;
+  final String? serviceReliabilityLabel;
+  final String? returnSummary;
+  final String? customerMessage;
+  final DateTime? observedAt;
+}
+
+abstract interface class BuyV2MarketplaceTrustAdapter {
+  BuyV2MarketplaceTrustSnapshot snapshotFor(BuyV2Product product);
+}
+
 enum BuyV2CommerceLoadState { loading, ready, offline, unavailable }
 
 enum BuyV2BusinessVerificationState { verified, pending, rejected, unavailable }
@@ -698,6 +741,23 @@ final class BuyV2CatalogueProductContentAdapter
           '${product.pack} at ${product.unitPrice}.',
     );
   }
+}
+
+final class BuyV2CatalogueMarketplaceTrustAdapter
+    implements BuyV2MarketplaceTrustAdapter {
+  const BuyV2CatalogueMarketplaceTrustAdapter();
+
+  @override
+  BuyV2MarketplaceTrustSnapshot snapshotFor(BuyV2Product product) =>
+      BuyV2MarketplaceTrustSnapshot(
+        productId: product.id,
+        state: BuyV2MarketplaceTrustState.ready,
+        sourceId: 'approved-buy-catalogue',
+        partnerName: product.seller,
+        partnerType: product.partnerRole,
+        partnerLocation: product.origin,
+        returnSummary: product.returnPolicy,
+      );
 }
 
 enum BuyV2SponsoredPlacement {
