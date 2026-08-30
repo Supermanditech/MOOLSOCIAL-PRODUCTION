@@ -473,6 +473,18 @@ class BuyV2Session extends ChangeNotifier {
   bool trackingAlertsBusy = false;
   String selectedPayment = 'UPI';
 
+  bool get purchaseOrderEligibleForCheckout {
+    final lines = checkoutLines;
+    return businessVerified &&
+        lines.isNotEmpty &&
+        lines.every(
+          (line) => line.product.destination == BuyV2Destination.wholesale,
+        );
+  }
+
+  static const purchaseOrderEligibilityMessage =
+      'Purchase order requires a verified business Workspace and a wholesale-only basket.';
+
   int _navigationMotionSequence = 0;
   BuyV2NavigationMotionDirection _navigationMotionDirection =
       BuyV2NavigationMotionDirection.replace;
@@ -3978,6 +3990,13 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (value == 'Purchase order' &&
+        view == BuyV2View.checkout &&
+        !purchaseOrderEligibleForCheckout) {
+      notice = purchaseOrderEligibilityMessage;
+      notifyListeners();
+      return false;
+    }
     selectedPayment = value;
     _invalidateLiveCartBenefits();
     if (_cart.isNotEmpty && liveCartBenefitsEnabled) {
@@ -4084,6 +4103,12 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> submitOrder() {
+    if (selectedPayment == 'Purchase order' &&
+        !purchaseOrderEligibleForCheckout) {
+      notice = purchaseOrderEligibilityMessage;
+      notifyListeners();
+      return Future<bool>.value(false);
+    }
     if (reviewDataEnabled && selectedPayment == 'Bank transfer') {
       return _submitOrderAsync();
     }

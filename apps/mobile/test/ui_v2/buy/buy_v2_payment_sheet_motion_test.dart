@@ -161,6 +161,57 @@ void main() {
     expect(find.byKey(const ValueKey('buy-payment-sheet-route')), findsNothing);
   });
 
+  testWidgets('retail Checkout fails closed for Purchase order', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final shopProduct = BuyV2Catalogue.products.firstWhere(
+      (product) =>
+          product.destination == BuyV2Destination.shop &&
+          !product.requiresPrescription,
+    );
+    expect(session.addProduct(shopProduct.id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(session.purchaseOrderEligibleForCheckout, isFalse);
+
+    await openSheet(tester, session);
+    expect(
+      find.text(
+        'Requires a verified business Workspace and a wholesale-only basket',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('buy-payment-Purchase order')));
+    await tester.pumpAndSettle();
+
+    expect(session.selectedPayment, 'UPI');
+    expect(session.notice, BuyV2Session.purchaseOrderEligibilityMessage);
+    expect(session.confirmedPurchaseId, isNull);
+
+    // A stale or restored client selection cannot bypass the visible guard.
+    session.selectedPayment = 'Purchase order';
+    expect(await session.submitOrder(), isFalse);
+    expect(session.notice, BuyV2Session.purchaseOrderEligibilityMessage);
+    expect(session.confirmedPurchaseId, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('wholesale-only Checkout permits Purchase order', () {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final wholesaleProduct = BuyV2Catalogue.products.firstWhere(
+      (product) => product.destination == BuyV2Destination.wholesale,
+    );
+    expect(session.addProduct(wholesaleProduct.id), isTrue);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    expect(session.openCheckout(), isTrue);
+    expect(session.purchaseOrderEligibleForCheckout, isTrue);
+    expect(session.choosePayment('Purchase order'), isTrue);
+    expect(session.selectedPayment, 'Purchase order');
+  });
+
   testWidgets('every payment method clears the OPPO navigation inset', (
     tester,
   ) async {

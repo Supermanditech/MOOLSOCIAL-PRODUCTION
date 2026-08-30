@@ -8705,7 +8705,7 @@ Future<void> showBuyV2PaymentSheet(
   final destination = session.destination;
   final view = session.view;
   final selectedPayment = session.selectedPayment;
-  final choices = const [
+  final choices = [
     (
       'UPI',
       Icons.qr_code_rounded,
@@ -8719,7 +8719,9 @@ Future<void> showBuyV2PaymentSheet(
     (
       'Purchase order',
       Icons.receipt_long_outlined,
-      'Choose for an eligible business workspace',
+      session.purchaseOrderEligibleForCheckout
+          ? 'Use your verified business Workspace for this wholesale basket'
+          : 'Requires a verified business Workspace and a wholesale-only basket',
     ),
   ].where((choice) => session.availablePaymentMethods.contains(choice.$1));
   await showModalBottomSheet<void>(
