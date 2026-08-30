@@ -942,6 +942,8 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                 sharedSession.voteOnSocialContent(item.id, intent.choiceIndex!),
           );
         }
+      case SocialProtectedAction.follow:
+        await _toggleFeedFollow(item, followed: true);
     }
   }
 
@@ -3057,7 +3059,16 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                 item: item,
                 session: session,
                 onOpenAuthor: _openAuthor,
-                onReply: () => _openComments(item),
+                onOpenPost: _openPostDetail,
+                onRelationship: (item) => unawaited(_toggleFeedFollow(item)),
+                followed: item.authorId == null
+                    ? null
+                    : session.socialAuthorProfile(item.authorId!)?.followed,
+                relationshipBusy:
+                    item.authorId != null &&
+                    (session.socialAuthorLoading(item.authorId!) ||
+                        session.socialFollowBusy(item.authorId!)),
+                onReply: () => _openPostDetail(item, focusReplies: true),
                 onShare: () => _openShare(item),
                 onAuthenticationRequired: widget.session.isAuthenticated
                     ? null
@@ -3111,26 +3122,105 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   }
 
   void _openComments(SocialPublishedItem item) {
+    _openPostDetail(item, focusReplies: true);
+  }
+
+  void _openPostDetail(SocialPublishedItem item, {bool focusReplies = false}) {
     showSocialV2Sheet(
       context,
-      title: 'Replies',
-      subtitle: 'Public replies to ${item.authorName}',
+      title: 'Post',
+      subtitle: '${item.authorHandle} · Public conversation',
       children: [
-        _SocialCommentsPanelV2(
+        _SocialPostDetailV2(
           item: item,
           session: widget.sharedSession,
           authenticated: widget.session.isAuthenticated,
-          onAuthenticationRequired: () {
+          focusReplies: focusReplies,
+          onOpenAuthor: () {
             Navigator.of(context).pop();
-            _requireFeedAuthentication(
-              item,
-              const SocialProtectedActionIntent(
-                action: SocialProtectedAction.reply,
-              ),
-            );
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _openAuthor(item);
+            });
+          },
+          onRelationship: () {
+            if (!widget.session.isAuthenticated) {
+              Navigator.of(context).pop();
+              _requireFeedAuthentication(
+                item,
+                const SocialProtectedActionIntent(
+                  action: SocialProtectedAction.follow,
+                ),
+              );
+              return;
+            }
+            unawaited(_toggleFeedFollow(item));
+          },
+          onShare: () {
+            Navigator.of(context).pop();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _openShare(item);
+            });
+          },
+          onAuthenticationRequired: (intent) {
+            Navigator.of(context).pop();
+            _requireFeedAuthentication(item, intent);
           },
         ),
       ],
+    );
+  }
+
+  Future<void> _toggleFeedFollow(
+    SocialPublishedItem item, {
+    bool? followed,
+  }) async {
+    final authorId = item.authorId;
+    if (authorId == null || authorId.isEmpty) {
+      showSocialV2Message(
+        context,
+        'That MoolSocial author is no longer available.',
+      );
+      return;
+    }
+    if (!widget.session.isAuthenticated) {
+      _requireFeedAuthentication(
+        item,
+        const SocialProtectedActionIntent(action: SocialProtectedAction.follow),
+      );
+      return;
+    }
+    var profile = widget.sharedSession.socialAuthorProfile(authorId);
+    if (profile == null) {
+      await widget.sharedSession.loadSocialAuthor(
+        authorId,
+        authenticated: true,
+      );
+      if (!mounted) return;
+      profile = widget.sharedSession.socialAuthorProfile(authorId);
+    }
+    if (profile == null) {
+      showSocialV2Message(
+        context,
+        widget.sharedSession.socialAuthorError(authorId) ??
+            'Follow is unavailable right now. Nothing changed.',
+      );
+      return;
+    }
+    if (profile.isSelf) {
+      showSocialV2Message(context, 'This is your MoolSocial profile.');
+      return;
+    }
+    final nextFollowed = followed ?? !profile.followed;
+    if (profile.followed == nextFollowed) return;
+    final completed = await widget.sharedSession.setSocialFollow(
+      authorId,
+      nextFollowed,
+    );
+    if (!mounted || completed) return;
+    showSocialV2Message(
+      context,
+      widget.sharedSession.socialAuthorError(authorId) ??
+          'Follow could not be updated. Nothing changed.',
     );
   }
 
@@ -6866,6 +6956,112 @@ class _VideoChannelIdentity extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SocialPostDetailV2 extends StatefulWidget {
+  const _SocialPostDetailV2({
+    required this.item,
+    required this.session,
+    required this.authenticated,
+    required this.focusReplies,
+    required this.onOpenAuthor,
+    required this.onRelationship,
+    required this.onShare,
+    required this.onAuthenticationRequired,
+  });
+
+  final SocialPublishedItem item;
+  final SharedSession session;
+  final bool authenticated;
+  final bool focusReplies;
+  final VoidCallback onOpenAuthor;
+  final VoidCallback onRelationship;
+  final VoidCallback onShare;
+  final ValueChanged<SocialProtectedActionIntent> onAuthenticationRequired;
+
+  @override
+  State<_SocialPostDetailV2> createState() => _SocialPostDetailV2State();
+}
+
+class _SocialPostDetailV2State extends State<_SocialPostDetailV2> {
+  final GlobalKey _repliesKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.focusReplies) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showReplies());
+    }
+  }
+
+  void _showReplies() {
+    final repliesContext = _repliesKey.currentContext;
+    if (!mounted || repliesContext == null) return;
+    unawaited(
+      Scrollable.ensureVisible(
+        repliesContext,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        alignment: .08,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.session,
+    builder: (context, _) {
+      final liveItem = widget.session.socialPublishedItems
+          .where((candidate) => candidate.id == widget.item.id)
+          .firstOrNull;
+      final item = liveItem ?? widget.item;
+      final authorId = item.authorId;
+      return Column(
+        key: Key('social-post-detail-${item.id}'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SocialPublishedContentCardV2(
+            item: item,
+            session: widget.session,
+            onOpenAuthor: (_) => widget.onOpenAuthor(),
+            onRelationship: (_) => widget.onRelationship(),
+            followed: authorId == null
+                ? null
+                : widget.session.socialAuthorProfile(authorId)?.followed,
+            relationshipBusy:
+                authorId != null &&
+                (widget.session.socialAuthorLoading(authorId) ||
+                    widget.session.socialFollowBusy(authorId)),
+            onReply: _showReplies,
+            onShare: widget.onShare,
+            onAuthenticationRequired: widget.onAuthenticationRequired,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Conversation',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: SocialV2Colors.navy,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          KeyedSubtree(
+            key: _repliesKey,
+            child: _SocialCommentsPanelV2(
+              item: item,
+              session: widget.session,
+              authenticated: widget.authenticated,
+              onAuthenticationRequired: () => widget.onAuthenticationRequired(
+                const SocialProtectedActionIntent(
+                  action: SocialProtectedAction.reply,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 class _SocialAuthorPanelV2 extends StatefulWidget {

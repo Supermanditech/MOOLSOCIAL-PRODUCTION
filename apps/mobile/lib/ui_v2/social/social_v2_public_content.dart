@@ -7,7 +7,7 @@ import '../../features/shared/shared_models.dart';
 import '../../features/shared/shared_session.dart';
 import 'social_v2_design.dart';
 
-enum SocialProtectedAction { like, reply, repost, save, vote }
+enum SocialProtectedAction { like, reply, repost, save, vote, follow }
 
 @immutable
 class SocialProtectedActionIntent {
@@ -59,6 +59,10 @@ class SocialPublishedContentCardV2 extends StatelessWidget {
     required this.session,
     required this.onReply,
     required this.onShare,
+    this.onOpenPost,
+    this.onRelationship,
+    this.followed,
+    this.relationshipBusy = false,
     this.onMessageAuthor,
     this.onOpenAuthor,
     this.onAuthenticationRequired,
@@ -69,6 +73,10 @@ class SocialPublishedContentCardV2 extends StatelessWidget {
   final SharedSession session;
   final VoidCallback onReply;
   final VoidCallback onShare;
+  final ValueChanged<SocialPublishedItem>? onOpenPost;
+  final ValueChanged<SocialPublishedItem>? onRelationship;
+  final bool? followed;
+  final bool relationshipBusy;
   final ValueChanged<SocialPublishedItem>? onMessageAuthor;
   final ValueChanged<SocialPublishedItem>? onOpenAuthor;
   final ValueChanged<SocialProtectedActionIntent>? onAuthenticationRequired;
@@ -87,18 +95,31 @@ class SocialPublishedContentCardV2 extends StatelessWidget {
             onMessage: onMessageAuthor == null
                 ? null
                 : () => onMessageAuthor!(item),
+            onRelationship: onRelationship == null
+                ? null
+                : () => onRelationship!(item),
+            followed: followed,
+            relationshipBusy: relationshipBusy,
           ),
           if (item.body.isNotEmpty &&
               item.type != SocialPublishedContentType.reel)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
-              child: Text(
-                item.body,
-                style: const TextStyle(
-                  color: SocialV2Colors.ink,
-                  fontSize: 14,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
+            Semantics(
+              button: onOpenPost != null,
+              label: 'Open post from ${item.authorName}',
+              child: InkWell(
+                key: Key('social-open-post-${item.id}'),
+                onTap: onOpenPost == null ? null : () => onOpenPost!(item),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
+                  child: Text(
+                    item.body,
+                    style: const TextStyle(
+                      color: SocialV2Colors.ink,
+                      fontSize: 14,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -532,11 +553,21 @@ class _SocialMediaUnavailable extends StatelessWidget {
 }
 
 class _PublicAuthorLine extends StatelessWidget {
-  const _PublicAuthorLine({required this.item, this.onOpen, this.onMessage});
+  const _PublicAuthorLine({
+    required this.item,
+    this.onOpen,
+    this.onMessage,
+    this.onRelationship,
+    this.followed,
+    this.relationshipBusy = false,
+  });
 
   final SocialPublishedItem item;
   final VoidCallback? onOpen;
   final VoidCallback? onMessage;
+  final VoidCallback? onRelationship;
+  final bool? followed;
+  final bool relationshipBusy;
 
   @override
   Widget build(BuildContext context) {
@@ -601,6 +632,28 @@ class _PublicAuthorLine extends StatelessWidget {
               ),
             ),
           ),
+          if (item.authorId != null && onRelationship != null)
+            TextButton(
+              key: Key('social-author-relationship-${item.id}'),
+              onPressed: relationshipBusy ? null : onRelationship,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(58, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: Text(
+                relationshipBusy
+                    ? 'Updating'
+                    : followed == true
+                    ? 'Following'
+                    : 'Follow',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
           if (item.authorId != null &&
               onMessage != null &&
               compactMessageAction)
@@ -1001,7 +1054,8 @@ class _PublicActionRow extends StatelessWidget {
               icon: item.liked
                   ? Icons.favorite_rounded
                   : Icons.favorite_border_rounded,
-              label: item.likeCount == 0 ? 'Like' : '${item.likeCount}',
+              label: item.liked ? 'Liked' : 'Like',
+              value: _socialCompactCount(item.likeCount),
               color: color,
               onTap: interactionBusy
                   ? null
@@ -1018,7 +1072,8 @@ class _PublicActionRow extends StatelessWidget {
             child: _PublicIconAction(
               key: Key('social-public-reply-${item.id}'),
               icon: Icons.chat_bubble_outline_rounded,
-              label: item.replyCount == 0 ? 'Reply' : '${item.replyCount}',
+              label: 'Comment',
+              value: _socialCompactCount(item.replyCount),
               color: color,
               onTap: onReply,
             ),
@@ -1027,11 +1082,8 @@ class _PublicActionRow extends StatelessWidget {
             child: _PublicIconAction(
               key: Key('social-public-repost-${item.id}'),
               icon: Icons.repeat_rounded,
-              label: item.reposted
-                  ? 'Undo'
-                  : item.repostCount == 0
-                  ? 'Repost'
-                  : '${item.repostCount}',
+              label: item.reposted ? 'Undo' : 'Repost',
+              value: _socialCompactCount(item.repostCount),
               color: color,
               onTap: interactionBusy
                   ? null
@@ -1048,7 +1100,8 @@ class _PublicActionRow extends StatelessWidget {
             child: _PublicIconAction(
               key: Key('social-public-share-${item.id}'),
               icon: Icons.share_outlined,
-              label: item.shareCount == 0 ? 'Share' : '${item.shareCount}',
+              label: 'Share',
+              value: _socialCompactCount(item.shareCount),
               color: color,
               onTap: onShare,
             ),
@@ -1084,11 +1137,13 @@ class _PublicIconAction extends StatelessWidget {
     required this.label,
     required this.color,
     required this.onTap,
+    this.value,
     super.key,
   });
 
   final IconData icon;
   final String label;
+  final String? value;
   final Color color;
   final VoidCallback? onTap;
 
@@ -1097,12 +1152,12 @@ class _PublicIconAction extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: onTap != null,
-      label: label,
+      label: value == null ? label : '$label, $value',
       child: InkResponse(
         onTap: onTap,
         radius: 24,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 54),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -1122,12 +1177,37 @@ class _PublicIconAction extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              if (value != null)
+                Text(
+                  value!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: onTap == null
+                        ? color.withValues(alpha: 0.45)
+                        : color.withValues(alpha: 0.72),
+                    fontSize: 8,
+                    height: 1.05,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+String? _socialCompactCount(int count) {
+  if (count <= 0) return null;
+  if (count < 1000) return '$count';
+  if (count < 1000000) {
+    final value = count / 1000;
+    return '${value >= 10 ? value.toStringAsFixed(0) : value.toStringAsFixed(1)}K';
+  }
+  final value = count / 1000000;
+  return '${value >= 10 ? value.toStringAsFixed(0) : value.toStringAsFixed(1)}M';
 }
 
 String _initials(String value) {

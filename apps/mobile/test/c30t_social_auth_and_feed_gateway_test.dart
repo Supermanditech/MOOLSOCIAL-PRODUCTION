@@ -94,6 +94,12 @@ void main() {
         find.byKey(const Key('social-message-author-UI-REVIEW-FEED-001')),
         findsNothing,
       );
+      expect(
+        find.byKey(const Key('social-author-relationship-UI-REVIEW-FEED-001')),
+        findsOneWidget,
+      );
+      expect(find.text('Like'), findsWidgets);
+      expect(find.text('Comment'), findsWidgets);
 
       await tester.tap(find.byKey(const Key('screen04-feed-mode-following')));
       await tester.pumpAndSettle();
@@ -101,6 +107,21 @@ void main() {
       expect(find.text('Asha Verma'), findsNothing);
 
       await tester.tap(find.byKey(const Key('screen04-feed-mode-forYou')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('social-open-post-UI-REVIEW-FEED-001')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('social-post-detail-UI-REVIEW-FEED-001')),
+        findsOneWidget,
+      );
+      expect(find.text('Conversation'), findsOneWidget);
+      expect(
+        find.byKey(const Key('social-comments-panel-UI-REVIEW-FEED-001')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byTooltip('Close'));
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const Key('social-author-profile-UI-REVIEW-FEED-001')),
@@ -497,6 +518,19 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(
+        find.byKey(Key('social-author-relationship-${item.id}')),
+      );
+      await tester.pump();
+      expect(journey.stage, JourneyStage.signIn);
+      expect(
+        journey.returnTo,
+        '/app/social?sub=feed&item=${item.id}&action=follow',
+      );
+      expect(shared.socialAuthorProfile(item.authorId!), isNull);
+      journey.cancelSignIn();
+      await tester.pumpAndSettle();
+
       await tester.tap(find.byKey(Key('social-author-profile-${item.id}')));
       await tester.pumpAndSettle();
       expect(journey.stage, JourneyStage.ready);
@@ -580,19 +614,84 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(Key('social-author-profile-${item.id}')));
-      await tester.pumpAndSettle();
-      final follow = find.byKey(Key('social-author-follow-${item.authorId}'));
-      await tester.ensureVisible(follow);
-      await tester.tap(follow);
+      final relationship = find.byKey(
+        Key('social-author-relationship-${item.id}'),
+      );
+      await tester.tap(relationship);
       await tester.pumpAndSettle();
 
       expect(shared.socialAuthorProfile(item.authorId!)?.followed, isTrue);
-      expect(find.text('Unfollow'), findsOneWidget);
-      await tester.tap(follow);
+      expect(
+        find.descendant(of: relationship, matching: find.text('Following')),
+        findsOneWidget,
+      );
+      await tester.tap(relationship);
       await tester.pumpAndSettle();
       expect(shared.socialAuthorProfile(item.authorId!)?.followed, isFalse);
-      expect(find.text('Follow'), findsOneWidget);
+      expect(find.text('Follow'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'C30T restored Follow intent never unfollows an existing relationship',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final journey = JourneySession(
+        store: MemoryJourneyStore(snapshot: readySnapshot),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+      );
+      final creator = CreatorSession();
+      final retailer = RetailerSession();
+      final socialGateway = ReviewSocialContentGateway();
+      final shared = SharedSession(socialContentGateway: socialGateway);
+      addTearDown(journey.dispose);
+      addTearDown(creator.dispose);
+      addTearDown(retailer.dispose);
+      addTearDown(shared.dispose);
+      final item = await socialGateway.publish(
+        const SocialPublishDraft(
+          idempotencyKey: 'restored-follow-already-complete',
+          type: SocialPublishedContentType.post,
+          authorName: 'Riya Sharma',
+          authorHandle: '@riyasharma',
+          body: 'Keep this existing follow relationship.',
+          audience: 'Public',
+          mediaPaths: <String>[],
+          mediaAreAssets: false,
+          choices: <SocialPublishedChoice>[],
+        ),
+      );
+      await socialGateway.follow(authorId: item.authorId!, followed: true);
+      await journey.start();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SocialUniversalV2(
+            session: journey,
+            creatorSession: creator,
+            retailerSession: retailer,
+            sharedSession: shared,
+            initialSubAction: 'feed',
+            initialItem: item.id,
+            initialAction: 'follow',
+            youtubePublicAccessOverride: false,
+            youtubeCreatorAccessOverride: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(shared.socialAuthorProfile(item.authorId!)?.followed, isTrue);
+      expect(
+        find.descendant(
+          of: find.byKey(Key('social-author-relationship-${item.id}')),
+          matching: find.text('Following'),
+        ),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     },
   );
