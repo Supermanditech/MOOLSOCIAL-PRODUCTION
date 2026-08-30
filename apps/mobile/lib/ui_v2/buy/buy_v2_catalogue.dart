@@ -887,61 +887,145 @@ class _SearchReadyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final suggestions = session.searchSuggestions;
+    final recentSearches = session.recentSearchesFor(session.destination);
     return ColoredBox(
       color: Colors.white,
-      child: ListView.separated(
+      child: ListView(
         key: const ValueKey('buy-search-suggestion-list'),
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        itemCount: suggestions.length,
-        separatorBuilder: (_, _) =>
-            const Divider(height: 1, indent: 42, color: BuyV2Colors.line),
-        itemBuilder: (context, index) {
-          final suggestion = suggestions[index];
-          return Semantics(
-            button: true,
-            label: 'Search ${session.destination.label} for $suggestion',
-            child: InkWell(
-              key: ValueKey(
-                'buy-search-suggestion-${session.destination.name}-$index',
-              ),
-              onTap: () {
-                HapticFeedback.selectionClick();
-                session.updateQuery(suggestion);
-              },
-              child: SizedBox(
-                height: 44,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Row(
-                    children: [
-                      const SizedBox(
-                        width: 30,
-                        child: Icon(
-                          Icons.search_rounded,
-                          size: 20,
-                          color: BuyV2Colors.muted,
-                        ),
+        children: [
+          if (recentSearches.isNotEmpty)
+            SizedBox(
+              height: 44,
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.history_rounded,
+                    size: 19,
+                    color: BuyV2Colors.navy,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Recent searches',
+                      style: context.buyBody.copyWith(
+                        fontWeight: FontWeight.w900,
                       ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          suggestion,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: BuyV2Colors.ink,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  TextButton(
+                    key: const ValueKey('buy-recent-searches-clear'),
+                    onPressed: () =>
+                        session.clearRecentSearches(session.destination),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(44, 44),
+                    ),
+                    child: const Text('Clear'),
+                  ),
+                ],
+              ),
+            ),
+          for (final (index, recent) in recentSearches.indexed) ...[
+            Semantics(
+              button: true,
+              label: 'Search again for $recent',
+              child: InkWell(
+                key: ValueKey('buy-recent-search-$index'),
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  session.submitSearch(recent);
+                },
+                child: SizedBox(
+                  height: 44,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Row(
+                      children: [
+                        const SizedBox(
+                          width: 30,
+                          child: Icon(
+                            Icons.history_rounded,
+                            size: 19,
+                            color: BuyV2Colors.muted,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            recent,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: BuyV2Colors.ink,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.north_west_rounded,
+                          size: 17,
+                          color: BuyV2Colors.muted,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          );
-        },
+            const Divider(height: 1, indent: 42, color: BuyV2Colors.line),
+          ],
+          if (recentSearches.isNotEmpty && suggestions.isNotEmpty)
+            const SizedBox(height: 4),
+          for (final (index, suggestion) in suggestions.indexed) ...[
+            Semantics(
+              button: true,
+              label: 'Search ${session.destination.label} for $suggestion',
+              child: InkWell(
+                key: ValueKey(
+                  'buy-search-suggestion-${session.destination.name}-$index',
+                ),
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  session.submitSearch(suggestion);
+                },
+                child: SizedBox(
+                  height: 44,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Row(
+                      children: [
+                        const SizedBox(
+                          width: 30,
+                          child: Icon(
+                            Icons.search_rounded,
+                            size: 20,
+                            color: BuyV2Colors.muted,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            suggestion,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: BuyV2Colors.ink,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (index != suggestions.length - 1)
+              const Divider(height: 1, indent: 42, color: BuyV2Colors.line),
+          ],
+        ],
       ),
     );
   }

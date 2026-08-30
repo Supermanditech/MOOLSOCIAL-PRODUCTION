@@ -1070,7 +1070,8 @@ class _BuySearchBand extends StatelessWidget {
                                 vertical: 10,
                               ),
                             ),
-                            onSubmitted: (_) {
+                            onSubmitted: (value) {
+                              session.submitSearch(value);
                               FocusScope.of(context).unfocus();
                             },
                           )
@@ -1161,6 +1162,9 @@ class _BuySearchBand extends StatelessWidget {
                         key: const ValueKey('buy-search-close'),
                         tooltip: 'Finish search',
                         onPressed: () {
+                          if (controller.text.trim().isNotEmpty) {
+                            session.submitSearch(controller.text);
+                          }
                           FocusScope.of(context).unfocus();
                           onOpenChanged(false);
                         },

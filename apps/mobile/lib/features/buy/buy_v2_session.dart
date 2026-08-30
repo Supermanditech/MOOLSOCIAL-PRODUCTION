@@ -659,6 +659,7 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, int> _tipsByFulfilmentKey = {};
   final Set<String> _savedKeys = {};
   final List<String> _recentlyViewedProductIds = [];
+  final Map<BuyV2Destination, List<String>> _recentSearches = {};
   String? _savedProductsOwnerScope;
   int _savedProductsMutationRevision = 0;
   String? _customerStateOwnerScope;
@@ -1510,6 +1511,38 @@ class BuyV2Session extends ChangeNotifier {
     return List.unmodifiable(suggestions);
   }
 
+  List<String> recentSearchesFor(BuyV2Destination value) =>
+      List.unmodifiable(_recentSearches[value] ?? const <String>[]);
+
+  bool submitSearch(String value) {
+    final clean = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    query = clean;
+    if (clean.length < 2 || clean.length > 80) {
+      notifyListeners();
+      return false;
+    }
+    _recordRecentSearch(destination, clean);
+    _persistCustomerState();
+    notifyListeners();
+    return true;
+  }
+
+  void clearRecentSearches(BuyV2Destination value) {
+    if (_recentSearches.remove(value) == null) return;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void _recordRecentSearch(BuyV2Destination value, String clean) {
+    if (value == BuyV2Destination.medicine) return;
+    final values = _recentSearches.putIfAbsent(value, () => <String>[]);
+    values.removeWhere(
+      (candidate) => candidate.toLowerCase() == clean.toLowerCase(),
+    );
+    values.insert(0, clean);
+    if (values.length > 6) values.removeRange(6, values.length);
+  }
+
   List<BuyV2Product> savedProductsFor(BuyV2Destination value) {
     final destination = value == BuyV2Destination.orders
         ? BuyV2Destination.shop
@@ -1709,6 +1742,24 @@ class BuyV2Session extends ChangeNotifier {
               .toSet()
               .take(10),
         );
+      _recentSearches.clear();
+      for (final entry in snapshot.recentSearches.entries) {
+        if (entry.key != BuyV2Destination.shop &&
+            entry.key != BuyV2Destination.wholesale &&
+            entry.key != BuyV2Destination.orders) {
+          continue;
+        }
+        final seen = <String>{};
+        final values = <String>[];
+        for (final value in entry.value) {
+          final clean = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+          if (clean.length < 2 || clean.length > 80) continue;
+          if (!seen.add(clean.toLowerCase())) continue;
+          values.add(clean);
+          if (values.length == 6) break;
+        }
+        if (values.isNotEmpty) _recentSearches[entry.key] = values;
+      }
       final storedSubmissionState = BuyV2CheckoutSubmissionState.values
           .where((state) => state.name == snapshot.checkoutSubmissionState)
           .firstOrNull;
@@ -1756,6 +1807,10 @@ class BuyV2Session extends ChangeNotifier {
       productSort: productSort.name,
       availableOnly: availableProductsOnly,
       recentlyViewedProductIds: List.unmodifiable(_recentlyViewedProductIds),
+      recentSearches: Map<BuyV2Destination, List<String>>.unmodifiable({
+        for (final entry in _recentSearches.entries)
+          entry.key: List<String>.unmodifiable(entry.value),
+      }),
     );
     unawaited(
       store
@@ -3566,6 +3621,11 @@ class BuyV2Session extends ChangeNotifier {
     if (view != BuyV2View.product) {
       _productReturnDestination = destination;
       _productReturnView = view;
+    }
+    final activeSearch = query.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (view == BuyV2View.catalogue && activeSearch.length >= 2) {
+      _recordRecentSearch(destination, activeSearch);
+      _persistCustomerState();
     }
     destination = item.destination;
     selectedProductId = item.id;
