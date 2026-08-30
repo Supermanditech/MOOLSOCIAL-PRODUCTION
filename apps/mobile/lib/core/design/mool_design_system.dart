@@ -418,6 +418,9 @@ abstract final class MoolLocalNavigationTokens {
   static const FontWeight destinationSelectedLabelWeight = FontWeight.w800;
   static const double destinationSelectedIndicatorWidth = 14;
   static const double destinationSelectedIndicatorHeight = 2;
+  static const double destinationSelectedCellRadius = 14;
+  static const double destinationSelectedFillOpacity = .10;
+  static const double destinationSelectedBorderOpacity = .22;
   static const Color destinationCanvas = Color(0xF7F8F9FC);
   static const Color destinationDivider = Color(0x1F12163D);
   static const double switcherWidth = 136;
@@ -1118,6 +1121,7 @@ class MoolLocalNavigationRail extends StatelessWidget {
                       width: cellWidth,
                       height: MoolLocalNavigationTokens.destinationRailHeight,
                       child: _MoolLocalNavigationCell(
+                        familyId: familyId,
                         action: actions[index],
                         selected: activeId == actions[index].id,
                       ),
@@ -1147,10 +1151,12 @@ class MoolLocalNavigationRail extends StatelessWidget {
 
 class _MoolLocalNavigationCell extends StatefulWidget {
   const _MoolLocalNavigationCell({
+    required this.familyId,
     required this.action,
     required this.selected,
   });
 
+  final String familyId;
   final MoolLocalNavigationAction action;
   final bool selected;
 
@@ -1166,7 +1172,10 @@ class _MoolLocalNavigationCellState extends State<_MoolLocalNavigationCell> {
   Widget build(BuildContext context) {
     final action = widget.action;
     final selected = widget.selected;
-    final foreground = selected ? MoolColors.navy : MoolColors.muted;
+    final accent = MoolLocalNavigationTokens.navigationAccentForFamily(
+      widget.familyId,
+    );
+    final foreground = selected ? accent : MoolColors.muted;
     return Semantics(
       container: true,
       selected: selected,
@@ -1191,16 +1200,48 @@ class _MoolLocalNavigationCellState extends State<_MoolLocalNavigationCell> {
               MoolLocalNavigationTokens.pressDuration,
             ),
             curve: MoolMotion.change,
-            child: SizedBox.expand(
+            child: AnimatedContainer(
               key: ValueKey('moolsocial-local-${action.id}-selection'),
+              duration: MoolMotion.accessible(
+                context,
+                MoolLocalNavigationTokens.stateDuration,
+              ),
+              curve: MoolMotion.change,
+              decoration: BoxDecoration(
+                color: selected
+                    ? accent.withValues(
+                        alpha: MoolLocalNavigationTokens
+                            .destinationSelectedFillOpacity,
+                      )
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(
+                  MoolLocalNavigationTokens.destinationSelectedCellRadius,
+                ),
+              ),
+              foregroundDecoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(
+                  MoolLocalNavigationTokens.destinationSelectedCellRadius,
+                ),
+                border: Border.all(
+                  color: selected
+                      ? accent.withValues(
+                          alpha: MoolLocalNavigationTokens
+                              .destinationSelectedBorderOpacity,
+                        )
+                      : Colors.transparent,
+                ),
+              ),
               child: InkWell(
                 key: Key(action.keyName),
                 onTap: action.onPressed,
                 onHighlightChanged: action.onPressed == null
                     ? null
                     : (value) => setState(() => _pressed = value),
-                splashColor: MoolColors.navy.withValues(alpha: .06),
-                highlightColor: MoolColors.navy.withValues(alpha: .035),
+                borderRadius: BorderRadius.circular(
+                  MoolLocalNavigationTokens.destinationSelectedCellRadius,
+                ),
+                splashColor: accent.withValues(alpha: .08),
+                highlightColor: accent.withValues(alpha: .045),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -1234,7 +1275,7 @@ class _MoolLocalNavigationCellState extends State<_MoolLocalNavigationCell> {
                         height: MoolLocalNavigationTokens
                             .destinationSelectedIndicatorHeight,
                         decoration: BoxDecoration(
-                          color: MoolColors.navy,
+                          color: accent,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -1322,15 +1363,11 @@ class MoolOutcomeDock extends StatelessWidget {
                                           width:
                                               MoolLocalNavigationTokens.itemGap,
                                         ),
-                                      Flexible(
-                                        child: SizedBox(
-                                          width: MoolLocalNavigationTokens
-                                              .capsuleWidth,
-                                          child: _MoolMiddleDockAction(
-                                            action: actions[index],
-                                            selected:
-                                                activeId == actions[index].id,
-                                          ),
+                                      Expanded(
+                                        child: _MoolMiddleDockAction(
+                                          action: actions[index],
+                                          selected:
+                                              activeId == actions[index].id,
                                         ),
                                       ),
                                     ],
@@ -1812,7 +1849,6 @@ class _MoolMiddleDockActionState extends State<_MoolMiddleDockAction> {
       onTap: action.onPressed,
       excludeSemantics: true,
       child: SizedBox(
-        width: MoolLocalNavigationTokens.capsuleWidth,
         height: MoolLocalNavigationTokens.controlHeight,
         child: ClipRRect(
           borderRadius: radius,
@@ -1880,8 +1916,9 @@ class _MoolMiddleDockActionState extends State<_MoolMiddleDockAction> {
                             Icon(
                               action.icon,
                               size: MoolLocalNavigationTokens.iconSize,
-                              color:
-                                  MoolLocalNavigationTokens.neutralForeground,
+                              color: selected
+                                  ? MoolColors.royal
+                                  : MoolLocalNavigationTokens.neutralForeground,
                             ),
                             const SizedBox(height: 1),
                             FittedBox(
@@ -1889,14 +1926,18 @@ class _MoolMiddleDockActionState extends State<_MoolMiddleDockAction> {
                               child: Text(
                                 action.label,
                                 maxLines: 1,
-                                style: const TextStyle(
-                                  color: MoolLocalNavigationTokens
-                                      .neutralForeground,
+                                style: TextStyle(
+                                  color: selected
+                                      ? MoolColors.royal
+                                      : MoolLocalNavigationTokens
+                                            .neutralForeground,
                                   fontSize:
                                       MoolLocalNavigationTokens.labelFontSize,
                                   height: 1.05,
-                                  fontWeight:
-                                      MoolLocalNavigationTokens.labelFontWeight,
+                                  fontWeight: selected
+                                      ? FontWeight.w900
+                                      : MoolLocalNavigationTokens
+                                            .labelFontWeight,
                                 ),
                               ),
                             ),
@@ -1956,6 +1997,29 @@ class _MoolMiddleDockActionState extends State<_MoolMiddleDockAction> {
                                     MoolLocalNavigationSurfaceTone.media,
                                   ),
                               borderRadius: BorderRadius.circular(1),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 18,
+                        right: 18,
+                        bottom: 1,
+                        height: MoolLocalNavigationTokens
+                            .destinationSelectedIndicatorHeight,
+                        child: AnimatedOpacity(
+                          key: ValueKey(
+                            'mool-action-${action.id}-selected-indicator',
+                          ),
+                          opacity: selected ? 1 : 0,
+                          duration: MoolMotion.accessible(
+                            context,
+                            MoolLocalNavigationTokens.stateDuration,
+                          ),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: MoolColors.royal,
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
                         ),

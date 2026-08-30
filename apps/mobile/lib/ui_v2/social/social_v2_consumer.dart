@@ -4041,6 +4041,7 @@ class _SocialOwnershipDock extends StatelessWidget {
                         label: 'Home',
                         selected: selected == SocialV2Tab.videos,
                         ownership: 'YouTube',
+                        selectedAccent: const Color(0xFFFF3355),
                         onTap: onHome,
                       ),
                       _SocialOwnershipDockItem(
@@ -4050,6 +4051,7 @@ class _SocialOwnershipDock extends StatelessWidget {
                         label: 'Shorts',
                         selected: selected == SocialV2Tab.shorts,
                         ownership: 'YouTube',
+                        selectedAccent: const Color(0xFFFF3355),
                         onTap: onShorts,
                       ),
                       _SocialOwnershipDockItem(
@@ -4059,6 +4061,7 @@ class _SocialOwnershipDock extends StatelessWidget {
                         label: 'Create',
                         selected: selected == SocialV2Tab.create,
                         ownership: 'Create',
+                        selectedAccent: const Color(0xFF7C5CFF),
                         prominent: true,
                         onTap: onCreate,
                       ),
@@ -4069,6 +4072,7 @@ class _SocialOwnershipDock extends StatelessWidget {
                         label: 'Feed',
                         selected: selected == SocialV2Tab.feed,
                         ownership: 'MoolSocial',
+                        selectedAccent: const Color(0xFF41C997),
                         onTap: onFeed,
                       ),
                     ],
@@ -4096,6 +4100,7 @@ class _SocialOwnershipDockItem extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.ownership,
+    required this.selectedAccent,
     required this.onTap,
     this.prominent = false,
   });
@@ -4106,6 +4111,7 @@ class _SocialOwnershipDockItem extends StatelessWidget {
   final String label;
   final bool selected;
   final String ownership;
+  final Color selectedAccent;
   final VoidCallback onTap;
   final bool prominent;
 
@@ -4125,45 +4131,82 @@ class _SocialOwnershipDockItem extends StatelessWidget {
         child: SizedBox.expand(
           child: InkWell(
             onTap: onTap,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                AnimatedContainer(
-                  duration: MoolMotion.accessible(
-                    context,
-                    MoolLocalNavigationTokens.selectionDuration,
-                  ),
-                  width: prominent ? 42 : 34,
-                  height: prominent ? 34 : 28,
-                  decoration: BoxDecoration(
-                    color: prominent
-                        ? Colors.white
-                        : selected
-                        ? const Color(0xFF272727)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(prominent ? 11 : 14),
-                    border: prominent
-                        ? Border.all(color: Colors.white, width: 2)
-                        : null,
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    selected ? selectedIcon : icon,
-                    color: prominent ? Colors.black : Colors.white,
-                    size: prominent ? 27 : 23,
-                  ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    AnimatedContainer(
+                      duration: MoolMotion.accessible(
+                        context,
+                        MoolLocalNavigationTokens.selectionDuration,
+                      ),
+                      width: prominent ? 42 : 36,
+                      height: prominent ? 34 : 30,
+                      decoration: BoxDecoration(
+                        color: prominent
+                            ? selected
+                                  ? selectedAccent
+                                  : Colors.white
+                            : selected
+                            ? selectedAccent.withValues(alpha: .30)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(
+                          prominent ? 11 : 14,
+                        ),
+                        border: Border.all(
+                          color: selected
+                              ? selectedAccent.withValues(alpha: .90)
+                              : prominent
+                              ? Colors.white
+                              : Colors.transparent,
+                          width: prominent ? 2 : 1,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        selected ? selectedIcon : icon,
+                        color: prominent && !selected
+                            ? Colors.black
+                            : Colors.white,
+                        size: prominent ? 27 : 23,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: selected || prominent
+                            ? Colors.white
+                            : Colors.white70,
+                        fontSize: 10,
+                        height: 1,
+                        fontWeight: selected
+                            ? FontWeight.w800
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: selected || prominent
-                        ? Colors.white
-                        : Colors.white70,
-                    fontSize: 10,
-                    height: 1,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                Positioned(
+                  bottom: 0,
+                  child: AnimatedScale(
+                    key: ValueKey('social-rail-$label-selected-indicator'),
+                    duration: MoolMotion.accessible(
+                      context,
+                      MoolLocalNavigationTokens.selectionDuration,
+                    ),
+                    scale: selected ? 1 : 0,
+                    child: Container(
+                      width: 16,
+                      height: 2,
+                      decoration: BoxDecoration(
+                        color: selectedAccent,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
                   ),
                 ),
               ],

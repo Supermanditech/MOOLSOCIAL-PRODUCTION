@@ -552,10 +552,17 @@ class _MoolFamilyRootButton extends StatelessWidget {
         width: fixedCellWidth,
         height: MoolLocalNavigationTokens.destinationRailHeight,
         child: Material(
-          color: Colors.transparent,
+          color: accent.withValues(alpha: .08),
+          borderRadius: BorderRadius.circular(
+            MoolLocalNavigationTokens.destinationSelectedCellRadius,
+          ),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
             key: ValueKey('moolsocial-family-root-${family.id}-tap'),
             onTap: onPressed,
+            borderRadius: BorderRadius.circular(
+              MoolLocalNavigationTokens.destinationSelectedCellRadius,
+            ),
             splashColor: accent.withValues(alpha: .08),
             highlightColor: accent.withValues(alpha: .045),
             child: MoolDestinationIconLabel(
