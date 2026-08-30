@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -92,6 +93,11 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
+    final view = View.of(context);
+    final exportedBottomClearance =
+        defaultTargetPlatform == TargetPlatform.android
+        ? view.viewPadding.bottom / view.devicePixelRatio
+        : 0.0;
     final taxInvoice = order.taxInvoiceDetails;
     final legalInvoiceRequired = order.taxInvoiceState != null;
     final legalInvoiceReady =
@@ -466,7 +472,9 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
         ),
       ),
       bottomNavigationBar: SafeArea(
+        key: const ValueKey('buy-invoice-bottom-safe-area'),
         top: false,
+        minimum: EdgeInsets.only(bottom: exportedBottomClearance),
         child: Container(
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
           decoration: const BoxDecoration(

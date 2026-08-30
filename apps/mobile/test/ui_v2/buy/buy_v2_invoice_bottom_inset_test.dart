@@ -13,9 +13,11 @@ void main() {
         tester.view.physicalSize = const Size(360, 800);
         tester.view.devicePixelRatio = 1;
         tester.view.padding = const FakeViewPadding(bottom: 24);
+        tester.view.viewPadding = const FakeViewPadding(bottom: 44);
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
         addTearDown(tester.view.resetPadding);
+        addTearDown(tester.view.resetViewPadding);
         final session = BuyV2Session(core: BuySession());
         final order = session.orders.first;
 
@@ -48,6 +50,13 @@ void main() {
         final download = find.byKey(
           ValueKey('buy-download-invoice-${order.id}'),
         );
+        expect(
+          find.byKey(const ValueKey('buy-invoice-bottom-safe-area')),
+          findsOneWidget,
+        );
+        final downloadRect = tester.getRect(download);
+        expect(downloadRect.height, greaterThanOrEqualTo(48));
+        expect(downloadRect.bottom, lessThanOrEqualTo(756));
         expect(
           tester.getBottomLeft(notice).dy,
           lessThan(tester.getTopLeft(download).dy),
