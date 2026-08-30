@@ -2503,103 +2503,109 @@ class _HouseholdBasket extends StatelessWidget {
       namesRoute: true,
       explicitChildNodes: true,
       label: 'Monthly home basket',
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _BuyV2InfoSheetHeader(
-              icon: Icons.shopping_basket_outlined,
-              title: 'Monthly home basket',
-              detail: 'A ready 30-day household plan',
-              onClose: onClose,
-            ),
-            const SizedBox(height: 14),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: BuyV2Colors.line),
+      child: SafeArea(
+        key: const ValueKey('buy-household-basket-bottom-safe-area'),
+        top: false,
+        maintainBottomViewPadding: true,
+        minimum: const EdgeInsets.only(bottom: 12),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _BuyV2InfoSheetHeader(
+                icon: Icons.shopping_basket_outlined,
+                title: 'Monthly home basket',
+                detail: 'A ready 30-day household plan',
+                onClose: onClose,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'HOUSEHOLD BASKET',
-                          style: context.buyMeta.copyWith(
-                            color: BuyV2Colors.navy,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: .7,
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: BuyV2Colors.line),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'HOUSEHOLD BASKET',
+                            style: context.buyMeta.copyWith(
+                              color: BuyV2Colors.navy,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: .7,
+                            ),
                           ),
                         ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: BuyV2Colors.softGreen,
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                        child: const Text(
-                          'Save ₹415',
-                          style: TextStyle(
-                            color: BuyV2Colors.green,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: BuyV2Colors.softGreen,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: const Text(
+                            'Save ₹415',
+                            style: TextStyle(
+                              color: BuyV2Colors.green,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _HouseholdBasketFact(
-                        icon: Icons.inventory_2_outlined,
-                        label: '12 products',
-                      ),
-                      _HouseholdBasketFact(
-                        icon: Icons.layers_outlined,
-                        label: '21 packs',
-                      ),
-                      _HouseholdBasketFact(
-                        icon: Icons.calendar_month_outlined,
-                        label: '30 days',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Review the products first, or add the existing basket to your cart.',
-                    style: context.buyMeta,
-                  ),
-                ],
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _HouseholdBasketFact(
+                          icon: Icons.inventory_2_outlined,
+                          label: '12 products',
+                        ),
+                        _HouseholdBasketFact(
+                          icon: Icons.layers_outlined,
+                          label: '21 packs',
+                        ),
+                        _HouseholdBasketFact(
+                          icon: Icons.calendar_month_outlined,
+                          label: '30 days',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Review the products first, or add the existing basket to your cart.',
+                      style: context.buyMeta,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            if (compactActions) ...[
-              SizedBox(width: double.infinity, child: seeProducts),
-              const SizedBox(height: 8),
-              SizedBox(width: double.infinity, child: addToCart),
-            ] else
-              Row(
-                children: [
-                  Expanded(child: seeProducts),
-                  const SizedBox(width: 8),
-                  Expanded(child: addToCart),
-                ],
-              ),
-          ],
+              const SizedBox(height: 14),
+              if (compactActions) ...[
+                SizedBox(width: double.infinity, child: seeProducts),
+                const SizedBox(height: 8),
+                SizedBox(width: double.infinity, child: addToCart),
+              ] else
+                Row(
+                  children: [
+                    Expanded(child: seeProducts),
+                    const SizedBox(width: 8),
+                    Expanded(child: addToCart),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );

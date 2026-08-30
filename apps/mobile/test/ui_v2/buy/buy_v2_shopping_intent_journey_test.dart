@@ -82,6 +82,38 @@ void main() {
     },
   );
 
+  testWidgets('monthly basket actions clear the OPPO bottom navigation inset', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tapVisible(tester, const ValueKey('buy-promotion-shop-basket'));
+
+    final seeProducts = find.byKey(
+      const ValueKey('buy-household-see-products'),
+    );
+    final addBasket = find.byKey(const ValueKey('buy-household-add-to-cart'));
+    expect(
+      find.byKey(const ValueKey('buy-household-basket-bottom-safe-area')),
+      findsOneWidget,
+    );
+    for (final action in [seeProducts, addBasket]) {
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      final rect = tester.getRect(action);
+      expect(rect.height, greaterThanOrEqualTo(44));
+      expect(rect.bottom, lessThanOrEqualTo(756));
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('business and home cards switch exact catalogues with intent', (
     tester,
   ) async {
