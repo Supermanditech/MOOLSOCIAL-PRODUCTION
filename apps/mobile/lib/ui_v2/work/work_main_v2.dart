@@ -307,9 +307,7 @@ class _WorkHero extends StatelessWidget {
                   icon: workspaceReady
                       ? Icons.verified_rounded
                       : Icons.add_business_outlined,
-                  label: workspaceReady
-                      ? 'Workspace verified'
-                      : 'Set up provider access',
+                  label: workspaceReady ? 'Workspace ready' : 'Provider access',
                 ),
               ),
             ],
