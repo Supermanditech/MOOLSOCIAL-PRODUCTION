@@ -4091,6 +4091,9 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
+    final modalBottomInset = media.viewInsets.bottom > 0
+        ? 12.0
+        : BuyV2AddressSheetMotion.resolveModalActionBottomInset(context);
     return AnimatedPadding(
       key: const ValueKey('buy-gst-invoice-sheet'),
       duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
@@ -4098,180 +4101,189 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
       padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
       child: SafeArea(
         top: false,
-        minimum: const EdgeInsets.only(bottom: 12),
-        child: FocusTraversalGroup(
-          policy: OrderedTraversalPolicy(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: media.size.height * .9),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: SingleChildScrollView(
-                    key: const ValueKey('buy-gst-form-scroll'),
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'GST invoice details',
-                          style: context.buyTitle.copyWith(fontSize: 20),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'These details affect the invoice only. GST applies as required.',
-                          style: context.buyMeta,
-                        ),
-                        const SizedBox(height: 12),
-                        MergeSemantics(
-                          child: Semantics(
-                            label: 'Legal name',
-                            child: FocusTraversalOrder(
-                              order: const NumericFocusOrder(1),
-                              child: TextField(
-                                key: const ValueKey('buy-gst-legal-name'),
-                                controller: _legalName,
-                                focusNode: _legalNameFocus,
-                                textInputAction: TextInputAction.next,
-                                onSubmitted: (_) => _gstinFocus.requestFocus(),
-                                decoration: const InputDecoration(
-                                  label: ExcludeSemantics(
-                                    child: Text('Legal name'),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        MergeSemantics(
-                          child: Semantics(
-                            label: 'GSTIN',
-                            child: FocusTraversalOrder(
-                              order: const NumericFocusOrder(2),
-                              child: TextField(
-                                key: const ValueKey('buy-gst-gstin'),
-                                controller: _gstin,
-                                focusNode: _gstinFocus,
-                                maxLength: 15,
-                                autocorrect: false,
-                                enableSuggestions: false,
-                                textCapitalization:
-                                    TextCapitalization.characters,
-                                textInputAction: TextInputAction.next,
-                                onSubmitted: (_) =>
-                                    _billingAddressFocus.requestFocus(),
-                                decoration: const InputDecoration(
-                                  label: ExcludeSemantics(child: Text('GSTIN')),
-                                  semanticCounterText: '15 characters maximum',
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        MergeSemantics(
-                          child: Semantics(
-                            label: 'Billing address',
-                            child: FocusTraversalOrder(
-                              order: const NumericFocusOrder(3),
-                              child: TextField(
-                                key: const ValueKey('buy-gst-billing-address'),
-                                controller: _billingAddress,
-                                focusNode: _billingAddressFocus,
-                                minLines: 2,
-                                maxLines: 3,
-                                textInputAction: TextInputAction.done,
-                                onSubmitted: (_) =>
-                                    _billingAddressFocus.unfocus(),
-                                decoration: const InputDecoration(
-                                  label: ExcludeSemantics(
-                                    child: Text('Billing address'),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (widget.controller.persistenceAvailable)
-                          FocusTraversalOrder(
-                            order: const NumericFocusOrder(4),
-                            child: SwitchListTile.adaptive(
-                              key: const ValueKey('buy-gst-remember'),
-                              contentPadding: EdgeInsets.zero,
-                              value: _remember,
-                              onChanged: widget.controller.busy
-                                  ? null
-                                  : (value) =>
-                                        setState(() => _remember = value),
-                              title: Text(
-                                widget.controller.sessionPersistenceOnly
-                                    ? 'Use again until you close the app'
-                                    : 'Remember these GST details',
-                              ),
-                              subtitle: Text(
-                                widget.controller.sessionPersistenceOnly
-                                    ? 'These details are cleared when you close the app.'
-                                    : 'Reuse them on a later invoice.',
-                              ),
-                            ),
-                          )
-                        else
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            child: Text(
-                              'These details will be used for this order only.',
-                              key: const ValueKey('buy-gst-session-only'),
-                              style: context.buyMeta,
-                            ),
-                          ),
-                        if (_error case final error?) ...[
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: modalBottomInset),
+          child: FocusTraversalGroup(
+            policy: OrderedTraversalPolicy(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: media.size.height * .9),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: SingleChildScrollView(
+                      key: const ValueKey('buy-gst-form-scroll'),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            error,
-                            key: const ValueKey('buy-gst-error'),
-                            style: const TextStyle(
-                              color: Color(0xFFB42318),
-                              fontWeight: FontWeight.w700,
+                            'GST invoice details',
+                            style: context.buyTitle.copyWith(fontSize: 20),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'These details affect the invoice only. GST applies as required.',
+                            style: context.buyMeta,
+                          ),
+                          const SizedBox(height: 12),
+                          MergeSemantics(
+                            child: Semantics(
+                              label: 'Legal name',
+                              child: FocusTraversalOrder(
+                                order: const NumericFocusOrder(1),
+                                child: TextField(
+                                  key: const ValueKey('buy-gst-legal-name'),
+                                  controller: _legalName,
+                                  focusNode: _legalNameFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onSubmitted: (_) =>
+                                      _gstinFocus.requestFocus(),
+                                  decoration: const InputDecoration(
+                                    label: ExcludeSemantics(
+                                      child: Text('Legal name'),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
+                          MergeSemantics(
+                            child: Semantics(
+                              label: 'GSTIN',
+                              child: FocusTraversalOrder(
+                                order: const NumericFocusOrder(2),
+                                child: TextField(
+                                  key: const ValueKey('buy-gst-gstin'),
+                                  controller: _gstin,
+                                  focusNode: _gstinFocus,
+                                  maxLength: 15,
+                                  autocorrect: false,
+                                  enableSuggestions: false,
+                                  textCapitalization:
+                                      TextCapitalization.characters,
+                                  textInputAction: TextInputAction.next,
+                                  onSubmitted: (_) =>
+                                      _billingAddressFocus.requestFocus(),
+                                  decoration: const InputDecoration(
+                                    label: ExcludeSemantics(
+                                      child: Text('GSTIN'),
+                                    ),
+                                    semanticCounterText:
+                                        '15 characters maximum',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          MergeSemantics(
+                            child: Semantics(
+                              label: 'Billing address',
+                              child: FocusTraversalOrder(
+                                order: const NumericFocusOrder(3),
+                                child: TextField(
+                                  key: const ValueKey(
+                                    'buy-gst-billing-address',
+                                  ),
+                                  controller: _billingAddress,
+                                  focusNode: _billingAddressFocus,
+                                  minLines: 2,
+                                  maxLines: 3,
+                                  textInputAction: TextInputAction.done,
+                                  onSubmitted: (_) =>
+                                      _billingAddressFocus.unfocus(),
+                                  decoration: const InputDecoration(
+                                    label: ExcludeSemantics(
+                                      child: Text('Billing address'),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (widget.controller.persistenceAvailable)
+                            FocusTraversalOrder(
+                              order: const NumericFocusOrder(4),
+                              child: SwitchListTile.adaptive(
+                                key: const ValueKey('buy-gst-remember'),
+                                contentPadding: EdgeInsets.zero,
+                                value: _remember,
+                                onChanged: widget.controller.busy
+                                    ? null
+                                    : (value) =>
+                                          setState(() => _remember = value),
+                                title: Text(
+                                  widget.controller.sessionPersistenceOnly
+                                      ? 'Use again until you close the app'
+                                      : 'Remember these GST details',
+                                ),
+                                subtitle: Text(
+                                  widget.controller.sessionPersistenceOnly
+                                      ? 'These details are cleared when you close the app.'
+                                      : 'Reuse them on a later invoice.',
+                                ),
+                              ),
+                            )
+                          else
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Text(
+                                'These details will be used for this order only.',
+                                key: const ValueKey('buy-gst-session-only'),
+                                style: context.buyMeta,
+                              ),
+                            ),
+                          if (_error case final error?) ...[
+                            Text(
+                              error,
+                              key: const ValueKey('buy-gst-error'),
+                              style: const TextStyle(
+                                color: Color(0xFFB42318),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
-                DecoratedBox(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border: Border(top: BorderSide(color: BuyV2Colors.line)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: FocusTraversalOrder(
-                        order: const NumericFocusOrder(5),
-                        child: FilledButton(
-                          key: const ValueKey('buy-gst-save'),
-                          onPressed: widget.controller.busy ? null : _save,
-                          child: widget.controller.busy
-                              ? const SizedBox.square(
-                                  dimension: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text('Use GST details'),
+                  DecoratedBox(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(top: BorderSide(color: BuyV2Colors.line)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: FocusTraversalOrder(
+                          order: const NumericFocusOrder(5),
+                          child: FilledButton(
+                            key: const ValueKey('buy-gst-save'),
+                            onPressed: widget.controller.busy ? null : _save,
+                            child: widget.controller.busy
+                                ? const SizedBox.square(
+                                    dimension: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('Use GST details'),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

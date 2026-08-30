@@ -85,4 +85,44 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('GST action clears OPPO navigation and semantics insets', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 44);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    final controller = BuyV2GstInvoiceController(
+      store: session.gstInvoiceProfileStore,
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: FilledButton(
+              onPressed: () => showBuyV2GstInvoiceSheet(
+                context,
+                controller: controller,
+                destination: BuyV2Destination.shop,
+              ),
+              child: const Text('Add GST details'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Add GST details'));
+    await tester.pumpAndSettle();
+
+    final action = find.byKey(const ValueKey('buy-gst-save'));
+    final rect = tester.getRect(action);
+    expect(rect.height, greaterThanOrEqualTo(44));
+    expect(rect.bottom, lessThanOrEqualTo(729));
+    expect(tester.takeException(), isNull);
+  });
 }

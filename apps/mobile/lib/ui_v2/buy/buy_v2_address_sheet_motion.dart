@@ -39,6 +39,24 @@ abstract final class BuyV2AddressSheetMotion {
     );
   }
 
+  static double resolveModalActionBottomInset(BuildContext context) {
+    final view = View.of(context);
+    final devicePixelRatio = view.devicePixelRatio;
+    final rawTopPadding = devicePixelRatio > 0
+        ? view.viewPadding.top / devicePixelRatio
+        : 0.0;
+    final rawBottomPadding = devicePixelRatio > 0
+        ? view.viewPadding.bottom / devicePixelRatio
+        : 0.0;
+    const exportedSemanticsOverflow = 58.0 - 44.0;
+    final exportedSemanticsClearance = math.max(
+      0.0,
+      rawTopPadding - exportedSemanticsOverflow,
+    );
+    return math.max(fallbackBottomSafeInset, rawBottomPadding) +
+        exportedSemanticsClearance;
+  }
+
   static AnimationStyle resolve(BuildContext context) {
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
     return AnimationStyle(
