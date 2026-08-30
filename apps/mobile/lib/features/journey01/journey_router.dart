@@ -1407,6 +1407,11 @@ GoRouter createJourneyRouter(
         ),
       ),
       GoRoute(
+        path: '/app/account/identity/name',
+        builder: (context, state) =>
+            GlobalPersonalProfileNameEditorV2(session: session),
+      ),
+      GoRoute(
         path: '/app/ask',
         builder: (context, state) => GlobalHelpSupportV2(
           session: session,

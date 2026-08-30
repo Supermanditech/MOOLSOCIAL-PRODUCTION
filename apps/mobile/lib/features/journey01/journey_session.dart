@@ -110,6 +110,7 @@ class JourneySession extends ChangeNotifier {
   CurrentAreaFailureReason? currentAreaFailureReason;
   String? phoneNumber;
   String? emailAddress;
+  String? profileDisplayName;
   OtpChannel? otpChannel;
   SocialAuthProvider? socialAuthProvider;
   SocialAuthState socialAuthState = SocialAuthState.idle;
@@ -225,6 +226,7 @@ class JourneySession extends ChangeNotifier {
         manualArea = snapshot.areaLabel;
         currentAreaLabel = snapshot.currentAreaLabel;
         homeOrWorkArea = snapshot.homeOrWorkAreaLabel;
+        profileDisplayName = snapshot.profileDisplayName;
         if (currentAreaLabel case final label?) {
           final parts = label
               .split(',')
@@ -453,6 +455,30 @@ class JourneySession extends ChangeNotifier {
     } on Object {
       languageCode = previous;
       errorMessage = 'Language could not be saved. Try again.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateProfileDisplayName(String value) async {
+    final normalized = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalized.length < 2 || normalized.length > 60) {
+      errorMessage = 'Enter a display name from 2 to 60 characters.';
+      notifyListeners();
+      return false;
+    }
+    final previous = profileDisplayName;
+    profileDisplayName = normalized;
+    errorMessage = null;
+    notifyListeners();
+    try {
+      await _persist(setupComplete: true);
+      noticeMessage = 'Display name updated.';
+      notifyListeners();
+      return true;
+    } on Object {
+      profileDisplayName = previous;
+      errorMessage = 'Display name could not be saved. Try again.';
       notifyListeners();
       return false;
     }
@@ -1594,6 +1620,7 @@ class JourneySession extends ChangeNotifier {
           areaLabel: snapshot.areaLabel,
           currentAreaLabel: snapshot.currentAreaLabel,
           homeOrWorkAreaLabel: snapshot.homeOrWorkAreaLabel,
+          profileDisplayName: snapshot.profileDisplayName,
           setupComplete: snapshot.setupComplete,
           pendingRoute: location,
           pendingAuthenticationCancelRoute:
@@ -1644,6 +1671,7 @@ class JourneySession extends ChangeNotifier {
         areaLabel: manualArea,
         currentAreaLabel: currentAreaLabel,
         homeOrWorkAreaLabel: homeOrWorkArea,
+        profileDisplayName: profileDisplayName,
         setupComplete: setupComplete,
         pendingRoute: returnTo,
         pendingAuthenticationCancelRoute: stage == JourneyStage.signIn

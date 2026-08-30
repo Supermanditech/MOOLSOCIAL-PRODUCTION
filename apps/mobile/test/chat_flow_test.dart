@@ -785,11 +785,24 @@ void main() {
       size: const Size(360, 800),
     );
 
-    final newChat = tester.widget<FloatingActionButton>(
+    final newChat = tester.widget<FilledButton>(
       find.byKey(const Key('chat-new')),
     );
-    expect(newChat.backgroundColor, const Color(0xFF000080));
-    expect(newChat.foregroundColor, Colors.white);
+    expect(
+      newChat.style?.backgroundColor?.resolve(const <WidgetState>{}),
+      const Color(0xFF000080),
+    );
+    expect(
+      newChat.style?.foregroundColor?.resolve(const <WidgetState>{}),
+      Colors.white,
+    );
+    expect(
+      find.ancestor(
+        of: find.byKey(const Key('chat-new')),
+        matching: find.byType(CustomScrollView),
+      ),
+      findsOneWidget,
+    );
 
     expect(find.byKey(const Key('chat-global-edge-navigation')), findsNothing);
     expect(

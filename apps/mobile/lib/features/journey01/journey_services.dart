@@ -14,6 +14,7 @@ class JourneySnapshot {
     this.areaLabel,
     this.currentAreaLabel,
     this.homeOrWorkAreaLabel,
+    this.profileDisplayName,
     this.pendingRoute,
     this.pendingAuthenticationCancelRoute,
     this.pendingAuthenticationPurpose,
@@ -26,6 +27,7 @@ class JourneySnapshot {
   final String? areaLabel;
   final String? currentAreaLabel;
   final String? homeOrWorkAreaLabel;
+  final String? profileDisplayName;
   final bool setupComplete;
   final String? pendingRoute;
   final String? pendingAuthenticationCancelRoute;

@@ -523,17 +523,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
             ],
             icon: const Icon(Icons.more_vert_rounded),
           ),
-          floatingActionButton:
-              _section == ChatHomeSection.chats && threads.isNotEmpty
-              ? FloatingActionButton(
-                  key: const Key('chat-new'),
-                  tooltip: 'Start a conversation',
-                  onPressed: () => _selectSection(ChatHomeSection.discover),
-                  backgroundColor: MoolColors.navy,
-                  foregroundColor: Colors.white,
-                  child: const Icon(Icons.person_add_alt_1_rounded),
-                )
-              : null,
+          floatingActionButton: null,
           bottom: NavigationBar(
             key: const Key('chat-native-navigation'),
             height: 72,
@@ -659,7 +649,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                       ),
                       tooltip: hasSearchQuery
                           ? 'Clear conversation search'
-                          : 'Search assistance',
+                          : 'Open conversation search',
                       onPressed: hasSearchQuery
                           ? _clearConversationSearch
                           : () async {
@@ -686,6 +676,23 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                   ),
                 ),
               ),
+              if (threads.isNotEmpty) ...[
+                const SizedBox(height: MoolSpacing.xs),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    key: const Key('chat-new'),
+                    onPressed: () => _selectSection(ChatHomeSection.discover),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: MoolColors.navy,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(44, 44),
+                    ),
+                    icon: const Icon(Icons.person_add_alt_1_rounded),
+                    label: const Text('New conversation'),
+                  ),
+                ),
+              ],
               const SizedBox(height: MoolSpacing.sm),
               if (_entryContext.showThreadFilters) ...[
                 _FilterStrip(session: widget.session),

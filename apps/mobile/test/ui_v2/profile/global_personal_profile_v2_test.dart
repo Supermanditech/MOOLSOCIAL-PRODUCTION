@@ -39,6 +39,21 @@ void main() {
             surfaceTone: surfaceTone,
           ),
         ),
+        GoRoute(
+          path: '/app/account/identity/name',
+          builder: (_, _) =>
+              GlobalPersonalProfileNameEditorV2(session: session),
+        ),
+        GoRoute(
+          path: '/app/account/security',
+          builder: (_, _) =>
+              const Scaffold(key: Key('profile-security-destination')),
+        ),
+        GoRoute(
+          path: '/app/account/workspaces/preferences',
+          builder: (_, _) =>
+              const Scaffold(key: Key('profile-preferences-destination')),
+        ),
       ],
     );
     addTearDown(router.dispose);
@@ -89,6 +104,94 @@ void main() {
     await tester.pumpAndSettle();
     expect(router.routeInformationProvider.value.uri.path, '/origin');
     expect(find.byKey(const Key('open-personal-profile')), findsOne);
+  });
+
+  testWidgets('incomplete profile explains progress and every row acts', (
+    tester,
+  ) async {
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'manual',
+          areaLabel: 'Jodhpur',
+          setupComplete: true,
+        ),
+      ),
+    )..manualArea = 'Jodhpur';
+    addTearDown(session.dispose);
+    final router = await pumpProfile(tester, session);
+
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Not signed in'), findsOneWidget);
+    expect(find.text('Add a sign-in method'), findsOneWidget);
+    expect(find.text('Next: display name · contact'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('global-personal-profile-name')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('global-personal-profile-name-field')),
+      'Aarav Sharma',
+    );
+    await tester.ensureVisible(
+      find.byKey(const Key('global-personal-profile-name-save')),
+    );
+    await tester.pumpAndSettle();
+    tester
+        .widget<FilledButton>(
+          find.byKey(const Key('global-personal-profile-name-save')),
+        )
+        .onPressed!();
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(session.profileDisplayName, 'Aarav Sharma');
+    expect(find.text('Aarav Sharma'), findsWidgets);
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      '/app/account/identity',
+    );
+
+    await tester.ensureVisible(
+      find.byKey(const Key('global-personal-profile-email')),
+    );
+    await tester.pumpAndSettle();
+    tester
+        .widget<InkWell>(
+          find.byKey(const Key('global-personal-profile-email')),
+        )
+        .onTap!();
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      '/app/account/security',
+    );
+    expect(
+      find.byKey(const Key('profile-security-destination')),
+      findsOneWidget,
+    );
+    router.go('/app/account/identity');
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const Key('global-personal-profile-language')),
+    );
+    await tester.pumpAndSettle();
+    tester
+        .widget<InkWell>(
+          find.byKey(const Key('global-personal-profile-language')),
+        )
+        .onTap!();
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      '/app/account/workspaces/preferences',
+    );
+    expect(
+      find.byKey(const Key('profile-preferences-destination')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('compact personal profile remains readable without overflow', (
