@@ -929,6 +929,51 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('notification settings preview cannot pretend to save choices', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyGuestJourney();
+    final chat = ChatSession.production(gateway: _PeopleChatGateway());
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await mount(
+      tester,
+      route:
+          '/app/chat/notifications?return=%2Fapp%2Fsocial%3Fsub%3Dfeed&preview=true',
+      journey: journey,
+      chat: chat,
+      size: const Size(360, 800),
+    );
+
+    expect(
+      find.byKey(const Key('chat-notification-settings-screen')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('chat-notification-preview-notice')),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<SwitchListTile>(
+            find.byKey(const Key('chat-notification-messages')),
+          )
+          .onChanged,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('chat-notification-device-enable')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Universal Chat choices open the matching production inbox', (
     tester,
   ) async {

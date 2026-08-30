@@ -30,6 +30,7 @@ import '../chat/chat_models.dart';
 import '../chat/chat_session.dart';
 import '../chat/screens/chat_inbox_screen.dart';
 import '../chat/screens/chat_people_directory.dart';
+import '../chat/screens/chat_notification_settings_screen.dart';
 import '../chat/screens/chat_thread_screen.dart';
 import '../creator/creator_models.dart';
 import '../creator/creator_session.dart';
@@ -627,6 +628,18 @@ GoRouter createJourneyRouter(
           returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
           returnDirectToOrigin:
               state.uri.queryParameters['directReturn'] == 'true',
+        ),
+      ),
+      GoRoute(
+        path: '/app/chat/notifications',
+        pageBuilder: (context, state) => moolMainDestinationPage(
+          state: state,
+          child: ChatNotificationSettingsScreen(
+            session: chatSession,
+            originReturnRoute:
+                state.uri.queryParameters['return'] ?? '/app/social',
+            previewOnly: state.uri.queryParameters['preview'] == 'true',
+          ),
         ),
       ),
       GoRoute(

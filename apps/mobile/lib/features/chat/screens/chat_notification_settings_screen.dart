@@ -12,11 +12,13 @@ class ChatNotificationSettingsScreen extends StatefulWidget {
   const ChatNotificationSettingsScreen({
     required this.session,
     required this.originReturnRoute,
+    this.previewOnly = false,
     super.key,
   });
 
   final ChatSession session;
   final String originReturnRoute;
+  final bool previewOnly;
 
   @override
   State<ChatNotificationSettingsScreen> createState() =>
@@ -107,6 +109,19 @@ class _ChatNotificationSettingsScreenState
             key: const Key('chat-notification-settings-list'),
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
             children: [
+              if (widget.previewOnly) ...[
+                const _NotificationCard(
+                  child: ListTile(
+                    key: Key('chat-notification-preview-notice'),
+                    leading: Icon(Icons.visibility_outlined),
+                    title: Text('Settings preview'),
+                    subtitle: Text(
+                      'Sign in to save device, preview and quiet-hours choices.',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               _NotificationCard(
                 child: ListTile(
                   key: const Key('chat-notification-device'),
@@ -129,7 +144,8 @@ class _ChatNotificationSettingsScreenState
                   trailing: session.deviceNotificationsRegistered
                       ? TextButton(
                           key: const Key('chat-notification-device-pause'),
-                          onPressed: session.notificationLoading
+                          onPressed:
+                              widget.previewOnly || session.notificationLoading
                               ? null
                               : () => unawaited(
                                   session.disableDeviceNotifications(),
@@ -141,7 +157,8 @@ class _ChatNotificationSettingsScreenState
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(84, 44),
                           ),
-                          onPressed: session.notificationLoading
+                          onPressed:
+                              widget.previewOnly || session.notificationLoading
                               ? null
                               : () => unawaited(_enableDevice()),
                           child: const Text('Enable'),
@@ -205,14 +222,18 @@ class _ChatNotificationSettingsScreenState
                         key: const Key('chat-notification-quiet-start'),
                         title: const Text('Starts'),
                         trailing: Text(_timeLabel(settings.quietStartMinutes)),
-                        onTap: () => unawaited(_pickQuietTime(start: true)),
+                        onTap: widget.previewOnly
+                            ? null
+                            : () => unawaited(_pickQuietTime(start: true)),
                       ),
                       const Divider(height: 1),
                       ListTile(
                         key: const Key('chat-notification-quiet-end'),
                         title: const Text('Ends'),
                         trailing: Text(_timeLabel(settings.quietEndMinutes)),
-                        onTap: () => unawaited(_pickQuietTime(start: false)),
+                        onTap: widget.previewOnly
+                            ? null
+                            : () => unawaited(_pickQuietTime(start: false)),
                       ),
                     ],
                   ],
@@ -243,7 +264,9 @@ class _ChatNotificationSettingsScreenState
     title: Text(title),
     subtitle: subtitle == null ? null : Text(subtitle),
     value: value,
-    onChanged: widget.session.notificationLoading ? null : onChanged,
+    onChanged: widget.previewOnly || widget.session.notificationLoading
+        ? null
+        : onChanged,
   );
 }
 

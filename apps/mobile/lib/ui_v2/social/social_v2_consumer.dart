@@ -2458,38 +2458,22 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   }
 
   void _openNotificationSettings() {
-    var orders = true;
-    var work = true;
-    var social = true;
+    final previewOnly =
+        widget.enableCreateReviewPreview && !widget.session.isAuthenticated;
+    final returnRoute = _productionChatReturnRoute();
     Navigator.of(context).pop();
-    showSocialV2Sheet(
-      context,
-      title: 'Notification settings',
-      subtitle: 'Choose the updates you want to receive',
-      children: [
-        StatefulBuilder(
-          builder: (context, setSheetState) => Column(
-            children: [
-              SwitchListTile(
-                value: orders,
-                onChanged: (value) => setSheetState(() => orders = value),
-                title: const Text('Orders and bookings'),
-              ),
-              SwitchListTile(
-                value: work,
-                onChanged: (value) => setSheetState(() => work = value),
-                title: const Text('Work and earnings'),
-              ),
-              SwitchListTile(
-                value: social,
-                onChanged: (value) => setSheetState(() => social = value),
-                title: const Text('Social activity'),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.push(
+        Uri(
+          path: '/app/chat/notifications',
+          queryParameters: {
+            'return': returnRoute,
+            if (previewOnly) 'preview': 'true',
+          },
+        ).toString(),
+      );
+    });
   }
 
   void _openSearch() {
