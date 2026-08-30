@@ -9,7 +9,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('promotion offsets remain isolated to their Buy destination', (
+  testWidgets('both promotion intents fit without horizontal clipping', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -28,37 +28,30 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    Finder promotionScrollable() => find
-        .descendant(
-          of: find.byKey(const ValueKey('buy-catalogue-promotions')),
-          matching: find.byType(Scrollable),
-        )
-        .first;
+    void expectContained(List<ValueKey<String>> keys) {
+      final owner = tester.getRect(
+        find.byKey(const ValueKey('buy-catalogue-promotions')),
+      );
+      for (final key in keys) {
+        final rect = tester.getRect(find.byKey(key));
+        expect(owner.contains(rect.topLeft), isTrue);
+        expect(owner.contains(rect.bottomRight), isTrue);
+        expect(rect.width, greaterThanOrEqualTo(140));
+        expect(rect.height, greaterThanOrEqualTo(96));
+      }
+    }
 
-    double offset() =>
-        tester.state<ScrollableState>(promotionScrollable()).position.pixels;
-
-    await tester.drag(promotionScrollable(), const Offset(-90, 0));
-    await tester.pumpAndSettle();
-    final shopOffset = offset();
-    expect(shopOffset, greaterThan(40));
-
-    session.openDestination(BuyV2Destination.wholesale);
-    await tester.pumpAndSettle();
-    expect(offset(), 0, reason: 'Wholesale must not inherit Shop offset');
-
-    await tester.drag(promotionScrollable(), const Offset(-55, 0));
-    await tester.pumpAndSettle();
-    final wholesaleOffset = offset();
-    expect(wholesaleOffset, greaterThan(20));
-
-    session.openDestination(BuyV2Destination.shop);
-    await tester.pumpAndSettle();
-    expect(offset(), closeTo(shopOffset, 1));
+    expectContained(const [
+      ValueKey('buy-promotion-shop-basket'),
+      ValueKey('buy-promotion-shop-wholesale'),
+    ]);
 
     session.openDestination(BuyV2Destination.wholesale);
     await tester.pumpAndSettle();
-    expect(offset(), closeTo(wholesaleOffset, 1));
+    expectContained(const [
+      ValueKey('buy-promotion-wholesale-restock'),
+      ValueKey('buy-promotion-wholesale-shop'),
+    ]);
     expect(tester.takeException(), isNull);
   });
 }

@@ -20,7 +20,7 @@ void main() {
     expect(order.paymentTermLabel, contains('balance at delivery'));
     expect(order.amountPaidNow, 1260);
     expect(order.balanceDue, 2940);
-    expect(order.balanceDueLabel, contains('Thu, 30 Jul'));
+    expect(order.balanceDueLabel, 'Due at confirmed delivery');
     expect(order.paymentStatusLabel, contains('balance due'));
   });
 
@@ -68,7 +68,6 @@ void main() {
         find.text('Booking amount paid · balance due at delivery'),
         findsOneWidget,
       );
-      expect(find.textContaining('Thu, 30 Jul'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

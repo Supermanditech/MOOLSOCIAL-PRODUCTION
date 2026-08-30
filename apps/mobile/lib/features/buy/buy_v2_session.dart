@@ -703,7 +703,7 @@ class BuyV2Session extends ChangeNotifier {
       total: 4839,
       partner: 'Sardarpura Supermart',
       partnerType: 'Mool Retail Partner',
-      promise: 'Wed, 29 Jul · by 7:30 pm',
+      promise: 'Delivery schedule awaiting live confirmation',
       destinationLabel: 'Sardarpura · 342003',
       progress: .54,
       status: BuyV2OrderStatus.preparing,
@@ -722,9 +722,9 @@ class BuyV2Session extends ChangeNotifier {
       paymentTermLabel: 'Booking amount with balance at delivery',
       amountPaidNow: 1260,
       balanceDue: 2940,
-      balanceDueLabel: 'Due at delivery · Thu, 30 Jul',
+      balanceDueLabel: 'Due at confirmed delivery',
       paymentStatusLabel: 'Booking amount paid · balance due at delivery',
-      promise: 'Thu, 30 Jul · 10:00 am–2:00 pm',
+      promise: 'Supplier delivery schedule awaiting confirmation',
       destinationLabel: 'Basni · 342005',
       progress: .34,
       status: BuyV2OrderStatus.confirmed,
@@ -737,7 +737,7 @@ class BuyV2Session extends ChangeNotifier {
       total: 134,
       partner: 'Sardarpura Health Pharmacy',
       partnerType: 'Mool Pharmacy Partner',
-      promise: 'Wed, 29 Jul · by 11:00 am',
+      promise: 'Pharmacy delivery schedule awaiting confirmation',
       destinationLabel: 'Sardarpura · 342003',
       progress: .67,
       status: BuyV2OrderStatus.preparing,
@@ -1328,18 +1328,16 @@ class BuyV2Session extends ChangeNotifier {
           product.categoryId == category;
       final matchesFilter = switch (selectedFilter) {
         'fast' => switch (filterDestination) {
-          BuyV2Destination.shop => product.deliveryPromise.contains('within'),
-          BuyV2Destination.wholesale => product.deliveryPromise.contains(
-            'Thu, 30 Jul',
+          BuyV2Destination.shop => product.deliveryPromise.contains(
+            'Delivered in',
           ),
-          BuyV2Destination.medicine => product.deliveryPromise.contains(
-            '11:00',
+          BuyV2Destination.wholesale => product.origin.toLowerCase().contains(
+            'jodhpur',
           ),
+          BuyV2Destination.medicine => !product.requiresPrescription,
           BuyV2Destination.orders => false,
         },
-        'today' =>
-          product.deliveryPromise.contains('Wed, 29 Jul') ||
-              product.deliveryPromise.contains('within'),
+        'today' => product.deliveryPromise.contains('Delivered in'),
         'lowest' =>
           product.badge.toLowerCase().contains('lowest') ||
               product.badge.contains('off'),
@@ -1351,8 +1349,8 @@ class BuyV2Session extends ChangeNotifier {
               product.seller.toLowerCase().contains('sardarpura') ||
               product.seller.toLowerCase().contains('jodhpur'),
         'two-days' =>
-          !product.deliveryPromise.toLowerCase().contains('aug') &&
-              !product.deliveryPromise.toLowerCase().contains('week'),
+          product.origin.toLowerCase().contains('jodhpur') ||
+              product.origin.toLowerCase().contains('jaipur'),
         'freight' => product.freightIncluded,
         'moq' =>
           product.destination == BuyV2Destination.wholesale &&
@@ -2867,6 +2865,7 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2Order> get visibleOrders {
     final normalizedQuery = query.trim().toLowerCase();
     return _orders
+        .where((order) => order.destination != BuyV2Destination.medicine)
         .where(
           (order) => ordersTab == BuyV2OrdersTab.delivered
               ? order.status == BuyV2OrderStatus.delivered
@@ -2888,10 +2887,12 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   int get activeOrderCount => _orders
+      .where((order) => order.destination != BuyV2Destination.medicine)
       .where((order) => order.status != BuyV2OrderStatus.delivered)
       .length;
 
   int get deliveredOrderCount => _orders
+      .where((order) => order.destination != BuyV2Destination.medicine)
       .where((order) => order.status == BuyV2OrderStatus.delivered)
       .length;
 
@@ -3691,15 +3692,7 @@ class BuyV2Session extends ChangeNotifier {
     selectedFilter = intent == BuyV2ShoppingIntent.flexibleRestocking
         ? 'moq'
         : null;
-    notice = switch (intent) {
-      BuyV2ShoppingIntent.monthlyBasket =>
-        'Monthly basket products are ready to review.',
-      BuyV2ShoppingIntent.businessBuying =>
-        'Wholesale packs are ready to compare.',
-      BuyV2ShoppingIntent.flexibleRestocking =>
-        'Flexible minimum packs are shown.',
-      BuyV2ShoppingIntent.homeShopping => 'Retail packs for home are shown.',
-    };
+    notice = null;
     _persistCustomerState();
     notifyListeners();
   }

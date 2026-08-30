@@ -2477,9 +2477,7 @@ void main() {
 
     session.addProduct(medicine.id);
     await tester.pumpAndSettle();
-    final miniCart = find.byKey(
-      const ValueKey('buy-compact-cart-indicator'),
-    );
+    final miniCart = find.byKey(const ValueKey('buy-compact-cart-indicator'));
     expect(miniCart, findsOneWidget);
     expect(
       tester.getSemantics(miniCart).label,
@@ -3868,6 +3866,45 @@ void main() {
       find.byKey(const ValueKey('buy-checkout-action-bar')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('Offers source filters are real, reversible and channel-safe', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+    await tester.pumpAndSettle();
+
+    final retail = find.byKey(const ValueKey('buy-offers-filter-retailer'));
+    expect(retail, findsOneWidget);
+    await tester.tap(retail);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-product-s-tomato')), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-product-w-oil')), findsNothing);
+
+    await tester.tap(retail);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-product-w-oil')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Shop Orders excludes Care-owned Medicine and stale promises', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-local-tab-orders')));
+    await tester.pumpAndSettle();
+
+    expect(session.activeOrderCount, 2);
+    expect(session.deliveredOrderCount, 2);
+    expect(find.text('Medicine order'), findsNothing);
+    expect(find.textContaining('29 Jul'), findsNothing);
+    expect(find.textContaining('30 Jul'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Cart can return to Offers and add another product', (

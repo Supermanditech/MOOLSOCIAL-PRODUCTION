@@ -139,6 +139,7 @@ void main() {
       ),
     );
 
+    await tapVisible(tester, const ValueKey('buy-shopping-intent-clear'));
     await tapVisible(tester, const ValueKey('buy-promotion-wholesale-shop'));
     expect(session.destination, BuyV2Destination.shop);
     expect(session.activeShoppingIntent, BuyV2ShoppingIntent.homeShopping);

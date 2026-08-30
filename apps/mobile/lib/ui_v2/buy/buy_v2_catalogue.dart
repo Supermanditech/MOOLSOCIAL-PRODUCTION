@@ -204,6 +204,7 @@ class BuyV2OffersView extends StatefulWidget {
 
 class _BuyV2OffersViewState extends State<BuyV2OffersView> {
   BuyV2PublishedOffersSnapshot? _snapshot;
+  BuyV2OfferPublisherType? _selectedPublisher;
   var _requestSequence = 0;
 
   BuyV2Session get session => widget.session;
@@ -262,7 +263,7 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
         ? snapshot!.offers
         : widget.source.publishedOffers;
     final query = session.query.trim().toLowerCase();
-    final resolved = <({BuyV2PublishedOffer offer, BuyV2Product product})>[];
+    final allResolved = <({BuyV2PublishedOffer offer, BuyV2Product product})>[];
     final productIds = <String>{};
     for (final offer in publishedOffers) {
       final product = session.findProduct(offer.productId);
@@ -279,14 +280,19 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
           ])) {
         continue;
       }
-      resolved.add((offer: offer, product: product));
+      allResolved.add((offer: offer, product: product));
     }
+    final resolved = _selectedPublisher == null
+        ? allResolved
+        : allResolved
+              .where((entry) => entry.offer.publisherType == _selectedPublisher)
+              .toList(growable: false);
     final products = resolved
         .map((entry) => entry.product)
         .toList(growable: false);
     final publisherCounts = {
       for (final type in BuyV2OfferPublisherType.values)
-        type: resolved
+        type: allResolved
             .where((entry) => entry.offer.publisherType == type)
             .length,
     };
@@ -350,6 +356,12 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
                           child: _OfferPublisherChip(
                             type: type,
                             count: publisherCounts[type] ?? 0,
+                            selected: _selectedPublisher == type,
+                            onTap: () => setState(() {
+                              _selectedPublisher = _selectedPublisher == type
+                                  ? null
+                                  : type;
+                            }),
                           ),
                         ),
                         if (type != BuyV2OfferPublisherType.retailer)
@@ -540,10 +552,17 @@ bool _matchesPublishedOffer(String query, List<String> values) {
 }
 
 class _OfferPublisherChip extends StatelessWidget {
-  const _OfferPublisherChip({required this.type, required this.count});
+  const _OfferPublisherChip({
+    required this.type,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
 
   final BuyV2OfferPublisherType type;
   final int count;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -552,22 +571,39 @@ class _OfferPublisherChip extends StatelessWidget {
       BuyV2OfferPublisherType.wholesaler => 'Wholesale',
       BuyV2OfferPublisherType.retailer => 'Retail',
     };
-    return Container(
-      height: 32,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .88),
+    return Semantics(
+      key: ValueKey('buy-offers-filter-${type.name}'),
+      button: true,
+      selected: selected,
+      label: '$label offers, $count available',
+      child: Material(
+        color: selected
+            ? BuyV2Colors.navy
+            : Colors.white.withValues(alpha: .88),
         borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: const Color(0x1F000080)),
-      ),
-      child: Text(
-        '$label · $count',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: context.buyMeta.copyWith(
-          color: BuyV2Colors.navy,
-          fontSize: 8,
-          fontWeight: FontWeight.w900,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(11),
+          child: Container(
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(
+                color: selected ? BuyV2Colors.navy : const Color(0x1F000080),
+              ),
+            ),
+            child: Text(
+              '$label · $count',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.buyMeta.copyWith(
+                color: selected ? Colors.white : BuyV2Colors.navy,
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1147,17 +1183,17 @@ class _CatalogueOwnedFeature extends StatelessWidget {
   Widget build(BuildContext context) {
     final feature = switch (session.destination) {
       BuyV2Destination.shop => (
-        'MoolSocial value',
+        'Best prices',
         'lowest',
         Icons.auto_awesome_rounded,
       ),
       BuyV2Destination.wholesale => (
-        'Flexible packs',
+        'Lower minimums',
         'moq',
         Icons.inventory_2_outlined,
       ),
       BuyV2Destination.medicine => (
-        'Everyday care',
+        'No-prescription care',
         'otc',
         Icons.health_and_safety_outlined,
       ),
@@ -1169,7 +1205,7 @@ class _CatalogueOwnedFeature extends StatelessWidget {
     };
     final active = session.selectedFilter == feature.$2;
     return Semantics(
-      label: '${feature.$1}, MoolSocial feature',
+      label: '${feature.$1} filter',
       selected: active,
       button: true,
       child: Material(
@@ -2657,13 +2693,23 @@ class _HouseholdBasketFact extends StatelessWidget {
 
 String _compactProductBadge(String value) {
   final normalized = value.toLowerCase();
-  if (normalized.contains('lowest')) return 'Lowest price';
+  if (normalized.contains('manufacturer')) return 'Maker offer';
+  if (normalized.contains('landed')) return 'Best cost';
+  if (normalized.contains('lowest')) return 'Lowest';
   if (normalized.contains('popular')) return 'Popular';
   if (normalized.contains('prescription')) return 'Rx required';
   return value;
 }
 
 String _compactDeliveryPromise(String value) {
+  if (value.toLowerCase().contains('confirmed at checkout')) {
+    return 'At checkout';
+  }
+  final minutes = RegExp(
+    r'(?:delivered|delivery)\s+in\s+(\d+)\s+min',
+    caseSensitive: false,
+  ).firstMatch(value);
+  if (minutes != null) return '${minutes.group(1)} min';
   final parts = value.split(' · ');
   if (parts.length < 2) return value;
   final date = parts.first.replaceFirst(RegExp(r'^[A-Za-z]{3},\s*'), '');
@@ -2698,7 +2744,8 @@ class _ProductGrid extends StatelessWidget {
     final showPromotions =
         !savedOnly &&
         session.query.isEmpty &&
-        session.selectedCategoryId == 'all';
+        session.selectedCategoryId == 'all' &&
+        session.activeShoppingIntent == null;
     if (products.isEmpty) {
       return Center(
         child: Padding(
@@ -3513,16 +3560,21 @@ class _CataloguePromotionRail extends StatelessWidget {
     };
     return SizedBox(
       key: const ValueKey('buy-catalogue-promotions'),
-      height: accessibleText ? 118 : 98,
-      child: ListView.separated(
+      height: accessibleText ? 138 : 122,
+      child: Padding(
         key: PageStorageKey(
           'buy-catalogue-promotions-${session.destination.name}',
         ),
         padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
-        scrollDirection: Axis.horizontal,
-        itemCount: cards.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 7),
-        itemBuilder: (context, index) => cards[index],
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var index = 0; index < cards.length; index++) ...[
+              if (index > 0) const SizedBox(width: 7),
+              Expanded(child: cards[index]),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -4443,10 +4495,29 @@ class BuyV2ProductCard extends StatelessWidget {
                                                               FontWeight.w900,
                                                         ),
                                                       )
-                                                    : const Icon(
-                                                        Icons.add_rounded,
-                                                        color: BuyV2Colors.navy,
-                                                        size: 20,
+                                                    : const Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                            Icons.add_rounded,
+                                                            color: BuyV2Colors
+                                                                .navy,
+                                                            size: 17,
+                                                          ),
+                                                          SizedBox(width: 3),
+                                                          Text(
+                                                            'Add',
+                                                            style: TextStyle(
+                                                              color: BuyV2Colors
+                                                                  .navy,
+                                                              fontSize: 9,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w900,
+                                                            ),
+                                                          ),
+                                                        ],
                                                       ),
                                               ),
                                             ),

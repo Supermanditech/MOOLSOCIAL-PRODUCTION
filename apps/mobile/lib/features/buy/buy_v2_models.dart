@@ -735,7 +735,7 @@ abstract final class BuyV2Catalogue {
       origin: wholesale
           ? '$originCity → Jodhpur 342003'
           : 'Jodhpur → Sardarpura 342003',
-      confirmedOn: 'Confirmed 29 Jul',
+      confirmedOn: 'Catalogue details verified',
       visualLabel: _visualLabel(seed.id.replaceAll('-', ' ')),
       visualKind: _visualKind(
         wholesale ? seed.wholesaleCategory : seed.shopCategory,
@@ -756,17 +756,13 @@ abstract final class BuyV2Catalogue {
       caseSensitive: false,
     ).firstMatch(source);
     if (minutes != null) {
-      return 'Wed, 29 Jul · within ${minutes.group(1)} min';
+      return 'Delivered in ${minutes.group(1)} min';
     }
-    final by = RegExp(r'by\s+(.+)$', caseSensitive: false).firstMatch(source);
-    return 'Wed, 29 Jul · by ${by?.group(1) ?? '8:00 pm'}';
+    return 'Delivery time confirmed at checkout';
   }
 
-  static String _wholesalePromise(String originCity) => switch (originCity) {
-    'Delhi' => 'Sat, 1 Aug – Sun, 2 Aug',
-    'Jaipur' => 'Fri, 31 Jul – Sat, 1 Aug',
-    _ => 'Thu, 30 Jul',
-  };
+  static String _wholesalePromise(String originCity) =>
+      'Delivery schedule confirmed at checkout';
 
   static String _supplierOrigin(String seller, String sellerType) {
     final name = seller.toLowerCase();
@@ -888,7 +884,7 @@ abstract final class BuyV2Catalogue {
       badge: '18% off',
       seller: 'Sardarpura Health Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed at checkout',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Expiry and batch shown before dispatch',
       visualLabel: '500',
@@ -911,7 +907,7 @@ abstract final class BuyV2Catalogue {
       badge: '16% off',
       seller: 'Jodhpur Care Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed at checkout',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Sealed tube',
       visualLabel: 'GEL',
@@ -933,7 +929,7 @@ abstract final class BuyV2Catalogue {
       badge: 'Prescription required',
       seller: 'Sardarpura Health Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed after prescription review',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Pharmacist review required',
       visualLabel: 'SR 500',
@@ -956,7 +952,7 @@ abstract final class BuyV2Catalogue {
       badge: '13% off',
       seller: 'Marwar Wellness Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed at checkout',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Check meter compatibility',
       visualLabel: '50',
@@ -979,7 +975,7 @@ abstract final class BuyV2Catalogue {
       badge: 'Prescription required',
       seller: 'Sardarpura Health Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed after prescription review',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Pharmacist review required',
       visualLabel: '40',
@@ -1002,7 +998,7 @@ abstract final class BuyV2Catalogue {
       badge: 'Prescription required',
       seller: 'Marwar Wellness Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed after prescription review',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Pharmacist review required',
       visualLabel: '10',
@@ -1025,7 +1021,7 @@ abstract final class BuyV2Catalogue {
       badge: 'Prescription required',
       seller: 'Sardarpura Health Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed at checkout',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Pharmacist review required',
       visualLabel: '40',
@@ -1048,7 +1044,7 @@ abstract final class BuyV2Catalogue {
       badge: '20% off',
       seller: 'Sardarpura Health Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed after prescription review',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Sealed single-use sachets',
       visualLabel: 'ORS',
