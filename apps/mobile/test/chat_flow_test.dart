@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/chat/chat_models.dart';
@@ -1088,9 +1089,11 @@ void main() {
   testWidgets('OPPO bottom inset keeps the composer above system navigation', (
     tester,
   ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(360, 800);
-    tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+    tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 44);
     addTearDown(tester.view.reset);
     final journey = await readyJourney();
     final chat = ChatSession(
@@ -1106,16 +1109,25 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    debugDefaultTargetPlatformOverride = null;
 
     final field = find.byKey(const Key('chat-message-field'));
     final media = MediaQuery.of(tester.element(field));
     expect(media.viewPadding.bottom, greaterThan(0));
     final safeBottom = media.size.height - media.viewPadding.bottom;
+    final exportedClearance = media.viewPadding.top - (58 - 44);
+    final exportedSafeBottom = safeBottom - exportedClearance;
+    for (final key in const [
+      Key('chat-attach'),
+      Key('chat-composer-camera'),
+      Key('chat-voice-message'),
+    ]) {
+      final rect = tester.getRect(find.byKey(key));
+      expect(rect.width, greaterThanOrEqualTo(44), reason: '$key width');
+      expect(rect.height, greaterThanOrEqualTo(44), reason: '$key height');
+      expect(rect.bottom, lessThanOrEqualTo(exportedSafeBottom));
+    }
     expect(tester.getBottomRight(field).dy, lessThanOrEqualTo(safeBottom));
-    expect(
-      tester.getBottomRight(find.byKey(const Key('chat-voice-message'))).dy,
-      lessThanOrEqualTo(safeBottom),
-    );
     expect(tester.takeException(), isNull);
   });
 }

@@ -165,10 +165,15 @@ class ChatPageScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    final bottomSystemInset = MediaQuery.viewPaddingOf(context).bottom;
-    final bottomContentInset = keyboardInset > 0
-        ? keyboardInset
-        : bottomSystemInset;
+    final viewPadding = MediaQuery.viewPaddingOf(context);
+    final bottomSystemInset = viewPadding.bottom;
+    final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
+      viewPadding: viewPadding,
+      platform: Theme.of(context).platform,
+    );
+    final bottomContentInset =
+        (keyboardInset > 0 ? keyboardInset : bottomSystemInset) +
+        exportedSemanticsClearance;
     return _ChatPresenceLifecycle(
       session: session,
       child: PopScope<Object?>(
