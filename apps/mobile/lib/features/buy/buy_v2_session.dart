@@ -314,6 +314,7 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2Session({
     required this.core,
     this.productFactsAdapter = const BuyV2CatalogueProductFactsAdapter(),
+    this.productContentAdapter = const BuyV2CatalogueProductContentAdapter(),
     this.sponsoredContentAdapter = const BuyV2DisabledSponsoredContentAdapter(),
     BuyV2CartBenefitsAdapter? cartBenefitsAdapter,
     this.tipPolicy = const BuyV2DisabledTipPolicy(),
@@ -372,6 +373,7 @@ class BuyV2Session extends ChangeNotifier {
 
   final BuySession core;
   final BuyV2ProductFactsAdapter productFactsAdapter;
+  final BuyV2ProductContentAdapter productContentAdapter;
   final BuyV2SponsoredContentAdapter sponsoredContentAdapter;
   final BuyV2CartBenefitsAdapter cartBenefitsAdapter;
   final BuyV2TipPolicy tipPolicy;
@@ -388,6 +390,8 @@ class BuyV2Session extends ChangeNotifier {
   static const bool sponsoredContentActivationApproved = false;
   static const BuyV2CatalogueProductFactsAdapter _catalogueFactsFallback =
       BuyV2CatalogueProductFactsAdapter();
+  static const BuyV2CatalogueProductContentAdapter _catalogueContentFallback =
+      BuyV2CatalogueProductContentAdapter();
 
   static const Set<String> paymentMethods = {
     'UPI',
@@ -595,6 +599,7 @@ class BuyV2Session extends ChangeNotifier {
   final List<BuyV2Product> _catalogueProducts = [];
   final Map<String, BuyV2CartLine> _cart = {};
   final Map<String, BuyV2ProductFactsSnapshot> _productFacts = {};
+  final Map<String, BuyV2ProductContentSnapshot> _productContent = {};
   final Map<String, int> _prescriptionApprovedQuantities = {};
   final Map<String, BuyV2CustomerReview> _customerReviews = {};
   final Map<String, String> _reportedProductReasons = {};
@@ -2984,6 +2989,67 @@ class BuyV2Session extends ChangeNotifier {
             snapshot.deliveryFeeLabel!.trim().isNotEmpty) &&
         (snapshot.storeOperatingState != BuyV2StoreOperatingState.closed ||
             snapshot.nextOpeningLabel?.trim().isNotEmpty == true);
+  }
+
+  BuyV2ProductContentSnapshot productContentFor(BuyV2Product product) {
+    return _productContent.putIfAbsent(product.id, () {
+      final next = productContentAdapter.snapshotFor(product);
+      return _validProductContent(product, next)
+          ? next
+          : _catalogueContentFallback.snapshotFor(product);
+    });
+  }
+
+  bool refreshProductContent(String productId) {
+    final product = findProduct(productId);
+    if (product == null) {
+      notice = 'This product could not be found.';
+      notifyListeners();
+      return false;
+    }
+    final next = productContentAdapter.snapshotFor(product);
+    if (!_validProductContent(product, next)) {
+      notice = 'Product details could not be refreshed.';
+      notifyListeners();
+      return false;
+    }
+    final previous = _productContent[product.id];
+    _productContent[product.id] = next;
+    if (!identical(previous, next)) notifyListeners();
+    return true;
+  }
+
+  bool _validProductContent(
+    BuyV2Product product,
+    BuyV2ProductContentSnapshot snapshot,
+  ) {
+    if (snapshot.productId != product.id || snapshot.sourceId.trim().isEmpty) {
+      return false;
+    }
+    final mediaIds = <String>{};
+    if (snapshot.media.any(
+      (item) =>
+          item.id.trim().isEmpty ||
+          !mediaIds.add(item.id) ||
+          item.label.trim().isEmpty ||
+          item.semanticLabel.trim().isEmpty,
+    )) {
+      return false;
+    }
+    if (snapshot.highlights.any((item) => item.trim().isEmpty) ||
+        snapshot.specifications.any(
+          (item) => item.label.trim().isEmpty || item.value.trim().isEmpty,
+        ) ||
+        (snapshot.description != null &&
+            snapshot.description!.trim().isEmpty)) {
+      return false;
+    }
+    if ((snapshot.state == BuyV2ProductContentState.offline ||
+            snapshot.state == BuyV2ProductContentState.unavailable) &&
+        snapshot.customerMessage?.trim().isNotEmpty != true) {
+      return false;
+    }
+    return true;
   }
 
   BuyV2SponsoredContent? sponsoredContentFor(

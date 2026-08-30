@@ -401,6 +401,7 @@ class BuyV2ProductView extends StatelessWidget {
     final quantity = session.quantityFor(product.id);
     final review = session.customerReviewFor(product.id);
     final facts = session.productFactsFor(product);
+    final content = session.productContentFor(product);
     final variants = session.productVariantsFor(product);
     final automaticFulfilment =
         product.destination == BuyV2Destination.shop ||
@@ -446,15 +447,26 @@ class BuyV2ProductView extends StatelessWidget {
                   product: product,
                   compact: wholesale,
                   media: [
-                    _BuyV2ProductMediaItem(
-                      label: 'Product visual',
-                      child: BuyV2ProductPackshot(
-                        key: const ValueKey('buy-product-gallery-image-0'),
-                        product: product,
-                        borderRadius: 17,
-                        animateFirstFrame: true,
+                    for (final media
+                        in content.media.isEmpty
+                            ? [
+                                BuyV2ProductMediaAsset(
+                                  id: '${product.id}-packshot-fallback',
+                                  label: 'Product image',
+                                  semanticLabel:
+                                      '${product.title}, ${product.pack}',
+                                  kind: BuyV2ProductContentMediaKind
+                                      .cataloguePackshot,
+                                ),
+                              ]
+                            : content.media)
+                      _BuyV2ProductMediaItem(
+                        label: media.label,
+                        child: _ProductContentMediaSurface(
+                          product: product,
+                          media: media,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -711,6 +723,12 @@ class BuyV2ProductView extends StatelessWidget {
                       value: returnPolicy,
                     ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              _ProductContentSections(
+                session: session,
+                product: product,
+                content: content,
               ),
               const SizedBox(height: 10),
               _ProductReviewsPanel(
@@ -2478,6 +2496,50 @@ class _PartnerProductAction extends StatelessWidget {
   }
 }
 
+class _ProductContentMediaSurface extends StatelessWidget {
+  const _ProductContentMediaSurface({
+    required this.product,
+    required this.media,
+  });
+
+  final BuyV2Product product;
+  final BuyV2ProductMediaAsset media;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget fallback() => BuyV2ProductPackshot(
+      key: ValueKey('buy-product-gallery-image-${media.id}'),
+      product: product,
+      borderRadius: 17,
+      animateFirstFrame: true,
+    );
+
+    return Semantics(
+      image: true,
+      label: media.semanticLabel,
+      excludeSemantics: true,
+      child: switch (media.kind) {
+        BuyV2ProductContentMediaKind.cataloguePackshot => fallback(),
+        BuyV2ProductContentMediaKind.asset => Image.asset(
+          media.source!,
+          key: ValueKey('buy-product-gallery-asset-${media.id}'),
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => fallback(),
+        ),
+        BuyV2ProductContentMediaKind.network => Image.network(
+          media.source!,
+          key: ValueKey('buy-product-gallery-network-${media.id}'),
+          fit: BoxFit.contain,
+          loadingBuilder: (context, child, progress) => progress == null
+              ? child
+              : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          errorBuilder: (_, _, _) => fallback(),
+        ),
+      },
+    );
+  }
+}
+
 class _BuyV2ProductMediaItem {
   const _BuyV2ProductMediaItem({required this.label, required this.child});
 
@@ -2841,6 +2903,163 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
       ),
     );
   }
+}
+
+class _ProductContentSections extends StatelessWidget {
+  const _ProductContentSections({
+    required this.session,
+    required this.product,
+    required this.content,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final BuyV2ProductContentSnapshot content;
+
+  @override
+  Widget build(BuildContext context) {
+    if (content.state != BuyV2ProductContentState.ready) {
+      final loading = content.state == BuyV2ProductContentState.loading;
+      return Container(
+        key: ValueKey(
+          'buy-product-content-${content.state.name}-${product.id}',
+        ),
+        padding: const EdgeInsets.all(12),
+        decoration: buyV2CardDecoration(
+          color: loading ? BuyV2Colors.softBlue : BuyV2Colors.softOrange,
+          radius: 15,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              loading
+                  ? 'Loading product details'
+                  : 'Product details unavailable',
+              style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              content.customerMessage ??
+                  'More product information is unavailable right now. Price, pack and delivery remain available.',
+              style: context.buyMeta,
+            ),
+            if (!loading) ...[
+              const SizedBox(height: 9),
+              OutlinedButton.icon(
+                key: ValueKey('buy-product-content-retry-${product.id}'),
+                onPressed: () => session.refreshProductContent(product.id),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Try again'),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      key: ValueKey('buy-product-content-ready-${product.id}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (content.highlights.isNotEmpty)
+          _ProductContentCard(
+            title: 'Highlights',
+            icon: Icons.auto_awesome_outlined,
+            children: [
+              for (final highlight in content.highlights)
+                _ProductContentLine(value: highlight),
+            ],
+          ),
+        if (content.highlights.isNotEmpty &&
+            (content.specifications.isNotEmpty || content.description != null))
+          const SizedBox(height: 8),
+        if (content.specifications.isNotEmpty)
+          _ProductContentCard(
+            title: 'Specifications',
+            icon: Icons.fact_check_outlined,
+            children: [
+              for (final specification in content.specifications)
+                _DecisionRow(
+                  icon: Icons.circle,
+                  label: specification.label,
+                  value: specification.value,
+                ),
+            ],
+          ),
+        if (content.specifications.isNotEmpty && content.description != null)
+          const SizedBox(height: 8),
+        if (content.description case final description?)
+          _ProductContentCard(
+            title: 'Description',
+            icon: Icons.notes_rounded,
+            children: [
+              Text(description, style: context.buyBody.copyWith(fontSize: 10)),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _ProductContentCard extends StatelessWidget {
+  const _ProductContentCard({
+    required this.title,
+    required this.icon,
+    required this.children,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(11),
+    decoration: buyV2CardDecoration(radius: 15),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: BuyV2Colors.navy, size: 19),
+            const SizedBox(width: 7),
+            Text(title, style: context.buyTitle.copyWith(fontSize: 14)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...children,
+      ],
+    ),
+  );
+}
+
+class _ProductContentLine extends StatelessWidget {
+  const _ProductContentLine({required this.value});
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 3),
+          child: Icon(
+            Icons.check_circle_rounded,
+            size: 15,
+            color: BuyV2Colors.green,
+          ),
+        ),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(value, style: context.buyBody.copyWith(fontSize: 10)),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ProductTrustPill extends StatelessWidget {

@@ -44,6 +44,14 @@ void main() {
       expect(facts.fulfilmentMode, BuyV2FulfilmentMode.quickLocal);
       expect(facts.isLive, isFalse);
       expect(facts.stale, isFalse);
+
+      final content = session.productContentFor(product);
+      expect(content.state, BuyV2ProductContentState.ready);
+      expect(content.sourceId, 'approved-buy-catalogue');
+      expect(content.media, hasLength(1));
+      expect(content.highlights, isNotEmpty);
+      expect(content.specifications, isNotEmpty);
+      expect(content.description, isNotEmpty);
     });
 
     test('catalogue fulfilment modes remain contextual and explicit', () {

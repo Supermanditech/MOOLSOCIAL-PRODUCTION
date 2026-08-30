@@ -151,6 +151,67 @@ abstract interface class BuyV2ProductFactsAdapter {
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product);
 }
 
+enum BuyV2ProductContentState { ready, loading, offline, unavailable }
+
+enum BuyV2ProductContentMediaKind { cataloguePackshot, asset, network }
+
+@immutable
+class BuyV2ProductMediaAsset {
+  const BuyV2ProductMediaAsset({
+    required this.id,
+    required this.label,
+    required this.semanticLabel,
+    required this.kind,
+    this.source,
+  }) : assert(
+         kind == BuyV2ProductContentMediaKind.cataloguePackshot ||
+             (source != null && source != ''),
+       );
+
+  final String id;
+  final String label;
+  final String semanticLabel;
+  final BuyV2ProductContentMediaKind kind;
+  final String? source;
+}
+
+@immutable
+class BuyV2ProductSpecification {
+  const BuyV2ProductSpecification({required this.label, required this.value});
+
+  final String label;
+  final String value;
+}
+
+@immutable
+class BuyV2ProductContentSnapshot {
+  const BuyV2ProductContentSnapshot({
+    required this.productId,
+    required this.state,
+    required this.sourceId,
+    this.media = const [],
+    this.highlights = const [],
+    this.specifications = const [],
+    this.description,
+    this.customerMessage,
+    this.observedAt,
+  });
+
+  final String productId;
+  final BuyV2ProductContentState state;
+  final String sourceId;
+  final List<BuyV2ProductMediaAsset> media;
+  final List<String> highlights;
+  final List<BuyV2ProductSpecification> specifications;
+  final String? description;
+  final String? customerMessage;
+  final DateTime? observedAt;
+}
+
+abstract interface class BuyV2ProductContentAdapter {
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product);
+}
+
 enum BuyV2CommerceLoadState { loading, ready, offline, unavailable }
 
 enum BuyV2BusinessVerificationState { verified, pending, rejected, unavailable }
@@ -603,6 +664,38 @@ final class BuyV2CatalogueProductFactsAdapter
           : 'Available to add',
       sourceId: 'approved-buy-catalogue',
       fulfilmentMode: buyV2CatalogueFulfilmentModeFor(product),
+    );
+  }
+}
+
+final class BuyV2CatalogueProductContentAdapter
+    implements BuyV2ProductContentAdapter {
+  const BuyV2CatalogueProductContentAdapter();
+
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
+    final returnDetail = product.returnPolicy;
+    return BuyV2ProductContentSnapshot(
+      productId: product.id,
+      state: BuyV2ProductContentState.ready,
+      sourceId: 'approved-buy-catalogue',
+      media: [
+        BuyV2ProductMediaAsset(
+          id: '${product.id}-packshot',
+          label: 'Product image',
+          semanticLabel: '${product.title}, ${product.pack}',
+          kind: BuyV2ProductContentMediaKind.cataloguePackshot,
+        ),
+      ],
+      highlights: [product.variant, product.unitPrice, ?returnDetail],
+      specifications: [
+        BuyV2ProductSpecification(label: 'Brand', value: product.brand),
+        BuyV2ProductSpecification(label: 'Pack', value: product.pack),
+        BuyV2ProductSpecification(label: 'Variant', value: product.variant),
+      ],
+      description:
+          '${product.title} · ${product.variant}. '
+          '${product.pack} at ${product.unitPrice}.',
     );
   }
 }
