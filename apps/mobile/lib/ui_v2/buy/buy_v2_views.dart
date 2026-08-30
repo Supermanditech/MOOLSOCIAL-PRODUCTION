@@ -115,6 +115,9 @@ class BuyV2GstInvoiceController extends ChangeNotifier {
 
   bool get persistenceAvailable => store?.ownerScope != null;
 
+  bool get sessionPersistenceOnly =>
+      store?.ownerScope?.startsWith('device-review-session:') ?? false;
+
   bool get restoring => _restoring;
 
   bool get busy => _busy;
@@ -269,7 +272,11 @@ class BuyV2GstInvoiceController extends ChangeNotifier {
     }
     _requested[destination] = true;
     _selected[destination] = details;
-    _message = shouldRemember ? 'GST details saved.' : null;
+    _message = shouldRemember
+        ? sessionPersistenceOnly
+              ? 'GST details kept for this session.'
+              : 'GST details saved.'
+        : null;
     _notify();
     return true;
   }
@@ -3929,6 +3936,8 @@ class _GstInvoiceCard extends StatelessWidget {
                         fontSize: 9,
                         color:
                             message == 'GST details saved.' ||
+                                message ==
+                                    'GST details kept for this session.' ||
                                 message == 'GST details removed.'
                             ? BuyV2Colors.navy
                             : const Color(0xFFB42318),
@@ -4198,9 +4207,15 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
                                   ? null
                                   : (value) =>
                                         setState(() => _remember = value),
-                              title: const Text('Remember these GST details'),
-                              subtitle: const Text(
-                                'Reuse them on a later invoice.',
+                              title: Text(
+                                widget.controller.sessionPersistenceOnly
+                                    ? 'Keep for this session'
+                                    : 'Remember these GST details',
+                              ),
+                              subtitle: Text(
+                                widget.controller.sessionPersistenceOnly
+                                    ? 'Reuse while this app stays open.'
+                                    : 'Reuse them on a later invoice.',
                               ),
                             ),
                           )

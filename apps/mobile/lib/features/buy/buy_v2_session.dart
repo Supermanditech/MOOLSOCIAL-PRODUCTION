@@ -293,6 +293,23 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
   );
 }
 
+final class _BuyV2DeviceReviewGstInvoiceProfileStore
+    implements BuyV2GstInvoiceProfileStore {
+  BuyV2GstInvoiceProfileSnapshot? _snapshot;
+
+  @override
+  String? get ownerScope => 'device-review-session:buy-gst';
+
+  @override
+  Future<BuyV2GstInvoiceProfileSnapshot?> read() async => _snapshot;
+
+  @override
+  Future<bool> write(BuyV2GstInvoiceProfileSnapshot snapshot) async {
+    _snapshot = snapshot;
+    return true;
+  }
+}
+
 class BuyV2Session extends ChangeNotifier {
   BuyV2Session({
     required this.core,
@@ -302,7 +319,7 @@ class BuyV2Session extends ChangeNotifier {
     this.tipPolicy = const BuyV2DisabledTipPolicy(),
     this.savedProductsStore,
     this.customerStateStore,
-    this.gstInvoiceProfileStore,
+    BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore,
     this.commercialPaymentTermsAdapter,
     this.checkoutQuoteAdapter,
     this.balancePaymentAdapter,
@@ -317,6 +334,12 @@ class BuyV2Session extends ChangeNotifier {
        reviewDataEnabled =
            reviewDataEnabled ??
            (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled),
+       gstInvoiceProfileStore =
+           gstInvoiceProfileStore ??
+           ((reviewDataEnabled ??
+                   (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
+               ? _BuyV2DeviceReviewGstInvoiceProfileStore()
+               : null),
        commerceAdapter =
            commerceAdapter ??
            ((reviewDataEnabled ??
