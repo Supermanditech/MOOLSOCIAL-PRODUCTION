@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show immutable, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/design/mool_design_system.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
@@ -2129,6 +2132,15 @@ class _CatalogueToolsMenu extends StatelessWidget {
                 showBuyV2HouseholdBasket(context, session);
               },
             ),
+          if (session.destination == BuyV2Destination.shop ||
+              session.destination == BuyV2Destination.wholesale)
+            BuyV2FilterSheetAction(
+              keyName: 'buy-shopping-settings-button',
+              icon: Icons.tune_rounded,
+              title: 'Shopping settings',
+              detail: 'Delivery, payments, alerts and saved activity',
+              onTap: () => showBuyV2ShoppingSettings(context, session),
+            ),
           if (session.destination == BuyV2Destination.medicine)
             BuyV2FilterSheetAction(
               keyName: 'buy-prescription-button',
@@ -2225,6 +2237,391 @@ List<(String, String)> _filterOptionsFor(BuyV2Destination destination) =>
       ],
       BuyV2Destination.orders => const [],
     };
+
+Future<void> showBuyV2ShoppingSettings(
+  BuildContext context,
+  BuyV2Session session,
+) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    sheetAnimationStyle: BuyV2InfoSheetMotion.resolve(context),
+    builder: (sheetContext) => _BuyV2ShoppingSettingsSheet(session: session),
+  );
+}
+
+class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
+  const _BuyV2ShoppingSettingsSheet({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: session,
+      builder: (context, _) {
+        final recentCount =
+            session.recentlyViewedProductsFor(BuyV2Destination.shop).length +
+            session
+                .recentlyViewedProductsFor(BuyV2Destination.wholesale)
+                .length;
+        final savedCount =
+            session.savedCountFor(BuyV2Destination.shop) +
+            session.savedCountFor(BuyV2Destination.wholesale);
+        final preferredDelivery = session.selectedFulfilmentMode == null
+            ? 'No preference'
+            : buyV2FulfilmentModeLabel(session.selectedFulfilmentMode!);
+        return SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            key: const ValueKey('buy-shopping-settings'),
+            padding: EdgeInsets.fromLTRB(
+              14,
+              0,
+              14,
+              18 + MediaQuery.viewPaddingOf(context).bottom,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Shopping settings',
+                  style: context.buyTitle.copyWith(fontSize: 19),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Keep delivery, payment and shopping preferences easy to review.',
+                  style: context.buyMeta,
+                ),
+                const SizedBox(height: 12),
+                const _ShoppingSettingsHeading('Checkout preferences'),
+                _ShoppingSettingsRow(
+                  key: const ValueKey('buy-settings-addresses'),
+                  icon: Icons.location_on_outlined,
+                  title: 'Delivery addresses',
+                  detail:
+                      session.selectedAddressOrNull?.shortLine ??
+                      'Choose or add an address',
+                  onTap: () => showBuyV2AddressSheet(context, session),
+                ),
+                _ShoppingSettingsRow(
+                  key: const ValueKey('buy-settings-payment'),
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Payment preference',
+                  detail: session.selectedPayment.isEmpty
+                      ? 'Choose at Checkout'
+                      : session.selectedPayment,
+                  onTap: () => showBuyV2PaymentSheet(context, session),
+                ),
+                _ShoppingSettingsRow(
+                  key: const ValueKey('buy-settings-delivery'),
+                  icon: Icons.local_shipping_outlined,
+                  title: 'Preferred delivery',
+                  detail: preferredDelivery,
+                  onTap: () => _showBuyV2DeliveryPreference(context, session),
+                ),
+                const SizedBox(height: 12),
+                const _ShoppingSettingsHeading('Orders and activity'),
+                _ShoppingSettingsRow(
+                  key: const ValueKey('buy-settings-order-alerts'),
+                  icon: Icons.notifications_active_outlined,
+                  title: 'Order notifications',
+                  detail: session.trackingAlertsBusy
+                      ? 'Updating preference…'
+                      : !session.trackingAlertsAvailable
+                      ? 'Unavailable right now'
+                      : session.trackingAlertsEnabled
+                      ? 'Order and delivery alerts are on'
+                      : 'Order and delivery alerts are paused',
+                  trailing: Switch.adaptive(
+                    value:
+                        session.trackingAlertsAvailable &&
+                        session.trackingAlertsEnabled,
+                    onChanged:
+                        session.trackingAlertsBusy ||
+                            !session.trackingAlertsAvailable
+                        ? null
+                        : (value) =>
+                              unawaited(session.setTrackingAlerts(value)),
+                  ),
+                  onTap:
+                      session.trackingAlertsBusy ||
+                          !session.trackingAlertsAvailable
+                      ? null
+                      : () => unawaited(
+                          session.setTrackingAlerts(
+                            !session.trackingAlertsEnabled,
+                          ),
+                        ),
+                ),
+                _ShoppingSettingsRow(
+                  key: const ValueKey('buy-settings-saved'),
+                  icon: Icons.bookmark_border_rounded,
+                  title: 'Saved products',
+                  detail: '$savedCount saved',
+                  onTap: () => showBuyV2SavedProducts(context, session),
+                ),
+                _ShoppingSettingsRow(
+                  key: const ValueKey('buy-settings-recently-viewed'),
+                  icon: Icons.history_rounded,
+                  title: 'Recently viewed',
+                  detail: recentCount == 0
+                      ? 'No recently viewed products'
+                      : '$recentCount recently viewed',
+                  onTap: recentCount == 0
+                      ? null
+                      : () =>
+                            _confirmClearBuyV2RecentlyViewed(context, session),
+                ),
+                _ShoppingSettingsRow(
+                  key: const ValueKey('buy-settings-messages'),
+                  icon: Icons.forum_outlined,
+                  title: 'Messages and blocked sellers',
+                  detail: 'Manage Shop conversations and seller access',
+                  onTap: () => _openBuyV2SettingsRoute(
+                    context,
+                    Uri(
+                      path: '/app/chat/inbox',
+                      queryParameters: {
+                        'type': 'business',
+                        'return': '/app/buy',
+                      },
+                    ).toString(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const _ShoppingSettingsHeading('Privacy and help'),
+                _ShoppingSettingsRow(
+                  key: const ValueKey('buy-settings-privacy'),
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Privacy preferences',
+                  detail: 'Control activity and communication preferences',
+                  onTap: () => _openBuyV2SettingsRoute(
+                    context,
+                    '/app/account/workspaces/preferences',
+                  ),
+                ),
+                _ShoppingSettingsRow(
+                  key: const ValueKey('buy-settings-security'),
+                  icon: Icons.security_outlined,
+                  title: 'Security and account controls',
+                  detail: 'Review sign-in, sessions and account access',
+                  onTap: () =>
+                      _openBuyV2SettingsRoute(context, '/app/account/security'),
+                ),
+                _ShoppingSettingsRow(
+                  key: const ValueKey('buy-settings-help'),
+                  icon: Icons.help_outline_rounded,
+                  title: 'Help and support',
+                  detail: 'Get help with shopping and orders',
+                  onTap: () => _openBuyV2SettingsRoute(context, '/app/ask'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ShoppingSettingsHeading extends StatelessWidget {
+  const _ShoppingSettingsHeading(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 0, 4, 5),
+    child: Text(label, style: context.buyEyebrow),
+  );
+}
+
+class _ShoppingSettingsRow extends StatelessWidget {
+  const _ShoppingSettingsRow({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.onTap,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: onTap != null,
+    enabled: onTap != null,
+    label: '$title. $detail',
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 58),
+        margin: const EdgeInsets.only(bottom: 7),
+        padding: const EdgeInsets.fromLTRB(10, 7, 8, 7),
+        decoration: buyV2CardDecoration(radius: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softBlue,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 19, color: BuyV2Colors.navy),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: context.buyBody.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    detail,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyMeta,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            trailing ??
+                Icon(
+                  onTap == null
+                      ? Icons.remove_rounded
+                      : Icons.chevron_right_rounded,
+                  color: BuyV2Colors.muted,
+                ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Future<void> _showBuyV2DeliveryPreference(
+  BuildContext context,
+  BuyV2Session session,
+) async {
+  final currentKey = switch (session.selectedFulfilmentMode) {
+    BuyV2FulfilmentMode.quickLocal => 'quick-local',
+    BuyV2FulfilmentMode.standardCourier => 'standard-courier',
+    BuyV2FulfilmentMode.bulkFreight => 'bulk-freight',
+    null => 'any',
+  };
+  final selected = await showModalBottomSheet<String>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    builder: (sheetContext) => SafeArea(
+      top: false,
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+        children: [
+          Text(
+            'Preferred delivery',
+            style: sheetContext.buyTitle.copyWith(fontSize: 18),
+          ),
+          const SizedBox(height: 5),
+          for (final option in <(String, BuyV2FulfilmentMode?, String)>[
+            ('any', null, 'No preference'),
+            (
+              'quick-local',
+              BuyV2FulfilmentMode.quickLocal,
+              'Quick local delivery',
+            ),
+            (
+              'standard-courier',
+              BuyV2FulfilmentMode.standardCourier,
+              'Standard/courier delivery',
+            ),
+            ('bulk-freight', BuyV2FulfilmentMode.bulkFreight, 'Bulk freight'),
+          ])
+            ListTile(
+              key: ValueKey('buy-settings-delivery-${option.$1}'),
+              minTileHeight: 48,
+              leading: Icon(
+                currentKey == option.$1
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: BuyV2Colors.navy,
+              ),
+              onTap: () => Navigator.of(sheetContext).pop(option.$1),
+              title: Text(option.$3),
+            ),
+        ],
+      ),
+    ),
+  );
+  if (selected == null) return;
+  session.chooseFulfilmentMode(switch (selected) {
+    'quick-local' => BuyV2FulfilmentMode.quickLocal,
+    'standard-courier' => BuyV2FulfilmentMode.standardCourier,
+    'bulk-freight' => BuyV2FulfilmentMode.bulkFreight,
+    _ => null,
+  });
+}
+
+Future<void> _confirmClearBuyV2RecentlyViewed(
+  BuildContext context,
+  BuyV2Session session,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Clear recently viewed?'),
+      content: const Text(
+        'Products you viewed in Shop and Wholesale will be removed from this device.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Keep'),
+        ),
+        FilledButton(
+          key: const ValueKey('buy-settings-recently-viewed-confirm'),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Clear'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+  session.clearRecentlyViewed(BuyV2Destination.shop);
+  session.clearRecentlyViewed(BuyV2Destination.wholesale);
+}
+
+void _openBuyV2SettingsRoute(BuildContext context, String route) {
+  final router = GoRouter.maybeOf(context);
+  if (router == null) return;
+  Navigator.of(context).pop();
+  Future<void>.microtask(() => router.push(route));
+}
 
 Future<void> showBuyV2HouseholdBasket(
   BuildContext context,
