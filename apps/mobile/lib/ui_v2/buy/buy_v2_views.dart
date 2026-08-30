@@ -6505,6 +6505,7 @@ class _OrdersContinuationRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accessibleText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
     final cards = [
       BuyV2PromotionCard(
         key: const ValueKey('buy-promotion-orders-shop'),
@@ -6535,7 +6536,7 @@ class _OrdersContinuationRail extends StatelessWidget {
     ];
     return SizedBox(
       key: const ValueKey('buy-orders-promotions'),
-      height: 90,
+      height: accessibleText ? 108 : 90,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: cards.length,
