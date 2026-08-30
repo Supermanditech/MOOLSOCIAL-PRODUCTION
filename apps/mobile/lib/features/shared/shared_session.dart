@@ -77,6 +77,12 @@ class SharedSession extends ChangeNotifier {
   final Map<String, String> _pendingSocialReportFingerprints = {};
   final Map<String, String> _pendingSocialReportKeys = {};
   int _socialReportSequence = 0;
+  final List<SocialPublishedItem> _socialSavedPosts = [];
+  String? _socialSavedCursor;
+  bool socialSavedLoading = false;
+  bool socialSavedLoaded = false;
+  bool socialSavedHasMore = false;
+  String? socialSavedError;
 
   List<SocialPublishedItem> get socialPublishedItems =>
       List<SocialPublishedItem>.unmodifiable(_socialPublishedItems);
@@ -97,6 +103,11 @@ class SharedSession extends ChangeNotifier {
   SocialModerationGateway? get _socialModerationGateway =>
       _socialContentGateway is SocialModerationGateway
       ? _socialContentGateway as SocialModerationGateway
+      : null;
+
+  SocialSavedGateway? get _socialSavedGateway =>
+      _socialContentGateway is SocialSavedGateway
+      ? _socialContentGateway as SocialSavedGateway
       : null;
 
   bool socialInteractionBusy(String postId) =>
@@ -142,6 +153,9 @@ class SharedSession extends ChangeNotifier {
 
   bool socialPostReported(String postId) =>
       _reportedSocialPosts.contains(postId);
+
+  List<SocialPublishedItem> get socialSavedPosts =>
+      List<SocialPublishedItem>.unmodifiable(_socialSavedPosts);
 
   void saveSocialReplyDraft(String postId, String value) {
     if (value.isEmpty) {
@@ -486,6 +500,55 @@ class SharedSession extends ChangeNotifier {
     }
   }
 
+  Future<bool> loadSavedSocialPosts({bool refresh = false}) async {
+    if (socialSavedLoading) return false;
+    if (!online) {
+      socialSavedError =
+          'You are offline. Previously loaded saved posts remain available.';
+      notifyListeners();
+      return false;
+    }
+    if (!authorized) {
+      socialSavedError = 'Sign in again to view your saved posts.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialSavedGateway;
+    if (gateway == null) {
+      socialSavedError =
+          'Saved posts are unavailable right now. Try again later.';
+      notifyListeners();
+      return false;
+    }
+    socialSavedLoading = true;
+    socialSavedError = null;
+    notifyListeners();
+    try {
+      final page = await gateway.saved(
+        cursor: refresh ? null : _socialSavedCursor,
+      );
+      if (refresh) _socialSavedPosts.clear();
+      for (final item in page.items) {
+        _upsertSavedSocialItem(item);
+      }
+      _socialSavedCursor = page.nextCursor;
+      socialSavedHasMore = page.nextCursor != null;
+      socialSavedLoaded = true;
+      socialSavedError = null;
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      socialSavedError = error.message;
+      return false;
+    } on Object {
+      socialSavedError =
+          'Saved posts could not load. Check your connection and try again.';
+      return false;
+    } finally {
+      socialSavedLoading = false;
+      notifyListeners();
+    }
+  }
+
   String filterFor(SharedScreenSpec spec) =>
       filters[spec.screen] ?? spec.filters.first;
 
@@ -540,6 +603,12 @@ class SharedSession extends ChangeNotifier {
     _pendingSocialReportFingerprints.clear();
     _pendingSocialReportKeys.clear();
     _socialReportSequence = 0;
+    _socialSavedPosts.clear();
+    _socialSavedCursor = null;
+    socialSavedLoading = false;
+    socialSavedLoaded = false;
+    socialSavedHasMore = false;
+    socialSavedError = null;
     notifyListeners();
   }
 
@@ -1027,6 +1096,13 @@ class SharedSession extends ChangeNotifier {
         choiceIndex: choiceIndex,
       );
       _upsertSocialItem(updated);
+      if (interaction == 'save') {
+        if (updated.saved) {
+          _upsertSavedSocialItem(updated);
+        } else {
+          _socialSavedPosts.removeWhere((item) => item.id == updated.id);
+        }
+      }
       _socialInteractionErrors.remove(id);
       clearMessages();
       notifyListeners();
@@ -1061,6 +1137,17 @@ class SharedSession extends ChangeNotifier {
       _socialPublishedItems.add(item);
     } else {
       _socialPublishedItems.insert(0, item);
+    }
+  }
+
+  void _upsertSavedSocialItem(SocialPublishedItem item) {
+    final index = _socialSavedPosts.indexWhere(
+      (candidate) => candidate.id == item.id,
+    );
+    if (index >= 0) {
+      _socialSavedPosts[index] = item;
+    } else {
+      _socialSavedPosts.add(item);
     }
   }
 }

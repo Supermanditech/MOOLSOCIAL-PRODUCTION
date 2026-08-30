@@ -81,6 +81,36 @@ void main() {
     expect(transport.headers.single, isNot(contains('authorization')));
   });
 
+  test('Saved posts use the authenticated paged contract', () async {
+    final credentials = _Credentials();
+    final transport = _Transport((body) {
+      expect(body, {'operation': 'saved', 'limit': 20});
+      return jsonEncode({
+        'ok': true,
+        'data': {
+          'items': [
+            {...jsonDecode(_postData()) as Map<String, Object?>, 'saved': true},
+          ],
+          'nextCursor': 'saved-page-2',
+        },
+      });
+    });
+    final gateway = AuthenticatedSocialContentGateway(
+      endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialContent',
+      ),
+      credentials: credentials,
+      transport: transport,
+    );
+
+    final page = await gateway.saved();
+
+    expect(page.items.single.saved, isTrue);
+    expect(page.nextCursor, 'saved-page-2');
+    expect(credentials.modes, [SocialAppCheckTokenMode.standard]);
+    expect(transport.headers.single['authorization'], 'Bearer id-token');
+  });
+
   test('quoted publish and repost map only server-acknowledged truth', () async {
     final credentials = _Credentials();
     var call = 0;

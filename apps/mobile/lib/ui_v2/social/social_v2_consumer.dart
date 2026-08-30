@@ -401,6 +401,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   String? _resolvedFeedLinkItem;
   String? _unavailableFeedLinkItem;
   String? _openedInitialAuthorItem;
+  bool _openedInitialSaved = false;
   String? _handledInitialFeedActionToken;
   static SocialV2Tab _tabFor(String? subAction) => switch (subAction) {
     'shorts' => SocialV2Tab.shorts,
@@ -677,6 +678,8 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         unawaited(_loadInitialSocialFeed());
       } else if (_hasSharedFeedTarget) {
         unawaited(_resolveSharedFeedItem());
+      } else {
+        _maybeOpenInitialSaved();
       }
     }
   }
@@ -811,6 +814,21 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   Future<void> _loadInitialSocialFeed() async {
     await widget.sharedSession.loadSocialFeed(refresh: true);
     await _resolveSharedFeedItem();
+    _maybeOpenInitialSaved();
+  }
+
+  void _maybeOpenInitialSaved() {
+    if (_openedInitialSaved ||
+        !mounted ||
+        _tab != SocialV2Tab.feed ||
+        widget.initialState != 'saved' ||
+        !widget.session.isAuthenticated) {
+      return;
+    }
+    _openedInitialSaved = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openSavedPosts();
+    });
   }
 
   bool get _hasSharedFeedTarget =>
@@ -3110,6 +3128,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           onProfile: _openAccount,
           onCreate: _openCreationGateway,
           onDiscover: () => _openFeedChatSection('discover'),
+          onSaved: _openSavedPosts,
           onRetry: () {
             if (_feedState != 'empty') {
               setState(() => _feedState = 'empty');
@@ -3754,6 +3773,32 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                   Navigator.of(context).pop();
                   unawaited(_startPostReport(item));
                 },
+        ),
+      ],
+    );
+  }
+
+  void _openSavedPosts() {
+    if (!widget.session.isAuthenticated) {
+      widget.session.beginSignIn(
+        returnLocation: '/app/social?sub=feed&state=saved',
+        cancelLocation: '/app/social?sub=feed',
+      );
+      return;
+    }
+    showSocialV2Sheet(
+      context,
+      title: 'Saved posts',
+      subtitle: 'Private to your MoolSocial account',
+      children: [
+        _SocialSavedPostsPanelV2(
+          session: widget.sharedSession,
+          onOpenPost: (item) {
+            Navigator.of(context).pop();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _openPostDetail(item);
+            });
+          },
         ),
       ],
     );
@@ -4422,6 +4467,7 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
     required this.onProfile,
     required this.onCreate,
     required this.onDiscover,
+    required this.onSaved,
     required this.onRetry,
   });
 
@@ -4439,6 +4485,7 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
   final VoidCallback onProfile;
   final VoidCallback onCreate;
   final VoidCallback onDiscover;
+  final VoidCallback onSaved;
   final VoidCallback onRetry;
 
   @override
@@ -4617,6 +4664,17 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
               ),
               icon: const Icon(Icons.person_search_outlined, size: 18),
               label: const Text('Discover people'),
+            ),
+            OutlinedButton.icon(
+              key: const Key('screen04-feed-saved-posts'),
+              onPressed: onSaved,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(44, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                visualDensity: VisualDensity.compact,
+              ),
+              icon: const Icon(Icons.bookmark_outline_rounded, size: 18),
+              label: const Text('Saved posts'),
             ),
           ],
         ),
@@ -7078,6 +7136,165 @@ class _VideoChannelIdentity extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SocialSavedPostsPanelV2 extends StatefulWidget {
+  const _SocialSavedPostsPanelV2({
+    required this.session,
+    required this.onOpenPost,
+  });
+
+  final SharedSession session;
+  final ValueChanged<SocialPublishedItem> onOpenPost;
+
+  @override
+  State<_SocialSavedPostsPanelV2> createState() =>
+      _SocialSavedPostsPanelV2State();
+}
+
+class _SocialSavedPostsPanelV2State extends State<_SocialSavedPostsPanelV2> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(widget.session.loadSavedSocialPosts(refresh: true));
+      }
+    });
+  }
+
+  Future<void> _remove(SocialPublishedItem item) async {
+    final removed = await widget.session.toggleSocialSave(item.id);
+    if (!mounted || removed) return;
+    showSocialV2Message(
+      context,
+      widget.session.socialInteractionError(item.id) ??
+          'This post remains saved. Try again.',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.session,
+    builder: (context, _) {
+      final posts = widget.session.socialSavedPosts;
+      final loading = widget.session.socialSavedLoading;
+      final error = widget.session.socialSavedError;
+      return Column(
+        key: const Key('social-saved-posts-panel'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (loading && posts.isEmpty)
+            const Center(child: CircularProgressIndicator.adaptive())
+          else if (posts.isEmpty)
+            const SocialV2Notice(
+              title: 'No saved posts yet',
+              detail:
+                  'Use Save on a Feed post to keep it private in this list.',
+            )
+          else ...[
+            for (final item in posts)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SocialV2Card(
+                  key: Key('social-saved-post-${item.id}'),
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.bookmark_rounded,
+                            color: SocialV2Colors.navy,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${item.authorName} · ${item.authorHandle}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: SocialV2Colors.navy,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  item.body.isEmpty ? 'Media post' : item.body,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: SocialV2Colors.ink,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          TextButton.icon(
+                            key: Key('social-saved-open-${item.id}'),
+                            onPressed: () => widget.onOpenPost(item),
+                            icon: const Icon(Icons.open_in_new_rounded),
+                            label: const Text('Open post'),
+                          ),
+                          const Spacer(),
+                          TextButton(
+                            key: Key('social-saved-remove-${item.id}'),
+                            onPressed:
+                                widget.session.socialInteractionBusy(item.id)
+                                ? null
+                                : () => unawaited(_remove(item)),
+                            child: Text(
+                              widget.session.socialInteractionBusy(item.id)
+                                  ? 'Removing…'
+                                  : 'Remove',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+          if (error != null) ...[
+            SocialV2Notice(
+              title: 'Saved posts did not refresh',
+              detail: error,
+              warning: true,
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (error != null && posts.isEmpty)
+            OutlinedButton.icon(
+              key: const Key('social-saved-retry'),
+              onPressed: loading
+                  ? null
+                  : () => widget.session.loadSavedSocialPosts(refresh: true),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Retry saved posts'),
+            ),
+          if (posts.isNotEmpty && widget.session.socialSavedHasMore)
+            OutlinedButton.icon(
+              key: const Key('social-saved-load-more'),
+              onPressed: loading ? null : widget.session.loadSavedSocialPosts,
+              icon: const Icon(Icons.expand_more_rounded),
+              label: Text(loading ? 'Loading posts' : 'Load more'),
+            ),
+        ],
+      );
+    },
+  );
 }
 
 class _SocialPostDetailV2 extends StatefulWidget {

@@ -8,7 +8,8 @@ class ReviewSocialContentGateway
         SocialContentGateway,
         SocialCommentGateway,
         SocialAuthorGateway,
-        SocialModerationGateway {
+        SocialModerationGateway,
+        SocialSavedGateway {
   ReviewSocialContentGateway({DateTime Function()? now})
     : _now = now ?? DateTime.now;
 
@@ -78,6 +79,17 @@ class ReviewSocialContentGateway
     return SocialFeedPage(
       items: List.unmodifiable(_items.sublist(offset, end)),
       nextCursor: end < _items.length ? '$end' : null,
+    );
+  }
+
+  @override
+  Future<SocialFeedPage> saved({String? cursor, int limit = 20}) async {
+    final savedItems = _items.where((item) => item.saved).toList();
+    final offset = cursor == null ? 0 : int.tryParse(cursor) ?? 0;
+    final end = min(offset + limit, savedItems.length);
+    return SocialFeedPage(
+      items: List.unmodifiable(savedItems.sublist(offset, end)),
+      nextCursor: end < savedItems.length ? '$end' : null,
     );
   }
 

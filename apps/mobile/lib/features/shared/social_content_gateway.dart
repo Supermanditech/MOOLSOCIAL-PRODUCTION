@@ -152,6 +152,10 @@ abstract interface class SocialModerationGateway {
   });
 }
 
+abstract interface class SocialSavedGateway {
+  Future<SocialFeedPage> saved({String? cursor, int limit = 20});
+}
+
 SocialContentGateway buildSocialContentGateway() {
   if (moolSocialContentUrl.trim().isEmpty) {
     return const UnavailableSocialContentGateway();
@@ -168,7 +172,8 @@ class UnavailableSocialContentGateway
         SocialContentGateway,
         SocialCommentGateway,
         SocialAuthorGateway,
-        SocialModerationGateway {
+        SocialModerationGateway,
+        SocialSavedGateway {
   const UnavailableSocialContentGateway();
 
   @override
@@ -217,6 +222,10 @@ class UnavailableSocialContentGateway
     required String idempotencyKey,
   }) => Future<void>.error(_unavailable());
 
+  @override
+  Future<SocialFeedPage> saved({String? cursor, int limit = 20}) =>
+      Future<SocialFeedPage>.error(_unavailable());
+
   static SocialContentGatewayException _unavailable() =>
       const SocialContentGatewayException(
         code: 'service_unavailable',
@@ -236,7 +245,8 @@ class UiReviewSocialContentGateway
         SocialContentGateway,
         SocialCommentGateway,
         SocialAuthorGateway,
-        SocialModerationGateway {
+        SocialModerationGateway,
+        SocialSavedGateway {
   UiReviewSocialContentGateway({DateTime Function()? now})
     : _now = now ?? DateTime.now {
     final current = _now();
@@ -402,6 +412,10 @@ class UiReviewSocialContentGateway
     required String idempotencyKey,
   }) => Future<void>.error(_writeUnavailable());
 
+  @override
+  Future<SocialFeedPage> saved({String? cursor, int limit = 20}) async =>
+      const SocialFeedPage(items: <SocialPublishedItem>[]);
+
   static SocialContentGatewayException _writeUnavailable() =>
       const SocialContentGatewayException(
         code: 'ui_review_read_only',
@@ -557,7 +571,8 @@ class AuthenticatedSocialContentGateway
         SocialContentGateway,
         SocialCommentGateway,
         SocialAuthorGateway,
-        SocialModerationGateway {
+        SocialModerationGateway,
+        SocialSavedGateway {
   AuthenticatedSocialContentGateway({
     required Uri endpoint,
     required this._credentials,
@@ -604,6 +619,26 @@ class AuthenticatedSocialContentGateway
     final items = _list(
       data['items'],
     ).map((item) => _decodePost(_map(item))).toList(growable: false);
+    return SocialFeedPage(
+      items: List.unmodifiable(items),
+      nextCursor: _optionalString(data['nextCursor']),
+    );
+  }
+
+  @override
+  Future<SocialFeedPage> saved({String? cursor, int limit = 20}) async {
+    final data = _map(
+      await _invoke('saved', body: {'limit': limit, 'cursor': ?cursor}),
+    );
+    final items = _list(
+      data['items'],
+    ).map((item) => _decodePost(_map(item))).toList(growable: false);
+    if (items.any((item) => !item.saved)) {
+      throw const SocialContentGatewayException(
+        code: 'invalid_response',
+        message: 'MoolSocial returned content that is not saved.',
+      );
+    }
     return SocialFeedPage(
       items: List.unmodifiable(items),
       nextCursor: _optionalString(data['nextCursor']),

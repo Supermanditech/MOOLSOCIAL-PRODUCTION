@@ -102,6 +102,10 @@ void main() {
         find.byKey(const Key('screen04-feed-network-discover')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('screen04-feed-saved-posts')),
+        findsOneWidget,
+      );
       expect(find.text('Like'), findsWidgets);
       expect(find.text('Comment'), findsWidgets);
 
@@ -835,6 +839,115 @@ void main() {
     expect(socialGateway.reports.single.$2, SocialReportReason.spam);
     expect(shared.socialPostReported(item.id), isTrue);
     expect(find.textContaining('Report sent'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('C30T guest Saved posts preserves the exact return', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final journey = JourneySession(
+      store: MemoryJourneyStore(snapshot: readySnapshot),
+      allowGuestReady: true,
+    );
+    final creator = CreatorSession();
+    final retailer = RetailerSession();
+    final shared = SharedSession(
+      socialContentGateway: UiReviewSocialContentGateway(),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(creator.dispose);
+    addTearDown(retailer.dispose);
+    addTearDown(shared.dispose);
+    await journey.start();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SocialUniversalV2(
+          session: journey,
+          creatorSession: creator,
+          retailerSession: retailer,
+          sharedSession: shared,
+          initialSubAction: 'feed',
+          enableCreateReviewPreview: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('screen04-feed-saved-posts')));
+    await tester.pump();
+
+    expect(journey.stage, JourneyStage.signIn);
+    expect(journey.returnTo, '/app/social?sub=feed&state=saved');
+    expect(journey.readyRoute(), '/app/social?sub=feed');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('C30T Saved posts opens the selected public post', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final journey = JourneySession(
+      store: MemoryJourneyStore(snapshot: readySnapshot),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+    );
+    final creator = CreatorSession();
+    final retailer = RetailerSession();
+    final socialGateway = ReviewSocialContentGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    addTearDown(journey.dispose);
+    addTearDown(creator.dispose);
+    addTearDown(retailer.dispose);
+    addTearDown(shared.dispose);
+    final item = await socialGateway.publish(
+      const SocialPublishDraft(
+        idempotencyKey: 'saved-post-library',
+        type: SocialPublishedContentType.post,
+        authorName: 'Riya Sharma',
+        authorHandle: '@riyasharma',
+        body: 'A useful post saved for later.',
+        audience: 'Public',
+        mediaPaths: <String>[],
+        mediaAreAssets: false,
+        choices: <SocialPublishedChoice>[],
+      ),
+    );
+    await journey.start();
+    await shared.loadSocialFeed(refresh: true);
+    expect(await shared.toggleSocialSave(item.id), isTrue);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SocialUniversalV2(
+          session: journey,
+          creatorSession: creator,
+          retailerSession: retailer,
+          sharedSession: shared,
+          initialSubAction: 'feed',
+          youtubePublicAccessOverride: false,
+          youtubeCreatorAccessOverride: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('screen04-feed-saved-posts')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('social-saved-posts-panel')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(Key('social-saved-post-${item.id}')),
+        matching: find.text('A useful post saved for later.'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(Key('social-saved-open-${item.id}')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(Key('social-post-detail-${item.id}')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
