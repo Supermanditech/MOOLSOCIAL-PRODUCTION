@@ -20,6 +20,8 @@ class ChatInboxScreen extends StatefulWidget {
   const ChatInboxScreen({
     required this.session,
     required this.returnRoute,
+    this.authenticated = true,
+    this.onAuthenticationRequired,
     this.socialSession,
     this.initialFilter,
     this.initialTargetUserId,
@@ -30,6 +32,8 @@ class ChatInboxScreen extends StatefulWidget {
 
   final ChatSession session;
   final String returnRoute;
+  final bool authenticated;
+  final VoidCallback? onAuthenticationRequired;
   final SharedSession? socialSession;
   final ChatThreadType? initialFilter;
   final String? initialTargetUserId;
@@ -64,7 +68,11 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     _section = widget.initialSection;
     _searchFocusNode.addListener(_handleSearchFocusChange);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _queueRouteApplication();
+      if (!mounted) return;
+      _queueRouteApplication();
+      if (_section != ChatHomeSection.chats) {
+        unawaited(_ensurePeopleDirectory());
+      }
     });
   }
 
@@ -90,6 +98,9 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         oldWidget.returnRoute != widget.returnRoute) {
       if (oldWidget.initialSection != widget.initialSection) {
         _section = widget.initialSection;
+        if (_section != ChatHomeSection.chats) {
+          unawaited(_ensurePeopleDirectory());
+        }
       }
       _queueRouteApplication();
     }
@@ -223,7 +234,10 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           .toList(growable: false);
       await Future.wait(
         authorIds.map(
-          (authorId) => social.loadSocialAuthor(authorId, authenticated: true),
+          (authorId) => social.loadSocialAuthor(
+            authorId,
+            authenticated: widget.authenticated,
+          ),
         ),
       );
       if (!mounted || request != _peopleRequest) return;
@@ -297,6 +311,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   }
 
   Future<void> _toggleConnection(ChatPersonEntry person) async {
+    if (!_requirePeopleAuthentication()) return;
     final social = widget.socialSession;
     if (social == null) return;
     var profile = social.socialAuthorProfile(person.authorId);
@@ -309,6 +324,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   }
 
   Future<void> _startPersonChat(ChatPersonEntry person) async {
+    if (!_requirePeopleAuthentication()) return;
     final approved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -340,6 +356,21 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         ),
       ),
     );
+  }
+
+  bool _requirePeopleAuthentication() {
+    if (widget.authenticated) return true;
+    final callback = widget.onAuthenticationRequired;
+    if (callback != null) {
+      callback();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sign in to follow people or request a conversation.'),
+        ),
+      );
+    }
+    return false;
   }
 
   int get _sectionIndex => ChatHomeSection.values.indexOf(_section);
@@ -575,6 +606,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
               ChatHomeSection.discover => ChatPeopleDirectory(
                 key: ValueKey('chat-section-body-${_section.name}'),
                 section: _section,
+                authenticated: widget.authenticated,
                 searchController: _peopleSearchController,
                 people: people,
                 loading: _loadingPeopleDirectory,

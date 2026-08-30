@@ -4492,11 +4492,25 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
             ],
           ),
         ),
-        if (reviewPreview && content.isNotEmpty)
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: _FeedPreviewLabel(),
-          ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (reviewPreview && content.isNotEmpty) const _FeedPreviewLabel(),
+            OutlinedButton.icon(
+              key: const Key('screen04-feed-network-discover'),
+              onPressed: onDiscover,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(44, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                visualDensity: VisualDensity.compact,
+              ),
+              icon: const Icon(Icons.person_search_outlined, size: 18),
+              label: const Text('Discover people'),
+            ),
+          ],
+        ),
         if (searchOpen)
           TextField(
             key: const Key('screen04-feed-search-input'),

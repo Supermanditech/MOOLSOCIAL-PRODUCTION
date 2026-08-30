@@ -570,6 +570,12 @@ GoRouter createJourneyRouter(
               key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
               session: chatSession,
               socialSession: sharedSession,
+              authenticated: session.isAuthenticated,
+              onAuthenticationRequired: () => session.beginSignIn(
+                returnLocation: state.uri.toString(),
+                cancelLocation:
+                    state.uri.queryParameters['return'] ?? '/app/social',
+              ),
               initialFilter: filter,
               initialTargetUserId: state.uri.queryParameters['start'],
               initialMessageDraft: state.uri.queryParameters['draft'],
@@ -593,6 +599,12 @@ GoRouter createJourneyRouter(
               key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
               session: chatSession,
               socialSession: sharedSession,
+              authenticated: session.isAuthenticated,
+              onAuthenticationRequired: () => session.beginSignIn(
+                returnLocation: state.uri.toString(),
+                cancelLocation:
+                    state.uri.queryParameters['return'] ?? '/app/social',
+              ),
               initialFilter: filter,
               initialTargetUserId: state.uri.queryParameters['start'],
               initialMessageDraft: state.uri.queryParameters['draft'],

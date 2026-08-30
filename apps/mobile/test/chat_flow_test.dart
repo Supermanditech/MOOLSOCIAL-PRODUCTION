@@ -29,6 +29,22 @@ void main() {
     return session;
   }
 
+  Future<JourneySession> readyGuestJourney() async {
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'manual',
+          areaLabel: 'Sardarpura',
+          setupComplete: true,
+        ),
+      ),
+      allowGuestReady: true,
+    );
+    await session.start();
+    return session;
+  }
+
   Future<void> mount(
     WidgetTester tester, {
     required String route,
@@ -546,6 +562,15 @@ void main() {
     expect(find.text('Alice News'), findsWidgets);
     expect(find.text('Public discovery post'), findsWidgets);
 
+    await tapVisible(tester, const Key('screen04-feed-network-discover'));
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+
     await tapVisible(tester, const Key('social-public-like-post-a'));
     await tester.pumpAndSettle();
     expect(socialGateway.interactions, [('post-a', 'like')]);
@@ -556,11 +581,10 @@ void main() {
       find.byKey(const Key('social-author-panel-person-a')),
       findsOneWidget,
     );
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
-
-    await tapVisible(tester, const Key('social-message-author-post-a'));
+    await tapVisible(
+      tester,
+      const Key('social-author-message-request-person-a'),
+    );
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('social-message-request-dialog-person-a')),
@@ -664,6 +688,42 @@ void main() {
     expect(find.byKey(const Key('chat-thread-screen')), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'guest Discover stays readable and preserves exact sign-in return',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final journey = await readyGuestJourney();
+      final socialGateway = _PeopleSocialGateway();
+      final shared = SharedSession(socialContentGateway: socialGateway);
+      final chat = ChatSession.production(gateway: _PeopleChatGateway());
+      addTearDown(journey.dispose);
+      addTearDown(shared.dispose);
+      addTearDown(chat.dispose);
+
+      await mount(
+        tester,
+        route:
+            '/app/chat/inbox?section=discover&return=%2Fapp%2Fsocial%3Fsub%3Dfeed',
+        journey: journey,
+        chat: chat,
+        sharedSession: shared,
+        size: const Size(360, 800),
+      );
+
+      expect(find.text('Alice News'), findsOneWidget);
+      expect(find.text('Sign in to follow'), findsWidgets);
+      await tapVisible(tester, const Key('chat-person-connect-person-a'));
+      await tester.pumpAndSettle();
+
+      expect(journey.stage, JourneyStage.signIn);
+      expect(journey.returnTo, contains('/app/chat/inbox'));
+      expect(journey.returnTo, contains('section=discover'));
+      expect(socialGateway.followed['person-a'], isFalse);
+      expect(find.byKey(const Key('screen03-login-v5')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'Following search, clear and unfollow complete without a dead end',

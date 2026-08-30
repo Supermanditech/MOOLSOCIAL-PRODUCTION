@@ -98,6 +98,10 @@ void main() {
         find.byKey(const Key('social-author-relationship-UI-REVIEW-FEED-001')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('screen04-feed-network-discover')),
+        findsOneWidget,
+      );
       expect(find.text('Like'), findsWidgets);
       expect(find.text('Comment'), findsWidgets);
 

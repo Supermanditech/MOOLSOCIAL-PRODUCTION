@@ -56,6 +56,7 @@ class ChatPersonEntry {
 class ChatPeopleDirectory extends StatelessWidget {
   const ChatPeopleDirectory({
     required this.section,
+    required this.authenticated,
     required this.searchController,
     required this.people,
     required this.loading,
@@ -72,6 +73,7 @@ class ChatPeopleDirectory extends StatelessWidget {
   });
 
   final ChatHomeSection section;
+  final bool authenticated;
   final TextEditingController searchController;
   final List<ChatPersonEntry> people;
   final bool loading;
@@ -267,6 +269,7 @@ class ChatPeopleDirectory extends StatelessWidget {
                   index: index,
                   child: _PersonCard(
                     person: people[index],
+                    authenticated: authenticated,
                     onConnect: () => onConnect(people[index]),
                     onChat: () => onChat(people[index]),
                   ),
@@ -282,11 +285,13 @@ class ChatPeopleDirectory extends StatelessWidget {
 class _PersonCard extends StatelessWidget {
   const _PersonCard({
     required this.person,
+    required this.authenticated,
     required this.onConnect,
     required this.onChat,
   });
 
   final ChatPersonEntry person;
+  final bool authenticated;
   final VoidCallback onConnect;
   final VoidCallback onChat;
 
@@ -404,7 +409,13 @@ class _PersonCard extends StatelessWidget {
                                 ? Icons.person_rounded
                                 : Icons.person_add_alt_1_rounded,
                           ),
-                    label: Text(person.connected ? 'Following' : 'Follow'),
+                    label: Text(
+                      person.connected
+                          ? 'Following'
+                          : authenticated
+                          ? 'Follow'
+                          : 'Sign in to follow',
+                    ),
                   ),
                 ),
                 const SizedBox(width: MoolSpacing.xs),
@@ -422,7 +433,9 @@ class _PersonCard extends StatelessWidget {
                     label: Text(
                       person.messageRequestPending
                           ? 'Awaiting approval'
-                          : 'Request chat',
+                          : authenticated
+                          ? 'Request chat'
+                          : 'Sign in to request',
                     ),
                   ),
                 ),
