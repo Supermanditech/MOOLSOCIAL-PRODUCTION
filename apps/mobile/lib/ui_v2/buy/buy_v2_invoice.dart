@@ -104,10 +104,13 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
     final exportedBottomClearance =
         defaultTargetPlatform == TargetPlatform.android
         ? math.max(
-            viewPadding.bottom,
-            moolAndroidExportedSemanticsClearance(
-              viewPadding: viewPadding,
-              platform: defaultTargetPlatform,
+            36.0,
+            math.max(
+              viewPadding.bottom,
+              moolAndroidExportedSemanticsClearance(
+                viewPadding: viewPadding,
+                platform: defaultTargetPlatform,
+              ),
             ),
           )
         : 0.0;

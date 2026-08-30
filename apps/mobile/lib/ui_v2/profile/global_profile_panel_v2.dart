@@ -315,10 +315,13 @@ class GlobalProfilePanelV2 extends StatelessWidget {
     final exportedBottomClearance =
         defaultTargetPlatform == TargetPlatform.android
         ? math.max(
-            viewPadding.bottom,
-            (viewPadding.top - exportedTargetOverflow)
-                .clamp(0, double.infinity)
-                .toDouble(),
+            24.0,
+            math.max(
+              viewPadding.bottom,
+              (viewPadding.top - exportedTargetOverflow)
+                  .clamp(0, double.infinity)
+                  .toDouble(),
+            ),
           )
         : 0.0;
     return _GlobalProfilePaletteScope(

@@ -21,7 +21,10 @@ double _preferencesSheetBottomInset(BuildContext context) {
   final exportedClearance = defaultTargetPlatform == TargetPlatform.android
       ? (rawTop - exportedTargetOverflow).clamp(0, double.infinity).toDouble()
       : 0.0;
-  return math.max(mediaBottom, math.max(rawBottom, exportedClearance));
+  return math.max(
+    24.0,
+    math.max(mediaBottom, math.max(rawBottom, exportedClearance)),
+  );
 }
 
 class GlobalPrivacyPreferencesV2 extends StatelessWidget {
