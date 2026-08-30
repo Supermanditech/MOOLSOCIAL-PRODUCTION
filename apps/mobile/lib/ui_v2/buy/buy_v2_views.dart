@@ -7297,6 +7297,12 @@ class BuyV2TrackingView extends StatelessWidget {
               label: order.partnerType,
               value: order.partner,
             ),
+            if (order.buyerName case final buyer?)
+              _DecisionRow(
+                icon: Icons.business_outlined,
+                label: order.buyerType ?? 'Buyer',
+                value: buyer,
+              ),
             _DecisionRow(
               icon: Icons.local_shipping_outlined,
               label: order.deliveryPartnerType ?? 'Delivery partner',
@@ -7364,6 +7370,12 @@ class BuyV2TrackingView extends StatelessWidget {
                 icon: Icons.payments_outlined,
                 label: 'Paid now',
                 value: buyV2Money(paidNow),
+              ),
+            if (order.paymentStatusLabel case final paymentStatus?)
+              _DecisionRow(
+                icon: Icons.verified_outlined,
+                label: 'Payment status',
+                value: paymentStatus,
               ),
             if (order.balanceDue > 0)
               _DecisionRow(

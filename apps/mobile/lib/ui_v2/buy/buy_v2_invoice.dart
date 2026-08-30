@@ -334,6 +334,10 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                   ),
                   _InvoiceFact(label: 'Seller', value: order.partner),
                   _InvoiceFact(label: 'Seller role', value: order.partnerType),
+                  if (order.buyerName case final buyer?)
+                    _InvoiceFact(label: 'Buyer', value: buyer),
+                  if (order.buyerType case final buyerType?)
+                    _InvoiceFact(label: 'Buyer role', value: buyerType),
                   if (order.paymentMethod case final payment?)
                     _InvoiceFact(label: 'Payment method', value: payment),
                   if (order.paymentTermLabel case final term?)
@@ -343,6 +347,8 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                       label: 'Amount paid now',
                       value: buyV2Money(paidNow),
                     ),
+                  if (order.paymentStatusLabel case final paymentStatus?)
+                    _InvoiceFact(label: 'Payment status', value: paymentStatus),
                   if (order.balanceDue > 0)
                     _InvoiceFact(
                       label: 'Balance due',

@@ -676,10 +676,18 @@ class BuyV2Session extends ChangeNotifier {
       id: 'PO-240783',
       destination: BuyV2Destination.wholesale,
       title: 'Wholesale order',
-      itemSummary: '1 trade product · Shree Balaji Retail',
+      itemSummary: '1 trade product · Work receiving · Basni',
       total: 4200,
       partner: 'Marwar Foods Distribution',
       partnerType: 'Mool Trade Partner',
+      buyerName: 'Shree Balaji Retail',
+      buyerType: 'Verified retailer Workspace',
+      paymentMethod: 'Bank transfer',
+      paymentTermLabel: 'Booking amount with balance at delivery',
+      amountPaidNow: 1260,
+      balanceDue: 2940,
+      balanceDueLabel: 'Due at delivery · Thu, 30 Jul',
+      paymentStatusLabel: 'Booking amount paid · balance due at delivery',
       promise: 'Thu, 30 Jul · 10:00 am–2:00 pm',
       destinationLabel: 'Basni · 342005',
       progress: .34,
@@ -715,10 +723,16 @@ class BuyV2Session extends ChangeNotifier {
       id: 'PO-240728',
       destination: BuyV2Destination.wholesale,
       title: 'Wholesale order',
-      itemSummary: '3 trade products · Shree Balaji Retail',
+      itemSummary: '3 trade products · Work receiving · Basni',
       total: 8460,
       partner: 'Marwar Foods Distribution',
       partnerType: 'Mool Trade Partner',
+      buyerName: 'Shree Balaji Retail',
+      buyerType: 'Verified retailer Workspace',
+      paymentMethod: 'Bank transfer',
+      paymentTermLabel: 'Full advance',
+      amountPaidNow: 8460,
+      paymentStatusLabel: 'Paid in full',
       promise: 'Delivered · 23 Jul · 1:18 pm',
       destinationLabel: 'Basni · 342005',
       progress: 1,
@@ -4595,6 +4609,17 @@ class BuyV2Session extends ChangeNotifier {
       amountPaidNow: paymentTerm?.amountDueNow,
       balanceDue: paymentTerm?.balanceDue ?? 0,
       balanceDueLabel: paymentTerm?.balanceDueLabel,
+      paymentStatusLabel: paymentTerm == null
+          ? null
+          : paymentTerm.balanceDue == 0
+          ? 'Paid in full'
+          : 'Booking amount paid · balance ${paymentTerm.balanceDueLabel}',
+      buyerName: group.destination == BuyV2Destination.wholesale
+          ? 'Shree Balaji Retail'
+          : null,
+      buyerType: group.destination == BuyV2Destination.wholesale
+          ? 'Verified retailer Workspace'
+          : null,
       tax: tax,
       freight: freight,
       deliveryFee: deliveryFee,

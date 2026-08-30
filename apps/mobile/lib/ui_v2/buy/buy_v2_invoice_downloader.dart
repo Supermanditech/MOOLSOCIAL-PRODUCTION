@@ -67,11 +67,15 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
     'Order type: ${_destinationLabel(order.destination)}',
     'Seller: ${_invoiceText(order.partner)}',
     'Seller role: ${_invoiceText(order.partnerType)}',
+    if (order.buyerName case final value?) 'Buyer: ${_invoiceText(value)}',
+    if (order.buyerType case final value?) 'Buyer role: ${_invoiceText(value)}',
     if (order.paymentMethod case final value?)
       'Payment method: ${_invoiceText(value)}',
     if (order.paymentTermLabel case final value?)
       'Payment term: ${_invoiceText(value)}',
     if (order.amountPaidNow case final value?) 'Amount paid now: INR $value',
+    if (order.paymentStatusLabel case final value?)
+      'Payment status: ${_invoiceText(value)}',
     if (order.balanceDue > 0)
       'Balance due: INR ${order.balanceDue} - '
           '${_invoiceText(order.balanceDueLabel ?? 'Due later')}',
