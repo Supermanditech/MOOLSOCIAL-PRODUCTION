@@ -3999,23 +3999,32 @@ Future<void> showBuyV2GstInvoiceSheet(
   BuildContext context, {
   required BuyV2GstInvoiceController controller,
   required BuyV2Destination destination,
-}) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  useSafeArea: true,
-  routeSettings: const RouteSettings(name: 'buy-gst-invoice-details'),
-  builder: (context) =>
-      _BuyV2GstInvoiceSheet(controller: controller, destination: destination),
-);
+}) {
+  final bottomSafeInset =
+      BuyV2AddressSheetMotion.resolveModalActionBottomInset(context) + 12.0;
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    routeSettings: const RouteSettings(name: 'buy-gst-invoice-details'),
+    builder: (context) => _BuyV2GstInvoiceSheet(
+      controller: controller,
+      destination: destination,
+      bottomSafeInset: bottomSafeInset,
+    ),
+  );
+}
 
 class _BuyV2GstInvoiceSheet extends StatefulWidget {
   const _BuyV2GstInvoiceSheet({
     required this.controller,
     required this.destination,
+    required this.bottomSafeInset,
   });
 
   final BuyV2GstInvoiceController controller;
   final BuyV2Destination destination;
+  final double bottomSafeInset;
 
   @override
   State<_BuyV2GstInvoiceSheet> createState() => _BuyV2GstInvoiceSheetState();
@@ -4094,8 +4103,8 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final modalBottomInset = media.viewInsets.bottom > 0
-        ? 12.0
-        : BuyV2AddressSheetMotion.resolveModalActionBottomInset(context);
+        ? 30.0
+        : widget.bottomSafeInset;
     return AnimatedPadding(
       key: const ValueKey('buy-gst-invoice-sheet'),
       duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),

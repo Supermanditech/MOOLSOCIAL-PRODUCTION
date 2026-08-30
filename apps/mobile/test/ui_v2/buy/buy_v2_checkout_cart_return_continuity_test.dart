@@ -1149,6 +1149,18 @@ void main() {
 
     for (final viewport in viewports) {
       tester.view.physicalSize = viewport.size;
+      tester.view.padding = FakeViewPadding(
+        left: viewport.safeArea.left,
+        top: viewport.safeArea.top,
+        right: viewport.safeArea.right,
+        bottom: viewport.safeArea.bottom,
+      );
+      tester.view.viewPadding = FakeViewPadding(
+        left: viewport.safeArea.left,
+        top: viewport.safeArea.top,
+        right: viewport.safeArea.right,
+        bottom: viewport.safeArea.bottom,
+      );
       final gstStore = _MemoryGstInvoiceProfileStore();
       final session = mixedSession(gstInvoiceProfileStore: gstStore);
       session.openCart(scope: BuyV2CartScope.wholesale);
