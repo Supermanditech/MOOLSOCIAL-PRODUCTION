@@ -95,42 +95,11 @@ class WorkPageScaffold extends StatelessWidget {
                 )
               : null,
           titleSpacing: showBack ? 4 : MoolSpacing.md,
-          title: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 240;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    key: const Key('work-page-title'),
-                    maxLines: compact ? 2 : 1,
-                    overflow: compact
-                        ? TextOverflow.clip
-                        : TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: MoolColors.ink,
-                      fontSize: compact ? 15 : 20,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: compact ? -.15 : -.35,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    key: const Key('work-page-subtitle'),
-                    maxLines: 2,
-                    overflow: TextOverflow.clip,
-                    style: TextStyle(
-                      color: MoolColors.muted,
-                      fontSize: compact ? 10.5 : 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              );
-            },
+          title: MoolServiceHeaderTitle(
+            title: title,
+            subtitle: subtitle,
+            titleKey: const Key('work-page-title'),
+            subtitleKey: const Key('work-page-subtitle'),
           ),
           actions: [
             if (showHeaderChat) ...[

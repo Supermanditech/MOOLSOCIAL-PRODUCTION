@@ -34,6 +34,60 @@ abstract final class MoolServiceHomeTokens {
   }
 }
 
+class MoolServiceHeaderTitle extends StatelessWidget {
+  const MoolServiceHeaderTitle({
+    required this.title,
+    required this.subtitle,
+    this.titleKey,
+    this.subtitleKey,
+    super.key,
+  });
+
+  final String title;
+  final String subtitle;
+  final Key? titleKey;
+  final Key? subtitleKey;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final compact = constraints.maxWidth < 240;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            key: titleKey,
+            maxLines: compact ? 2 : 1,
+            overflow: compact ? TextOverflow.clip : TextOverflow.ellipsis,
+            style: TextStyle(
+              color: MoolColors.ink,
+              fontSize: compact ? 15 : 20,
+              height: 1.05,
+              fontWeight: FontWeight.w900,
+              letterSpacing: compact ? -.15 : -.35,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            key: subtitleKey,
+            maxLines: 2,
+            overflow: TextOverflow.clip,
+            style: TextStyle(
+              color: MoolColors.muted,
+              fontSize: compact ? 10.5 : 12,
+              height: 1.1,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 class MoolServiceSearchField extends StatelessWidget {
   const MoolServiceSearchField({
     required this.hintText,
