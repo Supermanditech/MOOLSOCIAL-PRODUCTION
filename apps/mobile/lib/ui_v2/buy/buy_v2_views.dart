@@ -6091,20 +6091,6 @@ class BuyV2OrdersView extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                key: const ValueKey('buy-orders-assist'),
-                tooltip: 'MoolSocial Assist',
-                onPressed: () => onOpenOrderHelp(session.assistOrder),
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(44, 44),
-                  backgroundColor: BuyV2Colors.softBlue,
-                  foregroundColor: BuyV2Colors.navy,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                ),
-                icon: const Icon(Icons.chat_outlined, size: 20),
-              ),
             ],
           ),
         ),

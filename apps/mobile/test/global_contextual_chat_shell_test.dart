@@ -204,11 +204,7 @@ void main() {
           origin: '/app/pay/home',
           title: 'Pay Chat',
           threadId: 'pay-support',
-          excludedThreadIds: [
-            'order-support',
-            'shop-assist',
-            'workspace-support',
-          ],
+          excludedThreadIds: ['order-support', 'workspace-support'],
           returnKey: 'legacy-route-containment-standalone-pay',
         ),
       ]) {
@@ -236,6 +232,10 @@ void main() {
       expect(find.text(entry.title), findsOneWidget);
       expect(
         find.byKey(ValueKey('chat-open-thread-${entry.threadId}')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('chat-open-thread-shop-assist')),
         findsOneWidget,
       );
       for (final threadId in entry.excludedThreadIds) {

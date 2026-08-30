@@ -41,6 +41,7 @@ class ChatEntryContext {
   final Set<String>? allowedThreadPrefixes;
 
   bool allowsThread(String threadId) {
+    if (threadId == 'shop-assist') return true;
     final ids = allowedThreadIds;
     final prefixes = allowedThreadPrefixes;
     if (ids == null && prefixes == null) return true;

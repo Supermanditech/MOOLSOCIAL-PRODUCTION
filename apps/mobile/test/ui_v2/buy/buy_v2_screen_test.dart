@@ -233,7 +233,8 @@ void main() {
 
     session.openOrders();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('buy-orders-assist')));
+    expect(find.byKey(const ValueKey('buy-orders-assist')), findsNothing);
+    session.openAssist();
     await tester.pump();
 
     expect(

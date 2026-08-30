@@ -244,7 +244,7 @@ class ChatSession extends ChangeNotifier {
   final Map<String, String> _draftTextByThread = {};
   final Set<String> _readThreads = {};
   final Set<String> _markedUnreadThreads = {};
-  final Set<String> _pinnedThreadIds = {};
+  final Set<String> _pinnedThreadIds = {'shop-assist'};
   final Set<String> _reducedAttentionThreadIds = {};
   final Set<String> _archivedThreadIds = {};
   final Map<String, String> _retryKeys = {};
@@ -2338,7 +2338,9 @@ class ChatSession extends ChangeNotifier {
     _draftTextByThread.clear();
     _readThreads.clear();
     _markedUnreadThreads.clear();
-    _pinnedThreadIds.clear();
+    _pinnedThreadIds
+      ..clear()
+      ..add('shop-assist');
     _reducedAttentionThreadIds.clear();
     _archivedThreadIds.clear();
     _retryKeys.clear();

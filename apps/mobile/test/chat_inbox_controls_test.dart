@@ -69,6 +69,9 @@ void main() {
       addTearDown(chat.dispose);
 
       final rasoi = chat.thread('rasoi');
+      expect(chat.isPinnedForSession('shop-assist'), isTrue);
+      expect(chat.visibleThreads().first.id, 'shop-assist');
+      chat.setPinnedForSession('shop-assist', pinned: false);
       expect(chat.visibleThreads().first.id, isNot('rasoi'));
       chat.setPinnedForSession('rasoi', pinned: true);
       expect(chat.visibleThreads().first.id, 'rasoi');
@@ -99,11 +102,58 @@ void main() {
       chat.setHideMessagePreviewsForSession(hidden: true);
       chat.resetForAuthenticationBoundary();
       expect(chat.isPinnedForSession('rasoi'), isFalse);
+      expect(chat.isPinnedForSession('shop-assist'), isTrue);
       expect(chat.hasReducedAttentionForSession('rasoi'), isFalse);
       expect(chat.isArchivedForSession('rasoi'), isFalse);
       expect(chat.globalChatAvailableForSession, isTrue);
       expect(chat.globalReviewBeforeSendingForSession, isFalse);
       expect(chat.hideMessagePreviewsForSession, isFalse);
+    },
+  );
+
+  testWidgets(
+    'MoolSocial Assist starts on top and can be unpinned or restored',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+      await mountInbox(tester, journey: journey, chat: chat);
+
+      final assist = find.byKey(const ValueKey('chat-open-thread-shop-assist'));
+      final orderSupport = find.byKey(
+        const ValueKey('chat-open-thread-order-support'),
+      );
+      expect(chat.isPinnedForSession('shop-assist'), isTrue);
+      expect(
+        tester.getTopLeft(assist).dy,
+        lessThan(tester.getTopLeft(orderSupport).dy),
+      );
+
+      await openActions(tester, 'shop-assist');
+      expect(find.text('Unpin conversation'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('chat-action-pin-shop-assist')));
+      await tester.pumpAndSettle();
+      expect(chat.isPinnedForSession('shop-assist'), isFalse);
+      expect(
+        find.text('Conversation unpinned for this app session.'),
+        findsOneWidget,
+      );
+      await dismissFeedback(tester);
+
+      await openActions(tester, 'shop-assist');
+      expect(find.text('Pin conversation'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('chat-action-pin-shop-assist')));
+      await tester.pumpAndSettle();
+      expect(chat.isPinnedForSession('shop-assist'), isTrue);
+      expect(
+        find.text('Conversation pinned for this app session.'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
     },
   );
 
