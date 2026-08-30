@@ -314,6 +314,10 @@ void main() {
 
       await tester.tap(find.byKey(const Key('screen04-rail-videos')));
       await tester.pumpAndSettle();
+      final compactTitle = find.byKey(const Key('screen04-youtube-home-title'));
+      expect(tester.widget<Text>(compactTitle).data, 'YouTube');
+      expect(tester.getRect(compactTitle).left, greaterThanOrEqualTo(0));
+      expect(tester.getRect(compactTitle).right, lessThanOrEqualTo(320));
       expect(
         tester
             .widget<AnimatedScale>(

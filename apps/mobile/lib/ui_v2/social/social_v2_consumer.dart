@@ -4254,6 +4254,7 @@ class _YouTubeHomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 380;
     return ColoredBox(
       color: const Color(0xFF0F0F0F),
       child: SizedBox(
@@ -4263,13 +4264,14 @@ class _YouTubeHomeHeader extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
             children: [
-              const Flexible(
+              Flexible(
                 child: Text(
-                  'YouTube videos',
+                  compact ? 'YouTube' : 'YouTube videos',
+                  key: const Key('screen04-youtube-home-title'),
                   maxLines: 1,
-                  overflow: TextOverflow.fade,
+                  overflow: TextOverflow.ellipsis,
                   softWrap: false,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
