@@ -3648,11 +3648,13 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                     ],
                   ),
                 ),
-                TextButton(
+                IconButton(
+                  key: const ValueKey('buy-cart-empty'),
+                  tooltip: 'Empty cart',
                   onPressed: session.clearCart,
-                  child: const Text(
-                    'Clear',
-                    style: TextStyle(color: Color(0xFFB42318), fontSize: 10),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFB42318),
                   ),
                 ),
               ],

@@ -692,10 +692,12 @@ class BuyV2ShoppingIntentBar extends StatelessWidget {
                   ],
                 ),
               ),
-              TextButton(
+              IconButton(
                 key: const ValueKey('buy-shopping-intent-clear'),
+                tooltip: 'Dismiss $title',
                 onPressed: session.clearShoppingIntent,
-                child: const Text('Clear'),
+                icon: const Icon(Icons.close_rounded),
+                color: BuyV2Colors.navy,
               ),
             ],
           ),

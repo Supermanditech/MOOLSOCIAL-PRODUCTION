@@ -47,6 +47,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Monthly basket'), findsOneWidget);
+      expect(find.text('Clear'), findsNothing);
+      expect(find.byTooltip('Dismiss Monthly basket'), findsOneWidget);
       expect(session.visibleProducts, hasLength(12));
       final product = session.visibleProducts.first;
       expect(session.openProduct(product.id), isTrue);

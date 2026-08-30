@@ -63,6 +63,10 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('buy-cart-empty')), findsOneWidget);
+    expect(find.byTooltip('Empty cart'), findsOneWidget);
+    expect(find.text('Clear'), findsNothing);
+
     for (final product in products) {
       final packshot = find.byKey(ValueKey('buy-cart-packshot-${product.id}'));
       await showInMainCartList(tester, packshot);
