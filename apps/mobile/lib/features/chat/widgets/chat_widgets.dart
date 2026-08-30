@@ -188,7 +188,11 @@ class ChatPageScaffold extends StatelessWidget {
               backgroundColor: backgroundColor,
               appBar: AppBar(
                 automaticallyImplyLeading: false,
-                toolbarHeight: prominentTitle ? 76 : 64,
+                toolbarHeight: prominentTitle
+                    ? 76
+                    : trailing != null
+                    ? 82
+                    : 64,
                 backgroundColor: MoolColors.canvas,
                 surfaceTintColor: Colors.transparent,
                 leadingWidth: showContentBack ? 52 : 0,
@@ -215,66 +219,82 @@ class ChatPageScaffold extends StatelessWidget {
                       constraints: const BoxConstraints(
                         minHeight: MoolMetrics.minimumTapTarget,
                       ),
-                      child: Row(
-                        children: [
-                          if (titleIcon != null) ...[
-                            Container(
-                              key: const Key('chat-context-icon'),
-                              width: 36,
-                              height: 36,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: (titleAccent ?? MoolColors.navy)
-                                    .withValues(alpha: .10),
-                                borderRadius: BorderRadius.circular(
-                                  MoolRadii.control,
-                                ),
-                              ),
-                              child: Icon(
-                                titleIcon,
-                                size: 20,
-                                color: titleAccent ?? MoolColors.navy,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                          ],
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: MoolColors.ink,
-                                    fontSize: prominentTitle
-                                        ? 25
-                                        : trailing != null && title.length > 14
-                                        ? 17
-                                        : 19,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: prominentTitle ? -.55 : -.25,
-                                  ),
-                                ),
-                                if (subtitle.trim().isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    subtitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: MoolColors.muted,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compact = constraints.maxWidth < 180;
+                          final showIcon = titleIcon != null && !compact;
+                          final showSubtitle = subtitle.trim().isNotEmpty;
+                          return Row(
+                            children: [
+                              if (showIcon) ...[
+                                Container(
+                                  key: const Key('chat-context-icon'),
+                                  width: 36,
+                                  height: 36,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: (titleAccent ?? MoolColors.navy)
+                                        .withValues(alpha: .10),
+                                    borderRadius: BorderRadius.circular(
+                                      MoolRadii.control,
                                     ),
                                   ),
-                                ],
+                                  child: Icon(
+                                    titleIcon,
+                                    size: 20,
+                                    color: titleAccent ?? MoolColors.navy,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
                               ],
-                            ),
-                          ),
-                        ],
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      key: const Key('chat-page-title'),
+                                      title,
+                                      maxLines: compact ? 2 : 1,
+                                      overflow: compact
+                                          ? TextOverflow.clip
+                                          : TextOverflow.ellipsis,
+                                      softWrap: compact,
+                                      style: TextStyle(
+                                        color: MoolColors.ink,
+                                        fontSize: compact
+                                            ? 15
+                                            : prominentTitle
+                                            ? 25
+                                            : trailing != null &&
+                                                  title.length > 14
+                                            ? 17
+                                            : 19,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: prominentTitle
+                                            ? -.55
+                                            : -.25,
+                                      ),
+                                    ),
+                                    if (showSubtitle) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        subtitle,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: MoolColors.muted,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),

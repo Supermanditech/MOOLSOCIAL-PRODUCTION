@@ -1160,6 +1160,21 @@ void main() {
         tester.widget<TextField>(field).controller?.text,
         'Help with order PO-240783',
       );
+      final pageTitle = find.byKey(const Key('chat-page-title'));
+      expect(tester.widget<Text>(pageTitle).data, 'MoolSocial Assist');
+      expect(tester.widget<Text>(pageTitle).maxLines, 2);
+      expect(tester.widget<Text>(pageTitle).overflow, TextOverflow.clip);
+      expect(tester.getRect(pageTitle).right, lessThanOrEqualTo(360));
+      await tester.drag(
+        find.byKey(const Key('chat-suggested-prompt-list')),
+        const Offset(-344, 0),
+      );
+      await tester.pumpAndSettle();
+      final longPrompt = find.byKey(const Key('chat-suggested-prompt-label-1'));
+      expect(tester.widget<Text>(longPrompt).data, 'Cancel or change order');
+      expect(tester.widget<Text>(longPrompt).maxLines, 2);
+      expect(tester.getRect(longPrompt).right, lessThanOrEqualTo(348));
+      expect(tester.getRect(longPrompt).left, greaterThanOrEqualTo(12));
       final textField = tester.widget<TextField>(field);
       final padding = textField.decoration?.contentPadding as EdgeInsets?;
       expect(padding?.bottom, greaterThanOrEqualTo(44));

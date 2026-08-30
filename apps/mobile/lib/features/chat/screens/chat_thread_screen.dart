@@ -653,27 +653,40 @@ class _SuggestedPromptStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maximumChipWidth = MediaQuery.sizeOf(context).width - 24;
     return Container(
       key: const Key('chat-suggested-prompts'),
       width: double.infinity,
       color: MoolColors.canvas,
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 2),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (final (index, value) in values.indexed) ...[
-              ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 44),
+      child: SizedBox(
+        height: 64,
+        child: ListView.separated(
+          key: const Key('chat-suggested-prompt-list'),
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.hardEdge,
+          itemCount: values.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final value = values[index];
+            return SizedBox(
+              width: maximumChipWidth,
+              child: Align(
+                alignment: Alignment.centerLeft,
                 child: ActionChip(
                   key: Key('chat-suggested-prompt-$index'),
-                  label: Text(value),
+                  label: Text(
+                    value,
+                    key: Key('chat-suggested-prompt-label-$index'),
+                    maxLines: 2,
+                    softWrap: true,
+                    overflow: TextOverflow.clip,
+                  ),
                   onPressed: () => onSelected(value),
                 ),
               ),
-              if (index != values.length - 1) const SizedBox(width: 8),
-            ],
-          ],
+            );
+          },
         ),
       ),
     );
