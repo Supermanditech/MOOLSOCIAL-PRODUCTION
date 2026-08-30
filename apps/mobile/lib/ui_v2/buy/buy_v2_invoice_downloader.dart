@@ -58,9 +58,27 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
       'Seller legal name: ${_invoiceText(taxInvoice.sellerLegalName)}',
       'Seller address: ${_invoiceText(taxInvoice.sellerAddress)}',
       'Seller GSTIN: ${_invoiceText(taxInvoice.sellerGstin)}',
+      if (taxInvoice.sellerPan case final value?)
+        'Seller PAN: ${_invoiceText(value)}',
+      if (taxInvoice.sellerCin case final value?)
+        'Seller CIN: ${_invoiceText(value)}',
+      if (taxInvoice.sellerFssaiNumber case final value?)
+        'Seller FSSAI: ${_invoiceText(value)}',
+      if (taxInvoice.recipientLegalName case final value?)
+        'Recipient: ${_invoiceText(value)}',
+      if (taxInvoice.recipientBillingAddress case final value?)
+        'Recipient billing address: ${_invoiceText(value)}',
       if (taxInvoice.buyerGstin case final value?)
         'Buyer GSTIN: ${_invoiceText(value)}',
       'Place of supply: ${_invoiceText(taxInvoice.placeOfSupply)}',
+      'Reverse charge: ${taxInvoice.reverseCharge ? 'Yes' : 'No'}',
+      if (taxInvoice.irn case final value?) 'IRN: ${_invoiceText(value)}',
+      if (taxInvoice.acknowledgementNumber case final value?)
+        'Acknowledgement number: ${_invoiceText(value)}',
+      if (taxInvoice.authorizedSignatory case final value?)
+        'Authorized signatory: ${_invoiceText(value)}',
+      if (taxInvoice.supplyStatement case final value?)
+        'Tax treatment: ${_invoiceText(value)}',
       if (taxInvoice.revisionLabel case final value?)
         'Correction: ${_invoiceText(value)}',
     ],
@@ -101,6 +119,27 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
       '',
       'Tax breakdown',
       for (final line in taxInvoice.lines)
+        '${_invoiceText(line.description)} | HSN/SAC ${_invoiceText(line.hsnSac)} | '
+            '${line.quantity == null ? '' : 'Quantity ${line.quantity}${line.unit == null ? '' : ' ${_invoiceText(line.unit!)}'} | '}'
+            '${line.unitPrice == null ? '' : 'Unit INR ${line.unitPrice} | '}'
+            'Taxable INR ${line.taxableValue} | GST ${line.gstRate.toStringAsFixed(2)}% | '
+            'CGST ${line.cgst} | SGST ${line.sgst} | IGST ${line.igst} | Cess ${line.cess}',
+    ],
+    if (order.platformTaxInvoiceDetails case final platformTax?) ...[
+      '',
+      'MoolSocial service tax invoice',
+      'Invoice number: ${_invoiceText(platformTax.invoiceNumber)}',
+      'Invoice date: ${platformTax.issuedAt.toIso8601String()}',
+      'Service provider: ${_invoiceText(platformTax.sellerLegalName)}',
+      'Provider address: ${_invoiceText(platformTax.sellerAddress)}',
+      'Provider GSTIN: ${_invoiceText(platformTax.sellerGstin)}',
+      if (platformTax.recipientLegalName case final value?)
+        'Recipient: ${_invoiceText(value)}',
+      if (platformTax.buyerGstin case final value?)
+        'Buyer GSTIN: ${_invoiceText(value)}',
+      'Place of supply: ${_invoiceText(platformTax.placeOfSupply)}',
+      'Reverse charge: ${platformTax.reverseCharge ? 'Yes' : 'No'}',
+      for (final line in platformTax.lines)
         '${_invoiceText(line.description)} | HSN/SAC ${_invoiceText(line.hsnSac)} | '
             'Taxable INR ${line.taxableValue} | GST ${line.gstRate.toStringAsFixed(2)}% | '
             'CGST ${line.cgst} | SGST ${line.sgst} | IGST ${line.igst} | Cess ${line.cess}',

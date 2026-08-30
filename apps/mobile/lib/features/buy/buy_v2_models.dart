@@ -271,6 +271,9 @@ class BuyV2TaxInvoiceLine {
     required this.sgst,
     required this.igst,
     required this.cess,
+    this.quantity,
+    this.unit,
+    this.unitPrice,
   });
 
   final String description;
@@ -281,6 +284,9 @@ class BuyV2TaxInvoiceLine {
   final int sgst;
   final int igst;
   final int cess;
+  final int? quantity;
+  final String? unit;
+  final int? unitPrice;
 
   int get totalTax => cgst + sgst + igst + cess;
 }
@@ -297,6 +303,16 @@ class BuyV2TaxInvoiceDetails {
     required this.lines,
     this.buyerGstin,
     this.revisionLabel,
+    this.recipientLegalName,
+    this.recipientBillingAddress,
+    this.sellerPan,
+    this.sellerCin,
+    this.sellerFssaiNumber,
+    this.reverseCharge = false,
+    this.irn,
+    this.acknowledgementNumber,
+    this.authorizedSignatory,
+    this.supplyStatement,
   });
 
   final String invoiceNumber;
@@ -309,6 +325,16 @@ class BuyV2TaxInvoiceDetails {
   final String sourceId;
   final List<BuyV2TaxInvoiceLine> lines;
   final String? revisionLabel;
+  final String? recipientLegalName;
+  final String? recipientBillingAddress;
+  final String? sellerPan;
+  final String? sellerCin;
+  final String? sellerFssaiNumber;
+  final bool reverseCharge;
+  final String? irn;
+  final String? acknowledgementNumber;
+  final String? authorizedSignatory;
+  final String? supplyStatement;
 
   int get totalTax => lines.fold(0, (total, line) => total + line.totalTax);
 }
@@ -356,6 +382,7 @@ class BuyV2Order {
     this.proofOfDeliveryStatus,
     this.taxInvoiceState,
     this.taxInvoiceDetails,
+    this.platformTaxInvoiceDetails,
     this.invoiceAvailable = true,
     this.receiptReference,
   });
@@ -401,6 +428,7 @@ class BuyV2Order {
   final String? proofOfDeliveryStatus;
   final BuyV2TaxInvoiceState? taxInvoiceState;
   final BuyV2TaxInvoiceDetails? taxInvoiceDetails;
+  final BuyV2TaxInvoiceDetails? platformTaxInvoiceDetails;
   final bool invoiceAvailable;
   final String? receiptReference;
 }

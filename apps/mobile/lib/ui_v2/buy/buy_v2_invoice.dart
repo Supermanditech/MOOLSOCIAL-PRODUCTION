@@ -285,6 +285,16 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                           context,
                         ).formatMediumDate(taxInvoice.issuedAt),
                       ),
+                      const _InvoiceFact(
+                        label: 'Document copy',
+                        value: 'Original for recipient',
+                      ),
+                      _InvoiceFact(
+                        label: 'Purchase type',
+                        value: order.destination == BuyV2Destination.wholesale
+                            ? 'Wholesale / business purchase'
+                            : 'Consumer retail purchase',
+                      ),
                       _InvoiceFact(
                         label: 'Seller legal name',
                         value: taxInvoice.sellerLegalName,
@@ -297,12 +307,46 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                         label: 'Seller GSTIN',
                         value: taxInvoice.sellerGstin,
                       ),
+                      if (taxInvoice.sellerPan case final value?)
+                        _InvoiceFact(label: 'Seller PAN', value: value),
+                      if (taxInvoice.sellerCin case final value?)
+                        _InvoiceFact(label: 'Seller CIN', value: value),
+                      if (taxInvoice.sellerFssaiNumber case final value?)
+                        _InvoiceFact(
+                          label: 'FSSAI licence / registration',
+                          value: value,
+                        ),
+                      if (taxInvoice.recipientLegalName case final value?)
+                        _InvoiceFact(label: 'Recipient', value: value),
+                      if (taxInvoice.recipientBillingAddress case final value?)
+                        _InvoiceFact(
+                          label: 'Recipient billing address',
+                          value: value,
+                        ),
                       if (taxInvoice.buyerGstin case final buyerGstin?)
                         _InvoiceFact(label: 'Buyer GSTIN', value: buyerGstin),
                       _InvoiceFact(
                         label: 'Place of supply',
                         value: taxInvoice.placeOfSupply,
                       ),
+                      _InvoiceFact(
+                        label: 'Reverse charge',
+                        value: taxInvoice.reverseCharge ? 'Yes' : 'No',
+                      ),
+                      if (taxInvoice.irn case final value?)
+                        _InvoiceFact(label: 'IRN', value: value),
+                      if (taxInvoice.acknowledgementNumber case final value?)
+                        _InvoiceFact(
+                          label: 'Acknowledgement number',
+                          value: value,
+                        ),
+                      if (taxInvoice.authorizedSignatory case final value?)
+                        _InvoiceFact(
+                          label: 'Authorized signatory',
+                          value: value,
+                        ),
+                      if (taxInvoice.supplyStatement case final value?)
+                        _InvoiceFact(label: 'Tax treatment', value: value),
                       if (taxInvoice.revisionLabel case final revision?)
                         _InvoiceFact(label: 'Correction', value: revision),
                     ],
@@ -322,6 +366,55 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                         _TaxInvoiceLine(line: taxInvoice.lines[index]),
                         if (index < taxInvoice.lines.length - 1)
                           const Divider(height: 14),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+              if (order.platformTaxInvoiceDetails case final platformTax?) ...[
+                const SizedBox(height: 9),
+                _InvoiceSection(
+                  key: ValueKey('buy-platform-tax-invoice-${order.id}'),
+                  title: 'MoolSocial service tax invoice',
+                  child: Column(
+                    children: [
+                      _InvoiceFact(
+                        label: 'Invoice number',
+                        value: platformTax.invoiceNumber,
+                      ),
+                      _InvoiceFact(
+                        label: 'Invoice date',
+                        value: MaterialLocalizations.of(
+                          context,
+                        ).formatMediumDate(platformTax.issuedAt),
+                      ),
+                      _InvoiceFact(
+                        label: 'Service provider',
+                        value: platformTax.sellerLegalName,
+                      ),
+                      _InvoiceFact(
+                        label: 'Registered address',
+                        value: platformTax.sellerAddress,
+                      ),
+                      _InvoiceFact(
+                        label: 'Provider GSTIN',
+                        value: platformTax.sellerGstin,
+                      ),
+                      if (platformTax.recipientLegalName case final value?)
+                        _InvoiceFact(label: 'Recipient', value: value),
+                      if (platformTax.buyerGstin case final value?)
+                        _InvoiceFact(label: 'Buyer GSTIN', value: value),
+                      _InvoiceFact(
+                        label: 'Place of supply',
+                        value: platformTax.placeOfSupply,
+                      ),
+                      _InvoiceFact(
+                        label: 'Reverse charge',
+                        value: platformTax.reverseCharge ? 'Yes' : 'No',
+                      ),
+                      for (final line in platformTax.lines) ...[
+                        const Divider(height: 14),
+                        _TaxInvoiceLine(line: line),
                       ],
                     ],
                   ),
@@ -659,6 +752,13 @@ class _TaxInvoiceLine extends StatelessWidget {
         Text(line.description, style: context.buyBody),
         const SizedBox(height: 3),
         _InvoiceFact(label: 'HSN/SAC', value: line.hsnSac),
+        if (line.quantity case final quantity?)
+          _InvoiceFact(
+            label: 'Quantity',
+            value: line.unit == null ? '$quantity' : '$quantity ${line.unit}',
+          ),
+        if (line.unitPrice case final unitPrice?)
+          _InvoiceFact(label: 'Unit price', value: buyV2Money(unitPrice)),
         _InvoiceFact(
           label: 'Taxable value',
           value: buyV2Money(line.taxableValue),
