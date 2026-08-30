@@ -182,85 +182,93 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
     BuildContext context,
     GlobalProfileSurfacePalette palette,
   ) async {
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
       useRootNavigator: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: palette.card,
-      showDragHandle: false,
-      clipBehavior: Clip.antiAlias,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) {
-        return SingleChildScrollView(
+      builder: (dialogContext) {
+        return Dialog(
           key: const Key('global-preferences-language-sheet'),
-          padding: EdgeInsets.fromLTRB(
-            MoolSpacing.md,
-            MoolSpacing.sm,
-            MoolSpacing.md,
-            _preferencesSheetBottomInset(sheetContext) + MoolSpacing.md,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: MoolSpacing.lg,
+            vertical: 48,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Choose language',
-                style: TextStyle(
-                  color: palette.ink,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              for (final choice in const [
-                (code: 'en', label: 'English'),
-                (code: 'hi', label: 'हिन्दी'),
-              ])
-                Padding(
-                  padding: EdgeInsets.only(
-                    bottom: choice.code == 'en' ? MoolSpacing.xs : 0,
-                  ),
-                  child: Semantics(
-                    selected: session.languageCode == choice.code,
-                    button: true,
-                    child: ListTile(
-                      key: Key('global-preferences-language-${choice.code}'),
-                      tileColor: palette.control,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(MoolRadii.control),
-                        side: BorderSide(color: palette.border),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: MoolSpacing.sm,
-                      ),
-                      minTileHeight: 56,
-                      leading: Icon(
-                        session.languageCode == choice.code
-                            ? Icons.check_circle_rounded
-                            : Icons.circle_outlined,
-                        color: palette.accent,
-                      ),
-                      title: Text(
-                        choice.label,
-                        style: TextStyle(
-                          color: palette.ink,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      onTap: () async {
-                        final saved = await session.updateLanguage(choice.code);
-                        if (saved && sheetContext.mounted) {
-                          Navigator.pop(sheetContext);
-                        }
-                      },
+          backgroundColor: palette.card,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(MoolRadii.floating),
+            side: BorderSide(color: palette.border),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.all(MoolSpacing.md),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Choose language',
+                    style: TextStyle(
+                      color: palette.ink,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                ),
-            ],
+                  const SizedBox(height: MoolSpacing.sm),
+                  for (final choice in const [
+                    (code: 'en', label: 'English'),
+                    (code: 'hi', label: 'हिन्दी'),
+                  ])
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: choice.code == 'en' ? MoolSpacing.xs : 0,
+                      ),
+                      child: Semantics(
+                        selected: session.languageCode == choice.code,
+                        button: true,
+                        child: ListTile(
+                          key: Key(
+                            'global-preferences-language-${choice.code}',
+                          ),
+                          tileColor: palette.control,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              MoolRadii.control,
+                            ),
+                            side: BorderSide(color: palette.border),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: MoolSpacing.sm,
+                          ),
+                          minTileHeight: 56,
+                          leading: Icon(
+                            session.languageCode == choice.code
+                                ? Icons.check_circle_rounded
+                                : Icons.circle_outlined,
+                            color: palette.accent,
+                          ),
+                          title: Text(
+                            choice.label,
+                            style: TextStyle(
+                              color: palette.ink,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          onTap: () async {
+                            final saved = await session.updateLanguage(
+                              choice.code,
+                            );
+                            if (saved && dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         );
       },
