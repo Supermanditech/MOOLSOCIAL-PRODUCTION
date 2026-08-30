@@ -32,6 +32,7 @@ import 'features/journey01/journey_session.dart';
 import 'features/journey01/review_journey_services.dart';
 import 'features/retailer/retailer_session.dart';
 import 'features/shared/social_content_gateway.dart';
+import 'features/shared/shared_session.dart';
 import 'features/shared/social_create_draft_media_store.dart';
 import 'features/shared/social_create_draft_repository.dart';
 import 'features/shared/youtube_public_catalogue_repository.dart';
@@ -370,8 +371,13 @@ void _runUiReviewOnlyApp() {
     MoolSocialApp(
       session: session,
       chatSession: ChatSession(),
+      sharedSession: SharedSession(
+        socialContentGateway: UiReviewSocialContentGateway(),
+      ),
       disposeSession: true,
       disposeChatSession: true,
+      disposeSharedSession: true,
+      uiReviewOnly: true,
       initialLocation: '/app/buy',
     ),
   );

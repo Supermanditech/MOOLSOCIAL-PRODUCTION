@@ -45,6 +45,7 @@ class MoolSocialApp extends StatefulWidget {
     this.launchInterruptionGuard,
     this.onAuthenticatedBoundary,
     this.initialLocation = '/boot',
+    this.uiReviewOnly = false,
     this.legacyPresentationForTestsOnly = false,
     this.disposeSession = false,
     this.disposeBookSession = false,
@@ -80,6 +81,7 @@ class MoolSocialApp extends StatefulWidget {
   final LaunchInterruptionGuard? launchInterruptionGuard;
   final Future<void> Function()? onAuthenticatedBoundary;
   final String initialLocation;
+  final bool uiReviewOnly;
 
   /// Keeps historical presentation regression tests attached to the untouched
   /// legacy widgets. Product builds must use the default native V2 routes.

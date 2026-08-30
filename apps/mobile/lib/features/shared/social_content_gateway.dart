@@ -189,6 +189,184 @@ class UnavailableSocialContentGateway
       );
 }
 
+/// Deterministic, non-promotable content for the UI-review package only.
+///
+/// It implements the same frontend contract as the authenticated service so
+/// Feed layout and navigation can be reviewed on a device without inventing a
+/// backend success. Every write still fails closed.
+class UiReviewSocialContentGateway
+    implements SocialContentGateway, SocialCommentGateway, SocialAuthorGateway {
+  UiReviewSocialContentGateway({DateTime Function()? now})
+    : _now = now ?? DateTime.now {
+    final current = _now();
+    _items = <SocialPublishedItem>[
+      SocialPublishedItem(
+        id: 'UI-REVIEW-FEED-001',
+        authorId: 'ui-review-asha',
+        type: SocialPublishedContentType.post,
+        authorName: 'Asha Verma',
+        authorHandle: '@ashaverma',
+        body:
+            'What is one small idea that made your neighbourhood better this week?',
+        audience: 'Public',
+        publishedAt: current.subtract(const Duration(minutes: 12)),
+        likeCount: 148,
+        replyCount: 32,
+        repostCount: 18,
+        shareCount: 11,
+      ),
+      SocialPublishedItem(
+        id: 'UI-REVIEW-FEED-002',
+        authorId: 'ui-review-rohan',
+        type: SocialPublishedContentType.post,
+        authorName: 'Rohan Mehta',
+        authorHandle: '@rohanbuilds',
+        body:
+            'A simple morning market guide for choosing fresher produce and supporting nearby sellers.',
+        audience: 'Public',
+        publishedAt: current.subtract(const Duration(hours: 1, minutes: 8)),
+        mediaPaths: const <String>[
+          'assets/prototype/social-market-grocery.png',
+        ],
+        mediaAreAssets: true,
+        likeCount: 326,
+        replyCount: 54,
+        repostCount: 41,
+        shareCount: 29,
+      ),
+      SocialPublishedItem(
+        id: 'UI-REVIEW-FEED-003',
+        authorId: 'ui-review-community',
+        type: SocialPublishedContentType.quickPoll,
+        authorName: 'MoolSocial Community',
+        authorHandle: '@moolsocialcommunity',
+        body: 'Which local story would you like to explore next?',
+        audience: 'Public',
+        publishedAt: current.subtract(const Duration(hours: 3)),
+        closesAt: current.add(const Duration(days: 2)),
+        choices: const <SocialPublishedChoice>[
+          SocialPublishedChoice(
+            label: 'People building communities',
+            votes: 84,
+          ),
+          SocialPublishedChoice(label: 'Local food and makers', votes: 67),
+          SocialPublishedChoice(label: 'Useful work and skills', votes: 51),
+        ],
+        likeCount: 92,
+        replyCount: 21,
+        repostCount: 9,
+        shareCount: 7,
+      ),
+    ];
+    _comments = <String, List<SocialComment>>{
+      'UI-REVIEW-FEED-001': <SocialComment>[
+        SocialComment(
+          id: 'UI-REVIEW-COMMENT-001',
+          postId: 'UI-REVIEW-FEED-001',
+          authorId: 'ui-review-neha',
+          authorName: 'Neha Jain',
+          authorHandle: '@nehajain',
+          body: 'A shared book shelf at our community centre.',
+          publishedAt: current.subtract(const Duration(minutes: 5)),
+        ),
+      ],
+    };
+  }
+
+  final DateTime Function() _now;
+  late final List<SocialPublishedItem> _items;
+  late final Map<String, List<SocialComment>> _comments;
+
+  @override
+  Future<SocialFeedPage> feed({String? cursor, int limit = 20}) async {
+    final offset = cursor == null ? 0 : int.tryParse(cursor) ?? 0;
+    final safeOffset = offset.clamp(0, _items.length).toInt();
+    final end = min(safeOffset + limit, _items.length);
+    return SocialFeedPage(
+      items: List<SocialPublishedItem>.unmodifiable(
+        _items.sublist(safeOffset, end),
+      ),
+      nextCursor: end < _items.length ? '$end' : null,
+    );
+  }
+
+  @override
+  Future<SocialCommentPage> comments({
+    required String postId,
+    String? cursor,
+    int limit = 30,
+  }) async {
+    final source = _comments[postId] ?? const <SocialComment>[];
+    final offset = cursor == null ? 0 : int.tryParse(cursor) ?? 0;
+    final safeOffset = offset.clamp(0, source.length).toInt();
+    final end = min(safeOffset + limit, source.length);
+    return SocialCommentPage(
+      items: List<SocialComment>.unmodifiable(source.sublist(safeOffset, end)),
+      nextCursor: end < source.length ? '$end' : null,
+    );
+  }
+
+  @override
+  Future<SocialAuthorProfile> author({
+    required String authorId,
+    bool authenticated = false,
+    int limit = 12,
+  }) async {
+    final posts = _items
+        .where((item) => item.authorId == authorId)
+        .take(limit)
+        .toList(growable: false);
+    if (posts.isEmpty) throw _notAvailable();
+    final first = posts.first;
+    return SocialAuthorProfile(
+      authorId: authorId,
+      authorName: first.authorName,
+      authorHandle: first.authorHandle,
+      followerCount: switch (authorId) {
+        'ui-review-asha' => 12400,
+        'ui-review-rohan' => 8900,
+        _ => 28600,
+      },
+      followed: false,
+      isSelf: false,
+      posts: List<SocialPublishedItem>.unmodifiable(posts),
+    );
+  }
+
+  @override
+  Future<SocialPublishedItem> publish(SocialPublishDraft draft) =>
+      Future<SocialPublishedItem>.error(_writeUnavailable());
+
+  @override
+  Future<SocialPublishedItem> interact({
+    required String postId,
+    required String interaction,
+    int? choiceIndex,
+  }) => Future<SocialPublishedItem>.error(_writeUnavailable());
+
+  @override
+  Future<SocialReplyResult> reply(SocialReplyDraft draft) =>
+      Future<SocialReplyResult>.error(_writeUnavailable());
+
+  @override
+  Future<SocialAuthorProfile> follow({
+    required String authorId,
+    required bool followed,
+  }) => Future<SocialAuthorProfile>.error(_writeUnavailable());
+
+  static SocialContentGatewayException _writeUnavailable() =>
+      const SocialContentGatewayException(
+        code: 'ui_review_read_only',
+        message: 'Sign in to complete this Feed action.',
+      );
+
+  static SocialContentGatewayException _notAvailable() =>
+      const SocialContentGatewayException(
+        code: 'not_found',
+        message: 'That MoolSocial author is not available.',
+      );
+}
+
 enum SocialAppCheckTokenMode { standard, limitedUse }
 
 abstract interface class SocialContentCredentials {
