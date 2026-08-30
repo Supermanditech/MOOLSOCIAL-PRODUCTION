@@ -654,6 +654,11 @@ void main() {
     expect(find.text('Alice News'), findsOneWidget);
     expect(find.text('Bharat Creator'), findsOneWidget);
     expect(
+      find.byIcon(Icons.verified_rounded),
+      findsNothing,
+      reason: 'A loaded profile is not proof of verified identity.',
+    );
+    expect(
       tester
           .widget<FilledButton>(
             find.byKey(const Key('chat-person-message-person-b')),

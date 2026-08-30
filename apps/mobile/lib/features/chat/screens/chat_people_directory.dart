@@ -350,14 +350,6 @@ class _PersonCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (person.profile != null) ...[
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.verified_rounded,
-                              size: 15,
-                              color: MoolColors.success,
-                            ),
-                          ],
                         ],
                       ),
                       Text(
