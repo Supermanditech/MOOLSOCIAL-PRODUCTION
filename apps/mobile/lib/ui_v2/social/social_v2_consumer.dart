@@ -2464,14 +2464,20 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     Navigator.of(context).pop();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.push(
-        Uri(
-          path: '/app/chat/notifications',
-          queryParameters: {
-            'return': returnRoute,
-            if (previewOnly) 'preview': 'true',
-          },
-        ).toString(),
+      unawaited(
+        context
+            .push(
+              Uri(
+                path: '/app/chat/notifications',
+                queryParameters: {
+                  'return': returnRoute,
+                  if (previewOnly) 'preview': 'true',
+                },
+              ).toString(),
+            )
+            .then((_) {
+              if (mounted) _openUniversalNotifications();
+            }),
       );
     });
   }
