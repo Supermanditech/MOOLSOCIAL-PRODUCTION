@@ -66,7 +66,7 @@ class _DoctorBookingScreenState extends State<DoctorBookingScreen> {
               const SizedBox(height: MoolServiceHomeTokens.sectionGap),
               const MoolServiceSectionHeader(
                 title: 'How would you like care?',
-                subtitle: 'Choose once; fee and availability update together.',
+                subtitle: 'Choose a consultation type before continuing.',
               ),
               const SizedBox(height: MoolSpacing.sm),
               Wrap(
@@ -166,7 +166,7 @@ class _DoctorBookingScreenState extends State<DoctorBookingScreen> {
                   ),
                 ],
                 semanticLabel:
-                    'Dr. Kavita Sharma, verified general physician, today at 6:20 PM, ₹300, approximately 12 minute wait',
+                    'Dr. Kavita Sharma, verified general physician, ${session.doctorCare.label}, today at 6:20 PM, ₹300, approximately 12 minute wait',
                 onTap: () {
                   session.clearMessages();
                   context.go('/app/book/doctor/details');
@@ -241,12 +241,13 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen> {
             MoolSpacing.xl,
           ),
           children: [
-            const BookCard(
-              color: Color(0xFFF4F3FF),
+            BookCard(
+              color: const Color(0xFFF4F3FF),
               child: BookFact(
                 icon: Icons.verified_rounded,
                 title: 'Dr. Kavita Sharma · Today 6:20 PM',
-                detail: 'Clinic · ₹300 · registration and clinic verified',
+                detail:
+                    '${session.doctorCare.label} · ₹300 · doctor registration verified',
               ),
             ),
             const SizedBox(height: MoolSpacing.lg),
@@ -331,7 +332,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen> {
                   icon: Icons.event_available_rounded,
                   title: 'Appointment ${session.appointment!.id} confirmed',
                   detail:
-                      'Today 6:20 PM · clinic chat, cancellation and follow-up remain available',
+                      'Today 6:20 PM · ${session.appointment!.care.label} details, cancellation and follow-up remain available',
                 ),
               ),
               const SizedBox(height: MoolSpacing.sm),

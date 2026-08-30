@@ -224,7 +224,7 @@ class BookSession extends ChangeNotifier {
         need: symptoms.join(', '),
       );
       noticeMessage =
-          'Appointment ${appointment!.id} confirmed for today at 6:20 PM.';
+          '${appointment!.care.label} appointment ${appointment!.id} confirmed for today at 6:20 PM.';
       return true;
     } on BookServiceException catch (error) {
       errorMessage = error.userMessage;

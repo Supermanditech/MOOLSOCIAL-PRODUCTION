@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/core/design/mool_service_home.dart';
+import 'package:moolsocial/features/book/book_models.dart';
 import 'package:moolsocial/features/book/book_services.dart';
 import 'package:moolsocial/features/book/book_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -185,6 +186,36 @@ void main() {
       semantics.dispose();
       sessions.dispose();
     }
+  });
+
+  testWidgets('Doctor keeps Video selected through details and native Back', (
+    tester,
+  ) async {
+    final sessions = await _mount(
+      tester,
+      route: '/app/book/doctor',
+      size: const Size(360, 800),
+    );
+    addTearDown(sessions.dispose);
+
+    await tester.tap(find.byKey(const Key('doctor-care-video')));
+    await tester.pumpAndSettle();
+    expect(sessions.book.doctorCare, DoctorCare.video);
+    expect(find.text('Continue with Video'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('book-doctor')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Video · ₹300 · doctor registration verified'),
+      findsOneWidget,
+    );
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('doctor-care-video')), findsOneWidget);
+    expect(sessions.book.doctorCare, DoctorCare.video);
+    expect(find.text('Continue with Video'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('C24E Salon search updates the direct price and booking choice', (
