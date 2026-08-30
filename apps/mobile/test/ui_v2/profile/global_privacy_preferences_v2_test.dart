@@ -25,6 +25,7 @@ void main() {
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
+    tester.view.viewPadding = FakeViewPadding(bottom: bottomInset);
     addTearDown(tester.view.reset);
     final router = GoRouter(
       initialLocation: '/app/work/home',

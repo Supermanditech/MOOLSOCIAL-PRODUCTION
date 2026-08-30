@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -8,6 +10,13 @@ import '../../features/journey01/journey_session.dart';
 import 'global_profile_panel_v2.dart';
 
 final _privacyPolicyUri = Uri.parse('https://moolsocial.com/privacy/');
+
+double _preferencesSheetBottomInset(BuildContext context) {
+  final mediaBottom = MediaQuery.viewPaddingOf(context).bottom;
+  final view = View.of(context);
+  final rawBottom = view.viewPadding.bottom / view.devicePixelRatio;
+  return math.max(mediaBottom, rawBottom);
+}
 
 class GlobalPrivacyPreferencesV2 extends StatelessWidget {
   const GlobalPrivacyPreferencesV2({
@@ -176,14 +185,13 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) {
-        final media = MediaQuery.of(sheetContext);
         return SingleChildScrollView(
           key: const Key('global-preferences-language-sheet'),
           padding: EdgeInsets.fromLTRB(
             MoolSpacing.md,
             MoolSpacing.sm,
             MoolSpacing.md,
-            media.viewPadding.bottom + MoolSpacing.md,
+            _preferencesSheetBottomInset(sheetContext) + MoolSpacing.md,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -330,12 +338,13 @@ class _ServiceAreaSheetState extends State<_ServiceAreaSheet> {
     final session = widget.session;
     final palette = widget.palette;
     final media = MediaQuery.of(context);
+    final bottomSafeInset = _preferencesSheetBottomInset(context);
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         MoolSpacing.md,
         MoolSpacing.sm,
         MoolSpacing.md,
-        media.viewInsets.bottom + media.viewPadding.bottom + MoolSpacing.md,
+        media.viewInsets.bottom + bottomSafeInset + MoolSpacing.md,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
