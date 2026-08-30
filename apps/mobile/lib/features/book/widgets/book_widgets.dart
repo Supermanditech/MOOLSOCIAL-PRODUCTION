@@ -119,6 +119,7 @@ class BookPageScaffold extends StatelessWidget {
     this.activeLocalAction = '',
     this.fallbackBackRoute = '/app/book',
     this.showBack = true,
+    this.onBack,
     this.trailing,
     this.bottomAction,
     super.key,
@@ -131,12 +132,13 @@ class BookPageScaffold extends StatelessWidget {
   final String activeLocalAction;
   final String fallbackBackRoute;
   final bool showBack;
+  final VoidCallback? onBack;
   final Widget? trailing;
   final Widget? bottomAction;
 
   @override
   Widget build(BuildContext context) {
-    final canPop = Navigator.of(context).canPop();
+    final canPop = onBack == null && Navigator.of(context).canPop();
     final currentPath = GoRouterState.of(context).uri.path;
     final routeSubAction = currentPath.startsWith('/app/book/doctor')
         ? 'doctor'
@@ -155,6 +157,11 @@ class BookPageScaffold extends StatelessWidget {
 
     void leaveContentDepth() {
       session.clearMessages();
+      final customBack = onBack;
+      if (customBack != null) {
+        customBack();
+        return;
+      }
       if (context.canPop()) {
         context.pop();
       } else {

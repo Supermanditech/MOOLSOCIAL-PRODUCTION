@@ -213,6 +213,53 @@ void main() {
     },
   );
 
+  testWidgets(
+    'OPPO Bus selection completes a truthful request and native return',
+    (tester) async {
+      final sessions = await _mount(tester, size: const Size(360, 800));
+      addTearDown(sessions.dispose);
+
+      await tester.tap(find.byKey(const Key('bus-search')));
+      await tester.pumpAndSettle();
+      final first = find.byKey(const Key('bus-trip-BUS-20260809-1'));
+      await _scrollTo(tester, first);
+      await tester.tap(first);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('bus-review')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('bus-review')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bus-review-screen')), findsOneWidget);
+      expect(find.text('Live checkout required'), findsOneWidget);
+      expect(
+        find.text('A preference is not a confirmed seat.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('bus-passengers-2')));
+      await tester.tap(find.byKey(const Key('bus-seat-aisle')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bus-prepare-request')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('bus-request-ready-screen')), findsOneWidget);
+      expect(find.text('Booking request ready'), findsOneWidget);
+      expect(find.text('No payment or ticket yet'), findsOneWidget);
+      expect(find.text('₹0 charged'), findsOneWidget);
+      expect(sessions.book.noticeMessage, contains('No payment was taken'));
+      expect(sessions.book.noticeMessage, contains('no ticket was issued'));
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bus-review-screen')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bus-booking-home')), findsOneWidget);
+      expect(find.byKey(const Key('bus-review')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('C24F result motion is immediate when reduced', (tester) async {
     final sessions = await _mount(
       tester,
