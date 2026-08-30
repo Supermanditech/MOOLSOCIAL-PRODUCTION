@@ -271,7 +271,7 @@ class _RideBookingScreenState extends State<RideBookingScreen> {
       builder: (context, _) => RidePageScaffold(
         session: session,
         title: 'Ride',
-        subtitle: 'Choose destination, vehicle and fare',
+        subtitle: 'Destination, vehicle and fare',
         fallbackBackRoute: '/app/ride',
         showBack: false,
         activeLocalAction: session.selectedType.name,
