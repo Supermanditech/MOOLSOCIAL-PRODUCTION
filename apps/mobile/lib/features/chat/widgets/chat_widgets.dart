@@ -171,9 +171,9 @@ class ChatPageScaffold extends StatelessWidget {
       viewPadding: viewPadding,
       platform: Theme.of(context).platform,
     );
-    final bottomContentInset =
-        (keyboardInset > 0 ? keyboardInset : bottomSystemInset) +
-        exportedSemanticsClearance;
+    final bottomContentInset = keyboardInset > 0
+        ? keyboardInset
+        : bottomSystemInset + exportedSemanticsClearance;
     return _ChatPresenceLifecycle(
       session: session,
       child: PopScope<Object?>(
