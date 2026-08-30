@@ -11,6 +11,11 @@ import '../work_session.dart';
 
 const _workAccent = Color(0xFF4D46A8);
 
+double _workViewBottomInset(BuildContext context) {
+  final view = View.of(context);
+  return view.viewPadding.bottom / view.devicePixelRatio;
+}
+
 class MyWorkScreen extends StatefulWidget {
   const MyWorkScreen({required this.session, super.key});
 
@@ -781,6 +786,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                   child: const Text('Send request'),
                 ),
                 TextButton(
+                  key: const Key('work-profile-request-back'),
                   onPressed: () => Navigator.pop(sheetContext),
                   child: const Text('Back to cards'),
                 ),
@@ -1226,73 +1232,82 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
   ) {
     return showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.lg,
-          0,
-          MoolSpacing.lg,
-          MoolSpacing.lg,
+      builder: (sheetContext) => SafeArea(
+        key: const Key('work-proof-source-safe-area'),
+        top: false,
+        minimum: EdgeInsets.only(
+          bottom: _workViewBottomInset(sheetContext) + 12,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Add ${proof.label}',
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 21,
-                fontWeight: FontWeight.w900,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            MoolSpacing.lg,
+            0,
+            MoolSpacing.lg,
+            MoolSpacing.xs,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Add ${proof.label}',
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-            ),
-            const Text(
-              'Choose the easiest available source.',
-              style: TextStyle(color: MoolColors.muted),
-            ),
-            const SizedBox(height: MoolSpacing.md),
-            for (final source in const [
-              (
-                'camera',
-                'Camera',
-                Icons.camera_alt_outlined,
-                WorkProofSource.camera,
+              const Text(
+                'Choose the easiest available source.',
+                style: TextStyle(color: MoolColors.muted),
               ),
-              (
-                'gallery',
-                'Photo library',
-                Icons.photo_library_outlined,
-                WorkProofSource.gallery,
+              const SizedBox(height: MoolSpacing.md),
+              for (final source in const [
+                (
+                  'camera',
+                  'Camera',
+                  Icons.camera_alt_outlined,
+                  WorkProofSource.camera,
+                ),
+                (
+                  'gallery',
+                  'Photo library',
+                  Icons.photo_library_outlined,
+                  WorkProofSource.gallery,
+                ),
+                (
+                  'upload',
+                  'Upload PDF or image',
+                  Icons.upload_file_outlined,
+                  WorkProofSource.upload,
+                ),
+              ]) ...[
+                OutlinedButton.icon(
+                  key: Key('work-proof-source-${source.$1}'),
+                  onPressed: () async {
+                    final added = await widget.session.addProof(
+                      proof.id,
+                      source.$4,
+                    );
+                    if (added && sheetContext.mounted) {
+                      Navigator.pop(sheetContext);
+                    }
+                  },
+                  icon: Icon(source.$3),
+                  label: Text(source.$2),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+              ],
+              TextButton(
+                key: const Key('work-proof-source-cancel'),
+                onPressed: () => Navigator.pop(sheetContext),
+                child: const Text('Cancel'),
               ),
-              (
-                'upload',
-                'Upload PDF or image',
-                Icons.upload_file_outlined,
-                WorkProofSource.upload,
-              ),
-            ]) ...[
-              OutlinedButton.icon(
-                key: Key('work-proof-source-${source.$1}'),
-                onPressed: () async {
-                  final added = await widget.session.addProof(
-                    proof.id,
-                    source.$4,
-                  );
-                  if (added && sheetContext.mounted) {
-                    Navigator.pop(sheetContext);
-                  }
-                },
-                icon: Icon(source.$3),
-                label: Text(source.$2),
-              ),
-              const SizedBox(height: MoolSpacing.xs),
             ],
-            TextButton(
-              onPressed: () => Navigator.pop(sheetContext),
-              child: const Text('Cancel'),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -1792,66 +1807,75 @@ class WorkVerificationStatusScreen extends StatelessWidget {
   Future<void> _showGstProofSource(BuildContext context) {
     return showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (sourceContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.lg,
-          0,
-          MoolSpacing.lg,
-          MoolSpacing.lg,
+      builder: (sourceContext) => SafeArea(
+        key: const Key('work-gst-source-safe-area'),
+        top: false,
+        minimum: EdgeInsets.only(
+          bottom: _workViewBottomInset(sourceContext) + 12,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Add GST certificate',
-              style: TextStyle(
-                color: MoolColors.ink,
-                fontSize: 21,
-                fontWeight: FontWeight.w900,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            MoolSpacing.lg,
+            0,
+            MoolSpacing.lg,
+            MoolSpacing.xs,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Add GST certificate',
+                style: TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-            ),
-            const SizedBox(height: MoolSpacing.md),
-            for (final source in const [
-              (
-                'camera',
-                'Camera',
-                Icons.camera_alt_outlined,
-                WorkProofSource.camera,
+              const SizedBox(height: MoolSpacing.md),
+              for (final source in const [
+                (
+                  'camera',
+                  'Camera',
+                  Icons.camera_alt_outlined,
+                  WorkProofSource.camera,
+                ),
+                (
+                  'gallery',
+                  'Photo library',
+                  Icons.photo_library_outlined,
+                  WorkProofSource.gallery,
+                ),
+                (
+                  'upload',
+                  'Upload PDF or image',
+                  Icons.upload_file_outlined,
+                  WorkProofSource.upload,
+                ),
+              ]) ...[
+                OutlinedButton.icon(
+                  key: Key('work-gst-source-${source.$1}'),
+                  onPressed: () async {
+                    final added = await session.addGstProof(source.$4);
+                    if (added && sourceContext.mounted) {
+                      Navigator.pop(sourceContext);
+                    }
+                  },
+                  icon: Icon(source.$3),
+                  label: Text(source.$2),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+              ],
+              TextButton(
+                key: const Key('work-gst-source-cancel'),
+                onPressed: () => Navigator.pop(sourceContext),
+                child: const Text('Cancel'),
               ),
-              (
-                'gallery',
-                'Photo library',
-                Icons.photo_library_outlined,
-                WorkProofSource.gallery,
-              ),
-              (
-                'upload',
-                'Upload PDF or image',
-                Icons.upload_file_outlined,
-                WorkProofSource.upload,
-              ),
-            ]) ...[
-              OutlinedButton.icon(
-                key: Key('work-gst-source-${source.$1}'),
-                onPressed: () async {
-                  final added = await session.addGstProof(source.$4);
-                  if (added && sourceContext.mounted) {
-                    Navigator.pop(sourceContext);
-                  }
-                },
-                icon: Icon(source.$3),
-                label: Text(source.$2),
-              ),
-              const SizedBox(height: MoolSpacing.xs),
             ],
-            TextButton(
-              onPressed: () => Navigator.pop(sourceContext),
-              child: const Text('Cancel'),
-            ),
-          ],
+          ),
         ),
       ),
     );

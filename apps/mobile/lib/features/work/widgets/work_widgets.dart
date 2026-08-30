@@ -78,12 +78,12 @@ class WorkPageScaffold extends StatelessWidget {
         }
       },
       child: Scaffold(
-        extendBody: true,
+        extendBody: false,
         appBar: AppBar(
           backgroundColor: MoolColors.canvas,
           surfaceTintColor: Colors.transparent,
           automaticallyImplyLeading: false,
-          toolbarHeight: 72,
+          toolbarHeight: 88,
           leadingWidth: showBack ? 64 : 16,
           leading: showBack
               ? Padding(
@@ -95,33 +95,42 @@ class WorkPageScaffold extends StatelessWidget {
                 )
               : null,
           titleSpacing: showBack ? 4 : MoolSpacing.md,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -.35,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.muted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          title: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 240;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    key: const Key('work-page-title'),
+                    maxLines: compact ? 2 : 1,
+                    overflow: compact
+                        ? TextOverflow.clip
+                        : TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: MoolColors.ink,
+                      fontSize: compact ? 15 : 20,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: compact ? -.15 : -.35,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    key: const Key('work-page-subtitle'),
+                    maxLines: 2,
+                    overflow: TextOverflow.clip,
+                    style: TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: compact ? 10.5 : 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           actions: [
             if (showHeaderChat) ...[
@@ -167,7 +176,10 @@ class WorkPageScaffold extends StatelessWidget {
                   Expanded(child: body),
                   if (bottomAction != null)
                     Material(
+                      key: const Key('work-sticky-action-bar'),
                       color: Colors.white,
+                      elevation: 8,
+                      shadowColor: const Color(0x22000050),
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(
                           MoolSpacing.md,
