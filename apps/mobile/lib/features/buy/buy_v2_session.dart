@@ -456,6 +456,7 @@ class BuyV2Session extends ChangeNotifier {
   String? notice;
   String? cartAcknowledgement;
   String? selectedFilter;
+  BuyV2ShoppingIntent? activeShoppingIntent;
   bool businessVerified = true;
   BuyV2BusinessVerificationState _businessVerificationState =
       BuyV2BusinessVerificationState.unavailable;
@@ -1296,8 +1297,19 @@ class BuyV2Session extends ChangeNotifier {
         ? BuyV2Destination.shop
         : destination;
     final category = selectedCategoryId;
+    final intentProductIds =
+        activeShoppingIntent == BuyV2ShoppingIntent.monthlyBasket
+        ? _catalogueProducts
+              .where((product) => product.destination == BuyV2Destination.shop)
+              .take(12)
+              .map((product) => product.id)
+              .toSet()
+        : null;
     final candidates = _catalogueProducts.where((product) {
       if (product.destination != filterDestination) return false;
+      if (intentProductIds != null && !intentProductIds.contains(product.id)) {
+        return false;
+      }
       final matchesCategory =
           category == 'all' ||
           (category == 'rx' && product.requiresPrescription) ||
@@ -1533,6 +1545,9 @@ class BuyV2Session extends ChangeNotifier {
       _paymentReference = snapshot.paymentReference;
       _paymentActionUri = snapshot.paymentActionUri;
       _bankTransferInstructions = snapshot.bankTransferInstructions;
+      activeShoppingIntent = BuyV2ShoppingIntent.values
+          .where((intent) => intent.name == snapshot.shoppingIntent)
+          .firstOrNull;
       final storedSubmissionState = BuyV2CheckoutSubmissionState.values
           .where((state) => state.name == snapshot.checkoutSubmissionState)
           .firstOrNull;
@@ -1571,6 +1586,7 @@ class BuyV2Session extends ChangeNotifier {
       paymentReference: _paymentReference,
       paymentActionUri: _paymentActionUri,
       bankTransferInstructions: _bankTransferInstructions,
+      shoppingIntent: activeShoppingIntent?.name,
       checkoutSubmissionState: checkoutSubmissionState.name,
     );
     unawaited(
@@ -3024,6 +3040,7 @@ class BuyV2Session extends ChangeNotifier {
         : BuyV2View.catalogue;
     query = '';
     selectedFilter = null;
+    activeShoppingIntent = null;
     notice = null;
     _notifyNavigationIfChanged(
       previous,
@@ -3631,6 +3648,7 @@ class BuyV2Session extends ChangeNotifier {
         return false;
     }
     selectedFilter = null;
+    activeShoppingIntent = null;
     notice = null;
     notifyListeners();
     return true;
@@ -3638,6 +3656,48 @@ class BuyV2Session extends ChangeNotifier {
 
   void chooseFilter(String? value) {
     selectedFilter = value;
+    notifyListeners();
+  }
+
+  void chooseShoppingIntent(BuyV2ShoppingIntent intent) {
+    final target = switch (intent) {
+      BuyV2ShoppingIntent.monthlyBasket ||
+      BuyV2ShoppingIntent.homeShopping => BuyV2Destination.shop,
+      BuyV2ShoppingIntent.businessBuying ||
+      BuyV2ShoppingIntent.flexibleRestocking => BuyV2Destination.wholesale,
+    };
+    openDestination(target);
+    activeShoppingIntent = intent;
+    switch (target) {
+      case BuyV2Destination.shop:
+        shopCategoryId = 'all';
+      case BuyV2Destination.wholesale:
+        wholesaleCategoryId = 'all';
+      case BuyV2Destination.medicine || BuyV2Destination.orders:
+        break;
+    }
+    selectedFilter = intent == BuyV2ShoppingIntent.flexibleRestocking
+        ? 'moq'
+        : null;
+    notice = switch (intent) {
+      BuyV2ShoppingIntent.monthlyBasket =>
+        'Monthly basket products are ready to review.',
+      BuyV2ShoppingIntent.businessBuying =>
+        'Wholesale packs are ready to compare.',
+      BuyV2ShoppingIntent.flexibleRestocking =>
+        'Flexible minimum packs are shown.',
+      BuyV2ShoppingIntent.homeShopping => 'Retail packs for home are shown.',
+    };
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void clearShoppingIntent() {
+    if (activeShoppingIntent == null) return;
+    activeShoppingIntent = null;
+    selectedFilter = null;
+    notice = 'Showing all ${destination.label} products.';
+    _persistCustomerState();
     notifyListeners();
   }
 

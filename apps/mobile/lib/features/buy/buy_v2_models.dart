@@ -2,6 +2,13 @@ import 'buy_v2_catalogue_data.dart';
 
 enum BuyV2Destination { shop, wholesale, medicine, orders }
 
+enum BuyV2ShoppingIntent {
+  monthlyBasket,
+  businessBuying,
+  flexibleRestocking,
+  homeShopping,
+}
+
 /// Presentation-only direction for a genuine Buy surface replacement.
 ///
 /// Route, Back and restoration outcomes remain owned by [BuyV2Session]. This

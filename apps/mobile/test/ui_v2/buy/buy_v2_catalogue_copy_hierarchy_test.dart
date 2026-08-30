@@ -102,7 +102,7 @@ void main() {
     expect(tester.getSize(promotionRail).height, 118);
     final title = tester.widget<Text>(find.text('Plan the monthly basket'));
     final detail = tester.widget<Text>(
-      find.text('Review a ready household product list'),
+      find.text('Review a curated 30-day household basket'),
     );
     expect(title.maxLines, 2);
     expect(title.style?.fontSize, greaterThanOrEqualTo(10.5));

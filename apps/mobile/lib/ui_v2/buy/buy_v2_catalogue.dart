@@ -626,6 +626,84 @@ class _BuyV2CatalogueViewState extends State<BuyV2CatalogueView> {
   }
 }
 
+class BuyV2ShoppingIntentBar extends StatelessWidget {
+  const BuyV2ShoppingIntentBar({super.key, required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final intent = session.activeShoppingIntent;
+    if (intent == null) return const SizedBox.shrink();
+    final (title, detail, icon) = switch (intent) {
+      BuyV2ShoppingIntent.monthlyBasket => (
+        'Monthly basket',
+        '12 household products · edit before Checkout',
+        Icons.shopping_basket_outlined,
+      ),
+      BuyV2ShoppingIntent.businessBuying => (
+        'Buying for business',
+        'Wholesale packs for your verified Workspace',
+        Icons.storefront_outlined,
+      ),
+      BuyV2ShoppingIntent.flexibleRestocking => (
+        'Flexible restocking',
+        'Products with lower minimum pack quantities',
+        Icons.inventory_2_outlined,
+      ),
+      BuyV2ShoppingIntent.homeShopping => (
+        'Shopping for home',
+        'Retail packs for household use',
+        Icons.shopping_bag_outlined,
+      ),
+    };
+    return Material(
+      key: const ValueKey('buy-shopping-intent-bar'),
+      color: BuyV2Colors.softGreen,
+      child: Semantics(
+        container: true,
+        label: '$title. $detail',
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 7, 6, 7),
+          child: Row(
+            children: [
+              Icon(icon, color: BuyV2Colors.green, size: 21),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      key: const ValueKey('buy-shopping-intent-title'),
+                      style: context.buyBody.copyWith(
+                        color: BuyV2Colors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      detail,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyMeta,
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                key: const ValueKey('buy-shopping-intent-clear'),
+                onPressed: session.clearShoppingIntent,
+                child: const Text('Clear'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CatalogueMotionOwner extends StatelessWidget {
   const _CatalogueMotionOwner({
     super.key,
@@ -2020,6 +2098,7 @@ Future<void> showBuyV2HouseholdBasket(
   BuildContext context,
   BuyV2Session session,
 ) async {
+  session.chooseShoppingIntent(BuyV2ShoppingIntent.monthlyBasket);
   final action = await showModalBottomSheet<_HouseholdBasketAction>(
     context: context,
     useSafeArea: true,
@@ -3357,7 +3436,7 @@ class _CataloguePromotionRail extends StatelessWidget {
         BuyV2PromotionCard(
           key: const ValueKey('buy-promotion-shop-basket'),
           title: 'Plan the monthly basket',
-          detail: 'Review a ready household product list',
+          detail: 'Review a curated 30-day household basket',
           icon: Icons.shopping_basket_outlined,
           sequenceIndex: 0,
           onTap: () => showBuyV2HouseholdBasket(context, session),
@@ -3365,30 +3444,34 @@ class _CataloguePromotionRail extends StatelessWidget {
         BuyV2PromotionCard(
           key: const ValueKey('buy-promotion-shop-wholesale'),
           title: 'Buying for a business?',
-          detail: 'Compare established wholesale packs',
+          detail: 'Compare wholesale packs for your Workspace',
           icon: Icons.storefront_outlined,
           accent: BuyV2Colors.green,
           sequenceIndex: 1,
-          onTap: () => session.openDestination(BuyV2Destination.wholesale),
+          onTap: () =>
+              session.chooseShoppingIntent(BuyV2ShoppingIntent.businessBuying),
         ),
       ],
       BuyV2Destination.wholesale => [
         BuyV2PromotionCard(
           key: const ValueKey('buy-promotion-wholesale-restock'),
           title: 'Flexible restocking',
-          detail: 'See products with flexible minimum packs',
+          detail: 'Compare products with lower minimum packs',
           icon: Icons.inventory_2_outlined,
           sequenceIndex: 0,
-          onTap: () => session.chooseFilter('moq'),
+          onTap: () => session.chooseShoppingIntent(
+            BuyV2ShoppingIntent.flexibleRestocking,
+          ),
         ),
         BuyV2PromotionCard(
           key: const ValueKey('buy-promotion-wholesale-shop'),
           title: 'Shopping for home?',
-          detail: 'Return to retail packs in Shop',
+          detail: 'Browse retail packs sized for home',
           icon: Icons.shopping_bag_outlined,
           accent: BuyV2Colors.green,
           sequenceIndex: 1,
-          onTap: () => session.openDestination(BuyV2Destination.shop),
+          onTap: () =>
+              session.chooseShoppingIntent(BuyV2ShoppingIntent.homeShopping),
         ),
       ],
       BuyV2Destination.medicine => [

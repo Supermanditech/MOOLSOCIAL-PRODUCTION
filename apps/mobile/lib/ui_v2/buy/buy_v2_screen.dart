@@ -460,6 +460,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               onAccount: _openBuyProfile,
                               scannerBusy: _scannerBusy,
                             ),
+                          if (session.activeShoppingIntent != null &&
+                              session.destination != BuyV2Destination.orders &&
+                              session.destination != BuyV2Destination.medicine)
+                            BuyV2ShoppingIntentBar(session: session),
                           Expanded(
                             child: Stack(
                               children: [

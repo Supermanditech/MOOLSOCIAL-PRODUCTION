@@ -26,6 +26,7 @@ class BuyV2CustomerStateSnapshot {
     this.paymentReference,
     this.paymentActionUri,
     this.bankTransferInstructions,
+    this.shoppingIntent,
     this.checkoutSubmissionState,
   });
 
@@ -39,6 +40,7 @@ class BuyV2CustomerStateSnapshot {
   final String? paymentReference;
   final Uri? paymentActionUri;
   final BuyV2BankTransferInstructions? bankTransferInstructions;
+  final String? shoppingIntent;
   final String? checkoutSubmissionState;
 }
 
