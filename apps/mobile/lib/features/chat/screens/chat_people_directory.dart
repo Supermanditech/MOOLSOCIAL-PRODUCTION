@@ -36,6 +36,7 @@ class ChatPersonEntry {
     this.profile,
     this.loading = false,
     this.connecting = false,
+    this.messageRequestPending = false,
     this.error,
   });
 
@@ -45,6 +46,7 @@ class ChatPersonEntry {
   final SocialAuthorProfile? profile;
   final bool loading;
   final bool connecting;
+  final bool messageRequestPending;
   final String? error;
 
   bool get connected => profile?.followed == true;
@@ -110,7 +112,7 @@ class ChatPeopleDirectory extends StatelessWidget {
                     textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
                       hintText: connectedOnly
-                          ? 'Search connected people'
+                          ? 'Search people you follow'
                           : 'Search MoolSocial people',
                       prefixIcon: const Icon(Icons.search_rounded),
                       filled: false,
@@ -157,7 +159,7 @@ class ChatPeopleDirectory extends StatelessWidget {
                           children: [
                             Text(
                               connectedOnly
-                                  ? 'Your MoolSocial people'
+                                  ? 'People you follow'
                                   : publicFeedOpened
                                   ? 'Public Feed'
                                   : 'Discover from the public Feed',
@@ -169,10 +171,10 @@ class ChatPeopleDirectory extends StatelessWidget {
                             const SizedBox(height: 3),
                             Text(
                               connectedOnly
-                                  ? 'People you connected with stay separate from shops, orders and support.'
+                                  ? 'Following controls public updates. Private messages still require recipient approval.'
                                   : publicFeedOpened
                                   ? 'Public profiles and conversations appear here when Feed is available.'
-                                  : 'Connect with a public profile before continuing privately in Chat.',
+                                  : 'Follow public updates or request a private conversation. Messages open only after approval.',
                               style: const TextStyle(
                                 color: MoolColors.muted,
                                 fontSize: 12,
@@ -196,9 +198,7 @@ class ChatPeopleDirectory extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        connectedOnly
-                            ? 'Connected people'
-                            : 'People to discover',
+                        connectedOnly ? 'Following' : 'People to discover',
                         style: const TextStyle(
                           color: MoolColors.ink,
                           fontSize: 18,
@@ -401,21 +401,29 @@ class _PersonCard extends StatelessWidget {
                           )
                         : Icon(
                             person.connected
-                                ? Icons.person_remove_outlined
+                                ? Icons.person_rounded
                                 : Icons.person_add_alt_1_rounded,
                           ),
-                    label: Text(person.connected ? 'Disconnect' : 'Connect'),
+                    label: Text(person.connected ? 'Following' : 'Follow'),
                   ),
                 ),
                 const SizedBox(width: MoolSpacing.xs),
                 Expanded(
                   child: FilledButton.icon(
                     key: Key('chat-person-message-${person.authorId}'),
-                    onPressed: person.isSelf || !person.connected
+                    onPressed: person.isSelf || person.messageRequestPending
                         ? null
                         : onChat,
-                    icon: const Icon(Icons.chat_bubble_outline_rounded),
-                    label: Text(person.connected ? 'Chat' : 'Connect first'),
+                    icon: Icon(
+                      person.messageRequestPending
+                          ? Icons.hourglass_top_rounded
+                          : Icons.mark_chat_unread_outlined,
+                    ),
+                    label: Text(
+                      person.messageRequestPending
+                          ? 'Awaiting approval'
+                          : 'Request chat',
+                    ),
                   ),
                 ),
               ],
@@ -493,7 +501,7 @@ class _PeopleEmpty extends StatelessWidget {
             hasQuery
                 ? 'No matching people'
                 : connectedOnly
-                ? 'No connected people yet'
+                ? 'You are not following anyone yet'
                 : publicFeedOpened
                 ? 'Public Feed unavailable'
                 : 'No public people to show yet',
@@ -507,7 +515,7 @@ class _PeopleEmpty extends StatelessWidget {
           const SizedBox(height: MoolSpacing.xs),
           Text(
             connectedOnly
-                ? 'Discover a public MoolSocial profile, connect, then continue privately in Chat.'
+                ? 'Discover a public profile to follow. Private conversations require a separate approved message request.'
                 : publicFeedOpened
                 ? 'Public profiles could not load. Try again or return to conversations.'
                 : 'Open Feed to discover public profiles and conversations.',

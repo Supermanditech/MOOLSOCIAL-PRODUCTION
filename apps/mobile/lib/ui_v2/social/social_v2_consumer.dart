@@ -297,6 +297,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   late final ScrollController _youtubeSearchResultsController;
   late final TextEditingController _youtubeSearchController;
   late final FocusNode _youtubeSearchFocusNode;
+  late final TextEditingController _feedSearchController;
+  bool _feedSearchOpen = false;
+  String _feedQuery = '';
+  final Set<String> _pendingFeedMessageRequests = <String>{};
   late final SocialMediaPicker _mediaPicker;
   SocialCreateDraftV2 get _createDraft => _retainedState.createDraft;
   late final Screen04YouTubeCatalogueSnapshotStore _youtubeCatalogueSnapshots;
@@ -575,6 +579,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       text: _youtubeSubmittedQuery,
     );
     _youtubeSearchFocusNode = FocusNode();
+    _feedSearchController = TextEditingController();
     _mediaPicker = widget.mediaPicker ?? NativeSocialMediaPicker();
     _world = screen04Worlds.any((world) => world.id == widget.initialWorld)
         ? widget.initialWorld
@@ -686,6 +691,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     _youtubeSearchResultsController.dispose();
     _youtubeSearchController.dispose();
     _youtubeSearchFocusNode.dispose();
+    _feedSearchController.dispose();
     _youtubeChannelRequest += 1;
     super.dispose();
   }
@@ -1282,6 +1288,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       widget.session.beginSignIn(
         returnLocation: '/app/social?sub=create',
         cancelLocation: '/app/social?sub=${_tab.name}',
+        purpose: JourneyAuthenticationPurpose.socialCreate,
       );
       return;
     }
@@ -1317,6 +1324,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       widget.session.beginSignIn(
         returnLocation: '/app/social?sub=create',
         cancelLocation: '/app/social?sub=${_tab.name}',
+        purpose: JourneyAuthenticationPurpose.socialCreate,
       );
       return;
     }
@@ -2376,51 +2384,68 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
 
   Widget _buildShorts() {
     if (_contentUnavailable) {
-      return _YouTubeShortsStatusView(
-        key: const Key('screen04-youtube-shorts-state-unavailable'),
-        icon: Icons.smart_display_outlined,
-        title: 'YouTube Shorts are unavailable',
-        detail: 'This Short isn’t available here right now.',
-        actionLabel: _youtubePublicAccessAvailable ? 'Try again' : null,
-        onAction: _youtubePublicAccessAvailable ? _loadLiveYouTubeVideos : null,
+      return _buildYouTubeShortsStatus(
+        _YouTubeShortsStatusView(
+          key: const Key('screen04-youtube-shorts-state-unavailable'),
+          icon: Icons.smart_display_outlined,
+          title: 'YouTube Shorts are unavailable',
+          detail: 'This Short isn’t available here right now.',
+          actionLabel: _youtubePublicAccessAvailable
+              ? 'Try again'
+              : 'Open Feed',
+          onAction: _youtubePublicAccessAvailable
+              ? _loadLiveYouTubeVideos
+              : () => _selectChoice('feed'),
+        ),
       );
     }
     if (!_youtubePublicAccessAvailable) {
-      return const _YouTubeShortsStatusView(
-        key: Key('screen04-youtube-shorts-state-provider-access'),
-        icon: Icons.smart_display_outlined,
-        title: 'YouTube Shorts are unavailable right now',
-        detail: 'Please try again later.',
+      return _buildYouTubeShortsStatus(
+        _YouTubeShortsStatusView(
+          key: const Key('screen04-youtube-shorts-state-provider-access'),
+          icon: Icons.smart_display_outlined,
+          title: 'YouTube Shorts are unavailable right now',
+          detail:
+              'You can continue in MoolSocial Feed while YouTube is unavailable.',
+          actionLabel: 'Open Feed',
+          onAction: () => _selectChoice('feed'),
+        ),
       );
     }
     if (_liveYouTubeShortsLoading && !_hasYouTubeShortsSnapshot) {
-      return const _YouTubeShortsStatusView(
-        key: Key('screen04-youtube-shorts-state-loading'),
-        icon: Icons.smart_display_rounded,
-        title: 'Loading YouTube Shorts',
-        detail: 'Checking the current public catalogue.',
-        loading: true,
+      return _buildYouTubeShortsStatus(
+        const _YouTubeShortsStatusView(
+          key: Key('screen04-youtube-shorts-state-loading'),
+          icon: Icons.smart_display_rounded,
+          title: 'Loading YouTube Shorts',
+          detail: 'Checking the current public catalogue.',
+          loading: true,
+        ),
       );
     }
     if (_liveYouTubeShortsError != null && !_hasYouTubeShortsSnapshot) {
-      return _YouTubeShortsStatusView(
-        key: const Key('screen04-youtube-shorts-state-error'),
-        icon: Icons.wifi_off_rounded,
-        title: 'YouTube Shorts couldn’t load',
-        detail: _liveYouTubeShortsError!,
-        actionLabel: 'Try again',
-        onAction: _loadLiveYouTubeVideos,
+      return _buildYouTubeShortsStatus(
+        _YouTubeShortsStatusView(
+          key: const Key('screen04-youtube-shorts-state-error'),
+          icon: Icons.wifi_off_rounded,
+          title: 'YouTube Shorts couldn’t load',
+          detail: _liveYouTubeShortsError!,
+          actionLabel: 'Try again',
+          onAction: _loadLiveYouTubeVideos,
+        ),
       );
     }
     final shorts = _eligibleLiveYouTubeShorts();
     if (shorts.isEmpty) {
-      return _YouTubeShortsStatusView(
-        key: const Key('screen04-youtube-shorts-state-empty'),
-        icon: Icons.video_library_outlined,
-        title: 'No Shorts to show',
-        detail: 'Check again soon.',
-        actionLabel: 'Check again',
-        onAction: _loadLiveYouTubeVideos,
+      return _buildYouTubeShortsStatus(
+        _YouTubeShortsStatusView(
+          key: const Key('screen04-youtube-shorts-state-empty'),
+          icon: Icons.video_library_outlined,
+          title: 'No Shorts to show',
+          detail: 'Check again soon.',
+          actionLabel: 'Check again',
+          onAction: _loadLiveYouTubeVideos,
+        ),
       );
     }
     final topSystemInset = MediaQuery.viewPaddingOf(context).top;
@@ -2640,20 +2665,25 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           icon: Icons.smart_display_outlined,
           title: 'YouTube Videos are unavailable',
           detail: 'This video isn’t available here right now.',
-          actionLabel: _youtubePublicAccessAvailable ? 'Try again' : null,
+          actionLabel: _youtubePublicAccessAvailable
+              ? 'Try again'
+              : 'Open Feed',
           onAction: _youtubePublicAccessAvailable
               ? _loadLiveYouTubeVideos
-              : null,
+              : () => _selectChoice('feed'),
         ),
       );
     }
     if (!_youtubePublicAccessAvailable) {
       return _buildYouTubeHomeStatus(
-        const _YouTubeVideosStatusView(
+        _YouTubeVideosStatusView(
           key: Key('screen04-youtube-videos-state-provider-access'),
           icon: Icons.smart_display_outlined,
           title: 'YouTube Videos are unavailable right now',
-          detail: 'Please try again later.',
+          detail:
+              'You can continue in MoolSocial Feed while YouTube is unavailable.',
+          actionLabel: 'Open Feed',
+          onAction: () => _selectChoice('feed'),
         ),
       );
     }
@@ -2848,13 +2878,41 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     );
   }
 
+  Widget _buildYouTubeShortsStatus(Widget status) {
+    return ColoredBox(
+      color: const Color(0xFF070711),
+      child: Column(
+        children: [
+          _YouTubeHomeHeader(
+            title: 'Shorts',
+            onSearch: _openYouTubeSearch,
+            onNotifications: _openUniversalNotifications,
+            onChannelStatus: _openYouTubeChannelStatus,
+            onAccount: _openAccount,
+          ),
+          Expanded(child: status),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFeed() {
     return ListenableBuilder(
       listenable: widget.sharedSession,
       builder: (context, _) {
         final session = widget.sharedSession;
+        final normalizedFeedQuery = _feedQuery.trim().toLowerCase();
         final publishedItems = session.socialPublishedItems
             .where((item) => item.type != SocialPublishedContentType.reel)
+            .where(
+              (item) =>
+                  normalizedFeedQuery.isEmpty ||
+                  item.authorName.toLowerCase().contains(normalizedFeedQuery) ||
+                  item.authorHandle.toLowerCase().contains(
+                    normalizedFeedQuery,
+                  ) ||
+                  item.body.toLowerCase().contains(normalizedFeedQuery),
+            )
             .toList();
         final sharedItemIndex = _feedLinkContextActive
             ? publishedItems.indexWhere(
@@ -2927,6 +2985,19 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                 ),
               ),
           ],
+          searchOpen: _feedSearchOpen,
+          searchController: _feedSearchController,
+          query: _feedQuery,
+          onSearchChanged: (value) => setState(() => _feedQuery = value),
+          onSearch: () => setState(() {
+            _feedSearchOpen = !_feedSearchOpen;
+            if (!_feedSearchOpen) {
+              _feedSearchController.clear();
+              _feedQuery = '';
+            }
+          }),
+          onNotifications: _openUniversalNotifications,
+          onProfile: _openAccount,
           onCreate: _openCreationGateway,
           onDiscover: () => _openFeedChatSection('discover'),
           onStartConversation: () => _openFeedChatSection('chats'),
@@ -2936,7 +3007,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
             } else if (session.socialContentAvailable) {
               unawaited(session.loadSocialFeed(refresh: true));
             } else {
-              setState(() => _feedState = 'empty');
+              showSocialV2Message(
+                context,
+                'Feed could not refresh right now. You can still create, discover people or open Chat.',
+              );
             }
           },
         );
@@ -3004,21 +3078,53 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     );
   }
 
-  void _startChatWithAuthor(SocialPublishedItem item) {
+  Future<void> _startChatWithAuthor(SocialPublishedItem item) async {
     final authorId = item.authorId;
     if (authorId == null || authorId.isEmpty) return;
-    final location = Uri(
-      path: '/app/chat',
-      queryParameters: {'start': authorId, 'return': '/app/social?sub=feed'},
-    ).toString();
     if (!widget.session.isAuthenticated) {
       widget.session.beginSignIn(
-        returnLocation: location,
+        returnLocation: Uri(
+          path: '/app/social',
+          queryParameters: {'sub': 'feed', 'item': item.id},
+        ).toString(),
         cancelLocation: '/app/social?sub=${_tab.name}',
       );
       return;
     }
-    context.push(location);
+    if (_pendingFeedMessageRequests.contains(authorId)) {
+      showSocialV2Message(
+        context,
+        'Message request is still awaiting approval.',
+      );
+      return;
+    }
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: Key('social-message-request-dialog-$authorId'),
+        title: Text('Request to message ${item.authorName}?'),
+        content: const Text(
+          'They must approve before a private conversation opens. Following public posts does not grant message access.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            key: const Key('social-message-request-send'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Send request'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || approved != true) return;
+    setState(() => _pendingFeedMessageRequests.add(authorId));
+    showSocialV2Message(
+      context,
+      'Message request is awaiting approval. No private chat was opened.',
+    );
   }
 
   void _requireFeedAuthentication(
@@ -3125,24 +3231,36 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       key: const Key('screen04-create-home'),
       padding: const EdgeInsets.fromLTRB(12, 16, 12, 120),
       children: [
-        SocialV2Card(
+        Container(
+          key: const Key('screen04-create-hub-header'),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF090057), Color(0xFF5B3FD0)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(22),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Create',
+                'Create something worth sharing',
                 style: TextStyle(
-                  color: SocialV2Colors.navy,
+                  color: Colors.white,
                   fontSize: 24,
+                  height: 1.08,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               const Text(
-                'Choose what you want to make. Your unpublished work stays private until you post it.',
+                'Start with a thought, photo, carousel, poll or quiz. Your work stays private until you publish.',
                 style: TextStyle(
-                  color: SocialV2Colors.muted,
+                  color: Colors.white70,
                   fontSize: 13,
+                  height: 1.35,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -3153,19 +3271,128 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                     ? null
                     : () => _openCreateEditor('post'),
                 icon: const Icon(Icons.edit_note_rounded),
-                label: const Text('Create a post'),
+                label: const Text('Start writing'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: SocialV2Colors.navy,
+                  minimumSize: const Size.fromHeight(50),
+                ),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                key: const Key('screen04-create-carousel-entry'),
-                onPressed: hasUserContent
-                    ? null
-                    : () => _openCreateEditor('carousel'),
-                icon: const Icon(Icons.view_carousel_outlined),
-                label: const Text('Create a carousel'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        const Text(
+          'Choose a format',
+          style: TextStyle(
+            color: SocialV2Colors.navy,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Each format opens a focused editor with a clear preview before publishing.',
+          style: TextStyle(
+            color: SocialV2Colors.muted,
+            fontSize: 12,
+            height: 1.35,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final width = (constraints.maxWidth - 10) / 2;
+            return Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                SizedBox(
+                  width: width,
+                  child: _SocialCreateFormatTile(
+                    key: const Key('screen04-create-photo-entry'),
+                    title: 'Photo',
+                    detail: 'One image with context',
+                    icon: Icons.add_photo_alternate_outlined,
+                    enabled: !hasUserContent,
+                    onTap: () => _openCreateEditor('image'),
+                  ),
+                ),
+                SizedBox(
+                  width: width,
+                  child: _SocialCreateFormatTile(
+                    key: const Key('screen04-create-carousel-entry'),
+                    title: 'Carousel',
+                    detail: 'Tell a story in slides',
+                    icon: Icons.view_carousel_outlined,
+                    enabled: !hasUserContent,
+                    onTap: () => _openCreateEditor('carousel'),
+                  ),
+                ),
+                SizedBox(
+                  width: width,
+                  child: _SocialCreateFormatTile(
+                    key: const Key('screen04-create-poll-entry'),
+                    title: 'Poll',
+                    detail: 'Ask and collect votes',
+                    icon: Icons.poll_outlined,
+                    enabled: !hasUserContent,
+                    onTap: () => _openCreateEditor('quick-poll'),
+                  ),
+                ),
+                SizedBox(
+                  width: width,
+                  child: _SocialCreateFormatTile(
+                    key: const Key('screen04-create-quiz-entry'),
+                    title: 'Quiz',
+                    detail: 'Make learning interactive',
+                    icon: Icons.quiz_outlined,
+                    enabled: !hasUserContent,
+                    onTap: () => _openCreateEditor('quiz'),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 14),
+        SocialV2Card(
+          key: const Key('screen04-create-draft-card'),
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              const CircleAvatar(
+                backgroundColor: Color(0xFFEDE8FF),
+                foregroundColor: SocialV2Colors.navy,
+                child: Icon(Icons.drafts_outlined),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hasDraft ? 'Draft ready to continue' : 'No saved draft',
+                      style: const TextStyle(
+                        color: SocialV2Colors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      hasDraft
+                          ? 'Your unpublished work remains private.'
+                          : 'A draft appears here after you start creating.',
+                      style: const TextStyle(
+                        color: SocialV2Colors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
                 key: const Key('screen04-create-draft-entry'),
                 onPressed: hasDraft
                     ? () => _openCreateEditor(
@@ -3173,11 +3400,16 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                         preserveIntent: true,
                       )
                     : null,
-                icon: const Icon(Icons.drafts_outlined),
-                label: Text(hasDraft ? 'Continue draft' : 'No saved draft'),
+                child: const Text('Continue'),
               ),
             ],
           ),
+        ),
+        TextButton.icon(
+          key: const Key('screen04-create-open-feed'),
+          onPressed: () => _selectChoice('feed'),
+          icon: const Icon(Icons.dynamic_feed_outlined),
+          label: const Text('Return to Feed'),
         ),
       ],
     );
@@ -3667,10 +3899,90 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   }
 }
 
+class _SocialCreateFormatTile extends StatelessWidget {
+  const _SocialCreateFormatTile({
+    required this.title,
+    required this.detail,
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+    super.key,
+  });
+
+  final String title;
+  final String detail;
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    enabled: enabled,
+    label: '$title. $detail',
+    excludeSemantics: true,
+    child: Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: Color(0xFFE1E0EC)),
+      ),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(18),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 116),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  icon,
+                  color: enabled ? SocialV2Colors.navy : SocialV2Colors.muted,
+                  size: 27,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: enabled ? SocialV2Colors.navy : SocialV2Colors.muted,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: SocialV2Colors.muted,
+                    fontSize: 11,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class _MoolSocialFeedStatusView extends StatelessWidget {
   const _MoolSocialFeedStatusView({
     required this.state,
     required this.content,
+    required this.searchOpen,
+    required this.searchController,
+    required this.query,
+    required this.onSearchChanged,
+    required this.onSearch,
+    required this.onNotifications,
+    required this.onProfile,
     required this.onCreate,
     required this.onDiscover,
     required this.onStartConversation,
@@ -3679,6 +3991,13 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
 
   final String state;
   final List<Widget> content;
+  final bool searchOpen;
+  final TextEditingController searchController;
+  final String query;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onSearch;
+  final VoidCallback onNotifications;
+  final VoidCallback onProfile;
   final VoidCallback onCreate;
   final VoidCallback onDiscover;
   final VoidCallback onStartConversation;
@@ -3706,8 +4025,10 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
       ),
       _ => (
         Icons.forum_outlined,
-        'Your Feed is ready',
-        'Nothing new has arrived yet. Start a conversation, share a photo or build a carousel in Create.',
+        query.trim().isEmpty ? 'No posts yet' : 'No matching posts',
+        query.trim().isEmpty
+            ? 'Create a post, discover people or start a conversation while new public posts arrive.'
+            : 'Try another search or discover people to continue.',
       ),
     };
 
@@ -3717,95 +4038,110 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
       children: [
         Container(
           key: const Key('screen04-moolsocial-feed-brand'),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF090057), SocialV2Colors.navy],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x26000050),
-                blurRadius: 14,
-                offset: Offset(0, 6),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.dynamic_feed_rounded,
-                      color: SocialV2Colors.navy,
-                      size: 23,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'MOOLSOCIAL',
-                          style: TextStyle(
-                            color: SocialV2Colors.saffron,
-                            fontSize: 10,
-                            letterSpacing: 1.6,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Your Feed',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            height: 1,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    constraints: const BoxConstraints(minHeight: 32),
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0x22FFFFFF),
-                      borderRadius: BorderRadius.circular(99),
-                      border: Border.all(color: const Color(0x55FFFFFF)),
-                    ),
-                    child: const Text(
-                      'PUBLIC FEED',
+              Container(
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.dynamic_feed_rounded,
+                  color: SocialV2Colors.navy,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Feed',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 8,
-                        letterSpacing: .6,
+                        fontSize: 18,
+                        height: 1,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: 3),
+                    Text(
+                      'Public MoolSocial posts',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                key: const Key('screen04-feed-search-toggle'),
+                tooltip: searchOpen ? 'Close Feed search' : 'Search Feed',
+                onPressed: onSearch,
+                color: Colors.white,
+                icon: Icon(
+                  searchOpen ? Icons.close_rounded : Icons.search_rounded,
+                ),
+              ),
+              IconButton(
+                key: const Key('screen04-feed-notifications'),
+                tooltip: 'Notifications',
+                onPressed: onNotifications,
+                color: Colors.white,
+                icon: const Icon(Icons.notifications_none_rounded),
+              ),
+              IconButton(
+                key: const Key('screen04-feed-profile'),
+                tooltip: 'Open your MoolSocial profile',
+                onPressed: onProfile,
+                color: Colors.white,
+                icon: const Icon(Icons.account_circle_outlined),
               ),
             ],
           ),
         ),
+        if (searchOpen)
+          TextField(
+            key: const Key('screen04-feed-search-input'),
+            controller: searchController,
+            autofocus: true,
+            onChanged: onSearchChanged,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'Search posts or people',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: query.isEmpty
+                  ? null
+                  : IconButton(
+                      key: const Key('screen04-feed-search-clear'),
+                      tooltip: 'Clear Feed search',
+                      onPressed: () {
+                        searchController.clear();
+                        onSearchChanged('');
+                      },
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+            ),
+          ),
         if (showStatus)
           SocialV2Card(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(14),
             child: Semantics(
               liveRegion: true,
               label: title,
@@ -3815,22 +4151,22 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Container(
-                      width: 54,
-                      height: 54,
+                      width: 42,
+                      height: 42,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: const Color(0xFFF1F0FA),
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Icon(icon, color: SocialV2Colors.navy, size: 28),
+                      child: Icon(icon, color: SocialV2Colors.navy, size: 23),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   Text(
                     title,
                     style: const TextStyle(
                       color: SocialV2Colors.navy,
-                      fontSize: 21,
+                      fontSize: 19,
                       height: 1.08,
                       fontWeight: FontWeight.w900,
                     ),
@@ -3846,7 +4182,7 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                     ),
                   ),
                   if (loading) ...[
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 14),
                     const LinearProgressIndicator(
                       key: Key('screen04-moolsocial-feed-loading'),
                       minHeight: 4,
@@ -3865,24 +4201,42 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                         label: const Text('Create a post'),
                       ),
                       const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        key: const Key('screen04-feed-discover-people'),
-                        onPressed: onDiscover,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                        ),
-                        icon: const Icon(Icons.person_search_outlined),
-                        label: const Text('Discover people'),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              key: const Key('screen04-feed-discover-people'),
+                              onPressed: onDiscover,
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                              ),
+                              icon: const Icon(Icons.person_search_outlined),
+                              label: const Text('Discover'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              key: const Key(
+                                'screen04-feed-start-conversation',
+                              ),
+                              onPressed: onStartConversation,
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                              ),
+                              icon: const Icon(
+                                Icons.chat_bubble_outline_rounded,
+                              ),
+                              label: const Text('Chat'),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        key: const Key('screen04-feed-start-conversation'),
-                        onPressed: onStartConversation,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                        ),
-                        icon: const Icon(Icons.chat_bubble_outline_rounded),
-                        label: const Text('Start a conversation'),
+                      TextButton.icon(
+                        key: const Key('screen04-feed-refresh-empty'),
+                        onPressed: onRetry,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Refresh Feed'),
                       ),
                     ] else ...[
                       FilledButton.icon(
@@ -3950,37 +4304,6 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
               ],
             ),
           ),
-        Container(
-          key: const Key('screen04-moolsocial-feed-ownership-note'),
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF7E9),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFFFD79A)),
-          ),
-          child: const Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.verified_outlined,
-                color: SocialV2Colors.navy,
-                size: 20,
-              ),
-              SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  'MoolSocial posts stay in Feed. YouTube-hosted content stays in Shorts and Videos.',
-                  style: TextStyle(
-                    color: SocialV2Colors.navy,
-                    fontSize: 11,
-                    height: 1.35,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -4063,7 +4386,7 @@ class _SocialOwnershipDock extends StatelessWidget {
       ),
       child: Material(
         key: const Key('moolsocial-compact-destination-rail'),
-        color: const Color(0xFF0F0F0F),
+        color: const Color(0xFFF6F6FA),
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
@@ -4118,7 +4441,6 @@ class _SocialOwnershipDock extends StatelessWidget {
                         selected: selected == SocialV2Tab.create,
                         ownership: 'Create',
                         selectedAccent: const Color(0xFF7C5CFF),
-                        prominent: true,
                         onTap: onCreate,
                       ),
                       _SocialOwnershipDockItem(
@@ -4160,7 +4482,6 @@ class _SocialOwnershipDockItem extends StatelessWidget {
     required this.ownership,
     required this.selectedAccent,
     required this.onTap,
-    this.prominent = false,
   });
 
   final Key controlKey;
@@ -4171,7 +4492,6 @@ class _SocialOwnershipDockItem extends StatelessWidget {
   final String ownership;
   final Color selectedAccent;
   final VoidCallback onTap;
-  final bool prominent;
 
   @override
   Widget build(BuildContext context) {
@@ -4200,35 +4520,27 @@ class _SocialOwnershipDockItem extends StatelessWidget {
                         context,
                         MoolLocalNavigationTokens.selectionDuration,
                       ),
-                      width: prominent ? 42 : 36,
-                      height: prominent ? 34 : 30,
+                      width: 38,
+                      height: 32,
                       decoration: BoxDecoration(
-                        color: prominent
-                            ? selected
-                                  ? selectedAccent
-                                  : Colors.white
-                            : selected
-                            ? selectedAccent.withValues(alpha: .30)
+                        color: selected
+                            ? selectedAccent.withValues(alpha: .13)
                             : Colors.transparent,
-                        borderRadius: BorderRadius.circular(
-                          prominent ? 11 : 14,
-                        ),
+                        borderRadius: BorderRadius.circular(13),
                         border: Border.all(
                           color: selected
-                              ? selectedAccent.withValues(alpha: .90)
-                              : prominent
-                              ? Colors.white
+                              ? selectedAccent.withValues(alpha: .55)
                               : Colors.transparent,
-                          width: prominent ? 2 : 1,
+                          width: 1,
                         ),
                       ),
                       alignment: Alignment.center,
                       child: Icon(
                         selected ? selectedIcon : icon,
-                        color: prominent && !selected
-                            ? Colors.black
-                            : Colors.white,
-                        size: prominent ? 27 : 23,
+                        color: selected
+                            ? selectedAccent
+                            : const Color(0xFF5E6378),
+                        size: 23,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -4236,9 +4548,9 @@ class _SocialOwnershipDockItem extends StatelessWidget {
                       label,
                       maxLines: 1,
                       style: TextStyle(
-                        color: selected || prominent
-                            ? Colors.white
-                            : Colors.white70,
+                        color: selected
+                            ? selectedAccent
+                            : const Color(0xFF5E6378),
                         fontSize: 10,
                         height: 1,
                         fontWeight: selected
@@ -4278,12 +4590,14 @@ class _SocialOwnershipDockItem extends StatelessWidget {
 
 class _YouTubeHomeHeader extends StatelessWidget {
   const _YouTubeHomeHeader({
+    this.title = 'YouTube',
     required this.onSearch,
     required this.onNotifications,
     required this.onChannelStatus,
     required this.onAccount,
   });
 
+  final String title;
   final VoidCallback onSearch;
   final VoidCallback onNotifications;
   final VoidCallback onChannelStatus;
@@ -4301,9 +4615,13 @@ class _YouTubeHomeHeader extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
             children: [
-              Flexible(
+              Expanded(
                 child: Text(
-                  compact ? 'YouTube' : 'YouTube videos',
+                  compact
+                      ? title
+                      : title == 'YouTube'
+                      ? 'YouTube videos'
+                      : title,
                   key: const Key('screen04-youtube-home-title'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -4315,7 +4633,6 @@ class _YouTubeHomeHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              const Spacer(),
               IconButton(
                 key: const Key('screen04-youtube-home-search'),
                 tooltip: 'Search YouTube',
@@ -4430,7 +4747,7 @@ class _YouTubeSearchSurface extends StatelessWidget {
         children: [
           SizedBox(
             key: const Key('screen04-youtube-search-header'),
-            height: 64,
+            height: 82,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(2, 8, 10, 8),
               child: Row(
@@ -4450,7 +4767,8 @@ class _YouTubeSearchSurface extends StatelessWidget {
                         controller: controller,
                         focusNode: focusNode,
                         autofocus: autofocus,
-                        maxLines: 1,
+                        minLines: 1,
+                        maxLines: 2,
                         textInputAction: TextInputAction.search,
                         textCapitalization: TextCapitalization.sentences,
                         keyboardType: TextInputType.text,
@@ -4546,7 +4864,7 @@ class _YouTubeSearchSurface extends StatelessWidget {
                     key: const Key('screen04-youtube-search-draft-ready'),
                     icon: Icons.search_rounded,
                     title: 'Ready to search',
-                    detail: 'Press Search on the keyboard or continue below.',
+                    detail: 'Review the full query, then search.',
                     actionLabel: 'Search now',
                     onAction: () => onSubmitted(draftQuery),
                   ),
@@ -4586,9 +4904,10 @@ class _YouTubeSearchStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return Align(
+      alignment: Alignment.topCenter,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(24, 36, 24, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -4601,8 +4920,8 @@ class _YouTubeSearchStatus extends StatelessWidget {
                 ),
               )
             else
-              Icon(icon, color: Colors.white54, size: 44),
-            const SizedBox(height: 16),
+              Icon(icon, color: Colors.white54, size: 36),
+            const SizedBox(height: 12),
             Text(
               title,
               textAlign: TextAlign.center,
@@ -6279,6 +6598,32 @@ class _SocialAuthorPanelV2State extends State<_SocialAuthorPanelV2> {
     await widget.session.setSocialFollow(_authorId, !profile.followed);
   }
 
+  Future<void> _openPaidFollow(SocialAuthorProfile profile) async {
+    final price = profile.paidFollowMonthlyPrice;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: Key('social-author-paid-follow-dialog-$_authorId'),
+        title: Text(
+          price == null
+              ? 'Creator membership is not offered'
+              : 'Join for ₹$price per month?',
+        ),
+        content: Text(
+          price == null
+              ? 'You can still follow public updates. This creator has not enabled a paid following option.'
+              : 'Paid following requires a live creator offering, payment and entitlement confirmation. Those services are unavailable right now, so nothing will be charged.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.session,
@@ -6371,6 +6716,52 @@ class _SocialAuthorPanelV2State extends State<_SocialAuthorPanelV2> {
                       ),
                     ),
                   ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            SocialV2Card(
+              key: Key('social-author-paid-follow-$_authorId'),
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  const CircleAvatar(
+                    backgroundColor: Color(0xFFFFF1D6),
+                    foregroundColor: SocialV2Colors.navy,
+                    child: Icon(Icons.workspace_premium_outlined),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Creator membership',
+                          style: TextStyle(
+                            color: SocialV2Colors.navy,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          profile.paidFollowAvailable
+                              ? '₹${profile.paidFollowMonthlyPrice} per month · ${profile.paidFollowBenefits.isEmpty ? 'creator benefits' : profile.paidFollowBenefits.join(' · ')}'
+                              : 'Follow public updates free. Paid following is not offered by this creator.',
+                          style: const TextStyle(
+                            color: SocialV2Colors.muted,
+                            fontSize: 11,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    key: Key('social-author-paid-follow-action-$_authorId'),
+                    onPressed: () => _openPaidFollow(profile),
+                    child: Text(
+                      profile.paidFollowAvailable ? 'View' : 'Details',
+                    ),
+                  ),
                 ],
               ),
             ),

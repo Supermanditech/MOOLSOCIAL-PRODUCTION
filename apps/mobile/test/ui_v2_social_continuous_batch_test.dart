@@ -42,7 +42,11 @@ void main() {
         find.text('YouTube Shorts are unavailable right now'),
         findsOneWidget,
       );
-      expect(find.text('Please try again later.'), findsOneWidget);
+      expect(
+        find.textContaining('continue in MoolSocial Feed'),
+        findsOneWidget,
+      );
+      expect(find.text('Open Feed'), findsOneWidget);
       expect(find.text('Fresh basket packed this morning'), findsNothing);
       expect(find.text('Meet Rajasthan makers this week'), findsNothing);
       expect(find.text('Promoted'), findsNothing);
@@ -84,7 +88,11 @@ void main() {
         find.text('YouTube Videos are unavailable right now'),
         findsOneWidget,
       );
-      expect(find.text('Please try again later.'), findsOneWidget);
+      expect(
+        find.textContaining('continue in MoolSocial Feed'),
+        findsOneWidget,
+      );
+      expect(find.text('Open Feed'), findsOneWidget);
       expect(find.text('Live'), findsNothing);
       expect(find.text('Learning'), findsNothing);
       expect(find.text('Local'), findsNothing);
@@ -242,7 +250,10 @@ void main() {
 
       expect(find.text('Account access video'), findsOneWidget);
       expect(find.byTooltip('YouTube channel status'), findsOneWidget);
-      expect(find.byTooltip('MoolSocial account'), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen04-youtube-home-account')),
+        findsOneWidget,
+      );
       await tester.tap(
         find.byKey(const Key('screen04-youtube-home-channel-status')),
       );
@@ -434,7 +445,15 @@ void main() {
         find.byKey(const Key('screen04-moolsocial-feed-brand')),
         findsOneWidget,
       );
-      expect(find.text('PUBLIC FEED'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('screen04-moolsocial-feed-brand')),
+          matching: find.text('Feed'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Public MoolSocial posts'), findsOneWidget);
+      expect(find.text('No posts yet'), findsOneWidget);
       expect(
         find.byKey(const Key('screen04-feed-create-post')),
         findsOneWidget,

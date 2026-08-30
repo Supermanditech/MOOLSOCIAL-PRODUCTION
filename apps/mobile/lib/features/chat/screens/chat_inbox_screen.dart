@@ -49,6 +49,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   bool _applyingRoute = false;
   bool _loadingPeopleDirectory = false;
   String? _peopleDirectoryError;
+  final Set<String> _pendingMessageRequests = <String>{};
   late ChatHomeSection _section;
   bool _publicFeedOpened = false;
 
@@ -272,6 +273,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           profile: profile,
           loading: social.socialAuthorLoading(authorId),
           connecting: social.socialFollowBusy(authorId),
+          messageRequestPending: _pendingMessageRequests.contains(authorId),
           error: social.socialAuthorError(authorId),
         ),
       );
@@ -307,9 +309,37 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   }
 
   Future<void> _startPersonChat(ChatPersonEntry person) async {
-    final thread = await widget.session.createDirectThread(person.authorId);
-    if (!mounted || thread == null) return;
-    _openThread(context, thread.id, widget.returnRoute);
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: Key('chat-message-request-dialog-${person.authorId}'),
+        title: Text('Request to message ${person.name}?'),
+        content: const Text(
+          'They must approve before a private conversation opens. Following someone does not bypass message approval.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('chat-message-request-cancel'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            key: const Key('chat-message-request-send'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Send request'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || approved != true) return;
+    setState(() => _pendingMessageRequests.add(person.authorId));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Message request is awaiting approval. No private chat was opened.',
+        ),
+      ),
+    );
   }
 
   int get _sectionIndex => ChatHomeSection.values.indexOf(_section);

@@ -79,6 +79,15 @@ void main() {
     await tester.tap(find.text('Create a post'));
     await tester.pump();
     expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+    expect(find.byKey(const Key('screen04-create-hub-header')), findsOneWidget);
+    for (final key in const [
+      Key('screen04-create-photo-entry'),
+      Key('screen04-create-carousel-entry'),
+      Key('screen04-create-poll-entry'),
+      Key('screen04-create-quiz-entry'),
+    ]) {
+      expect(find.byKey(key), findsOneWidget);
+    }
     expect(journey.stage, JourneyStage.ready);
     expect(journey.isAuthenticated, isTrue);
   });
@@ -124,6 +133,10 @@ void main() {
 
     expect(journey.stage, JourneyStage.signIn);
     expect(journey.returnTo, '/app/social?sub=create');
+    expect(
+      journey.authenticationPurpose,
+      JourneyAuthenticationPurpose.socialCreate,
+    );
     expect(find.byKey(const Key('social-v2-create-workbench')), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -408,6 +421,14 @@ void main() {
       expect(find.text('@riyasharma'), findsWidgets);
       expect(find.text('A public author post.'), findsWidgets);
       expect(find.textContaining('followers'), findsOneWidget);
+      expect(
+        find.byKey(Key('social-author-paid-follow-${item.authorId}')),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Paid following is not offered'),
+        findsOneWidget,
+      );
       expect(find.textContaining('email'), findsNothing);
       final follow = find.byKey(Key('social-author-follow-${item.authorId}'));
       await tester.ensureVisible(follow);
@@ -762,10 +783,7 @@ void main() {
       );
       await tester.pump();
       expect(journey.stage, JourneyStage.signIn);
-      expect(
-        journey.returnTo,
-        '/app/chat?start=public-author-1&return=%2Fapp%2Fsocial%3Fsub%3Dfeed',
-      );
+      expect(journey.returnTo, '/app/social?sub=feed&item=public-action-truth');
       expect(socialGateway.interactions, isEmpty);
       expect(tester.takeException(), isNull);
     },

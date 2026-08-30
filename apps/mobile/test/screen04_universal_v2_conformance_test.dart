@@ -795,7 +795,8 @@ void main() {
       find.text('YouTube Shorts are unavailable right now'),
       findsOneWidget,
     );
-    expect(find.text('Please try again later.'), findsOneWidget);
+    expect(find.textContaining('continue in MoolSocial Feed'), findsOneWidget);
+    expect(find.text('Open Feed'), findsOneWidget);
     expect(
       find.textContaining('will not replace it with unverified videos'),
       findsNothing,

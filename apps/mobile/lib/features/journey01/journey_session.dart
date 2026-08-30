@@ -25,7 +25,11 @@ enum EmailLinkState {
   failed,
 }
 
-enum JourneyAuthenticationPurpose { general, youtubeChannelConnection }
+enum JourneyAuthenticationPurpose {
+  general,
+  socialCreate,
+  youtubeChannelConnection,
+}
 
 class JourneySession extends ChangeNotifier {
   JourneySession({

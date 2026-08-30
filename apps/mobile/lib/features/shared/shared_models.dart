@@ -80,6 +80,8 @@ class SocialAuthorProfile {
     required this.followed,
     required this.isSelf,
     required this.posts,
+    this.paidFollowMonthlyPrice,
+    this.paidFollowBenefits = const <String>[],
   });
 
   final String authorId;
@@ -89,6 +91,11 @@ class SocialAuthorProfile {
   final bool followed;
   final bool isSelf;
   final List<SocialPublishedItem> posts;
+  final int? paidFollowMonthlyPrice;
+  final List<String> paidFollowBenefits;
+
+  bool get paidFollowAvailable =>
+      paidFollowMonthlyPrice != null && paidFollowMonthlyPrice! > 0;
 }
 
 class SocialPublishedItem {

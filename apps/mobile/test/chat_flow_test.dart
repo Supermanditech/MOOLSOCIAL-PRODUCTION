@@ -507,7 +507,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Open Feed continues through Social and back into direct Chat', (
+  testWidgets('Open Feed continues through approved message requests', (
     tester,
   ) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -552,15 +552,15 @@ void main() {
 
     await tapVisible(tester, const Key('social-message-author-post-a'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
-    expect(chatGateway.createdTargets, ['person-a']);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-    await tester.binding.handlePopRoute();
+    expect(
+      find.byKey(const Key('social-message-request-dialog-person-a')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('social-message-request-send')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
-    expect(find.text('Public discovery post'), findsWidgets);
+    expect(chatGateway.createdTargets, isEmpty);
+    expect(find.textContaining('awaiting approval'), findsOneWidget);
 
     await tapVisible(tester, const Key('social-global-chat'));
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
@@ -571,11 +571,15 @@ void main() {
     );
     await tapVisible(tester, const Key('chat-person-connect-person-b'));
     await tapVisible(tester, const Key('chat-person-message-person-b'));
-    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
-    expect(chatGateway.createdTargets, ['person-a', 'person-b']);
-
-    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('chat-message-request-dialog-person-b')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('chat-message-request-send')));
+    await tester.pumpAndSettle();
+    expect(chatGateway.createdTargets, isEmpty);
+    expect(find.text('Awaiting approval'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('chat-section-body-discover')),
       findsOneWidget,
@@ -586,71 +590,73 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Discover follows people and keeps private chat approval-gated', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final socialGateway = _PeopleSocialGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    final chatGateway = _PeopleChatGateway();
+    final chat = ChatSession.production(gateway: chatGateway);
+    addTearDown(journey.dispose);
+    addTearDown(shared.dispose);
+    addTearDown(chat.dispose);
+
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/social?sub=feed',
+      journey: journey,
+      chat: chat,
+      sharedSession: shared,
+    );
+
+    expect(find.byKey(const Key('chat-section-chats')), findsOneWidget);
+    await tapVisible(tester, const Key('chat-section-discover'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+    expect(find.byKey(const Key('chat-person-person-b')), findsOneWidget);
+    expect(find.text('Alice News'), findsOneWidget);
+    expect(find.text('Bharat Creator'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('chat-person-message-person-b')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+
+    await tapVisible(tester, const Key('chat-person-connect-person-a'));
+    expect(socialGateway.followed['person-a'], isTrue);
+    expect(find.widgetWithText(OutlinedButton, 'Following'), findsOneWidget);
+
+    await tapVisible(tester, const Key('chat-section-people'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+    expect(find.byKey(const Key('chat-person-person-b')), findsNothing);
+
+    await tapVisible(tester, const Key('chat-section-discover'));
+    await tester.pumpAndSettle();
+    await tapVisible(tester, const Key('chat-person-connect-person-b'));
+    expect(socialGateway.followed['person-b'], isTrue);
+    await tapVisible(tester, const Key('chat-person-message-person-b'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('chat-message-request-dialog-person-b')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('chat-message-request-send')));
+    await tester.pumpAndSettle();
+    expect(chatGateway.createdTargets, isEmpty);
+    expect(find.text('Awaiting approval'), findsOneWidget);
+    expect(find.byKey(const Key('chat-thread-screen')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
-    'Discover connects MoolSocial people and starts a real direct Chat',
-    (tester) async {
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final journey = await readyJourney();
-      final socialGateway = _PeopleSocialGateway();
-      final shared = SharedSession(socialContentGateway: socialGateway);
-      final chatGateway = _PeopleChatGateway();
-      final chat = ChatSession.production(gateway: chatGateway);
-      addTearDown(journey.dispose);
-      addTearDown(shared.dispose);
-      addTearDown(chat.dispose);
-
-      await mount(
-        tester,
-        route: '/app/chat/inbox?return=/app/social?sub=feed',
-        journey: journey,
-        chat: chat,
-        sharedSession: shared,
-      );
-
-      expect(find.byKey(const Key('chat-section-chats')), findsOneWidget);
-      await tapVisible(tester, const Key('chat-section-discover'));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
-      expect(find.byKey(const Key('chat-person-person-b')), findsOneWidget);
-      expect(find.text('Alice News'), findsOneWidget);
-      expect(find.text('Bharat Creator'), findsOneWidget);
-      expect(
-        tester
-            .widget<FilledButton>(
-              find.byKey(const Key('chat-person-message-person-b')),
-            )
-            .onPressed,
-        isNull,
-      );
-
-      await tapVisible(tester, const Key('chat-person-connect-person-a'));
-      expect(socialGateway.followed['person-a'], isTrue);
-      expect(find.widgetWithText(OutlinedButton, 'Disconnect'), findsOneWidget);
-
-      await tapVisible(tester, const Key('chat-section-people'));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
-      expect(find.byKey(const Key('chat-person-person-b')), findsNothing);
-
-      await tapVisible(tester, const Key('chat-section-discover'));
-      await tester.pumpAndSettle();
-      await tapVisible(tester, const Key('chat-person-connect-person-b'));
-      expect(socialGateway.followed['person-b'], isTrue);
-      await tapVisible(tester, const Key('chat-person-message-person-b'));
-      await tester.pumpAndSettle();
-
-      expect(chatGateway.createdTargets, ['person-b']);
-      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
-      expect(find.text('Bharat Creator'), findsOneWidget);
-      await tapVisible(tester, const Key('chat-back'));
-      expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'People search, clear and disconnect complete without a dead end',
+    'Following search, clear and unfollow complete without a dead end',
     (tester) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final journey = await readyJourney();
@@ -706,7 +712,7 @@ void main() {
       expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
       await tapVisible(tester, const Key('chat-person-connect-person-a'));
       expect(socialGateway.followed['person-a'], isFalse);
-      expect(find.text('No connected people yet'), findsOneWidget);
+      expect(find.text('You are not following anyone yet'), findsOneWidget);
 
       await tapVisible(tester, const Key('chat-people-open-discover'));
       expect(
@@ -720,7 +726,7 @@ void main() {
               find.byKey(const Key('chat-person-message-person-a')),
             )
             .onPressed,
-        isNull,
+        isNotNull,
       );
       expect(tester.takeException(), isNull);
     },

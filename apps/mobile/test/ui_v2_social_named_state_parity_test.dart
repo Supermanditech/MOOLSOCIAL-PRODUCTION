@@ -64,7 +64,8 @@ void main() {
       find.text('YouTube Shorts are unavailable right now'),
       findsOneWidget,
     );
-    expect(find.text('Please try again later.'), findsOneWidget);
+    expect(find.textContaining('continue in MoolSocial Feed'), findsOneWidget);
+    expect(find.text('Open Feed'), findsOneWidget);
     expect(find.text('Fresh basket packed this morning'), findsNothing);
     expect(find.text('Comment'), findsNothing);
 
@@ -135,7 +136,8 @@ void main() {
         find.text('YouTube Videos are unavailable right now'),
         findsOneWidget,
       );
-      expect(find.text('Please try again later.'), findsOneWidget);
+      expect(find.textContaining('continue in MoolSocial Feed'), findsOneWidget);
+      expect(find.text('Open Feed'), findsOneWidget);
       expect(find.text('5-minute morning mobility'), findsNothing);
       expect(find.byKey(const Key('screen04-video-watch')), findsNothing);
       expect(find.text('Subscribe'), findsNothing);
