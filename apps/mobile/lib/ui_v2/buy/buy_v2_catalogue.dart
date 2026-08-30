@@ -1170,12 +1170,13 @@ class _CatalogueToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final order = session.orders.firstWhere(
-      (order) =>
-          order.destination == session.destination ||
-          session.destination == BuyV2Destination.shop,
-      orElse: () => session.orders.first,
-    );
+    final order = session.orders
+        .where(
+          (order) =>
+              order.destination == session.destination ||
+              session.destination == BuyV2Destination.shop,
+        )
+        .firstOrNull;
     return Container(
       key: const ValueKey('buy-catalogue-toolbar'),
       height: 60,
@@ -2098,7 +2099,7 @@ class _CatalogueToolsMenu extends StatelessWidget {
   const _CatalogueToolsMenu({required this.session, required this.order});
 
   final BuyV2Session session;
-  final BuyV2Order order;
+  final BuyV2Order? order;
 
   @override
   Widget build(BuildContext context) {
@@ -2110,13 +2111,14 @@ class _CatalogueToolsMenu extends StatelessWidget {
         context,
         session,
         actions: [
-          BuyV2FilterSheetAction(
-            keyName: 'buy-active-orders-button',
-            icon: Icons.local_shipping_outlined,
-            title: 'Track active order',
-            detail: 'Order ${order.id}',
-            onTap: () => session.openTracking(order.id),
-          ),
+          if (order case final activeOrder?)
+            BuyV2FilterSheetAction(
+              keyName: 'buy-active-orders-button',
+              icon: Icons.local_shipping_outlined,
+              title: 'Track active order',
+              detail: 'Order ${activeOrder.id}',
+              onTap: () => session.openTracking(activeOrder.id),
+            ),
           if (session.destination == BuyV2Destination.shop)
             BuyV2FilterSheetAction(
               keyName: 'buy-household-basket-button',
