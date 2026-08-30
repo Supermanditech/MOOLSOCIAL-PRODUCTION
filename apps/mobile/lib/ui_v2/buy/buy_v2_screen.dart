@@ -514,6 +514,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
           bottomNavigationBar: MoolDestinationNavigationV2(
             activeId: careNavigation ? 'book' : 'buy',
             destinationLabel: careNavigation ? 'Care' : 'Shop',
+            familyRootSelected:
+                !careNavigation &&
+                !_offersActive &&
+                session.activeDockDestination == BuyV2Destination.shop,
             selectedLocalIndex: careNavigation
                 ? 1
                 : _offersActive

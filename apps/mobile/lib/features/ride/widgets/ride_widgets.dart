@@ -284,6 +284,7 @@ class RidePageScaffold extends StatelessWidget {
         bottomNavigationBar: MoolDestinationNavigationV2(
           activeId: 'ride',
           destinationLabel: 'Travel',
+          familyRootSelected: activeSubAction == 'bike',
           selectedLocalIndex: switch (activeSubAction) {
             'auto' => 1,
             'cab' => 2,

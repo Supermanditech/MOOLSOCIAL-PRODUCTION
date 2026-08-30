@@ -201,6 +201,7 @@ class WorkPageScaffold extends StatelessWidget {
         bottomNavigationBar: MoolDestinationNavigationV2(
           activeId: 'work',
           destinationLabel: 'Work',
+          familyRootSelected: activeLocalAction == 'home',
           selectedLocalIndex: activeLocalAction == 'workspace' ? 1 : 0,
           localActionCount: 2,
           localNavigation: MoolLocalNavigationRail(

@@ -1115,6 +1115,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                   : MoolDestinationNavigationV2(
                       activeId: _world,
                       destinationLabel: world.label,
+                      familyRootSelected:
+                          world.choices.isNotEmpty &&
+                          choice == world.choices.first.id,
                       selectedLocalIndex: selectedChoiceIndex < 0
                           ? 0
                           : selectedChoiceIndex,

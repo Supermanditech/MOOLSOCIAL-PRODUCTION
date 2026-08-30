@@ -24,6 +24,7 @@ void main() {
           bottomNavigationBar: MoolDestinationNavigationV2(
             activeId: 'buy',
             destinationLabel: 'Shop',
+            familyRootSelected: false,
             selectedLocalIndex: 1,
             localActionCount: 3,
             onOpenMool: () => opened.add('/app/mool'),
@@ -78,8 +79,12 @@ void main() {
 
     final selected = tester.widget<AnimatedContainer>(selections[1]);
     final unselected = tester.widget<AnimatedContainer>(selections[0]);
+    final familyRoot = tester.widget<Material>(
+      find.byKey(const ValueKey('moolsocial-family-root-buy-surface')),
+    );
     expect((selected.decoration! as BoxDecoration).color!.a, greaterThan(0));
     expect((unselected.decoration! as BoxDecoration).color!.a, 0);
+    expect(familyRoot.color!.a, 0);
     expect(
       tester
           .getSemantics(find.bySemanticsLabel('Orders, current'))
@@ -96,6 +101,62 @@ void main() {
     await tester.pumpAndSettle();
     expect(opened, containsAllInOrder(['shop', 'orders', 'offers']));
     expect(chatTaps, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('family home owns the selected cue only while it is current', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          bottomNavigationBar: MoolDestinationNavigationV2(
+            activeId: 'buy',
+            destinationLabel: 'Shop',
+            familyRootSelected: true,
+            selectedLocalIndex: 0,
+            localActionCount: 1,
+            onOpenMool: () {},
+            onOpenAction: (_) {},
+            onOpenChat: () {},
+            localNavigation: MoolLocalNavigationRail(
+              familyId: 'buy',
+              semanticLabel: 'Shop choices',
+              activeId: 'none',
+              actions: const [
+                MoolLocalNavigationAction(
+                  keyName: 'root-test-wholesale',
+                  id: 'wholesale',
+                  label: 'Wholesale',
+                  icon: Icons.inventory_2_outlined,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final familyRoot = tester.widget<Material>(
+      find.byKey(const ValueKey('moolsocial-family-root-buy-surface')),
+    );
+    expect(familyRoot.color!.a, greaterThan(0));
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Shop home, current'))
+          .flagsCollection
+          .isSelected,
+      Tristate.isTrue,
+    );
+    expect(
+      tester
+          .widget<AnimatedContainer>(
+            find.byKey(const ValueKey('moolsocial-local-wholesale-selection')),
+          )
+          .decoration,
+      isA<BoxDecoration>().having((value) => value.color!.a, 'alpha', 0),
+    );
     expect(tester.takeException(), isNull);
   });
 

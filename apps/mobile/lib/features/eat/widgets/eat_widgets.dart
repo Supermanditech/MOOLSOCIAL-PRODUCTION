@@ -264,6 +264,7 @@ class EatPageScaffold extends StatelessWidget {
         bottomNavigationBar: MoolDestinationNavigationV2(
           activeId: 'eat',
           destinationLabel: 'Food',
+          familyRootSelected: activeLocalAction == 'order',
           selectedLocalIndex: activeLocalAction == 'table' ? 1 : 0,
           localActionCount: 2,
           localNavigation: MoolLocalNavigationRail(

@@ -37,6 +37,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.bySemanticsLabel('Shop home, current'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Open Shop home'), findsOneWidget);
+      expect(find.bySemanticsLabel('Offers, current'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('moolsocial-family-root-buy-tap')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Shop home, current'), findsOneWidget);
+
       const targets = <(String, Key)>[
         ('social', Key('screen04-universal-v2')),
         ('eat', Key('eat-home-screen')),

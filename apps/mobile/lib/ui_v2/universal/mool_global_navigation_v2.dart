@@ -413,6 +413,7 @@ class MoolDestinationNavigationV2 extends StatefulWidget {
     required this.localNavigation,
     required this.selectedLocalIndex,
     required this.localActionCount,
+    this.familyRootSelected = false,
     required this.onOpenMool,
     required this.onOpenAction,
     required this.onOpenChat,
@@ -429,6 +430,7 @@ class MoolDestinationNavigationV2 extends StatefulWidget {
   final Widget localNavigation;
   final int selectedLocalIndex;
   final int localActionCount;
+  final bool familyRootSelected;
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec> onOpenAction;
   final VoidCallback? onOpenChat;
@@ -498,6 +500,7 @@ class _MoolDestinationNavigationV2State
                     if (family.id != 'social') ...[
                       _MoolFamilyRootButton(
                         family: family,
+                        selected: widget.familyRootSelected,
                         onPressed: () => widget.onOpenAction(
                           PersonalMoolActionSpec(
                             id: family.id,
@@ -527,9 +530,14 @@ class _MoolDestinationNavigationV2State
 }
 
 class _MoolFamilyRootButton extends StatelessWidget {
-  const _MoolFamilyRootButton({required this.family, required this.onPressed});
+  const _MoolFamilyRootButton({
+    required this.family,
+    required this.selected,
+    required this.onPressed,
+  });
 
   final MoolActionFamilySpec family;
+  final bool selected;
   final VoidCallback onPressed;
 
   @override
@@ -544,7 +552,10 @@ class _MoolFamilyRootButton extends StatelessWidget {
     return Semantics(
       container: true,
       button: true,
-      label: 'Open ${family.label} home',
+      selected: selected,
+      label: selected
+          ? '${family.label} home, current'
+          : 'Open ${family.label} home',
       onTap: onPressed,
       excludeSemantics: true,
       child: SizedBox(
@@ -552,9 +563,25 @@ class _MoolFamilyRootButton extends StatelessWidget {
         width: fixedCellWidth,
         height: MoolLocalNavigationTokens.destinationRailHeight,
         child: Material(
-          color: accent.withValues(alpha: .08),
-          borderRadius: BorderRadius.circular(
-            MoolLocalNavigationTokens.destinationSelectedCellRadius,
+          key: ValueKey('moolsocial-family-root-${family.id}-surface'),
+          color: selected
+              ? accent.withValues(
+                  alpha:
+                      MoolLocalNavigationTokens.destinationSelectedFillOpacity,
+                )
+              : Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(
+              MoolLocalNavigationTokens.destinationSelectedCellRadius,
+            ),
+            side: BorderSide(
+              color: selected
+                  ? accent.withValues(
+                      alpha: MoolLocalNavigationTokens
+                          .destinationSelectedBorderOpacity,
+                    )
+                  : Colors.transparent,
+            ),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -565,12 +592,41 @@ class _MoolFamilyRootButton extends StatelessWidget {
             ),
             splashColor: accent.withValues(alpha: .08),
             highlightColor: accent.withValues(alpha: .045),
-            child: MoolDestinationIconLabel(
-              key: ValueKey('moolsocial-family-root-${family.id}-icon-label'),
-              label: family.label,
-              icon: family.icon,
-              color: accent.withValues(alpha: .84),
-              emphasized: true,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                MoolDestinationIconLabel(
+                  key: ValueKey(
+                    'moolsocial-family-root-${family.id}-icon-label',
+                  ),
+                  label: family.label,
+                  icon: family.icon,
+                  color: selected ? accent : accent.withValues(alpha: .72),
+                  emphasized: selected,
+                ),
+                Positioned(
+                  bottom: 0,
+                  child: AnimatedContainer(
+                    key: ValueKey(
+                      'moolsocial-family-root-${family.id}-selected-indicator',
+                    ),
+                    duration: MoolMotion.accessible(
+                      context,
+                      MoolLocalNavigationTokens.stateDuration,
+                    ),
+                    width: selected
+                        ? MoolLocalNavigationTokens
+                              .destinationSelectedIndicatorWidth
+                        : 0,
+                    height: MoolLocalNavigationTokens
+                        .destinationSelectedIndicatorHeight,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
