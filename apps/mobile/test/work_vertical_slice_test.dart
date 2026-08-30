@@ -353,7 +353,7 @@ void main() {
       await tapVisible(tester, const Key('work-proof-source-upload'));
       expect(
         find.text(
-          'Proof was not added. Choose the same file or source and retry.',
+          'Document not added. Choose the same file or another option and try again.',
         ),
         findsOneWidget,
       );

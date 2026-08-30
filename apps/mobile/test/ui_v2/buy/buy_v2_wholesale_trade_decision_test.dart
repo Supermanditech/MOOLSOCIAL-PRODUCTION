@@ -102,7 +102,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Jodhpur trade context'), findsOneWidget);
+    expect(find.text('Jodhpur market insight'), findsOneWidget);
     expect(find.text('Steady local restocking'), findsOneWidget);
     expect(
       find.text('MoolSocial local trade activity · Updated 10 minutes ago'),
@@ -169,10 +169,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Local trade signal unavailable'), findsOneWidget);
+    expect(find.text('Local market insight unavailable'), findsOneWidget);
     expect(
       find.text(
-        'You can still decide using the current price, stock and delivery promise.',
+        'You can still compare the current price, stock and delivery time.',
       ),
       findsOneWidget,
     );
@@ -208,7 +208,7 @@ void main() {
 
     await tester.pumpWidget(app(session, adapter));
     await tester.pump();
-    expect(find.text('Checking local trade context'), findsOneWidget);
+    expect(find.text('Checking local market insight'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
     expect(
       find.byKey(ValueKey('buy-product-primary-${product.id}')),
@@ -218,7 +218,7 @@ void main() {
     pending.completeError(StateError('service unavailable'));
     await tester.pumpAndSettle();
     expect(
-      find.text('Local trade context could not be loaded'),
+      find.text('Local market insight could not be loaded'),
       findsOneWidget,
     );
     final retry = find.byKey(
@@ -255,7 +255,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Offer needs review'), findsWidgets);
+    expect(find.text('Check current availability'), findsWidgets);
     expect(
       find.byKey(ValueKey('buy-product-primary-${product.id}')),
       findsNothing,

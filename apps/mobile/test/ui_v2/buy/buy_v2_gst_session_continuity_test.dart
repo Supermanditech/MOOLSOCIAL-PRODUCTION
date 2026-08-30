@@ -26,7 +26,7 @@ void main() {
         ),
         isTrue,
       );
-      expect(first.message, 'GST details kept for this session.');
+      expect(first.message, 'GST details kept until you close the app.');
 
       final restored = BuyV2GstInvoiceController(store: store);
       addTearDown(restored.dispose);
@@ -73,8 +73,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('buy-gst-remember')), findsOneWidget);
-      expect(find.text('Keep for this session'), findsOneWidget);
-      expect(find.text('Reuse while this app stays open.'), findsOneWidget);
+      expect(find.text('Use again until you close the app'), findsOneWidget);
+      expect(
+        find.text('These details are cleared when you close the app.'),
+        findsOneWidget,
+      );
       expect(
         find.text('These details will be used for this order only.'),
         findsNothing,

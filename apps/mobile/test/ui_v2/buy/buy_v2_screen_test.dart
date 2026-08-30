@@ -1559,7 +1559,7 @@ void main() {
       scrollable: productScrollable,
     );
     expect(find.text('WHOLESALE PRICE'), findsOneWidget);
-    expect(find.text('Trade decision'), findsOneWidget);
+    expect(find.text('Order details'), findsOneWidget);
     final primary = find.byKey(ValueKey('buy-product-primary-${product.id}'));
     expect(primary, findsOneWidget);
     expect(

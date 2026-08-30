@@ -664,7 +664,7 @@ void main() {
       expect(chat.voiceCallsAvailableForSession('home-basket'), isFalse);
       expect(find.byKey(const Key('chat-info-local-feedback')), findsOneWidget);
       expect(
-        find.text('Voice calls paused for this app session.'),
+        find.text('Voice calls are paused until you close the app.'),
         findsOneWidget,
       );
       await tester.tap(find.byKey(const Key('chat-info-video-availability')));
@@ -774,7 +774,7 @@ void main() {
       expect(chat.reviewBeforeSendingForSession('home-basket'), isTrue);
       expect(chat.reviewBeforeSendingForSession('rasoi'), isFalse);
       expect(
-        find.text('Send review turned on for this app session.'),
+        find.text('Send review is on until you close the app.'),
         findsOneWidget,
       );
 

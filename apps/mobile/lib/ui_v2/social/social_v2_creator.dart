@@ -300,7 +300,7 @@ class _CreatorSocialV2ScreenState extends State<CreatorSocialV2Screen> {
         const SocialV2ListTile(
           icon: Icons.video_library_outlined,
           title: 'Choose what you create',
-          detail: 'Reels, posts, carousels or provider-hosted video',
+          detail: 'Reels, posts, carousels or video on a connected service',
           badge: '2',
         ),
         const SocialV2ListTile(
@@ -675,7 +675,7 @@ class _CreatorSocialV2ScreenState extends State<CreatorSocialV2Screen> {
         _MetricGrid(
           values: [
             ('MoolSocial reach', values.$1, 'Eligible Social impressions'),
-            ('External reach', values.$2, 'Connected-provider reports'),
+            ('External reach', values.$2, 'Connected account reports'),
             ('Delivered orders', values.$3, 'Returns removed'),
             ('Payable', values.$4, 'Attributable delivered orders'),
           ],
@@ -719,7 +719,7 @@ class _CreatorSocialV2ScreenState extends State<CreatorSocialV2Screen> {
           ),
         ),
         const SocialV2Notice(
-          title: 'Provider metrics explain content performance',
+          title: 'Connected account insights explain content performance',
           detail:
               'MoolSocial order-line attribution controls creator commission.',
         ),

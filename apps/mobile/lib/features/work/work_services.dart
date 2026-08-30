@@ -81,7 +81,7 @@ class NativeWorkProofPicker implements WorkProofPicker {
       throw WorkGatewayException(
         denied
             ? 'Camera or photo access was denied. Allow access in device settings, then try again.'
-            : 'The device could not open that proof source. Try another source.',
+            : 'The device could not open that option. Choose another way to add the document.',
       );
     } on FileSystemException {
       throw const WorkGatewayException(
@@ -89,7 +89,7 @@ class NativeWorkProofPicker implements WorkProofPicker {
       );
     } on Object {
       throw const WorkGatewayException(
-        'The device could not open that proof source. Try another source.',
+        'The device could not open that option. Choose another way to add the document.',
       );
     }
   }
@@ -535,7 +535,7 @@ class ReviewWorkGateway implements WorkGateway {
     if (failProof) {
       failProof = false;
       throw const WorkGatewayException(
-        'Proof was not added. Choose the same file or source and retry.',
+        'Document not added. Choose the same file or another option and try again.',
       );
     }
     return 'PROOF-${proofId.toUpperCase()}-$proofCalls';

@@ -357,8 +357,8 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         final pinned = !widget.session.isPinnedForSession(thread.id);
         widget.session.setPinnedForSession(thread.id, pinned: pinned);
         message = pinned
-            ? 'Conversation pinned for this app session.'
-            : 'Conversation unpinned for this app session.';
+            ? 'Conversation pinned until you close the app.'
+            : 'Conversation unpinned.';
       case _ConversationAction.attention:
         final reduced = !widget.session.hasReducedAttentionForSession(
           thread.id,
@@ -368,14 +368,14 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           reduced: reduced,
         );
         message = reduced
-            ? 'Attention cues reduced for this app session.'
+            ? 'Attention cues reduced until you close the app.'
             : 'Standard attention cues restored.';
       case _ConversationAction.read:
         final markRead = widget.session.unreadFor(thread) > 0;
         widget.session.setReadForSession(thread.id, read: markRead);
         message = markRead
-            ? 'Conversation marked read in this app session.'
-            : 'Conversation marked unread in this app session.';
+            ? 'Conversation marked read.'
+            : 'Conversation marked unread.';
       case _ConversationAction.archive:
         widget.session.setArchivedForSession(thread.id, archived: true);
         final messenger = ScaffoldMessenger.of(context);
@@ -386,7 +386,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
               key: const Key('chat-archive-feedback'),
               behavior: SnackBarBehavior.floating,
               content: const Text(
-                'Conversation archived for this app session.',
+                'Conversation archived until you close the app.',
               ),
               action: SnackBarAction(
                 key: const Key('chat-archive-undo'),
@@ -1068,7 +1068,7 @@ Future<_ConversationAction?> _chooseConversationAction(
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 8, 16, 14),
             child: Text(
-              'Pin, attention, read and archive choices on this screen apply to this app session only.',
+              'Pin, attention and archive choices reset when you close the app.',
               style: TextStyle(
                 color: MoolColors.muted,
                 fontSize: 11.5,

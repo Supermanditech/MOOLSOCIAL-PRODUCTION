@@ -33,7 +33,7 @@ class ChatArchivedScreen extends StatelessWidget {
           key: const Key('chat-archived-screen'),
           session: session,
           title: 'Archived conversations',
-          subtitle: 'Hidden for this app session',
+          subtitle: 'Hidden until you close the app',
           returnRoute: chatRoute(
             '/app/chat/inbox',
             returnRoute: originReturnRoute,
@@ -217,7 +217,7 @@ class _ArchivedEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: MoolSpacing.xs),
             const Text(
-              'Conversations archived in this app session will appear here.',
+              'Conversations archived until you close the app will appear here.',
               textAlign: TextAlign.center,
               style: TextStyle(color: MoolColors.muted),
             ),

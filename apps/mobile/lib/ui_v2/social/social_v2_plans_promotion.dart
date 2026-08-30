@@ -781,7 +781,7 @@ class _SocialPromotionV2ScreenState extends State<SocialPromotionV2Screen> {
           detail: 'MoolSocial Shorts · Feed · Video discovery · Search',
         ),
         const SocialV2Notice(
-          title: 'YouTube playback remains provider-owned',
+          title: 'YouTube videos continue playing on YouTube',
           detail:
               'MoolSocial promotion never appears inside or over the YouTube player.',
           warning: true,

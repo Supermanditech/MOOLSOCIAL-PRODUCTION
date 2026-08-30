@@ -1261,7 +1261,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                 ),
               ),
               const Text(
-                'Choose the easiest available source.',
+                'Choose how you want to add this document.',
                 style: TextStyle(color: MoolColors.muted),
               ),
               const SizedBox(height: MoolSpacing.md),

@@ -91,7 +91,7 @@ void main() {
       'buy-product-offer-decision-v1',
     );
     expect(find.text('Price, pack and delivery'), findsOneWidget);
-    expect(find.text('Ready to add'), findsOneWidget);
+    expect(find.text('Available now'), findsOneWidget);
     expect(find.text('${product.pack} · ${product.variant}'), findsOneWidget);
     expect(find.textContaining(buyV2Money(product.price)), findsWidgets);
     expect(find.text('Available to add'), findsOneWidget);
@@ -136,7 +136,7 @@ void main() {
           })
         >[
           (
-            label: 'Offer needs review',
+            label: 'Check current availability',
             facts: (product) => factsFor(product, stale: true),
           ),
           (
@@ -154,7 +154,7 @@ void main() {
             facts: (product) => factsFor(product, price: product.price + 5),
           ),
           (
-            label: 'Fulfilment unavailable',
+            label: 'Delivery unavailable',
             facts: (product) =>
                 factsFor(product, partner: 'Assignment pending'),
           ),
@@ -240,12 +240,12 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
     await openProductDecision(tester, session, product.id);
-    expect(find.text('Offer needs review'), findsWidgets);
+    expect(find.text('Check current availability'), findsWidgets);
 
     await tester.tap(find.byKey(ValueKey('buy-offer-retry-${product.id}')));
     await tester.pumpAndSettle();
     expect(adapter.requestsFor(product.id), 2);
-    expect(find.text('Ready to add'), findsOneWidget);
+    expect(find.text('Available now'), findsOneWidget);
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
     await tester.ensureVisible(add);
     await tester.tap(add);
@@ -278,7 +278,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(session.view, BuyV2View.product);
     expect(session.cartLines, isEmpty);
-    expect(find.text('Offer needs review'), findsWidgets);
+    expect(find.text('Check current availability'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 

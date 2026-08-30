@@ -111,7 +111,7 @@ class ChatSession extends ChangeNotifier {
           id: 'workspace-review-1',
           sender: 'Workspace Review',
           text:
-              'Choose one provider profile and complete only the requested details. Your personal account remains active during review.',
+              'Choose one work profile and complete only the requested details. Your personal account remains active during review.',
           timeLabel: 'Now',
           mine: false,
         ),

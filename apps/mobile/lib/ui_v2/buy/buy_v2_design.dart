@@ -114,9 +114,9 @@ class BuyV2WholesaleTradeSignal {
   const BuyV2WholesaleTradeSignal.unavailable({required this.productId})
     : state = BuyV2WholesaleTradeSignalState.unavailable,
       localityLabel = '',
-      headline = 'Local trade signal unavailable',
+      headline = 'Local market insight unavailable',
       detail =
-          'You can still decide using the current price, stock and delivery promise.',
+          'You can still compare the current price, stock and delivery time.',
       sourceLabel = '',
       updatedLabel = '',
       priceValidUntilLabel = null;
@@ -198,9 +198,9 @@ BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
   if (facts.stale) {
     return const BuyV2ProductOfferDecision(
       state: BuyV2ProductOfferDecisionState.stale,
-      statusLabel: 'Offer needs review',
+      statusLabel: 'Check current availability',
       detail:
-          'Price, availability or delivery information may be out of date. Retry before adding to Cart.',
+          'Price, stock or delivery may have changed. Check again before adding to Cart.',
     );
   }
   if (orderability.contains('unavailable') ||
@@ -210,7 +210,7 @@ BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
       state: BuyV2ProductOfferDecisionState.unavailable,
       statusLabel: 'Currently unavailable',
       detail:
-          'This product cannot be added to Cart right now. Retry or choose another product.',
+          'This product cannot be added to Cart right now. Check again or choose another product.',
     );
   }
   if (orderability.contains('checking') ||
@@ -220,7 +220,7 @@ BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
       state: BuyV2ProductOfferDecisionState.checking,
       statusLabel: 'Checking availability',
       detail:
-          'Current stock and delivery must be confirmed before adding to Cart.',
+          'We’re confirming current stock and delivery before you add this product.',
     );
   }
   if (facts.price != product.price) {
@@ -228,7 +228,7 @@ BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
       state: BuyV2ProductOfferDecisionState.changedPrice,
       statusLabel: 'Price changed',
       detail:
-          'The delivered price changed from ${buyV2Money(product.price)} to ${buyV2Money(facts.price)}. Retry or choose another product.',
+          'The price changed from ${buyV2Money(product.price)} to ${buyV2Money(facts.price)}. Check again or choose another product.',
     );
   }
   if (automaticFulfilment &&
@@ -239,14 +239,14 @@ BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
           partner.contains('missing'))) {
     return const BuyV2ProductOfferDecision(
       state: BuyV2ProductOfferDecisionState.missingFulfilment,
-      statusLabel: 'Fulfilment unavailable',
+      statusLabel: 'Delivery unavailable',
       detail:
-          'A delivery promise and automatic fulfilment path must be confirmed before adding to Cart.',
+          'A delivery time and delivery partner must be confirmed before adding to Cart.',
     );
   }
   return const BuyV2ProductOfferDecision(
     state: BuyV2ProductOfferDecisionState.ready,
-    statusLabel: 'Ready to add',
+    statusLabel: 'Available now',
     detail: 'Current price, stock and delivery are confirmed.',
   );
 }

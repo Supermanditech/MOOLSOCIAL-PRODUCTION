@@ -952,8 +952,8 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                               );
                               _confirmLocalChange(
                                 available
-                                    ? 'Chat resumed for this app session.'
-                                    : 'Chat paused for this app session.',
+                                    ? 'Chat is available until you close the app.'
+                                    : 'Chat is paused until you close the app.',
                               );
                             },
                     ),
@@ -983,8 +983,8 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                               );
                               _confirmLocalChange(
                                 available
-                                    ? 'Voice calls turned on for this app session.'
-                                    : 'Voice calls paused for this app session.',
+                                    ? 'Voice calls are on until you close the app.'
+                                    : 'Voice calls are paused until you close the app.',
                               );
                             },
                     ),
@@ -1014,8 +1014,8 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                               );
                               _confirmLocalChange(
                                 available
-                                    ? 'Video calls turned on for this app session.'
-                                    : 'Video calls paused for this app session.',
+                                    ? 'Video calls are on until you close the app.'
+                                    : 'Video calls are paused until you close the app.',
                               );
                             },
                     ),
@@ -1078,8 +1078,8 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                               );
                               _confirmLocalChange(
                                 enabled
-                                    ? 'Send review turned on for this app session.'
-                                    : 'Send review turned off for this app session.',
+                                    ? 'Send review is on until you close the app.'
+                                    : 'Send review is off.',
                               );
                             },
                     ),
@@ -2080,7 +2080,9 @@ Future<void> _showMessageActions(
               key: Key('chat-remove-message-${message.id}'),
               leading: const Icon(Icons.visibility_off_outlined),
               title: const Text('Remove for me'),
-              subtitle: const Text('Hide this message for this app session.'),
+              subtitle: const Text(
+                'Hide this message until you close the app.',
+              ),
               onTap: () {
                 final messenger = ScaffoldMessenger.of(context);
                 Navigator.of(sheetContext).pop();
@@ -2096,7 +2098,7 @@ Future<void> _showMessageActions(
                       key: const Key('chat-message-remove-feedback'),
                       behavior: SnackBarBehavior.floating,
                       content: const Text(
-                        'Message removed for this app session.',
+                        'Message hidden until you close the app.',
                       ),
                       action: SnackBarAction(
                         key: const Key('chat-message-remove-undo'),
@@ -2114,7 +2116,7 @@ Future<void> _showMessageActions(
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 8, 16, 14),
               child: Text(
-                'Remove for me affects this app session only. It does not delete the message for anyone else.',
+                'Remove for me hides this message until you close the app. It does not delete the message for anyone else.',
                 style: TextStyle(
                   color: MoolColors.muted,
                   fontSize: 11.5,

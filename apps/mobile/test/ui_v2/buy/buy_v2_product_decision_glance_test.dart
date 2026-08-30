@@ -49,7 +49,7 @@ void main() {
     );
     expect(glance, findsOneWidget);
     expect(find.text(buyV2Money(product.price)), findsWidgets);
-    expect(find.text('Ready to add'), findsWidgets);
+    expect(find.text('Available now'), findsWidgets);
     expect(find.text('${product.pack} · $buyerPromise'), findsOneWidget);
     expect(
       find.descendant(

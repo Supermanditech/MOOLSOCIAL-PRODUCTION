@@ -138,10 +138,7 @@ void main() {
       await tester.tap(find.byKey(const Key('chat-action-pin-shop-assist')));
       await tester.pumpAndSettle();
       expect(chat.isPinnedForSession('shop-assist'), isFalse);
-      expect(
-        find.text('Conversation unpinned for this app session.'),
-        findsOneWidget,
-      );
+      expect(find.text('Conversation unpinned.'), findsOneWidget);
       await dismissFeedback(tester);
 
       await openActions(tester, 'shop-assist');
@@ -150,7 +147,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(chat.isPinnedForSession('shop-assist'), isTrue);
       expect(
-        find.text('Conversation pinned for this app session.'),
+        find.text('Conversation pinned until you close the app.'),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);

@@ -199,8 +199,8 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                         );
                         _confirmSessionChange(
                           available
-                              ? 'Chat resumed for this app session.'
-                              : 'Chat paused for this app session.',
+                              ? 'Chat is available until you close the app.'
+                              : 'Chat is paused until you close the app.',
                         );
                       },
                     ),
@@ -253,7 +253,7 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                             ),
                     ),
                     const _ChatSettingsScopeNote(
-                      'Chat pause is local to this app session. Voice and video call availability is saved to your account so callers receive the correct status.',
+                      'Chat pause resets when you close the app. Voice and video call availability is saved to your account so callers receive the correct status.',
                     ),
                   ],
                 ),
@@ -279,7 +279,7 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                         );
                         _confirmSessionChange(
                           enabled
-                              ? 'Send review turned on across Chat for this app session.'
+                              ? 'Send review is on across Chat until you close the app.'
                               : 'Global send review turned off. Conversation choices remain.',
                         );
                       },
@@ -301,8 +301,8 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                         );
                         _confirmSessionChange(
                           hidden
-                              ? 'Message previews hidden for this app session.'
-                              : 'Message previews shown for this app session.',
+                              ? 'Message previews are hidden until you close the app.'
+                              : 'Message previews are shown.',
                         );
                       },
                     ),
@@ -323,8 +323,8 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                         );
                         _confirmSessionChange(
                           visible
-                              ? 'Suggested prompts shown for this app session.'
-                              : 'Suggested prompts hidden for this app session.',
+                              ? 'Suggested prompts are shown.'
+                              : 'Suggested prompts are hidden until you close the app.',
                         );
                       },
                     ),
@@ -344,7 +344,7 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                       ),
                     ),
                     const _ChatSettingsScopeNote(
-                      'Local display and send controls apply only in this app session. Device or account notification choices never change without a confirmed result.',
+                      'Display and send choices reset when you close the app. Device or account notification choices change only after confirmation.',
                     ),
                   ],
                 ),

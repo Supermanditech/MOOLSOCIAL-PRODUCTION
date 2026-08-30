@@ -274,7 +274,7 @@ class BuyV2GstInvoiceController extends ChangeNotifier {
     _selected[destination] = details;
     _message = shouldRemember
         ? sessionPersistenceOnly
-              ? 'GST details kept for this session.'
+              ? 'GST details kept until you close the app.'
               : 'GST details saved.'
         : null;
     _notify();
@@ -1037,9 +1037,9 @@ class _WholesaleTradeDecisionPanelState
         : BuyV2Colors.orange;
     final minimumTotal = facts.price * product.minimumOrder;
     final signalSummary = _loading
-        ? 'Checking local trade context.'
+        ? 'Checking local market insight.'
         : _failure != null
-        ? 'Local trade context could not be loaded.'
+        ? 'Local market insight could not be loaded.'
         : '${_signal!.headline}. ${_signal!.detail}';
 
     return Semantics(
@@ -1070,13 +1070,13 @@ class _WholesaleTradeDecisionPanelState
           const SizedBox(height: 8),
           _DecisionPanel(
             key: ValueKey('buy-automatic-fulfilment-${product.id}'),
-            title: 'Trade decision',
+            title: 'Order details',
             children: [
               _DecisionRow(
                 icon: decision.canAdd
                     ? Icons.check_circle_outline_rounded
                     : Icons.info_outline_rounded,
-                label: 'Decision',
+                label: 'Availability',
                 value: decision.statusLabel,
                 valueColor: statusColor,
               ),
@@ -1386,14 +1386,14 @@ class _WholesaleTradeSignalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ready = !loading && !failed && signal?.hasCurrentSignal == true;
     final headline = loading
-        ? 'Checking local trade context'
+        ? 'Checking local market insight'
         : failed
-        ? 'Local trade context could not be loaded'
+        ? 'Local market insight could not be loaded'
         : signal!.headline;
     final detail = loading
         ? 'Current price, stock and delivery remain available while this loads.'
         : failed
-        ? 'Retry the local signal or continue using the current trade facts.'
+        ? 'Check again or continue with the current price, stock and delivery details.'
         : signal!.detail;
     return Semantics(
       key: const ValueKey('buy-wholesale-local-trade-signal'),
@@ -1429,8 +1429,8 @@ class _WholesaleTradeSignalCard extends StatelessWidget {
                     children: [
                       Text(
                         ready && signal!.localityLabel.isNotEmpty
-                            ? '${signal!.localityLabel} trade context'
-                            : 'Local trade context',
+                            ? '${signal!.localityLabel} market insight'
+                            : 'Local market insight',
                         style: context.buyMeta.copyWith(
                           color: BuyV2Colors.muted,
                           fontWeight: FontWeight.w800,
@@ -1473,7 +1473,7 @@ class _WholesaleTradeSignalCard extends StatelessWidget {
                 style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Retry local signal'),
+                label: const Text('Check local insight again'),
               ),
             ],
           ],
@@ -1678,7 +1678,7 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                 icon: decision.canAdd
                     ? Icons.check_circle_outline_rounded
                     : Icons.info_outline_rounded,
-                label: 'Decision',
+                label: 'Availability',
                 value: decision.statusLabel,
                 valueColor: statusColor,
               ),
@@ -1749,8 +1749,8 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
               ),
               const _DecisionRow(
                 icon: Icons.verified_outlined,
-                label: 'Price source',
-                value: 'Published by MoolSocial',
+                label: 'Price published by',
+                value: 'MoolSocial',
               ),
               if (product.destination == BuyV2Destination.shop)
                 _DecisionRow(
@@ -3937,7 +3937,7 @@ class _GstInvoiceCard extends StatelessWidget {
                         color:
                             message == 'GST details saved.' ||
                                 message ==
-                                    'GST details kept for this session.' ||
+                                    'GST details kept until you close the app.' ||
                                 message == 'GST details removed.'
                             ? BuyV2Colors.navy
                             : const Color(0xFFB42318),
@@ -4209,12 +4209,12 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
                                         setState(() => _remember = value),
                               title: Text(
                                 widget.controller.sessionPersistenceOnly
-                                    ? 'Keep for this session'
+                                    ? 'Use again until you close the app'
                                     : 'Remember these GST details',
                               ),
                               subtitle: Text(
                                 widget.controller.sessionPersistenceOnly
-                                    ? 'Reuse while this app stays open.'
+                                    ? 'These details are cleared when you close the app.'
                                     : 'Reuse them on a later invoice.',
                               ),
                             ),
@@ -8240,7 +8240,7 @@ class BuyV2AccountView extends StatelessWidget {
               ? 'Sign out or switch account'
               : 'Sign in to MoolSocial',
           detail: accountAuthenticated
-              ? 'Account security and provider access'
+              ? 'Account security and connected services'
               : 'Use one identity across MoolSocial',
           onTap: () => context.push('/app/account/security'),
         ),
