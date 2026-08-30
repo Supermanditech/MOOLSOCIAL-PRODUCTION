@@ -590,6 +590,30 @@ void main() {
       );
     });
 
+    test('variant selection replaces only the current product depth', () {
+      final original = session.product('s-milk');
+      final variants = session.productVariantsFor(original);
+      expect(
+        variants.map((product) => product.id),
+        containsAll(['s-milk', 's-milk-500ml', 's-milk-2l']),
+      );
+
+      expect(session.openProduct(original.id), isTrue);
+      expect(session.selectProductVariant('s-milk-500ml'), isTrue);
+      expect(session.selectedProduct?.id, 's-milk-500ml');
+      expect(session.view, BuyV2View.product);
+      expect(session.destination, BuyV2Destination.shop);
+      expect(session.addProduct('s-milk-500ml'), isTrue);
+      expect(session.quantityFor('s-milk-500ml'), 1);
+      expect(session.quantityFor('s-milk'), 0);
+
+      expect(session.selectProductVariant('w-milk'), isFalse);
+      expect(session.selectedProduct?.id, 's-milk-500ml');
+      session.closeProduct();
+      expect(session.view, BuyV2View.catalogue);
+      expect(session.destination, BuyV2Destination.shop);
+    });
+
     test('one saved prescription unlocks only its matched medicine lines', () {
       const telmisartan = 'm-telmisartan-40';
       const atorvastatin = 'm-atorvastatin-10';

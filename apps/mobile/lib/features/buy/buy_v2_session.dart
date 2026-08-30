@@ -2759,6 +2759,17 @@ class BuyV2Session extends ChangeNotifier {
   /// This is deliberately independent of Cart contents, customer history,
   /// popularity, serviceability and provider state. It is a local catalogue
   /// ordering helper, not a personalized or clinical recommendation owner.
+  List<BuyV2Product> productVariantsFor(BuyV2Product current) {
+    if (current.destination == BuyV2Destination.orders) return const [];
+    return List.unmodifiable(
+      _catalogueProducts.where(
+        (product) =>
+            product.destination == current.destination &&
+            product.canonicalId == current.canonicalId,
+      ),
+    );
+  }
+
   List<BuyV2Product> productContinuationsFor(
     BuyV2Product current, {
     int limit = 6,
@@ -2777,7 +2788,7 @@ class BuyV2Session extends ChangeNotifier {
         .where(
           (product) =>
               product.destination == current.destination &&
-              product.id != current.id,
+              product.canonicalId != current.canonicalId,
         )
         .toList(growable: false);
     candidates.sort((left, right) {
@@ -3098,6 +3109,29 @@ class BuyV2Session extends ChangeNotifier {
     _notifyNavigationIfChanged(
       previous,
       BuyV2NavigationMotionDirection.forward,
+    );
+    return true;
+  }
+
+  bool selectProductVariant(String id) {
+    final current = selectedProduct;
+    final next = findProduct(id);
+    if (current == null ||
+        next == null ||
+        next.destination != current.destination ||
+        next.canonicalId != current.canonicalId) {
+      notice = 'This product option is no longer available.';
+      notifyListeners();
+      return false;
+    }
+    if (next.id == current.id) return true;
+    final previous = _navigationSurfaceIdentity;
+    selectedProductId = next.id;
+    destination = next.destination;
+    notice = null;
+    _notifyNavigationIfChanged(
+      previous,
+      BuyV2NavigationMotionDirection.replace,
     );
     return true;
   }
