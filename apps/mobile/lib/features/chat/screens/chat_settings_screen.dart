@@ -268,7 +268,7 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                     _ChatSettingsScopeNote(
                       serviceBackedCalls
                           ? 'Chat pause resets when you close the app. Voice and video call availability is saved to your account so callers receive the correct status.'
-                          : 'Chat and call choices reset when you close the app. Other people’s caller status requires the call service and is unavailable in this UI review.',
+                          : 'Chat and call choices reset when you close the app. Showing your call availability to other people needs the calling service and is not available yet.',
                     ),
                   ],
                 ),

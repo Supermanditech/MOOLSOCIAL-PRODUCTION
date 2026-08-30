@@ -174,7 +174,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('saved to your account'), findsNothing);
-      expect(find.textContaining('requires the call service'), findsOneWidget);
+      expect(find.textContaining('needs the calling service'), findsOneWidget);
+      expect(find.textContaining('UI review'), findsNothing);
 
       for (final key in const [
         Key('chat-settings-chat-availability'),
