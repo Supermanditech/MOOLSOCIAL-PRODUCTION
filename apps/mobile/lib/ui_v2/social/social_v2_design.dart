@@ -816,61 +816,82 @@ Future<void> showSocialV2Sheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (context) => Theme(
-      data: sheetTheme,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      color: SocialV2Colors.navy,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Close',
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
-            ),
-            const SizedBox(height: 3),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                color: SocialV2Colors.muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Flexible(
-              child: SingleChildScrollView(
+    builder: (context) {
+      final media = MediaQuery.of(context);
+      return AnimatedPadding(
+        key: const Key('social-v2-sheet-keyboard-safe'),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+        child: Theme(
+          data: sheetTheme,
+          child: SafeArea(
+            key: const Key('social-v2-sheet-visible-surface'),
+            top: false,
+            minimum: const EdgeInsets.only(bottom: 12),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: media.size.height * .9),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 6),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (var index = 0; index < children.length; index++) ...[
-                      children[index],
-                      if (index != children.length - 1)
-                        const SizedBox(height: 9),
-                    ],
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              color: SocialV2Colors.navy,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Close',
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: SocialV2Colors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (
+                              var index = 0;
+                              index < children.length;
+                              index++
+                            ) ...[
+                              children[index],
+                              if (index != children.length - 1)
+                                const SizedBox(height: 9),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ],
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
