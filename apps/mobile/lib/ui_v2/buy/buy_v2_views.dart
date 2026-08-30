@@ -8937,6 +8937,8 @@ Future<void> showBuyV2PrescriptionSheet(
   final destination = session.destination;
   final view = session.view;
   final pendingProductId = session.pendingPrescriptionProductId;
+  final bottomViewPadding =
+      BuyV2AddressSheetMotion.resolveModalActionBottomInset(context);
 
   Future<void> finishAfterReverse(
     BuildContext sheetContext,
@@ -8986,7 +8988,7 @@ Future<void> showBuyV2PrescriptionSheet(
           child: ListView(
             key: const ValueKey('buy-prescription-sheet-list'),
             shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 18 + bottomViewPadding),
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

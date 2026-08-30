@@ -314,6 +314,35 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('OPPO inset exports the full Add prescription target', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.padding = const FakeViewPadding(top: 41, bottom: 44);
+    tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 44);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    await openSheet(tester, session);
+
+    final target = find.byKey(const ValueKey('buy-prescription-add-new'));
+    await tester.scrollUntilVisible(
+      target,
+      120,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('buy-prescription-sheet-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final rect = tester.getRect(target);
+    expect(rect.height, greaterThanOrEqualTo(58));
+    expect(rect.bottom, lessThanOrEqualTo(756));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('reduced motion opens and commits immediately', (tester) async {
     final session = BuyV2Session(core: BuySession());
     addTearDown(session.dispose);
