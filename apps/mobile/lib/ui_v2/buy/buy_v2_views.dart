@@ -403,6 +403,8 @@ class BuyV2ProductView extends StatelessWidget {
     final facts = session.productFactsFor(product);
     final content = session.productContentFor(product);
     final trust = session.marketplaceTrustFor(product);
+    final productBenefits = session.productBenefitsFor(product);
+    final productBenefitsState = session.productBenefitsStateFor(product);
     final variants = session.productVariantsFor(product);
     final automaticFulfilment =
         product.destination == BuyV2Destination.shop ||
@@ -657,6 +659,17 @@ class BuyV2ProductView extends StatelessWidget {
                     ),
                   ],
                 ),
+              if (product.destination == BuyV2Destination.shop ||
+                  product.destination == BuyV2Destination.wholesale) ...[
+                const SizedBox(height: 10),
+                _ProductBenefitsPreview(
+                  session: session,
+                  product: product,
+                  benefits: productBenefits,
+                  state: productBenefitsState,
+                  customerMessage: session.productBenefitsMessageFor(product),
+                ),
+              ],
               if (product.destination == BuyV2Destination.medicine) ...[
                 const SizedBox(height: 10),
                 _DecisionPanel(
@@ -3105,6 +3118,193 @@ class _ProductTrustPill extends StatelessWidget {
             label,
             style: const TextStyle(
               color: BuyV2Colors.ink,
+              fontSize: 8,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductBenefitsPreview extends StatelessWidget {
+  const _ProductBenefitsPreview({
+    required this.session,
+    required this.product,
+    required this.benefits,
+    required this.state,
+    required this.customerMessage,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final List<BuyV2CartBenefit> benefits;
+  final BuyV2CartBenefitsLoadState state;
+  final String? customerMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleBenefits = benefits.take(3).toList(growable: false);
+    if (state == BuyV2CartBenefitsLoadState.idle ||
+        state == BuyV2CartBenefitsLoadState.loading) {
+      return Container(
+        key: ValueKey('buy-product-benefits-loading-${product.id}'),
+        padding: const EdgeInsets.all(12),
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softBlue,
+          radius: 15,
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 9),
+            Expanded(child: Text('Checking product offers')),
+          ],
+        ),
+      );
+    }
+    if (state == BuyV2CartBenefitsLoadState.offline ||
+        state == BuyV2CartBenefitsLoadState.unavailable) {
+      return Container(
+        key: ValueKey('buy-product-benefits-unavailable-${product.id}'),
+        padding: const EdgeInsets.all(12),
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softOrange,
+          radius: 15,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Product offers unavailable',
+              style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              customerMessage ?? 'Offers could not be checked right now.',
+              style: context.buyMeta,
+            ),
+            const SizedBox(height: 9),
+            OutlinedButton.icon(
+              key: ValueKey('buy-product-benefits-retry-${product.id}'),
+              onPressed: () => session.refreshProductBenefits(product.id),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      key: ValueKey('buy-product-benefits-ready-${product.id}'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.local_offer_outlined,
+                color: BuyV2Colors.navy,
+                size: 19,
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  'Offers for this product',
+                  style: context.buyTitle.copyWith(fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Eligibility is checked again at Checkout.',
+            style: context.buyMeta.copyWith(fontSize: 8),
+          ),
+          const SizedBox(height: 8),
+          if (visibleBenefits.isEmpty)
+            Text('No product offers right now.', style: context.buyBody)
+          else
+            for (final (index, benefit) in visibleBenefits.indexed) ...[
+              _ProductBenefitPreviewTile(benefit: benefit),
+              if (index != visibleBenefits.length - 1)
+                const SizedBox(height: 7),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductBenefitPreviewTile extends StatelessWidget {
+  const _ProductBenefitPreviewTile({required this.benefit});
+
+  final BuyV2CartBenefit benefit;
+
+  @override
+  Widget build(BuildContext context) {
+    final validUntil = benefit.validUntil;
+    final paymentMethods = benefit.eligiblePaymentMethods.toList()..sort();
+    final sponsor = switch (benefit.sponsor) {
+      BuyV2CartBenefitSponsor.retailer => 'Retail partner',
+      BuyV2CartBenefitSponsor.wholesaler => 'Wholesale partner',
+      BuyV2CartBenefitSponsor.manufacturer => 'Manufacturer',
+      BuyV2CartBenefitSponsor.bank => 'Bank offer',
+      BuyV2CartBenefitSponsor.financialPartner => 'Payment partner',
+      BuyV2CartBenefitSponsor.moolSocial => 'MoolSocial',
+    };
+    return Container(
+      key: ValueKey('buy-product-benefit-${benefit.id}'),
+      padding: const EdgeInsets.all(9),
+      decoration: BoxDecoration(
+        color: BuyV2Colors.softBlue.withValues(alpha: .58),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: const Color(0x22000080)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  benefit.title,
+                  style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+                ),
+              ),
+              if (benefit.savingAmount > 0)
+                Text(
+                  'Save ${buyV2Money(benefit.savingAmount)}',
+                  style: context.buyBody.copyWith(
+                    color: BuyV2Colors.green,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(benefit.detail, style: context.buyMeta),
+          const SizedBox(height: 4),
+          Text(
+            [
+              '$sponsor · ${benefit.sponsorName}',
+              if (benefit.freeDelivery) 'Free delivery',
+              if (paymentMethods.isNotEmpty)
+                'With ${paymentMethods.join(' or ')}',
+              if (validUntil != null)
+                'Until ${MaterialLocalizations.of(context).formatShortDate(validUntil)}',
+            ].join(' · '),
+            style: context.buyMeta.copyWith(
+              color: BuyV2Colors.navy,
               fontSize: 8,
               fontWeight: FontWeight.w800,
             ),

@@ -635,6 +635,10 @@ class BuyV2Session extends ChangeNotifier {
       {};
   List<BuyV2CartBenefit> _liveCartBenefits = [];
   int _cartBenefitsRequestSequence = 0;
+  final Map<String, List<BuyV2CartBenefit>> _productBenefits = {};
+  final Map<String, BuyV2CartBenefitsLoadState> _productBenefitStates = {};
+  final Map<String, String> _productBenefitMessages = {};
+  final Map<String, int> _productBenefitRequestSequences = {};
   BuyV2CartBenefitsLoadState cartBenefitsLoadState =
       BuyV2CartBenefitsLoadState.ready;
   String? cartBenefitsMessage;
@@ -2088,6 +2092,135 @@ class BuyV2Session extends ChangeNotifier {
   bool get cartBenefitsBusy =>
       cartBenefitsLoadState == BuyV2CartBenefitsLoadState.loading;
 
+  BuyV2CartBenefitsLoadState productBenefitsStateFor(BuyV2Product product) {
+    if (!liveCartBenefitsEnabled) return BuyV2CartBenefitsLoadState.ready;
+    return _productBenefitStates[product.id] ?? BuyV2CartBenefitsLoadState.idle;
+  }
+
+  String? productBenefitsMessageFor(BuyV2Product product) =>
+      _productBenefitMessages[product.id];
+
+  List<BuyV2CartBenefit> productBenefitsFor(BuyV2Product product) {
+    if (liveCartBenefitsEnabled) {
+      return List.unmodifiable(_productBenefits[product.id] ?? const []);
+    }
+    final total = productFactsFor(product).price * product.minimumOrder;
+    final candidates = [
+      for (final kind in BuyV2CartBenefitKind.values)
+        ...cartBenefitsAdapter.benefitsFor(
+          kind: kind,
+          destinations: {product.destination},
+          itemTotal: total,
+        ),
+    ];
+    return _validatedProductBenefits(
+      product,
+      candidates,
+      evaluatedAt: DateTime.now(),
+    );
+  }
+
+  Future<bool> refreshProductBenefits(String productId) async {
+    final product = findProduct(productId);
+    if (product == null) {
+      notice = 'This product could not be found.';
+      notifyListeners();
+      return false;
+    }
+    final adapter = cartBenefitsAdapter;
+    if (adapter is! BuyV2LiveCartBenefitsAdapter) {
+      _productBenefits[product.id] = productBenefitsFor(product);
+      _productBenefitStates[product.id] = BuyV2CartBenefitsLoadState.ready;
+      _productBenefitMessages.remove(product.id);
+      notifyListeners();
+      return true;
+    }
+    final sequence = (_productBenefitRequestSequences[product.id] ?? 0) + 1;
+    _productBenefitRequestSequences[product.id] = sequence;
+    final fingerprint = _productBenefitFingerprint(product);
+    _productBenefits.remove(product.id);
+    _productBenefitStates[product.id] = BuyV2CartBenefitsLoadState.loading;
+    _productBenefitMessages.remove(product.id);
+    notifyListeners();
+    try {
+      final snapshot = await adapter.loadEligibility(
+        BuyV2CartBenefitsRequest(
+          lines: [
+            BuyV2CartLine(product: product, quantity: product.minimumOrder),
+          ],
+          selectedPaymentMethod: selectedPayment,
+        ),
+      );
+      if (_productBenefitRequestSequences[product.id] != sequence ||
+          _productBenefitFingerprint(product) != fingerprint) {
+        return false;
+      }
+      _productBenefitStates[product.id] = snapshot.state;
+      if (snapshot.customerMessage case final message?) {
+        _productBenefitMessages[product.id] = message;
+      } else {
+        _productBenefitMessages.remove(product.id);
+      }
+      if (snapshot.state != BuyV2CartBenefitsLoadState.ready) {
+        _productBenefits.remove(product.id);
+        notifyListeners();
+        return false;
+      }
+      _productBenefits[product.id] = _validatedProductBenefits(
+        product,
+        snapshot.benefits,
+        evaluatedAt: snapshot.evaluatedAt,
+      );
+      notifyListeners();
+      return true;
+    } on Object {
+      if (_productBenefitRequestSequences[product.id] != sequence) {
+        return false;
+      }
+      _productBenefits.remove(product.id);
+      _productBenefitStates[product.id] =
+          BuyV2CartBenefitsLoadState.unavailable;
+      _productBenefitMessages[product.id] =
+          'Product offers could not be checked. Try again.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  String _productBenefitFingerprint(BuyV2Product product) =>
+      '${product.id}:${product.minimumOrder}:${productFactsFor(product).price}:'
+      '$selectedPayment';
+
+  List<BuyV2CartBenefit> _validatedProductBenefits(
+    BuyV2Product product,
+    List<BuyV2CartBenefit> benefits, {
+    required DateTime evaluatedAt,
+  }) {
+    final total = productFactsFor(product).price * product.minimumOrder;
+    final ids = <String>{};
+    return List.unmodifiable([
+      for (final benefit in benefits)
+        if (benefit.destination == product.destination &&
+            benefit.id.trim().isNotEmpty &&
+            benefit.title.trim().isNotEmpty &&
+            benefit.detail.trim().isNotEmpty &&
+            benefit.sourceId.trim().isNotEmpty &&
+            benefit.sponsorName.trim().isNotEmpty &&
+            benefit.savingAmount >= 0 &&
+            benefit.savingAmount <= total &&
+            (benefit.kind == BuyV2CartBenefitKind.coupon ||
+                benefit.savingAmount == 0) &&
+            _liveBenefitMatchesStrategy(
+              benefit,
+              evaluatedAt: evaluatedAt,
+              destinationTotal: total,
+              destinationQuantity: product.minimumOrder,
+            ) &&
+            ids.add('${benefit.kind.name}|${benefit.id}'))
+          benefit,
+    ]);
+  }
+
   String _cartBenefitsFingerprint() => _cart.values
       .map(
         (line) => '${line.product.id}:${line.quantity}:${line.product.price}',
@@ -3366,6 +3499,9 @@ class BuyV2Session extends ChangeNotifier {
       previous,
       BuyV2NavigationMotionDirection.forward,
     );
+    if (liveCartBenefitsEnabled) {
+      unawaited(refreshProductBenefits(item.id));
+    }
     return true;
   }
 
@@ -3389,6 +3525,9 @@ class BuyV2Session extends ChangeNotifier {
       previous,
       BuyV2NavigationMotionDirection.replace,
     );
+    if (liveCartBenefitsEnabled) {
+      unawaited(refreshProductBenefits(next.id));
+    }
     return true;
   }
 
