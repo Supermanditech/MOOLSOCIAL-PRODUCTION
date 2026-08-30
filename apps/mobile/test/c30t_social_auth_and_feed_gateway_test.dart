@@ -46,7 +46,7 @@ void main() {
     'UI review Feed uses the real contract and keeps messaging on profiles',
     (tester) async {
       tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(390, 844);
+      tester.view.physicalSize = const Size(360, 800);
       addTearDown(tester.view.reset);
       final journey = JourneySession(
         store: MemoryJourneyStore(snapshot: readySnapshot),

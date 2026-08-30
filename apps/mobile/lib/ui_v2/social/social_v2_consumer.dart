@@ -4289,8 +4289,8 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 34,
+                height: 34,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
@@ -4298,15 +4298,15 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(11),
                 ),
                 child: const Icon(
                   Icons.blur_on_rounded,
                   color: Colors.white,
-                  size: 23,
+                  size: 19,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -4318,7 +4318,7 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: SocialV2Colors.navy,
-                        fontSize: 18,
+                        fontSize: 16,
                         height: 1,
                         fontWeight: FontWeight.w900,
                       ),
@@ -4349,8 +4349,14 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                 tooltip: searchOpen ? 'Close Feed search' : 'Search Feed',
                 onPressed: onSearch,
                 color: SocialV2Colors.navy,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 42,
+                  height: 42,
+                ),
                 icon: Icon(
                   searchOpen ? Icons.close_rounded : Icons.search_rounded,
+                  size: 21,
                 ),
               ),
               IconButton(
@@ -4358,14 +4364,24 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                 tooltip: 'Notifications',
                 onPressed: onNotifications,
                 color: SocialV2Colors.navy,
-                icon: const Icon(Icons.notifications_none_rounded),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 42,
+                  height: 42,
+                ),
+                icon: const Icon(Icons.notifications_none_rounded, size: 21),
               ),
               IconButton(
                 key: const Key('screen04-feed-profile'),
                 tooltip: 'Open your MoolSocial profile',
                 onPressed: onProfile,
                 color: SocialV2Colors.navy,
-                icon: const Icon(Icons.account_circle_outlined),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 42,
+                  height: 42,
+                ),
+                icon: const Icon(Icons.account_circle_outlined, size: 21),
               ),
             ],
           ),
