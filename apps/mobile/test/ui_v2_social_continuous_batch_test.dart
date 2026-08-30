@@ -498,6 +498,96 @@ void main() {
       );
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets(
+      'UI review exposes Create for feedback without allowing guest publish',
+      (tester) async {
+        final owners = _GuestOwners();
+        addTearDown(owners.dispose);
+        await owners.journey.start();
+        await _pump(
+          tester,
+          SocialUniversalV2(
+            session: owners.journey,
+            creatorSession: owners.creator,
+            retailerSession: owners.retailer,
+            sharedSession: owners.shared,
+            initialSubAction: 'feed',
+            enableCreateReviewPreview: true,
+          ),
+        );
+
+        await tester.tap(find.byKey(const Key('screen04-feed-create-post')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('social-create-review-choice')),
+          findsOneWidget,
+        );
+        expect(find.text('Continue to sign in'), findsOneWidget);
+        expect(find.text('Preview Create'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('social-create-review-preview')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+        expect(
+          find.byKey(const Key('screen04-create-preview-hub-notice')),
+          findsOneWidget,
+        );
+        expect(owners.journey.isAuthenticated, isFalse);
+
+        await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('screen04-create-preview-notice')),
+          findsOneWidget,
+        );
+        expect(find.text('Sign in to post'), findsOneWidget);
+        await tester.enterText(
+          find.byKey(const Key('screen04-create-post-text')),
+          'Preview draft',
+        );
+        await tester.tap(find.byKey(const Key('screen04-create-publish-post')));
+        await tester.pumpAndSettle();
+
+        expect(owners.journey.stage, JourneyStage.signIn);
+        expect(
+          owners.journey.authenticationPurpose,
+          JourneyAuthenticationPurpose.socialCreate,
+        );
+        expect(owners.shared.socialPublishedItems, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('normal guest Create still goes directly to sign-in', (
+      tester,
+    ) async {
+      final owners = _GuestOwners();
+      addTearDown(owners.dispose);
+      await owners.journey.start();
+      await _pump(
+        tester,
+        SocialUniversalV2(
+          session: owners.journey,
+          creatorSession: owners.creator,
+          retailerSession: owners.retailer,
+          sharedSession: owners.shared,
+          initialSubAction: 'feed',
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('screen04-feed-create-post')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('social-create-review-choice')),
+        findsNothing,
+      );
+      expect(owners.journey.stage, JourneyStage.signIn);
+      expect(
+        owners.journey.authenticationPurpose,
+        JourneyAuthenticationPurpose.socialCreate,
+      );
+    });
   });
 
   group('Creator, plans and promotion owners', () {

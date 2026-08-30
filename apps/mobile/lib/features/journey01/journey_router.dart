@@ -141,6 +141,7 @@ GoRouter createJourneyRouter(
   required LaunchPresentationGate launchPresentationGate,
   required LaunchInterruptionGuard launchInterruptionGuard,
   String initialLocation = '/boot',
+  bool uiReviewOnly = false,
   bool legacyPresentationForTestsOnly = false,
 }) {
   final buyV2Session = BuyV2Session(core: buySession);
@@ -1651,6 +1652,7 @@ GoRouter createJourneyRouter(
                 initialItem: state.uri.queryParameters['item'],
                 initialAction: state.uri.queryParameters['action'],
                 initialChoice: state.uri.queryParameters['choice'],
+                enableCreateReviewPreview: uiReviewOnly,
                 onOpenMool: () => context.push('/app/mool?from=social'),
                 onOpenMainAction: (action) => openMoolConnectedRoute(
                   context,

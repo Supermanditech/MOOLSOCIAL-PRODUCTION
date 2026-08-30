@@ -193,6 +193,7 @@ class SocialUniversalV2 extends StatefulWidget {
     this.contextualChatSource =
         const MoolDefaultContextualChatProvisioningSource(),
     this.mediaPicker,
+    this.enableCreateReviewPreview = false,
     @visibleForTesting this.youtubePublicAccessOverride,
     @visibleForTesting this.youtubeCreatorAccessOverride,
     @visibleForTesting this.youtubeVideosLoader,
@@ -226,6 +227,7 @@ class SocialUniversalV2 extends StatefulWidget {
   final BuyV2ShopChatHandoffHandler? onContextualChatHandoff;
   final MoolContextualChatProvisioningSource contextualChatSource;
   final SocialMediaPicker? mediaPicker;
+  final bool enableCreateReviewPreview;
 
   @visibleForTesting
   final bool? youtubePublicAccessOverride;
@@ -280,6 +282,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   late String _world;
   late bool _chatAuthenticated;
   bool _contextualChatActive = false;
+  bool _createReviewPreviewActive = false;
   late final _SocialV2RetainedState _retainedState;
 
   Map<String, String> get _choiceByWorld => _retainedState.choiceByWorld;
@@ -593,6 +596,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     _tab = _world == 'social'
         ? _tabFor(_choiceByWorld['social'])
         : SocialV2Tab.shorts;
+    _createReviewPreviewActive =
+        widget.enableCreateReviewPreview &&
+        !widget.session.isAuthenticated &&
+        _tab == SocialV2Tab.create;
     if (widget.initialState != null) {
       _createView = _createViewFor(widget.initialState);
     } else if (_tab == SocialV2Tab.create && !hasRetainedState) {
@@ -1193,7 +1200,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     _retainedState.contextualChatStates.clear();
     if (!mounted) return;
     FocusScope.of(context).unfocus();
-    setState(() => _contextualChatActive = false);
+    setState(() {
+      _contextualChatActive = false;
+      if (authenticated) _createReviewPreviewActive = false;
+    });
   }
 
   void _handleScreen04Back() {
@@ -1285,11 +1295,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         choiceId == 'create' &&
         !widget.session.isAuthenticated) {
       _resetShorts();
-      widget.session.beginSignIn(
-        returnLocation: '/app/social?sub=create',
-        cancelLocation: '/app/social?sub=${_tab.name}',
-        purpose: JourneyAuthenticationPurpose.socialCreate,
-      );
+      if (widget.enableCreateReviewPreview) {
+        unawaited(_chooseCreateReviewPath());
+      } else {
+        _beginCreateSignIn();
+      }
       return;
     }
     _discardDurableYouTubeWatch();
@@ -1302,6 +1312,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       _resetYouTubeSearch();
       if (_world == 'social') {
         _tab = _tabFor(choiceId);
+        if (_tab != SocialV2Tab.create) {
+          _createReviewPreviewActive = false;
+        }
         if (_tab == SocialV2Tab.feed) {
           _feedLinkRequest += 1;
           _feedLinkContextActive = false;
@@ -1321,11 +1334,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
 
   void _openCreationGateway() {
     if (!widget.session.isAuthenticated) {
-      widget.session.beginSignIn(
-        returnLocation: '/app/social?sub=create',
-        cancelLocation: '/app/social?sub=${_tab.name}',
-        purpose: JourneyAuthenticationPurpose.socialCreate,
-      );
+      if (widget.enableCreateReviewPreview) {
+        unawaited(_chooseCreateReviewPath());
+      } else {
+        _beginCreateSignIn();
+      }
       return;
     }
     _discardDurableYouTubeWatch();
@@ -1336,6 +1349,55 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       _activeVideo = null;
       _tab = SocialV2Tab.create;
       _createView = 'home';
+      _createReviewPreviewActive = false;
+    });
+  }
+
+  void _beginCreateSignIn() {
+    widget.session.beginSignIn(
+      returnLocation: '/app/social?sub=create',
+      cancelLocation: '/app/social?sub=${_tab.name}',
+      purpose: JourneyAuthenticationPurpose.socialCreate,
+    );
+  }
+
+  Future<void> _chooseCreateReviewPath() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('social-create-review-choice'),
+        title: const Text('Create on MoolSocial'),
+        content: const Text(
+          'Posting requires sign-in. You can preview every Create screen for design review without publishing anything.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('social-create-review-sign-in'),
+            onPressed: () => Navigator.pop(dialogContext, 'sign-in'),
+            child: const Text('Continue to sign in'),
+          ),
+          FilledButton(
+            key: const Key('social-create-review-preview'),
+            onPressed: () => Navigator.pop(dialogContext, 'preview'),
+            child: const Text('Preview Create'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'sign-in') {
+      _beginCreateSignIn();
+      return;
+    }
+    _discardDurableYouTubeWatch();
+    _resetShorts();
+    HapticFeedback.selectionClick();
+    setState(() {
+      _choiceByWorld['social'] = 'create';
+      _activeVideo = null;
+      _tab = SocialV2Tab.create;
+      _createView = 'home';
+      _createReviewPreviewActive = true;
     });
   }
 
@@ -3174,6 +3236,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       disableLocalMediaPreviewForTesting:
           widget.disableLocalDraftMediaPreviewForTesting,
       externalOperationLocked: _createBackBusy,
+      previewOnly:
+          _createReviewPreviewActive && !widget.session.isAuthenticated,
+      onPreviewSignIn: _beginCreateSignIn,
       onClose: _closeCreate,
       initialIntent: switch (_createView) {
         'image' => SocialCreateIntentV2.image,
@@ -3232,6 +3297,35 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       key: const Key('screen04-create-home'),
       padding: const EdgeInsets.fromLTRB(12, 16, 12, 120),
       children: [
+        if (_createReviewPreviewActive && !widget.session.isAuthenticated) ...[
+          SocialV2Card(
+            key: const Key('screen04-create-preview-hub-notice'),
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+            child: Row(
+              children: [
+                const Icon(Icons.visibility_outlined, color: Color(0xFF8A4B00)),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Create preview is open. Explore every format; posting still requires sign-in.',
+                    style: TextStyle(
+                      color: SocialV2Colors.ink,
+                      fontSize: 12,
+                      height: 1.3,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  key: const Key('screen04-create-preview-sign-in'),
+                  onPressed: _beginCreateSignIn,
+                  child: const Text('Sign in'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
         Container(
           key: const Key('screen04-create-hub-header'),
           padding: const EdgeInsets.all(18),

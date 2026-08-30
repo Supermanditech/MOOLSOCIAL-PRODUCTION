@@ -207,6 +207,8 @@ class SocialCreateWorkbenchV2 extends StatefulWidget {
     this.recoverInterruptedMedia = true,
     this.disableLocalMediaPreviewForTesting = false,
     this.externalOperationLocked = false,
+    this.previewOnly = false,
+    this.onPreviewSignIn,
     super.key,
   });
 
@@ -227,6 +229,8 @@ class SocialCreateWorkbenchV2 extends StatefulWidget {
   @visibleForTesting
   final bool disableLocalMediaPreviewForTesting;
   final bool externalOperationLocked;
+  final bool previewOnly;
+  final VoidCallback? onPreviewSignIn;
 
   @override
   State<SocialCreateWorkbenchV2> createState() =>
@@ -611,6 +615,10 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
   }
 
   Future<void> _publish() async {
+    if (widget.previewOnly) {
+      widget.onPreviewSignIn?.call();
+      return;
+    }
     if (widget.session.busy || _selectingMedia) return;
     if (_draft.quotedPost != null && _body.text.trim().isEmpty) {
       showSocialV2Message(
@@ -863,26 +871,40 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                           icon: const Icon(Icons.delete_outline_rounded),
                         ),
                         SizedBox(
-                          width: 96,
+                          width: widget.previewOnly ? 126 : 96,
                           height: 44,
                           child: FilledButton.icon(
                             key: const Key('screen04-create-publish-post'),
                             style: FilledButton.styleFrom(
-                              minimumSize: const Size(96, 44),
-                              maximumSize: const Size(96, 44),
+                              minimumSize: Size(
+                                widget.previewOnly ? 126 : 96,
+                                44,
+                              ),
+                              maximumSize: Size(
+                                widget.previewOnly ? 126 : 96,
+                                44,
+                              ),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
                               ),
                             ),
-                            onPressed: widget.session.busy || _selectingMedia
+                            onPressed:
+                                !widget.previewOnly &&
+                                    (widget.session.busy || _selectingMedia)
                                 ? null
                                 : _publish,
-                            icon: const Icon(
-                              Icons.arrow_upward_rounded,
+                            icon: Icon(
+                              widget.previewOnly
+                                  ? Icons.login_rounded
+                                  : Icons.arrow_upward_rounded,
                               size: 18,
                             ),
                             label: Text(
-                              widget.session.busy ? 'Posting…' : 'Post',
+                              widget.previewOnly
+                                  ? 'Sign in to post'
+                                  : widget.session.busy
+                                  ? 'Posting…'
+                                  : 'Post',
                             ),
                           ),
                         ),
@@ -892,6 +914,35 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                 ),
               ),
             ),
+            if (widget.previewOnly)
+              const Material(
+                key: Key('screen04-create-preview-notice'),
+                color: Color(0xFFFFF4DE),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(12, 8, 12, 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.visibility_outlined,
+                        color: Color(0xFF8A4B00),
+                        size: 18,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Create preview · Nothing can be published until you sign in.',
+                          style: TextStyle(
+                            color: Color(0xFF6A3A00),
+                            fontSize: 11.5,
+                            height: 1.25,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             Expanded(
               child: SingleChildScrollView(
                 key: const Key('screen04-create-scrollable-composer'),

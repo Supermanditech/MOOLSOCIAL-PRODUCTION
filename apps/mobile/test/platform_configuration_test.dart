@@ -121,6 +121,7 @@ void main() {
     expect(reviewSource, contains('ChatSession()'));
     expect(reviewSource, contains("initialLocation: '/app/buy'"));
     expect(reviewSource, contains('allowGuestReady: true'));
+    expect(reviewSource, contains('uiReviewOnly: true'));
   });
 
   test('profile device-review builds retain candidate provenance markers', () {

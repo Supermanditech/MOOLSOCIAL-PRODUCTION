@@ -372,6 +372,7 @@ void _runUiReviewOnlyApp() {
       chatSession: ChatSession(),
       disposeSession: true,
       disposeChatSession: true,
+      uiReviewOnly: true,
       initialLocation: '/app/buy',
     ),
   );
