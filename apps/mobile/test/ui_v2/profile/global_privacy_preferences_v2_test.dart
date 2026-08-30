@@ -20,12 +20,16 @@ void main() {
     required Future<bool> Function() openPrivacy,
     Size size = const Size(390, 844),
     double textScale = 1,
+    double topInset = 0,
     double bottomInset = 0,
     ValueListenable<double>? keyboardInset,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
-    tester.view.viewPadding = FakeViewPadding(bottom: bottomInset);
+    tester.view.viewPadding = FakeViewPadding(
+      top: topInset,
+      bottom: bottomInset,
+    );
     addTearDown(tester.view.reset);
     final router = GoRouter(
       initialLocation: '/app/work/home',
@@ -423,6 +427,31 @@ void main() {
       }
     },
   );
+
+  testWidgets('Language sheet uses OPPO top-only exported clearance', (
+    tester,
+  ) async {
+    final journey = JourneySession(store: MemoryJourneyStore());
+    final work = WorkSession();
+    addTearDown(journey.dispose);
+    addTearDown(work.dispose);
+    await pumpFromWork(
+      tester,
+      journey: journey,
+      work: work,
+      openNotifications: () async => true,
+      openPrivacy: () async => true,
+      size: const Size(360, 800),
+      topInset: 41,
+    );
+
+    await tester.tap(find.byKey(const Key('global-preferences-language')));
+    await tester.pumpAndSettle();
+    final hindi = find.byKey(const Key('global-preferences-language-hi'));
+    expect(tester.getSize(hindi).height, greaterThanOrEqualTo(56));
+    expect(tester.getBottomRight(hindi).dy, lessThanOrEqualTo(773));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('direct Preferences restore returns to its exact safe origin', (
     tester,

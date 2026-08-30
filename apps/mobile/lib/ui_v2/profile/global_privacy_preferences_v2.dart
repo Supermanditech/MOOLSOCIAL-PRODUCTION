@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -14,8 +15,13 @@ final _privacyPolicyUri = Uri.parse('https://moolsocial.com/privacy/');
 double _preferencesSheetBottomInset(BuildContext context) {
   final mediaBottom = MediaQuery.viewPaddingOf(context).bottom;
   final view = View.of(context);
+  final rawTop = view.viewPadding.top / view.devicePixelRatio;
   final rawBottom = view.viewPadding.bottom / view.devicePixelRatio;
-  return math.max(mediaBottom, rawBottom);
+  const exportedTargetOverflow = 14.0;
+  final exportedClearance = defaultTargetPlatform == TargetPlatform.android
+      ? (rawTop - exportedTargetOverflow).clamp(0, double.infinity).toDouble()
+      : 0.0;
+  return math.max(mediaBottom, math.max(rawBottom, exportedClearance));
 }
 
 class GlobalPrivacyPreferencesV2 extends StatelessWidget {

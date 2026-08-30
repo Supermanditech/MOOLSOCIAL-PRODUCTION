@@ -307,9 +307,19 @@ class GlobalProfilePanelV2 extends StatelessWidget {
     final width = math.min(media.size.width * .74, 320.0);
     final palette = GlobalProfileSurfacePalette.forTone(surfaceTone);
     final view = View.of(context);
+    final viewPadding = EdgeInsets.fromViewPadding(
+      view.viewPadding,
+      view.devicePixelRatio,
+    );
+    const exportedTargetOverflow = 14.0;
     final exportedBottomClearance =
         defaultTargetPlatform == TargetPlatform.android
-        ? view.viewPadding.bottom / view.devicePixelRatio
+        ? math.max(
+            viewPadding.bottom,
+            (viewPadding.top - exportedTargetOverflow)
+                .clamp(0, double.infinity)
+                .toDouble(),
+          )
         : 0.0;
     return _GlobalProfilePaletteScope(
       palette: palette,
