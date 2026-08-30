@@ -1118,6 +1118,8 @@ class ChatSession extends ChangeNotifier {
   ChatCallGateway? get _callGateway =>
       _gateway is ChatCallGateway ? _gateway as ChatCallGateway : null;
 
+  bool get callPreferencesBackedByService => _callGateway != null;
+
   Future<bool> loadCallPreferences({bool refresh = false}) async {
     if (callLoading || (callPreferencesLoaded && !refresh)) {
       return callPreferencesLoaded;

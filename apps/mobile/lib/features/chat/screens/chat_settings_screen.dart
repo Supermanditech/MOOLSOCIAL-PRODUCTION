@@ -151,6 +151,7 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
       animation: widget.session,
       builder: (context, _) {
         final session = widget.session;
+        final serviceBackedCalls = session.callPreferencesBackedByService;
         return ChatPageScaffold(
           key: const Key('chat-settings-screen'),
           session: session,
@@ -211,8 +212,10 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                         horizontal: 14,
                       ),
                       title: const Text('Voice calls in this app'),
-                      subtitle: const Text(
-                        'Let people know whether they can voice call you.',
+                      subtitle: Text(
+                        serviceBackedCalls
+                            ? 'Let people know whether they can voice call you.'
+                            : 'Show or hide voice calling on this device.',
                       ),
                       value: session.globalVoiceCallsAvailableForSession,
                       onChanged: session.callLoading
@@ -223,8 +226,12 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                                   voiceCallsEnabled: available,
                                 ),
                                 available
-                                    ? 'Voice calls turned on for your account.'
-                                    : 'Voice calls turned off for your account.',
+                                    ? serviceBackedCalls
+                                          ? 'Voice calls turned on for your account.'
+                                          : 'Voice calls are on until you close the app.'
+                                    : serviceBackedCalls
+                                    ? 'Voice calls turned off for your account.'
+                                    : 'Voice calls are off until you close the app.',
                               ),
                             ),
                     ),
@@ -235,8 +242,10 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                         horizontal: 14,
                       ),
                       title: const Text('Video calls in this app'),
-                      subtitle: const Text(
-                        'Let people know whether they can video call you.',
+                      subtitle: Text(
+                        serviceBackedCalls
+                            ? 'Let people know whether they can video call you.'
+                            : 'Show or hide video calling on this device.',
                       ),
                       value: session.globalVideoCallsAvailableForSession,
                       onChanged: session.callLoading
@@ -247,13 +256,19 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                                   videoCallsEnabled: available,
                                 ),
                                 available
-                                    ? 'Video calls turned on for your account.'
-                                    : 'Video calls turned off for your account.',
+                                    ? serviceBackedCalls
+                                          ? 'Video calls turned on for your account.'
+                                          : 'Video calls are on until you close the app.'
+                                    : serviceBackedCalls
+                                    ? 'Video calls turned off for your account.'
+                                    : 'Video calls are off until you close the app.',
                               ),
                             ),
                     ),
-                    const _ChatSettingsScopeNote(
-                      'Chat pause resets when you close the app. Voice and video call availability is saved to your account so callers receive the correct status.',
+                    _ChatSettingsScopeNote(
+                      serviceBackedCalls
+                          ? 'Chat pause resets when you close the app. Voice and video call availability is saved to your account so callers receive the correct status.'
+                          : 'Chat and call choices reset when you close the app. Other people’s caller status requires the call service and is unavailable in this UI review.',
                     ),
                   ],
                 ),

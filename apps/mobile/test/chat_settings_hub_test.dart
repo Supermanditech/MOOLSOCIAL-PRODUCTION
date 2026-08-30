@@ -164,6 +164,17 @@ void main() {
         size: const Size(360, 800),
       );
       await openSettings(tester);
+      expect(chat.callPreferencesBackedByService, isFalse);
+      expect(
+        find.text('Show or hide voice calling on this device.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Show or hide video calling on this device.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('saved to your account'), findsNothing);
+      expect(find.textContaining('requires the call service'), findsOneWidget);
 
       for (final key in const [
         Key('chat-settings-chat-availability'),
