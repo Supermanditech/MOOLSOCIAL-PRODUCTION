@@ -161,6 +161,28 @@ void main() {
     expect(find.byKey(const ValueKey('buy-payment-sheet-route')), findsNothing);
   });
 
+  testWidgets('every payment method clears the OPPO navigation inset', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 44);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+
+    await openSheet(tester, session);
+    for (final name in const ['UPI', 'Bank transfer', 'Purchase order']) {
+      final action = find.byKey(ValueKey('buy-payment-$name'));
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      final rect = tester.getRect(action);
+      expect(rect.height, greaterThanOrEqualTo(44), reason: name);
+      expect(rect.bottom, lessThanOrEqualTo(729), reason: name);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Back, Close and lifecycle preserve the existing choice', (
     tester,
   ) async {

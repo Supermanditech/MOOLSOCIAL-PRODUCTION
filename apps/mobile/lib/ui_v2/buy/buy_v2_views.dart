@@ -8743,7 +8743,15 @@ Future<void> showBuyV2PaymentSheet(
           child: ListView(
             key: const ValueKey('buy-payment-sheet-list'),
             shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              18 +
+                  BuyV2AddressSheetMotion.resolveModalActionBottomInset(
+                    sheetContext,
+                  ),
+            ),
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
