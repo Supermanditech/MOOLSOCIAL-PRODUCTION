@@ -85,6 +85,18 @@ void main() {
     expect((selected.decoration! as BoxDecoration).color!.a, greaterThan(0));
     expect((unselected.decoration! as BoxDecoration).color!.a, 0);
     expect(familyRoot.color!.a, 0);
+    final fullRailWidths = [
+      tester.getSize(find.byKey(const Key('mool-compact-launcher'))).width,
+      tester
+          .getSize(find.byKey(const ValueKey('moolsocial-family-root-buy-tap')))
+          .width,
+      for (final key in const ['rail-shop', 'rail-orders', 'rail-offers'])
+        tester.getSize(find.byKey(Key(key))).width,
+      tester.getSize(find.byKey(const Key('mool-global-chat-tap'))).width,
+    ];
+    for (final width in fullRailWidths.skip(1)) {
+      expect(width, closeTo(fullRailWidths.first, .01));
+    }
     expect(
       tester
           .getSemantics(find.bySemanticsLabel('Orders, current'))
@@ -209,11 +221,12 @@ void main() {
     await tester.pumpAndSettle();
 
     final actionRects = [
-      for (final id in const ['orders', 'stock', 'sales'])
+      for (final id in const ['mool', 'orders', 'stock', 'sales', 'chat'])
         tester.getRect(find.byKey(Key('dock-$id'))),
     ];
-    expect(actionRects[0].width, closeTo(actionRects[1].width, .01));
-    expect(actionRects[1].width, closeTo(actionRects[2].width, .01));
+    for (final rect in actionRects.skip(1)) {
+      expect(rect.width, closeTo(actionRects.first.width, .01));
+    }
     for (final rect in actionRects) {
       expect(rect.height, greaterThanOrEqualTo(44));
     }
@@ -282,6 +295,20 @@ void main() {
         final size = tester.getSize(find.byKey(Key(key)));
         expect(size.width, greaterThanOrEqualTo(44), reason: key);
         expect(size.height, greaterThanOrEqualTo(44), reason: key);
+      }
+      final socialWidths = [
+        tester.getSize(find.byKey(const Key('mool-compact-launcher'))).width,
+        for (final key in const [
+          'screen04-rail-videos',
+          'screen04-rail-shorts',
+          'screen04-rail-create',
+          'screen04-rail-feed',
+        ])
+          tester.getSize(find.byKey(Key(key))).width,
+        tester.getSize(find.byKey(const Key('social-global-chat'))).width,
+      ];
+      for (final width in socialWidths.skip(1)) {
+        expect(width, closeTo(socialWidths.first, .01));
       }
 
       await tester.tap(find.byKey(const Key('screen04-rail-videos')));

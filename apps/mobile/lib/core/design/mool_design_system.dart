@@ -1079,36 +1079,15 @@ class MoolLocalNavigationRail extends StatelessWidget {
         child: LayoutBuilder(
           key: const Key('moolsocial-local-navigation-adaptive-layout'),
           builder: (context, constraints) {
-            final compactGap =
-                MoolLocalNavigationTokens.destinationCompactItemGap;
             final minimumClusterWidth =
-                MoolMetrics.minimumTapTarget * actions.length +
-                compactGap * math.max(0, actions.length - 1);
-            final insetAvailable = math.max(
-              0.0,
-              constraints.maxWidth -
-                  MoolLocalNavigationTokens.horizontalInset * 2,
-            );
+                MoolMetrics.minimumTapTarget * actions.length;
             final requiresOverflow = minimumClusterWidth > constraints.maxWidth;
-            final requiresEdgeToEdgeMinimum =
-                !requiresOverflow && minimumClusterWidth > insetAvailable;
-            final usesMinimumGeometry =
-                requiresOverflow || requiresEdgeToEdgeMinimum;
-            final clusterWidth = usesMinimumGeometry
+            final clusterWidth = requiresOverflow
                 ? minimumClusterWidth
-                : MoolLocalNavigationTokens.clusterWidth(
-                    constraints.maxWidth,
-                    actions.length,
-                  );
-            final cellWidth = usesMinimumGeometry
+                : constraints.maxWidth;
+            final cellWidth = requiresOverflow
                 ? MoolMetrics.minimumTapTarget
-                : MoolLocalNavigationTokens.cellWidth(
-                    constraints.maxWidth,
-                    actions.length,
-                  );
-            final gap = usesMinimumGeometry
-                ? compactGap
-                : MoolLocalNavigationTokens.gap(clusterWidth, actions.length);
+                : constraints.maxWidth / actions.length;
             final cluster = SizedBox(
               key: const Key('moolsocial-local-navigation-compact-cluster'),
               width: clusterWidth,
@@ -1116,7 +1095,6 @@ class MoolLocalNavigationRail extends StatelessWidget {
               child: Row(
                 children: [
                   for (var index = 0; index < actions.length; index++) ...[
-                    if (index > 0) SizedBox(width: gap),
                     SizedBox(
                       width: cellWidth,
                       height: MoolLocalNavigationTokens.destinationRailHeight,
@@ -1317,110 +1295,71 @@ class MoolOutcomeDock extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: MoolSpacing.xxs),
-        child: SizedBox(
-          key: const Key('mool-outcome-dock-surface'),
-          height: MoolMetrics.compactTapTarget,
+      child: SizedBox(
+        key: const Key('mool-outcome-dock-surface'),
+        height: MoolLocalNavigationTokens.destinationRailHeight,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            color: MoolLocalNavigationTokens.destinationCanvas,
+            border: Border(
+              top: BorderSide(
+                color: MoolLocalNavigationTokens.destinationDivider,
+              ),
+            ),
+          ),
           child: Semantics(
             container: true,
             explicitChildNodes: true,
             label: semanticLabel,
-            child: MoolGlassSurface(
-              padding: EdgeInsets.zero,
-              borderRadius: MoolRadii.card,
-              insetBorder: false,
-              child: Row(
-                children: [
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final cellCount = actions.length + 2;
+                final minimumWidth = MoolMetrics.minimumTapTarget * cellCount;
+                final overflow = minimumWidth > constraints.maxWidth;
+                final cellWidth = overflow
+                    ? MoolMetrics.minimumTapTarget
+                    : constraints.maxWidth / cellCount;
+                final cells = <Widget>[
                   _MoolEdgeDockAction(
                     action: mool,
                     selected: activeId == mool.id,
                     isMool: true,
                   ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F1F8).withValues(alpha: .86),
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(color: const Color(0x10000080)),
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.zero,
-                        child: actions.length <= 3
-                            ? KeyedSubtree(
-                                key: actionsKey,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    for (
-                                      var index = 0;
-                                      index < actions.length;
-                                      index++
-                                    ) ...[
-                                      if (index > 0)
-                                        const SizedBox(
-                                          width:
-                                              MoolLocalNavigationTokens.itemGap,
-                                        ),
-                                      Expanded(
-                                        child: _MoolMiddleDockAction(
-                                          action: actions[index],
-                                          selected:
-                                              activeId == actions[index].id,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              )
-                            : showOverflowCue
-                            ? _MoolScrollableDockActions(
-                                actionsKey: actionsKey,
-                                actions: actions,
-                                activeId: activeId,
-                              )
-                            : SingleChildScrollView(
-                                key: actionsKey,
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 2,
-                                ),
-                                child: Row(
-                                  children: [
-                                    for (
-                                      var index = 0;
-                                      index < actions.length;
-                                      index++
-                                    ) ...[
-                                      if (index > 0)
-                                        const SizedBox(
-                                          width:
-                                              MoolLocalNavigationTokens.itemGap,
-                                        ),
-                                      SizedBox(
-                                        width: MoolLocalNavigationTokens
-                                            .capsuleWidth,
-                                        child: _MoolMiddleDockAction(
-                                          action: actions[index],
-                                          selected:
-                                              activeId == actions[index].id,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                      ),
+                  for (final action in actions)
+                    _MoolMiddleDockAction(
+                      action: action,
+                      selected: activeId == action.id,
                     ),
-                  ),
-                  const SizedBox(width: 4),
                   _MoolEdgeDockAction(
                     action: chat,
                     selected: activeId == chat.id,
                   ),
-                ],
-              ),
+                ];
+                final row = KeyedSubtree(
+                  key: actionsKey,
+                  child: SizedBox(
+                    width: overflow ? minimumWidth : constraints.maxWidth,
+                    height: MoolLocalNavigationTokens.destinationRailHeight,
+                    child: Row(
+                      children: [
+                        for (final cell in cells)
+                          SizedBox(
+                            width: cellWidth,
+                            height:
+                                MoolLocalNavigationTokens.destinationRailHeight,
+                            child: cell,
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+                if (!overflow) return row;
+                return SingleChildScrollView(
+                  key: const Key('mool-outcome-dock-overflow'),
+                  scrollDirection: Axis.horizontal,
+                  child: row,
+                );
+              },
             ),
           ),
         ),
@@ -1433,12 +1372,10 @@ class _MoolScrollableDockActions extends StatefulWidget {
   const _MoolScrollableDockActions({
     required this.actions,
     required this.activeId,
-    this.actionsKey,
   });
 
   final List<MoolDockAction> actions;
   final String activeId;
-  final Key? actionsKey;
 
   @override
   State<_MoolScrollableDockActions> createState() =>
@@ -1585,7 +1522,7 @@ class _MoolScrollableDockActionsState
           ),
           Expanded(
             child: SingleChildScrollView(
-              key: widget.actionsKey,
+              key: const Key('mool-scrollable-dock-actions'),
               controller: _controller,
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -1703,116 +1640,121 @@ class _MoolEdgeDockAction extends StatelessWidget {
       selected: selected,
       button: true,
       enabled: action.onPressed != null,
-      label: action.semanticLabel ?? action.label,
+      label: selected
+          ? '${action.semanticLabel ?? action.label}, current'
+          : action.semanticLabel ?? 'Open ${action.label}',
       onTap: action.onPressed,
       excludeSemantics: true,
-      child: InkWell(
-        key: Key(action.keyName),
-        onTap: action.onPressed,
-        borderRadius: BorderRadius.circular(17),
-        child: AnimatedContainer(
-          duration: MoolMotion.accessible(context, MoolMotion.quick),
-          curve: MoolMotion.change,
-          width: MoolMetrics.minimumTapTarget,
-          height: MoolMetrics.minimumTapTarget,
-          decoration: BoxDecoration(
-            gradient: isMool
-                ? const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF2929D4), Color(0xFF07076E)],
-                  )
-                : null,
-            color: isMool
-                ? null
-                : selected
-                ? MoolColors.navy
-                : Colors.white.withValues(alpha: .74),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-              color: selected || isMool
-                  ? Colors.white.withValues(alpha: .22)
-                  : const Color(0x16000080),
-            ),
-            boxShadow: isMool || selected
-                ? const [
-                    BoxShadow(
-                      color: Color(0x33070768),
-                      blurRadius: 18,
-                      offset: Offset(0, 8),
-                    ),
-                  ]
-                : null,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: Key(action.keyName),
+          onTap: action.onPressed,
+          borderRadius: BorderRadius.circular(
+            MoolLocalNavigationTokens.destinationSelectedCellRadius,
           ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Center(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: isMool
-                      ? const Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              MoolBrand.moolLauncherIcon,
-                              color: Colors.white,
-                              size: 19,
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Mool',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        )
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(action.icon, color: foreground, size: 19),
-                            const SizedBox(height: 2),
-                            Text(
-                              action.label,
-                              maxLines: 1,
-                              style: TextStyle(
-                                color: foreground,
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        ),
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: AnimatedContainer(
+              duration: MoolMotion.accessible(context, MoolMotion.quick),
+              curve: MoolMotion.change,
+              width: double.infinity,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                gradient: isMool
+                    ? const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF2929D4), Color(0xFF07076E)],
+                      )
+                    : null,
+                color: isMool
+                    ? null
+                    : selected
+                    ? MoolColors.navy
+                    : Colors.white.withValues(alpha: .74),
+                borderRadius: BorderRadius.circular(
+                  MoolLocalNavigationTokens.destinationSelectedCellRadius,
+                ),
+                border: Border.all(
+                  color: selected || isMool
+                      ? Colors.white.withValues(alpha: .22)
+                      : const Color(0x16000080),
                 ),
               ),
-              if (action.badgeCount > 0)
-                Positioned(
-                  right: -3,
-                  top: -3,
-                  child: Container(
-                    constraints: const BoxConstraints(minWidth: 18),
-                    height: 18,
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      color: MoolColors.orange,
-                      borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                      border: Border.all(color: Colors.white, width: 1.5),
-                    ),
-                    child: Text(
-                      '${action.badgeCount}',
-                      style: const TextStyle(
-                        color: MoolColors.ink,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                      ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: isMool
+                          ? const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  MoolBrand.moolLauncherIcon,
+                                  color: Colors.white,
+                                  size: 19,
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Mool',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(action.icon, color: foreground, size: 19),
+                                const SizedBox(height: 2),
+                                Text(
+                                  action.label,
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    color: foreground,
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
                   ),
-                ),
-            ],
+                  if (action.badgeCount > 0)
+                    Positioned(
+                      right: -1,
+                      top: -1,
+                      child: Container(
+                        constraints: const BoxConstraints(minWidth: 18),
+                        height: 18,
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          color: MoolColors.orange,
+                          borderRadius: BorderRadius.circular(
+                            MoolRadii.capsule,
+                          ),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        child: Text(
+                          '${action.badgeCount}',
+                          style: const TextStyle(
+                            color: MoolColors.ink,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -1838,18 +1780,20 @@ class _MoolMiddleDockActionState extends State<_MoolMiddleDockAction> {
     final action = widget.action;
     final selected = widget.selected;
     final radius = BorderRadius.circular(
-      MoolLocalNavigationTokens.controlRadius,
+      MoolLocalNavigationTokens.destinationSelectedCellRadius,
     );
     return Semantics(
       key: action.anchorKey,
       selected: selected,
       button: true,
       enabled: action.onPressed != null,
-      label: action.semanticLabel ?? action.label,
+      label: selected
+          ? '${action.semanticLabel ?? action.label}, current'
+          : 'Open ${action.semanticLabel ?? action.label}',
       onTap: action.onPressed,
       excludeSemantics: true,
       child: SizedBox(
-        height: MoolLocalNavigationTokens.controlHeight,
+        height: MoolLocalNavigationTokens.destinationRailHeight,
         child: ClipRRect(
           borderRadius: radius,
           child: BackdropFilter(

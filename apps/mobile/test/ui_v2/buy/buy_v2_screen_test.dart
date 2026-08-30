@@ -3671,7 +3671,10 @@ void main() {
       tester.getRect(offers),
     ];
 
-    expect(rectangles.map((rect) => rect.size).toSet(), hasLength(1));
+    for (final rectangle in rectangles.skip(1)) {
+      expect(rectangle.width, closeTo(rectangles.first.width, .01));
+      expect(rectangle.height, closeTo(rectangles.first.height, .01));
+    }
     expect(rectangles.every((rect) => rect.height >= 44), isTrue);
     expect(
       rectangles[1].left - rectangles[0].right,

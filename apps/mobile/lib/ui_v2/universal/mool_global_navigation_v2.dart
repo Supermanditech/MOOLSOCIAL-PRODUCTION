@@ -488,35 +488,43 @@ class _MoolDestinationNavigationV2State
                 height: MoolLocalNavigationTokens.destinationRailHeight,
                 child: Row(
                   children: [
-                    MoolGlobalNavigationV2(
-                      activeId: widget.activeId,
-                      onOpenMool: widget.onOpenMool,
-                      onOpenAction: widget.onOpenAction,
-                      onOpenChat: widget.onOpenChat,
-                      controller: widget.moolNavigationController,
-                      compact: true,
+                    Expanded(
+                      child: MoolGlobalNavigationV2(
+                        activeId: widget.activeId,
+                        onOpenMool: widget.onOpenMool,
+                        onOpenAction: widget.onOpenAction,
+                        onOpenChat: widget.onOpenChat,
+                        controller: widget.moolNavigationController,
+                        compact: true,
+                        compactExpanded: true,
+                      ),
                     ),
-                    const SizedBox(width: 2),
                     if (family.id != 'social') ...[
-                      _MoolFamilyRootButton(
-                        family: family,
-                        selected: widget.familyRootSelected,
-                        onPressed: () => widget.onOpenAction(
-                          PersonalMoolActionSpec(
-                            id: family.id,
-                            label: family.label,
-                            route: family.route,
-                            icon: family.icon,
+                      Expanded(
+                        child: _MoolFamilyRootButton(
+                          family: family,
+                          selected: widget.familyRootSelected,
+                          onPressed: () => widget.onOpenAction(
+                            PersonalMoolActionSpec(
+                              id: family.id,
+                              label: family.label,
+                              route: family.route,
+                              icon: family.icon,
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 2),
                     ],
-                    Expanded(child: widget.localNavigation),
-                    const SizedBox(width: 2),
-                    MoolGlobalChatNavigationV2(
-                      controlKey: const Key('mool-global-chat'),
-                      onOpenChat: widget.onOpenChat,
+                    Expanded(
+                      flex: widget.localActionCount,
+                      child: widget.localNavigation,
+                    ),
+                    Expanded(
+                      child: MoolGlobalChatNavigationV2(
+                        controlKey: const Key('mool-global-chat'),
+                        onOpenChat: widget.onOpenChat,
+                        expandedCell: true,
+                      ),
                     ),
                   ],
                 ),
@@ -545,10 +553,6 @@ class _MoolFamilyRootButton extends StatelessWidget {
     final accent = MoolLocalNavigationTokens.navigationAccentForFamily(
       family.id,
     );
-    final fixedCellWidth =
-        MoolLocalNavigationTokens.destinationFixedCellWidthFor(
-          MediaQuery.sizeOf(context).width,
-        );
     return Semantics(
       container: true,
       button: true,
@@ -560,7 +564,7 @@ class _MoolFamilyRootButton extends StatelessWidget {
       excludeSemantics: true,
       child: SizedBox(
         key: ValueKey('moolsocial-family-root-${family.id}'),
-        width: fixedCellWidth,
+        width: double.infinity,
         height: MoolLocalNavigationTokens.destinationRailHeight,
         child: Material(
           key: ValueKey('moolsocial-family-root-${family.id}-surface'),
@@ -1447,6 +1451,7 @@ class MoolGlobalNavigationV2 extends StatefulWidget {
     this.localNavigationExpanded,
     this.onToggleLocalNavigation,
     this.compact = false,
+    this.compactExpanded = false,
     this.compactOverlayAlignEnd = false,
     super.key,
   }) : assert(
@@ -1462,6 +1467,7 @@ class MoolGlobalNavigationV2 extends StatefulWidget {
   final bool? localNavigationExpanded;
   final VoidCallback? onToggleLocalNavigation;
   final bool compact;
+  final bool compactExpanded;
   final bool compactOverlayAlignEnd;
 
   @override
@@ -1686,6 +1692,7 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
         link: _launcherLink,
         child: _MoolHomeLauncher(
           compact: widget.compact,
+          expandedCell: widget.compactExpanded,
           expanded: _isOpen,
           onPressed: _toggleConnectedNavigator,
         ),
@@ -1749,11 +1756,13 @@ class MoolGlobalChatNavigationV2 extends StatefulWidget {
   const MoolGlobalChatNavigationV2({
     required this.onOpenChat,
     this.controlKey = const Key('mool-global-chat'),
+    this.expandedCell = false,
     super.key,
   });
 
   final VoidCallback? onOpenChat;
   final Key controlKey;
+  final bool expandedCell;
 
   @override
   State<MoolGlobalChatNavigationV2> createState() =>
@@ -1787,7 +1796,7 @@ class _MoolGlobalChatNavigationV2State
         ),
         curve: MoolMotion.change,
         child: SizedBox(
-          width: fixedCellWidth,
+          width: widget.expandedCell ? double.infinity : fixedCellWidth,
           height: MoolLocalNavigationTokens.destinationRailHeight,
           child: Material(
             key: const Key('mool-global-chat-white-surface'),
@@ -1833,11 +1842,13 @@ class _MoolHomeLauncher extends StatefulWidget {
     required this.onPressed,
     required this.expanded,
     this.compact = false,
+    this.expandedCell = false,
   });
 
   final VoidCallback onPressed;
   final bool expanded;
   final bool compact;
+  final bool expandedCell;
 
   @override
   State<_MoolHomeLauncher> createState() => _MoolHomeLauncherState();
@@ -1872,7 +1883,7 @@ class _MoolHomeLauncherState extends State<_MoolHomeLauncher> {
           ),
           curve: MoolMotion.change,
           child: SizedBox(
-            width: fixedCellWidth,
+            width: widget.expandedCell ? double.infinity : fixedCellWidth,
             height: MoolLocalNavigationTokens.destinationRailHeight,
             child: Material(
               key: const Key('mool-compact-launcher-white-surface'),

@@ -4025,15 +4025,18 @@ class _SocialOwnershipDock extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                MoolGlobalNavigationV2(
-                  activeId: 'social',
-                  onOpenMool: onMool,
-                  onOpenAction: onOpenAction,
-                  onOpenChat: onOpenChat,
-                  compact: true,
-                ),
-                const SizedBox(width: 2),
                 Expanded(
+                  child: MoolGlobalNavigationV2(
+                    activeId: 'social',
+                    onOpenMool: onMool,
+                    onOpenAction: onOpenAction,
+                    onOpenChat: onOpenChat,
+                    compact: true,
+                    compactExpanded: true,
+                  ),
+                ),
+                Expanded(
+                  flex: 4,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -4081,10 +4084,12 @@ class _SocialOwnershipDock extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 2),
-                MoolGlobalChatNavigationV2(
-                  controlKey: const Key('social-global-chat'),
-                  onOpenChat: onOpenChat,
+                Expanded(
+                  child: MoolGlobalChatNavigationV2(
+                    controlKey: const Key('social-global-chat'),
+                    onOpenChat: onOpenChat,
+                    expandedCell: true,
+                  ),
                 ),
               ],
             ),
