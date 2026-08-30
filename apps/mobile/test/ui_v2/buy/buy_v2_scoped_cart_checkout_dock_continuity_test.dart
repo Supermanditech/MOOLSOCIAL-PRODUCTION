@@ -281,56 +281,56 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets(
-    'R58.8.7 responsive Android and iOS candidate captures',
-    (tester) async {
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-
-      for (final viewport in const [
-        (
-          size: Size(320, 568),
-          safe: EdgeInsets.symmetric(vertical: 24),
-          textScale: 1.0,
-          reduced: false,
-          checkout: true,
-          label: '320x568-android-checkout',
-        ),
-        (
-          size: Size(360, 800),
-          safe: EdgeInsets.symmetric(vertical: 24),
-          textScale: 1.0,
-          reduced: false,
-          checkout: false,
-          label: '360x800-android-cart',
-        ),
-        (
-          size: Size(390, 844),
-          safe: EdgeInsets.only(top: 47, bottom: 34),
-          textScale: 1.0,
-          reduced: false,
-          checkout: true,
-          label: '390x844-ios-checkout',
-        ),
-        (
-          size: Size(430, 932),
-          safe: EdgeInsets.only(top: 59, bottom: 34),
-          textScale: 1.0,
-          reduced: false,
-          checkout: false,
-          label: '430x932-ios-cart',
-        ),
-        (
-          size: Size(320, 568),
-          safe: EdgeInsets.symmetric(vertical: 24),
-          textScale: 1.4,
-          reduced: true,
-          checkout: true,
-          label: '320x568-a11y140-reduced',
-        ),
-      ]) {
+  for (final viewport in const [
+    (
+      size: Size(320, 568),
+      safe: EdgeInsets.symmetric(vertical: 24),
+      textScale: 1.0,
+      reduced: false,
+      checkout: true,
+      label: '320x568-android-checkout',
+    ),
+    (
+      size: Size(360, 800),
+      safe: EdgeInsets.symmetric(vertical: 24),
+      textScale: 1.0,
+      reduced: false,
+      checkout: false,
+      label: '360x800-android-cart',
+    ),
+    (
+      size: Size(390, 844),
+      safe: EdgeInsets.only(top: 47, bottom: 34),
+      textScale: 1.0,
+      reduced: false,
+      checkout: true,
+      label: '390x844-ios-checkout',
+    ),
+    (
+      size: Size(430, 932),
+      safe: EdgeInsets.only(top: 59, bottom: 34),
+      textScale: 1.0,
+      reduced: false,
+      checkout: false,
+      label: '430x932-ios-cart',
+    ),
+    (
+      size: Size(320, 568),
+      safe: EdgeInsets.symmetric(vertical: 24),
+      textScale: 1.4,
+      reduced: true,
+      checkout: true,
+      label: '320x568-a11y140-reduced',
+    ),
+  ]) {
+    testWidgets(
+      'R58.8.7 responsive ${viewport.label} candidate capture',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
         tester.view.physicalSize = viewport.size;
         final session = mixedSession();
+        addTearDown(session.dispose);
         session.openDestination(BuyV2Destination.medicine);
         session.openCart(scope: BuyV2CartScope.shop);
         if (viewport.checkout) {
@@ -355,12 +355,8 @@ void main() {
             'candidate_captures/buy-v2-r58-8-7-c24f-${viewport.label}.png',
           ),
         );
-
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-        session.dispose();
-      }
-    },
-    tags: 'protected-reference',
-  );
+      },
+      tags: 'protected-reference',
+    );
+  }
 }

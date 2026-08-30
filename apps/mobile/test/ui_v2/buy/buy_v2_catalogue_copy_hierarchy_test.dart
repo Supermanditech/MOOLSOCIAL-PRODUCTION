@@ -99,14 +99,14 @@ void main() {
     final promotionRail = find.byKey(
       const ValueKey('buy-catalogue-promotions'),
     );
-    expect(tester.getSize(promotionRail).height, 118);
+    expect(tester.getSize(promotionRail).height, 164);
     final title = tester.widget<Text>(find.text('Plan the monthly basket'));
     final detail = tester.widget<Text>(
       find.text('Review a curated 30-day household basket'),
     );
     expect(title.maxLines, 2);
     expect(title.style?.fontSize, greaterThanOrEqualTo(10.5));
-    expect(detail.maxLines, 2);
+    expect(detail.maxLines, 4);
     expect(detail.style?.fontSize, greaterThanOrEqualTo(9.5));
     expect(tester.takeException(), isNull);
   });
