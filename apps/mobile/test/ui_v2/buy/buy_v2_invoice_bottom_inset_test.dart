@@ -50,6 +50,8 @@ void main() {
         final download = find.byKey(
           ValueKey('buy-download-invoice-${order.id}'),
         );
+        await tester.scrollUntilVisible(download, 120, scrollable: scrollable);
+        await tester.pumpAndSettle();
         expect(
           find.byKey(const ValueKey('buy-invoice-bottom-safe-area')),
           findsOneWidget,
@@ -85,6 +87,16 @@ void main() {
       await tester.pumpAndSettle();
 
       final download = find.byKey(ValueKey('buy-download-invoice-${order.id}'));
+      final list = find.byKey(ValueKey('buy-invoice-scroll-${order.id}'));
+      await tester.scrollUntilVisible(
+        download,
+        120,
+        scrollable: find.descendant(
+          of: list,
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await tester.pumpAndSettle();
       final rect = tester.getRect(download);
       expect(rect.height, greaterThanOrEqualTo(48));
       expect(rect.bottom, lessThanOrEqualTo(773));

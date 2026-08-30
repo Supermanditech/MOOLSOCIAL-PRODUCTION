@@ -574,38 +574,35 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
               textAlign: TextAlign.center,
               style: context.buyMeta.copyWith(fontSize: 9),
             ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: SizedBox(
-        key: const ValueKey('buy-invoice-bottom-safe-area'),
-        height: 66 + exportedBottomClearance,
-        child: Container(
-          padding: EdgeInsets.fromLTRB(10, 8, 10, 8 + exportedBottomClearance),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: BuyV2Colors.line)),
-          ),
-          child: SizedBox(
-            height: 48,
-            child: FilledButton.icon(
-              key: ValueKey('buy-download-invoice-${order.id}'),
-              onPressed: _downloading || !legalInvoiceReady ? null : _download,
-              icon: _downloading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.download_rounded),
-              label: Text(
-                _downloading ? 'Preparing invoice' : 'Download invoice',
+            const SizedBox(height: 12),
+            Padding(
+              key: const ValueKey('buy-invoice-bottom-safe-area'),
+              padding: EdgeInsets.only(bottom: exportedBottomClearance),
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton.icon(
+                  key: ValueKey('buy-download-invoice-${order.id}'),
+                  onPressed: _downloading || !legalInvoiceReady
+                      ? null
+                      : _download,
+                  icon: _downloading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.download_rounded),
+                  label: Text(
+                    _downloading ? 'Preparing invoice' : 'Download invoice',
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
