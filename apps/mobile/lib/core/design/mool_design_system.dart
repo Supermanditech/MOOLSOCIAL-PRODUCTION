@@ -423,18 +423,18 @@ abstract final class MoolLocalNavigationTokens {
   static const double destinationPreferredLocalCellWidth = 72;
   static const double destinationItemGap = MoolSpacing.xs;
   static const double destinationCompactItemGap = 2;
-  static const double destinationIconSize = 22;
-  static const double destinationLabelSize = 10.5;
+  static const double destinationIconSize = 20;
+  static const double destinationLabelSize = 10;
   static const double destinationLabelLineHeight = 1;
-  static const double destinationLabelSlotHeight = 28;
+  static const double destinationLabelSlotHeight = 18;
   static const String destinationFontFamily = 'Inter';
   static const FontWeight destinationLabelWeight = FontWeight.w700;
   static const FontWeight destinationSelectedLabelWeight = FontWeight.w800;
-  static const double destinationSelectedIndicatorWidth = 14;
-  static const double destinationSelectedIndicatorHeight = 2;
-  static const double destinationSelectedCellRadius = 14;
-  static const double destinationSelectedFillOpacity = .10;
-  static const double destinationSelectedBorderOpacity = .22;
+  static const double destinationSelectedIndicatorWidth = 20;
+  static const double destinationSelectedIndicatorHeight = 3;
+  static const double destinationSelectedCellRadius = 10;
+  static const double destinationSelectedFillOpacity = .07;
+  static const double destinationSelectedBorderOpacity = .12;
   static const Color destinationCanvas = Color(0xF7F8F9FC);
   static const Color destinationDivider = Color(0x1F12163D);
   static const double switcherWidth = 136;
@@ -1007,7 +1007,7 @@ class MoolDestinationIconLabel extends StatelessWidget {
       context,
     ).scale(1).clamp(1.0, MoolLocalNavigationTokens.maximumTextScale);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 2, 2, 3),
+      padding: const EdgeInsets.fromLTRB(2, 1, 2, 2),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -1030,29 +1030,39 @@ class MoolDestinationIconLabel extends StatelessWidget {
                     ),
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           SizedBox(
+            width: double.infinity,
             height: MoolLocalNavigationTokens.destinationLabelSlotHeight,
             child: Center(
-              child: MediaQuery(
-                data: MediaQuery.of(
-                  context,
-                ).copyWith(textScaler: TextScaler.linear(textScale)),
-                child: Text(
-                  label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: color,
-                    fontFamily: MoolLocalNavigationTokens.destinationFontFamily,
-                    fontSize: MoolLocalNavigationTokens.destinationLabelSize,
-                    height:
-                        MoolLocalNavigationTokens.destinationLabelLineHeight,
-                    fontWeight: emphasized
-                        ? MoolLocalNavigationTokens
-                              .destinationSelectedLabelWeight
-                        : MoolLocalNavigationTokens.destinationLabelWeight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: MediaQuery(
+                    data: MediaQuery.of(
+                      context,
+                    ).copyWith(textScaler: TextScaler.linear(textScale)),
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.clip,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: color,
+                        fontFamily:
+                            MoolLocalNavigationTokens.destinationFontFamily,
+                        fontSize:
+                            MoolLocalNavigationTokens.destinationLabelSize,
+                        height: MoolLocalNavigationTokens
+                            .destinationLabelLineHeight,
+                        fontWeight: emphasized
+                            ? MoolLocalNavigationTokens
+                                  .destinationSelectedLabelWeight
+                            : MoolLocalNavigationTokens.destinationLabelWeight,
+                      ),
+                    ),
                   ),
                 ),
               ),

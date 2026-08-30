@@ -60,7 +60,7 @@ void main() {
             find.byKey(const Key('mool-compact-launcher-white-surface')),
           )
           .color,
-      Colors.white,
+      Colors.transparent,
     );
     expect(
       tester
@@ -68,7 +68,7 @@ void main() {
             find.byKey(const Key('mool-global-chat-white-surface')),
           )
           .color,
-      Colors.white,
+      Colors.transparent,
     );
     expect(tester.getSemantics(mool).rect.height, greaterThanOrEqualTo(44));
     expect(tester.getSemantics(chat).rect.height, greaterThanOrEqualTo(44));

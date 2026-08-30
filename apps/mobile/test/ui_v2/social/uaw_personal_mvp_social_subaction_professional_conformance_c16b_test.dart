@@ -41,7 +41,7 @@ void main() {
               find.byKey(const Key('mool-compact-launcher-white-surface')),
             )
             .color,
-        Colors.white,
+        Colors.transparent,
       );
       expect(
         tester
@@ -49,7 +49,7 @@ void main() {
               find.byKey(const Key('mool-global-chat-white-surface')),
             )
             .color,
-        Colors.white,
+        Colors.transparent,
       );
 
       for (final id in const ['videos', 'shorts', 'create', 'feed']) {

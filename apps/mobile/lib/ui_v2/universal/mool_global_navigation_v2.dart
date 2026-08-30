@@ -626,7 +626,7 @@ class _MoolFamilyRootButton extends StatelessWidget {
                   ),
                   label: family.label,
                   icon: family.icon,
-                  color: selected ? accent : accent.withValues(alpha: .72),
+                  color: selected ? accent : MoolColors.muted,
                   emphasized: selected,
                 ),
                 Positioned(
@@ -1821,10 +1821,12 @@ class _MoolGlobalChatNavigationV2State
           height: MoolLocalNavigationTokens.destinationRailHeight,
           child: Material(
             key: const Key('mool-global-chat-white-surface'),
-            color: Colors.white,
-            elevation: 1,
-            shadowColor: const Color(0x26000050),
-            borderRadius: BorderRadius.circular(14),
+            color: Colors.transparent,
+            elevation: 0,
+            shadowColor: Colors.transparent,
+            borderRadius: BorderRadius.circular(
+              MoolLocalNavigationTokens.destinationSelectedCellRadius,
+            ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               key: const Key('mool-global-chat-tap'),
@@ -1847,8 +1849,8 @@ class _MoolGlobalChatNavigationV2State
                 key: Key('mool-global-chat-icon-label'),
                 label: 'Chat',
                 icon: Icons.chat_bubble_outline_rounded,
-                color: MoolColors.navy,
-                emphasized: true,
+                color: MoolColors.muted,
+                emphasized: false,
               ),
             ),
           ),
@@ -1908,10 +1910,12 @@ class _MoolHomeLauncherState extends State<_MoolHomeLauncher> {
             height: MoolLocalNavigationTokens.destinationRailHeight,
             child: Material(
               key: const Key('mool-compact-launcher-white-surface'),
-              color: Colors.white,
-              elevation: 1,
-              shadowColor: const Color(0x26000050),
-              borderRadius: BorderRadius.circular(14),
+              color: Colors.transparent,
+              elevation: 0,
+              shadowColor: Colors.transparent,
+              borderRadius: BorderRadius.circular(
+                MoolLocalNavigationTokens.destinationSelectedCellRadius,
+              ),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 key: const Key('mool-compact-launcher'),
@@ -1927,12 +1931,14 @@ class _MoolHomeLauncherState extends State<_MoolHomeLauncher> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    const MoolDestinationIconLabel(
+                    MoolDestinationIconLabel(
                       key: Key('mool-compact-launcher-icon-label'),
                       label: 'Mool',
                       icon: Icons.grid_view_rounded,
-                      color: MoolColors.navy,
-                      emphasized: true,
+                      color: widget.expanded
+                          ? MoolColors.navy
+                          : MoolColors.muted,
+                      emphasized: widget.expanded,
                     ),
                     Positioned(
                       bottom: 0,

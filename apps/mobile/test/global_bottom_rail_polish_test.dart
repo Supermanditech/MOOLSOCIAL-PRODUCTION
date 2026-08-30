@@ -14,7 +14,7 @@ void main() {
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
+    tester.view.physicalSize = const Size(360, 800);
     addTearDown(tester.view.reset);
     final opened = <String>[];
     var chatTaps = 0;
@@ -37,11 +37,11 @@ void main() {
               activeId: 'orders',
               actions: [
                 MoolLocalNavigationAction(
-                  keyName: 'rail-shop',
-                  id: 'shop',
-                  label: 'Shop',
-                  icon: Icons.storefront_outlined,
-                  onPressed: () => opened.add('shop'),
+                  keyName: 'rail-wholesale',
+                  id: 'wholesale',
+                  label: 'Wholesale',
+                  icon: Icons.inventory_2_outlined,
+                  onPressed: () => opened.add('wholesale'),
                 ),
                 MoolLocalNavigationAction(
                   keyName: 'rail-orders',
@@ -66,7 +66,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final selections = [
-      for (final id in const ['shop', 'orders', 'offers'])
+      for (final id in const ['wholesale', 'orders', 'offers'])
         find.byKey(ValueKey('moolsocial-local-$id-selection')),
     ];
     final widths = [
@@ -91,13 +91,40 @@ void main() {
       tester
           .getSize(find.byKey(const ValueKey('moolsocial-family-root-buy-tap')))
           .width,
-      for (final key in const ['rail-shop', 'rail-orders', 'rail-offers'])
+      for (final key in const ['rail-wholesale', 'rail-orders', 'rail-offers'])
         tester.getSize(find.byKey(Key(key))).width,
       tester.getSize(find.byKey(const Key('mool-global-chat-tap'))).width,
     ];
     for (final width in fullRailWidths.skip(1)) {
       expect(width, closeTo(fullRailWidths.first, .01));
     }
+    final wholesaleLabel = find.descendant(
+      of: find.byKey(const Key('rail-wholesale')),
+      matching: find.text('Wholesale'),
+    );
+    final wholesaleText = tester.widget<Text>(wholesaleLabel);
+    expect(wholesaleText.maxLines, 1);
+    expect(wholesaleText.softWrap, isFalse);
+    expect(
+      find.ancestor(of: wholesaleLabel, matching: find.byType(FittedBox)),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<Material>(
+            find.byKey(const Key('mool-compact-launcher-white-surface')),
+          )
+          .color,
+      Colors.transparent,
+    );
+    expect(
+      tester
+          .widget<Material>(
+            find.byKey(const Key('mool-global-chat-white-surface')),
+          )
+          .color,
+      Colors.transparent,
+    );
     expect(
       tester
           .getSemantics(find.bySemanticsLabel('Orders, current'))
@@ -106,13 +133,13 @@ void main() {
       Tristate.isTrue,
     );
 
-    for (final key in const ['rail-shop', 'rail-orders', 'rail-offers']) {
+    for (final key in const ['rail-wholesale', 'rail-orders', 'rail-offers']) {
       await tester.tap(find.byKey(Key(key)));
       await tester.pumpAndSettle();
     }
     await tester.tap(find.byKey(const Key('mool-global-chat')));
     await tester.pumpAndSettle();
-    expect(opened, containsAllInOrder(['shop', 'orders', 'offers']));
+    expect(opened, containsAllInOrder(['wholesale', 'orders', 'offers']));
     expect(chatTaps, 1);
     expect(tester.takeException(), isNull);
   });
