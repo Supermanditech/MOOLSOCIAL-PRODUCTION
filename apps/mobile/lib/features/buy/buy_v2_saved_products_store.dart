@@ -34,6 +34,7 @@ class BuyV2CustomerStateSnapshot {
     this.fulfilmentMode,
     this.productSort,
     this.availableOnly = false,
+    this.recentlyViewedProductIds = const [],
   });
 
   final Map<String, int> cartQuantities;
@@ -54,6 +55,7 @@ class BuyV2CustomerStateSnapshot {
   final String? fulfilmentMode;
   final String? productSort;
   final bool availableOnly;
+  final List<String> recentlyViewedProductIds;
 }
 
 abstract interface class BuyV2CustomerStateStore {

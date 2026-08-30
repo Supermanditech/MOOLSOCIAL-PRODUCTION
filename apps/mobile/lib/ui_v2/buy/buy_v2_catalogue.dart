@@ -2808,6 +2808,9 @@ class _ProductGrid extends StatelessWidget {
         final featuredProducts = showPromotions
             ? products.take(6).toList(growable: false)
             : const <BuyV2Product>[];
+        final recentlyViewedProducts = showPromotions
+            ? session.recentlyViewedProductsFor(session.destination)
+            : const <BuyV2Product>[];
         final prescriptionMatches =
             showPromotions && session.destination == BuyV2Destination.medicine
             ? session.matchedPrescriptionProducts
@@ -2824,6 +2827,14 @@ class _ProductGrid extends StatelessWidget {
             if (showPromotions)
               SliverToBoxAdapter(
                 child: _CataloguePromotionRail(session: session),
+              ),
+            if (recentlyViewedProducts.isNotEmpty)
+              SliverToBoxAdapter(
+                child: _RecentlyViewedRail(
+                  session: session,
+                  products: recentlyViewedProducts,
+                  accessibleText: accessibleText,
+                ),
               ),
             if (prescriptionMatches.isNotEmpty)
               SliverToBoxAdapter(
@@ -3793,6 +3804,203 @@ class _FeaturedProductRail extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RecentlyViewedRail extends StatelessWidget {
+  const _RecentlyViewedRail({
+    required this.session,
+    required this.products,
+    required this.accessibleText,
+  });
+
+  final BuyV2Session session;
+  final List<BuyV2Product> products;
+  final bool accessibleText;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      key: const ValueKey('buy-recently-viewed'),
+      height: accessibleText ? 178 : 158,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(9, 2, 4, 2),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Recently viewed',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.buyTitle.copyWith(fontSize: 14),
+                      ),
+                      Text(
+                        'Continue with the exact pack you viewed',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.buyMeta.copyWith(fontSize: 8),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  key: const ValueKey('buy-recently-viewed-clear'),
+                  onPressed: () =>
+                      session.clearRecentlyViewed(session.destination),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(44, 44),
+                    foregroundColor: BuyV2Colors.navy,
+                    textStyle: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  child: const Text('Clear'),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              key: const ValueKey('buy-recently-viewed-list'),
+              padding: const EdgeInsets.fromLTRB(7, 0, 12, 8),
+              scrollDirection: Axis.horizontal,
+              itemCount: products.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) => _RecentlyViewedCard(
+                session: session,
+                product: products[index],
+                accessibleText: accessibleText,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecentlyViewedCard extends StatelessWidget {
+  const _RecentlyViewedCard({
+    required this.session,
+    required this.product,
+    required this.accessibleText,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final bool accessibleText;
+
+  @override
+  Widget build(BuildContext context) {
+    final facts = session.productFactsFor(product);
+    final fulfilmentMode =
+        facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
+    final deliveryPromise = buyV2BuyerDeliveryPromise(facts);
+    return SizedBox(
+      width: accessibleText ? 224 : 206,
+      child: Semantics(
+        button: true,
+        label:
+            '${product.title}, ${product.pack}, ${buyV2Money(facts.price)}, '
+            '${buyV2FulfilmentModeLabel(fulfilmentMode)}, $deliveryPromise',
+        child: Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: BuyV2Colors.line),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: ValueKey('buy-recently-viewed-product-${product.id}'),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              session.openProduct(product.id);
+            },
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 78,
+                  height: double.infinity,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: _productVisualColors(product),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(7),
+                      child: BuyV2ProductPackshot(
+                        key: ValueKey(
+                          'buy-recently-viewed-packshot-${product.id}',
+                        ),
+                        product: product,
+                        borderRadius: 11,
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(9, 7, 8, 7),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: BuyV2Colors.ink,
+                            fontSize: 10,
+                            height: 1.05,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          product.pack,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyMeta.copyWith(fontSize: 8),
+                        ),
+                        const Spacer(),
+                        Text(
+                          buyV2Money(facts.price),
+                          style: const TextStyle(
+                            color: BuyV2Colors.navy,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          '${buyV2CompactFulfilmentModeLabel(fulfilmentMode)} · '
+                          '${_compactDeliveryPromise(deliveryPromise)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: BuyV2Colors.green,
+                            fontSize: 7,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -655,6 +655,7 @@ class BuyV2Session extends ChangeNotifier {
   String? checkoutQuoteMessage;
   final Map<String, int> _tipsByFulfilmentKey = {};
   final Set<String> _savedKeys = {};
+  final List<String> _recentlyViewedProductIds = [];
   String? _savedProductsOwnerScope;
   int _savedProductsMutationRevision = 0;
   String? _customerStateOwnerScope;
@@ -1688,6 +1689,22 @@ class BuyV2Session extends ChangeNotifier {
               .firstOrNull ??
           BuyV2ProductSort.relevance;
       availableProductsOnly = snapshot.availableOnly;
+      final validRecentIds = _catalogueProducts
+          .where(
+            (product) =>
+                product.destination == BuyV2Destination.shop ||
+                product.destination == BuyV2Destination.wholesale,
+          )
+          .map((product) => product.id)
+          .toSet();
+      _recentlyViewedProductIds
+        ..clear()
+        ..addAll(
+          snapshot.recentlyViewedProductIds
+              .where(validRecentIds.contains)
+              .toSet()
+              .take(10),
+        );
       final storedSubmissionState = BuyV2CheckoutSubmissionState.values
           .where((state) => state.name == snapshot.checkoutSubmissionState)
           .firstOrNull;
@@ -1734,6 +1751,7 @@ class BuyV2Session extends ChangeNotifier {
       fulfilmentMode: selectedFulfilmentMode?.name,
       productSort: productSort.name,
       availableOnly: availableProductsOnly,
+      recentlyViewedProductIds: List.unmodifiable(_recentlyViewedProductIds),
     );
     unawaited(
       store
@@ -3025,6 +3043,54 @@ class BuyV2Session extends ChangeNotifier {
     );
   }
 
+  List<BuyV2Product> recentlyViewedProductsFor(
+    BuyV2Destination destination, {
+    int limit = 10,
+  }) {
+    if (limit <= 0 ||
+        (destination != BuyV2Destination.shop &&
+            destination != BuyV2Destination.wholesale)) {
+      return const [];
+    }
+    return List.unmodifiable(
+      _recentlyViewedProductIds
+          .map(findProduct)
+          .whereType<BuyV2Product>()
+          .where((product) => product.destination == destination)
+          .take(limit),
+    );
+  }
+
+  void _recordRecentlyViewed(BuyV2Product product) {
+    if (product.destination != BuyV2Destination.shop &&
+        product.destination != BuyV2Destination.wholesale) {
+      return;
+    }
+    _recentlyViewedProductIds
+      ..remove(product.id)
+      ..insert(0, product.id);
+    if (_recentlyViewedProductIds.length > 10) {
+      _recentlyViewedProductIds.removeRange(
+        10,
+        _recentlyViewedProductIds.length,
+      );
+    }
+    _persistCustomerState();
+  }
+
+  void clearRecentlyViewed(BuyV2Destination destination) {
+    final productIds = _catalogueProducts
+        .where((product) => product.destination == destination)
+        .map((product) => product.id)
+        .toSet();
+    final previousLength = _recentlyViewedProductIds.length;
+    _recentlyViewedProductIds.removeWhere(productIds.contains);
+    if (_recentlyViewedProductIds.length == previousLength) return;
+    notice = 'Recently viewed products cleared.';
+    _persistCustomerState();
+    notifyListeners();
+  }
+
   List<BuyV2Product> productContinuationsFor(
     BuyV2Product current, {
     int limit = 6,
@@ -3495,6 +3561,7 @@ class BuyV2Session extends ChangeNotifier {
     selectedProductId = item.id;
     view = BuyV2View.product;
     notice = null;
+    _recordRecentlyViewed(item);
     _notifyNavigationIfChanged(
       previous,
       BuyV2NavigationMotionDirection.forward,
@@ -3521,6 +3588,7 @@ class BuyV2Session extends ChangeNotifier {
     selectedProductId = next.id;
     destination = next.destination;
     notice = null;
+    _recordRecentlyViewed(next);
     _notifyNavigationIfChanged(
       previous,
       BuyV2NavigationMotionDirection.replace,
