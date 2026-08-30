@@ -234,7 +234,7 @@ class _WorkHero extends StatelessWidget {
     final workspaceReady = session.activeWorkspace?.verified == true;
     return Container(
       key: const Key('work-main-hero'),
-      padding: const EdgeInsets.all(MoolSpacing.lg),
+      padding: const EdgeInsets.all(MoolSpacing.md),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -258,12 +258,12 @@ class _WorkHero extends StatelessWidget {
             color: Color(0xFFFFB547),
             icon: Icons.work_outline_rounded,
           ),
-          const SizedBox(height: MoolSpacing.md),
+          const SizedBox(height: MoolSpacing.sm),
           const Text(
             'Earn, provide services and grow your business',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 24,
+              fontSize: 21,
               height: 1.08,
               fontWeight: FontWeight.w900,
               letterSpacing: -.45,
@@ -279,7 +279,7 @@ class _WorkHero extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: MoolSpacing.md),
+          const SizedBox(height: MoolSpacing.sm),
           Wrap(
             spacing: MoolSpacing.xs,
             runSpacing: MoolSpacing.xs,
@@ -294,7 +294,7 @@ class _WorkHero extends StatelessWidget {
                     : Icons.add_business_outlined,
                 label: workspaceReady
                     ? 'Provider workspace verified'
-                    : 'Provider workspace separate',
+                    : 'Set up provider access',
               ),
             ],
           ),
@@ -311,15 +311,10 @@ class _HeroFact extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(
-      horizontal: MoolSpacing.sm,
+      horizontal: MoolSpacing.xs,
       vertical: MoolSpacing.xs,
-    ),
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: .13),
-      borderRadius: BorderRadius.circular(MoolRadii.capsule),
-      border: Border.all(color: Colors.white.withValues(alpha: .24)),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,

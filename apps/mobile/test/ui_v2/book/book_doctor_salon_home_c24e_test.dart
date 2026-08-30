@@ -175,10 +175,13 @@ void main() {
       await _scrollTo(tester, provider, const Key('doctor-discovery-home'));
       final data = tester.getSemantics(provider).getSemanticsData();
       expect(data.hasAction(SemanticsAction.tap), isTrue);
-      expect(data.label, contains('verified general physician'));
+      expect(data.label, contains('Registration checked at confirmation'));
       expect(data.label, contains('₹300'));
       expect(data.label, contains('12 minute wait'));
       await tester.tap(provider);
+      await tester.pumpAndSettle();
+      expect(sessions.book.selectedDoctorId, 'kavita-sharma');
+      await tester.tap(find.byKey(const Key('book-doctor')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('patient-self')), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -201,20 +204,35 @@ void main() {
     await tester.tap(find.byKey(const Key('doctor-care-video')));
     await tester.pumpAndSettle();
     expect(sessions.book.doctorCare, DoctorCare.video);
-    expect(find.text('Continue with Video'), findsOneWidget);
+    expect(find.text('Choose a doctor above'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.descendant(
+              of: find.byKey(const Key('book-doctor')),
+              matching: find.byType(FilledButton),
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
 
+    sessions.book.selectDoctor('kavita-sharma');
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('book-doctor')));
     await tester.pumpAndSettle();
     expect(
-      find.text('Video · ₹300 · doctor registration verified'),
+      find.text('Video · ₹300 · registration status confirmed before booking'),
       findsOneWidget,
     );
+    expect(find.textContaining('6:20 PM'), findsNothing);
+    expect(find.textContaining('Prescription is already linked'), findsNothing);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('doctor-care-video')), findsOneWidget);
     expect(sessions.book.doctorCare, DoctorCare.video);
-    expect(find.text('Continue with Video'), findsOneWidget);
+    expect(find.text('Review Dr. Kavita · ₹300'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

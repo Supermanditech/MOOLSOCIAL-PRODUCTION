@@ -138,6 +138,7 @@ void main() {
       );
       await tapVisible(tester, const Key('doctor-care-video'));
       await tapVisible(tester, const Key('doctor-need-skin'));
+      await tapVisible(tester, const Key('doctor-top-provider'));
       await tapVisible(tester, const Key('book-doctor'));
       await tapVisible(tester, const Key('patient-mother'));
       await tapVisible(tester, const Key('symptom-cough'));
@@ -196,7 +197,7 @@ void main() {
       await tapVisible(tester, const Key('followup-book-slot'));
       expect(find.byKey(const Key('followup-slot-sheet')), findsOneWidget);
       await tapVisible(tester, const Key('followup-slot-video-today'));
-      expect(book.followUpSlot, 'Video · Today 6:20 PM');
+      expect(book.followUpSlot, 'Video · Next available');
       await tapVisible(tester, const Key('followup-sharing'));
       expect(book.clinicSharing, isFalse);
     },

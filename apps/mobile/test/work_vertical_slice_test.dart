@@ -128,7 +128,6 @@ void main() {
       final (_, work) = await mount(tester, route: '/app/work/earn');
 
       await tapVisible(tester, const Key('work-opportunity-mool-explainer'));
-      await tapVisible(tester, const Key('work-review-mool-explainer'));
       expect(find.byKey(const Key('work-opportunity-screen')), findsOneWidget);
       await tapVisible(tester, const Key('work-term-payment'));
       expect(find.textContaining('₹1,500 is reserved'), findsOneWidget);
@@ -228,7 +227,7 @@ void main() {
       findsOneWidget,
     );
     await tapVisible(tester, const Key('work-refresh-feed'));
-    expect(find.text('Verified work is up to date.'), findsOneWidget);
+    expect(find.text('Work opportunities refreshed.'), findsOneWidget);
   });
 
   testWidgets(

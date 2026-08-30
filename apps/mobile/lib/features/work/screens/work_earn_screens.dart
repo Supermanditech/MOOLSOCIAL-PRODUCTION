@@ -161,6 +161,7 @@ class _OpportunityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return WorkCard(
       keyName: 'work-opportunity-${opportunity.id}',
+      onTap: onReview,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -157,7 +157,7 @@ class WorkSession extends ChangeNotifier {
       final records = await gateway.loadFeed();
       _restoreWorkspaceState(records);
       initialWorkspaceStateLoaded = true;
-    }, success: 'Verified work is up to date.');
+    }, success: 'Work opportunities refreshed.');
   }
 
   Future<void> loadInitialWorkspaceState() async {

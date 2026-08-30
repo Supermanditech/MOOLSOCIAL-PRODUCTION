@@ -138,19 +138,19 @@ class _DoctorBookingScreenState extends State<DoctorBookingScreen> {
                     'General physician · Sardarpura Clinic · ${session.doctorCare.label}',
                 icon: Icons.medical_services_outlined,
                 accent: _accent,
-                emphasized: true,
+                emphasized: session.selectedDoctorId == 'kavita-sharma',
                 metadata: [
                   const MoolServiceMeta(
-                    icon: Icons.verified_rounded,
-                    label: 'Registration verified',
+                    icon: Icons.badge_outlined,
+                    label: 'Registration checked at confirmation',
                   ),
                   MoolServiceMeta(
                     icon: session.appointment == null
                         ? Icons.schedule_rounded
                         : Icons.event_available_rounded,
                     label: session.appointment == null
-                        ? 'Today · 6:20 PM'
-                        : 'Confirmed · 6:20 PM',
+                        ? 'Next available today'
+                        : 'Appointment confirmed',
                   ),
                   const MoolServiceMeta(
                     icon: Icons.timer_outlined,
@@ -166,11 +166,8 @@ class _DoctorBookingScreenState extends State<DoctorBookingScreen> {
                   ),
                 ],
                 semanticLabel:
-                    'Dr. Kavita Sharma, verified general physician, ${session.doctorCare.label}, today at 6:20 PM, ₹300, approximately 12 minute wait',
-                onTap: () {
-                  session.clearMessages();
-                  context.go('/app/book/doctor/details');
-                },
+                    'Dr. Kavita Sharma, general physician, ${session.doctorCare.label}, next available today, ₹300, approximately 12 minute wait. Registration checked at confirmation',
+                onTap: () => session.selectDoctor('kavita-sharma'),
               ),
               const SizedBox(height: MoolSpacing.sm),
               OutlinedButton.icon(
@@ -194,11 +191,15 @@ class _DoctorBookingScreenState extends State<DoctorBookingScreen> {
           key: const Key('book-doctor'),
           accent: _accent,
           icon: Icons.event_available_outlined,
-          label: 'Continue with ${session.doctorCare.label}',
-          onPressed: () {
-            session.clearMessages();
-            context.go('/app/book/doctor/details');
-          },
+          label: session.selectedDoctorId == null
+              ? 'Choose a doctor above'
+              : 'Review Dr. Kavita · ₹300',
+          onPressed: session.selectedDoctorId == null
+              ? null
+              : () {
+                  session.clearMessages();
+                  context.go('/app/book/doctor/details');
+                },
         ),
       ),
     );
@@ -244,10 +245,10 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen> {
             BookCard(
               color: const Color(0xFFF4F3FF),
               child: BookFact(
-                icon: Icons.verified_rounded,
-                title: 'Dr. Kavita Sharma · Today 6:20 PM',
+                icon: Icons.badge_outlined,
+                title: 'Dr. Kavita Sharma · Next available',
                 detail:
-                    '${session.doctorCare.label} · ₹300 · doctor registration verified',
+                    '${session.doctorCare.label} · ₹300 · registration status confirmed before booking',
               ),
             ),
             const SizedBox(height: MoolSpacing.lg),
@@ -309,8 +310,9 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen> {
                 title: session.reportAttached
                     ? 'Lab report attached'
                     : 'Add lab report or photo',
-                detail:
-                    'Prescription is already linked. Reports stay private to this case.',
+                detail: session.prescriptionAttached
+                    ? 'Prescription linked. Reports stay private to this case.'
+                    : 'No prescription linked. Add only the reports needed for this appointment.',
                 trailing: const Icon(Icons.arrow_forward_rounded),
               ),
             ),
@@ -319,7 +321,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen> {
               key: const Key('medical-consent'),
               value: session.medicalConsent,
               onChanged: session.setMedicalConsent,
-              title: const Text('Share with this verified doctor'),
+              title: const Text('Share with this doctor'),
               subtitle: const Text(
                 'Only appointment details and files you choose are shared.',
               ),
@@ -332,7 +334,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen> {
                   icon: Icons.event_available_rounded,
                   title: 'Appointment ${session.appointment!.id} confirmed',
                   detail:
-                      'Today 6:20 PM · ${session.appointment!.care.label} details, cancellation and follow-up remain available',
+                      '${session.appointment!.care.label} details, final time, cancellation and follow-up remain available',
                 ),
               ),
               const SizedBox(height: MoolSpacing.sm),
@@ -814,7 +816,7 @@ Future<void> _showFollowUpSlots(BuildContext context, BookSession session) {
           ),
           const SizedBox(height: MoolSpacing.sm),
           for (final slot in const [
-            ('video-today', 'Video · Today 6:20 PM'),
+            ('video-today', 'Video · Next available'),
             ('clinic-tomorrow', 'Clinic · Tomorrow 10:30 AM'),
             ('video-tomorrow', 'Video · Tomorrow 5:40 PM'),
           ])

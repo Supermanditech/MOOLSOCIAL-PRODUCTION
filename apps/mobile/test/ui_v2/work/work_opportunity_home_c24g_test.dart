@@ -120,19 +120,12 @@ void main() {
       await _scrollTo(tester, card, const Key('work-earn-screen'));
       expect(find.text('₹20 per delivered order'), findsOneWidget);
       expect(find.text('Jodhpur · 4 km'), findsOneWidget);
-      expect(find.text('Ends 21 Jul · 9:00 PM'), findsOneWidget);
+      expect(find.text('Open while 20 funded orders remain'), findsOneWidget);
       expect(find.text('Funded · maximum payout ₹400'), findsOneWidget);
 
-      final review = find.byKey(const Key('work-review-mahadev-orders'));
-      await _scrollTo(tester, review, const Key('work-earn-screen'));
-      expect(tester.getSize(review).height, greaterThanOrEqualTo(48));
-      final semantics = tester
-          .getSemantics(
-            find.descendant(of: review, matching: find.byType(FilledButton)),
-          )
-          .getSemanticsData();
+      final semantics = tester.getSemantics(card).getSemanticsData();
       expect(semantics.hasAction(SemanticsAction.tap), isTrue);
-      await tester.tap(review);
+      await tester.tap(card);
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('work-opportunity-screen')), findsOneWidget);

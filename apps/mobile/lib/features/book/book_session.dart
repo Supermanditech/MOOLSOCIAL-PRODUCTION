@@ -20,10 +20,11 @@ class BookSession extends ChangeNotifier {
 
   DoctorCare doctorCare = DoctorCare.clinic;
   String doctorNeed = 'Fever';
+  String? selectedDoctorId;
   String patient = 'Self';
   int? childAge;
   final Set<String> symptoms = {'Fever'};
-  bool prescriptionAttached = true;
+  bool prescriptionAttached = false;
   bool reportAttached = false;
   bool medicalConsent = false;
   DoctorAppointment? appointment;
@@ -152,7 +153,13 @@ class BookSession extends ChangeNotifier {
   }
 
   void prepareDoctor() {
+    selectedDoctorId = null;
     clearMessages();
+  }
+
+  void selectDoctor(String doctorId) {
+    selectedDoctorId = doctorId;
+    showNotice('Dr. Kavita Sharma selected. Review details before booking.');
   }
 
   void chooseDoctorCare(DoctorCare value) {
@@ -212,7 +219,7 @@ class BookSession extends ChangeNotifier {
       return false;
     }
     if (!medicalConsent) {
-      showError('Allow sharing with this verified doctor to confirm.');
+      showError('Allow sharing with this doctor to confirm.');
       return false;
     }
     busy = true;
@@ -224,7 +231,7 @@ class BookSession extends ChangeNotifier {
         need: symptoms.join(', '),
       );
       noticeMessage =
-          '${appointment!.care.label} appointment ${appointment!.id} confirmed for today at 6:20 PM.';
+          '${appointment!.care.label} appointment ${appointment!.id} confirmed. Review the appointment details for the final time.';
       return true;
     } on BookServiceException catch (error) {
       errorMessage = error.userMessage;
