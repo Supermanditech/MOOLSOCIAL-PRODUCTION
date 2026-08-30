@@ -2050,6 +2050,17 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     );
   }
 
+  void _openFeedChatSection(String section) {
+    FocusScope.of(context).unfocus();
+    HapticFeedback.selectionClick();
+    context.push(
+      Uri(
+        path: '/app/chat/inbox',
+        queryParameters: {'section': section, 'return': '/app/social?sub=feed'},
+      ).toString(),
+    );
+  }
+
   void _handoffContextualChatAction(
     BuyV2ShopChatThread thread,
     BuyV2ShopChatAction action,
@@ -2917,6 +2928,8 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
               ),
           ],
           onCreate: _openCreationGateway,
+          onDiscover: () => _openFeedChatSection('discover'),
+          onStartConversation: () => _openFeedChatSection('chats'),
           onRetry: () {
             if (_feedState != 'empty') {
               setState(() => _feedState = 'empty');
@@ -3659,12 +3672,16 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
     required this.state,
     required this.content,
     required this.onCreate,
+    required this.onDiscover,
+    required this.onStartConversation,
     required this.onRetry,
   });
 
   final String state;
   final List<Widget> content;
   final VoidCallback onCreate;
+  final VoidCallback onDiscover;
+  final VoidCallback onStartConversation;
   final VoidCallback onRetry;
 
   @override
@@ -3837,7 +3854,7 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                     ),
                   ] else ...[
                     const SizedBox(height: 20),
-                    if (state == 'empty')
+                    if (state == 'empty') ...[
                       FilledButton.icon(
                         key: const Key('screen04-feed-create-post'),
                         onPressed: onCreate,
@@ -3846,8 +3863,28 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                         ),
                         icon: const Icon(Icons.add_rounded),
                         label: const Text('Create a post'),
-                      )
-                    else ...[
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        key: const Key('screen04-feed-discover-people'),
+                        onPressed: onDiscover,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                        ),
+                        icon: const Icon(Icons.person_search_outlined),
+                        label: const Text('Discover people'),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        key: const Key('screen04-feed-start-conversation'),
+                        onPressed: onStartConversation,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                        ),
+                        icon: const Icon(Icons.chat_bubble_outline_rounded),
+                        label: const Text('Start a conversation'),
+                      ),
+                    ] else ...[
                       FilledButton.icon(
                         key: const Key('screen04-feed-retry'),
                         onPressed: onRetry,

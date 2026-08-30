@@ -29,6 +29,7 @@ import '../captain/screens/captain_trip_screens.dart';
 import '../chat/chat_models.dart';
 import '../chat/chat_session.dart';
 import '../chat/screens/chat_inbox_screen.dart';
+import '../chat/screens/chat_people_directory.dart';
 import '../chat/screens/chat_thread_screen.dart';
 import '../creator/creator_models.dart';
 import '../creator/creator_session.dart';
@@ -571,6 +572,11 @@ GoRouter createJourneyRouter(
               initialFilter: filter,
               initialTargetUserId: state.uri.queryParameters['start'],
               initialMessageDraft: state.uri.queryParameters['draft'],
+              initialSection: switch (state.uri.queryParameters['section']) {
+                'people' => ChatHomeSection.people,
+                'discover' => ChatHomeSection.discover,
+                _ => ChatHomeSection.chats,
+              },
               returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
             ),
           );
@@ -589,6 +595,11 @@ GoRouter createJourneyRouter(
               initialFilter: filter,
               initialTargetUserId: state.uri.queryParameters['start'],
               initialMessageDraft: state.uri.queryParameters['draft'],
+              initialSection: switch (state.uri.queryParameters['section']) {
+                'people' => ChatHomeSection.people,
+                'discover' => ChatHomeSection.discover,
+                _ => ChatHomeSection.chats,
+              },
               returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
             ),
           );

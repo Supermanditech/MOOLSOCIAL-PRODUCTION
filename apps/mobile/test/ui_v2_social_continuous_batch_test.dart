@@ -439,7 +439,45 @@ void main() {
         find.byKey(const Key('screen04-feed-create-post')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('screen04-feed-discover-people')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('screen04-feed-start-conversation')),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('screen04-quick-post-feed')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('screen04-feed-discover-people')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('chat-section-body-discover')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('screen04-feed-start-conversation')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('chat-section-body-chats')),
+        findsOneWidget,
+      );
+      expect(find.text('All'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
     });
   });
 

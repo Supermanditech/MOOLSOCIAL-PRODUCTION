@@ -24,6 +24,7 @@ class ChatInboxScreen extends StatefulWidget {
     this.initialFilter,
     this.initialTargetUserId,
     this.initialMessageDraft,
+    this.initialSection = ChatHomeSection.chats,
     super.key,
   });
 
@@ -33,6 +34,7 @@ class ChatInboxScreen extends StatefulWidget {
   final ChatThreadType? initialFilter;
   final String? initialTargetUserId;
   final String? initialMessageDraft;
+  final ChatHomeSection initialSection;
 
   @override
   State<ChatInboxScreen> createState() => _ChatInboxScreenState();
@@ -47,7 +49,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   bool _applyingRoute = false;
   bool _loadingPeopleDirectory = false;
   String? _peopleDirectoryError;
-  ChatHomeSection _section = ChatHomeSection.chats;
+  late ChatHomeSection _section;
   bool _publicFeedOpened = false;
 
   ChatEntryContext get _entryContext =>
@@ -58,6 +60,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   @override
   void initState() {
     super.initState();
+    _section = widget.initialSection;
     _searchFocusNode.addListener(_handleSearchFocusChange);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _queueRouteApplication();
@@ -82,7 +85,11 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         oldWidget.initialFilter != widget.initialFilter ||
         oldWidget.initialTargetUserId != widget.initialTargetUserId ||
         oldWidget.initialMessageDraft != widget.initialMessageDraft ||
+        oldWidget.initialSection != widget.initialSection ||
         oldWidget.returnRoute != widget.returnRoute) {
+      if (oldWidget.initialSection != widget.initialSection) {
+        _section = widget.initialSection;
+      }
       _queueRouteApplication();
     }
   }
