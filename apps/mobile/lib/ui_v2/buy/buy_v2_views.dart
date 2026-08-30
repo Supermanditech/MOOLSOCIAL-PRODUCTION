@@ -4973,10 +4973,15 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
     final pending = state == BuyV2CheckoutSubmissionState.paymentPending;
     final unknown = state == BuyV2CheckoutSubmissionState.paymentUnknown;
     final submitting = state == BuyV2CheckoutSubmissionState.submitting;
+    final bankTransfer =
+        session.selectedPayment == 'Bank transfer' &&
+        session.bankTransferInstructions != null;
     final title = switch (state) {
       BuyV2CheckoutSubmissionState.submitting => 'Checking your order',
       BuyV2CheckoutSubmissionState.paymentActionRequired =>
-        'Continue securely to payment',
+        bankTransfer
+            ? 'Transfer to place your order'
+            : 'Continue securely to payment',
       BuyV2CheckoutSubmissionState.paymentPending =>
         'Payment confirmation is pending',
       BuyV2CheckoutSubmissionState.paymentUnknown =>
@@ -4992,7 +4997,9 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
       BuyV2CheckoutSubmissionState.submitting =>
         'Keep this screen open while the latest price, payment and order are confirmed.',
       BuyV2CheckoutSubmissionState.paymentActionRequired =>
-        'Your Cart is reserved for this attempt. Complete payment once, then return here.',
+        bankTransfer
+            ? 'Use the exact amount and reference below. Your Cart stays reserved for this single attempt.'
+            : 'Your Cart is reserved for this attempt. Complete payment once, then return here.',
       BuyV2CheckoutSubmissionState.paymentPending ||
       BuyV2CheckoutSubmissionState.paymentUnknown =>
         'Do not pay again. Check this payment before trying another method.',
@@ -5045,6 +5052,24 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
                   Text(title, style: context.buyBody),
                   const SizedBox(height: 2),
                   Text(detail, style: context.buyMeta),
+                  if (bankTransfer && actionRequired) ...[
+                    const SizedBox(height: 8),
+                    _BankTransferInstructionsCard(
+                      instructions: session.bankTransferInstructions!,
+                      amount: session.checkoutAmountDueNow,
+                    ),
+                  ] else if (bankTransfer && needsCheck) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      'Transfer reference · ${session.paymentReference}',
+                      key: const ValueKey(
+                        'buy-bank-transfer-pending-reference',
+                      ),
+                      style: context.buyMeta.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                   if (!submitting) ...[
                     const SizedBox(height: 9),
                     if (actionRequired)
@@ -5053,7 +5078,9 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
                         height: BuyV2Metrics.minimumTap,
                         child: FilledButton.icon(
                           key: const ValueKey('buy-checkout-continue-payment'),
-                          onPressed: paymentHandoff == null
+                          onPressed: bankTransfer
+                              ? session.markBankTransferSent
+                              : paymentHandoff == null
                               ? () {
                                   if (session.cancelPaymentAttempt()) {
                                     showBuyV2PaymentSheet(context, session);
@@ -5061,13 +5088,15 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
                                 }
                               : () => session.continuePayment(paymentHandoff!),
                           icon: Icon(
-                            paymentHandoff == null
+                            bankTransfer || paymentHandoff == null
                                 ? Icons.swap_horiz_rounded
                                 : Icons.open_in_new_rounded,
                             size: 18,
                           ),
                           label: Text(
-                            paymentHandoff == null
+                            bankTransfer
+                                ? 'I’ve made the transfer'
+                                : paymentHandoff == null
                                 ? 'Choose another method'
                                 : 'Open payment app',
                           ),
@@ -5096,6 +5125,17 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
                         ),
                       ),
                     const SizedBox(height: 4),
+                    if (bankTransfer && actionRequired)
+                      TextButton.icon(
+                        key: const ValueKey('buy-bank-transfer-change-method'),
+                        onPressed: () {
+                          if (session.cancelPaymentAttempt()) {
+                            showBuyV2PaymentSheet(context, session);
+                          }
+                        },
+                        icon: const Icon(Icons.swap_horiz_rounded, size: 17),
+                        label: const Text('Choose another method'),
+                      ),
                     TextButton.icon(
                       key: const ValueKey('buy-checkout-submission-help'),
                       onPressed: session.openAssist,
@@ -5108,6 +5148,80 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _BankTransferInstructionsCard extends StatelessWidget {
+  const _BankTransferInstructionsCard({
+    required this.instructions,
+    required this.amount,
+  });
+
+  final BuyV2BankTransferInstructions instructions;
+  final int amount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey('buy-bank-transfer-instructions'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: buyV2CardDecoration(color: Colors.white, radius: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Transfer details', style: context.buyBody),
+          const SizedBox(height: 5),
+          _BankTransferFact(label: 'Amount', value: buyV2Money(amount)),
+          _BankTransferFact(
+            label: 'Beneficiary',
+            value: instructions.beneficiaryName,
+          ),
+          _BankTransferFact(label: 'Bank', value: instructions.bankName),
+          _BankTransferFact(
+            label: 'Account number',
+            value: instructions.accountNumber,
+          ),
+          _BankTransferFact(label: 'IFSC', value: instructions.ifsc),
+          _BankTransferFact(
+            label: 'Transfer reference',
+            value: instructions.transferReference,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Include the transfer reference exactly. Do not make a second transfer while this one is checked.',
+            style: context.buyMeta,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BankTransferFact extends StatelessWidget {
+  const _BankTransferFact({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 96, child: Text(label, style: context.buyMeta)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: SelectableText(
+              value,
+              style: context.buyMeta.copyWith(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
       ),
     );
   }

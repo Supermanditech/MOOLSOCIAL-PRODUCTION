@@ -122,6 +122,23 @@ enum BuyV2OrderPlacementOutcome {
 enum BuyV2OrderPlacementFailureKind { stockUnavailable, serviceAreaUnavailable }
 
 @immutable
+class BuyV2BankTransferInstructions {
+  const BuyV2BankTransferInstructions({
+    required this.beneficiaryName,
+    required this.bankName,
+    required this.accountNumber,
+    required this.ifsc,
+    required this.transferReference,
+  });
+
+  final String beneficiaryName;
+  final String bankName;
+  final String accountNumber;
+  final String ifsc;
+  final String transferReference;
+}
+
+@immutable
 class BuyV2CommerceSnapshot {
   const BuyV2CommerceSnapshot({
     required this.state,
@@ -181,6 +198,7 @@ class BuyV2OrderPlacementResult {
     this.purchaseReference,
     this.paymentReference,
     this.paymentActionUri,
+    this.bankTransferInstructions,
     this.orders = const [],
     this.failureKind,
     this.affectedProductId,
@@ -191,6 +209,7 @@ class BuyV2OrderPlacementResult {
   final String? purchaseReference;
   final String? paymentReference;
   final Uri? paymentActionUri;
+  final BuyV2BankTransferInstructions? bankTransferInstructions;
   final List<BuyV2Order> orders;
   final BuyV2OrderPlacementFailureKind? failureKind;
   final String? affectedProductId;

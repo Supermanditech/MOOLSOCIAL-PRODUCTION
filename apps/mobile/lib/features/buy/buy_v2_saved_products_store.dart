@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'buy_v2_content_contracts.dart';
 import 'buy_v2_models.dart';
 
 abstract interface class BuyV2SavedProductsStore {
@@ -24,6 +25,7 @@ class BuyV2CustomerStateSnapshot {
     this.checkoutIdempotencyKey,
     this.paymentReference,
     this.paymentActionUri,
+    this.bankTransferInstructions,
     this.checkoutSubmissionState,
   });
 
@@ -36,6 +38,7 @@ class BuyV2CustomerStateSnapshot {
   final String? checkoutIdempotencyKey;
   final String? paymentReference;
   final Uri? paymentActionUri;
+  final BuyV2BankTransferInstructions? bankTransferInstructions;
   final String? checkoutSubmissionState;
 }
 

@@ -201,20 +201,41 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
   @override
   Future<BuyV2OrderPlacementResult> placeOrder(
     BuyV2OrderPlacementRequest request,
-  ) async => BuyV2OrderPlacementResult(
-    outcome: BuyV2OrderPlacementOutcome.confirmed,
-    customerMessage: 'Your order is confirmed.',
-    purchaseReference:
-        'MS-${DateTime.now().microsecondsSinceEpoch.toString().substring(8)}',
-  );
+  ) async {
+    final reference =
+        'BT-${DateTime.now().microsecondsSinceEpoch.toString().substring(8)}';
+    if (request.paymentMethod == 'Bank transfer') {
+      return BuyV2OrderPlacementResult(
+        outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
+        customerMessage:
+            'Transfer the exact amount once, then return here to check it.',
+        paymentReference: reference,
+        bankTransferInstructions: BuyV2BankTransferInstructions(
+          beneficiaryName: 'MoolSocial Shop Payments',
+          bankName: 'MoolSocial Payments Bank',
+          accountNumber: '000000004821',
+          ifsc: 'MOOL0000482',
+          transferReference: reference,
+        ),
+      );
+    }
+    return BuyV2OrderPlacementResult(
+      outcome: BuyV2OrderPlacementOutcome.confirmed,
+      customerMessage: 'Your order is confirmed.',
+      purchaseReference:
+          'MS-${DateTime.now().microsecondsSinceEpoch.toString().substring(8)}',
+    );
+  }
 
   @override
   Future<BuyV2OrderPlacementResult> reconcileOrder({
     required String idempotencyKey,
     required String paymentReference,
-  }) async => const BuyV2OrderPlacementResult(
-    outcome: BuyV2OrderPlacementOutcome.paymentUnknown,
-    customerMessage: 'Payment status could not be confirmed yet.',
+  }) async => BuyV2OrderPlacementResult(
+    outcome: BuyV2OrderPlacementOutcome.paymentPending,
+    customerMessage:
+        'Your transfer is still being checked. Do not transfer again.',
+    paymentReference: paymentReference,
   );
 
   @override
@@ -359,11 +380,14 @@ class BuyV2Session extends ChangeNotifier {
   String? _checkoutIdempotencyKey;
   String? _paymentReference;
   Uri? _paymentActionUri;
+  BuyV2BankTransferInstructions? _bankTransferInstructions;
   int _checkoutAttemptSequence = 0;
 
   String? get checkoutIdempotencyKey => _checkoutIdempotencyKey;
   String? get paymentReference => _paymentReference;
   Uri? get paymentActionUri => _paymentActionUri;
+  BuyV2BankTransferInstructions? get bankTransferInstructions =>
+      _bankTransferInstructions;
 
   bool get catalogueAvailable =>
       commerceLoadState == BuyV2CommerceLoadState.ready;
@@ -1471,6 +1495,7 @@ class BuyV2Session extends ChangeNotifier {
       _checkoutIdempotencyKey = snapshot.checkoutIdempotencyKey;
       _paymentReference = snapshot.paymentReference;
       _paymentActionUri = snapshot.paymentActionUri;
+      _bankTransferInstructions = snapshot.bankTransferInstructions;
       final storedSubmissionState = BuyV2CheckoutSubmissionState.values
           .where((state) => state.name == snapshot.checkoutSubmissionState)
           .firstOrNull;
@@ -1508,6 +1533,7 @@ class BuyV2Session extends ChangeNotifier {
       checkoutIdempotencyKey: _checkoutIdempotencyKey,
       paymentReference: _paymentReference,
       paymentActionUri: _paymentActionUri,
+      bankTransferInstructions: _bankTransferInstructions,
       checkoutSubmissionState: checkoutSubmissionState.name,
     );
     unawaited(
@@ -3961,6 +3987,9 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> submitOrder() {
+    if (reviewDataEnabled && selectedPayment == 'Bank transfer') {
+      return _submitOrderAsync();
+    }
     if (reviewDataEnabled) {
       if ((liveCartBenefitsEnabled && _hasSelectedCartBenefitReference) ||
           checkoutQuoteEnabled ||
@@ -4200,6 +4229,8 @@ class BuyV2Session extends ChangeNotifier {
   }) {
     _paymentReference = placement.paymentReference ?? _paymentReference;
     _paymentActionUri = placement.paymentActionUri;
+    _bankTransferInstructions =
+        placement.bankTransferInstructions ?? _bankTransferInstructions;
     if (placement.outcome != BuyV2OrderPlacementOutcome.confirmed &&
         _openPlacementRecovery(placement, lines)) {
       return false;
@@ -4207,7 +4238,8 @@ class BuyV2Session extends ChangeNotifier {
     if (placement.outcome != BuyV2OrderPlacementOutcome.confirmed) {
       checkoutSubmissionState = switch (placement.outcome) {
         BuyV2OrderPlacementOutcome.paymentActionRequired
-            when _validPaymentAction(placement) =>
+            when _validPaymentAction(placement) ||
+                _validBankTransferAction(placement) =>
           BuyV2CheckoutSubmissionState.paymentActionRequired,
         BuyV2OrderPlacementOutcome.paymentActionRequired =>
           BuyV2CheckoutSubmissionState.failed,
@@ -4230,6 +4262,7 @@ class BuyV2Session extends ChangeNotifier {
         _checkoutIdempotencyKey = null;
         _paymentReference = null;
         _paymentActionUri = null;
+        _bankTransferInstructions = null;
       }
       notice = placement.customerMessage;
       _persistCustomerState();
@@ -4297,6 +4330,7 @@ class BuyV2Session extends ChangeNotifier {
     _checkoutIdempotencyKey = null;
     _paymentReference = null;
     _paymentActionUri = null;
+    _bankTransferInstructions = null;
     _persistCustomerState();
   }
 
@@ -4308,6 +4342,37 @@ class BuyV2Session extends ChangeNotifier {
         uri.host.isNotEmpty &&
         reference != null &&
         reference.isNotEmpty;
+  }
+
+  bool _validBankTransferAction(BuyV2OrderPlacementResult placement) {
+    final instructions = placement.bankTransferInstructions;
+    final reference = placement.paymentReference?.trim();
+    return selectedPayment == 'Bank transfer' &&
+        instructions != null &&
+        instructions.beneficiaryName.trim().isNotEmpty &&
+        instructions.bankName.trim().isNotEmpty &&
+        instructions.accountNumber.trim().isNotEmpty &&
+        instructions.ifsc.trim().isNotEmpty &&
+        instructions.transferReference.trim().isNotEmpty &&
+        reference != null &&
+        reference.isNotEmpty &&
+        instructions.transferReference == reference;
+  }
+
+  bool markBankTransferSent() {
+    if (checkoutBusy ||
+        selectedPayment != 'Bank transfer' ||
+        checkoutSubmissionState !=
+            BuyV2CheckoutSubmissionState.paymentActionRequired ||
+        _bankTransferInstructions == null ||
+        _paymentReference == null) {
+      return false;
+    }
+    checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentPending;
+    notice = 'Transfer submitted for checking. Do not transfer again.';
+    _persistCustomerState();
+    notifyListeners();
+    return true;
   }
 
   Future<bool> continuePayment(BuyV2PaymentHandoff handoff) async {
@@ -4389,6 +4454,7 @@ class BuyV2Session extends ChangeNotifier {
     _checkoutIdempotencyKey = null;
     _paymentReference = null;
     _paymentActionUri = null;
+    _bankTransferInstructions = null;
     notice = 'Payment cancelled. Your Cart has not changed.';
     _persistCustomerState();
     notifyListeners();
@@ -4419,6 +4485,7 @@ class BuyV2Session extends ChangeNotifier {
     _checkoutIdempotencyKey = null;
     _paymentReference = null;
     _paymentActionUri = null;
+    _bankTransferInstructions = null;
     notice = null;
     _clearCheckoutPromiseSnapshot();
     _persistCustomerState();
