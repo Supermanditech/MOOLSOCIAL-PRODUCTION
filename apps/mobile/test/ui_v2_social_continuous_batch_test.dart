@@ -452,7 +452,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('Public posts chosen for relevance'), findsOneWidget);
+      expect(find.text('Relevant public posts'), findsOneWidget);
       expect(find.text('No posts yet'), findsOneWidget);
       expect(
         find.byKey(const Key('screen04-feed-create-post')),

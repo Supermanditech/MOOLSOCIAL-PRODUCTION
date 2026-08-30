@@ -372,7 +372,13 @@ void main() {
       await tester.ensureVisible(field);
       await tester.enterText(field, 'Keep this reply through sign-in');
       final submit = find.byKey(Key('social-reply-submit-${item.id}'));
-      await tester.ensureVisible(submit);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getBottomRight(submit).dy,
+        lessThanOrEqualTo(544),
+        reason: 'The reply action must stay above a 300dp keyboard.',
+      );
       await tester.tap(submit);
       await tester.pump();
 

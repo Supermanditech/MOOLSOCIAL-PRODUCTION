@@ -4416,8 +4416,7 @@ class _MoolSocialFeedStatusView extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       switch (mode) {
-                        _MoolSocialFeedMode.forYou =>
-                          'Public posts chosen for relevance',
+                        _MoolSocialFeedMode.forYou => 'Relevant public posts',
                         _MoolSocialFeedMode.following =>
                           'Public posts from people you follow',
                         _MoolSocialFeedMode.latest =>
@@ -7379,6 +7378,8 @@ class _SocialCommentsPanelV2 extends StatefulWidget {
 
 class _SocialCommentsPanelV2State extends State<_SocialCommentsPanelV2> {
   late final TextEditingController _replyController;
+  late final FocusNode _replyFocusNode;
+  final GlobalKey _replySubmitRevealKey = GlobalKey();
 
   @override
   void initState() {
@@ -7386,6 +7387,7 @@ class _SocialCommentsPanelV2State extends State<_SocialCommentsPanelV2> {
     _replyController = TextEditingController(
       text: widget.session.socialReplyDraft(widget.item.id),
     )..addListener(_saveDraft);
+    _replyFocusNode = FocusNode()..addListener(_handleReplyFocus);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !widget.session.socialCommentsLoaded(widget.item.id)) {
         unawaited(
@@ -7399,10 +7401,34 @@ class _SocialCommentsPanelV2State extends State<_SocialCommentsPanelV2> {
     widget.session.saveSocialReplyDraft(widget.item.id, _replyController.text);
   }
 
+  void _handleReplyFocus() {
+    if (!_replyFocusNode.hasFocus) return;
+    Future<void>.delayed(const Duration(milliseconds: 280), () {
+      final submitContext = _replySubmitRevealKey.currentContext;
+      if (submitContext == null ||
+          !submitContext.mounted ||
+          !_replyFocusNode.hasFocus) {
+        return;
+      }
+      final scrollable = Scrollable.maybeOf(submitContext);
+      if (scrollable == null) return;
+      unawaited(
+        scrollable.position.animateTo(
+          scrollable.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        ),
+      );
+    });
+  }
+
   @override
   void dispose() {
     _replyController.removeListener(_saveDraft);
     _replyController.dispose();
+    _replyFocusNode
+      ..removeListener(_handleReplyFocus)
+      ..dispose();
     super.dispose();
   }
 
@@ -7506,29 +7532,37 @@ class _SocialCommentsPanelV2State extends State<_SocialCommentsPanelV2> {
             TextField(
               key: Key('social-reply-field-$postId'),
               controller: _replyController,
+              focusNode: _replyFocusNode,
               minLines: 2,
               maxLines: 4,
               maxLength: 500,
+              scrollPadding: const EdgeInsets.only(bottom: 168),
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
                 labelText: 'Write a public reply',
                 hintText: 'Keep the conversation useful and respectful',
               ),
             ),
-            FilledButton.icon(
-              key: Key('social-reply-submit-$postId'),
-              onPressed: posting ? null : _submit,
-              icon: Icon(
-                widget.authenticated ? Icons.send_rounded : Icons.login_rounded,
-              ),
-              label: Text(
-                posting
-                    ? 'Posting…'
-                    : widget.authenticated
-                    ? 'Post reply'
-                    : 'Sign in to reply',
+            KeyedSubtree(
+              key: _replySubmitRevealKey,
+              child: FilledButton.icon(
+                key: Key('social-reply-submit-$postId'),
+                onPressed: posting ? null : _submit,
+                icon: Icon(
+                  widget.authenticated
+                      ? Icons.send_rounded
+                      : Icons.login_rounded,
+                ),
+                label: Text(
+                  posting
+                      ? 'Posting…'
+                      : widget.authenticated
+                      ? 'Post reply'
+                      : 'Sign in to reply',
+                ),
               ),
             ),
+            const SizedBox(height: 72),
           ],
         );
       },
