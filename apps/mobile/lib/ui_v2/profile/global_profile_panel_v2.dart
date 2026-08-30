@@ -313,9 +313,7 @@ class GlobalProfilePanelV2 extends StatelessWidget {
     );
     const exportedTargetOverflow = 14.0;
     final exportedBottomClearance = math.max(
-      defaultTargetPlatform == TargetPlatform.android
-          ? 24.0
-          : viewPadding.bottom,
+      24.0,
       math.max(
         viewPadding.bottom,
         defaultTargetPlatform == TargetPlatform.android

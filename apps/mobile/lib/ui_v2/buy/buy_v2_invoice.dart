@@ -102,9 +102,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
       view.devicePixelRatio,
     );
     final exportedBottomClearance = math.max(
-      defaultTargetPlatform == TargetPlatform.android
-          ? 36.0
-          : viewPadding.bottom,
+      36.0,
       math.max(
         viewPadding.bottom,
         moolAndroidExportedSemanticsClearance(
