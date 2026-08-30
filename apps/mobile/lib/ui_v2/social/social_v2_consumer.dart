@@ -4465,43 +4465,63 @@ class _YouTubeSearchSurface extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: switch ((loading, error, hasSubmittedQuery, results)) {
-              (true, _, _, _) => const _YouTubeSearchStatus(
-                key: Key('screen04-youtube-search-loading'),
-                icon: Icons.search_rounded,
-                title: 'Searching YouTube',
-                loading: true,
-              ),
-              (false, final failure?, _, _) => _YouTubeSearchStatus(
-                key: const Key('screen04-youtube-search-error'),
-                icon: Icons.wifi_off_rounded,
-                title: 'Search couldn’t load',
-                detail: failure,
-                actionLabel: 'Try again',
-                onAction: onRetry,
-              ),
-              (false, null, true, []) => const _YouTubeSearchStatus(
-                key: Key('screen04-youtube-search-empty'),
-                icon: Icons.search_off_rounded,
-                title: 'No results',
-                detail: 'Try a different search.',
-              ),
-              (false, null, true, final searchResults) => ListView.builder(
-                key: const Key('screen04-youtube-search-results'),
-                controller: resultsController,
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.only(bottom: 16),
-                itemCount: searchResults.length,
-                itemBuilder: (context, index) {
-                  final video = searchResults[index];
-                  return _VideoCard(data: video, onTap: () => onVideo(video));
-                },
-              ),
-              _ => const SizedBox.expand(
-                key: Key('screen04-youtube-search-ready'),
-              ),
-            },
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, _) {
+                final draftQuery = value.text.trim();
+                return switch ((loading, error, hasSubmittedQuery, results)) {
+                  (true, _, _, _) => const _YouTubeSearchStatus(
+                    key: Key('screen04-youtube-search-loading'),
+                    icon: Icons.search_rounded,
+                    title: 'Searching YouTube',
+                    loading: true,
+                  ),
+                  (false, final failure?, _, _) => _YouTubeSearchStatus(
+                    key: const Key('screen04-youtube-search-error'),
+                    icon: Icons.wifi_off_rounded,
+                    title: 'Search couldn’t load',
+                    detail: failure,
+                    actionLabel: 'Try again',
+                    onAction: onRetry,
+                  ),
+                  (false, null, true, []) => const _YouTubeSearchStatus(
+                    key: Key('screen04-youtube-search-empty'),
+                    icon: Icons.search_off_rounded,
+                    title: 'No results',
+                    detail: 'Try a different search.',
+                  ),
+                  (false, null, true, final searchResults) => ListView.builder(
+                    key: const Key('screen04-youtube-search-results'),
+                    controller: resultsController,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.only(bottom: 16),
+                    itemCount: searchResults.length,
+                    itemBuilder: (context, index) {
+                      final video = searchResults[index];
+                      return _VideoCard(
+                        data: video,
+                        onTap: () => onVideo(video),
+                      );
+                    },
+                  ),
+                  _ when draftQuery.isNotEmpty => _YouTubeSearchStatus(
+                    key: const Key('screen04-youtube-search-draft-ready'),
+                    icon: Icons.search_rounded,
+                    title: 'Ready to search',
+                    detail: 'Press Search on the keyboard or continue below.',
+                    actionLabel: 'Search now',
+                    onAction: () => onSubmitted(draftQuery),
+                  ),
+                  _ => const _YouTubeSearchStatus(
+                    key: Key('screen04-youtube-search-prompt'),
+                    icon: Icons.search_rounded,
+                    title: 'Search YouTube',
+                    detail: 'Type a topic, creator or video title.',
+                  ),
+                };
+              },
+            ),
           ),
         ],
       ),

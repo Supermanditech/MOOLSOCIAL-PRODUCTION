@@ -62,6 +62,13 @@ void main() {
       await tester.pump();
 
       await tester.enterText(input, '  India news  ');
+      await tester.pump();
+      expect(
+        find.byKey(const Key('screen04-youtube-search-draft-ready')),
+        findsOneWidget,
+      );
+      expect(find.text('Ready to search'), findsOneWidget);
+      expect(find.text('Search now'), findsOneWidget);
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pump();
 
