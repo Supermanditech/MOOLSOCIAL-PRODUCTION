@@ -1303,6 +1303,10 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2Destination.orders => 'all',
   };
 
+  BuyV2FulfilmentMode fulfilmentModeFor(BuyV2Product product) =>
+      productFactsFor(product).fulfilmentMode ??
+      buyV2CatalogueFulfilmentModeFor(product);
+
   List<BuyV2Product> get visibleProducts {
     final normalized = query.trim().toLowerCase();
     final filterDestination = destination == BuyV2Destination.orders
@@ -1356,6 +1360,12 @@ class BuyV2Session extends ChangeNotifier {
           product.destination == BuyV2Destination.wholesale &&
               product.minimumOrder <= 2,
         'returns' => product.returnPolicy != null,
+        'quick-local' =>
+          fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal,
+        'standard-courier' =>
+          fulfilmentModeFor(product) == BuyV2FulfilmentMode.standardCourier,
+        'bulk-freight' =>
+          fulfilmentModeFor(product) == BuyV2FulfilmentMode.bulkFreight,
         'rx' => product.requiresPrescription,
         'otc' => !product.requiresPrescription,
         _ => true,
@@ -2954,7 +2964,15 @@ class BuyV2Session extends ChangeNotifier {
         (snapshot.deliveryProviderName == null ||
             snapshot.deliveryProviderName!.trim().isNotEmpty) &&
         (snapshot.deliveryServiceLevel == null ||
-            snapshot.deliveryServiceLevel!.trim().isNotEmpty);
+            snapshot.deliveryServiceLevel!.trim().isNotEmpty) &&
+        (snapshot.nextOpeningLabel == null ||
+            snapshot.nextOpeningLabel!.trim().isNotEmpty) &&
+        (snapshot.orderCutoffLabel == null ||
+            snapshot.orderCutoffLabel!.trim().isNotEmpty) &&
+        (snapshot.deliveryFeeLabel == null ||
+            snapshot.deliveryFeeLabel!.trim().isNotEmpty) &&
+        (snapshot.storeOperatingState != BuyV2StoreOperatingState.closed ||
+            snapshot.nextOpeningLabel?.trim().isNotEmpty == true);
   }
 
   BuyV2SponsoredContent? sponsoredContentFor(

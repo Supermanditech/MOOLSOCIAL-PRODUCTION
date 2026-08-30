@@ -3,6 +3,22 @@ import 'package:flutter/foundation.dart';
 import 'buy_v2_cart_contracts.dart';
 import 'buy_v2_models.dart';
 
+enum BuyV2FulfilmentMode { quickLocal, standardCourier, bulkFreight }
+
+enum BuyV2StoreOperatingState { unknown, open, closed }
+
+BuyV2FulfilmentMode buyV2CatalogueFulfilmentModeFor(BuyV2Product product) {
+  if (product.destination == BuyV2Destination.wholesale) {
+    return BuyV2FulfilmentMode.bulkFreight;
+  }
+  final promise = product.deliveryPromise.toLowerCase();
+  if (product.destination == BuyV2Destination.shop &&
+      RegExp(r'\d+\s*(?:min|minute)').hasMatch(promise)) {
+    return BuyV2FulfilmentMode.quickLocal;
+  }
+  return BuyV2FulfilmentMode.standardCourier;
+}
+
 @immutable
 class BuyV2ProductFactsSnapshot {
   const BuyV2ProductFactsSnapshot({
@@ -16,6 +32,11 @@ class BuyV2ProductFactsSnapshot {
     this.dispatchPromise,
     this.deliveryProviderName,
     this.deliveryServiceLevel,
+    this.fulfilmentMode,
+    this.storeOperatingState = BuyV2StoreOperatingState.unknown,
+    this.nextOpeningLabel,
+    this.orderCutoffLabel,
+    this.deliveryFeeLabel,
     this.observedAt,
     this.stale = false,
   }) : assert(
@@ -33,6 +54,11 @@ class BuyV2ProductFactsSnapshot {
   final String? dispatchPromise;
   final String? deliveryProviderName;
   final String? deliveryServiceLevel;
+  final BuyV2FulfilmentMode? fulfilmentMode;
+  final BuyV2StoreOperatingState storeOperatingState;
+  final String? nextOpeningLabel;
+  final String? orderCutoffLabel;
+  final String? deliveryFeeLabel;
   final DateTime? observedAt;
   final bool stale;
 
@@ -48,6 +74,11 @@ class BuyV2ProductFactsSnapshot {
     String? dispatchPromise,
     String? deliveryProviderName,
     String? deliveryServiceLevel,
+    BuyV2FulfilmentMode? fulfilmentMode,
+    BuyV2StoreOperatingState? storeOperatingState,
+    String? nextOpeningLabel,
+    String? orderCutoffLabel,
+    String? deliveryFeeLabel,
     DateTime? observedAt,
     bool? stale,
   }) {
@@ -62,6 +93,11 @@ class BuyV2ProductFactsSnapshot {
       dispatchPromise: dispatchPromise ?? this.dispatchPromise,
       deliveryProviderName: deliveryProviderName ?? this.deliveryProviderName,
       deliveryServiceLevel: deliveryServiceLevel ?? this.deliveryServiceLevel,
+      fulfilmentMode: fulfilmentMode ?? this.fulfilmentMode,
+      storeOperatingState: storeOperatingState ?? this.storeOperatingState,
+      nextOpeningLabel: nextOpeningLabel ?? this.nextOpeningLabel,
+      orderCutoffLabel: orderCutoffLabel ?? this.orderCutoffLabel,
+      deliveryFeeLabel: deliveryFeeLabel ?? this.deliveryFeeLabel,
       observedAt: observedAt ?? this.observedAt,
       stale: stale ?? this.stale,
     );
@@ -80,6 +116,11 @@ class BuyV2ProductFactsSnapshot {
         other.dispatchPromise == dispatchPromise &&
         other.deliveryProviderName == deliveryProviderName &&
         other.deliveryServiceLevel == deliveryServiceLevel &&
+        other.fulfilmentMode == fulfilmentMode &&
+        other.storeOperatingState == storeOperatingState &&
+        other.nextOpeningLabel == nextOpeningLabel &&
+        other.orderCutoffLabel == orderCutoffLabel &&
+        other.deliveryFeeLabel == deliveryFeeLabel &&
         other.observedAt == observedAt &&
         other.stale == stale;
   }
@@ -96,6 +137,11 @@ class BuyV2ProductFactsSnapshot {
     dispatchPromise,
     deliveryProviderName,
     deliveryServiceLevel,
+    fulfilmentMode,
+    storeOperatingState,
+    nextOpeningLabel,
+    orderCutoffLabel,
+    deliveryFeeLabel,
     observedAt,
     stale,
   );
@@ -556,6 +602,7 @@ final class BuyV2CatalogueProductFactsAdapter
           ? 'Prescription required'
           : 'Available to add',
       sourceId: 'approved-buy-catalogue',
+      fulfilmentMode: buyV2CatalogueFulfilmentModeFor(product),
     );
   }
 }

@@ -2108,6 +2108,8 @@ List<(String, String)> _filterOptionsFor(BuyV2Destination destination) =>
         ('any', 'Any delivery time'),
         ('fast', 'Fast delivery'),
         ('today', 'Delivered today'),
+        ('quick-local', 'Quick local delivery'),
+        ('standard-courier', 'Standard/courier delivery'),
         ('lowest', 'Lowest delivered price'),
         ('nearby', 'Nearby sellers'),
         ('returns', 'Easy returns'),
@@ -2116,6 +2118,7 @@ List<(String, String)> _filterOptionsFor(BuyV2Destination destination) =>
         ('any', 'Any delivery schedule'),
         ('fast', 'Fastest delivery'),
         ('two-days', 'Within two days'),
+        ('bulk-freight', 'Bulk freight'),
         ('lowest', 'Lowest landed price'),
         ('freight', 'Freight included'),
         ('moq', 'Flexible MOQ'),
@@ -3845,6 +3848,8 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
     final session = widget.session;
     final product = widget.product;
     final facts = session.productFactsFor(product);
+    final fulfilmentMode =
+        facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
     final automaticFulfilment =
         product.destination == BuyV2Destination.shop ||
         product.destination == BuyV2Destination.wholesale;
@@ -3869,6 +3874,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
         child: Semantics(
           label:
               '${product.title}, ${product.pack}, ${buyV2Money(facts.price)}, '
+              '${buyV2FulfilmentModeLabel(fulfilmentMode)}, '
               '$buyerPromise${automaticFulfilment ? ', MoolSocial price, ${offerDecision!.statusLabel}' : ', fulfilled by ${facts.partner}'}',
           button: true,
           child: Material(
@@ -3962,7 +3968,8 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                                 Expanded(
                                   child: Text(
                                     automaticFulfilment
-                                        ? _compactDeliveryPromise(buyerPromise)
+                                        ? '${buyV2CompactFulfilmentModeLabel(fulfilmentMode)} · '
+                                              '${_compactDeliveryPromise(buyerPromise)}'
                                         : '${facts.partner} · '
                                               '${_compactDeliveryPromise(facts.deliveryPromise)}',
                                     maxLines: 1,
@@ -4190,6 +4197,8 @@ class BuyV2ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final facts = session.productFactsFor(product);
+    final fulfilmentMode =
+        facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
     final automaticFulfilment =
         product.destination == BuyV2Destination.shop ||
         product.destination == BuyV2Destination.wholesale;
@@ -4210,6 +4219,7 @@ class BuyV2ProductCard extends StatelessWidget {
       child: Semantics(
         label:
             '${product.title}, ${product.pack}, ${buyV2Money(facts.price)}, '
+            '${buyV2FulfilmentModeLabel(fulfilmentMode)}, '
             '$buyerPromise${automaticFulfilment ? ', MoolSocial price, ${offerDecision!.statusLabel}' : ', fulfilled by ${facts.partner}'}',
         button: true,
         child: InkWell(
@@ -4357,9 +4367,8 @@ class BuyV2ProductCard extends StatelessWidget {
                                               ? requiresOfferReview
                                                     ? offerDecision!.statusLabel
                                                     : automaticFulfilment
-                                                    ? _compactDeliveryPromise(
-                                                        buyerPromise,
-                                                      )
+                                                    ? '${buyV2CompactFulfilmentModeLabel(fulfilmentMode)} · '
+                                                          '${_compactDeliveryPromise(buyerPromise)}'
                                                     : '${facts.partner} · '
                                                           '${_compactDeliveryPromise(facts.deliveryPromise)}'
                                               : buyerPromise,

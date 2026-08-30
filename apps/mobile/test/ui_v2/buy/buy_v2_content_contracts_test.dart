@@ -41,8 +41,38 @@ void main() {
       expect(facts.deliveryPromise, product.deliveryPromise);
       expect(facts.partner, product.seller);
       expect(facts.sourceId, 'approved-buy-catalogue');
+      expect(facts.fulfilmentMode, BuyV2FulfilmentMode.quickLocal);
       expect(facts.isLive, isFalse);
       expect(facts.stale, isFalse);
+    });
+
+    test('catalogue fulfilment modes remain contextual and explicit', () {
+      final shopQuick = BuyV2Catalogue.products.firstWhere(
+        (product) =>
+            product.destination == BuyV2Destination.shop &&
+            product.deliveryPromise.contains('min'),
+      );
+      final shopScheduled = BuyV2Catalogue.products.firstWhere(
+        (product) =>
+            product.destination == BuyV2Destination.shop &&
+            !product.deliveryPromise.contains('min'),
+      );
+      final wholesale = BuyV2Catalogue.products.firstWhere(
+        (product) => product.destination == BuyV2Destination.wholesale,
+      );
+
+      expect(
+        buyV2CatalogueFulfilmentModeFor(shopQuick),
+        BuyV2FulfilmentMode.quickLocal,
+      );
+      expect(
+        buyV2CatalogueFulfilmentModeFor(shopScheduled),
+        BuyV2FulfilmentMode.standardCourier,
+      );
+      expect(
+        buyV2CatalogueFulfilmentModeFor(wholesale),
+        BuyV2FulfilmentMode.bulkFreight,
+      );
     });
 
     test('replaceable product facts require source and observed time', () {

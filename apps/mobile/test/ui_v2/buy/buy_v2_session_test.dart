@@ -1078,10 +1078,19 @@ void main() {
 
     test('every destination filter returns a real matching catalogue', () {
       const filters = {
-        BuyV2Destination.shop: ['fast', 'today', 'lowest', 'nearby', 'returns'],
+        BuyV2Destination.shop: [
+          'fast',
+          'today',
+          'quick-local',
+          'standard-courier',
+          'lowest',
+          'nearby',
+          'returns',
+        ],
         BuyV2Destination.wholesale: [
           'fast',
           'two-days',
+          'bulk-freight',
           'lowest',
           'freight',
           'moq',

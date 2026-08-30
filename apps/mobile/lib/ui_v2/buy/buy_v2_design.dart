@@ -76,6 +76,19 @@ String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
       BuyV2Destination.orders => 'Mool Fulfilment Partner',
     };
 
+String buyV2FulfilmentModeLabel(BuyV2FulfilmentMode mode) => switch (mode) {
+  BuyV2FulfilmentMode.quickLocal => 'Quick local delivery',
+  BuyV2FulfilmentMode.standardCourier => 'Standard/courier delivery',
+  BuyV2FulfilmentMode.bulkFreight => 'Bulk freight',
+};
+
+String buyV2CompactFulfilmentModeLabel(BuyV2FulfilmentMode mode) =>
+    switch (mode) {
+      BuyV2FulfilmentMode.quickLocal => 'Quick local',
+      BuyV2FulfilmentMode.standardCourier => 'Courier',
+      BuyV2FulfilmentMode.bulkFreight => 'Bulk freight',
+    };
+
 const buyV2ProductOfferDecisionContractVersion =
     'buy-product-offer-decision-v1';
 
@@ -200,6 +213,16 @@ BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
       product.destination == BuyV2Destination.shop ||
       product.destination == BuyV2Destination.wholesale;
 
+  if (facts.storeOperatingState == BuyV2StoreOperatingState.closed) {
+    final nextOpening = facts.nextOpeningLabel?.trim();
+    return BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.unavailable,
+      statusLabel: 'Store closed',
+      detail: nextOpening == null || nextOpening.isEmpty
+          ? 'This fulfilment partner is closed. Check again before adding to Cart.'
+          : 'This fulfilment partner is closed. $nextOpening.',
+    );
+  }
   if (facts.stale) {
     return const BuyV2ProductOfferDecision(
       state: BuyV2ProductOfferDecisionState.stale,

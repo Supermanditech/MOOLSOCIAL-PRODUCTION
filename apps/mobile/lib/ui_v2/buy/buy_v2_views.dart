@@ -1031,6 +1031,8 @@ class _WholesaleTradeDecisionPanelState
     final product = widget.product;
     final facts = widget.facts;
     final decision = widget.decision;
+    final fulfilmentMode =
+        facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
     final supplierProducts = widget.session.supplierContinuationsFor(product);
     final statusColor = decision.canAdd
         ? BuyV2Colors.green
@@ -1127,6 +1129,11 @@ class _WholesaleTradeDecisionPanelState
                   label: 'Delivery service',
                   value: serviceLevel,
                 ),
+              _DecisionRow(
+                icon: Icons.local_shipping_outlined,
+                label: 'Delivery mode',
+                value: buyV2FulfilmentModeLabel(fulfilmentMode),
+              ),
               _DecisionRow(
                 icon: Icons.storefront_outlined,
                 label: 'Fulfilment',
@@ -1655,6 +1662,8 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
         ? BuyV2Colors.green
         : BuyV2Colors.orange;
     final mrp = product.mrp;
+    final fulfilmentMode =
+        facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
     final savings = mrp == null || mrp <= facts.price
         ? null
         : mrp - facts.price;
@@ -1665,6 +1674,7 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
           '${product.title}. ${product.variant}. ${product.pack}. '
           '${buyV2Money(facts.price)} delivered price. '
           '${facts.orderabilityLabel}. $buyerPromise. '
+          '${buyV2FulfilmentModeLabel(fulfilmentMode)}. '
           '${buyV2AutomaticFulfilmentLabel(product.destination)}. '
           '${decision.statusLabel}. ${decision.detail}',
       child: Column(
@@ -1717,6 +1727,39 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                 value: buyerPromise,
                 valueColor: decision.canAdd ? BuyV2Colors.green : statusColor,
               ),
+              _DecisionRow(
+                icon: Icons.local_shipping_outlined,
+                label: 'Delivery mode',
+                value: buyV2FulfilmentModeLabel(fulfilmentMode),
+              ),
+              if (facts.storeOperatingState != BuyV2StoreOperatingState.unknown)
+                _DecisionRow(
+                  icon:
+                      facts.storeOperatingState == BuyV2StoreOperatingState.open
+                      ? Icons.storefront_outlined
+                      : Icons.night_shelter_outlined,
+                  label: 'Partner availability',
+                  value:
+                      facts.storeOperatingState == BuyV2StoreOperatingState.open
+                      ? 'Open for orders'
+                      : 'Closed · ${facts.nextOpeningLabel}',
+                  valueColor:
+                      facts.storeOperatingState == BuyV2StoreOperatingState.open
+                      ? BuyV2Colors.green
+                      : statusColor,
+                ),
+              if (facts.orderCutoffLabel case final cutoff?)
+                _DecisionRow(
+                  icon: Icons.timer_outlined,
+                  label: 'Order cutoff',
+                  value: cutoff,
+                ),
+              if (facts.deliveryFeeLabel case final deliveryFee?)
+                _DecisionRow(
+                  icon: Icons.payments_outlined,
+                  label: 'Delivery fee',
+                  value: deliveryFee,
+                ),
               if (facts.dispatchPromise case final dispatchPromise?)
                 _DecisionRow(
                   icon: Icons.inventory_2_outlined,
@@ -8391,6 +8434,16 @@ Future<void> showBuyV2FilterSheet(
       ('any', 'Any delivery time', 'Show every available product'),
       ('fast', 'Fast delivery', 'Nearby fulfilment first'),
       ('today', 'Delivered today', 'Confirmed same-day listings'),
+      (
+        'quick-local',
+        'Quick local delivery',
+        'Nearby rider fulfilment with a confirmed short delivery window',
+      ),
+      (
+        'standard-courier',
+        'Standard/courier delivery',
+        'Scheduled local or remote delivery with a confirmed date or window',
+      ),
       ('lowest', 'Lowest delivered price', 'Price including delivery'),
       ('nearby', 'Nearby sellers', 'Local Mool fulfilment partners'),
       ('returns', 'Easy returns', 'Listings with a clear return option'),
@@ -8399,6 +8452,11 @@ Future<void> showBuyV2FilterSheet(
       ('any', 'Any delivery schedule', 'Show every confirmed trade listing'),
       ('fast', 'Fastest delivery', 'Earliest confirmed dispatch first'),
       ('two-days', 'Within two days', 'Nearby and priority supply'),
+      (
+        'bulk-freight',
+        'Bulk freight',
+        'Tracked Wholesale delivery for MOQ and bulk loads',
+      ),
       ('lowest', 'Lowest landed price', 'Product and freight together'),
       ('freight', 'Freight included', 'Delivered price without hidden freight'),
       ('moq', 'Flexible MOQ', 'Lower minimum-order listings'),
