@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'chat_models.dart';
-
 enum ChatEntryContextId {
   mool,
   social,
@@ -23,7 +21,6 @@ class ChatEntryContext {
     required this.subtitle,
     required this.icon,
     required this.accent,
-    this.defaultFilter,
     this.showThreadFilters = true,
     this.allowedThreadIds,
     this.allowedThreadPrefixes,
@@ -35,7 +32,6 @@ class ChatEntryContext {
   final String subtitle;
   final IconData icon;
   final Color accent;
-  final ChatThreadType? defaultFilter;
   final bool showThreadFilters;
   final Set<String>? allowedThreadIds;
   final Set<String>? allowedThreadPrefixes;
@@ -95,8 +91,6 @@ class ChatEntryContext {
     subtitle: 'People and creators',
     icon: Icons.people_alt_outlined,
     accent: Color(0xFF2F5BEA),
-    defaultFilter: ChatThreadType.people,
-    showThreadFilters: false,
   );
 
   static const shop = ChatEntryContext(
@@ -121,7 +115,6 @@ class ChatEntryContext {
     subtitle: 'Orders and tables',
     icon: Icons.restaurant_outlined,
     accent: Color(0xFFF27A1A),
-    defaultFilter: ChatThreadType.order,
     allowedThreadIds: {'rasoi', 'order-support'},
     allowedThreadPrefixes: {'food-restaurant-'},
   );
@@ -133,7 +126,6 @@ class ChatEntryContext {
     subtitle: 'Trips and bookings',
     icon: Icons.route_outlined,
     accent: Color(0xFF4C4C8A),
-    defaultFilter: ChatThreadType.support,
     allowedThreadIds: {'ride-support', 'ride-captain'},
     allowedThreadPrefixes: {'ride-'},
   );
@@ -145,7 +137,6 @@ class ChatEntryContext {
     subtitle: 'Appointments and care',
     icon: Icons.health_and_safety_outlined,
     accent: Color(0xFF00757B),
-    defaultFilter: ChatThreadType.business,
     allowedThreadIds: {'clinic-care', 'task-helper', 'order-support'},
   );
 
@@ -156,7 +147,6 @@ class ChatEntryContext {
     subtitle: 'Opportunities',
     icon: Icons.work_outline_rounded,
     accent: Color(0xFF2F7A28),
-    defaultFilter: ChatThreadType.business,
     allowedThreadIds: {'work-opportunity', 'work-support'},
   );
 
@@ -167,7 +157,6 @@ class ChatEntryContext {
     subtitle: 'Setup and review support',
     icon: Icons.storefront_outlined,
     accent: Color(0xFF5B3F8C),
-    defaultFilter: ChatThreadType.support,
     allowedThreadIds: {'workspace-support'},
   );
 
@@ -178,7 +167,6 @@ class ChatEntryContext {
     subtitle: 'Setup and review support',
     icon: Icons.storefront_outlined,
     accent: Color(0xFF5B3F8C),
-    defaultFilter: ChatThreadType.support,
     allowedThreadIds: {
       'workspace-support',
       'order-support',
@@ -196,7 +184,6 @@ class ChatEntryContext {
     subtitle: 'Setup and review support',
     icon: Icons.storefront_outlined,
     accent: Color(0xFF5B3F8C),
-    defaultFilter: ChatThreadType.support,
     allowedThreadIds: {'workspace-support', 'order-support'},
   );
 
@@ -207,7 +194,6 @@ class ChatEntryContext {
     subtitle: 'Setup and review support',
     icon: Icons.storefront_outlined,
     accent: Color(0xFF5B3F8C),
-    defaultFilter: ChatThreadType.support,
     allowedThreadIds: {'workspace-support', 'order-support', 'ride-support'},
     allowedThreadPrefixes: {'ride-'},
   );
@@ -219,7 +205,6 @@ class ChatEntryContext {
     subtitle: 'Setup and review support',
     icon: Icons.storefront_outlined,
     accent: Color(0xFF5B3F8C),
-    defaultFilter: ChatThreadType.support,
     allowedThreadIds: {'workspace-support', 'order-support'},
   );
 
@@ -230,7 +215,6 @@ class ChatEntryContext {
     subtitle: 'Setup and review support',
     icon: Icons.storefront_outlined,
     accent: Color(0xFF5B3F8C),
-    defaultFilter: ChatThreadType.support,
     allowedThreadIds: {'workspace-support'},
   );
 
@@ -241,7 +225,6 @@ class ChatEntryContext {
     subtitle: 'Payments and support',
     icon: Icons.account_balance_wallet_outlined,
     accent: Color(0xFF0B6B55),
-    defaultFilter: ChatThreadType.support,
     allowedThreadIds: {'pay-support'},
   );
 

@@ -30,94 +30,36 @@ void main() {
   }
 
   test('one resolver classifies every shared Chat origin', () {
-    const cases = <(String, ChatEntryContextId, String, ChatThreadType?)>[
-      ('/app/mool', ChatEntryContextId.mool, 'Chat', null),
-      (
-        '/app/social?sub=feed',
-        ChatEntryContextId.social,
-        'Social Chat',
-        ChatThreadType.people,
-      ),
-      ('/app/buy?sub=shop', ChatEntryContextId.shop, 'Shop Chat', null),
-      (
-        '/app/buy?sub=medicine',
-        ChatEntryContextId.care,
-        'Care Chat',
-        ChatThreadType.business,
-      ),
-      (
-        '/app/eat/home',
-        ChatEntryContextId.food,
-        'Food Chat',
-        ChatThreadType.order,
-      ),
-      (
-        '/app/ride/book?type=cab',
-        ChatEntryContextId.travel,
-        'Travel Chat',
-        ChatThreadType.support,
-      ),
-      (
-        '/app/book/doctor',
-        ChatEntryContextId.care,
-        'Care Chat',
-        ChatThreadType.business,
-      ),
-      (
-        '/app/work/earn',
-        ChatEntryContextId.work,
-        'Work Chat',
-        ChatThreadType.business,
-      ),
-      (
-        '/app/work/my-work',
-        ChatEntryContextId.workspace,
-        'Workspace Chat',
-        ChatThreadType.support,
-      ),
-      (
-        '/app/retailer/orders',
-        ChatEntryContextId.workspace,
-        'Workspace Chat',
-        ChatThreadType.support,
-      ),
+    const cases = <(String, ChatEntryContextId, String)>[
+      ('/app/mool', ChatEntryContextId.mool, 'Chat'),
+      ('/app/social?sub=feed', ChatEntryContextId.social, 'Social Chat'),
+      ('/app/buy?sub=shop', ChatEntryContextId.shop, 'Shop Chat'),
+      ('/app/buy?sub=medicine', ChatEntryContextId.care, 'Care Chat'),
+      ('/app/eat/home', ChatEntryContextId.food, 'Food Chat'),
+      ('/app/ride/book?type=cab', ChatEntryContextId.travel, 'Travel Chat'),
+      ('/app/book/doctor', ChatEntryContextId.care, 'Care Chat'),
+      ('/app/work/earn', ChatEntryContextId.work, 'Work Chat'),
+      ('/app/work/my-work', ChatEntryContextId.workspace, 'Workspace Chat'),
+      ('/app/retailer/orders', ChatEntryContextId.workspace, 'Workspace Chat'),
       (
         '/app/manufacturer/orders/review',
         ChatEntryContextId.workspace,
         'Workspace Chat',
-        ChatThreadType.support,
       ),
       (
         '/app/captain/trips/ride-1',
         ChatEntryContextId.workspace,
         'Workspace Chat',
-        ChatThreadType.support,
       ),
-      (
-        '/app/creator/audience',
-        ChatEntryContextId.workspace,
-        'Workspace Chat',
-        ChatThreadType.support,
-      ),
-      (
-        '/app/operations/home',
-        ChatEntryContextId.workspace,
-        'Workspace Chat',
-        ChatThreadType.support,
-      ),
-      (
-        '/app/pay/home',
-        ChatEntryContextId.pay,
-        'Pay Chat',
-        ChatThreadType.support,
-      ),
+      ('/app/creator/audience', ChatEntryContextId.workspace, 'Workspace Chat'),
+      ('/app/operations/home', ChatEntryContextId.workspace, 'Workspace Chat'),
+      ('/app/pay/home', ChatEntryContextId.pay, 'Pay Chat'),
     ];
 
     for (final entry in cases) {
       final resolved = ChatEntryContext.resolve(entry.$1);
       expect(resolved.id, entry.$2, reason: entry.$1);
       expect(resolved.title, entry.$3, reason: entry.$1);
-      expect(resolved.defaultFilter, entry.$4, reason: entry.$1);
     }
     expect(
       ChatEntryContext.resolve('/app/ride/book?type=cab').allowedThreadIds,
@@ -316,12 +258,44 @@ void main() {
     ('/app/mool', 'Chat', 'All your conversations', null),
     ('/app/social?sub=feed', 'Social Chat', 'People and creators', null),
     ('/app/buy?sub=shop', 'Shop Chat', 'Orders and products', null),
+    ('/app/buy?sub=wholesale', 'Shop Chat', 'Orders and products', null),
+    ('/app/buy?sub=orders', 'Shop Chat', 'Orders and products', null),
     ('/app/buy?sub=medicine', 'Care Chat', 'Appointments and care', null),
     ('/app/eat/home', 'Food Chat', 'Orders and tables', null),
     ('/app/ride/book?type=cab', 'Travel Chat', 'Trips and bookings', null),
     ('/app/book/doctor', 'Care Chat', 'Appointments and care', null),
     ('/app/work/earn', 'Work Chat', 'Opportunities', null),
     ('/app/work/my-work', 'Workspace Chat', 'Setup and review support', null),
+    (
+      '/app/retailer/orders',
+      'Workspace Chat',
+      'Setup and review support',
+      null,
+    ),
+    (
+      '/app/manufacturer/orders/review',
+      'Workspace Chat',
+      'Setup and review support',
+      null,
+    ),
+    (
+      '/app/captain/trips/ride-1',
+      'Workspace Chat',
+      'Setup and review support',
+      null,
+    ),
+    (
+      '/app/creator/audience',
+      'Workspace Chat',
+      'Setup and review support',
+      null,
+    ),
+    (
+      '/app/operations/home',
+      'Workspace Chat',
+      'Setup and review support',
+      null,
+    ),
     ('/app/pay/home', 'Pay Chat', 'Payments and support', null),
   ]) {
     testWidgets('${entry.$2} from ${entry.$1} is compact and defaults to All', (
@@ -335,6 +309,7 @@ void main() {
       final chat = ChatSession(
         sendGateway: ReviewChatSendGateway(latency: Duration.zero),
       );
+      chat.chooseFilter(ChatThreadType.support);
       addTearDown(journey.dispose);
       addTearDown(chat.dispose);
       final route = Uri(
@@ -412,18 +387,20 @@ void main() {
         );
       }
       if (entry.$2 == 'Workspace Chat') {
-        expect(
-          find.byKey(const Key('chat-open-thread-workspace-support')),
-          findsOneWidget,
+        final workspaceSupport = find.byKey(
+          const Key('chat-open-thread-workspace-support'),
         );
-        expect(
-          find.byKey(const Key('chat-open-thread-order-support')),
-          findsNothing,
+        await tester.scrollUntilVisible(
+          workspaceSupport,
+          140,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('chat-inbox-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
         );
-        expect(
-          find.byKey(const Key('chat-open-thread-ride-support')),
-          findsNothing,
-        );
+        expect(workspaceSupport, findsOneWidget);
       }
       expect(tester.takeException(), isNull);
 
