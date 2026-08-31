@@ -215,6 +215,80 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'store catalogue exposes full products and exact related-store continuation',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      expect(session.openProduct('s-eggs'), isTrue);
+
+      await tester.pumpWidget(_app(session));
+      await tester.pumpAndSettle();
+      final sellerAction = find.byKey(
+        const ValueKey('buy-shop-seller-action-s-eggs'),
+      );
+      await _revealProductAction(tester, 's-eggs', sellerAction);
+      await tester.tap(sellerAction);
+      await tester.pumpAndSettle();
+
+      final storeSheet = find.byKey(
+        const ValueKey('buy-shop-seller-sheet-s-eggs'),
+      );
+      final storeScroll = find
+          .descendant(of: storeSheet, matching: find.byType(Scrollable))
+          .first;
+      final viewMore = find.byKey(
+        const ValueKey('buy-shop-seller-view-more-s-eggs'),
+      );
+      await tester.scrollUntilVisible(viewMore, 220, scrollable: storeScroll);
+      await tester.tap(viewMore);
+      await tester.pumpAndSettle();
+      final fullCatalogue = find.byKey(
+        const ValueKey('buy-shop-seller-full-catalogue-list'),
+      );
+      expect(fullCatalogue, findsOneWidget);
+      expect(find.text('Safe Protein Store'), findsWidgets);
+      final fullEggs = find
+          .descendant(
+            of: fullCatalogue,
+            matching: find.byKey(const ValueKey('buy-product-s-eggs')),
+          )
+          .first;
+      expect(fullEggs, findsOneWidget);
+      expect(tester.getSize(fullEggs).width, lessThan(130));
+
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-seller-full-catalogue-close')),
+      );
+      await tester.pumpAndSettle();
+      final relatedStores = find.byKey(
+        const ValueKey('buy-shop-seller-other-stores'),
+      );
+      await tester.scrollUntilVisible(
+        relatedStores,
+        220,
+        scrollable: storeScroll,
+      );
+      expect(relatedStores, findsOneWidget);
+      final related = find.byKey(
+        const ValueKey('buy-shop-seller-other-store-s-tomato'),
+      );
+      await tester.tap(related);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-seller-sheet-s-tomato')),
+        findsOneWidget,
+      );
+      expect(find.text('More from Shree Balaji Fresh'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Widget _app(BuyV2Session session) => MaterialApp(

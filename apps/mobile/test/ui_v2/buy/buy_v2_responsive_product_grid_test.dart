@@ -5,6 +5,7 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -75,7 +76,7 @@ void main() {
             reason: '$size product $index fully visible',
           );
         }
-        expect(firstRect.height, inInclusiveRange(221, 225));
+        expect(firstRect.height, inInclusiveRange(242, 244));
 
         final title = tester.widget<Text>(
           find
@@ -87,9 +88,24 @@ void main() {
               .descendant(of: firstCard, matching: find.text(products[0].pack))
               .first,
         );
-        expect(title.style?.fontSize, greaterThanOrEqualTo(10.5));
-        expect(title.maxLines, 2);
-        expect(pack.style?.fontSize, greaterThanOrEqualTo(9.5));
+        expect(title.style?.fontSize, greaterThanOrEqualTo(10));
+        expect(title.maxLines, 3);
+        expect(title.overflow, TextOverflow.clip);
+        expect(pack.style?.fontSize, greaterThanOrEqualTo(8.5));
+        expect(
+          find.descendant(
+            of: firstCard,
+            matching: find.text(products[0].seller),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: firstCard,
+            matching: find.textContaining('12 min'),
+          ),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull, reason: '$size overflow');
 
         await tester.pumpWidget(const SizedBox.shrink());
@@ -135,7 +151,7 @@ void main() {
       findsOneWidget,
     );
     final firstCard = find.byKey(ValueKey('buy-product-${products[0].id}'));
-    expect(tester.getSize(firstCard).height, inInclusiveRange(286, 290));
+    expect(tester.getSize(firstCard).height, inInclusiveRange(306, 308));
     final add = find.descendant(
       of: firstCard,
       matching: find.byKey(ValueKey('buy-add-shell-${products[0].id}')),
@@ -173,8 +189,45 @@ void main() {
       final card = find.byKey(ValueKey('buy-product-${products[index].id}'));
       expect(card, findsOneWidget);
       expect(tester.getSize(card).width, greaterThanOrEqualTo(160));
-      expect(tester.getSize(card).height, inInclusiveRange(221, 225));
+      expect(tester.getSize(card).height, inInclusiveRange(242, 244));
     }
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'Fresh picks keeps store and delivery on separate complete lines',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final product = session.product('s-tomato');
+      final card = find.byKey(ValueKey('buy-product-${product.id}')).first;
+      expect(card, findsOneWidget);
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.textContaining(product.seller),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.textContaining('12 min')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

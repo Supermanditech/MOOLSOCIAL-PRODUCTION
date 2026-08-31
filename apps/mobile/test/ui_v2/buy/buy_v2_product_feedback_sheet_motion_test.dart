@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +21,7 @@ void main() {
     bool disableAnimations = false,
     double textScale = 1,
     EdgeInsets viewInsets = EdgeInsets.zero,
+    EdgeInsets viewPadding = EdgeInsets.zero,
   }) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -31,6 +33,7 @@ void main() {
             disableAnimations: disableAnimations,
             textScaler: TextScaler.linear(textScale),
             viewInsets: viewInsets,
+            viewPadding: viewPadding,
           ),
           child: child!,
         );
@@ -45,6 +48,7 @@ void main() {
     bool disableAnimations = false,
     double textScale = 1,
     EdgeInsets viewInsets = EdgeInsets.zero,
+    EdgeInsets viewPadding = EdgeInsets.zero,
   }) async {
     session.openProduct(product().id);
     await tester.pumpWidget(
@@ -53,6 +57,7 @@ void main() {
         disableAnimations: disableAnimations,
         textScale: textScale,
         viewInsets: viewInsets,
+        viewPadding: viewPadding,
       ),
     );
     await tester.pumpAndSettle();
@@ -70,6 +75,7 @@ void main() {
     bool disableAnimations = false,
     double textScale = 1,
     EdgeInsets viewInsets = EdgeInsets.zero,
+    EdgeInsets viewPadding = EdgeInsets.zero,
     bool settle = true,
   }) async {
     await openProduct(
@@ -78,6 +84,7 @@ void main() {
       disableAnimations: disableAnimations,
       textScale: textScale,
       viewInsets: viewInsets,
+      viewPadding: viewPadding,
     );
     await tester.tap(
       find.byKey(ValueKey('buy-review-product-${product().id}')),
@@ -91,6 +98,8 @@ void main() {
     BuyV2Session session, {
     bool disableAnimations = false,
     double textScale = 1,
+    EdgeInsets viewInsets = EdgeInsets.zero,
+    EdgeInsets viewPadding = EdgeInsets.zero,
     bool settle = true,
   }) async {
     await openProduct(
@@ -98,6 +107,8 @@ void main() {
       session,
       disableAnimations: disableAnimations,
       textScale: textScale,
+      viewInsets: viewInsets,
+      viewPadding: viewPadding,
     );
     await tester.tap(
       find.byKey(ValueKey('buy-report-product-${product().id}')),
@@ -379,6 +390,107 @@ void main() {
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
+
+  testWidgets(
+    'review keyboard keeps composer and final actions above the Android boundary',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      const keyboard = EdgeInsets.only(bottom: 300);
+      const system = EdgeInsets.only(top: 41, bottom: 44);
+
+      await openReview(
+        tester,
+        session,
+        viewInsets: keyboard,
+        viewPadding: system,
+      );
+      final comment = find.byKey(
+        ValueKey('buy-review-comment-${product().id}'),
+      );
+      await tester.tap(comment);
+      await tester.enterText(
+        comment,
+        'Fresh sealed pack.\nDelivery matched the promise.',
+      );
+      await tester.tap(
+        find.byKey(ValueKey('buy-review-rating-${product().id}-5')),
+      );
+      await tester.pumpAndSettle();
+      final submit = find.byKey(ValueKey('buy-submit-review-${product().id}'));
+      await tester.ensureVisible(submit);
+      await tester.pumpAndSettle();
+      final keyboardTop = 800 - keyboard.bottom;
+      expect(tester.getRect(comment).bottom, lessThanOrEqualTo(keyboardTop));
+      expect(tester.getRect(submit).height, greaterThanOrEqualTo(44));
+      expect(tester.getRect(submit).bottom, lessThanOrEqualTo(keyboardTop));
+      expect(
+        find.byKey(ValueKey('buy-feedback-product-${product().id}')),
+        findsOneWidget,
+      );
+      debugDefaultTargetPlatformOverride = null;
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Shop and Wholesale reports retain exact product identity above navigation',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      for (final productId in const ['s-eggs', 'w-eggs']) {
+        final session = BuyV2Session(core: BuySession());
+        expect(session.openProduct(productId), isTrue);
+        await tester.pumpWidget(
+          app(session, viewPadding: const EdgeInsets.only(top: 41, bottom: 44)),
+        );
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.byKey(ValueKey('buy-product-reviews-$productId')),
+          240,
+          scrollable: find.byType(Scrollable).first,
+        );
+        final reportAction = find.byKey(
+          ValueKey('buy-report-product-$productId'),
+        );
+        await tester.ensureVisible(reportAction);
+        await tester.pumpAndSettle();
+        await tester.tap(reportAction);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(ValueKey('buy-feedback-product-$productId')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(ValueKey('buy-submit-report-$productId')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('buy-report-reason-0')));
+        await tester.pumpAndSettle();
+        final submit = find.byKey(ValueKey('buy-submit-report-$productId'));
+        await tester.ensureVisible(submit);
+        final rect = tester.getRect(submit);
+        expect(rect.height, greaterThanOrEqualTo(44));
+        expect(rect.bottom, lessThanOrEqualTo(800 - 41));
+        await tester.tap(submit);
+        await tester.pumpAndSettle();
+        expect(session.hasReportedProduct(productId), isTrue);
+        session.dispose();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      }
+      debugDefaultTargetPlatformOverride = null;
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('reduced motion is immediate for both R56.5 routes', (
     tester,

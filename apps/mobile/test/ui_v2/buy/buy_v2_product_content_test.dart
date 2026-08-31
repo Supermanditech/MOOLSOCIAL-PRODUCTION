@@ -11,6 +11,72 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
+    'Shop and Wholesale product heroes expose complete purchase decisions',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      for (final productId in const ['s-atta', 'w-atta']) {
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        final product = session.product(productId);
+        expect(session.openProduct(productId), isTrue);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(
+              session: session,
+              initialDestination: session.destination,
+              initialView: session.view,
+              productId: productId,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final hero = find.byKey(
+          ValueKey('buy-product-purchase-hero-$productId'),
+        );
+        expect(hero, findsOneWidget);
+        expect(
+          find.descendant(of: hero, matching: find.text(product.title)),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: hero,
+            matching: find.textContaining(product.seller),
+          ),
+          findsWidgets,
+        );
+        expect(
+          find.descendant(
+            of: hero,
+            matching: find.textContaining(
+              product.destination == BuyV2Destination.wholesale
+                  ? 'Tomorrow'
+                  : '7:30',
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(ValueKey('buy-product-hero-price-$productId')),
+          findsOneWidget,
+        );
+        expect(find.text('Buy now'), findsNothing);
+        expect(tester.takeException(), isNull);
+
+        session.dispose();
+        core.dispose();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      }
+    },
+  );
+
+  testWidgets(
     'product gallery and details use one authoritative content owner',
     (tester) async {
       tester.view.devicePixelRatio = 1;

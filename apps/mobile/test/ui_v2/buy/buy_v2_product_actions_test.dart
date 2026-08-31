@@ -372,11 +372,16 @@ void main() {
         .first;
     final seller = find.byKey(ValueKey('buy-shop-seller-action-${product.id}'));
     await tester.scrollUntilVisible(seller, 220, scrollable: productScroll);
+    await tester.ensureVisible(seller);
+    await tester.pumpAndSettle();
     for (var attempt = 0; attempt < 3; attempt += 1) {
-      if (tester.getCenter(seller).dy < 520) break;
-      await tester.drag(productScroll, const Offset(0, -180));
+      final rect = tester.getRect(seller);
+      if (rect.top >= 0 && rect.bottom <= 600) break;
+      await tester.drag(productScroll, Offset(0, rect.top < 0 ? 180 : -180));
       await tester.pumpAndSettle();
     }
+    expect(tester.getRect(seller).top, greaterThanOrEqualTo(0));
+    expect(tester.getRect(seller).bottom, lessThanOrEqualTo(600));
     await tester.tap(seller);
     await tester.pumpAndSettle();
     expect(

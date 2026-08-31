@@ -1896,7 +1896,7 @@ void main() {
         ValueKey('buy-grid-packshot-${product.id}'),
       );
       expect(densePhoto, findsOneWidget);
-      expect(tester.getSize(densePhoto), const Size(86, 78));
+      expect(tester.getSize(densePhoto), const Size(78, 70));
       expect(find.byType(BuyV2ProductCard), findsWidgets);
       expect(tester.takeException(), isNull);
     },
@@ -2273,7 +2273,13 @@ void main() {
     await tester.pumpAndSettle();
 
     final primary = find.byKey(ValueKey('buy-product-primary-${product.id}'));
-    await tester.ensureVisible(primary);
+    final productScroll = find
+        .descendant(
+          of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(primary, 180, scrollable: productScroll);
     await tester.pumpAndSettle();
     await tester.tap(primary);
     await tester.pumpAndSettle();
