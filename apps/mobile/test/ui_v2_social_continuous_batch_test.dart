@@ -488,6 +488,9 @@ void main() {
     testWidgets(
       'UI review exposes Create for feedback without allowing guest publish',
       (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
         final owners = _GuestOwners();
         addTearDown(owners.dispose);
         await owners.journey.start();
@@ -550,8 +553,11 @@ void main() {
           Key('screen04-create-inline-gif'),
         ]) {
           final rect = tester.getRect(find.byKey(key));
-          expect(rect.left, greaterThanOrEqualTo(0));
-          expect(rect.right, lessThanOrEqualTo(390));
+          final canvas = tester.getRect(
+            find.byKey(const Key('screen04-create-writing-canvas')),
+          );
+          expect(rect.left, greaterThanOrEqualTo(canvas.left));
+          expect(rect.right, lessThanOrEqualTo(canvas.right));
           expect(rect.height, greaterThanOrEqualTo(44));
         }
         expect(find.text('Sign in to post'), findsOneWidget);

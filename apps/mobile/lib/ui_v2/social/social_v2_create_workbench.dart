@@ -1403,35 +1403,44 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                   ),
                 ),
                 const Divider(height: 14),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    _CreateCanvasInlineAction(
-                      key: const Key('screen04-create-inline-emoji'),
-                      icon: Icons.emoji_emotions_outlined,
-                      label: 'Emoji',
-                      onTap: () => unawaited(_openEmojiPalette()),
-                    ),
-                    _CreateCanvasInlineAction(
-                      key: const Key('screen04-create-inline-mention'),
-                      icon: Icons.alternate_email_rounded,
-                      label: 'Mention',
-                      onTap: () => _insertComposerText('@'),
-                    ),
-                    _CreateCanvasInlineAction(
-                      key: const Key('screen04-create-inline-topic'),
-                      icon: Icons.tag_rounded,
-                      label: 'Topic',
-                      onTap: () => _insertComposerText('#'),
-                    ),
-                    _CreateCanvasInlineAction(
-                      key: const Key('screen04-create-inline-gif'),
-                      icon: Icons.gif_box_outlined,
-                      label: 'GIF',
-                      onTap: _showGifAvailability,
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final actions = <Widget>[
+                      _CreateCanvasInlineAction(
+                        key: const Key('screen04-create-inline-emoji'),
+                        icon: Icons.emoji_emotions_outlined,
+                        label: 'Emoji',
+                        onTap: () => unawaited(_openEmojiPalette()),
+                      ),
+                      _CreateCanvasInlineAction(
+                        key: const Key('screen04-create-inline-mention'),
+                        icon: Icons.alternate_email_rounded,
+                        label: 'Mention',
+                        onTap: () => _insertComposerText('@'),
+                      ),
+                      _CreateCanvasInlineAction(
+                        key: const Key('screen04-create-inline-topic'),
+                        icon: Icons.tag_rounded,
+                        label: 'Topic',
+                        onTap: () => _insertComposerText('#'),
+                      ),
+                      _CreateCanvasInlineAction(
+                        key: const Key('screen04-create-inline-gif'),
+                        icon: Icons.gif_box_outlined,
+                        label: 'GIF',
+                        onTap: _showGifAvailability,
+                      ),
+                    ];
+                    final width = (constraints.maxWidth - 6) / 2;
+                    return Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final action in actions)
+                          SizedBox(width: width, child: action),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -2105,18 +2114,17 @@ class _CreateCanvasInlineAction extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => ActionChip(
-    avatar: Icon(icon, size: 17, color: SocialV2Colors.navy),
-    label: Text(label),
+  Widget build(BuildContext context) => OutlinedButton.icon(
     onPressed: onTap,
-    backgroundColor: const Color(0xFFF5F3FF),
-    side: const BorderSide(color: Color(0xFFE1DCFF)),
-    padding: const EdgeInsets.symmetric(horizontal: 3),
-    labelPadding: const EdgeInsets.symmetric(horizontal: 3),
-    labelStyle: const TextStyle(
-      color: SocialV2Colors.navy,
-      fontSize: 10.5,
-      fontWeight: FontWeight.w800,
+    icon: Icon(icon, size: 16),
+    label: Text(label),
+    style: OutlinedButton.styleFrom(
+      minimumSize: const Size.fromHeight(44),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      backgroundColor: const Color(0xFFF5F3FF),
+      foregroundColor: SocialV2Colors.navy,
+      side: const BorderSide(color: Color(0xFFE1DCFF)),
+      textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
     ),
   );
 }
