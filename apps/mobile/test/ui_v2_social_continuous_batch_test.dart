@@ -662,6 +662,22 @@ void main() {
       await tester.tap(find.text('Gallery'));
       await tester.pump();
       expect(session.mediaSelected, isTrue);
+      final title = tester.widget<TextField>(
+        find.byKey(const Key('social-creator-publish-title')),
+      );
+      final caption = tester.widget<TextField>(
+        find.byKey(const Key('social-creator-publish-caption')),
+      );
+      expect(title.textInputAction, TextInputAction.next);
+      expect(caption.textInputAction, TextInputAction.done);
+      expect(title.scrollPadding, const EdgeInsets.only(bottom: 160));
+      expect(caption.scrollPadding, const EdgeInsets.only(bottom: 160));
+      expect(
+        tester
+            .widget<ListView>(find.byType(ListView).first)
+            .keyboardDismissBehavior,
+        ScrollViewKeyboardDismissBehavior.onDrag,
+      );
       final rights = find.byType(CheckboxListTile).first;
       await tester.ensureVisible(rights);
       await tester.pumpAndSettle();
@@ -878,6 +894,14 @@ void main() {
         await _scrollToAndTap(tester, find.text('Sales'));
         await _scrollToAndTap(tester, find.text('Morning market Reel'));
         await _scrollToAndTap(tester, find.text('Continue to budget'));
+        final budget = tester.widget<EditableText>(
+          find.descendant(
+            of: find.byKey(const Key('social-promotion-budget-input')),
+            matching: find.byType(EditableText),
+          ),
+        );
+        expect(budget.textInputAction, TextInputAction.done);
+        expect(budget.scrollPadding, const EdgeInsets.only(bottom: 160));
         await _scrollToAndTap(tester, find.text('Check campaign'));
         await _scrollToAndTap(
           tester,

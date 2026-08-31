@@ -954,9 +954,13 @@ class _CreatorSocialV2ScreenState extends State<CreatorSocialV2Screen> {
       subtitle: 'Explain the evidence clearly',
       children: [
         TextField(
+          key: const Key('social-creator-appeal-input'),
           controller: controller,
           minLines: 3,
           maxLines: 6,
+          scrollPadding: socialV2InputScrollPadding,
+          textInputAction: TextInputAction.done,
+          onEditingComplete: () => FocusScope.of(context).unfocus(),
           decoration: const InputDecoration(
             labelText: 'Evidence and explanation',
           ),
@@ -1274,15 +1278,23 @@ class _PublishComposerState extends State<_PublishComposer> {
                   detail: 'Ready for title, caption and destination',
                 ),
               TextField(
+                key: const Key('social-creator-publish-title'),
                 controller: _title,
+                scrollPadding: socialV2InputScrollPadding,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
                 decoration: const InputDecoration(labelText: 'Title'),
                 onChanged: session.setPostTitle,
               ),
               const SizedBox(height: 9),
               TextField(
+                key: const Key('social-creator-publish-caption'),
                 controller: _caption,
                 minLines: 3,
                 maxLines: 6,
+                scrollPadding: socialV2InputScrollPadding,
+                textInputAction: TextInputAction.done,
+                onEditingComplete: () => FocusScope.of(context).unfocus(),
                 decoration: const InputDecoration(labelText: 'Caption'),
                 onChanged: session.setPostCaption,
               ),

@@ -791,6 +791,7 @@ class SocialV2PageList extends StatelessWidget {
     return ListView.separated(
       controller: controller,
       primary: false,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: padding,
       itemCount: children.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -798,6 +799,8 @@ class SocialV2PageList extends StatelessWidget {
     );
   }
 }
+
+const socialV2InputScrollPadding = EdgeInsets.only(bottom: 160);
 
 Future<void> showSocialV2Sheet(
   BuildContext context, {

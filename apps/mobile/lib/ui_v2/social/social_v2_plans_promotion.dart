@@ -808,8 +808,12 @@ class _SocialPromotionV2ScreenState extends State<SocialPromotionV2Screen> {
           detail: 'Estimated delivery updates as choices change',
         ),
         TextFormField(
+          key: const Key('social-promotion-budget-input'),
           initialValue: widget.session.campaignSpendCap.toString(),
           keyboardType: TextInputType.number,
+          scrollPadding: socialV2InputScrollPadding,
+          textInputAction: TextInputAction.done,
+          onEditingComplete: () => FocusScope.of(context).unfocus(),
           decoration: const InputDecoration(
             labelText: 'Total campaign budget',
             prefixText: '₹',
