@@ -1403,39 +1403,35 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                   ),
                 ),
                 const Divider(height: 14),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _CreateCanvasInlineAction(
-                        key: const Key('screen04-create-inline-emoji'),
-                        icon: Icons.emoji_emotions_outlined,
-                        label: 'Emoji',
-                        onTap: () => unawaited(_openEmojiPalette()),
-                      ),
-                      const SizedBox(width: 6),
-                      _CreateCanvasInlineAction(
-                        key: const Key('screen04-create-inline-mention'),
-                        icon: Icons.alternate_email_rounded,
-                        label: 'Mention',
-                        onTap: () => _insertComposerText('@'),
-                      ),
-                      const SizedBox(width: 6),
-                      _CreateCanvasInlineAction(
-                        key: const Key('screen04-create-inline-topic'),
-                        icon: Icons.tag_rounded,
-                        label: 'Topic',
-                        onTap: () => _insertComposerText('#'),
-                      ),
-                      const SizedBox(width: 6),
-                      _CreateCanvasInlineAction(
-                        key: const Key('screen04-create-inline-gif'),
-                        icon: Icons.gif_box_outlined,
-                        label: 'GIF',
-                        onTap: _showGifAvailability,
-                      ),
-                    ],
-                  ),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _CreateCanvasInlineAction(
+                      key: const Key('screen04-create-inline-emoji'),
+                      icon: Icons.emoji_emotions_outlined,
+                      label: 'Emoji',
+                      onTap: () => unawaited(_openEmojiPalette()),
+                    ),
+                    _CreateCanvasInlineAction(
+                      key: const Key('screen04-create-inline-mention'),
+                      icon: Icons.alternate_email_rounded,
+                      label: 'Mention',
+                      onTap: () => _insertComposerText('@'),
+                    ),
+                    _CreateCanvasInlineAction(
+                      key: const Key('screen04-create-inline-topic'),
+                      icon: Icons.tag_rounded,
+                      label: 'Topic',
+                      onTap: () => _insertComposerText('#'),
+                    ),
+                    _CreateCanvasInlineAction(
+                      key: const Key('screen04-create-inline-gif'),
+                      icon: Icons.gif_box_outlined,
+                      label: 'GIF',
+                      onTap: _showGifAvailability,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -2115,6 +2111,8 @@ class _CreateCanvasInlineAction extends StatelessWidget {
     onPressed: onTap,
     backgroundColor: const Color(0xFFF5F3FF),
     side: const BorderSide(color: Color(0xFFE1DCFF)),
+    padding: const EdgeInsets.symmetric(horizontal: 3),
+    labelPadding: const EdgeInsets.symmetric(horizontal: 3),
     labelStyle: const TextStyle(
       color: SocialV2Colors.navy,
       fontSize: 10.5,

@@ -543,6 +543,17 @@ void main() {
           find.byKey(const Key('screen04-create-inline-gif')),
           findsOneWidget,
         );
+        for (final key in const [
+          Key('screen04-create-inline-emoji'),
+          Key('screen04-create-inline-mention'),
+          Key('screen04-create-inline-topic'),
+          Key('screen04-create-inline-gif'),
+        ]) {
+          final rect = tester.getRect(find.byKey(key));
+          expect(rect.left, greaterThanOrEqualTo(0));
+          expect(rect.right, lessThanOrEqualTo(390));
+          expect(rect.height, greaterThanOrEqualTo(44));
+        }
         expect(find.text('Sign in to post'), findsOneWidget);
         await tester.enterText(
           find.byKey(const Key('screen04-create-post-text')),
