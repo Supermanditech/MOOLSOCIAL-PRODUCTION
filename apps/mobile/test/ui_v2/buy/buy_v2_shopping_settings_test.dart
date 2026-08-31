@@ -113,12 +113,12 @@ void main() {
       find.byKey(const ValueKey('buy-recently-viewed-info-sheet')),
       findsOneWidget,
     );
-    expect(find.text('Clear recently viewed?'), findsNothing);
+    expect(find.text('Clear recent items?'), findsNothing);
     await tester.tap(
       find.byKey(const ValueKey('buy-recently-viewed-sheet-clear')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Clear recently viewed?'), findsOneWidget);
+    expect(find.text('Clear recent items?'), findsOneWidget);
     await tester.tap(
       find.byKey(const ValueKey('buy-settings-recently-viewed-confirm')),
     );

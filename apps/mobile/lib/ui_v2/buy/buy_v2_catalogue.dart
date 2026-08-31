@@ -2649,14 +2649,14 @@ Future<void> _confirmClearBuyV2RecentlyViewed(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Clear recently viewed?'),
-      content: const Text(
-        'Products you viewed in Shop and Wholesale will be removed from this device.',
-      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('Clear recent items?'),
+      content: const Text('This removes your recently viewed items.'),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(false),
-          child: const Text('Keep'),
+          child: const Text('Not now'),
         ),
         FilledButton(
           key: const ValueKey('buy-settings-recently-viewed-confirm'),
@@ -5439,8 +5439,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                                 Expanded(
                                   child: Text(
                                     automaticFulfilment
-                                        ? '${facts.partner} · '
-                                              '${_compactDeliveryPromise(buyerPromise)}'
+                                        ? _compactDeliveryPromise(buyerPromise)
                                         : '${facts.partner} · '
                                               '${_compactDeliveryPromise(facts.deliveryPromise)}',
                                     maxLines: 1,

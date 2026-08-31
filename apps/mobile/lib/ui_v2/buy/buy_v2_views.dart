@@ -5129,7 +5129,7 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
                             Text(
                               error,
                               key: const ValueKey('buy-gst-error'),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: Color(0xFFB42318),
                                 fontWeight: FontWeight.w700,
                               ),
@@ -11721,7 +11721,7 @@ class _DecisionActionRow extends StatelessWidget {
         onTap: onTap,
         child: ExcludeSemantics(
           child: Material(
-            color: emphasized ? BuyV2Colors.softBlue : Colors.transparent,
+            color: emphasized ? BuyV2Colors.navy : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
               onTap: onTap,
@@ -11737,7 +11737,11 @@ class _DecisionActionRow extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Icon(icon, color: BuyV2Colors.navy, size: 16),
+                      Icon(
+                        icon,
+                        color: emphasized ? Colors.white : BuyV2Colors.navy,
+                        size: 18,
+                      ),
                       const SizedBox(width: 7),
                       SizedBox(
                         width: 72,
@@ -11745,7 +11749,7 @@ class _DecisionActionRow extends StatelessWidget {
                           label,
                           style: context.buyMeta.copyWith(
                             color: emphasized
-                                ? BuyV2Colors.navy
+                                ? Colors.white
                                 : BuyV2Colors.muted,
                             fontSize: 8,
                             fontWeight: emphasized
@@ -11762,15 +11766,17 @@ class _DecisionActionRow extends StatelessWidget {
                               value,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: BuyV2Colors.ink,
+                              style: TextStyle(
+                                color: emphasized
+                                    ? Colors.white
+                                    : BuyV2Colors.ink,
                                 fontSize: 9,
                                 height: 1.2,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                             Text(
-                              detail,
+                              emphasized ? 'Browse this store' : detail,
                               style: context.buyMeta.copyWith(fontSize: 7.5),
                             ),
                           ],
@@ -11781,7 +11787,7 @@ class _DecisionActionRow extends StatelessWidget {
                         emphasized
                             ? Icons.storefront_rounded
                             : Icons.arrow_forward_rounded,
-                        color: BuyV2Colors.navy,
+                        color: emphasized ? Colors.white : BuyV2Colors.navy,
                         size: 18,
                       ),
                     ],
