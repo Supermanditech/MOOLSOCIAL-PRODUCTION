@@ -1439,11 +1439,11 @@ void main() {
           find.byKey(const Key('social-v2-create-workbench')),
           findsNothing,
         );
-        expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
-        final draft = find.byKey(const Key('screen04-create-draft-entry'));
-        await tester.ensureVisible(draft);
-        await tester.pumpAndSettle();
-        await tester.tap(draft);
+        expect(
+          find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const Key('screen04-rail-create')));
         await tester.pumpAndSettle();
         expect(
           find.byKey(const Key('social-v2-create-workbench')),

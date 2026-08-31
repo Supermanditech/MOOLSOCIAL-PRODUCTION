@@ -27,35 +27,21 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+        findsOneWidget,
+      );
       expect(
         socialCreateDraftState.snapshot?.body,
         'Keep this exact dirty draft',
       );
       expect(repository.snapshot?.body, 'Keep this exact dirty draft');
-      expect(
-        tester
-            .widget<FilledButton>(
-              find.byKey(const Key('screen04-create-post-entry')),
-            )
-            .onPressed,
-        isNull,
-      );
-      expect(
-        tester
-            .widget<OutlinedButton>(
-              find.byKey(const Key('screen04-create-carousel-entry')),
-            )
-            .onPressed,
-        isNull,
-      );
-
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('screen04-create-draft-entry')));
+      await tester.tap(find.byKey(const Key('screen04-rail-create')));
       await tester.pumpAndSettle();
       expect(
         tester
@@ -73,7 +59,10 @@ void main() {
         find.byKey(const Key('screen04-create-discard-confirm')),
       );
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+        findsOneWidget,
+      );
       expect(socialCreateDraftState.snapshot, isNull);
       expect(repository.snapshot, isNull);
       expect(tester.takeException(), isNull);

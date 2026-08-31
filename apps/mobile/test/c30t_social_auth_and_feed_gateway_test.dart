@@ -248,26 +248,21 @@ void main() {
 
     await tester.tap(find.text('Create a post'));
     await tester.pump();
-    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
-    expect(find.byKey(const Key('screen04-create-hub-header')), findsOneWidget);
+    expect(find.byKey(const Key('screen04-create-home')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('social-v2-create-workbench')),
+      findsOneWidget,
+    );
     for (final key in const [
-      Key('screen04-create-photo-entry'),
-      Key('screen04-create-carousel-entry'),
-      Key('screen04-create-poll-entry'),
-      Key('screen04-create-image-poll-entry'),
-      Key('screen04-create-quiz-entry'),
+      Key('screen04-create-tool-post'),
+      Key('screen04-create-tool-image'),
+      Key('screen04-create-tool-carousel'),
+      Key('screen04-create-tool-image-poll'),
+      Key('screen04-create-tool-quick-poll'),
+      Key('screen04-create-tool-quiz'),
     ]) {
       expect(find.byKey(key), findsOneWidget);
     }
-    expect(
-      tester
-          .getBottomRight(find.byKey(const Key('screen04-create-quiz-entry')))
-          .dy,
-      lessThanOrEqualTo(
-        tester.getTopLeft(find.byKey(const Key('screen04-context-tabs'))).dy,
-      ),
-      reason: 'Every Step 1 format must remain above the Social rail.',
-    );
     expect(journey.stage, JourneyStage.ready);
     expect(journey.isAuthenticated, isTrue);
   });

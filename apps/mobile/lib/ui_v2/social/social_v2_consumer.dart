@@ -624,6 +624,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       _createView = _createViewFor(widget.initialState);
     } else if (_tab == SocialV2Tab.create && !hasRetainedState) {
       _createView = 'post';
+    } else if (_tab == SocialV2Tab.create) {
+      _createView = _createDraft.hasMeaningfulContent
+          ? _createDraftResumeView()
+          : 'post';
     } else if (_tab != SocialV2Tab.create) {
       _createView = 'home';
     }
@@ -771,7 +775,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
             : 'home';
         if (_tab == SocialV2Tab.create &&
             requestedCreateView != 'home' &&
-            _createDraft.hasUserContent) {
+            _createDraft.hasMeaningfulContent) {
           _createView = _createDraftResumeView();
         } else {
           _createView = requestedCreateView;
@@ -781,6 +785,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         }
       } else if (_tab != SocialV2Tab.create) {
         _createView = 'home';
+      } else {
+        _createView = _createDraft.hasMeaningfulContent
+            ? _createDraftResumeView()
+            : 'post';
       }
       if (_tab == SocialV2Tab.feed) {
         _feedState = _feedStateFor(widget.initialState);
@@ -1021,10 +1029,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         _world == 'social' &&
         (_tab == SocialV2Tab.videos || _tab == SocialV2Tab.shorts);
     final shortsOwned = _world == 'social' && _tab == SocialV2Tab.shorts;
-    final nestedCreateOpen =
-        _world == 'social' &&
-        _tab == SocialV2Tab.create &&
-        _createView != 'home';
+    final nestedCreateOpen = _world == 'social' && _tab == SocialV2Tab.create;
     final composerOpen = nestedCreateOpen;
     final contextualChatOpen =
         _contextualChatActive && MoolContextualChatCatalog.supports(_world);
@@ -1354,7 +1359,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         !widget.session.isAuthenticated) {
       _resetShorts();
       if (widget.enableCreateReviewPreview) {
-        unawaited(_chooseCreateReviewPath());
+        _openCreateReviewComposer();
       } else {
         _beginCreateSignIn();
       }
@@ -1372,6 +1377,10 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         _tab = _tabFor(choiceId);
         if (_tab != SocialV2Tab.create) {
           _createReviewPreviewActive = false;
+        } else {
+          _createView = _createDraft.hasMeaningfulContent
+              ? _createDraftResumeView()
+              : 'post';
         }
         if (_tab == SocialV2Tab.feed) {
           _feedLinkRequest += 1;
@@ -1393,7 +1402,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   void _openCreationGateway() {
     if (!widget.session.isAuthenticated) {
       if (widget.enableCreateReviewPreview) {
-        unawaited(_chooseCreateReviewPath());
+        _openCreateReviewComposer();
       } else {
         _beginCreateSignIn();
       }
@@ -1406,7 +1415,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       _choiceByWorld['social'] = 'create';
       _activeVideo = null;
       _tab = SocialV2Tab.create;
-      _createView = 'home';
+      _createView = _createDraft.hasMeaningfulContent
+          ? _createDraftResumeView()
+          : 'post';
       _createReviewPreviewActive = false;
     });
   }
@@ -1419,34 +1430,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     );
   }
 
-  Future<void> _chooseCreateReviewPath() async {
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        key: const Key('social-create-review-choice'),
-        title: const Text('Create on MoolSocial'),
-        content: const Text(
-          'Posting requires sign-in. You can preview every Create screen for design review without publishing anything.',
-        ),
-        actions: [
-          TextButton(
-            key: const Key('social-create-review-sign-in'),
-            onPressed: () => Navigator.pop(dialogContext, 'sign-in'),
-            child: const Text('Continue to sign in'),
-          ),
-          FilledButton(
-            key: const Key('social-create-review-preview'),
-            onPressed: () => Navigator.pop(dialogContext, 'preview'),
-            child: const Text('Preview Create'),
-          ),
-        ],
-      ),
-    );
-    if (!mounted || choice == null) return;
-    if (choice == 'sign-in') {
-      _beginCreateSignIn();
-      return;
-    }
+  void _openCreateReviewComposer() {
     _discardDurableYouTubeWatch();
     _resetShorts();
     HapticFeedback.selectionClick();
@@ -1454,7 +1438,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       _choiceByWorld['social'] = 'create';
       _activeVideo = null;
       _tab = SocialV2Tab.create;
-      _createView = 'home';
+      _createView = _createDraft.hasMeaningfulContent
+          ? _createDraftResumeView()
+          : 'post';
       _createReviewPreviewActive = true;
     });
   }
@@ -1588,12 +1574,13 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _createView = 'home';
-      _choiceByWorld['social'] = 'create';
-      _tab = SocialV2Tab.create;
+      _choiceByWorld['social'] = 'feed';
+      _tab = SocialV2Tab.feed;
+      _createReviewPreviewActive = false;
     });
     if (widget.initialSubAction == 'create' && widget.initialState != null) {
       final router = GoRouter.maybeOf(context);
-      if (router != null) context.replace('/app/social?sub=create');
+      if (router != null) context.replace('/app/social?sub=feed');
     }
   }
 
@@ -3445,7 +3432,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         child: CircularProgressIndicator(),
       );
     }
-    if (_createView == 'home') return _buildCreateHome();
+    final createView = _createView == 'home' ? 'post' : _createView;
     final workbench = SocialCreateWorkbenchV2(
       key: const ValueKey('social-creator-gateway'),
       session: widget.sharedSession,
@@ -3464,7 +3451,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
           _createReviewPreviewActive && !widget.session.isAuthenticated,
       onPreviewSignIn: _beginCreateSignIn,
       onClose: _closeCreate,
-      initialIntent: switch (_createView) {
+      initialIntent: switch (createView) {
         'image' => SocialCreateIntentV2.image,
         'carousel' => SocialCreateIntentV2.carousel,
         'image-poll' => SocialCreateIntentV2.imagePoll,
@@ -3472,7 +3459,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         'quiz' => SocialCreateIntentV2.quiz,
         _ => SocialCreateIntentV2.text,
       },
-      initialFormat: switch (_createView) {
+      initialFormat: switch (createView) {
         'reel' ||
         'reel-source' ||
         'reel-camera' ||
@@ -3514,6 +3501,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     );
   }
 
+  // ignore: unused_element
   Widget _buildCreateHome() {
     final hasDraft = _createDraft.hasMeaningfulContent;
     final hasUserContent = _createDraft.hasUserContent;

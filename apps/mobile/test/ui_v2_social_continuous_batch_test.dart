@@ -510,22 +510,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           find.byKey(const Key('social-create-review-choice')),
-          findsOneWidget,
-        );
-        expect(find.text('Continue to sign in'), findsOneWidget);
-        expect(find.text('Preview Create'), findsOneWidget);
-
-        await tester.tap(find.byKey(const Key('social-create-review-preview')));
-        await tester.pumpAndSettle();
-        expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
-        expect(
-          find.byKey(const Key('screen04-create-preview-hub-notice')),
           findsNothing,
         );
+        expect(find.byKey(const Key('screen04-create-home')), findsNothing);
         expect(owners.journey.isAuthenticated, isFalse);
-
-        await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
-        await tester.pumpAndSettle();
         expect(
           find.byKey(const Key('screen04-create-preview-notice')),
           findsNothing,
@@ -568,7 +556,16 @@ void main() {
           find.byKey(const Key('screen04-create-inline-gif')),
         );
         expect(gifRect.top, emojiRect.top);
-        expect(find.text('Sign in to post'), findsOneWidget);
+        expect(find.text('Sign in to post'), findsNothing);
+        expect(find.text('Post'), findsOneWidget);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const Key('screen04-create-publish-post')),
+              )
+              .onPressed,
+          isNull,
+        );
         await tester.enterText(
           find.byKey(const Key('screen04-create-post-text')),
           'Preview draft',
@@ -609,14 +606,7 @@ void main() {
         await tester.tap(find.byKey(const Key('screen04-create-inline-gif')));
         await tester.pumpAndSettle();
         expect(find.textContaining('approved media service'), findsOneWidget);
-        await tester.tap(find.byKey(const Key('screen04-create-publish-post')));
-        await tester.pumpAndSettle();
-
-        expect(owners.journey.stage, JourneyStage.signIn);
-        expect(
-          owners.journey.authenticationPurpose,
-          JourneyAuthenticationPurpose.socialCreate,
-        );
+        expect(owners.journey.stage, JourneyStage.ready);
         expect(owners.shared.socialPublishedItems, isEmpty);
         expect(tester.takeException(), isNull);
       },

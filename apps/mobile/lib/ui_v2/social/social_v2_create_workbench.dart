@@ -1026,40 +1026,29 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                           icon: const Icon(Icons.delete_outline_rounded),
                         ),
                         SizedBox(
-                          width: widget.previewOnly ? 126 : 96,
+                          width: 96,
                           height: 44,
                           child: FilledButton.icon(
                             key: const Key('screen04-create-publish-post'),
                             style: FilledButton.styleFrom(
-                              minimumSize: Size(
-                                widget.previewOnly ? 126 : 96,
-                                44,
-                              ),
-                              maximumSize: Size(
-                                widget.previewOnly ? 126 : 96,
-                                44,
-                              ),
+                              minimumSize: const Size(96, 44),
+                              maximumSize: const Size(96, 44),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
                               ),
                             ),
                             onPressed:
-                                !widget.previewOnly &&
-                                    (widget.session.busy || _selectingMedia)
+                                widget.previewOnly ||
+                                    widget.session.busy ||
+                                    _selectingMedia
                                 ? null
                                 : _publish,
-                            icon: Icon(
-                              widget.previewOnly
-                                  ? Icons.login_rounded
-                                  : Icons.arrow_upward_rounded,
+                            icon: const Icon(
+                              Icons.arrow_upward_rounded,
                               size: 18,
                             ),
                             label: Text(
-                              widget.previewOnly
-                                  ? 'Sign in to post'
-                                  : widget.session.busy
-                                  ? 'Posting…'
-                                  : 'Post',
+                              widget.session.busy ? 'Posting…' : 'Post',
                             ),
                           ),
                         ),

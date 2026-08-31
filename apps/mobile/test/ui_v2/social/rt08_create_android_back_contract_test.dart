@@ -48,72 +48,15 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('social-v2-create-workbench')),
-      findsNothing,
+      find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+      findsOneWidget,
     );
     expect(find.byKey(const Key('screen04-rail-create')), findsOneWidget);
-    final landingPopScope = tester.widget<PopScope<Object?>>(
-      find.ancestor(
-        of: find.byKey(const Key('screen04-universal-v2')),
-        matching: find.byType(PopScope<Object?>),
-      ),
-    );
-    expect(landingPopScope.canPop, isFalse);
 
-    await tester.binding.handlePopRoute();
+    await tester.tap(find.byKey(const Key('screen04-rail-create')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
-
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('social-v2-create-workbench')),
-      findsNothing,
-    );
-
-    await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('social-v2-create-workbench')),
-      findsOneWidget,
-    );
-    await tester.tap(find.byKey(const Key('screen04-create-close')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('screen04-create-carousel-entry')));
-    await tester.pumpAndSettle();
-    expect(find.text('New carousel'), findsOneWidget);
-    expect(
-      find.byKey(const Key('screen04-create-carousel-add')),
-      findsOneWidget,
-    );
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
-    await tester.pumpAndSettle();
-    expect(find.text('New text post'), findsOneWidget);
-    expect(find.byKey(const Key('screen04-create-carousel-add')), findsNothing);
-
     await tester.tap(find.byKey(const Key('screen04-create-tool-quick-poll')));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('screen04-create-quick-poll-choice-0')),
-      findsOneWidget,
-    );
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('screen04-create-draft-entry')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('screen04-create-draft-entry')));
     await tester.pumpAndSettle();
     expect(find.text('New quick poll'), findsOneWidget);
     expect(
@@ -123,25 +66,15 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('screen04-create-tool-image-poll')));
-    await tester.pumpAndSettle();
     expect(
-      find.byKey(const Key('screen04-create-image-poll-choice-0')),
+      find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
       findsOneWidget,
     );
-    await tester.binding.handlePopRoute();
+    await tester.tap(find.byKey(const Key('screen04-rail-create')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('screen04-create-draft-entry')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('screen04-create-draft-entry')));
-    await tester.pumpAndSettle();
-    expect(find.text('New image poll'), findsOneWidget);
+    expect(find.text('New quick poll'), findsOneWidget);
     expect(
-      find.byKey(const Key('screen04-create-image-poll-choice-0')),
+      find.byKey(const Key('screen04-create-quick-poll-choice-0')),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
