@@ -328,6 +328,9 @@ void main() {
 
     expect(profile.authorHandle, '@publicauthor');
     expect(profile.posts.single.authorId, 'author-1');
+    expect(profile.publicStatus?.publicLabel, 'Professional profile');
+    expect(profile.publicStatus?.earningState, SocialEarningState.building);
+    expect(profile.publicStatus?.criteria.single.met, isTrue);
     expect(credentials.modes, [SocialAppCheckTokenMode.standard]);
     expect(credentials.idTokenRequests, 0);
     expect(transport.headers.single, isNot(contains('authorization')));
@@ -1145,6 +1148,19 @@ Map<String, Object?> _profileData({
   'followerCount': followerCount,
   'followed': followed,
   'isSelf': false,
+  'publicStatus': {
+    'publicLabel': 'Professional profile',
+    'publicSummary': 'Public work and Social activity are visible.',
+    'earningState': 'building',
+    'earningSummary': 'Complete the supplied criteria before applying.',
+    'criteria': [
+      {
+        'label': 'Public profile',
+        'detail': 'Required identity fields are complete.',
+        'met': true,
+      },
+    ],
+  },
   'posts': [
     {
       ...jsonDecode(_postData()) as Map<String, Object?>,

@@ -486,6 +486,28 @@ class UiReviewSocialContentGateway
       },
       followed: false,
       isSelf: false,
+      publicStatus: SocialPublicProfileStatus(
+        publicLabel: authorId == 'ui-review-community'
+            ? 'Community profile'
+            : 'Public member',
+        publicSummary:
+            'Public posts, followers and conversations are visible on this profile.',
+        earningState: SocialEarningState.unavailable,
+        earningSummary:
+            'No Social earning program is connected in this UI review.',
+        criteria: const <SocialEarningCriterion>[
+          SocialEarningCriterion(
+            label: 'Public profile',
+            detail: 'Name, handle and public posts are available.',
+            met: true,
+          ),
+          SocialEarningCriterion(
+            label: 'Eligible earning program',
+            detail: 'No program eligibility was supplied for this profile.',
+            met: false,
+          ),
+        ],
+      ),
       posts: List<SocialPublishedItem>.unmodifiable(posts),
     );
   }
@@ -1149,10 +1171,44 @@ SocialAuthorProfile _decodeAuthorProfile(Map<String, Object?> data) =>
       followerCount: _integer(data['followerCount']),
       followed: data['followed'] == true,
       isSelf: data['isSelf'] == true,
+      publicStatus: switch (data['publicStatus']) {
+        final Map<Object?, Object?> value => _decodePublicProfileStatus(
+          _map(value),
+        ),
+        _ => null,
+      },
       posts: List.unmodifiable(
         _list(data['posts']).map((item) => _decodePost(_map(item))),
       ),
     );
+
+SocialPublicProfileStatus _decodePublicProfileStatus(
+  Map<String, Object?> data,
+) => SocialPublicProfileStatus(
+  publicLabel: _requiredString(data['publicLabel']),
+  publicSummary: _requiredString(data['publicSummary']),
+  earningState: switch (_requiredString(data['earningState'])) {
+    'unavailable' => SocialEarningState.unavailable,
+    'building' => SocialEarningState.building,
+    'eligible' => SocialEarningState.eligible,
+    'active' => SocialEarningState.active,
+    _ => throw const SocialContentGatewayException(
+      code: 'invalid_response',
+      message: 'MoolSocial returned an unknown earning status.',
+    ),
+  },
+  earningSummary: _requiredString(data['earningSummary']),
+  criteria: List.unmodifiable(
+    _list(data['criteria']).map((item) {
+      final criterion = _map(item);
+      return SocialEarningCriterion(
+        label: _requiredString(criterion['label']),
+        detail: _requiredString(criterion['detail']),
+        met: criterion['met'] == true,
+      );
+    }),
+  ),
+);
 
 void _validateAuthorProfileOwner(
   SocialAuthorProfile profile,

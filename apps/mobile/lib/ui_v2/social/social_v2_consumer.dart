@@ -7853,6 +7853,11 @@ class _SocialAuthorPanelV2State extends State<_SocialAuthorPanelV2> {
               ),
             ),
             const SizedBox(height: 8),
+            _SocialProfileStatusCardV2(
+              authorId: _authorId,
+              status: profile.publicStatus,
+            ),
+            const SizedBox(height: 8),
             SocialV2Card(
               key: Key('social-author-paid-follow-$_authorId'),
               padding: const EdgeInsets.all(14),
@@ -7957,6 +7962,124 @@ class _SocialAuthorPanelV2State extends State<_SocialAuthorPanelV2> {
     },
   );
 }
+
+class _SocialProfileStatusCardV2 extends StatelessWidget {
+  const _SocialProfileStatusCardV2({
+    required this.authorId,
+    required this.status,
+  });
+
+  final String authorId;
+  final SocialPublicProfileStatus? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = status;
+    return SocialV2Card(
+      key: Key('social-author-status-$authorId'),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const CircleAvatar(
+                backgroundColor: Color(0xFFEDE8FF),
+                foregroundColor: SocialV2Colors.navy,
+                child: Icon(Icons.insights_outlined),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value?.publicLabel ?? 'Public profile',
+                      style: const TextStyle(
+                        color: SocialV2Colors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      value?.publicSummary ??
+                          'Public status details are unavailable right now.',
+                      style: const TextStyle(
+                        color: SocialV2Colors.muted,
+                        fontSize: 11,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          Text(
+            value == null
+                ? 'Earning status unavailable'
+                : _socialEarningStateLabel(value.earningState),
+            style: const TextStyle(
+              color: SocialV2Colors.navy,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value?.earningSummary ??
+                'MoolSocial has not supplied an earning program status for this profile.',
+            style: const TextStyle(
+              color: SocialV2Colors.muted,
+              fontSize: 11,
+              height: 1.3,
+            ),
+          ),
+          if (value != null && value.criteria.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            for (final criterion in value.criteria)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      criterion.met
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      size: 18,
+                      color: criterion.met
+                          ? SocialV2Colors.green
+                          : SocialV2Colors.muted,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${criterion.label} · ${criterion.detail}',
+                        style: const TextStyle(
+                          color: SocialV2Colors.ink,
+                          fontSize: 11,
+                          height: 1.3,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+String _socialEarningStateLabel(SocialEarningState state) => switch (state) {
+  SocialEarningState.unavailable => 'Earning program unavailable',
+  SocialEarningState.building => 'Building earning readiness',
+  SocialEarningState.eligible => 'Eligible to apply',
+  SocialEarningState.active => 'Earning program active',
+};
 
 class _SocialCommentsPanelV2 extends StatefulWidget {
   const _SocialCommentsPanelV2({

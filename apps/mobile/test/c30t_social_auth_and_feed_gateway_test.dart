@@ -154,6 +154,11 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Sign in to message'), findsOneWidget);
+      expect(
+        find.byKey(const Key('social-author-status-ui-review-asha')),
+        findsOneWidget,
+      );
+      expect(find.text('Earning program unavailable'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
