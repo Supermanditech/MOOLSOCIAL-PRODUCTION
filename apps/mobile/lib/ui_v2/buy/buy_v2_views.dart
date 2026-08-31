@@ -646,7 +646,7 @@ class BuyV2ProductView extends StatelessWidget {
                             '${partnerProducts.length} other current products · Not medical advice',
                         semanticLabel:
                             'View ${partnerProducts.length} more products from ${product.seller} '
-                            'in the current Medicine catalogue. Not medical advice',
+                            'that are available now. Not medical advice',
                         onTap: () => _showPartnerProductsSheet(
                           context,
                           session,
@@ -1681,7 +1681,7 @@ class _WholesaleTradeDecisionPanelState
                   detail:
                       '${supplierProducts.length} other current trade packs',
                   semanticLabel:
-                      'View ${supplierProducts.length} more products from ${facts.partner} in the current Wholesale catalogue',
+                      'View ${supplierProducts.length} more products available from ${facts.partner}',
                   onTap: () => _showPartnerProductsSheet(
                     context,
                     widget.session,
@@ -2474,11 +2474,11 @@ class _ProductContinuationSection extends StatelessWidget {
     final (title, detail) = switch (product.destination) {
       BuyV2Destination.shop => (
         'You may also like',
-        'More from the current Shop catalogue',
+        'More products selected for you',
       ),
       BuyV2Destination.wholesale => (
         'More for business restocking',
-        'Trade packs from the current Wholesale catalogue',
+        'Trade packs for your next order',
       ),
       BuyV2Destination.medicine => (
         'More Medicine essentials',
@@ -2786,15 +2786,15 @@ class _PartnerProductAction extends StatelessWidget {
       BuyV2Destination.wholesale =>
         'View ${product.title} from ${product.seller}. ${product.pack}. '
             'MOQ ${product.minimumOrder}. ${buyV2Money(product.price)}. '
-            '${product.unitPrice}. Current Wholesale catalogue.',
+            '${product.unitPrice}. Available for Wholesale.',
       BuyV2Destination.medicine =>
         'View ${product.title} from ${product.seller}. $packFact. '
             '${buyV2Money(product.price)}. ${product.unitPrice}. '
-            'Current Medicine catalogue. Not medical advice.',
+            'Available from this pharmacy. Not medical advice.',
       _ =>
         'View ${product.title} from ${product.seller}. ${product.pack}. '
             '${buyV2Money(product.price)}. ${product.unitPrice}. '
-            'Current Shop catalogue.',
+            'Available in Shop.',
     };
 
     return BuyV2IntentDepth(
@@ -13615,7 +13615,7 @@ class _CartDiscoverySections extends StatelessWidget {
             laneId: 'special',
             title: _cartSpecialTitle(destination),
             detail:
-                'Current catalogue offers for this ${_cartFamilyLabel(destination).toLowerCase()}',
+                'Available offers for this ${_cartFamilyLabel(destination).toLowerCase()}',
             products: special,
           ),
         );
@@ -14186,7 +14186,7 @@ class _CartSavingsSummary extends StatelessWidget {
                 Text(
                   savings > 0
                       ? 'You save ${buyV2Money(savings)}'
-                      : 'Current catalogue prices',
+                      : 'Latest listed prices',
                   style: context.buyBody.copyWith(fontSize: 10),
                 ),
                 Text(
