@@ -9,6 +9,7 @@ import 'buy_v2_models.dart';
 import 'buy_v2_order_resolution_contracts.dart';
 import 'buy_v2_search_relevance.dart';
 import 'buy_v2_saved_products_store.dart';
+import 'buy_v2_shopping_alerts.dart';
 
 String _buyV2SavedKey(BuyV2Product product) =>
     '${product.destination.name}|${product.canonicalId}';
@@ -329,6 +330,7 @@ class BuyV2Session extends ChangeNotifier {
     this.balancePaymentAdapter,
     this.deliveryExceptionAdapter,
     BuyV2OrderResolutionAdapter? orderResolutionAdapter,
+    BuyV2ShoppingAlertsAdapter? shoppingAlertsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
     bool? reviewDataEnabled,
   }) : cartBenefitsAdapter =
@@ -356,7 +358,13 @@ class BuyV2Session extends ChangeNotifier {
            ((reviewDataEnabled ??
                    (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
                ? const BuyV2UiReviewOrderResolutionAdapter()
-               : const BuyV2UnavailableOrderResolutionAdapter()) {
+               : const BuyV2UnavailableOrderResolutionAdapter()),
+       shoppingAlertsAdapter =
+           shoppingAlertsAdapter ??
+           ((reviewDataEnabled ??
+                   (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
+               ? const BuyV2UiReviewShoppingAlertsAdapter()
+               : const BuyV2UnavailableShoppingAlertsAdapter()) {
     if (cartBenefitsAdapter is BuyV2LiveCartBenefitsAdapter) {
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.idle;
     }
@@ -396,6 +404,7 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2BalancePaymentAdapter? balancePaymentAdapter;
   final BuyV2DeliveryExceptionAdapter? deliveryExceptionAdapter;
   final BuyV2OrderResolutionAdapter orderResolutionAdapter;
+  final BuyV2ShoppingAlertsAdapter shoppingAlertsAdapter;
   final BuyV2CommerceAdapter commerceAdapter;
   final bool reviewDataEnabled;
 
@@ -638,6 +647,11 @@ class BuyV2Session extends ChangeNotifier {
       {};
   final Map<String, BuyV2OrderResolutionResult> _orderResolutionResults = {};
   final Set<String> _orderResolutionBusyIds = {};
+  List<BuyV2ShoppingAlert> _shoppingAlerts = [];
+  BuyV2ShoppingAlertsState shoppingAlertsState =
+      BuyV2ShoppingAlertsState.loading;
+  String? shoppingAlertsMessage;
+  bool shoppingAlertsBusy = false;
   final Map<String, BuyV2BalancePaymentResult> _balancePaymentResults = {};
   final Set<String> _balancePaymentBusyOrderIds = {};
   int _balancePaymentAttemptSequence = 0;
@@ -4044,6 +4058,85 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     } finally {
       _orderResolutionBusyIds.remove(orderId);
+      notifyListeners();
+    }
+  }
+
+  List<BuyV2ShoppingAlert> get shoppingAlerts =>
+      List.unmodifiable(_shoppingAlerts);
+
+  Future<bool> restoreShoppingAlerts() async {
+    if (shoppingAlertsBusy) return false;
+    shoppingAlertsBusy = true;
+    shoppingAlertsState = BuyV2ShoppingAlertsState.loading;
+    shoppingAlertsMessage = null;
+    notifyListeners();
+    try {
+      final snapshot = await shoppingAlertsAdapter.load(
+        BuyV2ShoppingAlertsRequest(
+          orders: List.unmodifiable(_orders),
+          products: List.unmodifiable(_catalogueProducts),
+        ),
+      );
+      if (snapshot.sourceId.trim().isEmpty) {
+        throw const FormatException('Missing shopping alerts source');
+      }
+      shoppingAlertsState = snapshot.state;
+      shoppingAlertsMessage = snapshot.customerMessage;
+      if (snapshot.state != BuyV2ShoppingAlertsState.ready) {
+        _shoppingAlerts = [];
+        return false;
+      }
+      final ids = <String>{};
+      _shoppingAlerts = List.unmodifiable(
+        snapshot.alerts.where((alert) {
+          if (alert.id.trim().isEmpty ||
+              alert.title.trim().isEmpty ||
+              alert.detail.trim().isEmpty ||
+              alert.updatedLabel.trim().isEmpty ||
+              !ids.add(alert.id)) {
+            return false;
+          }
+          final orderId = alert.orderId?.trim();
+          final productId = alert.productId?.trim();
+          final orderRequired = switch (alert.kind) {
+            BuyV2ShoppingAlertKind.order ||
+            BuyV2ShoppingAlertKind.payment ||
+            BuyV2ShoppingAlertKind.delivery ||
+            BuyV2ShoppingAlertKind.cancellation ||
+            BuyV2ShoppingAlertKind.returnUpdate ||
+            BuyV2ShoppingAlertKind.refund => true,
+            BuyV2ShoppingAlertKind.offer ||
+            BuyV2ShoppingAlertKind.priceDrop ||
+            BuyV2ShoppingAlertKind.restock => false,
+          };
+          if (orderRequired) {
+            return orderId != null &&
+                orderId.isNotEmpty &&
+                _orders.any((order) => order.id == orderId);
+          }
+          if (alert.kind == BuyV2ShoppingAlertKind.priceDrop ||
+              alert.kind == BuyV2ShoppingAlertKind.restock) {
+            return productId != null &&
+                productId.isNotEmpty &&
+                _catalogueProducts.any(
+                  (product) =>
+                      product.id == productId &&
+                      product.destination == alert.destination,
+                );
+          }
+          return alert.kind == BuyV2ShoppingAlertKind.offer;
+        }),
+      );
+      return true;
+    } on Object {
+      _shoppingAlerts = [];
+      shoppingAlertsState = BuyV2ShoppingAlertsState.unavailable;
+      shoppingAlertsMessage =
+          'Shopping alerts could not load. Try again. Your orders are unchanged.';
+      return false;
+    } finally {
+      shoppingAlertsBusy = false;
       notifyListeners();
     }
   }

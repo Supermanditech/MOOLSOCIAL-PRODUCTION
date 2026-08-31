@@ -9,6 +9,7 @@ import '../../core/design/mool_design_system.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_session.dart';
+import '../../features/buy/buy_v2_shopping_alerts.dart';
 import 'buy_v2_address_sheet_motion.dart';
 import 'buy_v2_category_sheet_policy.dart';
 import 'buy_v2_design.dart';
@@ -2362,6 +2363,21 @@ class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
                         ),
                 ),
                 _ShoppingSettingsRow(
+                  key: const ValueKey('buy-settings-shopping-alerts'),
+                  icon: Icons.notifications_none_rounded,
+                  title: 'Shopping alerts',
+                  detail: switch (session.shoppingAlertsState) {
+                    BuyV2ShoppingAlertsState.loading => 'Loading alerts…',
+                    BuyV2ShoppingAlertsState.ready =>
+                      '${session.shoppingAlerts.length} current alerts',
+                    BuyV2ShoppingAlertsState.offline =>
+                      'Reconnect to review alerts',
+                    BuyV2ShoppingAlertsState.unavailable =>
+                      'Alerts are unavailable right now',
+                  },
+                  onTap: () => showBuyV2ShoppingAlerts(context, session),
+                ),
+                _ShoppingSettingsRow(
                   key: const ValueKey('buy-settings-saved'),
                   icon: Icons.bookmark_border_rounded,
                   title: 'Saved products',
@@ -2622,6 +2638,190 @@ void _openBuyV2SettingsRoute(BuildContext context, String route) {
   Navigator.of(context).pop();
   Future<void>.microtask(() => router.push(route));
 }
+
+Future<void> showBuyV2ShoppingAlerts(
+  BuildContext context,
+  BuyV2Session session,
+) async {
+  final router = GoRouter.maybeOf(context);
+  await showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetContext) => AnimatedBuilder(
+      animation: session,
+      builder: (sheetContext, _) {
+        void openAlert(BuyV2ShoppingAlert alert) {
+          if (router == null) return;
+          final location = buyV2ShoppingAlertLocation(alert);
+          Navigator.of(sheetContext).pop();
+          Navigator.of(context).pop();
+          Future<void>.microtask(() => router.push(location));
+        }
+
+        return SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            key: const ValueKey('buy-shopping-alerts'),
+            padding: EdgeInsets.fromLTRB(
+              14,
+              0,
+              14,
+              18 + MediaQuery.viewPaddingOf(sheetContext).bottom,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Shopping alerts',
+                  style: sheetContext.buyTitle.copyWith(fontSize: 19),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Order, payment, delivery and product updates appear here.',
+                  style: sheetContext.buyMeta,
+                ),
+                const SizedBox(height: 12),
+                if (session.shoppingAlertsBusy ||
+                    session.shoppingAlertsState ==
+                        BuyV2ShoppingAlertsState.loading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: CircularProgressIndicator(strokeWidth: 3),
+                    ),
+                  )
+                else if (session.shoppingAlertsState !=
+                    BuyV2ShoppingAlertsState.ready) ...[
+                  Container(
+                    key: const ValueKey('buy-shopping-alerts-unavailable'),
+                    padding: const EdgeInsets.all(12),
+                    decoration: buyV2CardDecoration(
+                      color: BuyV2Colors.softOrange,
+                      radius: 15,
+                    ),
+                    child: Text(
+                      session.shoppingAlertsMessage ??
+                          'Shopping alerts are unavailable right now.',
+                      style: sheetContext.buyBody,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    key: const ValueKey('buy-shopping-alerts-retry'),
+                    onPressed: session.shoppingAlertsBusy
+                        ? null
+                        : session.restoreShoppingAlerts,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Try again'),
+                  ),
+                ] else if (session.shoppingAlerts.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: buyV2CardDecoration(radius: 15),
+                    child: const Text(
+                      'You have no current shopping alerts.',
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                else
+                  for (final alert in session.shoppingAlerts) ...[
+                    Semantics(
+                      button: router != null,
+                      label:
+                          '${alert.title}. ${alert.detail}. ${alert.updatedLabel}',
+                      child: InkWell(
+                        key: ValueKey('buy-shopping-alert-${alert.id}'),
+                        onTap: router == null ? null : () => openAlert(alert),
+                        borderRadius: BorderRadius.circular(15),
+                        child: Container(
+                          constraints: const BoxConstraints(minHeight: 72),
+                          padding: const EdgeInsets.all(10),
+                          decoration: buyV2CardDecoration(radius: 15),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: BuyV2Colors.softBlue,
+                                  borderRadius: BorderRadius.circular(13),
+                                ),
+                                child: Icon(
+                                  _buyV2ShoppingAlertIcon(alert.kind),
+                                  color: BuyV2Colors.navy,
+                                  size: 21,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      alert.title,
+                                      style: sheetContext.buyBody.copyWith(
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      alert.detail,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: sheetContext.buyMeta,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      alert.updatedLabel,
+                                      style: sheetContext.buyMeta.copyWith(
+                                        color: BuyV2Colors.green,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (router != null)
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: BuyV2Colors.muted,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+IconData _buyV2ShoppingAlertIcon(BuyV2ShoppingAlertKind kind) => switch (kind) {
+  BuyV2ShoppingAlertKind.order => Icons.receipt_long_outlined,
+  BuyV2ShoppingAlertKind.payment => Icons.account_balance_wallet_outlined,
+  BuyV2ShoppingAlertKind.delivery => Icons.local_shipping_outlined,
+  BuyV2ShoppingAlertKind.offer => Icons.local_offer_outlined,
+  BuyV2ShoppingAlertKind.priceDrop => Icons.trending_down_rounded,
+  BuyV2ShoppingAlertKind.restock => Icons.inventory_2_outlined,
+  BuyV2ShoppingAlertKind.cancellation => Icons.cancel_outlined,
+  BuyV2ShoppingAlertKind.returnUpdate => Icons.assignment_return_outlined,
+  BuyV2ShoppingAlertKind.refund => Icons.currency_rupee_rounded,
+};
 
 Future<void> showBuyV2HouseholdBasket(
   BuildContext context,
