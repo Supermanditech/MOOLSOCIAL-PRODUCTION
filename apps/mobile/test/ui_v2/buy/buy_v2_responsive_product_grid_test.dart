@@ -75,7 +75,7 @@ void main() {
             reason: '$size product $index fully visible',
           );
         }
-        expect(firstRect.height, inInclusiveRange(221, 225));
+        expect(firstRect.height, inInclusiveRange(296, 300));
 
         final title = tester.widget<Text>(
           find
@@ -88,7 +88,7 @@ void main() {
               .first,
         );
         expect(title.style?.fontSize, greaterThanOrEqualTo(10.5));
-        expect(title.maxLines, 2);
+        expect(title.maxLines, 3);
         expect(pack.style?.fontSize, greaterThanOrEqualTo(9.5));
         expect(tester.takeException(), isNull, reason: '$size overflow');
 
@@ -135,7 +135,7 @@ void main() {
       findsOneWidget,
     );
     final firstCard = find.byKey(ValueKey('buy-product-${products[0].id}'));
-    expect(tester.getSize(firstCard).height, inInclusiveRange(286, 290));
+    expect(tester.getSize(firstCard).height, inInclusiveRange(326, 330));
     final add = find.descendant(
       of: firstCard,
       matching: find.byKey(ValueKey('buy-add-shell-${products[0].id}')),
@@ -173,7 +173,7 @@ void main() {
       final card = find.byKey(ValueKey('buy-product-${products[index].id}'));
       expect(card, findsOneWidget);
       expect(tester.getSize(card).width, greaterThanOrEqualTo(160));
-      expect(tester.getSize(card).height, inInclusiveRange(221, 225));
+      expect(tester.getSize(card).height, inInclusiveRange(296, 300));
     }
     expect(tester.takeException(), isNull);
   });

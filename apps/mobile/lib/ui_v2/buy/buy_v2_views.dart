@@ -3708,10 +3708,19 @@ Future<void> _showProductReportSheet(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     sheetAnimationStyle: BuyV2ProductFeedbackSheetMotion.resolve(context),
-    builder: (sheetContext) => _ProductReportSheet(
-      session: session,
-      product: product,
-      reasons: reasons,
+    builder: (sheetContext) => AnimatedPadding(
+      duration: BuyV2ProductFeedbackSheetMotion.resolveKeyboardInsetDuration(
+        sheetContext,
+      ),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+      ),
+      child: _ProductReportSheet(
+        session: session,
+        product: product,
+        reasons: reasons,
+      ),
     ),
   );
 }
