@@ -4789,11 +4789,11 @@ _resolveCompactProductGridLayout({
             : 260.0
       : accessibleText
       ? constraints.maxWidth < 360
-            ? 310.0
-            : 296.0
+            ? 322.0
+            : 308.0
       : columns == 3
-      ? 246.0
-      : 244.0;
+      ? 258.0
+      : 256.0;
   return (columns: columns, cardWidth: cardWidth, tileHeight: tileHeight);
 }
 
@@ -6119,7 +6119,7 @@ class BuyV2ProductCard extends StatelessWidget {
                                                     : '${facts.partner} · '
                                                           '${_compactDeliveryPromise(facts.deliveryPromise)}'
                                               : buyerPromise,
-                                          maxLines: compact ? 2 : 2,
+                                          maxLines: compact ? 3 : 2,
                                           overflow: compact
                                               ? TextOverflow.clip
                                               : TextOverflow.ellipsis,

@@ -76,7 +76,7 @@ void main() {
             reason: '$size product $index fully visible',
           );
         }
-        expect(firstRect.height, inInclusiveRange(242, 244));
+        expect(firstRect.height, inInclusiveRange(254, 256));
 
         final title = tester.widget<Text>(
           find
@@ -151,12 +151,19 @@ void main() {
       findsOneWidget,
     );
     final firstCard = find.byKey(ValueKey('buy-product-${products[0].id}'));
-    expect(tester.getSize(firstCard).height, inInclusiveRange(306, 308));
+    expect(tester.getSize(firstCard).height, inInclusiveRange(318, 320));
     final add = find.descendant(
       of: firstCard,
       matching: find.byKey(ValueKey('buy-add-shell-${products[0].id}')),
     );
     expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
+    final completePromise = tester.widget<Text>(
+      find
+          .descendant(of: firstCard, matching: find.textContaining('10:30'))
+          .first,
+    );
+    expect(completePromise.maxLines, 3);
+    expect(completePromise.overflow, TextOverflow.clip);
     expect(tester.takeException(), isNull);
   });
 
@@ -189,7 +196,7 @@ void main() {
       final card = find.byKey(ValueKey('buy-product-${products[index].id}'));
       expect(card, findsOneWidget);
       expect(tester.getSize(card).width, greaterThanOrEqualTo(160));
-      expect(tester.getSize(card).height, inInclusiveRange(242, 244));
+      expect(tester.getSize(card).height, inInclusiveRange(254, 256));
     }
     expect(tester.takeException(), isNull);
   });
