@@ -164,6 +164,18 @@ void main() {
     );
     expect(completePromise.maxLines, 3);
     expect(completePromise.overflow, TextOverflow.clip);
+    final oneDayCard = find.byKey(ValueKey('buy-product-${products[2].id}'));
+    expect(
+      find.descendant(of: oneDayCard, matching: find.textContaining('1 day')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: oneDayCard,
+        matching: find.textContaining('within one day'),
+      ),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
   });
 

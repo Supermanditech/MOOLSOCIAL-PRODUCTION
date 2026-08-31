@@ -4163,6 +4163,22 @@ String _compactDeliveryPromise(String value) {
     caseSensitive: false,
   ).firstMatch(value);
   if (minutes != null) return '${minutes.group(1)} min';
+  final days = RegExp(
+    r'(?:(dispatch|delivery)\s+)?(?:in|within)\s+(one|two|three|\d+)\s+days?',
+    caseSensitive: false,
+  ).firstMatch(value);
+  if (days != null) {
+    final count = switch (days.group(2)!.toLowerCase()) {
+      'one' => '1',
+      'two' => '2',
+      'three' => '3',
+      final value => value,
+    };
+    final action = days.group(1)?.toLowerCase() == 'dispatch'
+        ? 'Dispatch'
+        : 'Delivery';
+    return '$action · $count ${count == '1' ? 'day' : 'days'}';
+  }
   final parts = value.split(' · ');
   if (parts.length < 2) return value;
   final date = parts.first.replaceFirst(RegExp(r'^[A-Za-z]{3},\s*'), '');
