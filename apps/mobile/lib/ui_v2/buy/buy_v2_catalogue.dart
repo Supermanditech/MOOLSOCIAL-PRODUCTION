@@ -5224,7 +5224,7 @@ class _FeaturedProductRail extends StatelessWidget {
     };
     return SizedBox(
       key: const ValueKey('buy-featured-products'),
-      height: accessibleText ? 362 : 322,
+      height: accessibleText ? 374 : 292,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -5632,7 +5632,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      flex: 5,
+                      flex: 11,
                       child: Stack(
                         children: [
                           Positioned.fill(
@@ -5661,7 +5661,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                       ),
                     ),
                     Expanded(
-                      flex: 6,
+                      flex: 10,
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
                         child: Column(
@@ -5736,7 +5736,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const Spacer(),
                             Text(
                               automaticFulfilment
                                   ? '${buyV2CompactFulfilmentModeLabel(fulfilmentMode)} · ${_compactDeliveryPromise(buyerPromise)}'
