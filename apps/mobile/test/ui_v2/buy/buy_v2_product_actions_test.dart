@@ -246,4 +246,60 @@ void main() {
     expect(session.selectedProductId, 'w-rice-50kg');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('Shop seller products open and return to the exact product', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    final product = BuyV2Catalogue.products.firstWhere(
+      (candidate) =>
+          candidate.destination == BuyV2Destination.shop &&
+          session.sellerContinuationsFor(candidate).isNotEmpty,
+    );
+    expect(session.openProduct(product.id), isTrue);
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(
+          session: session,
+          initialDestination: BuyV2Destination.shop,
+          initialView: BuyV2View.product,
+          productId: product.id,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final productScroll = find
+        .descendant(
+          of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    final seller = find.byKey(ValueKey('buy-shop-seller-action-${product.id}'));
+    await tester.scrollUntilVisible(seller, 220, scrollable: productScroll);
+    for (var attempt = 0; attempt < 3; attempt += 1) {
+      if (tester.getCenter(seller).dy < 520) break;
+      await tester.drag(productScroll, const Offset(0, -180));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(seller);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(ValueKey('buy-shop-seller-sheet-${product.id}')),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Compare available products and prices from this seller'),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.product);
+    expect(session.selectedProductId, product.id);
+    expect(tester.takeException(), isNull);
+  });
 }

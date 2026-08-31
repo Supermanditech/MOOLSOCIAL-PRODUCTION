@@ -419,9 +419,12 @@ class BuyV2ProductView extends StatelessWidget {
     final offerDecision = automaticFulfilment
         ? buyV2ResolveProductOfferDecision(product: product, facts: facts)
         : null;
-    final partnerProducts = product.destination == BuyV2Destination.medicine
-        ? session.sellerContinuationsFor(product)
-        : const <BuyV2Product>[];
+    final partnerProducts = switch (product.destination) {
+      BuyV2Destination.shop ||
+      BuyV2Destination.medicine => session.sellerContinuationsFor(product),
+      BuyV2Destination.wholesale ||
+      BuyV2Destination.orders => const <BuyV2Product>[],
+    };
     final rxBlocked =
         product.requiresPrescription &&
         !session.isPrescriptionApproved(product.id);
@@ -760,6 +763,17 @@ class BuyV2ProductView extends StatelessWidget {
                 session: session,
                 product: product,
                 trust: trust,
+                onViewSeller:
+                    product.destination == BuyV2Destination.shop &&
+                        partnerProducts.isNotEmpty
+                    ? () => _showPartnerProductsSheet(
+                        context,
+                        session,
+                        product,
+                        partnerProducts,
+                      )
+                    : null,
+                sellerProductCount: partnerProducts.length,
               ),
               const SizedBox(height: 10),
               _ProductReviewsPanel(
@@ -2626,11 +2640,11 @@ Future<void> _showPartnerProductsSheet(
   };
   final catalogueFactCopy = switch (current.destination) {
     BuyV2Destination.wholesale =>
-      'Current Wholesale catalogue · listed pack, MOQ and price facts only',
+      'Compare this supplier’s available packs, minimum orders and prices',
     BuyV2Destination.medicine =>
-      'Current Medicine catalogue · listed pack and price facts only · '
+      'Review available packs and prices from this pharmacy · '
           'Not medical advice',
-    _ => 'Current Shop catalogue · listed pack and price facts only',
+    _ => 'Compare available products and prices from this seller',
   };
   final closeTooltip = switch (current.destination) {
     BuyV2Destination.wholesale => 'Close supplier products',
@@ -3664,11 +3678,15 @@ class _MarketplaceTrustPanel extends StatelessWidget {
     required this.session,
     required this.product,
     required this.trust,
+    required this.onViewSeller,
+    required this.sellerProductCount,
   });
 
   final BuyV2Session session;
   final BuyV2Product product;
   final BuyV2MarketplaceTrustSnapshot trust;
+  final VoidCallback? onViewSeller;
+  final int sellerProductCount;
 
   @override
   Widget build(BuildContext context) {
@@ -3738,6 +3756,18 @@ class _MarketplaceTrustPanel extends StatelessWidget {
           label: trust.partnerType,
           value: trust.partnerName,
         ),
+        if (onViewSeller != null)
+          _DecisionActionRow(
+            key: ValueKey('buy-shop-seller-action-${product.id}'),
+            icon: Icons.storefront_outlined,
+            label: 'Seller products',
+            value: 'More from ${trust.partnerName}',
+            detail:
+                '$sellerProductCount other ${sellerProductCount == 1 ? 'product' : 'products'}',
+            semanticLabel:
+                'View $sellerProductCount more ${sellerProductCount == 1 ? 'product' : 'products'} from ${trust.partnerName}',
+            onTap: onViewSeller!,
+          ),
         if (partnerRating case final rating?)
           _DecisionRow(
             icon: Icons.workspace_premium_outlined,
