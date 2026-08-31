@@ -17,6 +17,7 @@ import '../../core/youtube/youtube_private_dev_workflow.dart';
 import '../../features/shared/social_media_picker.dart';
 import '../../features/shared/youtube_public_watch_state_repository.dart';
 import 'social_v2_create_workbench.dart';
+import 'social_v2_design.dart';
 import 'social_v2_youtube_public_runtime.dart';
 
 const _youtubeUploadPermission =
@@ -1104,6 +1105,8 @@ class _SocialYouTubeCreatorUploadScreenState
             : RefreshIndicator(
                 onRefresh: _refreshConnection,
                 child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                   children: [
                     Text(
@@ -1712,6 +1715,9 @@ class _SocialYouTubeCreatorUploadScreenState
                     controller: _title,
                     enabled: !_uploading,
                     maxLength: 100,
+                    scrollPadding: socialV2InputScrollPadding,
+                    textInputAction: TextInputAction.next,
+                    onEditingComplete: () => FocusScope.of(context).nextFocus(),
                     decoration: const InputDecoration(
                       labelText: 'Title',
                       border: OutlineInputBorder(),
@@ -1732,6 +1738,9 @@ class _SocialYouTubeCreatorUploadScreenState
                     enabled: !_uploading,
                     minLines: 3,
                     maxLines: 6,
+                    scrollPadding: socialV2InputScrollPadding,
+                    textInputAction: TextInputAction.done,
+                    onEditingComplete: () => FocusScope.of(context).unfocus(),
                     decoration: const InputDecoration(
                       labelText: 'Description (optional)',
                       border: OutlineInputBorder(),

@@ -735,6 +735,11 @@ void main() {
         addTearDown(session.dispose);
         await _pump(tester, SocialYouTubeConnectV2Screen(session: session));
 
+        final urlField = tester.widget<TextField>(
+          find.byKey(const Key('social-v2-youtube-url')),
+        );
+        expect(urlField.textInputAction, TextInputAction.done);
+        expect(urlField.scrollPadding, const EdgeInsets.only(bottom: 160));
         await tester.enterText(
           find.byKey(const Key('social-v2-youtube-url')),
           'https://youtube.com/watch?v=moolsocial',
@@ -746,8 +751,25 @@ void main() {
         expect(session.youtubeValidated, isTrue);
         expect(session.youtubeStep, YouTubeConnectStep.action);
         expect(find.text('Add post details'), findsOneWidget);
-
         await _scrollToAndTap(tester, find.text('Buy'));
+
+        final reference = find.byKey(const Key('social-v2-youtube-reference'));
+        await tester.ensureVisible(reference);
+        await tester.pumpAndSettle();
+        final referenceEditable = tester.widget<EditableText>(
+          find.descendant(of: reference, matching: find.byType(EditableText)),
+        );
+        expect(referenceEditable.textInputAction, TextInputAction.next);
+        expect(
+          referenceEditable.scrollPadding,
+          const EdgeInsets.only(bottom: 160),
+        );
+        final contextField = tester.widget<TextField>(
+          find.byKey(const Key('social-v2-youtube-context')),
+        );
+        expect(contextField.textInputAction, TextInputAction.done);
+        expect(contextField.scrollPadding, const EdgeInsets.only(bottom: 160));
+
         await _scrollToAndTap(
           tester,
           find.widgetWithText(

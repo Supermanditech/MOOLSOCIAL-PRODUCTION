@@ -544,6 +544,37 @@ void main() {
         find.byKey(const Key('youtube-creator-selected-video')),
         findsOneWidget,
       );
+      final title = find.byKey(const Key('youtube-creator-title'));
+      final description = find.byKey(const Key('youtube-creator-description'));
+      final titleEditable = tester.widget<EditableText>(
+        find.descendant(of: title, matching: find.byType(EditableText)),
+      );
+      final descriptionEditable = tester.widget<EditableText>(
+        find.descendant(of: description, matching: find.byType(EditableText)),
+      );
+      expect(titleEditable.textInputAction, TextInputAction.next);
+      expect(descriptionEditable.textInputAction, TextInputAction.done);
+      expect(titleEditable.scrollPadding, const EdgeInsets.only(bottom: 160));
+      expect(
+        descriptionEditable.scrollPadding,
+        const EdgeInsets.only(bottom: 160),
+      );
+      expect(
+        tester
+            .widget<ListView>(find.byType(ListView).first)
+            .keyboardDismissBehavior,
+        ScrollViewKeyboardDismissBehavior.onDrag,
+      );
+      tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+      await tester.ensureVisible(description);
+      await tester.enterText(description, 'A keyboard-safe Short description.');
+      await tester.pumpAndSettle();
+      expect(
+        tester.getBottomRight(description).dy,
+        lessThanOrEqualTo(915 - 320),
+      );
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.pumpAndSettle();
       await _reveal(tester, const Key('youtube-creator-not-kids'));
       await tester.tap(find.byKey(const Key('youtube-creator-not-kids')));
       await _reveal(tester, const Key('youtube-creator-rights'));
