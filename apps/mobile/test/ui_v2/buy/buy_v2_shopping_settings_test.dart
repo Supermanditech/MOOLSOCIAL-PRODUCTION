@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
+import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
@@ -108,6 +109,15 @@ void main() {
       find.byKey(const ValueKey('buy-settings-recently-viewed')),
     );
     await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-recently-viewed-info-sheet')),
+      findsOneWidget,
+    );
+    expect(find.text('Clear recently viewed?'), findsNothing);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-recently-viewed-sheet-clear')),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Clear recently viewed?'), findsOneWidget);
     await tester.tap(
       find.byKey(const ValueKey('buy-settings-recently-viewed-confirm')),
@@ -116,4 +126,76 @@ void main() {
     expect(session.recentlyViewedProductsFor(session.destination), isEmpty);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'Shopping settings reopens an exact recently viewed product and returns',
+    (tester) async {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      expect(session.openProduct('s-milk'), isTrue);
+      session.closeProduct();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
+      await tester.pumpAndSettle();
+      final openSettings = find.byKey(
+        const ValueKey('buy-shopping-settings-button'),
+      );
+      await tester.scrollUntilVisible(
+        openSettings,
+        160,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(openSettings);
+      await tester.pumpAndSettle();
+
+      final settings = find.byKey(const ValueKey('buy-shopping-settings'));
+      final settingsScroll = find
+          .descendant(of: settings, matching: find.byType(Scrollable))
+          .first;
+      final recentlyViewed = find.byKey(
+        const ValueKey('buy-settings-recently-viewed'),
+      );
+      await tester.scrollUntilVisible(
+        recentlyViewed,
+        160,
+        scrollable: settingsScroll,
+      );
+      await tester.tap(recentlyViewed);
+      await tester.pumpAndSettle();
+
+      expect(settings, findsNothing);
+      expect(
+        find.byKey(const ValueKey('buy-recently-viewed-info-sheet')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(
+          const ValueKey('buy-settings-recently-viewed-product-s-milk'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(session.view, BuyV2View.product);
+      expect(session.selectedProductId, 's-milk');
+      expect(
+        find.byKey(const ValueKey('buy-recently-viewed-info-sheet')),
+        findsNothing,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.catalogue);
+      expect(session.destination, BuyV2Destination.shop);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

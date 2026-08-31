@@ -108,6 +108,7 @@ void main() {
     bool disableAnimations = false,
     BuyV2ScannerLauncher scannerLauncher = showBuyV2ProductScanner,
     VoidCallback? onOpenMool,
+    VoidCallback? onOpenChat,
     BuyV2InvoiceDownloader? invoiceDownloader,
     AuthenticatedAccountIdentity? accountIdentity,
     bool accountAuthenticated = false,
@@ -134,6 +135,7 @@ void main() {
         accountAuthenticated: accountAuthenticated,
         scannerLauncher: scannerLauncher,
         onOpenMool: onOpenMool,
+        onOpenChat: onOpenChat,
         invoiceDownloader: invoiceDownloader,
         offersSource: offersSource,
         onOpenMainAction: (action) {
@@ -2097,14 +2099,15 @@ void main() {
     },
   );
 
-  testWidgets('Account and assist return to the exact purchase depth', (
+  testWidgets('Account and shared Chat preserve the exact purchase depth', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
+    var chatOpens = 0;
     final product = BuyV2Catalogue.products.firstWhere(
       (item) => item.destination == BuyV2Destination.wholesale,
     );
-    await tester.pumpWidget(app(session));
+    await tester.pumpWidget(app(session, onOpenChat: () => chatOpens += 1));
     session.openProduct(product.id);
     await tester.pumpAndSettle();
 
@@ -2129,9 +2132,7 @@ void main() {
     );
     await tester.tap(trackingHelp);
     await tester.pumpAndSettle();
-    expect(session.view, BuyV2View.assist);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
+    expect(chatOpens, 1);
     expect(session.destination, BuyV2Destination.orders);
     expect(session.view, BuyV2View.tracking);
     expect(session.selectedOrder.id, 'MS-240782');

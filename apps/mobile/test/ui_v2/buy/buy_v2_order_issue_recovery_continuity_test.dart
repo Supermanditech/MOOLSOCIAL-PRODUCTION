@@ -17,6 +17,7 @@ void main() {
     double textScale = 1,
     bool reducedMotion = false,
     EdgeInsets safeArea = EdgeInsets.zero,
+    VoidCallback? onOpenChat,
   }) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -34,11 +35,12 @@ void main() {
         session: session,
         initialDestination: session.destination,
         initialView: session.view,
+        onOpenChat: onOpenChat,
       ),
     );
   }
 
-  testWidgets('delivered Tracking owns direct exact-order Help', (
+  testWidgets('delivered Tracking owns direct exact-order Chat Help', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -46,8 +48,9 @@ void main() {
     final session = newSession();
     addTearDown(session.dispose);
     expect(session.openTracking('MS-240741'), isTrue);
+    var chatOpens = 0;
 
-    await tester.pumpWidget(app(session));
+    await tester.pumpWidget(app(session, onOpenChat: () => chatOpens += 1));
     await tester.pumpAndSettle();
 
     final help = find.byKey(const ValueKey('buy-tracking-delivered-help'));
@@ -65,16 +68,10 @@ void main() {
     await tester.tap(help);
     await tester.pumpAndSettle();
 
-    expect(session.view, BuyV2View.assist);
-    expect(session.assistOrder.id, 'MS-240741');
-    expect(find.textContaining('MS-240741'), findsOneWidget);
-    expect(find.text('Return, replacement or refund'), findsOneWidget);
-    expect(find.text('Cancel or change order'), findsNothing);
-    expect(
-      find.text('Topics prepare support; no order changes happen here.'),
-      findsOneWidget,
-    );
-    expect(find.text('Cancellation · return · refund help'), findsOneWidget);
+    expect(chatOpens, 1);
+    expect(session.view, BuyV2View.tracking);
+    expect(session.selectedOrder.id, 'MS-240741');
+    expect(find.byKey(const ValueKey('buy-assist-hero')), findsNothing);
   });
 
   testWidgets(

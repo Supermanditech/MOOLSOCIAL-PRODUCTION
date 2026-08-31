@@ -2254,14 +2254,38 @@ Future<void> showBuyV2ShoppingSettings(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     sheetAnimationStyle: BuyV2InfoSheetMotion.resolve(context),
-    builder: (sheetContext) => _BuyV2ShoppingSettingsSheet(session: session),
+    builder: (sheetContext) => _BuyV2ShoppingSettingsSheet(
+      session: session,
+      onOpenSavedProducts: () {
+        Navigator.of(sheetContext).pop();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) {
+            unawaited(showBuyV2SavedProducts(context, session));
+          }
+        });
+      },
+      onOpenRecentlyViewed: () {
+        Navigator.of(sheetContext).pop();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) {
+            unawaited(showBuyV2RecentlyViewed(context, session));
+          }
+        });
+      },
+    ),
   );
 }
 
 class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
-  const _BuyV2ShoppingSettingsSheet({required this.session});
+  const _BuyV2ShoppingSettingsSheet({
+    required this.session,
+    required this.onOpenSavedProducts,
+    required this.onOpenRecentlyViewed,
+  });
 
   final BuyV2Session session;
+  final VoidCallback onOpenSavedProducts;
+  final VoidCallback onOpenRecentlyViewed;
 
   @override
   Widget build(BuildContext context) {
@@ -2382,7 +2406,7 @@ class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
                   icon: Icons.bookmark_border_rounded,
                   title: 'Saved products',
                   detail: '$savedCount saved',
-                  onTap: () => showBuyV2SavedProducts(context, session),
+                  onTap: onOpenSavedProducts,
                 ),
                 _ShoppingSettingsRow(
                   key: const ValueKey('buy-settings-recently-viewed'),
@@ -2391,10 +2415,7 @@ class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
                   detail: recentCount == 0
                       ? 'No recently viewed products'
                       : '$recentCount recently viewed',
-                  onTap: recentCount == 0
-                      ? null
-                      : () =>
-                            _confirmClearBuyV2RecentlyViewed(context, session),
+                  onTap: recentCount == 0 ? null : onOpenRecentlyViewed,
                 ),
                 _ShoppingSettingsRow(
                   key: const ValueKey('buy-settings-messages'),
@@ -2893,6 +2914,35 @@ Future<void> showBuyV2SavedProducts(
   }
 }
 
+Future<void> showBuyV2RecentlyViewed(
+  BuildContext context,
+  BuyV2Session session,
+) async {
+  final destination = session.destination;
+  final selectedProductId = await showModalBottomSheet<String>(
+    context: context,
+    showDragHandle: true,
+    useSafeArea: true,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    sheetAnimationStyle: BuyV2InfoSheetMotion.resolve(context),
+    builder: (sheetContext) => _RecentlyViewedProductsSheet(
+      session: session,
+      destination: destination,
+      onClose: () => Navigator.of(sheetContext).pop(),
+      onOpenProduct: (productId) => Navigator.of(sheetContext).pop(productId),
+      onClear: () => _confirmClearBuyV2RecentlyViewed(sheetContext, session),
+    ),
+  );
+  if (selectedProductId != null) {
+    session.openProduct(selectedProductId);
+  }
+}
+
 enum _HouseholdBasketAction { seeProducts, addToCart }
 
 class _BuyV2InfoSheetHeader extends StatelessWidget {
@@ -3051,6 +3101,239 @@ class _SavedProductsSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RecentlyViewedProductsSheet extends StatelessWidget {
+  const _RecentlyViewedProductsSheet({
+    required this.session,
+    required this.destination,
+    required this.onClose,
+    required this.onOpenProduct,
+    required this.onClear,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Destination destination;
+  final VoidCallback onClose;
+  final ValueChanged<String> onOpenProduct;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final sheetHeight = (MediaQuery.sizeOf(context).height * .64)
+        .clamp(330.0, 480.0)
+        .toDouble();
+    return Semantics(
+      key: const ValueKey('buy-recently-viewed-info-sheet'),
+      container: true,
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: 'Recently viewed products in ${destination.label}',
+      child: SizedBox(
+        height: sheetHeight,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: AnimatedBuilder(
+            animation: session,
+            builder: (context, _) {
+              final products = session.recentlyViewedProductsFor(destination);
+              final ownerKey = products.map((product) => product.id).join('|');
+              final productLabel = products.length == 1
+                  ? 'product'
+                  : 'products';
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _BuyV2InfoSheetHeader(
+                    icon: Icons.history_rounded,
+                    title: 'Recently viewed',
+                    detail:
+                        '${destination.label} · ${products.length} $productLabel',
+                    onClose: onClose,
+                  ),
+                  if (products.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        key: const ValueKey('buy-recently-viewed-sheet-clear'),
+                        onPressed: onClear,
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                        ),
+                        label: const Text('Clear history'),
+                      ),
+                    ),
+                  ] else
+                    const SizedBox(height: 14),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      key: const ValueKey(
+                        'buy-recently-viewed-products-owner-motion',
+                      ),
+                      duration: BuyV2InfoSheetMotion.resolveContentDuration(
+                        context,
+                      ),
+                      reverseDuration:
+                          BuyV2InfoSheetMotion.resolveContentDuration(context),
+                      child: products.isEmpty
+                          ? _RecentlyViewedEmptyState(destination: destination)
+                          : ListView.separated(
+                              key: ValueKey(
+                                'buy-recently-viewed-products-list-$ownerKey',
+                              ),
+                              padding: EdgeInsets.zero,
+                              itemCount: products.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 8),
+                              itemBuilder: (context, index) {
+                                final product = products[index];
+                                return _RecentlyViewedProductInfoRow(
+                                  product: product,
+                                  facts: session.productFactsFor(product),
+                                  onOpen: () => onOpenProduct(product.id),
+                                );
+                              },
+                            ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentlyViewedEmptyState extends StatelessWidget {
+  const _RecentlyViewedEmptyState({required this.destination});
+
+  final BuyV2Destination destination;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: const BoxDecoration(
+              color: BuyV2Colors.softBlue,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.history_toggle_off_rounded,
+              color: BuyV2Colors.navy,
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No recently viewed products',
+            textAlign: TextAlign.center,
+            style: context.buyTitle.copyWith(fontSize: 16),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Products you open in ${destination.label} will appear here.',
+            textAlign: TextAlign.center,
+            style: context.buyMeta,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _RecentlyViewedProductInfoRow extends StatelessWidget {
+  const _RecentlyViewedProductInfoRow({
+    required this.product,
+    required this.facts,
+    required this.onOpen,
+  });
+
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: 'Open ${product.title}, ${product.pack}',
+    onTap: onOpen,
+    excludeSemantics: true,
+    child: Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: BuyV2Colors.line),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: ValueKey('buy-settings-recently-viewed-product-${product.id}'),
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          child: Row(
+            children: [
+              SizedBox.square(
+                dimension: 48,
+                child: BuyV2ProductPackshot(
+                  product: product,
+                  borderRadius: 12,
+                  animateFirstFrame: false,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: BuyV2Colors.ink,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${product.pack} · ${buyV2Money(facts.price)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyMeta,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      buyV2BuyerDeliveryPromise(facts),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyMeta.copyWith(
+                        color: BuyV2Colors.green,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right_rounded, color: BuyV2Colors.muted),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _SavedProductsEmptyState extends StatelessWidget {

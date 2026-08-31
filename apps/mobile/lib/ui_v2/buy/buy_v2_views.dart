@@ -5844,13 +5844,13 @@ class BuyV2CheckoutView extends StatelessWidget {
     super.key,
     required this.session,
     required this.gstInvoiceController,
-    required this.onOpenSupport,
+    this.onOpenSupport,
     this.paymentHandoff,
   });
 
   final BuyV2Session session;
   final BuyV2GstInvoiceController gstInvoiceController;
-  final VoidCallback onOpenSupport;
+  final VoidCallback? onOpenSupport;
   final BuyV2PaymentHandoff? paymentHandoff;
 
   @override
@@ -6151,7 +6151,7 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
   });
 
   final BuyV2Session session;
-  final VoidCallback onOpenSupport;
+  final VoidCallback? onOpenSupport;
   final BuyV2PaymentHandoff? paymentHandoff;
 
   @override
