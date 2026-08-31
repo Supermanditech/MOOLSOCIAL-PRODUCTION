@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9,6 +10,7 @@ import '../../features/shared/shared_session.dart';
 import '../../features/shared/social_media_picker.dart';
 import 'social_v2_design.dart';
 import 'social_v2_public_content.dart';
+import '../universal/mool_global_navigation_v2.dart';
 
 enum SocialCreateFormatV2 { reel, carousel, post }
 
@@ -256,6 +258,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
   final List<TextEditingController> _choiceControllers =
       List<TextEditingController>.generate(4, (_) => TextEditingController());
   final FocusNode _bodyFocus = FocusNode();
+  late final ScrollController _formatScrollController;
   late final List<SocialPickedMedia> _media;
   late final List<SocialPickedMedia?> _imagePollMedia;
   int _correctChoice = 0;
@@ -287,6 +290,9 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     }
     _format = _draft._format;
     _postTool = _draft._postTool;
+    _formatScrollController = ScrollController(
+      initialScrollOffset: _selectedFormatIndex * 74,
+    );
     _media = _draft._media;
     _imagePollMedia = _draft._imagePollMedia;
     _correctChoice = _draft._correctChoice;
@@ -333,6 +339,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       };
       _persistDraftState();
     });
+    _revealSelectedFormat();
     if (!selectionWasPending &&
         intent == SocialCreateIntentV2.image &&
         _media.isEmpty) {
@@ -353,7 +360,30 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       controller.dispose();
     }
     _bodyFocus.dispose();
+    _formatScrollController.dispose();
     super.dispose();
+  }
+
+  int get _selectedFormatIndex => switch ((_format, _postTool)) {
+    (SocialCreateFormatV2.post, _SocialPostTool.none) => 0,
+    (SocialCreateFormatV2.post, _SocialPostTool.image) => 1,
+    (SocialCreateFormatV2.carousel, _) => 3,
+    (SocialCreateFormatV2.post, _SocialPostTool.imagePoll) => 4,
+    (SocialCreateFormatV2.post, _SocialPostTool.quickPoll) => 5,
+    (SocialCreateFormatV2.post, _SocialPostTool.quiz) => 6,
+    (SocialCreateFormatV2.reel, _) => 7,
+  };
+
+  void _revealSelectedFormat() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_formatScrollController.hasClients) return;
+      final position = _formatScrollController.position;
+      final target = (_selectedFormatIndex * 74.0 - 12).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      _formatScrollController.jumpTo(target);
+    });
   }
 
   void _persistTextDraft() {
@@ -460,6 +490,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       }
       _persistDraftState();
     });
+    _revealSelectedFormat();
     if (nextTool == _SocialPostTool.image) {
       await _choosePostImage();
     } else if (nextFormat == SocialCreateFormatV2.carousel &&
@@ -595,6 +626,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
         _postTool = _SocialPostTool.image;
         _persistDraftState();
       });
+      _revealSelectedFormat();
     }
     await _choosePostImage(SocialMediaSource.camera);
   }
@@ -708,6 +740,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       _media.clear();
       _persistDraftState();
     });
+    _revealSelectedFormat();
   }
 
   Future<void> _publish() async {
@@ -921,7 +954,21 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
 
   @override
   Widget build(BuildContext context) {
-    final keyboardOpen = View.of(context).viewInsets.bottom > 0;
+    final view = View.of(context);
+    final keyboardOpen = view.viewInsets.bottom > 0;
+    final viewPadding = EdgeInsets.fromViewPadding(
+      view.viewPadding,
+      view.devicePixelRatio,
+    );
+    final sharedExportedClearance = moolAndroidExportedSemanticsClearance(
+      viewPadding: viewPadding,
+      platform: defaultTargetPlatform,
+    );
+    final composerDockClearance =
+        defaultTargetPlatform == TargetPlatform.android &&
+            viewPadding.top > sharedExportedClearance
+        ? viewPadding.top
+        : sharedExportedClearance;
     return DecoratedBox(
       key: const ValueKey('social-v2-create-workbench'),
       decoration: const BoxDecoration(color: SocialV2Colors.canvas),
@@ -988,23 +1035,29 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                 child: _buildWorkbenchCard(keyboardOpen),
               ),
             ),
-            Material(
-              key: const Key('screen04-create-format-decision'),
-              color: Colors.white,
-              elevation: 8,
-              shadowColor: const Color(0x28000050),
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
-                  child: Column(
-                    key: const Key('screen04-create-composer-dock'),
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildFormatDecisionBar(),
-                      const SizedBox(height: 4),
-                      _buildComposerActionBar(),
-                    ],
+            Padding(
+              key: const Key(
+                'screen04-create-android-exported-semantics-clearance',
+              ),
+              padding: EdgeInsets.only(bottom: composerDockClearance),
+              child: Material(
+                key: const Key('screen04-create-format-decision'),
+                color: Colors.white,
+                elevation: 8,
+                shadowColor: const Color(0x28000050),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+                    child: Column(
+                      key: const Key('screen04-create-composer-dock'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildFormatDecisionBar(),
+                        const SizedBox(height: 4),
+                        _buildComposerActionBar(),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1148,37 +1201,32 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     }
 
     return LayoutBuilder(
-      key: const Key('screen04-create-ime-format-strip'),
       builder: (context, constraints) {
-        final gap = constraints.maxWidth <= 340 ? .5 : 4.0;
-        final width = (constraints.maxWidth - (gap * 6)) / 7;
-        final primaryGroup = SizedBox(
-          width: constraints.maxWidth,
-          child: Row(
-            children: [
-              for (var index = 0; index < primaryActions.length; index++) ...[
-                if (index > 0) SizedBox(width: gap),
-                action(primaryActions[index], width: width),
-              ],
-            ],
-          ),
-        );
-        return SizedBox(
-          key: const ValueKey('create-keyboard-format-workbench'),
-          height: 50,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                primaryGroup,
-                for (final value in videoActions) ...[
-                  const SizedBox(width: 5),
-                  action(
-                    value,
-                    width: value.label == 'YouTube Short' ? 92 : 62,
-                  ),
+        final width = constraints.maxWidth < 360 ? 68.0 : 72.0;
+        final actions = [...primaryActions, ...videoActions];
+        return Semantics(
+          label: 'Create formats. Swipe left or right for more.',
+          child: SizedBox(
+            key: const ValueKey('create-keyboard-format-workbench'),
+            height: 50,
+            child: SingleChildScrollView(
+              key: const Key('screen04-create-ime-format-strip'),
+              controller: _formatScrollController,
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Row(
+                children: [
+                  for (var index = 0; index < actions.length; index++) ...[
+                    if (index > 0) const SizedBox(width: 6),
+                    action(
+                      actions[index],
+                      width: actions[index].label == 'YouTube Short'
+                          ? 96
+                          : width,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         );

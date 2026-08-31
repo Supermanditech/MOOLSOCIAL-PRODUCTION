@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
@@ -116,8 +117,8 @@ void main() {
       );
       expect(
         tester.getSize(action).width,
-        greaterThanOrEqualTo(44),
-        reason: '$key must keep a production touch target.',
+        greaterThanOrEqualTo(68),
+        reason: '$key must stay readable instead of being squeezed.',
       );
       expect(
         tester.getSize(action).height,
@@ -135,18 +136,21 @@ void main() {
       expect(find.byKey(key), findsOneWidget);
       expect(tester.getSize(find.byKey(key)).height, 44);
     }
+    final formatStrip = find.byKey(
+      const Key('screen04-create-ime-format-strip'),
+    );
+    final quiz = find.byKey(const Key('screen04-create-tool-quiz'));
     expect(
-      tester
-          .getBottomRight(find.byKey(const Key('screen04-create-tool-quiz')))
-          .dx,
-      lessThanOrEqualTo(
-        tester
-            .getBottomRight(
-              find.byKey(const Key('screen04-create-ime-format-strip')),
-            )
-            .dx,
-      ),
-      reason: 'All seven primary Create formats must fit on a 360dp phone.',
+      tester.getBottomRight(quiz).dx,
+      greaterThan(tester.getBottomRight(formatStrip).dx),
+      reason: 'The relaxed format rail must intentionally scroll.',
+    );
+    await tester.drag(formatStrip, const Offset(-260, 0));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(quiz).overlaps(tester.getRect(formatStrip)),
+      isTrue,
+      reason: 'A left swipe must reveal the later Create formats.',
     );
     final header = find.byKey(const Key('screen04-create-composer-header'));
     final actionRow = find.byKey(
@@ -181,6 +185,8 @@ void main() {
       Key('screen04-create-tool-quick-poll'),
       Key('screen04-create-tool-quiz'),
     ]) {
+      await tester.ensureVisible(find.byKey(key));
+      await tester.pump();
       await tester.tap(find.byKey(key));
       await tester.pumpAndSettle();
       expect(
@@ -189,6 +195,10 @@ void main() {
         reason: '$key must keep its fields above the writing composer.',
       );
     }
+    await tester.ensureVisible(
+      find.byKey(const Key('screen04-create-tool-post')),
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const Key('screen04-create-tool-post')));
     await tester.pumpAndSettle();
     expect(
@@ -200,6 +210,46 @@ void main() {
       findsNothing,
     );
     expect(find.text('Create a MoolSocial post'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('OPPO inset exports every Create dock action above navigation', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 44);
+    addTearDown(tester.view.reset);
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+
+    await tester.pumpWidget(_app(owners.consumer(state: 'text')));
+    await tester.pumpAndSettle();
+    debugDefaultTargetPlatformOverride = null;
+
+    final preview = find.byKey(const Key('screen04-create-open-preview'));
+    final clearance = tester.widget<Padding>(
+      find.byKey(
+        const Key('screen04-create-android-exported-semantics-clearance'),
+      ),
+    );
+    expect((clearance.padding as EdgeInsets).bottom, 41);
+    final media = MediaQuery.of(tester.element(preview));
+    final exportedSafeBottom = media.size.height - media.viewPadding.top;
+    for (final key in const [
+      Key('screen04-create-inline-gif'),
+      Key('screen04-create-inline-mention'),
+      Key('screen04-create-inline-topic'),
+      Key('screen04-create-open-preview'),
+      Key('screen04-create-publish-post'),
+    ]) {
+      final rect = tester.getRect(find.byKey(key));
+      expect(rect.width, greaterThanOrEqualTo(44), reason: '$key width');
+      expect(rect.height, greaterThanOrEqualTo(44), reason: '$key height');
+      expect(rect.bottom, lessThanOrEqualTo(exportedSafeBottom));
+    }
     expect(tester.takeException(), isNull);
   });
 
@@ -248,12 +298,16 @@ void main() {
       find.byKey(const Key('screen04-create-keyboard-done')),
       findsNothing,
     );
+    final formatStrip = find.byKey(
+      const Key('screen04-create-ime-format-strip'),
+    );
+    final quiz = find.byKey(const Key('screen04-create-tool-quiz'));
+    await tester.drag(formatStrip, const Offset(-260, 0));
+    await tester.pumpAndSettle();
     expect(
-      tester
-          .getBottomRight(find.byKey(const Key('screen04-create-tool-quiz')))
-          .dx,
-      lessThanOrEqualTo(tester.getBottomRight(imeWorkbench).dx + .5),
-      reason: 'Every primary Create format must remain visible above the IME.',
+      tester.getRect(quiz).overlaps(tester.getRect(imeWorkbench)),
+      isTrue,
+      reason: 'The relaxed Create rail must remain swipeable above the IME.',
     );
     expect(tester.getBottomRight(publish).dy, lessThanOrEqualTo(keyboardTop));
     expect(tester.getBottomRight(formats).dy, lessThanOrEqualTo(keyboardTop));
