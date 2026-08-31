@@ -86,6 +86,14 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     setState(() {});
   }
 
+  void _openInlineConversationSearch() {
+    _searchFocusNode.requestFocus();
+  }
+
+  void _closeInlineConversationSearch() {
+    _searchFocusNode.unfocus();
+  }
+
   @override
   void didUpdateWidget(covariant ChatInboxScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -648,6 +656,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
       );
     }
     final hasSearchQuery = _searchController.text.trim().isNotEmpty;
+    final searchFocused = _searchFocusNode.hasFocus;
     return CustomScrollView(
       key: const PageStorageKey('chat-inbox-scroll'),
       slivers: [
@@ -667,6 +676,8 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                   focusNode: _searchFocusNode,
                   controller: _searchController,
                   onChanged: (_) => setState(() {}),
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _searchFocusNode.unfocus(),
                   decoration: InputDecoration(
                     hintText: 'Search conversations',
                     prefixIcon: const Icon(Icons.search_rounded),
@@ -678,32 +689,32 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                       key: Key(
                         hasSearchQuery
                             ? 'chat-clear-search'
-                            : 'chat-search-assistance',
+                            : searchFocused
+                            ? 'chat-close-inline-search'
+                            : 'chat-open-inline-search',
                       ),
                       tooltip: hasSearchQuery
                           ? 'Clear conversation search'
-                          : 'Open conversation search',
+                          : searchFocused
+                          ? 'Close conversation search'
+                          : 'Search conversations',
                       onPressed: hasSearchQuery
                           ? _clearConversationSearch
-                          : () async {
-                              final query = await _showSearchAssistance(
-                                context,
-                              );
-                              if (query == null || !mounted) return;
-                              _searchController.value = TextEditingValue(
-                                text: query,
-                                selection: TextSelection.collapsed(
-                                  offset: query.length,
-                                ),
-                              );
-                              setState(() {});
-                            },
+                          : searchFocused
+                          ? _closeInlineConversationSearch
+                          : _openInlineConversationSearch,
                       icon: ChatActionIconMotion(
                         key: const Key('chat-search-action-icon-motion'),
-                        stateKey: hasSearchQuery ? 'clear' : 'assist',
+                        stateKey: hasSearchQuery
+                            ? 'clear'
+                            : searchFocused
+                            ? 'close'
+                            : 'search',
                         icon: hasSearchQuery
                             ? Icons.close_rounded
-                            : Icons.manage_search_rounded,
+                            : searchFocused
+                            ? Icons.keyboard_hide_rounded
+                            : Icons.search_rounded,
                       ),
                     ),
                   ),
@@ -1267,83 +1278,6 @@ void _openThread(
       '/app/chat/thread/$threadId',
       returnRoute: returnRoute,
       draft: draft,
-    ),
-  );
-}
-
-Future<String?> _showSearchAssistance(BuildContext context) {
-  final formKey = GlobalKey<FormState>();
-  var query = '';
-  final viewPadding = MediaQuery.viewPaddingOf(context);
-  final bottomInset = viewPadding.bottom;
-  final exportedSemanticsClearance = moolAndroidExportedSemanticsClearance(
-    viewPadding: viewPadding,
-    platform: Theme.of(context).platform,
-  );
-  return showModalBottomSheet<String>(
-    context: context,
-    showDragHandle: true,
-    useSafeArea: true,
-    isScrollControlled: true,
-    sheetAnimationStyle: ChatMotion.sheetStyle(context),
-    builder: (sheetContext) => ChatBottomSheetSafeArea(
-      bottomInset: bottomInset,
-      exportedSemanticsClearance: exportedSemanticsClearance,
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          MoolSpacing.lg,
-          MoolSpacing.xs,
-          MoolSpacing.lg,
-          MediaQuery.viewInsetsOf(sheetContext).bottom + MoolSpacing.lg,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Search conversations',
-              style: TextStyle(
-                color: MoolColors.ink,
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: MoolSpacing.xs),
-            const Text('Type a person, business, order or case.'),
-            const SizedBox(height: MoolSpacing.md),
-            Form(
-              key: formKey,
-              child: ChatFocusMotion(
-                motionKeyName: 'chat-search-assistance-focus-motion',
-                child: TextFormField(
-                  key: const Key('chat-search-assistance-field'),
-                  onChanged: (value) => query = value,
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter a conversation name.'
-                      : null,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search_rounded),
-                    labelText: 'Conversation name',
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: MoolSpacing.md),
-            FilledButton(
-              key: const Key('chat-use-search-assistance'),
-              onPressed: () {
-                if (!(formKey.currentState?.validate() ?? false)) return;
-                Navigator.of(sheetContext).pop(query.trim());
-              },
-              child: const Text('Search conversations'),
-            ),
-          ],
-        ),
-      ),
     ),
   );
 }

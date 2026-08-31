@@ -997,41 +997,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('search assistance clears the OPPO bottom system inset', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(360, 800);
-    tester.view.viewPadding = const FakeViewPadding(bottom: 44);
-    addTearDown(tester.view.reset);
-    final journey = await readyJourney();
-    final chat = ChatSession(
-      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
-    );
-    addTearDown(journey.dispose);
-    addTearDown(chat.dispose);
+  testWidgets(
+    'inline conversation search clears the OPPO bottom system inset',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+      addTearDown(tester.view.reset);
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
 
-    await tester.pumpWidget(
-      MoolSocialApp(
-        session: journey,
-        chatSession: chat,
-        initialLocation: '/app/chat/inbox?return=/app/mool',
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('chat-search-assistance')));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: '/app/chat/inbox?return=/app/mool',
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('chat-open-inline-search')));
+      await tester.pump();
+      final field = find.byKey(const Key('chat-search-field'));
+      await tester.enterText(field, 'Fresh Basket');
+      await tester.pumpAndSettle();
 
-    final action = find.byKey(const Key('chat-use-search-assistance'));
-    final safeBottom = 800 - tester.view.viewPadding.bottom;
-    expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
-    expect(tester.getBottomRight(action).dy, lessThanOrEqualTo(safeBottom));
-    expect(
-      find.byKey(const Key('chat-search-assistance-field')),
-      findsOneWidget,
-    );
-    expect(tester.takeException(), isNull);
-  });
+      final action = find.byKey(const Key('chat-clear-search'));
+      final safeBottom = 800 - tester.view.viewPadding.bottom;
+      expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
+      expect(tester.getBottomRight(action).dy, lessThanOrEqualTo(safeBottom));
+      expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+      expect(
+        find.byKey(const Key('chat-search-assistance-field')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('attachment list stays above an OPPO bottom system inset', (
     tester,

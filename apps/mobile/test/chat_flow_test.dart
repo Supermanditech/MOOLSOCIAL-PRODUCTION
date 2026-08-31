@@ -174,19 +174,18 @@ void main() {
       await tapVisible(tester, const Key('chat-section-chats'));
       await tapVisible(tester, const Key('chat-filter-all'));
 
-      await tapVisible(tester, const Key('chat-search-assistance'));
+      await tapVisible(tester, const Key('chat-open-inline-search'));
+      final inlineSearch = find.byKey(const Key('chat-search-field'));
       expect(
-        find.text('Type a person, business, order or case.'),
-        findsOneWidget,
+        tester.widget<TextField>(inlineSearch).focusNode!.hasFocus,
+        isTrue,
       );
-      expect(find.textContaining('Speak'), findsNothing);
-      await tapVisible(tester, const Key('chat-use-search-assistance'));
-      expect(find.text('Enter a conversation name.'), findsOneWidget);
-      await tester.enterText(
+      expect(
         find.byKey(const Key('chat-search-assistance-field')),
-        'Fresh Basket',
+        findsNothing,
       );
-      await tapVisible(tester, const Key('chat-use-search-assistance'));
+      await tester.enterText(inlineSearch, 'Fresh Basket');
+      await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('chat-open-thread-shop-order')),
         findsOneWidget,
@@ -252,11 +251,14 @@ void main() {
     await tester.enterText(field, 'Home');
     await tester.pump();
     expect(find.byKey(const Key('chat-clear-search')), findsOneWidget);
-    expect(find.byKey(const Key('chat-search-assistance')), findsNothing);
+    expect(find.byKey(const Key('chat-open-inline-search')), findsNothing);
     await tester.tap(find.byKey(const Key('chat-clear-search')));
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(field).controller?.text, isEmpty);
-    expect(find.byKey(const Key('chat-search-assistance')), findsOneWidget);
+    expect(find.byKey(const Key('chat-close-inline-search')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat-close-inline-search')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-open-inline-search')), findsOneWidget);
 
     tester.platformDispatcher.accessibilityFeaturesTestValue =
         FakeAccessibilityFeatures(disableAnimations: true);
@@ -385,17 +387,9 @@ void main() {
         chat: chat,
       );
 
-      await tapVisible(tester, const Key('chat-search-assistance'));
-      expect(
-        find.byKey(const Key('chat-search-assistance-field')),
-        findsOneWidget,
-      );
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('chat-search-assistance-field')),
-        findsNothing,
-      );
+      await tapVisible(tester, const Key('chat-open-inline-search'));
+      expect(find.byKey(const Key('chat-close-inline-search')), findsOneWidget);
+      await tapVisible(tester, const Key('chat-close-inline-search'));
       expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
 
       await tapVisible(tester, const Key('chat-open-thread-home-basket'));
