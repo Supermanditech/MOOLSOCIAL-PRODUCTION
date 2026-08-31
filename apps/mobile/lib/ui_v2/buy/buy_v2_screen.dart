@@ -749,6 +749,19 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     );
   }
 
+  void _openPartnerCatalogue(BuyV2Product product, {bool brandOnly = false}) {
+    HapticFeedback.selectionClick();
+    FocusScope.of(context).unfocus();
+    unawaited(
+      showBuyV2PartnerCatalogue(
+        context,
+        widget.session,
+        product,
+        brandOnly: brandOnly,
+      ),
+    );
+  }
+
   void _openShopChat() {
     HapticFeedback.selectionClick();
     FocusScope.of(context).unfocus();
@@ -798,6 +811,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         session: session,
         returnLabel: _offersActive ? 'Offers' : null,
         onAskSeller: _openProductQuestion,
+        onOpenPartnerCatalogue: _openPartnerCatalogue,
         wholesaleTradeDecisionAdapter: widget.wholesaleTradeDecisionAdapter,
       ),
       BuyV2View.cart => BuyV2CartView(

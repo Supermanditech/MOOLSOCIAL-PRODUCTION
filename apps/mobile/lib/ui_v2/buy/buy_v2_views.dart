@@ -21,7 +21,6 @@ import 'buy_v2_payment_sheet_motion.dart';
 import 'buy_v2_prescription_sheet_motion.dart';
 import 'buy_v2_product_feedback_sheet_motion.dart';
 import 'buy_v2_product_video.dart';
-import 'buy_v2_supplier_sheet_motion.dart';
 
 String _productCountLabel(int count) =>
     '$count ${count == 1 ? 'product' : 'products'}';
@@ -381,12 +380,16 @@ List<_BuyV2PurchaseGroup> _purchaseGroupsFor(List<BuyV2Order> orders) {
   ];
 }
 
+typedef BuyV2PartnerCatalogueHandler =
+    void Function(BuyV2Product product, {bool brandOnly});
+
 class BuyV2ProductView extends StatelessWidget {
   const BuyV2ProductView({
     super.key,
     required this.session,
     this.returnLabel,
     this.onAskSeller,
+    this.onOpenPartnerCatalogue,
     this.wholesaleTradeDecisionAdapter =
         const BuyV2UnavailableWholesaleTradeDecisionAdapter(),
   });
@@ -394,6 +397,7 @@ class BuyV2ProductView extends StatelessWidget {
   final BuyV2Session session;
   final String? returnLabel;
   final ValueChanged<BuyV2Product>? onAskSeller;
+  final BuyV2PartnerCatalogueHandler? onOpenPartnerCatalogue;
   final BuyV2WholesaleTradeDecisionAdapter wholesaleTradeDecisionAdapter;
 
   @override
@@ -426,6 +430,11 @@ class BuyV2ProductView extends StatelessWidget {
       BuyV2Destination.wholesale ||
       BuyV2Destination.orders => const <BuyV2Product>[],
     };
+    final brandProducts =
+        product.destination == BuyV2Destination.shop ||
+            product.destination == BuyV2Destination.wholesale
+        ? session.brandCatalogueFor(product)
+        : const <BuyV2Product>[];
     final rxBlocked =
         product.requiresPrescription &&
         !session.isPrescriptionApproved(product.id);
@@ -605,6 +614,7 @@ class BuyV2ProductView extends StatelessWidget {
                       decision: offerDecision!,
                       buyerPromise: buyerPromise,
                       adapter: wholesaleTradeDecisionAdapter,
+                      onOpenPartnerCatalogue: onOpenPartnerCatalogue,
                     ),
                   ],
                 )
@@ -636,7 +646,8 @@ class BuyV2ProductView extends StatelessWidget {
                       value: buyerPromise,
                       valueColor: BuyV2Colors.green,
                     ),
-                    if (partnerProducts.isEmpty)
+                    if (partnerProducts.isEmpty ||
+                        onOpenPartnerCatalogue == null)
                       _DecisionRow(
                         icon: Icons.local_pharmacy_outlined,
                         label: product.partnerRole,
@@ -655,12 +666,7 @@ class BuyV2ProductView extends StatelessWidget {
                         semanticLabel:
                             'View ${partnerProducts.length} more products from ${product.seller} '
                             'that are available now. Not medical advice',
-                        onTap: () => _showPartnerProductsSheet(
-                          context,
-                          session,
-                          product,
-                          partnerProducts,
-                        ),
+                        onTap: () => onOpenPartnerCatalogue!(product),
                       ),
                     _DecisionRow(
                       icon: Icons.route_outlined,
@@ -723,11 +729,26 @@ class BuyV2ProductView extends StatelessWidget {
               _DecisionPanel(
                 title: 'Product details',
                 children: [
-                  _DecisionRow(
-                    icon: Icons.sell_outlined,
-                    label: 'Brand',
-                    value: product.brand,
-                  ),
+                  if (brandProducts.length > 1 &&
+                      onOpenPartnerCatalogue != null)
+                    _DecisionActionRow(
+                      key: ValueKey('buy-brand-action-${product.id}'),
+                      icon: Icons.sell_outlined,
+                      label: 'Brand',
+                      value: product.brand,
+                      detail:
+                          '${brandProducts.length} available products in ${product.destination.label}',
+                      semanticLabel:
+                          'Browse ${brandProducts.length} ${product.brand} products in ${product.destination.label}',
+                      onTap: () =>
+                          onOpenPartnerCatalogue!(product, brandOnly: true),
+                    )
+                  else
+                    _DecisionRow(
+                      icon: Icons.sell_outlined,
+                      label: 'Brand',
+                      value: product.brand,
+                    ),
                   _DecisionRow(
                     icon: Icons.tune_rounded,
                     label: 'Variant',
@@ -773,13 +794,9 @@ class BuyV2ProductView extends StatelessWidget {
                 trust: trust,
                 onViewSeller:
                     product.destination == BuyV2Destination.shop &&
-                        partnerProducts.isNotEmpty
-                    ? () => _showPartnerProductsSheet(
-                        context,
-                        session,
-                        product,
-                        partnerProducts,
-                      )
+                        partnerProducts.isNotEmpty &&
+                        onOpenPartnerCatalogue != null
+                    ? () => onOpenPartnerCatalogue!(product)
                     : null,
                 sellerProductCount: partnerProducts.length,
               ),
@@ -1488,6 +1505,7 @@ class _WholesaleTradeDecisionPanel extends StatefulWidget {
     required this.decision,
     required this.buyerPromise,
     required this.adapter,
+    required this.onOpenPartnerCatalogue,
   });
 
   final BuyV2Session session;
@@ -1496,6 +1514,7 @@ class _WholesaleTradeDecisionPanel extends StatefulWidget {
   final BuyV2ProductOfferDecision decision;
   final String buyerPromise;
   final BuyV2WholesaleTradeDecisionAdapter adapter;
+  final BuyV2PartnerCatalogueHandler? onOpenPartnerCatalogue;
 
   @override
   State<_WholesaleTradeDecisionPanel> createState() =>
@@ -1676,7 +1695,8 @@ class _WholesaleTradeDecisionPanelState
                 label: 'Fulfilment',
                 value: buyV2AutomaticFulfilmentLabel(product.destination),
               ),
-              if (supplierProducts.isEmpty)
+              if (supplierProducts.isEmpty ||
+                  widget.onOpenPartnerCatalogue == null)
                 _DecisionRow(
                   icon: Icons.storefront_outlined,
                   label: product.partnerRole,
@@ -1692,12 +1712,7 @@ class _WholesaleTradeDecisionPanelState
                       '${supplierProducts.length} other current trade packs',
                   semanticLabel:
                       'View ${supplierProducts.length} more products available from ${facts.partner}',
-                  onTap: () => _showPartnerProductsSheet(
-                    context,
-                    widget.session,
-                    product,
-                    supplierProducts,
-                  ),
+                  onTap: () => widget.onOpenPartnerCatalogue!(product),
                 ),
               _DecisionRow(
                 icon: Icons.local_shipping_outlined,
@@ -2580,273 +2595,6 @@ class _ProductContinuationCard extends StatelessWidget {
                       ],
                     ),
                   ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-Future<void> _showPartnerProductsSheet(
-  BuildContext context,
-  BuyV2Session session,
-  BuyV2Product current,
-  List<BuyV2Product> products,
-) async {
-  final supportedDestination =
-      current.destination == BuyV2Destination.shop ||
-      current.destination == BuyV2Destination.wholesale ||
-      current.destination == BuyV2Destination.medicine;
-  final exactProducts = products.every(
-    (product) =>
-        product.id != current.id &&
-        product.destination == current.destination &&
-        product.seller == current.seller,
-  );
-  if (!supportedDestination || products.isEmpty || !exactProducts) {
-    return;
-  }
-  final ownerPrefix = switch (current.destination) {
-    BuyV2Destination.shop => 'buy-shop-seller',
-    BuyV2Destination.wholesale => 'buy-wholesale-supplier',
-    BuyV2Destination.medicine => 'buy-medicine-pharmacy',
-    BuyV2Destination.orders => 'buy-order-partner',
-  };
-  final catalogueFactCopy = switch (current.destination) {
-    BuyV2Destination.wholesale =>
-      'Compare this supplier’s available packs, minimum orders and prices',
-    BuyV2Destination.medicine =>
-      'Review available packs and prices from this pharmacy · '
-          'Not medical advice',
-    _ => 'Compare available products and prices from this seller',
-  };
-  final closeTooltip = switch (current.destination) {
-    BuyV2Destination.wholesale => 'Close supplier products',
-    BuyV2Destination.medicine => 'Close pharmacy products',
-    _ => 'Close seller products',
-  };
-  final motion = BuyV2SupplierSheetMotion.resolve(context);
-  final transitionController = AnimationController(
-    vsync: Navigator.of(context),
-    duration: motion.duration ?? Duration.zero,
-    reverseDuration: motion.reverseDuration ?? Duration.zero,
-  );
-  try {
-    final selectedProductId = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      backgroundColor: Colors.white,
-      constraints: const BoxConstraints(
-        maxWidth: BuyV2SupplierSheetMotion.maxWidth,
-      ),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      transitionAnimationController: transitionController,
-      builder: (sheetContext) => FractionallySizedBox(
-        heightFactor: BuyV2SupplierSheetMotion.heightFactor,
-        child: SafeArea(
-          top: false,
-          child: Semantics(
-            key: ValueKey('$ownerPrefix-sheet-${current.id}'),
-            container: true,
-            scopesRoute: true,
-            namesRoute: true,
-            explicitChildNodes: true,
-            label: 'More from ${current.seller}',
-            child: ListView(
-              key: ValueKey('$ownerPrefix-sheet-list'),
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: BuyV2Colors.softOrange,
-                        borderRadius: BorderRadius.circular(13),
-                      ),
-                      child: const Icon(
-                        Icons.storefront_outlined,
-                        color: BuyV2Colors.navy,
-                      ),
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'More from ${current.seller}',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: sheetContext.buyTitle.copyWith(fontSize: 17),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(catalogueFactCopy, style: sheetContext.buyMeta),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.outlined(
-                      key: ValueKey('$ownerPrefix-sheet-close'),
-                      onPressed: () => Navigator.of(sheetContext).pop(),
-                      tooltip: closeTooltip,
-                      style: IconButton.styleFrom(
-                        minimumSize: const Size.square(BuyV2Metrics.minimumTap),
-                        side: const BorderSide(color: BuyV2Colors.line),
-                      ),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                for (final product in products) ...[
-                  _PartnerProductAction(
-                    product: product,
-                    ownerPrefix: ownerPrefix,
-                  ),
-                  if (product != products.last) const SizedBox(height: 8),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    if (!transitionController.isDismissed) {
-      await transitionController.reverse();
-    }
-    if (selectedProductId != null) {
-      if (!context.mounted) return;
-      session.openProduct(selectedProductId);
-    }
-  } finally {
-    transitionController.dispose();
-  }
-}
-
-class _PartnerProductAction extends StatelessWidget {
-  const _PartnerProductAction({
-    required this.product,
-    required this.ownerPrefix,
-  });
-
-  final BuyV2Product product;
-  final String ownerPrefix;
-
-  @override
-  Widget build(BuildContext context) {
-    void selectProduct() {
-      HapticFeedback.selectionClick();
-      Navigator.of(context).pop(product.id);
-    }
-
-    final packFact = switch (product.destination) {
-      BuyV2Destination.wholesale =>
-        '${product.pack} · MOQ ${product.minimumOrder}',
-      BuyV2Destination.medicine =>
-        product.requiresPrescription
-            ? '${product.pack} · Prescription and pharmacist review required'
-            : '${product.pack} · No prescription required for this listed pack',
-      _ => product.pack,
-    };
-    final semanticLabel = switch (product.destination) {
-      BuyV2Destination.wholesale =>
-        'View ${product.title} from ${product.seller}. ${product.pack}. '
-            'MOQ ${product.minimumOrder}. ${buyV2Money(product.price)}. '
-            '${product.unitPrice}. Available for Wholesale.',
-      BuyV2Destination.medicine =>
-        'View ${product.title} from ${product.seller}. $packFact. '
-            '${buyV2Money(product.price)}. ${product.unitPrice}. '
-            'Available from this pharmacy. Not medical advice.',
-      _ =>
-        'View ${product.title} from ${product.seller}. ${product.pack}. '
-            '${buyV2Money(product.price)}. ${product.unitPrice}. '
-            'Available in Shop.',
-    };
-
-    return BuyV2IntentDepth(
-      key: ValueKey('$ownerPrefix-depth-${product.id}'),
-      child: Semantics(
-        key: ValueKey('$ownerPrefix-product-${product.id}'),
-        container: true,
-        button: true,
-        label: semanticLabel,
-        onTap: selectProduct,
-        child: ExcludeSemantics(
-          child: Material(
-            color: BuyV2Colors.canvas,
-            borderRadius: BorderRadius.circular(14),
-            child: InkWell(
-              onTap: selectProduct,
-              borderRadius: BorderRadius.circular(14),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 68),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(11, 9, 9, 9),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(11),
-                          border: Border.all(color: BuyV2Colors.line),
-                        ),
-                        child: const Icon(
-                          Icons.inventory_2_outlined,
-                          color: BuyV2Colors.navy,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.buyBody.copyWith(
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              packFact,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.buyMeta,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${buyV2Money(product.price)} · '
-                              '${product.unitPrice}',
-                              style: context.buyMeta.copyWith(
-                                color: BuyV2Colors.green,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: BuyV2Colors.navy,
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),

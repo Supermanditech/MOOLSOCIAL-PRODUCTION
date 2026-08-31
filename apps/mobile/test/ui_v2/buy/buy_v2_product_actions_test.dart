@@ -414,7 +414,16 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.text('Compare available products and prices from this seller'),
+      find.text('Browse this store’s available products and delivery times'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-horizontal-product-grid')),
+      findsOneWidget,
+    );
+    final continuation = session.sellerContinuationsFor(product).first;
+    expect(
+      find.byKey(ValueKey('buy-product-${continuation.id}')),
       findsOneWidget,
     );
     await tester.binding.handlePopRoute();

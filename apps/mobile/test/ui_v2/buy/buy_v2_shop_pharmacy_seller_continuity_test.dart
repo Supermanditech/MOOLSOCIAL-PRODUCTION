@@ -163,14 +163,12 @@ void main() {
     expect(find.text('More from Sardarpura Health Pharmacy'), findsOneWidget);
     expect(find.textContaining('Not medical advice'), findsWidgets);
     expect(
-      find.byKey(
-        const ValueKey('buy-medicine-pharmacy-product-m-metformin-500'),
-      ),
+      find.byKey(const ValueKey('buy-product-m-metformin-500')),
       findsOneWidget,
     );
     expect(
-      find.textContaining('Prescription and pharmacist review required'),
-      findsWidgets,
+      find.byKey(const ValueKey('buy-horizontal-product-grid')),
+      findsOneWidget,
     );
     expect(find.text('Pain relief gel'), findsNothing);
 

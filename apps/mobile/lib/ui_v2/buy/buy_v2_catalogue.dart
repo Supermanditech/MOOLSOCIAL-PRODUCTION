@@ -15,6 +15,7 @@ import 'buy_v2_category_sheet_policy.dart';
 import 'buy_v2_design.dart';
 import 'buy_v2_info_sheet_motion.dart';
 import 'buy_v2_saved_clear_sheet_motion.dart';
+import 'buy_v2_supplier_sheet_motion.dart';
 import 'buy_v2_views.dart';
 
 enum BuyV2OfferPublisherType { manufacturer, wholesaler, retailer }
@@ -2943,6 +2944,171 @@ Future<void> showBuyV2RecentlyViewed(
   }
 }
 
+Future<void> showBuyV2PartnerCatalogue(
+  BuildContext context,
+  BuyV2Session session,
+  BuyV2Product current, {
+  bool brandOnly = false,
+}) async {
+  final supportedDestination =
+      current.destination == BuyV2Destination.shop ||
+      current.destination == BuyV2Destination.wholesale ||
+      current.destination == BuyV2Destination.medicine;
+  final sellerProducts = current.destination == BuyV2Destination.medicine
+      ? [current, ...session.sellerContinuationsFor(current)]
+      : session.partnerCatalogueFor(current);
+  final brandProducts = current.destination == BuyV2Destination.medicine
+      ? const <BuyV2Product>[]
+      : session.brandCatalogueFor(current);
+  final products = brandOnly ? brandProducts : sellerProducts;
+  if (!supportedDestination || products.length <= 1) return;
+
+  final ownerPrefix = brandOnly
+      ? 'buy-${current.destination.name}-brand'
+      : switch (current.destination) {
+          BuyV2Destination.shop => 'buy-shop-seller',
+          BuyV2Destination.wholesale => 'buy-wholesale-supplier',
+          BuyV2Destination.medicine => 'buy-medicine-pharmacy',
+          BuyV2Destination.orders => 'buy-order-partner',
+        };
+  final title = brandOnly
+      ? '${current.brand} products'
+      : 'More from ${current.seller}';
+  final detail = brandOnly
+      ? 'Browse ${products.length} available ${current.brand} products'
+      : switch (current.destination) {
+          BuyV2Destination.wholesale =>
+            'Compare available packs, minimum orders, prices and delivery',
+          BuyV2Destination.medicine =>
+            'Review available packs and prices · Not medical advice',
+          _ => 'Browse this store’s available products and delivery times',
+        };
+  final closeTooltip = brandOnly
+      ? 'Close brand products'
+      : switch (current.destination) {
+          BuyV2Destination.wholesale => 'Close supplier products',
+          BuyV2Destination.medicine => 'Close pharmacy products',
+          _ => 'Close seller products',
+        };
+  final motion = BuyV2SupplierSheetMotion.resolve(context);
+  final transitionController = AnimationController(
+    vsync: Navigator.of(context),
+    duration: motion.duration ?? Duration.zero,
+    reverseDuration: motion.reverseDuration ?? Duration.zero,
+  );
+  try {
+    final selectedProductId = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      constraints: const BoxConstraints(
+        maxWidth: BuyV2SupplierSheetMotion.maxWidth,
+      ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      transitionAnimationController: transitionController,
+      builder: (sheetContext) => FractionallySizedBox(
+        heightFactor: .92,
+        child: SafeArea(
+          top: false,
+          child: Semantics(
+            key: ValueKey('$ownerPrefix-sheet-${current.id}'),
+            container: true,
+            scopesRoute: true,
+            namesRoute: true,
+            explicitChildNodes: true,
+            label: title,
+            child: ListView(
+              key: ValueKey('$ownerPrefix-sheet-list'),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: BuyV2Colors.softOrange,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        brandOnly
+                            ? Icons.sell_outlined
+                            : Icons.storefront_outlined,
+                        color: BuyV2Colors.navy,
+                      ),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: sheetContext.buyTitle.copyWith(fontSize: 18),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(detail, style: sheetContext.buyMeta),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${products.length} ${products.length == 1 ? 'product' : 'products'}',
+                            style: sheetContext.buyMeta.copyWith(
+                              color: BuyV2Colors.green,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.outlined(
+                      key: ValueKey('$ownerPrefix-sheet-close'),
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      tooltip: closeTooltip,
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size.square(BuyV2Metrics.minimumTap),
+                        side: const BorderSide(color: BuyV2Colors.line),
+                      ),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                BuyV2ProgressiveProductGrid(
+                  session: session,
+                  products: products,
+                  storageKey:
+                      '$ownerPrefix-catalogue-${brandOnly ? current.brand : current.seller}',
+                  semanticLabel:
+                      '${brandOnly ? current.brand : current.seller} product catalogue',
+                  laneCount: products.length > 1 ? 2 : 1,
+                  onOpenProduct: (product) =>
+                      Navigator.of(sheetContext).pop(product.id),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!transitionController.isDismissed) {
+      await transitionController.reverse();
+    }
+    if (selectedProductId != null && context.mounted) {
+      session.openProduct(selectedProductId);
+    }
+  } finally {
+    transitionController.dispose();
+  }
+}
+
 enum _HouseholdBasketAction { seeProducts, addToCart }
 
 class _BuyV2InfoSheetHeader extends StatelessWidget {
@@ -4235,6 +4401,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
     required this.semanticLabel,
     this.laneCount,
     this.savedContext = false,
+    this.onOpenProduct,
   });
 
   final BuyV2Session session;
@@ -4243,6 +4410,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
   final String semanticLabel;
   final int? laneCount;
   final bool savedContext;
+  final ValueChanged<BuyV2Product>? onOpenProduct;
 
   @override
   Widget build(BuildContext context) {
@@ -4264,6 +4432,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
           laneCount: laneCount,
           savedContext: savedContext,
           semanticLabel: semanticLabel,
+          onOpenProduct: onOpenProduct,
         );
       },
     );
@@ -4320,6 +4489,7 @@ class _HorizontalProductGrid extends StatefulWidget {
     this.laneCount,
     this.savedContext = false,
     this.semanticLabel = 'Products',
+    this.onOpenProduct,
   });
 
   final BuyV2Session session;
@@ -4331,6 +4501,7 @@ class _HorizontalProductGrid extends StatefulWidget {
   final int? laneCount;
   final bool savedContext;
   final String semanticLabel;
+  final ValueChanged<BuyV2Product>? onOpenProduct;
 
   @override
   State<_HorizontalProductGrid> createState() => _HorizontalProductGridState();
@@ -4454,6 +4625,7 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
                               product: products[productIndex],
                               compact: widget.compact,
                               savedContext: widget.savedContext,
+                              onOpenProduct: widget.onOpenProduct,
                             ),
                           );
                         },
@@ -5365,15 +5537,27 @@ class BuyV2ProductCard extends StatelessWidget {
     required this.product,
     this.compact = false,
     this.savedContext = false,
+    this.onOpenProduct,
   });
 
   final BuyV2Session session;
   final BuyV2Product product;
   final bool compact;
   final bool savedContext;
+  final ValueChanged<BuyV2Product>? onOpenProduct;
 
   @override
   Widget build(BuildContext context) {
+    void openProduct() {
+      HapticFeedback.selectionClick();
+      final callback = onOpenProduct;
+      if (callback != null) {
+        callback(product);
+      } else {
+        session.openProduct(product.id);
+      }
+    }
+
     final facts = session.productFactsFor(product);
     final fulfilmentMode =
         facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
@@ -5402,7 +5586,7 @@ class BuyV2ProductCard extends StatelessWidget {
         button: true,
         child: InkWell(
           key: ValueKey('buy-product-${product.id}'),
-          onTap: () => session.openProduct(product.id),
+          onTap: openProduct,
           borderRadius: BorderRadius.circular(BuyV2Metrics.compactRadius),
           child: Container(
             clipBehavior: Clip.antiAlias,

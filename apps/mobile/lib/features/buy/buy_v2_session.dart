@@ -3273,6 +3273,63 @@ class BuyV2Session extends ChangeNotifier {
     return List.unmodifiable(candidates.take(limit));
   }
 
+  List<BuyV2Product> partnerCatalogueFor(
+    BuyV2Product current, {
+    int limit = 50,
+  }) {
+    final supportedDestination =
+        current.destination == BuyV2Destination.shop ||
+        current.destination == BuyV2Destination.wholesale;
+    if (!supportedDestination || limit <= 0) return const [];
+
+    final candidates = _catalogueProducts
+        .where(
+          (product) =>
+              product.destination == current.destination &&
+              product.catalogueListing &&
+              product.seller == current.seller,
+        )
+        .toList(growable: false);
+    candidates.sort((left, right) {
+      if (left.id == current.id) return -1;
+      if (right.id == current.id) return 1;
+      final categoryOrder = left.categoryId.compareTo(right.categoryId);
+      if (categoryOrder != 0) return categoryOrder;
+      final priceOrder = left.price.compareTo(right.price);
+      if (priceOrder != 0) return priceOrder;
+      return left.id.compareTo(right.id);
+    });
+    return List.unmodifiable(candidates.take(limit));
+  }
+
+  List<BuyV2Product> brandCatalogueFor(BuyV2Product current, {int limit = 50}) {
+    final supportedDestination =
+        current.destination == BuyV2Destination.shop ||
+        current.destination == BuyV2Destination.wholesale;
+    if (!supportedDestination || current.brand.trim().isEmpty || limit <= 0) {
+      return const [];
+    }
+
+    final candidates = _catalogueProducts
+        .where(
+          (product) =>
+              product.destination == current.destination &&
+              product.catalogueListing &&
+              product.brand == current.brand,
+        )
+        .toList(growable: false);
+    candidates.sort((left, right) {
+      if (left.id == current.id) return -1;
+      if (right.id == current.id) return 1;
+      final sellerOrder = left.seller.compareTo(right.seller);
+      if (sellerOrder != 0) return sellerOrder;
+      final priceOrder = left.price.compareTo(right.price);
+      if (priceOrder != 0) return priceOrder;
+      return left.id.compareTo(right.id);
+    });
+    return List.unmodifiable(candidates.take(limit));
+  }
+
   Set<BuyV2Destination> get confirmedDestinations =>
       Set.unmodifiable(_confirmedDestinations);
 

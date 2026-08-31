@@ -117,6 +117,18 @@ void main() {
         find.byKey(const ValueKey('buy-wholesale-supplier-sheet-w-oil')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const ValueKey('buy-horizontal-product-grid')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('buy-product-w-oil')), findsOneWidget);
+      final continuation = session
+          .supplierContinuationsFor(session.product('w-oil'))
+          .first;
+      expect(
+        find.byKey(ValueKey('buy-product-${continuation.id}')),
+        findsOneWidget,
+      );
       await tester.tap(
         find.byKey(const ValueKey('buy-wholesale-supplier-sheet-close')),
       );
