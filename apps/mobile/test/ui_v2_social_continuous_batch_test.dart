@@ -7,6 +7,7 @@ import 'package:moolsocial/features/creator/creator_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/retailer/retailer_session.dart';
+import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_creator.dart';
@@ -614,9 +615,54 @@ void main() {
         expect(find.textContaining('approved media service'), findsOneWidget);
         expect(owners.journey.stage, JourneyStage.ready);
         expect(owners.shared.socialPublishedItems, isEmpty);
+
         expect(tester.takeException(), isNull);
       },
     );
+
+    testWidgets('UI review keeps a session draft without durable auth', (
+      tester,
+    ) async {
+      final owners = _GuestOwners();
+      addTearDown(owners.dispose);
+      await owners.journey.start();
+      await _pump(
+        tester,
+        SocialUniversalV2(
+          session: owners.journey,
+          creatorSession: owners.creator,
+          retailerSession: owners.retailer,
+          sharedSession: owners.shared,
+          createDraftStateCache: SocialCreateDraftStateCache(),
+          initialSubAction: 'feed',
+          enableCreateReviewPreview: true,
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('screen04-feed-create-post')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('screen04-create-post-text')),
+        'Session camera draft',
+      );
+      await tester.tap(find.byKey(const Key('screen04-create-close')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Draft save failed. Please try again.'), findsNothing);
+      expect(find.byKey(const Key('social-v2-create-workbench')), findsNothing);
+      await tester.tap(find.byKey(const Key('screen04-rail-create')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const Key('screen04-create-post-text')),
+            )
+            .controller!
+            .text,
+        'Session camera draft',
+      );
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets('normal guest Create still goes directly to sign-in', (
       tester,

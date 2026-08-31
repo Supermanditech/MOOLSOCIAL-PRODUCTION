@@ -1567,7 +1567,9 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   Future<bool> _flushCreateDraft() async {
     final request = ++_createDraftPersistenceRequest;
     if (!await _persistCreateDraft(request)) return false;
-    return _createDraftStateCache.settleDurableWritesConfirmed();
+    final durable = await _createDraftStateCache.settleDurableWritesConfirmed();
+    if (durable) return true;
+    return widget.enableCreateReviewPreview && _createReviewPreviewActive;
   }
 
   void _closeCreate() {
