@@ -728,6 +728,7 @@ void main() {
     'Following search, clear and unfollow complete without a dead end',
     (tester) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
+      addTearDown(tester.view.reset);
       final journey = await readyJourney();
       final socialGateway = _PeopleSocialGateway();
       final shared = SharedSession(socialContentGateway: socialGateway);
@@ -781,6 +782,31 @@ void main() {
       expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
       await tapVisible(tester, const Key('chat-person-connect-person-a'));
       expect(socialGateway.followed['person-a'], isFalse);
+      expect(find.text('You are not following anyone yet'), findsOneWidget);
+
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.enterText(
+        find.byKey(const Key('chat-people-search')),
+        'No matching member',
+      );
+      await tester.pumpAndSettle();
+      final clearEmptySearch = find.byKey(
+        const Key('chat-people-clear-empty-search'),
+      );
+      expect(find.text('No matching people'), findsOneWidget);
+      expect(clearEmptySearch, findsOneWidget);
+      expect(
+        find.byKey(const Key('chat-people-empty-discover')),
+        findsOneWidget,
+      );
+      final media = MediaQuery.of(tester.element(clearEmptySearch));
+      expect(
+        tester.getBottomRight(clearEmptySearch).dy,
+        lessThanOrEqualTo(media.size.height - media.viewInsets.bottom),
+      );
+      await tapVisible(tester, const Key('chat-people-clear-empty-search'));
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.pumpAndSettle();
       expect(find.text('You are not following anyone yet'), findsOneWidget);
 
       await tapVisible(tester, const Key('chat-people-open-discover'));

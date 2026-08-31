@@ -90,6 +90,9 @@ class ChatPeopleDirectory extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final connectedOnly = section == ChatHomeSection.people;
+    final hasQuery = searchController.text.trim().isNotEmpty;
+    final keyboardOpen = View.of(context).viewInsets.bottom > 0;
+    final compactSearchRecovery = keyboardOpen && hasQuery && people.isEmpty;
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: CustomScrollView(
@@ -139,55 +142,56 @@ class ChatPeopleDirectory extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: MoolSpacing.sm),
-                ChatSurfaceCard(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: connectedOnly
-                            ? const Color(0xFFE5F3E4)
-                            : const Color(0xFFEDE8FF),
-                        foregroundColor: MoolColors.navy,
-                        child: Icon(
-                          connectedOnly
-                              ? Icons.people_alt_outlined
-                              : Icons.travel_explore_rounded,
+                if (!compactSearchRecovery)
+                  ChatSurfaceCard(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: connectedOnly
+                              ? const Color(0xFFE5F3E4)
+                              : const Color(0xFFEDE8FF),
+                          foregroundColor: MoolColors.navy,
+                          child: Icon(
+                            connectedOnly
+                                ? Icons.people_alt_outlined
+                                : Icons.travel_explore_rounded,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: MoolSpacing.sm),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              connectedOnly
-                                  ? 'People you follow'
-                                  : publicFeedOpened
-                                  ? 'Public Feed'
-                                  : 'Discover from the public Feed',
-                              style: const TextStyle(
-                                color: MoolColors.ink,
-                                fontWeight: FontWeight.w900,
+                        const SizedBox(width: MoolSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                connectedOnly
+                                    ? 'People you follow'
+                                    : publicFeedOpened
+                                    ? 'Public Feed'
+                                    : 'Discover from the public Feed',
+                                style: const TextStyle(
+                                  color: MoolColors.ink,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              connectedOnly
-                                  ? 'Following controls public updates. Private messages still require recipient approval.'
-                                  : publicFeedOpened
-                                  ? 'Public profiles and conversations appear here when Feed is available.'
-                                  : 'Follow public updates or request a private conversation. Messages open only after approval.',
-                              style: const TextStyle(
-                                color: MoolColors.muted,
-                                fontSize: 12,
+                              const SizedBox(height: 3),
+                              Text(
+                                connectedOnly
+                                    ? 'Following controls public updates. Private messages still require recipient approval.'
+                                    : publicFeedOpened
+                                    ? 'Public profiles and conversations appear here when Feed is available.'
+                                    : 'Follow public updates or request a private conversation. Messages open only after approval.',
+                                style: const TextStyle(
+                                  color: MoolColors.muted,
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
                 if (error case final message?) ...[
                   const SizedBox(height: MoolSpacing.sm),
                   ChatFiniteIncomingMotion(
@@ -195,7 +199,11 @@ class ChatPeopleDirectory extends StatelessWidget {
                     child: _PeopleNotice(message: message, onRetry: onRefresh),
                   ),
                 ],
-                const SizedBox(height: MoolSpacing.md),
+                SizedBox(
+                  height: compactSearchRecovery
+                      ? MoolSpacing.xs
+                      : MoolSpacing.md,
+                ),
                 Row(
                   children: [
                     Expanded(
@@ -233,15 +241,40 @@ class ChatPeopleDirectory extends StatelessWidget {
                 ),
               ),
             )
+          else if (people.isEmpty && compactSearchRecovery)
+            SliverToBoxAdapter(
+              child: ChatFiniteIncomingMotion(
+                stateKey:
+                    'chat-people-empty-${section.name}-$hasQuery-$publicFeedOpened',
+                child: _PeopleEmpty(
+                  connectedOnly: connectedOnly,
+                  hasQuery: hasQuery,
+                  compact: true,
+                  onClearSearch: () {
+                    searchController.clear();
+                    onSearchChanged('');
+                  },
+                  onDiscover: onDiscover,
+                  onOpenFeed: onOpenFeed,
+                  publicFeedOpened: publicFeedOpened,
+                  onBackToChats: onBackToChats,
+                ),
+              ),
+            )
           else if (people.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: ChatFiniteIncomingMotion(
                 stateKey:
-                    'chat-people-empty-${section.name}-${searchController.text.trim().isNotEmpty}-$publicFeedOpened',
+                    'chat-people-empty-${section.name}-$hasQuery-$publicFeedOpened',
                 child: _PeopleEmpty(
                   connectedOnly: connectedOnly,
-                  hasQuery: searchController.text.trim().isNotEmpty,
+                  hasQuery: hasQuery,
+                  compact: false,
+                  onClearSearch: () {
+                    searchController.clear();
+                    onSearchChanged('');
+                  },
                   onDiscover: onDiscover,
                   onOpenFeed: onOpenFeed,
                   publicFeedOpened: publicFeedOpened,
@@ -474,6 +507,8 @@ class _PeopleEmpty extends StatelessWidget {
   const _PeopleEmpty({
     required this.connectedOnly,
     required this.hasQuery,
+    required this.compact,
+    required this.onClearSearch,
     required this.onDiscover,
     required this.onOpenFeed,
     required this.publicFeedOpened,
@@ -482,26 +517,36 @@ class _PeopleEmpty extends StatelessWidget {
 
   final bool connectedOnly;
   final bool hasQuery;
+  final bool compact;
+  final VoidCallback onClearSearch;
   final VoidCallback onDiscover;
   final VoidCallback onOpenFeed;
   final bool publicFeedOpened;
   final VoidCallback onBackToChats;
 
   @override
-  Widget build(BuildContext context) => Center(
+  Widget build(BuildContext context) => Align(
+    alignment: compact ? Alignment.topCenter : Alignment.center,
     child: Padding(
-      padding: const EdgeInsets.all(MoolSpacing.xl),
+      padding: EdgeInsets.fromLTRB(
+        MoolSpacing.xl,
+        compact ? MoolSpacing.xs : MoolSpacing.xl,
+        MoolSpacing.xl,
+        compact ? MoolSpacing.sm : MoolSpacing.xl,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            connectedOnly
-                ? Icons.people_outline_rounded
-                : Icons.person_search_outlined,
-            size: 48,
-            color: MoolColors.muted,
-          ),
-          const SizedBox(height: MoolSpacing.sm),
+          if (!compact) ...[
+            Icon(
+              connectedOnly
+                  ? Icons.people_outline_rounded
+                  : Icons.person_search_outlined,
+              size: 48,
+              color: MoolColors.muted,
+            ),
+            const SizedBox(height: MoolSpacing.sm),
+          ],
           Text(
             hasQuery
                 ? 'No matching people'
@@ -519,15 +564,45 @@ class _PeopleEmpty extends StatelessWidget {
           ),
           const SizedBox(height: MoolSpacing.xs),
           Text(
-            connectedOnly
+            hasQuery
+                ? 'Try another name or clear the search.'
+                : connectedOnly
                 ? 'Discover a public profile to follow. Private conversations require a separate approved message request.'
                 : publicFeedOpened
                 ? 'Public profiles could not load. Try again or return to conversations.'
                 : 'Open Feed to discover public profiles and conversations.',
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: MoolSpacing.md),
-          if (publicFeedOpened) ...[
+          SizedBox(height: compact ? MoolSpacing.sm : MoolSpacing.md),
+          if (hasQuery)
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: MoolSpacing.xs,
+              runSpacing: MoolSpacing.xs,
+              children: [
+                OutlinedButton.icon(
+                  key: const Key('chat-people-clear-empty-search'),
+                  onPressed: onClearSearch,
+                  icon: const Icon(Icons.close_rounded),
+                  label: const Text('Clear search'),
+                ),
+                FilledButton.icon(
+                  key: Key(
+                    connectedOnly
+                        ? 'chat-people-empty-discover'
+                        : 'chat-people-empty-open-feed',
+                  ),
+                  onPressed: connectedOnly ? onDiscover : onOpenFeed,
+                  icon: Icon(
+                    connectedOnly
+                        ? Icons.person_search_outlined
+                        : Icons.dynamic_feed_outlined,
+                  ),
+                  label: Text(connectedOnly ? 'Discover' : 'Open Feed'),
+                ),
+              ],
+            )
+          else if (publicFeedOpened) ...[
             Wrap(
               alignment: WrapAlignment.center,
               spacing: MoolSpacing.xs,
