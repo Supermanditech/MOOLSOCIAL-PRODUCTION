@@ -3123,7 +3123,7 @@ Future<void> showBuyV2PartnerCatalogue(
                       '$ownerPrefix-catalogue-${brandOnly ? current.brand : current.seller}',
                   semanticLabel:
                       '${brandOnly ? current.brand : current.seller} product catalogue',
-                  laneCount: products.length > 1 ? 2 : 1,
+                  laneCount: previewProducts.length >= 6 ? 2 : 1,
                   storeContext: !brandOnly,
                   onOpenProduct: (product) =>
                       Navigator.of(sheetContext).pop(product.id),
@@ -3285,7 +3285,7 @@ Future<String?> _showBuyV2FullStoreCatalogue(
               products: products,
               storageKey: '$ownerPrefix-full-catalogue-${current.seller}',
               semanticLabel: '${current.seller} full product catalogue',
-              laneCount: products.length > 3 ? 2 : 1,
+              laneCount: products.length >= 6 ? 2 : 1,
               storeContext: true,
               onOpenProduct: (product) =>
                   Navigator.of(sheetContext).pop(product.id),

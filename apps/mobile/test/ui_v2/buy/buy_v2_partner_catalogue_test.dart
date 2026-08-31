@@ -293,6 +293,61 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('four-product store fills one three-SKU row without dead width', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    expect(session.openProduct('s-curd'), isTrue);
+
+    await tester.pumpWidget(_app(session));
+    await tester.pumpAndSettle();
+    final sellerAction = find.byKey(
+      const ValueKey('buy-shop-seller-action-s-curd'),
+    );
+    await _revealProductAction(tester, 's-curd', sellerAction);
+    await tester.tap(sellerAction);
+    await tester.pumpAndSettle();
+
+    final products = session.partnerCatalogueFor(session.product('s-curd'));
+    expect(products.length, 4);
+    final sheet = find.byKey(const ValueKey('buy-shop-seller-sheet-s-curd'));
+    expect(
+      find.descendant(
+        of: sheet,
+        matching: find.byKey(const ValueKey('buy-horizontal-product-lane-0')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: sheet,
+        matching: find.byKey(const ValueKey('buy-horizontal-product-lane-1')),
+      ),
+      findsNothing,
+    );
+    for (final product in products.take(3)) {
+      final card = find
+          .descendant(
+            of: sheet,
+            matching: find.byKey(ValueKey('buy-product-${product.id}')),
+          )
+          .first;
+      expect(card, findsOneWidget);
+      expect(tester.getRect(card).right, lessThanOrEqualTo(378));
+    }
+    expect(
+      find.byKey(const ValueKey('buy-shop-seller-view-more-s-curd')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Widget _app(BuyV2Session session) => MaterialApp(
