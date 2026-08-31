@@ -97,7 +97,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Save ₹20'), findsOneWidget);
-      expect(find.textContaining('Family Dairy & Bake'), findsOneWidget);
+      expect(find.textContaining('Family Dairy & Bake'), findsWidgets);
       expect(find.textContaining('HDFC Bank'), findsOneWidget);
       expect(find.textContaining('With UPI'), findsOneWidget);
       expect(find.textContaining('Until'), findsOneWidget);

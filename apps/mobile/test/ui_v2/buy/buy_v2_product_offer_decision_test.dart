@@ -110,7 +110,7 @@ void main() {
       find.text(buyV2BuyerDeliveryPromise(factsFor(product))),
       findsWidgets,
     );
-    expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
+    expect(find.textContaining(product.seller), findsWidgets);
     expect(find.text('Quick local delivery'), findsOneWidget);
     if (product.mrp case final mrp?) {
       expect(

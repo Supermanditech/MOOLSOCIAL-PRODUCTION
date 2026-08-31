@@ -127,7 +127,7 @@ void main() {
       find.byKey(const ValueKey('buy-shop-seller-action-s-oil')),
       findsNothing,
     );
-    expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
+    expect(find.textContaining(product.seller), findsWidgets);
     expect(find.text(expectedPromise), findsWidgets);
     expect(find.text('Ghar Bazaar'), findsNothing);
     expect(find.textContaining('MoolSocial price'), findsWidgets);

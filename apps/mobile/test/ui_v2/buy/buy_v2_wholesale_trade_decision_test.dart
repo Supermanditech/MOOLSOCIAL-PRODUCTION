@@ -109,7 +109,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Current through 6:00 pm today'), findsOneWidget);
-    expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
+    expect(find.textContaining(product.seller), findsWidgets);
 
     final gallery = find.byKey(ValueKey('buy-product-packshot-${product.id}'));
     expect(tester.getSize(gallery).height, lessThanOrEqualTo(238));

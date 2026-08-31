@@ -3480,7 +3480,9 @@ class _MarketplaceTrustPanel extends StatelessWidget {
         ),
         if (onViewSeller != null)
           _DecisionActionRow(
-            key: ValueKey('buy-shop-seller-action-${product.id}'),
+            key: ValueKey(
+              '${product.destination == BuyV2Destination.wholesale ? 'buy-wholesale-store-action' : 'buy-shop-seller-action'}-${product.id}',
+            ),
             icon: Icons.storefront_outlined,
             label: 'Visit store',
             value: trust.partnerName,

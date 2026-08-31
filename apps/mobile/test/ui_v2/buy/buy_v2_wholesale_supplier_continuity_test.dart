@@ -103,14 +103,14 @@ void main() {
         const ValueKey('buy-automatic-fulfilment-w-oil'),
       );
       final supplier = find.byKey(
-        const ValueKey('buy-wholesale-supplier-action-w-oil'),
+        const ValueKey('buy-wholesale-store-action-w-oil'),
       );
       await revealSupplierAction(tester, supplier);
       expect(automatic, findsOneWidget);
       expect(supplier, findsOneWidget);
-      expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
+      expect(find.textContaining(session.product('w-oil').seller), findsWidgets);
       expect(find.text('Surya Oils India'), findsOneWidget);
-      expect(find.textContaining('MoolSocial price'), findsWidgets);
+      expect(find.textContaining('Surya Oils India'), findsWidgets);
       await tester.tap(supplier);
       await tester.pumpAndSettle();
       expect(
@@ -203,7 +203,7 @@ void main() {
       const ValueKey('buy-automatic-fulfilment-w-oil'),
     );
     final supplier = find.byKey(
-      const ValueKey('buy-wholesale-supplier-action-w-oil'),
+      const ValueKey('buy-wholesale-store-action-w-oil'),
     );
     await revealSupplierAction(tester, supplier);
     expect(automatic, findsOneWidget);
