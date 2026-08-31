@@ -5844,11 +5844,13 @@ class BuyV2CheckoutView extends StatelessWidget {
     super.key,
     required this.session,
     required this.gstInvoiceController,
+    required this.onOpenSupport,
     this.paymentHandoff,
   });
 
   final BuyV2Session session;
   final BuyV2GstInvoiceController gstInvoiceController;
+  final VoidCallback onOpenSupport;
   final BuyV2PaymentHandoff? paymentHandoff;
 
   @override
@@ -5914,6 +5916,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                     const SizedBox(height: 8),
                     _CheckoutSubmissionStatus(
                       session: session,
+                      onOpenSupport: onOpenSupport,
                       paymentHandoff: paymentHandoff,
                     ),
                   ],
@@ -6143,10 +6146,12 @@ class BuyV2CheckoutView extends StatelessWidget {
 class _CheckoutSubmissionStatus extends StatelessWidget {
   const _CheckoutSubmissionStatus({
     required this.session,
+    required this.onOpenSupport,
     required this.paymentHandoff,
   });
 
   final BuyV2Session session;
+  final VoidCallback onOpenSupport;
   final BuyV2PaymentHandoff? paymentHandoff;
 
   @override
@@ -6322,7 +6327,7 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
                       ),
                     TextButton.icon(
                       key: const ValueKey('buy-checkout-submission-help'),
-                      onPressed: session.openAssist,
+                      onPressed: onOpenSupport,
                       icon: const Icon(Icons.chat_outlined, size: 17),
                       label: const Text('Get order help'),
                     ),

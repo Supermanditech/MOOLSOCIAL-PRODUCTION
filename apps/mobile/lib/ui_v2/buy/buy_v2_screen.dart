@@ -723,7 +723,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       if (onOpenChat != null) {
         onOpenChat();
       } else {
-        widget.session.openAssist();
+        widget.session.showNotice(
+          'Shop Chat is unavailable right now. Your order is unchanged.',
+        );
       }
       return;
     }
@@ -816,6 +818,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       BuyV2View.checkout => BuyV2CheckoutView(
         session: session,
         gstInvoiceController: _gstInvoiceController,
+        onOpenSupport: _openShopChat,
         paymentHandoff: widget.paymentHandoff,
       ),
       BuyV2View.confirmation => BuyV2ConfirmationView(
