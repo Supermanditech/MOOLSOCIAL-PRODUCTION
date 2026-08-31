@@ -723,6 +723,103 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     _insertComposerText(emoji);
   }
 
+  Future<void> _openMoreCreateTools() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 2, 16, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'More creation tools',
+                style: TextStyle(
+                  color: SocialV2Colors.navy,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Add expression or context without leaving your draft.',
+                style: TextStyle(color: SocialV2Colors.muted),
+              ),
+              const SizedBox(height: 12),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const gap = 8.0;
+                  final width = (constraints.maxWidth - gap) / 2;
+                  Widget tool({
+                    required Key key,
+                    required IconData icon,
+                    required String label,
+                    required String value,
+                  }) => SizedBox(
+                    width: width,
+                    child: OutlinedButton.icon(
+                      key: key,
+                      onPressed: () => Navigator.pop(sheetContext, value),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        alignment: Alignment.centerLeft,
+                      ),
+                      icon: Icon(icon),
+                      label: Text(label),
+                    ),
+                  );
+                  return Wrap(
+                    spacing: gap,
+                    runSpacing: gap,
+                    children: [
+                      tool(
+                        key: const Key('screen04-create-inline-gif'),
+                        icon: Icons.gif_box_outlined,
+                        label: 'GIF',
+                        value: 'gif',
+                      ),
+                      tool(
+                        key: const Key('screen04-create-inline-emoji'),
+                        icon: Icons.emoji_emotions_outlined,
+                        label: 'Emoji',
+                        value: 'emoji',
+                      ),
+                      tool(
+                        key: const Key('screen04-create-inline-mention'),
+                        icon: Icons.alternate_email_rounded,
+                        label: 'Mention',
+                        value: 'mention',
+                      ),
+                      tool(
+                        key: const Key('screen04-create-inline-topic'),
+                        icon: Icons.tag_rounded,
+                        label: 'Topic',
+                        value: 'topic',
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'gif':
+        _showGifAvailability();
+      case 'emoji':
+        await _openEmojiPalette();
+      case 'mention':
+        _insertComposerText('@');
+      case 'topic':
+        _insertComposerText('#');
+    }
+  }
+
   void _showGifAvailability() {
     showSocialV2Message(
       context,
@@ -1203,36 +1300,12 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
         onTap: () => _selectIntent(SocialCreateIntentV2.quiz),
       ),
       (
-        key: const Key('screen04-create-inline-gif'),
+        key: const Key('screen04-create-more-tools'),
         ownerKey: null,
-        icon: Icons.gif_box_outlined,
-        label: 'GIF',
+        icon: Icons.add_circle_outline_rounded,
+        label: 'More',
         selected: false,
-        onTap: _showGifAvailability,
-      ),
-      (
-        key: const Key('screen04-create-inline-emoji'),
-        ownerKey: null,
-        icon: Icons.emoji_emotions_outlined,
-        label: 'Emoji',
-        selected: false,
-        onTap: () => unawaited(_openEmojiPalette()),
-      ),
-      (
-        key: const Key('screen04-create-inline-mention'),
-        ownerKey: null,
-        icon: Icons.alternate_email_rounded,
-        label: 'Mention',
-        selected: false,
-        onTap: () => _insertComposerText('@'),
-      ),
-      (
-        key: const Key('screen04-create-inline-topic'),
-        ownerKey: null,
-        icon: Icons.tag_rounded,
-        label: 'Topic',
-        selected: false,
-        onTap: () => _insertComposerText('#'),
+        onTap: () => unawaited(_openMoreCreateTools()),
       ),
       if (widget.allowReel)
         (
@@ -1253,13 +1326,14 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
           onTap: widget.onCreateYouTubeShort!,
         ),
     ];
-    Widget action(_KeyboardCreateAction value) {
+    Widget action(_KeyboardCreateAction value, {required double width}) {
       final child = compactAction(
         key: value.key,
         icon: value.icon,
         label: value.label,
         selected: value.selected,
         onTap: value.onTap,
+        width: width,
       );
       final ownerKey = value.ownerKey;
       return ownerKey == null
@@ -1267,27 +1341,42 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
           : KeyedSubtree(key: ownerKey, child: child);
     }
 
-    return SizedBox(
-      key: const ValueKey('create-keyboard-format-workbench'),
-      height: 52,
-      child: Row(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              key: const Key('screen04-create-ime-format-strip'),
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (var index = 0; index < actions.length; index++) ...[
-                    if (index > 0) const SizedBox(width: 3),
-                    action(actions[index]),
-                  ],
-                ],
-              ),
-            ),
+    if (actions.length > 8) {
+      return SizedBox(
+        key: const ValueKey('create-keyboard-format-workbench'),
+        height: 54,
+        child: SingleChildScrollView(
+          key: const Key('screen04-create-ime-format-strip'),
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var index = 0; index < actions.length; index++) ...[
+                if (index > 0) const SizedBox(width: 6),
+                action(actions[index], width: 82),
+              ],
+            ],
           ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      key: const Key('screen04-create-ime-format-strip'),
+      builder: (context, constraints) {
+        const gap = 6.0;
+        final width = (constraints.maxWidth - (gap * 3)) / 4;
+        return SizedBox(
+          key: const ValueKey('create-keyboard-format-workbench'),
+          height: 110,
+          child: Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final value in actions) action(value, width: width),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -2000,14 +2089,36 @@ class _FormatAction extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(15),
             child: SizedBox(
-              height: 48,
+              height: 52,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  Icon(
-                    icon,
-                    size: 22,
-                    color: selected ? Colors.white : SocialV2Colors.navy,
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        icon,
+                        size: 19,
+                        color: selected ? Colors.white : SocialV2Colors.navy,
+                      ),
+                      const SizedBox(height: 2),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: selected
+                                ? Colors.white
+                                : SocialV2Colors.navy,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   if (selected)
                     const Positioned(

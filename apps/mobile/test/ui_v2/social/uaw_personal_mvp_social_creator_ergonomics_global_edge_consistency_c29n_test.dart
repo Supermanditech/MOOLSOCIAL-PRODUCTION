@@ -97,9 +97,25 @@ void main() {
       'screen04-create-tool-image-poll',
       'screen04-create-tool-quick-poll',
       'screen04-create-tool-quiz',
+      'screen04-create-more-tools',
     ]) {
       final action = find.byKey(Key(key));
+      final label = switch (key) {
+        'screen04-create-tool-post' => 'Text',
+        'screen04-create-tool-image' => 'Image',
+        'screen04-create-tool-camera' => 'Camera',
+        'screen04-create-tool-carousel' => 'Carousel',
+        'screen04-create-tool-image-poll' => 'Image Poll',
+        'screen04-create-tool-quick-poll' => 'Quick Poll',
+        'screen04-create-tool-quiz' => 'Quiz',
+        _ => 'More',
+      };
       expect(action, findsOneWidget, reason: key);
+      expect(
+        find.descendant(of: action, matching: find.text(label)),
+        findsOneWidget,
+        reason: '$key must remain understandable without icon recall.',
+      );
       expect(
         tester.getSize(action).width,
         greaterThanOrEqualTo(44),
@@ -170,7 +186,7 @@ void main() {
     expect(bottomToolShelf, findsOneWidget);
     expect(
       tester.getSize(imeWorkbench).height,
-      lessThanOrEqualTo(62),
+      lessThanOrEqualTo(110),
       reason: 'The live Create tool shelf must stay compact above the IME.',
     );
     expect(

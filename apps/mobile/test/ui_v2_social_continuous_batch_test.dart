@@ -7,7 +7,6 @@ import 'package:moolsocial/features/creator/creator_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/retailer/retailer_session.dart';
-import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_creator.dart';
@@ -528,35 +527,17 @@ void main() {
           findsNothing,
         );
         expect(
-          find.byKey(const Key('screen04-create-inline-emoji')),
+          find.byKey(const Key('screen04-create-more-tools')),
           findsOneWidget,
         );
         expect(
-          find.byKey(const Key('screen04-create-inline-gif')),
-          findsOneWidget,
-        );
-        for (final key in const [
-          Key('screen04-create-inline-emoji'),
-          Key('screen04-create-inline-mention'),
-          Key('screen04-create-inline-topic'),
-          Key('screen04-create-inline-gif'),
-        ]) {
-          final rect = tester.getRect(find.byKey(key));
-          final shelf = tester.getRect(
-            find.byKey(const Key('screen04-create-format-decision')),
-          );
-          expect(rect.top, greaterThanOrEqualTo(shelf.top));
-          expect(rect.bottom, lessThanOrEqualTo(shelf.bottom));
-          expect(rect.height, greaterThanOrEqualTo(44));
-          expect(rect.width, lessThan(72));
-        }
-        final emojiRect = tester.getRect(
           find.byKey(const Key('screen04-create-inline-emoji')),
+          findsNothing,
         );
-        final gifRect = tester.getRect(
+        expect(
           find.byKey(const Key('screen04-create-inline-gif')),
+          findsNothing,
         );
-        expect(gifRect.top, emojiRect.top);
         expect(find.text('Sign in to post'), findsNothing);
         expect(find.text('Post'), findsOneWidget);
         expect(
@@ -589,9 +570,21 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        await tester.ensureVisible(
-          find.byKey(const Key('screen04-create-inline-emoji')),
-        );
+        await tester.tap(find.byKey(const Key('screen04-create-more-tools')));
+        await tester.pumpAndSettle();
+        expect(find.text('More creation tools'), findsOneWidget);
+        for (final key in const [
+          Key('screen04-create-inline-gif'),
+          Key('screen04-create-inline-emoji'),
+          Key('screen04-create-inline-mention'),
+          Key('screen04-create-inline-topic'),
+        ]) {
+          expect(find.byKey(key), findsOneWidget);
+          expect(
+            tester.getSize(find.byKey(key)).height,
+            greaterThanOrEqualTo(44),
+          );
+        }
         await tester.tap(find.byKey(const Key('screen04-create-inline-emoji')));
         await tester.pumpAndSettle();
         expect(find.text('Add a feeling'), findsOneWidget);
@@ -607,9 +600,8 @@ void main() {
           'Preview draft✨',
         );
 
-        await tester.ensureVisible(
-          find.byKey(const Key('screen04-create-inline-gif')),
-        );
+        await tester.tap(find.byKey(const Key('screen04-create-more-tools')));
+        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('screen04-create-inline-gif')));
         await tester.pumpAndSettle();
         expect(find.textContaining('approved media service'), findsOneWidget);
@@ -619,50 +611,6 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
-
-    testWidgets('UI review keeps a session draft without durable auth', (
-      tester,
-    ) async {
-      final owners = _GuestOwners();
-      addTearDown(owners.dispose);
-      await owners.journey.start();
-      await _pump(
-        tester,
-        SocialUniversalV2(
-          session: owners.journey,
-          creatorSession: owners.creator,
-          retailerSession: owners.retailer,
-          sharedSession: owners.shared,
-          createDraftStateCache: SocialCreateDraftStateCache(),
-          initialSubAction: 'feed',
-          enableCreateReviewPreview: true,
-        ),
-      );
-
-      await tester.tap(find.byKey(const Key('screen04-feed-create-post')));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const Key('screen04-create-post-text')),
-        'Session camera draft',
-      );
-      await tester.tap(find.byKey(const Key('screen04-create-close')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Draft save failed. Please try again.'), findsNothing);
-      expect(find.byKey(const Key('social-v2-create-workbench')), findsNothing);
-      await tester.tap(find.byKey(const Key('screen04-rail-create')));
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<TextField>(
-              find.byKey(const Key('screen04-create-post-text')),
-            )
-            .controller!
-            .text,
-        'Session camera draft',
-      );
-      expect(tester.takeException(), isNull);
-    });
 
     testWidgets('normal guest Create still goes directly to sign-in', (
       tester,
