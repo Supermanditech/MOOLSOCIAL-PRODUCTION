@@ -197,4 +197,53 @@ void main() {
     expect(session.selectedProductId, 's-milk');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('Wholesale Buy now preserves MOQ and exact product return', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 700);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    expect(session.openProduct('w-rice-50kg'), isTrue);
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(
+          session: session,
+          initialDestination: BuyV2Destination.wholesale,
+          initialView: BuyV2View.product,
+          productId: 'w-rice-50kg',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final buyNow = find.byKey(
+      const ValueKey('buy-wholesale-buy-now-w-rice-50kg'),
+    );
+    expect(buyNow, findsOneWidget);
+    await tester.tap(buyNow);
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.checkout);
+    expect(session.checkoutScope, BuyV2CartScope.wholesale);
+    expect(session.quantityFor('w-rice-50kg'), 1);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.product);
+    expect(session.selectedProductId, 'w-rice-50kg');
+    expect(tester.takeException(), isNull);
+  });
 }

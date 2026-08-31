@@ -795,6 +795,7 @@ class BuyV2ProductView extends StatelessWidget {
             decision: offerDecision!,
             quantity: quantity,
             onAdd: addProduct,
+            onBuyNow: () => session.buyProductNow(product.id),
             onDecrease: () => session.decrease(product.id),
             onIncrease: () => session.increase(product.id),
             onRetryOffer: () => session.refreshProductFacts(product.id),
@@ -2009,6 +2010,7 @@ class _WholesaleTradeActionDock extends StatelessWidget {
     required this.decision,
     required this.quantity,
     required this.onAdd,
+    required this.onBuyNow,
     required this.onDecrease,
     required this.onIncrease,
     required this.onRetryOffer,
@@ -2021,6 +2023,7 @@ class _WholesaleTradeActionDock extends StatelessWidget {
   final BuyV2ProductOfferDecision decision;
   final int quantity;
   final VoidCallback onAdd;
+  final VoidCallback onBuyNow;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
   final VoidCallback onRetryOffer;
@@ -2118,6 +2121,26 @@ class _WholesaleTradeActionDock extends StatelessWidget {
       );
     }
 
+    final actionGroup = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(height: 50, child: action),
+        if (businessVerified && decision.canAdd) ...[
+          const SizedBox(height: 5),
+          SizedBox(
+            height: BuyV2Metrics.minimumTap,
+            child: OutlinedButton.icon(
+              key: ValueKey('buy-wholesale-buy-now-${product.id}'),
+              onPressed: onBuyNow,
+              icon: const Icon(Icons.flash_on_rounded, size: 17),
+              label: const Text('Buy now'),
+            ),
+          ),
+        ],
+      ],
+    );
+
     return Material(
       key: ValueKey('buy-wholesale-action-dock-${product.id}'),
       color: Colors.white,
@@ -2133,11 +2156,7 @@ class _WholesaleTradeActionDock extends StatelessWidget {
               if (stacked) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    summary,
-                    const SizedBox(height: 8),
-                    SizedBox(height: 50, child: action),
-                  ],
+                  children: [summary, const SizedBox(height: 8), actionGroup],
                 );
               }
               return Row(
@@ -2150,7 +2169,7 @@ class _WholesaleTradeActionDock extends StatelessWidget {
                       minWidth: 148,
                       maxWidth: 190,
                     ),
-                    child: action,
+                    child: actionGroup,
                   ),
                 ],
               );
