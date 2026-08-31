@@ -520,7 +520,7 @@ void main() {
         expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
         expect(
           find.byKey(const Key('screen04-create-preview-hub-notice')),
-          findsOneWidget,
+          findsNothing,
         );
         expect(owners.journey.isAuthenticated, isFalse);
 
@@ -528,7 +528,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           find.byKey(const Key('screen04-create-preview-notice')),
-          findsOneWidget,
+          findsNothing,
         );
         expect(
           find.byKey(const Key('screen04-create-writing-canvas')),

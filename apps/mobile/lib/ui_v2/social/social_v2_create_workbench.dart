@@ -1056,35 +1056,6 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                 ),
               ),
             ),
-            if (widget.previewOnly)
-              const Material(
-                key: Key('screen04-create-preview-notice'),
-                color: Color(0xFFFFF4DE),
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(12, 8, 12, 8),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.visibility_outlined,
-                        color: Color(0xFF8A4B00),
-                        size: 18,
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Create preview · Nothing can be published until you sign in.',
-                          style: TextStyle(
-                            color: Color(0xFF6A3A00),
-                            fontSize: 11.5,
-                            height: 1.25,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             Expanded(
               child: SingleChildScrollView(
                 key: const Key('screen04-create-scrollable-composer'),

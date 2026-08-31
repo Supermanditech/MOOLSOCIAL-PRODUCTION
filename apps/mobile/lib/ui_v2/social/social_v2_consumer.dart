@@ -3521,35 +3521,6 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
       key: const Key('screen04-create-home'),
       padding: const EdgeInsets.fromLTRB(12, 16, 12, 120),
       children: [
-        if (_createReviewPreviewActive && !widget.session.isAuthenticated) ...[
-          SocialV2Card(
-            key: const Key('screen04-create-preview-hub-notice'),
-            padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-            child: Row(
-              children: [
-                const Icon(Icons.visibility_outlined, color: Color(0xFF8A4B00)),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'Create preview is open. Explore every format; posting still requires sign-in.',
-                    style: TextStyle(
-                      color: SocialV2Colors.ink,
-                      fontSize: 12,
-                      height: 1.3,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  key: const Key('screen04-create-preview-sign-in'),
-                  onPressed: _beginCreateSignIn,
-                  child: const Text('Sign in'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
         Container(
           key: const Key('screen04-create-hub-header'),
           padding: const EdgeInsets.all(16),
