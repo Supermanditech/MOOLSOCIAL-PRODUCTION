@@ -3641,6 +3641,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                     icon: Icons.add_photo_alternate_outlined,
                     accent: Color(0xFFE54878),
                     badge: 'Moment',
+                    compact: columns == 3,
                     enabled: !hasUserContent,
                     onTap: () => _openCreateEditor('image'),
                   ),
@@ -3654,6 +3655,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                     icon: Icons.view_carousel_outlined,
                     accent: Color(0xFF6D4AFF),
                     badge: 'Story',
+                    compact: columns == 3,
                     enabled: !hasUserContent,
                     onTap: () => _openCreateEditor('carousel'),
                   ),
@@ -3667,6 +3669,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                     icon: Icons.poll_outlined,
                     accent: Color(0xFF07856A),
                     badge: 'Conversation',
+                    compact: columns == 3,
                     enabled: !hasUserContent,
                     onTap: () => _openCreateEditor('quick-poll'),
                   ),
@@ -3680,6 +3683,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                     icon: Icons.grid_view_rounded,
                     accent: Color(0xFF006A78),
                     badge: 'Visual vote',
+                    compact: columns == 3,
                     enabled: !hasUserContent,
                     onTap: () => _openCreateEditor('image-poll'),
                   ),
@@ -3693,6 +3697,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                     icon: Icons.quiz_outlined,
                     accent: Color(0xFFD06A00),
                     badge: 'Play',
+                    compact: columns == 3,
                     enabled: !hasUserContent,
                     onTap: () => _openCreateEditor('quiz'),
                   ),
@@ -4420,6 +4425,7 @@ class _SocialCreateFormatTile extends StatelessWidget {
     required this.icon,
     required this.accent,
     required this.badge,
+    required this.compact,
     required this.enabled,
     required this.onTap,
     super.key,
@@ -4430,6 +4436,7 @@ class _SocialCreateFormatTile extends StatelessWidget {
   final IconData icon;
   final Color accent;
   final String badge;
+  final bool compact;
   final bool enabled;
   final VoidCallback onTap;
 
@@ -4449,17 +4456,17 @@ class _SocialCreateFormatTile extends StatelessWidget {
         onTap: enabled ? onTap : null,
         borderRadius: BorderRadius.circular(18),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 116),
+          constraints: BoxConstraints(minHeight: compact ? 100 : 116),
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: EdgeInsets.all(compact ? 12 : 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: compact ? 36 : 40,
+                      height: compact ? 36 : 40,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: accent.withValues(alpha: .13),
@@ -4468,58 +4475,64 @@ class _SocialCreateFormatTile extends StatelessWidget {
                       child: Icon(
                         icon,
                         color: enabled ? accent : SocialV2Colors.muted,
-                        size: 23,
+                        size: compact ? 21 : 23,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          child: Text(
-                            badge,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: enabled ? accent : SocialV2Colors.muted,
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.w900,
+                    if (!compact) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: Text(
+                              badge,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: enabled ? accent : SocialV2Colors.muted,
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: compact ? 8 : 12),
                 Text(
                   title,
+                  maxLines: compact ? 2 : 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: enabled ? SocialV2Colors.navy : SocialV2Colors.muted,
-                    fontSize: 15,
+                    fontSize: compact ? 14 : 15,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  detail,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: SocialV2Colors.muted,
-                    fontSize: 11,
-                    height: 1.25,
-                    fontWeight: FontWeight.w600,
+                if (!compact) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    detail,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: SocialV2Colors.muted,
+                      fontSize: 11,
+                      height: 1.25,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
