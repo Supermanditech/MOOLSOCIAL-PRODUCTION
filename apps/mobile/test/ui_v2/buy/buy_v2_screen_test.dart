@@ -3934,7 +3934,7 @@ void main() {
 
     await tester.drag(
       find.byKey(const PageStorageKey('buy-offers')),
-      const Offset(0, -180),
+      const Offset(0, -360),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('buy-add-s-tomato')));

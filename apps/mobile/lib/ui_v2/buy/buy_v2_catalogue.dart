@@ -4213,6 +4213,7 @@ class _ProductGrid extends StatelessWidget {
                   savedContext: savedOnly,
                 ),
               ),
+            const SliverToBoxAdapter(child: SizedBox(height: 96)),
           ],
         );
       },
@@ -4674,7 +4675,7 @@ _resolveCompactProductGridLayout({
             ? 330.0
             : 314.0
       : columns == 3
-      ? 300.0
+      ? 260.0
       : 286.0;
   return (columns: columns, cardWidth: cardWidth, tileHeight: tileHeight);
 }

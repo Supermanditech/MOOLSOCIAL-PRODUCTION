@@ -75,7 +75,7 @@ void main() {
             reason: '$size product $index fully visible',
           );
         }
-        expect(firstRect.height, inInclusiveRange(296, 300));
+        expect(firstRect.height, inInclusiveRange(256, 260));
 
         final title = tester.widget<Text>(
           find
@@ -173,7 +173,7 @@ void main() {
       final card = find.byKey(ValueKey('buy-product-${products[index].id}'));
       expect(card, findsOneWidget);
       expect(tester.getSize(card).width, greaterThanOrEqualTo(160));
-      expect(tester.getSize(card).height, inInclusiveRange(296, 300));
+      expect(tester.getSize(card).height, inInclusiveRange(256, 260));
     }
     expect(tester.takeException(), isNull);
   });
