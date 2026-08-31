@@ -230,6 +230,18 @@ class BuyV2GstInvoiceController extends ChangeNotifier {
     _notify();
   }
 
+  bool applySavedBusinessProfile() {
+    const destination = BuyV2Destination.wholesale;
+    if (_selected[destination] != null || _savedProfiles.isEmpty) {
+      return false;
+    }
+    _requested[destination] = true;
+    _selected[destination] = _savedProfiles.first;
+    _message = null;
+    _notify();
+    return true;
+  }
+
   Future<bool> save({
     required BuyV2Destination destination,
     required String legalName,
@@ -430,11 +442,6 @@ class BuyV2ProductView extends StatelessWidget {
       BuyV2Destination.wholesale ||
       BuyV2Destination.orders => const <BuyV2Product>[],
     };
-    final brandProducts =
-        product.destination == BuyV2Destination.shop ||
-            product.destination == BuyV2Destination.wholesale
-        ? session.brandCatalogueFor(product)
-        : const <BuyV2Product>[];
     final rxBlocked =
         product.requiresPrescription &&
         !session.isPrescriptionApproved(product.id);
@@ -729,26 +736,11 @@ class BuyV2ProductView extends StatelessWidget {
               _DecisionPanel(
                 title: 'Product details',
                 children: [
-                  if (brandProducts.length > 1 &&
-                      onOpenPartnerCatalogue != null)
-                    _DecisionActionRow(
-                      key: ValueKey('buy-brand-action-${product.id}'),
-                      icon: Icons.sell_outlined,
-                      label: 'Brand',
-                      value: product.brand,
-                      detail:
-                          '${brandProducts.length} available products in ${product.destination.label}',
-                      semanticLabel:
-                          'Browse ${brandProducts.length} ${product.brand} products in ${product.destination.label}',
-                      onTap: () =>
-                          onOpenPartnerCatalogue!(product, brandOnly: true),
-                    )
-                  else
-                    _DecisionRow(
-                      icon: Icons.sell_outlined,
-                      label: 'Brand',
-                      value: product.brand,
-                    ),
+                  _DecisionRow(
+                    icon: Icons.sell_outlined,
+                    label: 'Brand',
+                    value: product.brand,
+                  ),
                   _DecisionRow(
                     icon: Icons.tune_rounded,
                     label: 'Variant',
@@ -1706,12 +1698,12 @@ class _WholesaleTradeDecisionPanelState
                 _DecisionActionRow(
                   key: ValueKey('buy-wholesale-supplier-action-${product.id}'),
                   icon: Icons.storefront_outlined,
-                  label: product.partnerRole,
+                  label: 'Visit store',
                   value: facts.partner,
                   detail:
-                      '${supplierProducts.length} other current trade packs',
+                      '${supplierProducts.length} more current trade products',
                   semanticLabel:
-                      'View ${supplierProducts.length} more products available from ${facts.partner}',
+                      'Visit ${facts.partner} for ${supplierProducts.length} more products',
                   onTap: () => widget.onOpenPartnerCatalogue!(product),
                 ),
               _DecisionRow(
@@ -3508,12 +3500,12 @@ class _MarketplaceTrustPanel extends StatelessWidget {
           _DecisionActionRow(
             key: ValueKey('buy-shop-seller-action-${product.id}'),
             icon: Icons.storefront_outlined,
-            label: 'Seller products',
-            value: 'More from ${trust.partnerName}',
+            label: 'Visit store',
+            value: trust.partnerName,
             detail:
-                '$sellerProductCount other ${sellerProductCount == 1 ? 'product' : 'products'}',
+                '$sellerProductCount more ${sellerProductCount == 1 ? 'product' : 'products'} from this store',
             semanticLabel:
-                'View $sellerProductCount more ${sellerProductCount == 1 ? 'product' : 'products'} from ${trust.partnerName}',
+                'Visit ${trust.partnerName} for $sellerProductCount more ${sellerProductCount == 1 ? 'product' : 'products'}',
             onTap: onViewSeller!,
           ),
         if (partnerRating case final rating?)
@@ -4686,6 +4678,7 @@ class _GstInvoiceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final requested = controller.requestedFor(destination);
     final details = controller.detailsFor(destination);
+    final gstAdded = details != null;
     return Container(
       key: ValueKey('buy-gst-invoice-${destination.name}'),
       padding: const EdgeInsets.all(11),
@@ -4714,9 +4707,14 @@ class _GstInvoiceCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Add GST details', style: context.buyBody),
                     Text(
-                      'GST applies as required. Add GSTIN only for recipient details on the invoice.',
+                      gstAdded ? 'GST added' : 'Add GST details',
+                      style: context.buyBody,
+                    ),
+                    Text(
+                      gstAdded && destination == BuyV2Destination.wholesale
+                          ? 'Used automatically for this business order and future Wholesale checkout.'
+                          : 'GST applies as required. Add GSTIN only for recipient details on the invoice.',
                       style: context.buyMeta.copyWith(fontSize: 8),
                     ),
                   ],

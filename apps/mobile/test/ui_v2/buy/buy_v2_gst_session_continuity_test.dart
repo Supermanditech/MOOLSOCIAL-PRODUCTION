@@ -44,6 +44,38 @@ void main() {
     },
   );
 
+  test(
+    'saved business GST profile is automatically attached to Wholesale checkout',
+    () async {
+      final session = BuyV2Session(core: BuySession());
+      final store = session.gstInvoiceProfileStore;
+      final first = BuyV2GstInvoiceController(store: store);
+      addTearDown(first.dispose);
+      expect(
+        await first.save(
+          destination: BuyV2Destination.wholesale,
+          legalName: 'Safe Protein Store Business',
+          gstin: '08ABCDE1234F1Z5',
+          billingAddress: '12 Market Road, Jodhpur',
+          remember: true,
+        ),
+        isTrue,
+      );
+
+      final restored = BuyV2GstInvoiceController(store: store);
+      addTearDown(restored.dispose);
+      await restored.restore();
+
+      expect(restored.applySavedBusinessProfile(), isTrue);
+      expect(restored.requestedFor(BuyV2Destination.wholesale), isTrue);
+      expect(
+        restored.detailsFor(BuyV2Destination.wholesale)?.legalName,
+        'Safe Protein Store Business',
+      );
+      expect(restored.applySavedBusinessProfile(), isFalse);
+    },
+  );
+
   testWidgets(
     'GST sheet offers truthful session reuse instead of order-only copy',
     (tester) async {

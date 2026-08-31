@@ -127,6 +127,48 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Tools exposes Recently viewed without hiding it in settings', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    expect(session.openProduct('s-milk'), isTrue);
+    session.closeProduct();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(session: session),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
+    await tester.pumpAndSettle();
+
+    final recentlyViewed = find.byKey(
+      const ValueKey('buy-recently-viewed-button'),
+    );
+    await tester.scrollUntilVisible(
+      recentlyViewed,
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(recentlyViewed);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('buy-recently-viewed-info-sheet')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-settings-recently-viewed')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Shopping settings reopens an exact recently viewed product and returns',
     (tester) async {

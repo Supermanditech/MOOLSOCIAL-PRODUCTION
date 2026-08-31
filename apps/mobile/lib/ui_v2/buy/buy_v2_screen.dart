@@ -138,6 +138,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     await widget.session.refreshCheckoutQuote();
     await widget.session.refreshCommercialPaymentTerms();
     await _gstInvoiceController.restore();
+    if (widget.session.businessVerified) {
+      _gstInvoiceController.applySavedBusinessProfile();
+    }
   }
 
   void _applyInitialState() {

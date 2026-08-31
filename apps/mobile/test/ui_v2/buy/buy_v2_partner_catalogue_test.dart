@@ -96,46 +96,128 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Brand catalogue filters the same grid and Back keeps product', (
+  testWidgets('product details keeps Visit store as the single store route', (
     tester,
   ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(320, 700);
-    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
-    addTearDown(tester.view.reset);
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     final core = BuySession();
     final session = BuyV2Session(core: core);
     addTearDown(session.dispose);
     addTearDown(core.dispose);
-    final product = session.product('s-tomato');
-    expect(session.brandCatalogueFor(product).length, greaterThan(1));
+    final product = session.product('s-eggs');
     expect(session.openProduct(product.id), isTrue);
 
     await tester.pumpWidget(_app(session));
     await tester.pumpAndSettle();
-    final brandAction = find.byKey(ValueKey('buy-brand-action-${product.id}'));
-    await _revealProductAction(tester, product.id, brandAction);
-    await tester.tap(brandAction);
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(ValueKey('buy-shop-brand-sheet-${product.id}')),
-      findsOneWidget,
+    final sellerAction = find.byKey(
+      ValueKey('buy-shop-seller-action-${product.id}'),
     );
-    expect(find.text('${product.brand} products'), findsOneWidget);
-    for (final brandProduct in session.brandCatalogueFor(product)) {
-      expect(
-        find.byKey(ValueKey('buy-product-${brandProduct.id}')),
-        findsOneWidget,
-      );
-    }
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(session.view, BuyV2View.product);
-    expect(session.selectedProductId, product.id);
+    await _revealProductAction(tester, product.id, sellerAction);
+
+    expect(find.text('Visit store'), findsOneWidget);
+    expect(
+      find.byKey(ValueKey('buy-brand-action-${product.id}')),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('store grid wires Add and Buy now to their exact outcomes', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    expect(session.openProduct('s-eggs'), isTrue);
+
+    await tester.pumpWidget(_app(session));
+    await tester.pumpAndSettle();
+    final sellerAction = find.byKey(
+      const ValueKey('buy-shop-seller-action-s-eggs'),
+    );
+    await _revealProductAction(tester, 's-eggs', sellerAction);
+    await tester.tap(sellerAction);
+    await tester.pumpAndSettle();
+
+    final add = find.byKey(const ValueKey('buy-add-s-chicken'));
+    final buyNow = find.byKey(const ValueKey('buy-grid-buy-now-s-chicken'));
+    await tester.scrollUntilVisible(
+      buyNow,
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('buy-shop-seller-sheet-s-eggs')),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  (widget.axisDirection == AxisDirection.down ||
+                      widget.axisDirection == AxisDirection.up),
+            ),
+          )
+          .first,
+    );
+    await tester.ensureVisible(add);
+    expect(add, findsOneWidget);
+    expect(buyNow, findsOneWidget);
+    expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
+    expect(tester.getSize(buyNow).height, greaterThanOrEqualTo(44));
+
+    await tester.tap(buyNow);
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.checkout);
+    expect(session.quantityFor('s-chicken'), 1);
+    expect(
+      find.byKey(const ValueKey('buy-shop-seller-sheet-s-eggs')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'store grid Add keeps the shopper in the store and updates Cart',
+    (tester) async {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      expect(session.openProduct('s-eggs'), isTrue);
+
+      await tester.pumpWidget(_app(session));
+      await tester.pumpAndSettle();
+      final sellerAction = find.byKey(
+        const ValueKey('buy-shop-seller-action-s-eggs'),
+      );
+      await _revealProductAction(tester, 's-eggs', sellerAction);
+      await tester.tap(sellerAction);
+      await tester.pumpAndSettle();
+
+      final add = find.byKey(const ValueKey('buy-add-s-chicken'));
+      await tester.scrollUntilVisible(
+        add,
+        180,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('buy-shop-seller-sheet-s-eggs')),
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    (widget.axisDirection == AxisDirection.down ||
+                        widget.axisDirection == AxisDirection.up),
+              ),
+            )
+            .first,
+      );
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+
+      expect(session.quantityFor('s-chicken'), 1);
+      expect(
+        find.byKey(const ValueKey('buy-shop-seller-sheet-s-eggs')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Widget _app(BuyV2Session session) => MaterialApp(

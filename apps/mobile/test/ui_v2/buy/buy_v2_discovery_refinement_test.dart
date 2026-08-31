@@ -99,4 +99,44 @@ void main() {
     expect(session.view, BuyV2View.catalogue);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('discovery browse actions open the category destination', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(session: session),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('buy-featured-browse-categories')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-category-sheet-route')), findsOne);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    final browseMore = find.byKey(
+      const ValueKey('buy-more-products-browse-categories'),
+    );
+    await tester.scrollUntilVisible(
+      browseMore,
+      220,
+      scrollable: find
+          .descendant(
+            of: find.byType(CustomScrollView).first,
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(browseMore);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-category-sheet-route')), findsOne);
+    expect(tester.takeException(), isNull);
+  });
 }

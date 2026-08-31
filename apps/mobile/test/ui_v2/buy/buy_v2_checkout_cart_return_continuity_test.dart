@@ -528,6 +528,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
     await tester.pumpAndSettle();
 
+    expect(find.text('GST added'), findsOneWidget);
     expect(find.text('Shree Balaji Retail'), findsWidgets);
     expect(find.textContaining('08ABCDE1234F1Z5'), findsOneWidget);
     expect(find.text('Place order'), findsOneWidget);
