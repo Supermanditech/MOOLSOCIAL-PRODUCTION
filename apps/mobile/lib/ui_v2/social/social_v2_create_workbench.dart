@@ -1373,6 +1373,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
   };
 
   Widget _buildPost() {
+    final keyboardOpen = View.of(context).viewInsets.bottom > 0;
     final question =
         _format == SocialCreateFormatV2.post &&
         (_postTool == _SocialPostTool.imagePoll ||
@@ -1490,45 +1491,47 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
-                const Divider(height: 14),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final actions = <Widget>[
-                      _CreateCanvasInlineAction(
-                        key: const Key('screen04-create-inline-emoji'),
-                        icon: Icons.emoji_emotions_outlined,
-                        label: 'Emoji',
-                        onTap: () => unawaited(_openEmojiPalette()),
-                      ),
-                      _CreateCanvasInlineAction(
-                        key: const Key('screen04-create-inline-mention'),
-                        icon: Icons.alternate_email_rounded,
-                        label: 'Mention',
-                        onTap: () => _insertComposerText('@'),
-                      ),
-                      _CreateCanvasInlineAction(
-                        key: const Key('screen04-create-inline-topic'),
-                        icon: Icons.tag_rounded,
-                        label: 'Topic',
-                        onTap: () => _insertComposerText('#'),
-                      ),
-                      _CreateCanvasInlineAction(
-                        key: const Key('screen04-create-inline-gif'),
-                        icon: Icons.gif_box_outlined,
-                        label: 'GIF',
-                        onTap: _showGifAvailability,
-                      ),
-                    ];
-                    final width = (constraints.maxWidth - 18) / 4;
-                    return Wrap(
-                      spacing: 6,
-                      children: [
-                        for (final action in actions)
-                          SizedBox(width: width, child: action),
-                      ],
-                    );
-                  },
-                ),
+                if (!keyboardOpen) ...[
+                  const Divider(height: 14),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final actions = <Widget>[
+                        _CreateCanvasInlineAction(
+                          key: const Key('screen04-create-inline-emoji'),
+                          icon: Icons.emoji_emotions_outlined,
+                          label: 'Emoji',
+                          onTap: () => unawaited(_openEmojiPalette()),
+                        ),
+                        _CreateCanvasInlineAction(
+                          key: const Key('screen04-create-inline-mention'),
+                          icon: Icons.alternate_email_rounded,
+                          label: 'Mention',
+                          onTap: () => _insertComposerText('@'),
+                        ),
+                        _CreateCanvasInlineAction(
+                          key: const Key('screen04-create-inline-topic'),
+                          icon: Icons.tag_rounded,
+                          label: 'Topic',
+                          onTap: () => _insertComposerText('#'),
+                        ),
+                        _CreateCanvasInlineAction(
+                          key: const Key('screen04-create-inline-gif'),
+                          icon: Icons.gif_box_outlined,
+                          label: 'GIF',
+                          onTap: _showGifAvailability,
+                        ),
+                      ];
+                      final width = (constraints.maxWidth - 18) / 4;
+                      return Wrap(
+                        spacing: 6,
+                        children: [
+                          for (final action in actions)
+                            SizedBox(width: width, child: action),
+                        ],
+                      );
+                    },
+                  ),
+                ],
               ],
             ),
           ),
