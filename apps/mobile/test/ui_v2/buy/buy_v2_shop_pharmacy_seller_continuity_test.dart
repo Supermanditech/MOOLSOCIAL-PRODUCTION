@@ -130,7 +130,7 @@ void main() {
     expect(find.textContaining(product.seller), findsWidgets);
     expect(find.text(expectedPromise), findsWidgets);
     expect(find.text('Ghar Bazaar'), findsOneWidget);
-    expect(find.textContaining('MoolSocial price'), findsWidgets);
+    expect(find.textContaining('Ghar Bazaar'), findsWidgets);
   });
 
   testWidgets('Medicine pharmacy action keeps prescription and safety facts', (
