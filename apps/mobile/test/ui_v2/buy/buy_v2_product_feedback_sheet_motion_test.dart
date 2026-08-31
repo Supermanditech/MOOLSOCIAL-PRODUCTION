@@ -392,6 +392,58 @@ void main() {
   });
 
   testWidgets(
+    'review exports both actions before interaction above Android navigation',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      const system = EdgeInsets.only(top: 41, bottom: 44);
+
+      await openReview(tester, session, viewPadding: system);
+
+      final cancel = find.byKey(const ValueKey('buy-cancel-product-review'));
+      final submit = find.byKey(ValueKey('buy-submit-review-${product().id}'));
+      expect(cancel, findsOneWidget);
+      expect(submit, findsOneWidget);
+      expect(tester.getRect(cancel).height, greaterThanOrEqualTo(44));
+      expect(tester.getRect(submit).height, greaterThanOrEqualTo(44));
+      expect(tester.getRect(cancel).bottom, lessThanOrEqualTo(800 - 44));
+      expect(tester.getRect(submit).bottom, lessThanOrEqualTo(800 - 44));
+      debugDefaultTargetPlatformOverride = null;
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'report exports both actions before selection above Android navigation',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      const system = EdgeInsets.only(top: 41, bottom: 44);
+
+      await openReport(tester, session, viewPadding: system);
+
+      final cancel = find.byKey(const ValueKey('buy-cancel-product-report'));
+      final submit = find.byKey(ValueKey('buy-submit-report-${product().id}'));
+      expect(cancel, findsOneWidget);
+      expect(submit, findsOneWidget);
+      expect(tester.getRect(cancel).height, greaterThanOrEqualTo(44));
+      expect(tester.getRect(submit).height, greaterThanOrEqualTo(44));
+      expect(tester.getRect(cancel).bottom, lessThanOrEqualTo(800 - 44));
+      expect(tester.getRect(submit).bottom, lessThanOrEqualTo(800 - 44));
+      debugDefaultTargetPlatformOverride = null;
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'review keyboard keeps composer and final actions above the Android boundary',
     (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
