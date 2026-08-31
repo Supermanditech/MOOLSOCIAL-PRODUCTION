@@ -1577,13 +1577,13 @@ void main() {
       findsNothing,
     );
     expect(
-      find.descendant(
-        of: primary,
-        matching: find.text('Add ${product.minimumOrder} packs'),
-      ),
+      find.descendant(of: primary, matching: find.text('Add to Cart')),
       findsOneWidget,
     );
-    expect(find.text('Add to cart', skipOffstage: false), findsNothing);
+    expect(
+      find.byKey(ValueKey('buy-wholesale-buy-now-${product.id}')),
+      findsOneWidget,
+    );
   });
 
   testWidgets(

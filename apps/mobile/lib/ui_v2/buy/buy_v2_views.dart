@@ -2104,66 +2104,42 @@ class _WholesaleTradeActionDock extends StatelessWidget {
       ],
     );
 
-    Widget action;
+    Widget actionGroup;
     if (!businessVerified) {
-      action = FilledButton.icon(
-        key: ValueKey('buy-wholesale-verify-business-${product.id}'),
-        onPressed: onOpenWorkspace,
-        icon: const Icon(Icons.verified_user_outlined),
-        label: const Text('Verify business'),
+      actionGroup = SizedBox(
+        height: 50,
+        child: FilledButton.icon(
+          key: ValueKey('buy-wholesale-verify-business-${product.id}'),
+          onPressed: onOpenWorkspace,
+          icon: const Icon(Icons.verified_user_outlined),
+          label: const Text('Verify business'),
+        ),
       );
     } else if (!decision.canAdd) {
-      action = FilledButton.icon(
-        key: ValueKey('buy-wholesale-retry-offer-${product.id}'),
-        onPressed: onRetryOffer,
-        icon: const Icon(Icons.refresh_rounded),
-        label: const Text('Retry offer'),
-      );
-    } else if (quantity > 0) {
-      action = _CompactProductStepper(
-        key: ValueKey('buy-product-quantity-${product.id}'),
-        quantity: quantity,
-        onDecrease: onDecrease,
-        onIncrease: onIncrease,
+      actionGroup = SizedBox(
+        height: 50,
+        child: FilledButton.icon(
+          key: ValueKey('buy-wholesale-retry-offer-${product.id}'),
+          onPressed: onRetryOffer,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('Retry offer'),
+        ),
       );
     } else {
-      action = Semantics(
-        label:
+      actionGroup = _ProductPurchaseActionRow(
+        product: product,
+        quantity: quantity,
+        buyNowKey: ValueKey('buy-wholesale-buy-now-${product.id}'),
+        addSemanticLabel:
             'Add minimum order of ${product.minimumOrder} packs of '
             '${product.title} to Cart for ${buyV2Money(orderTotal)}. '
             '$deliveryDecision',
-        button: true,
-        onTap: onAdd,
-        excludeSemantics: true,
-        child: FilledButton.icon(
-          key: ValueKey('buy-product-primary-${product.id}'),
-          style: FilledButton.styleFrom(minimumSize: const Size(0, 50)),
-          onPressed: onAdd,
-          icon: const Icon(Icons.add_shopping_cart_rounded),
-          label: Text('Add ${product.minimumOrder} packs'),
-        ),
+        onAdd: onAdd,
+        onBuyNow: onBuyNow,
+        onDecrease: onDecrease,
+        onIncrease: onIncrease,
       );
     }
-
-    final actionGroup = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(height: 50, child: action),
-        if (businessVerified && decision.canAdd) ...[
-          const SizedBox(height: 5),
-          SizedBox(
-            height: BuyV2Metrics.minimumTap,
-            child: OutlinedButton.icon(
-              key: ValueKey('buy-wholesale-buy-now-${product.id}'),
-              onPressed: onBuyNow,
-              icon: const Icon(Icons.flash_on_rounded, size: 17),
-              label: const Text('Buy now'),
-            ),
-          ),
-        ],
-      ],
-    );
 
     return Material(
       key: ValueKey('buy-wholesale-action-dock-${product.id}'),
@@ -2177,7 +2153,7 @@ class _WholesaleTradeActionDock extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final stacked = largeText || constraints.maxWidth < 330;
-              if (stacked) {
+              if (stacked || (businessVerified && decision.canAdd)) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [summary, const SizedBox(height: 8), actionGroup],
@@ -2392,18 +2368,9 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                       '${buyV2FulfilmentModeLabel(fulfilmentMode)} · $buyerPromise',
                   rxBlocked: false,
                   onAdd: onAdd,
+                  onBuyNow: onBuyNow,
                   onDecrease: onDecrease,
                   onIncrease: onIncrease,
-                ),
-                const SizedBox(height: 7),
-                SizedBox(
-                  height: BuyV2Metrics.minimumTap,
-                  child: OutlinedButton.icon(
-                    key: ValueKey('buy-product-buy-now-${product.id}'),
-                    onPressed: onBuyNow,
-                    icon: const Icon(Icons.flash_on_rounded, size: 18),
-                    label: const Text('Buy now'),
-                  ),
                 ),
               ],
             )
@@ -12091,6 +12058,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
     this.deliveryDecision,
     required this.rxBlocked,
     required this.onAdd,
+    this.onBuyNow,
     required this.onDecrease,
     required this.onIncrease,
   });
@@ -12100,6 +12068,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
   final String? deliveryDecision;
   final bool rxBlocked;
   final VoidCallback onAdd;
+  final VoidCallback? onBuyNow;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
 
@@ -12246,6 +12215,28 @@ class _ProductOwnedActionPanel extends StatelessWidget {
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
+            if (onBuyNow case final buyNow?) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  price,
+                  const SizedBox(height: 8),
+                  _ProductPurchaseActionRow(
+                    product: product,
+                    quantity: quantity,
+                    buyNowKey: ValueKey('buy-product-buy-now-${product.id}'),
+                    addSemanticLabel:
+                        'Add ${product.minimumOrder == 1 ? product.title : 'minimum order of ${product.minimumOrder} packs of ${product.title}'} '
+                        'to Cart for ${buyV2Money(product.price * product.minimumOrder)}. '
+                        '${deliveryDecision ?? product.deliveryPromise}',
+                    onAdd: onAdd,
+                    onBuyNow: buyNow,
+                    onDecrease: onDecrease,
+                    onIncrease: onIncrease,
+                  ),
+                ],
+              );
+            }
             final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
             final stack = largeText || constraints.maxWidth < 276;
             if (stack) {
@@ -12273,22 +12264,113 @@ class _ProductOwnedActionPanel extends StatelessWidget {
   }
 }
 
+class _ProductPurchaseActionRow extends StatelessWidget {
+  const _ProductPurchaseActionRow({
+    required this.product,
+    required this.quantity,
+    required this.buyNowKey,
+    this.addSemanticLabel,
+    required this.onAdd,
+    required this.onBuyNow,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  final BuyV2Product product;
+  final int quantity;
+  final Key buyNowKey;
+  final String? addSemanticLabel;
+  final VoidCallback onAdd;
+  final VoidCallback onBuyNow;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  @override
+  Widget build(BuildContext context) {
+    final cartAction = AnimatedSwitcher(
+      key: ValueKey('buy-product-action-slot-${product.id}'),
+      duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
+      reverseDuration: Duration.zero,
+      transitionBuilder: (child, animation) => SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(.025, 0),
+          end: Offset.zero,
+        ).animate(animation),
+        transformHitTests: false,
+        textDirection: Directionality.of(context),
+        child: child,
+      ),
+      layoutBuilder: (currentChild, _) =>
+          Align(alignment: Alignment.center, child: currentChild),
+      child: quantity > 0
+          ? _CompactProductStepper(
+              key: ValueKey('buy-product-quantity-${product.id}'),
+              quantity: quantity,
+              expand: true,
+              onDecrease: onDecrease,
+              onIncrease: onIncrease,
+            )
+          : SizedBox.expand(
+              key: ValueKey('buy-product-add-shell-${product.id}'),
+              child: Semantics(
+                label:
+                    addSemanticLabel ??
+                    'Add ${product.minimumOrder == 1 ? product.title : 'minimum order of ${product.minimumOrder} packs of ${product.title}'} to Cart',
+                button: true,
+                onTap: onAdd,
+                excludeSemantics: true,
+                child: OutlinedButton.icon(
+                  key: ValueKey('buy-product-primary-${product.id}'),
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+                  label: const Text('Add to Cart'),
+                ),
+              ),
+            ),
+    );
+    return Semantics(
+      key: ValueKey('buy-product-purchase-actions-${product.id}'),
+      container: true,
+      explicitChildNodes: true,
+      child: SizedBox(
+        height: 50,
+        child: Row(
+          children: [
+            Expanded(child: cartAction),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton.icon(
+                key: buyNowKey,
+                onPressed: onBuyNow,
+                icon: const Icon(Icons.flash_on_rounded, size: 18),
+                label: const Text('Buy now'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CompactProductStepper extends StatelessWidget {
   const _CompactProductStepper({
     super.key,
     required this.quantity,
+    this.expand = false,
     required this.onDecrease,
     required this.onIncrease,
   });
 
   final int quantity;
+  final bool expand;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 148,
+      width: expand ? double.infinity : 148,
       height: 44,
       child: DecoratedBox(
         decoration: BoxDecoration(

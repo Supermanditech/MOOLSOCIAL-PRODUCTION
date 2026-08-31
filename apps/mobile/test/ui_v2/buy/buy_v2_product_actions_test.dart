@@ -53,6 +53,111 @@ void main() {
     expect(session.selectedProductId, 's-milk-2l');
   });
 
+  testWidgets(
+    'Shop Wholesale and Offers separate Cart from the primary Buy action',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+
+      for (final entry
+          in <
+            ({
+              String productId,
+              BuyV2Destination destination,
+              bool offers,
+              String buyNowKey,
+            })
+          >[
+            (
+              productId: 's-milk',
+              destination: BuyV2Destination.shop,
+              offers: false,
+              buyNowKey: 'buy-product-buy-now-s-milk',
+            ),
+            (
+              productId: 'w-onion',
+              destination: BuyV2Destination.wholesale,
+              offers: false,
+              buyNowKey: 'buy-wholesale-buy-now-w-onion',
+            ),
+            (
+              productId: 's-milk',
+              destination: BuyV2Destination.shop,
+              offers: true,
+              buyNowKey: 'buy-product-buy-now-s-milk',
+            ),
+          ]) {
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(
+              session: session,
+              initialDestination: entry.destination,
+              initialOffersActive: entry.offers,
+              initialView: BuyV2View.product,
+              productId: entry.productId,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final actions = find.byKey(
+          ValueKey('buy-product-purchase-actions-${entry.productId}'),
+        );
+        final scrollable = find
+            .descendant(
+              of: find.byKey(PageStorageKey('buy-product-${entry.productId}')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(actions, 220, scrollable: scrollable);
+        await tester.pumpAndSettle();
+
+        final add = find.byKey(
+          ValueKey('buy-product-primary-${entry.productId}'),
+        );
+        final buyNow = find.byKey(ValueKey(entry.buyNowKey));
+        expect(actions, findsOneWidget);
+        expect(add, findsOneWidget);
+        expect(buyNow, findsOneWidget);
+        expect(
+          find.descendant(of: add, matching: find.text('Add to Cart')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: buyNow, matching: find.text('Buy now')),
+          findsOneWidget,
+        );
+        final addRect = tester.getRect(add);
+        final buyNowRect = tester.getRect(buyNow);
+        expect(addRect.right, lessThanOrEqualTo(buyNowRect.left));
+        expect(addRect.center.dy, buyNowRect.center.dy);
+        expect(
+          tester
+              .getSemantics(add)
+              .getSemanticsData()
+              .hasAction(SemanticsAction.tap),
+          isTrue,
+        );
+        expect(
+          tester
+              .getSemantics(buyNow)
+              .getSemanticsData()
+              .hasAction(SemanticsAction.tap),
+          isTrue,
+        );
+        expect(tester.takeException(), isNull, reason: '$entry');
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        session.dispose();
+        core.dispose();
+      }
+    },
+  );
+
   testWidgets('product actions fit, compare and retain exact Back at 320', (
     tester,
   ) async {
