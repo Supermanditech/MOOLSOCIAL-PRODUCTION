@@ -960,6 +960,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardOpen = View.of(context).viewInsets.bottom > 0;
     return DecoratedBox(
       key: const ValueKey('social-v2-create-workbench'),
       decoration: const BoxDecoration(color: SocialV2Colors.canvas),
@@ -988,14 +989,20 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                             icon: const Icon(Icons.close_rounded),
                           ),
                         Expanded(
-                          child: Text(
-                            _composerTitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: SocialV2Colors.navy,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                _composerTitle,
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  color: SocialV2Colors.navy,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1094,18 +1101,27 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
               shadowColor: const Color(0x26000050),
               child: SafeArea(
                 top: false,
-                minimum: const EdgeInsets.only(bottom: 20),
+                bottom: !keyboardOpen,
+                minimum: EdgeInsets.only(bottom: keyboardOpen ? 4 : 20),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(8, 5, 8, 3),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_format == SocialCreateFormatV2.post) ...[
-                        _buildPostToolActions(),
-                        const SizedBox(height: 5),
-                      ],
-                      _buildFormatActions(),
-                    ],
+                  child: AnimatedSwitcher(
+                    key: const Key('screen04-create-ime-workbench-switcher'),
+                    duration: const Duration(milliseconds: 160),
+                    reverseDuration: const Duration(milliseconds: 120),
+                    child: keyboardOpen
+                        ? _buildKeyboardFormatStrip()
+                        : Column(
+                            key: const ValueKey('create-full-format-workbench'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_format == SocialCreateFormatV2.post) ...[
+                                _buildPostToolActions(),
+                                const SizedBox(height: 5),
+                              ],
+                              _buildFormatActions(),
+                            ],
+                          ),
                   ),
                 ),
               ),
@@ -1125,6 +1141,109 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     (SocialCreateFormatV2.post, _SocialPostTool.quiz) => 'New quiz',
     _ => 'New text post',
   };
+
+  Widget _buildKeyboardFormatStrip() {
+    Widget compactAction({
+      required Key key,
+      required IconData icon,
+      required String label,
+      required bool selected,
+      required VoidCallback onTap,
+    }) => SizedBox(
+      width: 94,
+      child: _FormatAction(
+        key: key,
+        icon: icon,
+        label: label,
+        selected: selected,
+        onTap: onTap,
+      ),
+    );
+
+    return SizedBox(
+      key: const ValueKey('create-keyboard-format-workbench'),
+      height: 52,
+      child: Row(
+        children: [
+          Expanded(
+            child: ListView(
+              key: const Key('screen04-create-ime-format-strip'),
+              scrollDirection: Axis.horizontal,
+              children: [
+                KeyedSubtree(
+                  key: const Key('social-create-moolsocial-post'),
+                  child: compactAction(
+                    key: const Key('screen04-create-tool-post'),
+                    icon: Icons.edit_note_rounded,
+                    label: 'Text',
+                    selected:
+                        _format == SocialCreateFormatV2.post &&
+                        _postTool == _SocialPostTool.none,
+                    onTap: () => _selectFormat(SocialCreateFormatV2.post),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                compactAction(
+                  key: const Key('screen04-create-tool-carousel'),
+                  icon: Icons.view_carousel_outlined,
+                  label: 'Carousel',
+                  selected: _format == SocialCreateFormatV2.carousel,
+                  onTap: () => _selectFormat(SocialCreateFormatV2.carousel),
+                ),
+                const SizedBox(width: 6),
+                compactAction(
+                  key: const Key('screen04-create-tool-image'),
+                  icon: Icons.image_outlined,
+                  label: 'Image',
+                  selected:
+                      _format == SocialCreateFormatV2.post &&
+                      _postTool == _SocialPostTool.image,
+                  onTap: () => _selectPostTool(_SocialPostTool.image),
+                ),
+                const SizedBox(width: 6),
+                compactAction(
+                  key: const Key('screen04-create-tool-image-poll'),
+                  icon: Icons.grid_view_rounded,
+                  label: 'Image Poll',
+                  selected:
+                      _format == SocialCreateFormatV2.post &&
+                      _postTool == _SocialPostTool.imagePoll,
+                  onTap: () => _selectPostTool(_SocialPostTool.imagePoll),
+                ),
+                const SizedBox(width: 6),
+                compactAction(
+                  key: const Key('screen04-create-tool-quick-poll'),
+                  icon: Icons.poll_outlined,
+                  label: 'Quick Poll',
+                  selected:
+                      _format == SocialCreateFormatV2.post &&
+                      _postTool == _SocialPostTool.quickPoll,
+                  onTap: () => _selectPostTool(_SocialPostTool.quickPoll),
+                ),
+                const SizedBox(width: 6),
+                compactAction(
+                  key: const Key('screen04-create-tool-quiz'),
+                  icon: Icons.check_circle_outline_rounded,
+                  label: 'Quiz',
+                  selected:
+                      _format == SocialCreateFormatV2.post &&
+                      _postTool == _SocialPostTool.quiz,
+                  onTap: () => _selectPostTool(_SocialPostTool.quiz),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          IconButton.filledTonal(
+            key: const Key('screen04-create-keyboard-done'),
+            tooltip: 'Hide keyboard',
+            onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
+            icon: const Icon(Icons.keyboard_hide_rounded),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildWorkbenchCard() {
     return Material(
@@ -1368,6 +1487,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                   minLines: 4,
                   maxLines: 10,
                   maxLength: 1200,
+                  scrollPadding: const EdgeInsets.only(bottom: 104),
                   textCapitalization: TextCapitalization.sentences,
                   keyboardAppearance: Brightness.light,
                   style: const TextStyle(
@@ -1684,6 +1804,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
         TextField(
           key: Key('screen04-create-image-poll-choice-$index'),
           controller: controller,
+          scrollPadding: const EdgeInsets.only(bottom: 104),
           style: const TextStyle(fontSize: 12.5, height: 1.25),
           decoration: InputDecoration(
             hintText: 'Choice ${index + 1}',
@@ -1740,6 +1861,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                             'screen04-create-${quiz ? 'quiz' : 'quick-poll'}-choice-$index',
                           ),
                           controller: _choiceControllers[index],
+                          scrollPadding: const EdgeInsets.only(bottom: 104),
                           style: const TextStyle(fontSize: 12.5, height: 1.25),
                           decoration: InputDecoration(
                             hintText: quiz

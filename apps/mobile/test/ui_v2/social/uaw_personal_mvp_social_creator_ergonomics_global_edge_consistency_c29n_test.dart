@@ -134,8 +134,22 @@ void main() {
     await tester.enterText(text, 'Keyboard-safe founder review post');
     await tester.pump();
     final keyboardTop = 844 - 320;
+    final imeWorkbench = find.byKey(
+      const Key('create-keyboard-format-workbench'),
+    );
+    expect(imeWorkbench, findsOneWidget);
+    expect(
+      tester.getSize(imeWorkbench).height,
+      lessThanOrEqualTo(52),
+      reason: 'The format selector must collapse while the IME is open.',
+    );
+    expect(
+      find.byKey(const Key('screen04-create-keyboard-done')),
+      findsOneWidget,
+    );
     expect(tester.getBottomRight(publish).dy, lessThanOrEqualTo(keyboardTop));
     expect(tester.getBottomRight(formats).dy, lessThanOrEqualTo(keyboardTop));
+    expect(find.text('New text post'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
