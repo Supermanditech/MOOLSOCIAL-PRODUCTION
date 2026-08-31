@@ -1581,7 +1581,6 @@ class _WholesaleTradeDecisionPanelState
     final decision = widget.decision;
     final fulfilmentMode =
         facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
-    final supplierProducts = widget.session.supplierContinuationsFor(product);
     final statusColor = decision.canAdd
         ? BuyV2Colors.green
         : BuyV2Colors.orange;
