@@ -100,7 +100,7 @@ void main() {
       await tester.pumpWidget(app(session));
       await tester.pumpAndSettle();
       final automatic = find.byKey(
-        const ValueKey('buy-automatic-fulfilment-w-oil'),
+        const ValueKey('buy-wholesale-trade-decision-w-oil'),
       );
       final supplier = find.byKey(
         const ValueKey('buy-wholesale-store-action-w-oil'),
@@ -200,7 +200,7 @@ void main() {
     await tester.pumpWidget(app(session, textScale: 1.4, reducedMotion: true));
     await tester.pumpAndSettle();
     final automatic = find.byKey(
-      const ValueKey('buy-automatic-fulfilment-w-oil'),
+        const ValueKey('buy-wholesale-trade-decision-w-oil'),
     );
     final supplier = find.byKey(
       const ValueKey('buy-wholesale-store-action-w-oil'),
