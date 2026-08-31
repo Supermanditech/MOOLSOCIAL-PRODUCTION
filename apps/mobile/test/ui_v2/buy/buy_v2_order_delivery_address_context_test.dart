@@ -18,6 +18,7 @@ void main() {
     double textScale = 1,
     bool reducedMotion = false,
     EdgeInsets safeArea = EdgeInsets.zero,
+    VoidCallback? onOpenChat,
   }) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -35,15 +36,17 @@ void main() {
         session: session,
         initialDestination: session.destination,
         initialView: session.view,
+        onOpenChat: onOpenChat,
       ),
     );
   }
 
   Future<void> openDeliverySheet(
     WidgetTester tester,
-    BuyV2Session session,
-  ) async {
-    await tester.pumpWidget(app(session));
+    BuyV2Session session, {
+    VoidCallback? onOpenChat,
+  }) async {
+    await tester.pumpWidget(app(session, onOpenChat: onOpenChat));
     await tester.pumpAndSettle();
     final address = find.byKey(const ValueKey('buy-tracking-address'));
     await tester.scrollUntilVisible(
@@ -151,7 +154,7 @@ void main() {
     expect(session.view, BuyV2View.tracking);
   });
 
-  testWidgets('order Help continues after reverse with exact Assist context', (
+  testWidgets('order Help continues after reverse with exact Chat context', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -159,7 +162,8 @@ void main() {
     final session = newSession();
     addTearDown(session.dispose);
     expect(session.openTracking('RX-240784'), isTrue);
-    await openDeliverySheet(tester, session);
+    var chatOpens = 0;
+    await openDeliverySheet(tester, session, onOpenChat: () => chatOpens += 1);
 
     final help = find.byKey(const ValueKey('buy-order-delivery-help'));
     await tester.ensureVisible(help);
@@ -170,10 +174,10 @@ void main() {
       find.byKey(const ValueKey('buy-order-delivery-sheet')),
       findsNothing,
     );
-    expect(session.view, BuyV2View.assist);
-    expect(session.assistOrder.id, 'RX-240784');
-    expect(find.textContaining('RX-240784'), findsOneWidget);
-    expect(find.textContaining('MS-240782'), findsNothing);
+    expect(chatOpens, 1);
+    expect(session.view, BuyV2View.tracking);
+    expect(session.selectedOrder.id, 'RX-240784');
+    expect(find.byKey(const ValueKey('buy-assist-hero')), findsNothing);
   });
 
   testWidgets('Back and reduced motion retain Tracking at 320px and 140%', (

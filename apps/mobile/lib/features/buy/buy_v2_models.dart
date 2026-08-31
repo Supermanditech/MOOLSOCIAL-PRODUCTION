@@ -31,6 +31,15 @@ enum BuyV2View {
 
 enum BuyV2CartScope { all, shop, wholesale, medicine }
 
+enum BuyV2ProductSort {
+  relevance,
+  priceLowToHigh,
+  priceHighToLow,
+  deliveryFastest,
+}
+
+enum BuyV2PackFilter { standard, multipack, bulk }
+
 enum BuyV2AddressKind { home, work, thirdParty, other }
 
 enum BuyV2OrderStatus { preparing, confirmed, dispatched, arriving, delivered }
@@ -86,6 +95,7 @@ class BuyV2Product {
     this.returnPolicy,
     this.freightIncluded = false,
     this.manufacturerVerified = false,
+    this.catalogueListing = true,
   }) : canonicalId = canonicalId ?? id;
 
   final String id;
@@ -114,25 +124,34 @@ class BuyV2Product {
   final String? returnPolicy;
   final bool freightIncluded;
   final bool manufacturerVerified;
+  final bool catalogueListing;
 
   BuyV2Product copyWith({
+    String? id,
+    String? canonicalId,
+    String? variant,
+    String? pack,
     int? price,
+    String? unitPrice,
+    String? badge,
     String? deliveryPromise,
     String? seller,
     String? sellerType,
     String? confirmedOn,
+    int? minimumOrder,
+    bool? catalogueListing,
   }) => BuyV2Product(
-    id: id,
-    canonicalId: canonicalId,
+    id: id ?? this.id,
+    canonicalId: canonicalId ?? this.canonicalId,
     destination: destination,
     categoryId: categoryId,
     brand: brand,
     title: title,
-    variant: variant,
-    pack: pack,
+    variant: variant ?? this.variant,
+    pack: pack ?? this.pack,
     price: price ?? this.price,
-    unitPrice: unitPrice,
-    badge: badge,
+    unitPrice: unitPrice ?? this.unitPrice,
+    badge: badge ?? this.badge,
     seller: seller ?? this.seller,
     sellerType: sellerType ?? this.sellerType,
     deliveryPromise: deliveryPromise ?? this.deliveryPromise,
@@ -144,10 +163,11 @@ class BuyV2Product {
     requiresPrescription: requiresPrescription,
     composition: composition,
     regulatoryNote: regulatoryNote,
-    minimumOrder: minimumOrder,
+    minimumOrder: minimumOrder ?? this.minimumOrder,
     returnPolicy: returnPolicy,
     freightIncluded: freightIncluded,
     manufacturerVerified: manufacturerVerified,
+    catalogueListing: catalogueListing ?? this.catalogueListing,
   );
 
   String get partnerRole => buyV2PartnerRoleFor(destination, sellerType);
@@ -697,6 +717,51 @@ abstract final class BuyV2Catalogue {
       .map((row) => _BuyV2CommerceSeed.fromRow(row.trim()))
       .toList(growable: false);
 
+  static final _commerceVariantProducts = <BuyV2Product>[
+    _commerceVariant(
+      canonicalId: 'milk',
+      destination: BuyV2Destination.shop,
+      id: 's-milk-500ml',
+      variant: 'Toned fresh milk · 500 ml',
+      pack: '500 ml pouch',
+      price: 35,
+      unitPrice: '₹70/L',
+      badge: 'Quick local choice',
+    ),
+    _commerceVariant(
+      canonicalId: 'milk',
+      destination: BuyV2Destination.shop,
+      id: 's-milk-2l',
+      variant: 'Toned fresh milk · family pack',
+      pack: '2 × 1 L pouches',
+      price: 128,
+      unitPrice: '₹64/L',
+      badge: 'Family pack',
+    ),
+    _commerceVariant(
+      canonicalId: 'rice',
+      destination: BuyV2Destination.wholesale,
+      id: 'w-rice-50kg',
+      variant: 'Aged basmati · 50 kg trade sack',
+      pack: '50 kg sack',
+      price: 3200,
+      unitPrice: '₹64/kg',
+      badge: 'Volume price',
+      minimumOrder: 1,
+    ),
+    _commerceVariant(
+      canonicalId: 'oil',
+      destination: BuyV2Destination.wholesale,
+      id: 'w-oil-10l',
+      variant: 'Refined sunflower · 10 L trade pack',
+      pack: '2 × 5 L cans',
+      price: 1580,
+      unitPrice: '₹158/L',
+      badge: 'Flexible bulk pack',
+      minimumOrder: 1,
+    ),
+  ];
+
   static final products = <BuyV2Product>[
     for (final seed in _commerceSeeds)
       _commerceProduct(seed, BuyV2Destination.shop),
@@ -704,6 +769,36 @@ abstract final class BuyV2Catalogue {
       _commerceProduct(seed, BuyV2Destination.wholesale),
     ..._medicineProducts,
   ];
+
+  static final allProducts = <BuyV2Product>[
+    ...products,
+    ..._commerceVariantProducts,
+  ];
+
+  static BuyV2Product _commerceVariant({
+    required String canonicalId,
+    required BuyV2Destination destination,
+    required String id,
+    required String variant,
+    required String pack,
+    required int price,
+    required String unitPrice,
+    required String badge,
+    int? minimumOrder,
+  }) {
+    final seed = _commerceSeeds.firstWhere((item) => item.id == canonicalId);
+    return _commerceProduct(seed, destination).copyWith(
+      id: id,
+      canonicalId: canonicalId,
+      variant: variant,
+      pack: pack,
+      price: price,
+      unitPrice: unitPrice,
+      badge: badge,
+      minimumOrder: minimumOrder,
+      catalogueListing: false,
+    );
+  }
 
   static BuyV2Product _commerceProduct(
     _BuyV2CommerceSeed seed,
@@ -730,7 +825,7 @@ abstract final class BuyV2Catalogue {
       seller: seller,
       sellerType: sellerType,
       deliveryPromise: wholesale
-          ? _wholesalePromise(originCity)
+          ? _wholesalePromise(seed.wholesaleDelivery)
           : _shopPromise(seed.shopDelivery),
       origin: wholesale
           ? '$originCity → Jodhpur 342003'
@@ -751,18 +846,24 @@ abstract final class BuyV2Catalogue {
   }
 
   static String _shopPromise(String source) {
+    final value = source.trim();
     final minutes = RegExp(
       r'(\d+)\s+minutes',
       caseSensitive: false,
-    ).firstMatch(source);
+    ).firstMatch(value);
     if (minutes != null) {
       return 'Delivered in ${minutes.group(1)} min';
     }
-    return 'Delivery time confirmed at checkout';
+    if (RegExp(
+      r'^(today|tomorrow)\s+by\s+',
+      caseSensitive: false,
+    ).hasMatch(value)) {
+      return 'Delivered ${value.toLowerCase()}';
+    }
+    return value;
   }
 
-  static String _wholesalePromise(String originCity) =>
-      'Delivery schedule confirmed at checkout';
+  static String _wholesalePromise(String source) => source.trim();
 
   static String _supplierOrigin(String seller, String sellerType) {
     final name = seller.toLowerCase();

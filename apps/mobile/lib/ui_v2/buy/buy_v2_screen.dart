@@ -132,10 +132,15 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     await widget.session.restoreCommerce();
     await widget.session.restoreCustomerState();
     await widget.session.restoreSavedProducts();
+    await widget.session.restoreOrderAlerts();
+    await widget.session.restoreShoppingAlerts();
     await widget.session.refreshCartBenefits();
     await widget.session.refreshCheckoutQuote();
     await widget.session.refreshCommercialPaymentTerms();
     await _gstInvoiceController.restore();
+    if (widget.session.businessVerified) {
+      _gstInvoiceController.applySavedBusinessProfile();
+    }
   }
 
   void _applyInitialState() {
@@ -721,12 +726,42 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       if (onOpenChat != null) {
         onOpenChat();
       } else {
-        widget.session.openAssist();
+        widget.session.showNotice(
+          'Shop Chat is unavailable right now. Your order is unchanged.',
+        );
       }
       return;
     }
     context.push(
       const BuyV2ChatRouteAdapter().orderHelpLocationFor(orderId: order.id),
+    );
+  }
+
+  void _openProductQuestion(BuyV2Product product) {
+    HapticFeedback.selectionClick();
+    FocusScope.of(context).unfocus();
+    final router = GoRouter.maybeOf(context);
+    if (router == null) {
+      widget.onOpenChat?.call();
+      return;
+    }
+    context.push(
+      const BuyV2ChatRouteAdapter().productQuestionLocationFor(
+        product: product,
+      ),
+    );
+  }
+
+  void _openPartnerCatalogue(BuyV2Product product, {bool brandOnly = false}) {
+    HapticFeedback.selectionClick();
+    FocusScope.of(context).unfocus();
+    unawaited(
+      showBuyV2PartnerCatalogue(
+        context,
+        widget.session,
+        product,
+        brandOnly: brandOnly,
+      ),
     );
   }
 
@@ -778,6 +813,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       BuyV2View.product => BuyV2ProductView(
         session: session,
         returnLabel: _offersActive ? 'Offers' : null,
+        onAskSeller: _openProductQuestion,
+        onOpenPartnerCatalogue: _openPartnerCatalogue,
         wholesaleTradeDecisionAdapter: widget.wholesaleTradeDecisionAdapter,
       ),
       BuyV2View.cart => BuyV2CartView(
@@ -798,6 +835,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       BuyV2View.checkout => BuyV2CheckoutView(
         session: session,
         gstInvoiceController: _gstInvoiceController,
+        onOpenSupport: _openShopChat,
         paymentHandoff: widget.paymentHandoff,
       ),
       BuyV2View.confirmation => BuyV2ConfirmationView(
@@ -1054,7 +1092,8 @@ class _BuySearchBand extends StatelessWidget {
                                 vertical: 10,
                               ),
                             ),
-                            onSubmitted: (_) {
+                            onSubmitted: (value) {
+                              session.submitSearch(value);
                               FocusScope.of(context).unfocus();
                             },
                           )
@@ -1145,6 +1184,9 @@ class _BuySearchBand extends StatelessWidget {
                         key: const ValueKey('buy-search-close'),
                         tooltip: 'Finish search',
                         onPressed: () {
+                          if (controller.text.trim().isNotEmpty) {
+                            session.submitSearch(controller.text);
+                          }
                           FocusScope.of(context).unfocus();
                           onOpenChanged(false);
                         },

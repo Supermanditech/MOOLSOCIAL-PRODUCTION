@@ -528,6 +528,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
     await tester.pumpAndSettle();
 
+    expect(find.text('GST added'), findsOneWidget);
     expect(find.text('Shree Balaji Retail'), findsWidgets);
     expect(find.textContaining('08ABCDE1234F1Z5'), findsOneWidget);
     expect(find.text('Place order'), findsOneWidget);
@@ -924,14 +925,15 @@ void main() {
     expect(find.text('19059090'), findsOneWidget);
     expect(find.text('CGST'), findsOneWidget);
     expect(find.text('SGST'), findsOneWidget);
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.byKey(const ValueKey('buy-download-invoice-ORDER-TAX-1')),
-          )
-          .onPressed,
-      isNotNull,
+    final download = find.byKey(
+      const ValueKey('buy-download-invoice-ORDER-TAX-1'),
     );
+    await tester.scrollUntilVisible(
+      download,
+      240,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(tester.widget<FilledButton>(download).onPressed, isNotNull);
     expect(tester.takeException(), isNull);
   });
 
@@ -1361,51 +1363,51 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets(
-    'R58.8.6 responsive Android and iOS candidate captures',
-    (tester) async {
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-
-      for (final viewport in const [
-        (
-          size: Size(320, 568),
-          safe: EdgeInsets.symmetric(vertical: 24),
-          textScale: 1.0,
-          reduced: false,
-          label: '320x568-android',
-        ),
-        (
-          size: Size(360, 800),
-          safe: EdgeInsets.symmetric(vertical: 24),
-          textScale: 1.0,
-          reduced: false,
-          label: '360x800-android',
-        ),
-        (
-          size: Size(390, 844),
-          safe: EdgeInsets.only(top: 47, bottom: 34),
-          textScale: 1.0,
-          reduced: false,
-          label: '390x844-ios',
-        ),
-        (
-          size: Size(430, 932),
-          safe: EdgeInsets.only(top: 59, bottom: 34),
-          textScale: 1.0,
-          reduced: false,
-          label: '430x932-ios',
-        ),
-        (
-          size: Size(320, 568),
-          safe: EdgeInsets.symmetric(vertical: 24),
-          textScale: 1.4,
-          reduced: true,
-          label: '320x568-a11y140-reduced',
-        ),
-      ]) {
+  for (final viewport in const [
+    (
+      size: Size(320, 568),
+      safe: EdgeInsets.symmetric(vertical: 24),
+      textScale: 1.0,
+      reduced: false,
+      label: '320x568-android',
+    ),
+    (
+      size: Size(360, 800),
+      safe: EdgeInsets.symmetric(vertical: 24),
+      textScale: 1.0,
+      reduced: false,
+      label: '360x800-android',
+    ),
+    (
+      size: Size(390, 844),
+      safe: EdgeInsets.only(top: 47, bottom: 34),
+      textScale: 1.0,
+      reduced: false,
+      label: '390x844-ios',
+    ),
+    (
+      size: Size(430, 932),
+      safe: EdgeInsets.only(top: 59, bottom: 34),
+      textScale: 1.0,
+      reduced: false,
+      label: '430x932-ios',
+    ),
+    (
+      size: Size(320, 568),
+      safe: EdgeInsets.symmetric(vertical: 24),
+      textScale: 1.4,
+      reduced: true,
+      label: '320x568-a11y140-reduced',
+    ),
+  ]) {
+    testWidgets(
+      'R58.8.6 responsive ${viewport.label} candidate capture',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
         tester.view.physicalSize = viewport.size;
         final session = mixedSession();
+        addTearDown(session.dispose);
         session.openCart(scope: BuyV2CartScope.shop);
         expect(session.openCheckout(), isTrue);
 
@@ -1419,7 +1421,6 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-
         final owner = find.byKey(const ValueKey('buy-checkout-return-cart'));
         expect(owner, findsOneWidget, reason: viewport.label);
         expect(
@@ -1435,12 +1436,8 @@ void main() {
             'buy-v2-r58-8-6-c24f-checkout-cart-return-${viewport.label}.png',
           ),
         );
-
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-        session.dispose();
-      }
-    },
-    tags: 'protected-reference',
-  );
+      },
+      tags: 'protected-reference',
+    );
+  }
 }

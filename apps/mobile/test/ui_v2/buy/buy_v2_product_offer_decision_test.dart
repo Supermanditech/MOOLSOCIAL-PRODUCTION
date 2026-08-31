@@ -35,6 +35,12 @@ void main() {
     String? deliveryPromise,
     String? partner,
     String orderabilityLabel = 'Available to add',
+    BuyV2FulfilmentMode? fulfilmentMode,
+    BuyV2StoreOperatingState storeOperatingState =
+        BuyV2StoreOperatingState.unknown,
+    String? nextOpeningLabel,
+    String? orderCutoffLabel,
+    String? deliveryFeeLabel,
     bool stale = false,
   }) => BuyV2ProductFactsSnapshot(
     productId: product.id,
@@ -43,6 +49,11 @@ void main() {
     partner: partner ?? product.seller,
     orderabilityLabel: orderabilityLabel,
     sourceId: 'product-offer-decision-test',
+    fulfilmentMode: fulfilmentMode,
+    storeOperatingState: storeOperatingState,
+    nextOpeningLabel: nextOpeningLabel,
+    orderCutoffLabel: orderCutoffLabel,
+    deliveryFeeLabel: deliveryFeeLabel,
     stale: stale,
   );
 
@@ -99,7 +110,8 @@ void main() {
       find.text(buyV2BuyerDeliveryPromise(factsFor(product))),
       findsWidgets,
     );
-    expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
+    expect(find.textContaining(product.seller), findsWidgets);
+    expect(find.text('Quick local delivery'), findsOneWidget);
     if (product.mrp case final mrp?) {
       expect(
         find.textContaining('List price ${buyV2Money(mrp)}'),
@@ -157,6 +169,15 @@ void main() {
             label: 'Delivery unavailable',
             facts: (product) =>
                 factsFor(product, partner: 'Assignment pending'),
+          ),
+          (
+            label: 'Store closed',
+            facts: (product) => factsFor(
+              product,
+              fulfilmentMode: BuyV2FulfilmentMode.quickLocal,
+              storeOperatingState: BuyV2StoreOperatingState.closed,
+              nextOpeningLabel: 'Reopens at 6:00 am',
+            ),
           ),
         ];
 

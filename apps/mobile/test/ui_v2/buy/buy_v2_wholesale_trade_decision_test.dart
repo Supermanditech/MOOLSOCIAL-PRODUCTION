@@ -109,17 +109,27 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Current through 6:00 pm today'), findsOneWidget);
-    expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
+    expect(find.textContaining(product.seller), findsWidgets);
 
     final gallery = find.byKey(ValueKey('buy-product-packshot-${product.id}'));
     expect(tester.getSize(gallery).height, lessThanOrEqualTo(238));
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
     expect(add, findsOneWidget);
     expect(tester.getSize(add).height, greaterThanOrEqualTo(50));
+    final facts = session.productFactsFor(product);
+    final deliveryDecision =
+        '${buyV2FulfilmentModeLabel(session.fulfilmentModeFor(product))} · '
+        '${buyV2BuyerDeliveryPromise(facts)}';
+    expect(
+      find.byKey(ValueKey('buy-wholesale-dock-delivery-${product.id}')),
+      findsOneWidget,
+    );
+    expect(find.text(deliveryDecision), findsWidgets);
     final actionLabel =
         'Add minimum order of ${product.minimumOrder} packs of '
         '${product.title} to Cart for '
-        '${buyV2Money(product.price * product.minimumOrder)}';
+        '${buyV2Money(product.price * product.minimumOrder)}. '
+        '$deliveryDecision';
     final actionSemantics = find.byWidgetPredicate(
       (widget) => widget is Semantics && widget.properties.label == actionLabel,
       description: 'Wholesale minimum-order action semantics',

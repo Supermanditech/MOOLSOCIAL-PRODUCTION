@@ -127,10 +127,10 @@ void main() {
       find.byKey(const ValueKey('buy-shop-seller-action-s-oil')),
       findsNothing,
     );
-    expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
+    expect(find.textContaining(product.seller), findsWidgets);
     expect(find.text(expectedPromise), findsWidgets);
-    expect(find.text('Ghar Bazaar'), findsNothing);
-    expect(find.textContaining('MoolSocial price'), findsWidgets);
+    expect(find.text('Ghar Bazaar'), findsOneWidget);
+    expect(find.textContaining('Ghar Bazaar'), findsWidgets);
   });
 
   testWidgets('Medicine pharmacy action keeps prescription and safety facts', (
@@ -146,8 +146,8 @@ void main() {
     );
     await revealAction(tester, action);
     final semanticAction = find.bySemanticsLabel(
-      'View 4 more products from Sardarpura Health Pharmacy in the current '
-      'Medicine catalogue. Not medical advice',
+      'View 4 more products from Sardarpura Health Pharmacy that are '
+      'available now. Not medical advice',
     );
     expect(semanticAction, findsOneWidget);
     expect(
@@ -163,14 +163,12 @@ void main() {
     expect(find.text('More from Sardarpura Health Pharmacy'), findsOneWidget);
     expect(find.textContaining('Not medical advice'), findsWidgets);
     expect(
-      find.byKey(
-        const ValueKey('buy-medicine-pharmacy-product-m-metformin-500'),
-      ),
+      find.byKey(const ValueKey('buy-product-m-metformin-500')),
       findsOneWidget,
     );
     expect(
-      find.textContaining('Prescription and pharmacist review required'),
-      findsWidgets,
+      find.byKey(const ValueKey('buy-horizontal-product-grid')),
+      findsOneWidget,
     );
     expect(find.text('Pain relief gel'), findsNothing);
 

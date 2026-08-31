@@ -68,6 +68,25 @@ class BuyV2ChatRouteAdapter {
     ).toString();
   }
 
+  String productQuestionLocationFor({required BuyV2Product product}) {
+    final returnRoute = Uri(
+      path: '/app/buy',
+      queryParameters: {
+        'sub': product.destination.name,
+        'view': 'product',
+        'product': product.id,
+      },
+    ).toString();
+    return Uri(
+      path: '/app/chat/thread/shop-partner',
+      queryParameters: {
+        'draft': 'Question about ${product.title} · ${product.pack}',
+        'return': returnRoute,
+        'directReturn': 'true',
+      },
+    ).toString();
+  }
+
   String _returnRouteFor({
     required BuyV2Destination destination,
     required BuyV2View view,

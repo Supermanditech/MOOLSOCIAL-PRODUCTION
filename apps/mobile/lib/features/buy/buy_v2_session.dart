@@ -6,8 +6,10 @@ import 'buy_session.dart';
 import 'buy_v2_cart_contracts.dart';
 import 'buy_v2_content_contracts.dart';
 import 'buy_v2_models.dart';
+import 'buy_v2_order_resolution_contracts.dart';
 import 'buy_v2_search_relevance.dart';
 import 'buy_v2_saved_products_store.dart';
+import 'buy_v2_shopping_alerts.dart';
 
 String _buyV2SavedKey(BuyV2Product product) =>
     '${product.destination.name}|${product.canonicalId}';
@@ -188,12 +190,12 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
   @override
   Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
     state: BuyV2CommerceLoadState.ready,
-    products: BuyV2Catalogue.products,
+    products: BuyV2Catalogue.allProducts,
     paymentMethods: BuyV2Session.paymentMethods,
     businessVerified: true,
     businessVerificationState: BuyV2BusinessVerificationState.verified,
     productReportsAvailable: true,
-    reviewableProductIds: BuyV2Catalogue.products
+    reviewableProductIds: BuyV2Catalogue.allProducts
         .map((product) => product.id)
         .toSet(),
   );
@@ -314,6 +316,9 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2Session({
     required this.core,
     this.productFactsAdapter = const BuyV2CatalogueProductFactsAdapter(),
+    this.productContentAdapter = const BuyV2CatalogueProductContentAdapter(),
+    this.marketplaceTrustAdapter =
+        const BuyV2CatalogueMarketplaceTrustAdapter(),
     this.sponsoredContentAdapter = const BuyV2DisabledSponsoredContentAdapter(),
     BuyV2CartBenefitsAdapter? cartBenefitsAdapter,
     this.tipPolicy = const BuyV2DisabledTipPolicy(),
@@ -324,6 +329,8 @@ class BuyV2Session extends ChangeNotifier {
     this.checkoutQuoteAdapter,
     this.balancePaymentAdapter,
     this.deliveryExceptionAdapter,
+    BuyV2OrderResolutionAdapter? orderResolutionAdapter,
+    BuyV2ShoppingAlertsAdapter? shoppingAlertsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
     bool? reviewDataEnabled,
   }) : cartBenefitsAdapter =
@@ -345,16 +352,28 @@ class BuyV2Session extends ChangeNotifier {
            ((reviewDataEnabled ??
                    (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
                ? const _BuyV2DeviceReviewCommerceAdapter()
-               : const _BuyV2UnavailableCommerceAdapter()) {
+               : const _BuyV2UnavailableCommerceAdapter()),
+       orderResolutionAdapter =
+           orderResolutionAdapter ??
+           ((reviewDataEnabled ??
+                   (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
+               ? const BuyV2UiReviewOrderResolutionAdapter()
+               : const BuyV2UnavailableOrderResolutionAdapter()),
+       shoppingAlertsAdapter =
+           shoppingAlertsAdapter ??
+           ((reviewDataEnabled ??
+                   (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
+               ? const BuyV2UiReviewShoppingAlertsAdapter()
+               : const BuyV2UnavailableShoppingAlertsAdapter()) {
     if (cartBenefitsAdapter is BuyV2LiveCartBenefitsAdapter) {
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.idle;
     }
-    _catalogueProducts.addAll(BuyV2Catalogue.products);
+    _catalogueProducts.addAll(BuyV2Catalogue.allProducts);
     if (this.reviewDataEnabled) {
       _businessVerificationState = BuyV2BusinessVerificationState.verified;
       _productReportsAvailable = true;
       _reviewableProductIds.addAll(
-        BuyV2Catalogue.products.map((product) => product.id),
+        BuyV2Catalogue.allProducts.map((product) => product.id),
       );
     }
     if (!this.reviewDataEnabled) {
@@ -372,6 +391,8 @@ class BuyV2Session extends ChangeNotifier {
 
   final BuySession core;
   final BuyV2ProductFactsAdapter productFactsAdapter;
+  final BuyV2ProductContentAdapter productContentAdapter;
+  final BuyV2MarketplaceTrustAdapter marketplaceTrustAdapter;
   final BuyV2SponsoredContentAdapter sponsoredContentAdapter;
   final BuyV2CartBenefitsAdapter cartBenefitsAdapter;
   final BuyV2TipPolicy tipPolicy;
@@ -382,12 +403,18 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2CheckoutQuoteAdapter? checkoutQuoteAdapter;
   final BuyV2BalancePaymentAdapter? balancePaymentAdapter;
   final BuyV2DeliveryExceptionAdapter? deliveryExceptionAdapter;
+  final BuyV2OrderResolutionAdapter orderResolutionAdapter;
+  final BuyV2ShoppingAlertsAdapter shoppingAlertsAdapter;
   final BuyV2CommerceAdapter commerceAdapter;
   final bool reviewDataEnabled;
 
   static const bool sponsoredContentActivationApproved = false;
   static const BuyV2CatalogueProductFactsAdapter _catalogueFactsFallback =
       BuyV2CatalogueProductFactsAdapter();
+  static const BuyV2CatalogueProductContentAdapter _catalogueContentFallback =
+      BuyV2CatalogueProductContentAdapter();
+  static const BuyV2CatalogueMarketplaceTrustAdapter _catalogueTrustFallback =
+      BuyV2CatalogueMarketplaceTrustAdapter();
 
   static const Set<String> paymentMethods = {
     'UPI',
@@ -456,6 +483,13 @@ class BuyV2Session extends ChangeNotifier {
   String? notice;
   String? cartAcknowledgement;
   String? selectedFilter;
+  final Set<String> _selectedBrands = {};
+  Set<String> get selectedBrands => Set.unmodifiable(_selectedBrands);
+  int? maximumProductPrice;
+  BuyV2PackFilter? selectedPackFilter;
+  BuyV2FulfilmentMode? selectedFulfilmentMode;
+  BuyV2ProductSort productSort = BuyV2ProductSort.relevance;
+  bool availableProductsOnly = false;
   BuyV2ShoppingIntent? activeShoppingIntent;
   bool businessVerified = true;
   BuyV2BusinessVerificationState _businessVerificationState =
@@ -591,10 +625,15 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2View _assistReturnView = BuyV2View.catalogue;
   BuyV2Destination _productReturnDestination = BuyV2Destination.shop;
   BuyV2View _productReturnView = BuyV2View.catalogue;
+  bool _cartProductReturnActive = false;
+  BuyV2Destination _cartProductReturnDestination = BuyV2Destination.shop;
+  String? _cartProductReturnId;
 
   final List<BuyV2Product> _catalogueProducts = [];
   final Map<String, BuyV2CartLine> _cart = {};
   final Map<String, BuyV2ProductFactsSnapshot> _productFacts = {};
+  final Map<String, BuyV2ProductContentSnapshot> _productContent = {};
+  final Map<String, BuyV2MarketplaceTrustSnapshot> _marketplaceTrust = {};
   final Map<String, int> _prescriptionApprovedQuantities = {};
   final Map<String, BuyV2CustomerReview> _customerReviews = {};
   final Map<String, String> _reportedProductReasons = {};
@@ -604,6 +643,15 @@ class BuyV2Session extends ChangeNotifier {
   final Set<String> _orderRefreshBusyIds = {};
   final Map<String, BuyV2CommerceLoadState> _orderRefreshStates = {};
   final Map<String, String> _orderRefreshMessages = {};
+  final Map<String, BuyV2OrderResolutionSnapshot> _orderResolutionSnapshots =
+      {};
+  final Map<String, BuyV2OrderResolutionResult> _orderResolutionResults = {};
+  final Set<String> _orderResolutionBusyIds = {};
+  List<BuyV2ShoppingAlert> _shoppingAlerts = [];
+  BuyV2ShoppingAlertsState shoppingAlertsState =
+      BuyV2ShoppingAlertsState.loading;
+  String? shoppingAlertsMessage;
+  bool shoppingAlertsBusy = false;
   final Map<String, BuyV2BalancePaymentResult> _balancePaymentResults = {};
   final Set<String> _balancePaymentBusyOrderIds = {};
   int _balancePaymentAttemptSequence = 0;
@@ -617,6 +665,10 @@ class BuyV2Session extends ChangeNotifier {
       {};
   List<BuyV2CartBenefit> _liveCartBenefits = [];
   int _cartBenefitsRequestSequence = 0;
+  final Map<String, List<BuyV2CartBenefit>> _productBenefits = {};
+  final Map<String, BuyV2CartBenefitsLoadState> _productBenefitStates = {};
+  final Map<String, String> _productBenefitMessages = {};
+  final Map<String, int> _productBenefitRequestSequences = {};
   BuyV2CartBenefitsLoadState cartBenefitsLoadState =
       BuyV2CartBenefitsLoadState.ready;
   String? cartBenefitsMessage;
@@ -633,6 +685,8 @@ class BuyV2Session extends ChangeNotifier {
   String? checkoutQuoteMessage;
   final Map<String, int> _tipsByFulfilmentKey = {};
   final Set<String> _savedKeys = {};
+  final List<String> _recentlyViewedProductIds = [];
+  final Map<BuyV2Destination, List<String>> _recentSearches = {};
   String? _savedProductsOwnerScope;
   int _savedProductsMutationRevision = 0;
   String? _customerStateOwnerScope;
@@ -1303,6 +1357,35 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2Destination.orders => 'all',
   };
 
+  BuyV2FulfilmentMode fulfilmentModeFor(BuyV2Product product) =>
+      productFactsFor(product).fulfilmentMode ??
+      buyV2CatalogueFulfilmentModeFor(product);
+
+  BuyV2PackFilter packFilterFor(BuyV2Product product) {
+    final pack = product.pack.toLowerCase();
+    if (product.destination == BuyV2Destination.wholesale ||
+        product.minimumOrder > 1 ||
+        RegExp(r'case|carton|crate|sack|pallet|lot|trade').hasMatch(pack)) {
+      return BuyV2PackFilter.bulk;
+    }
+    if (RegExp(r'pack of\s*[2-9]|[2-9]\s*[×x]').hasMatch(pack)) {
+      return BuyV2PackFilter.multipack;
+    }
+    return BuyV2PackFilter.standard;
+  }
+
+  bool _availableForDiscovery(BuyV2Product product) {
+    final facts = productFactsFor(product);
+    final orderability = facts.orderabilityLabel.toLowerCase();
+    return !facts.stale &&
+        facts.storeOperatingState != BuyV2StoreOperatingState.closed &&
+        !orderability.contains('unavailable') &&
+        !orderability.contains('not available') &&
+        !orderability.contains('out of stock') &&
+        !orderability.contains('checking') &&
+        !orderability.contains('loading');
+  }
+
   List<BuyV2Product> get visibleProducts {
     final normalized = query.trim().toLowerCase();
     final filterDestination = destination == BuyV2Destination.orders
@@ -1319,6 +1402,7 @@ class BuyV2Session extends ChangeNotifier {
         : null;
     final candidates = _catalogueProducts.where((product) {
       if (product.destination != filterDestination) return false;
+      if (!product.catalogueListing) return false;
       if (intentProductIds != null && !intentProductIds.contains(product.id)) {
         return false;
       }
@@ -1356,15 +1440,70 @@ class BuyV2Session extends ChangeNotifier {
           product.destination == BuyV2Destination.wholesale &&
               product.minimumOrder <= 2,
         'returns' => product.returnPolicy != null,
+        'quick-local' =>
+          fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal,
+        'standard-courier' =>
+          fulfilmentModeFor(product) == BuyV2FulfilmentMode.standardCourier,
+        'bulk-freight' =>
+          fulfilmentModeFor(product) == BuyV2FulfilmentMode.bulkFreight,
         'rx' => product.requiresPrescription,
         'otc' => !product.requiresPrescription,
         _ => true,
       };
-      return matchesCategory && matchesFilter;
+      final matchesBrands =
+          _selectedBrands.isEmpty || _selectedBrands.contains(product.brand);
+      final matchesPrice =
+          maximumProductPrice == null ||
+          productFactsFor(product).price <= maximumProductPrice!;
+      final matchesPack =
+          selectedPackFilter == null ||
+          packFilterFor(product) == selectedPackFilter;
+      final matchesFulfilment =
+          selectedFulfilmentMode == null ||
+          fulfilmentModeFor(product) == selectedFulfilmentMode;
+      final matchesAvailability =
+          !availableProductsOnly || _availableForDiscovery(product);
+      return matchesCategory &&
+          matchesFilter &&
+          matchesBrands &&
+          matchesPrice &&
+          matchesPack &&
+          matchesFulfilment &&
+          matchesAvailability;
     }).toList();
     final products = normalized.isEmpty
         ? candidates
         : BuyV2SearchRelevance.rankProducts(candidates, query);
+    switch (productSort) {
+      case BuyV2ProductSort.relevance:
+        break;
+      case BuyV2ProductSort.priceLowToHigh:
+        products.sort(
+          (left, right) => productFactsFor(
+            left,
+          ).price.compareTo(productFactsFor(right).price),
+        );
+      case BuyV2ProductSort.priceHighToLow:
+        products.sort(
+          (left, right) => productFactsFor(
+            right,
+          ).price.compareTo(productFactsFor(left).price),
+        );
+      case BuyV2ProductSort.deliveryFastest:
+        int priority(BuyV2Product product) =>
+            switch (fulfilmentModeFor(product)) {
+              BuyV2FulfilmentMode.quickLocal => 0,
+              BuyV2FulfilmentMode.standardCourier => 1,
+              BuyV2FulfilmentMode.bulkFreight => 2,
+            };
+        products.sort((left, right) {
+          final fulfilment = priority(left).compareTo(priority(right));
+          if (fulfilment != 0) return fulfilment;
+          return productFactsFor(
+            left,
+          ).price.compareTo(productFactsFor(right).price);
+        });
+    }
     if (category == 'all' && normalized.isEmpty && products.length > 18) {
       return products.take(18).toList();
     }
@@ -1374,7 +1513,9 @@ class BuyV2Session extends ChangeNotifier {
   bool get hasNarrowedProductSearchScope =>
       destination != BuyV2Destination.orders &&
       query.trim().isNotEmpty &&
-      (selectedCategoryId != 'all' || selectedFilter != null);
+      (selectedCategoryId != 'all' ||
+          selectedFilter != null ||
+          activeDiscoveryRefinementCount > 0);
 
   /// Truthful, replaceable search-discovery boundary for the active vertical.
   ///
@@ -1395,6 +1536,38 @@ class BuyV2Session extends ChangeNotifier {
       if (suggestions.length == 4) break;
     }
     return List.unmodifiable(suggestions);
+  }
+
+  List<String> recentSearchesFor(BuyV2Destination value) =>
+      List.unmodifiable(_recentSearches[value] ?? const <String>[]);
+
+  bool submitSearch(String value) {
+    final clean = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    query = clean;
+    if (clean.length < 2 || clean.length > 80) {
+      notifyListeners();
+      return false;
+    }
+    _recordRecentSearch(destination, clean);
+    _persistCustomerState();
+    notifyListeners();
+    return true;
+  }
+
+  void clearRecentSearches(BuyV2Destination value) {
+    if (_recentSearches.remove(value) == null) return;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void _recordRecentSearch(BuyV2Destination value, String clean) {
+    if (value == BuyV2Destination.medicine) return;
+    final values = _recentSearches.putIfAbsent(value, () => <String>[]);
+    values.removeWhere(
+      (candidate) => candidate.toLowerCase() == clean.toLowerCase(),
+    );
+    values.insert(0, clean);
+    if (values.length > 6) values.removeRange(6, values.length);
   }
 
   List<BuyV2Product> savedProductsFor(BuyV2Destination value) {
@@ -1558,6 +1731,62 @@ class BuyV2Session extends ChangeNotifier {
       activeShoppingIntent = BuyV2ShoppingIntent.values
           .where((intent) => intent.name == snapshot.shoppingIntent)
           .firstOrNull;
+      final validBrands = _catalogueProducts
+          .map((product) => product.brand)
+          .toSet();
+      _selectedBrands
+        ..clear()
+        ..addAll(snapshot.selectedBrands.where(validBrands.contains));
+      final storedMaximumPrice = snapshot.maximumPrice;
+      maximumProductPrice = storedMaximumPrice != null && storedMaximumPrice > 0
+          ? storedMaximumPrice
+          : null;
+      selectedPackFilter = BuyV2PackFilter.values
+          .where((value) => value.name == snapshot.packFilter)
+          .firstOrNull;
+      selectedFulfilmentMode = BuyV2FulfilmentMode.values
+          .where((value) => value.name == snapshot.fulfilmentMode)
+          .firstOrNull;
+      productSort =
+          BuyV2ProductSort.values
+              .where((value) => value.name == snapshot.productSort)
+              .firstOrNull ??
+          BuyV2ProductSort.relevance;
+      availableProductsOnly = snapshot.availableOnly;
+      final validRecentIds = _catalogueProducts
+          .where(
+            (product) =>
+                product.destination == BuyV2Destination.shop ||
+                product.destination == BuyV2Destination.wholesale,
+          )
+          .map((product) => product.id)
+          .toSet();
+      _recentlyViewedProductIds
+        ..clear()
+        ..addAll(
+          snapshot.recentlyViewedProductIds
+              .where(validRecentIds.contains)
+              .toSet()
+              .take(10),
+        );
+      _recentSearches.clear();
+      for (final entry in snapshot.recentSearches.entries) {
+        if (entry.key != BuyV2Destination.shop &&
+            entry.key != BuyV2Destination.wholesale &&
+            entry.key != BuyV2Destination.orders) {
+          continue;
+        }
+        final seen = <String>{};
+        final values = <String>[];
+        for (final value in entry.value) {
+          final clean = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+          if (clean.length < 2 || clean.length > 80) continue;
+          if (!seen.add(clean.toLowerCase())) continue;
+          values.add(clean);
+          if (values.length == 6) break;
+        }
+        if (values.isNotEmpty) _recentSearches[entry.key] = values;
+      }
       final storedSubmissionState = BuyV2CheckoutSubmissionState.values
           .where((state) => state.name == snapshot.checkoutSubmissionState)
           .firstOrNull;
@@ -1598,6 +1827,17 @@ class BuyV2Session extends ChangeNotifier {
       bankTransferInstructions: _bankTransferInstructions,
       shoppingIntent: activeShoppingIntent?.name,
       checkoutSubmissionState: checkoutSubmissionState.name,
+      selectedBrands: Set.unmodifiable(_selectedBrands),
+      maximumPrice: maximumProductPrice,
+      packFilter: selectedPackFilter?.name,
+      fulfilmentMode: selectedFulfilmentMode?.name,
+      productSort: productSort.name,
+      availableOnly: availableProductsOnly,
+      recentlyViewedProductIds: List.unmodifiable(_recentlyViewedProductIds),
+      recentSearches: Map<BuyV2Destination, List<String>>.unmodifiable({
+        for (final entry in _recentSearches.entries)
+          entry.key: List<String>.unmodifiable(entry.value),
+      }),
     );
     unawaited(
       store
@@ -1955,6 +2195,135 @@ class BuyV2Session extends ChangeNotifier {
 
   bool get cartBenefitsBusy =>
       cartBenefitsLoadState == BuyV2CartBenefitsLoadState.loading;
+
+  BuyV2CartBenefitsLoadState productBenefitsStateFor(BuyV2Product product) {
+    if (!liveCartBenefitsEnabled) return BuyV2CartBenefitsLoadState.ready;
+    return _productBenefitStates[product.id] ?? BuyV2CartBenefitsLoadState.idle;
+  }
+
+  String? productBenefitsMessageFor(BuyV2Product product) =>
+      _productBenefitMessages[product.id];
+
+  List<BuyV2CartBenefit> productBenefitsFor(BuyV2Product product) {
+    if (liveCartBenefitsEnabled) {
+      return List.unmodifiable(_productBenefits[product.id] ?? const []);
+    }
+    final total = productFactsFor(product).price * product.minimumOrder;
+    final candidates = [
+      for (final kind in BuyV2CartBenefitKind.values)
+        ...cartBenefitsAdapter.benefitsFor(
+          kind: kind,
+          destinations: {product.destination},
+          itemTotal: total,
+        ),
+    ];
+    return _validatedProductBenefits(
+      product,
+      candidates,
+      evaluatedAt: DateTime.now(),
+    );
+  }
+
+  Future<bool> refreshProductBenefits(String productId) async {
+    final product = findProduct(productId);
+    if (product == null) {
+      notice = 'This product could not be found.';
+      notifyListeners();
+      return false;
+    }
+    final adapter = cartBenefitsAdapter;
+    if (adapter is! BuyV2LiveCartBenefitsAdapter) {
+      _productBenefits[product.id] = productBenefitsFor(product);
+      _productBenefitStates[product.id] = BuyV2CartBenefitsLoadState.ready;
+      _productBenefitMessages.remove(product.id);
+      notifyListeners();
+      return true;
+    }
+    final sequence = (_productBenefitRequestSequences[product.id] ?? 0) + 1;
+    _productBenefitRequestSequences[product.id] = sequence;
+    final fingerprint = _productBenefitFingerprint(product);
+    _productBenefits.remove(product.id);
+    _productBenefitStates[product.id] = BuyV2CartBenefitsLoadState.loading;
+    _productBenefitMessages.remove(product.id);
+    notifyListeners();
+    try {
+      final snapshot = await adapter.loadEligibility(
+        BuyV2CartBenefitsRequest(
+          lines: [
+            BuyV2CartLine(product: product, quantity: product.minimumOrder),
+          ],
+          selectedPaymentMethod: selectedPayment,
+        ),
+      );
+      if (_productBenefitRequestSequences[product.id] != sequence ||
+          _productBenefitFingerprint(product) != fingerprint) {
+        return false;
+      }
+      _productBenefitStates[product.id] = snapshot.state;
+      if (snapshot.customerMessage case final message?) {
+        _productBenefitMessages[product.id] = message;
+      } else {
+        _productBenefitMessages.remove(product.id);
+      }
+      if (snapshot.state != BuyV2CartBenefitsLoadState.ready) {
+        _productBenefits.remove(product.id);
+        notifyListeners();
+        return false;
+      }
+      _productBenefits[product.id] = _validatedProductBenefits(
+        product,
+        snapshot.benefits,
+        evaluatedAt: snapshot.evaluatedAt,
+      );
+      notifyListeners();
+      return true;
+    } on Object {
+      if (_productBenefitRequestSequences[product.id] != sequence) {
+        return false;
+      }
+      _productBenefits.remove(product.id);
+      _productBenefitStates[product.id] =
+          BuyV2CartBenefitsLoadState.unavailable;
+      _productBenefitMessages[product.id] =
+          'Product offers could not be checked. Try again.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  String _productBenefitFingerprint(BuyV2Product product) =>
+      '${product.id}:${product.minimumOrder}:${productFactsFor(product).price}:'
+      '$selectedPayment';
+
+  List<BuyV2CartBenefit> _validatedProductBenefits(
+    BuyV2Product product,
+    List<BuyV2CartBenefit> benefits, {
+    required DateTime evaluatedAt,
+  }) {
+    final total = productFactsFor(product).price * product.minimumOrder;
+    final ids = <String>{};
+    return List.unmodifiable([
+      for (final benefit in benefits)
+        if (benefit.destination == product.destination &&
+            benefit.id.trim().isNotEmpty &&
+            benefit.title.trim().isNotEmpty &&
+            benefit.detail.trim().isNotEmpty &&
+            benefit.sourceId.trim().isNotEmpty &&
+            benefit.sponsorName.trim().isNotEmpty &&
+            benefit.savingAmount >= 0 &&
+            benefit.savingAmount <= total &&
+            (benefit.kind == BuyV2CartBenefitKind.coupon ||
+                benefit.savingAmount == 0) &&
+            _liveBenefitMatchesStrategy(
+              benefit,
+              evaluatedAt: evaluatedAt,
+              destinationTotal: total,
+              destinationQuantity: product.minimumOrder,
+            ) &&
+            ids.add('${benefit.kind.name}|${benefit.id}'))
+          benefit,
+    ]);
+  }
 
   String _cartBenefitsFingerprint() => _cart.values
       .map(
@@ -2729,6 +3098,7 @@ class BuyV2Session extends ChangeNotifier {
         .where(
           (product) =>
               product.destination == destination &&
+              product.catalogueListing &&
               !cartProductIds.contains(product.id) &&
               !excludedProductIds.contains(product.id) &&
               (!specialOffersOnly || hasOffer(product)),
@@ -2749,6 +3119,65 @@ class BuyV2Session extends ChangeNotifier {
   /// This is deliberately independent of Cart contents, customer history,
   /// popularity, serviceability and provider state. It is a local catalogue
   /// ordering helper, not a personalized or clinical recommendation owner.
+  List<BuyV2Product> productVariantsFor(BuyV2Product current) {
+    if (current.destination == BuyV2Destination.orders) return const [];
+    return List.unmodifiable(
+      _catalogueProducts.where(
+        (product) =>
+            product.destination == current.destination &&
+            product.canonicalId == current.canonicalId,
+      ),
+    );
+  }
+
+  List<BuyV2Product> recentlyViewedProductsFor(
+    BuyV2Destination destination, {
+    int limit = 10,
+  }) {
+    if (limit <= 0 ||
+        (destination != BuyV2Destination.shop &&
+            destination != BuyV2Destination.wholesale)) {
+      return const [];
+    }
+    return List.unmodifiable(
+      _recentlyViewedProductIds
+          .map(findProduct)
+          .whereType<BuyV2Product>()
+          .where((product) => product.destination == destination)
+          .take(limit),
+    );
+  }
+
+  void _recordRecentlyViewed(BuyV2Product product) {
+    if (product.destination != BuyV2Destination.shop &&
+        product.destination != BuyV2Destination.wholesale) {
+      return;
+    }
+    _recentlyViewedProductIds
+      ..remove(product.id)
+      ..insert(0, product.id);
+    if (_recentlyViewedProductIds.length > 10) {
+      _recentlyViewedProductIds.removeRange(
+        10,
+        _recentlyViewedProductIds.length,
+      );
+    }
+    _persistCustomerState();
+  }
+
+  void clearRecentlyViewed(BuyV2Destination destination) {
+    final productIds = _catalogueProducts
+        .where((product) => product.destination == destination)
+        .map((product) => product.id)
+        .toSet();
+    final previousLength = _recentlyViewedProductIds.length;
+    _recentlyViewedProductIds.removeWhere(productIds.contains);
+    if (_recentlyViewedProductIds.length == previousLength) return;
+    notice = 'Recently viewed products cleared.';
+    _persistCustomerState();
+    notifyListeners();
+  }
+
   List<BuyV2Product> productContinuationsFor(
     BuyV2Product current, {
     int limit = 6,
@@ -2767,7 +3196,8 @@ class BuyV2Session extends ChangeNotifier {
         .where(
           (product) =>
               product.destination == current.destination &&
-              product.id != current.id,
+              product.catalogueListing &&
+              product.canonicalId != current.canonicalId,
         )
         .toList(growable: false);
     candidates.sort((left, right) {
@@ -2797,6 +3227,7 @@ class BuyV2Session extends ChangeNotifier {
         .where(
           (product) =>
               product.destination == BuyV2Destination.wholesale &&
+              product.catalogueListing &&
               product.id != current.id &&
               product.seller == current.seller,
         )
@@ -2829,11 +3260,69 @@ class BuyV2Session extends ChangeNotifier {
         .where(
           (product) =>
               product.destination == current.destination &&
+              product.catalogueListing &&
               product.id != current.id &&
               product.seller == current.seller,
         )
         .toList(growable: false);
     candidates.sort((left, right) {
+      final priceOrder = left.price.compareTo(right.price);
+      if (priceOrder != 0) return priceOrder;
+      return left.id.compareTo(right.id);
+    });
+    return List.unmodifiable(candidates.take(limit));
+  }
+
+  List<BuyV2Product> partnerCatalogueFor(
+    BuyV2Product current, {
+    int limit = 50,
+  }) {
+    final supportedDestination =
+        current.destination == BuyV2Destination.shop ||
+        current.destination == BuyV2Destination.wholesale;
+    if (!supportedDestination || limit <= 0) return const [];
+
+    final candidates = _catalogueProducts
+        .where(
+          (product) =>
+              product.destination == current.destination &&
+              product.catalogueListing &&
+              product.seller == current.seller,
+        )
+        .toList(growable: false);
+    candidates.sort((left, right) {
+      if (left.id == current.id) return -1;
+      if (right.id == current.id) return 1;
+      final categoryOrder = left.categoryId.compareTo(right.categoryId);
+      if (categoryOrder != 0) return categoryOrder;
+      final priceOrder = left.price.compareTo(right.price);
+      if (priceOrder != 0) return priceOrder;
+      return left.id.compareTo(right.id);
+    });
+    return List.unmodifiable(candidates.take(limit));
+  }
+
+  List<BuyV2Product> brandCatalogueFor(BuyV2Product current, {int limit = 50}) {
+    final supportedDestination =
+        current.destination == BuyV2Destination.shop ||
+        current.destination == BuyV2Destination.wholesale;
+    if (!supportedDestination || current.brand.trim().isEmpty || limit <= 0) {
+      return const [];
+    }
+
+    final candidates = _catalogueProducts
+        .where(
+          (product) =>
+              product.destination == current.destination &&
+              product.catalogueListing &&
+              product.brand == current.brand,
+        )
+        .toList(growable: false);
+    candidates.sort((left, right) {
+      if (left.id == current.id) return -1;
+      if (right.id == current.id) return 1;
+      final sellerOrder = left.seller.compareTo(right.seller);
+      if (sellerOrder != 0) return sellerOrder;
       final priceOrder = left.price.compareTo(right.price);
       if (priceOrder != 0) return priceOrder;
       return left.id.compareTo(right.id);
@@ -2954,7 +3443,148 @@ class BuyV2Session extends ChangeNotifier {
         (snapshot.deliveryProviderName == null ||
             snapshot.deliveryProviderName!.trim().isNotEmpty) &&
         (snapshot.deliveryServiceLevel == null ||
-            snapshot.deliveryServiceLevel!.trim().isNotEmpty);
+            snapshot.deliveryServiceLevel!.trim().isNotEmpty) &&
+        (snapshot.nextOpeningLabel == null ||
+            snapshot.nextOpeningLabel!.trim().isNotEmpty) &&
+        (snapshot.orderCutoffLabel == null ||
+            snapshot.orderCutoffLabel!.trim().isNotEmpty) &&
+        (snapshot.deliveryFeeLabel == null ||
+            snapshot.deliveryFeeLabel!.trim().isNotEmpty) &&
+        (snapshot.storeOperatingState != BuyV2StoreOperatingState.closed ||
+            snapshot.nextOpeningLabel?.trim().isNotEmpty == true);
+  }
+
+  BuyV2ProductContentSnapshot productContentFor(BuyV2Product product) {
+    return _productContent.putIfAbsent(product.id, () {
+      final next = productContentAdapter.snapshotFor(product);
+      return _validProductContent(product, next)
+          ? next
+          : _catalogueContentFallback.snapshotFor(product);
+    });
+  }
+
+  bool refreshProductContent(String productId) {
+    final product = findProduct(productId);
+    if (product == null) {
+      notice = 'This product could not be found.';
+      notifyListeners();
+      return false;
+    }
+    final next = productContentAdapter.snapshotFor(product);
+    if (!_validProductContent(product, next)) {
+      notice = 'Product details could not be refreshed.';
+      notifyListeners();
+      return false;
+    }
+    final previous = _productContent[product.id];
+    _productContent[product.id] = next;
+    if (!identical(previous, next)) notifyListeners();
+    return true;
+  }
+
+  bool _validProductContent(
+    BuyV2Product product,
+    BuyV2ProductContentSnapshot snapshot,
+  ) {
+    if (snapshot.productId != product.id || snapshot.sourceId.trim().isEmpty) {
+      return false;
+    }
+    final mediaIds = <String>{};
+    if (snapshot.media.any(
+      (item) =>
+          item.id.trim().isEmpty ||
+          !mediaIds.add(item.id) ||
+          item.label.trim().isEmpty ||
+          item.semanticLabel.trim().isEmpty,
+    )) {
+      return false;
+    }
+    if (snapshot.highlights.any((item) => item.trim().isEmpty) ||
+        snapshot.specifications.any(
+          (item) => item.label.trim().isEmpty || item.value.trim().isEmpty,
+        ) ||
+        (snapshot.description != null &&
+            snapshot.description!.trim().isEmpty)) {
+      return false;
+    }
+    if ((snapshot.state == BuyV2ProductContentState.offline ||
+            snapshot.state == BuyV2ProductContentState.unavailable) &&
+        snapshot.customerMessage?.trim().isNotEmpty != true) {
+      return false;
+    }
+    return true;
+  }
+
+  BuyV2MarketplaceTrustSnapshot marketplaceTrustFor(BuyV2Product product) {
+    return _marketplaceTrust.putIfAbsent(product.id, () {
+      final next = marketplaceTrustAdapter.snapshotFor(product);
+      return _validMarketplaceTrust(product, next)
+          ? next
+          : _catalogueTrustFallback.snapshotFor(product);
+    });
+  }
+
+  bool refreshMarketplaceTrust(String productId) {
+    final product = findProduct(productId);
+    if (product == null) {
+      notice = 'This product could not be found.';
+      notifyListeners();
+      return false;
+    }
+    final next = marketplaceTrustAdapter.snapshotFor(product);
+    if (!_validMarketplaceTrust(product, next)) {
+      notice = 'Ratings and seller details could not be refreshed.';
+      notifyListeners();
+      return false;
+    }
+    final previous = _marketplaceTrust[product.id];
+    _marketplaceTrust[product.id] = next;
+    if (!identical(previous, next)) notifyListeners();
+    return true;
+  }
+
+  bool _validMarketplaceTrust(
+    BuyV2Product product,
+    BuyV2MarketplaceTrustSnapshot snapshot,
+  ) {
+    final facts = productFactsFor(product);
+    if (snapshot.productId != product.id ||
+        snapshot.sourceId.trim().isEmpty ||
+        snapshot.partnerName.trim().isEmpty ||
+        snapshot.partnerName != facts.partner ||
+        snapshot.partnerType.trim().isEmpty) {
+      return false;
+    }
+    bool validRating(double? rating) =>
+        rating == null || (rating >= 1 && rating <= 5);
+    if (!validRating(snapshot.productRating) ||
+        !validRating(snapshot.partnerRating) ||
+        (snapshot.productRatingCount != null &&
+            snapshot.productRatingCount! < 0) ||
+        (snapshot.verifiedBuyerRatingCount != null &&
+            snapshot.verifiedBuyerRatingCount! < 0) ||
+        (snapshot.productRatingCount != null &&
+            snapshot.verifiedBuyerRatingCount != null &&
+            snapshot.verifiedBuyerRatingCount! >
+                snapshot.productRatingCount!) ||
+        (snapshot.partnerOrderCount != null &&
+            snapshot.partnerOrderCount! < 0)) {
+      return false;
+    }
+    if ([
+      snapshot.partnerLocation,
+      snapshot.serviceReliabilityLabel,
+      snapshot.returnSummary,
+      snapshot.customerMessage,
+    ].whereType<String>().any((value) => value.trim().isEmpty)) {
+      return false;
+    }
+    if ((snapshot.state == BuyV2MarketplaceTrustState.offline ||
+            snapshot.state == BuyV2MarketplaceTrustState.unavailable) &&
+        snapshot.customerMessage?.trim().isNotEmpty != true) {
+      return false;
+    }
+    return true;
   }
 
   BuyV2SponsoredContent? sponsoredContentFor(
@@ -3053,7 +3683,10 @@ class BuyV2Session extends ChangeNotifier {
         : BuyV2View.catalogue;
     query = '';
     selectedFilter = null;
+    _clearDiscoveryRefinements();
     activeShoppingIntent = null;
+    _cartProductReturnActive = false;
+    _cartProductReturnId = null;
     notice = null;
     _notifyNavigationIfChanged(
       previous,
@@ -3073,14 +3706,50 @@ class BuyV2Session extends ChangeNotifier {
       _productReturnDestination = destination;
       _productReturnView = view;
     }
+    final activeSearch = query.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (view == BuyV2View.catalogue && activeSearch.length >= 2) {
+      _recordRecentSearch(destination, activeSearch);
+      _persistCustomerState();
+    }
     destination = item.destination;
     selectedProductId = item.id;
     view = BuyV2View.product;
     notice = null;
+    _recordRecentlyViewed(item);
     _notifyNavigationIfChanged(
       previous,
       BuyV2NavigationMotionDirection.forward,
     );
+    if (liveCartBenefitsEnabled) {
+      unawaited(refreshProductBenefits(item.id));
+    }
+    return true;
+  }
+
+  bool selectProductVariant(String id) {
+    final current = selectedProduct;
+    final next = findProduct(id);
+    if (current == null ||
+        next == null ||
+        next.destination != current.destination ||
+        next.canonicalId != current.canonicalId) {
+      notice = 'This product option is no longer available.';
+      notifyListeners();
+      return false;
+    }
+    if (next.id == current.id) return true;
+    final previous = _navigationSurfaceIdentity;
+    selectedProductId = next.id;
+    destination = next.destination;
+    notice = null;
+    _recordRecentlyViewed(next);
+    _notifyNavigationIfChanged(
+      previous,
+      BuyV2NavigationMotionDirection.replace,
+    );
+    if (liveCartBenefitsEnabled) {
+      unawaited(refreshProductBenefits(next.id));
+    }
     return true;
   }
 
@@ -3095,7 +3764,17 @@ class BuyV2Session extends ChangeNotifier {
 
   void openCart({BuyV2CartScope scope = BuyV2CartScope.all}) {
     final previous = _navigationSurfaceIdentity;
+    if (view == BuyV2View.product && selectedProductId != null) {
+      _cartProductReturnActive = true;
+      _cartProductReturnDestination = destination;
+      _cartProductReturnId = selectedProductId;
+    } else if (view != BuyV2View.checkout && view != BuyV2View.cart) {
+      _cartProductReturnActive = false;
+      _cartProductReturnId = null;
+    }
     if (_cart.isEmpty) {
+      _cartProductReturnActive = false;
+      _cartProductReturnId = null;
       destination = switch (scope) {
         BuyV2CartScope.shop => BuyV2Destination.shop,
         BuyV2CartScope.wholesale => BuyV2Destination.wholesale,
@@ -3120,6 +3799,24 @@ class BuyV2Session extends ChangeNotifier {
       previous,
       BuyV2NavigationMotionDirection.forward,
     );
+  }
+
+  bool buyProductNow(String productId) {
+    final product = findProduct(productId);
+    if (product == null || product.destination == BuyV2Destination.orders) {
+      notice = 'This product could not be found.';
+      notifyListeners();
+      return false;
+    }
+    if (quantityFor(product.id) == 0 && !addProduct(product.id)) return false;
+    final scope = switch (product.destination) {
+      BuyV2Destination.shop => BuyV2CartScope.shop,
+      BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+      BuyV2Destination.medicine => BuyV2CartScope.medicine,
+      BuyV2Destination.orders => BuyV2CartScope.all,
+    };
+    openCart(scope: scope);
+    return openCheckout();
   }
 
   bool openCheckout() {
@@ -3274,6 +3971,231 @@ class BuyV2Session extends ChangeNotifier {
         .whereType<BuyV2Product>()
         .where((product) => product.destination == order.destination)
         .toList(growable: false);
+  }
+
+  BuyV2OrderResolutionSnapshot? orderResolutionFor(String orderId) =>
+      _orderResolutionSnapshots[orderId];
+
+  BuyV2OrderResolutionResult? orderResolutionResultFor(String orderId) =>
+      _orderResolutionResults[orderId];
+
+  bool orderResolutionBusy(String orderId) =>
+      _orderResolutionBusyIds.contains(orderId);
+
+  Future<bool> refreshOrderResolution(String orderId) async {
+    final order = _orders
+        .where((candidate) => candidate.id == orderId)
+        .firstOrNull;
+    if (order == null || _orderResolutionBusyIds.contains(orderId)) {
+      return false;
+    }
+    _orderResolutionBusyIds.add(orderId);
+    _orderResolutionSnapshots[orderId] = BuyV2OrderResolutionSnapshot(
+      orderId: orderId,
+      state: BuyV2OrderResolutionState.loading,
+      sourceId: 'loading',
+    );
+    notifyListeners();
+    try {
+      final snapshot = await orderResolutionAdapter.load(order);
+      _orderResolutionSnapshots[orderId] = _validOrderResolutionSnapshot(
+        order,
+        snapshot,
+      );
+      return _orderResolutionSnapshots[orderId]!.state ==
+          BuyV2OrderResolutionState.ready;
+    } on Object {
+      _orderResolutionSnapshots[orderId] = BuyV2OrderResolutionSnapshot(
+        orderId: orderId,
+        state: BuyV2OrderResolutionState.unavailable,
+        sourceId: 'order-resolution-error',
+        customerMessage:
+            'Order changes could not be checked. Try again or contact support.',
+      );
+      return false;
+    } finally {
+      _orderResolutionBusyIds.remove(orderId);
+      notifyListeners();
+    }
+  }
+
+  BuyV2OrderResolutionSnapshot _validOrderResolutionSnapshot(
+    BuyV2Order order,
+    BuyV2OrderResolutionSnapshot snapshot,
+  ) {
+    if (snapshot.orderId != order.id || snapshot.sourceId.trim().isEmpty) {
+      return BuyV2OrderResolutionSnapshot(
+        orderId: order.id,
+        state: BuyV2OrderResolutionState.unavailable,
+        sourceId: 'invalid-order-resolution',
+        customerMessage:
+            'Order changes are unavailable right now. Contact support for help.',
+      );
+    }
+    if (snapshot.state != BuyV2OrderResolutionState.ready) return snapshot;
+    final kinds = <BuyV2OrderResolutionKind>{};
+    final options = snapshot.options
+        .where((option) {
+          final allowed = switch (option.kind) {
+            BuyV2OrderResolutionKind.cancel =>
+              order.status == BuyV2OrderStatus.preparing ||
+                  order.status == BuyV2OrderStatus.confirmed,
+            BuyV2OrderResolutionKind.returnItems ||
+            BuyV2OrderResolutionKind.replacement ||
+            BuyV2OrderResolutionKind.refund =>
+              order.status == BuyV2OrderStatus.delivered,
+          };
+          return allowed &&
+              kinds.add(option.kind) &&
+              option.title.trim().isNotEmpty &&
+              option.detail.trim().isNotEmpty &&
+              option.reasons.isNotEmpty &&
+              option.reasons.every((reason) => reason.trim().isNotEmpty);
+        })
+        .toList(growable: false);
+    if (options.isEmpty) {
+      return BuyV2OrderResolutionSnapshot(
+        orderId: order.id,
+        state: BuyV2OrderResolutionState.unavailable,
+        sourceId: snapshot.sourceId,
+        customerMessage:
+            snapshot.customerMessage ??
+            'This order cannot be changed at its current stage. Contact support for help.',
+      );
+    }
+    return BuyV2OrderResolutionSnapshot(
+      orderId: order.id,
+      state: BuyV2OrderResolutionState.ready,
+      sourceId: snapshot.sourceId,
+      options: List.unmodifiable(options),
+      customerMessage: snapshot.customerMessage,
+    );
+  }
+
+  Future<bool> submitOrderResolution({
+    required String orderId,
+    required BuyV2OrderResolutionKind kind,
+    required String reason,
+  }) async {
+    final cleanReason = reason.trim();
+    final snapshot = _orderResolutionSnapshots[orderId];
+    final option = snapshot?.options
+        .where((candidate) => candidate.kind == kind)
+        .firstOrNull;
+    if (snapshot?.state != BuyV2OrderResolutionState.ready ||
+        option == null ||
+        !option.reasons.contains(cleanReason) ||
+        _orderResolutionBusyIds.contains(orderId)) {
+      notice = 'Choose an available request and reason to continue.';
+      notifyListeners();
+      return false;
+    }
+    _orderResolutionBusyIds.add(orderId);
+    notifyListeners();
+    try {
+      final result = await orderResolutionAdapter.submit(
+        BuyV2OrderResolutionRequest(
+          orderId: orderId,
+          kind: kind,
+          reason: cleanReason,
+        ),
+      );
+      final valid =
+          result.customerMessage.trim().isNotEmpty &&
+          (!result.accepted || (result.reference?.trim().isNotEmpty ?? false));
+      if (!valid) {
+        notice = 'This request could not be confirmed. Try again.';
+        return false;
+      }
+      _orderResolutionResults[orderId] = result;
+      notice = result.accepted ? result.customerMessage : null;
+      return result.accepted;
+    } on Object {
+      notice = 'This request could not be sent. Try again or contact support.';
+      return false;
+    } finally {
+      _orderResolutionBusyIds.remove(orderId);
+      notifyListeners();
+    }
+  }
+
+  List<BuyV2ShoppingAlert> get shoppingAlerts =>
+      List.unmodifiable(_shoppingAlerts);
+
+  Future<bool> restoreShoppingAlerts() async {
+    if (shoppingAlertsBusy) return false;
+    shoppingAlertsBusy = true;
+    shoppingAlertsState = BuyV2ShoppingAlertsState.loading;
+    shoppingAlertsMessage = null;
+    notifyListeners();
+    try {
+      final snapshot = await shoppingAlertsAdapter.load(
+        BuyV2ShoppingAlertsRequest(
+          orders: List.unmodifiable(_orders),
+          products: List.unmodifiable(_catalogueProducts),
+        ),
+      );
+      if (snapshot.sourceId.trim().isEmpty) {
+        throw const FormatException('Missing shopping alerts source');
+      }
+      shoppingAlertsState = snapshot.state;
+      shoppingAlertsMessage = snapshot.customerMessage;
+      if (snapshot.state != BuyV2ShoppingAlertsState.ready) {
+        _shoppingAlerts = [];
+        return false;
+      }
+      final ids = <String>{};
+      _shoppingAlerts = List.unmodifiable(
+        snapshot.alerts.where((alert) {
+          if (alert.id.trim().isEmpty ||
+              alert.title.trim().isEmpty ||
+              alert.detail.trim().isEmpty ||
+              alert.updatedLabel.trim().isEmpty ||
+              !ids.add(alert.id)) {
+            return false;
+          }
+          final orderId = alert.orderId?.trim();
+          final productId = alert.productId?.trim();
+          final orderRequired = switch (alert.kind) {
+            BuyV2ShoppingAlertKind.order ||
+            BuyV2ShoppingAlertKind.payment ||
+            BuyV2ShoppingAlertKind.delivery ||
+            BuyV2ShoppingAlertKind.cancellation ||
+            BuyV2ShoppingAlertKind.returnUpdate ||
+            BuyV2ShoppingAlertKind.refund => true,
+            BuyV2ShoppingAlertKind.offer ||
+            BuyV2ShoppingAlertKind.priceDrop ||
+            BuyV2ShoppingAlertKind.restock => false,
+          };
+          if (orderRequired) {
+            return orderId != null &&
+                orderId.isNotEmpty &&
+                _orders.any((order) => order.id == orderId);
+          }
+          if (alert.kind == BuyV2ShoppingAlertKind.priceDrop ||
+              alert.kind == BuyV2ShoppingAlertKind.restock) {
+            return productId != null &&
+                productId.isNotEmpty &&
+                _catalogueProducts.any(
+                  (product) =>
+                      product.id == productId &&
+                      product.destination == alert.destination,
+                );
+          }
+          return alert.kind == BuyV2ShoppingAlertKind.offer;
+        }),
+      );
+      return true;
+    } on Object {
+      _shoppingAlerts = [];
+      shoppingAlertsState = BuyV2ShoppingAlertsState.unavailable;
+      shoppingAlertsMessage =
+          'Shopping alerts could not load. Try again. Your orders are unchanged.';
+      return false;
+    } finally {
+      shoppingAlertsBusy = false;
+      notifyListeners();
+    }
   }
 
   void toggleTrackingAlerts() {
@@ -3433,7 +4355,11 @@ class BuyV2Session extends ChangeNotifier {
         case BuyV2View.product:
           closeProduct();
         case BuyV2View.cart:
-          returnToCatalogue();
+          if (_cartProductReturnActive) {
+            _returnToCartProduct();
+          } else {
+            returnToCatalogue();
+          }
         case BuyV2View.checkout:
           openCart(scope: checkoutScope);
         case BuyV2View.confirmation:
@@ -3480,6 +4406,27 @@ class BuyV2Session extends ChangeNotifier {
       view = BuyV2View.catalogue;
     }
     selectedProductId = null;
+    _cartProductReturnActive = false;
+    _cartProductReturnId = null;
+    notice = null;
+    _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
+  }
+
+  void _returnToCartProduct() {
+    final previous = _navigationSurfaceIdentity;
+    final product = _cartProductReturnId == null
+        ? null
+        : findProduct(_cartProductReturnId!);
+    _cartProductReturnActive = false;
+    _cartProductReturnId = null;
+    if (product == null ||
+        product.destination != _cartProductReturnDestination) {
+      returnToCatalogue();
+      return;
+    }
+    destination = product.destination;
+    selectedProductId = product.id;
+    view = BuyV2View.product;
     notice = null;
     _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
   }
@@ -3670,6 +4617,100 @@ class BuyV2Session extends ChangeNotifier {
   void chooseFilter(String? value) {
     selectedFilter = value;
     notifyListeners();
+  }
+
+  List<String> get discoveryBrands {
+    if (destination == BuyV2Destination.orders) return const [];
+    final brands =
+        _catalogueProducts
+            .where((product) => product.destination == destination)
+            .map((product) => product.brand)
+            .toSet()
+            .toList(growable: false)
+          ..sort();
+    return List.unmodifiable(brands.take(10));
+  }
+
+  List<int> get discoveryPriceLimits => switch (destination) {
+    BuyV2Destination.shop => const [100, 250, 500, 1000],
+    BuyV2Destination.wholesale => const [2000, 5000, 10000],
+    BuyV2Destination.medicine => const [100, 250, 500, 1000],
+    BuyV2Destination.orders => const [],
+  };
+
+  int get activeDiscoveryRefinementCount =>
+      _selectedBrands.length +
+      (maximumProductPrice == null ? 0 : 1) +
+      (selectedPackFilter == null ? 0 : 1) +
+      (selectedFulfilmentMode == null ? 0 : 1) +
+      (productSort == BuyV2ProductSort.relevance ? 0 : 1) +
+      (availableProductsOnly ? 1 : 0);
+
+  String get discoveryRefinementSignature => [
+    productSort.name,
+    maximumProductPrice?.toString() ?? 'any-price',
+    selectedPackFilter?.name ?? 'any-pack',
+    selectedFulfilmentMode?.name ?? 'any-delivery',
+    availableProductsOnly ? 'available' : 'all-stock',
+    ...(_selectedBrands.toList()..sort()),
+  ].join('|');
+
+  void toggleDiscoveryBrand(String brand) {
+    final value = brand.trim();
+    if (value.isEmpty || !discoveryBrands.contains(value)) return;
+    if (!_selectedBrands.remove(value)) _selectedBrands.add(value);
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void chooseMaximumProductPrice(int? value) {
+    if (value != null &&
+        (value <= 0 || !discoveryPriceLimits.contains(value))) {
+      return;
+    }
+    maximumProductPrice = value;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void choosePackFilter(BuyV2PackFilter? value) {
+    selectedPackFilter = value;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void chooseFulfilmentMode(BuyV2FulfilmentMode? value) {
+    selectedFulfilmentMode = value;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void chooseProductSort(BuyV2ProductSort value) {
+    productSort = value;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void setAvailableProductsOnly(bool value) {
+    availableProductsOnly = value;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void clearDiscoveryRefinements() {
+    if (activeDiscoveryRefinementCount == 0) return;
+    _clearDiscoveryRefinements();
+    _persistCustomerState();
+    notifyListeners();
+  }
+
+  void _clearDiscoveryRefinements() {
+    _selectedBrands.clear();
+    maximumProductPrice = null;
+    selectedPackFilter = null;
+    selectedFulfilmentMode = null;
+    productSort = BuyV2ProductSort.relevance;
+    availableProductsOnly = false;
   }
 
   void chooseShoppingIntent(BuyV2ShoppingIntent intent) {

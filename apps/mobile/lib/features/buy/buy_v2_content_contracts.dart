@@ -3,6 +3,22 @@ import 'package:flutter/foundation.dart';
 import 'buy_v2_cart_contracts.dart';
 import 'buy_v2_models.dart';
 
+enum BuyV2FulfilmentMode { quickLocal, standardCourier, bulkFreight }
+
+enum BuyV2StoreOperatingState { unknown, open, closed }
+
+BuyV2FulfilmentMode buyV2CatalogueFulfilmentModeFor(BuyV2Product product) {
+  if (product.destination == BuyV2Destination.wholesale) {
+    return BuyV2FulfilmentMode.bulkFreight;
+  }
+  final promise = product.deliveryPromise.toLowerCase();
+  if (product.destination == BuyV2Destination.shop &&
+      RegExp(r'\d+\s*(?:min|minute)').hasMatch(promise)) {
+    return BuyV2FulfilmentMode.quickLocal;
+  }
+  return BuyV2FulfilmentMode.standardCourier;
+}
+
 @immutable
 class BuyV2ProductFactsSnapshot {
   const BuyV2ProductFactsSnapshot({
@@ -16,6 +32,11 @@ class BuyV2ProductFactsSnapshot {
     this.dispatchPromise,
     this.deliveryProviderName,
     this.deliveryServiceLevel,
+    this.fulfilmentMode,
+    this.storeOperatingState = BuyV2StoreOperatingState.unknown,
+    this.nextOpeningLabel,
+    this.orderCutoffLabel,
+    this.deliveryFeeLabel,
     this.observedAt,
     this.stale = false,
   }) : assert(
@@ -33,6 +54,11 @@ class BuyV2ProductFactsSnapshot {
   final String? dispatchPromise;
   final String? deliveryProviderName;
   final String? deliveryServiceLevel;
+  final BuyV2FulfilmentMode? fulfilmentMode;
+  final BuyV2StoreOperatingState storeOperatingState;
+  final String? nextOpeningLabel;
+  final String? orderCutoffLabel;
+  final String? deliveryFeeLabel;
   final DateTime? observedAt;
   final bool stale;
 
@@ -48,6 +74,11 @@ class BuyV2ProductFactsSnapshot {
     String? dispatchPromise,
     String? deliveryProviderName,
     String? deliveryServiceLevel,
+    BuyV2FulfilmentMode? fulfilmentMode,
+    BuyV2StoreOperatingState? storeOperatingState,
+    String? nextOpeningLabel,
+    String? orderCutoffLabel,
+    String? deliveryFeeLabel,
     DateTime? observedAt,
     bool? stale,
   }) {
@@ -62,6 +93,11 @@ class BuyV2ProductFactsSnapshot {
       dispatchPromise: dispatchPromise ?? this.dispatchPromise,
       deliveryProviderName: deliveryProviderName ?? this.deliveryProviderName,
       deliveryServiceLevel: deliveryServiceLevel ?? this.deliveryServiceLevel,
+      fulfilmentMode: fulfilmentMode ?? this.fulfilmentMode,
+      storeOperatingState: storeOperatingState ?? this.storeOperatingState,
+      nextOpeningLabel: nextOpeningLabel ?? this.nextOpeningLabel,
+      orderCutoffLabel: orderCutoffLabel ?? this.orderCutoffLabel,
+      deliveryFeeLabel: deliveryFeeLabel ?? this.deliveryFeeLabel,
       observedAt: observedAt ?? this.observedAt,
       stale: stale ?? this.stale,
     );
@@ -80,6 +116,11 @@ class BuyV2ProductFactsSnapshot {
         other.dispatchPromise == dispatchPromise &&
         other.deliveryProviderName == deliveryProviderName &&
         other.deliveryServiceLevel == deliveryServiceLevel &&
+        other.fulfilmentMode == fulfilmentMode &&
+        other.storeOperatingState == storeOperatingState &&
+        other.nextOpeningLabel == nextOpeningLabel &&
+        other.orderCutoffLabel == orderCutoffLabel &&
+        other.deliveryFeeLabel == deliveryFeeLabel &&
         other.observedAt == observedAt &&
         other.stale == stale;
   }
@@ -96,6 +137,11 @@ class BuyV2ProductFactsSnapshot {
     dispatchPromise,
     deliveryProviderName,
     deliveryServiceLevel,
+    fulfilmentMode,
+    storeOperatingState,
+    nextOpeningLabel,
+    orderCutoffLabel,
+    deliveryFeeLabel,
     observedAt,
     stale,
   );
@@ -103,6 +149,123 @@ class BuyV2ProductFactsSnapshot {
 
 abstract interface class BuyV2ProductFactsAdapter {
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product);
+}
+
+enum BuyV2ProductContentState { ready, loading, offline, unavailable }
+
+enum BuyV2ProductContentMediaKind {
+  cataloguePackshot,
+  asset,
+  network,
+  networkVideo,
+}
+
+@immutable
+class BuyV2ProductMediaAsset {
+  const BuyV2ProductMediaAsset({
+    required this.id,
+    required this.label,
+    required this.semanticLabel,
+    required this.kind,
+    this.source,
+    this.posterSource,
+    this.transcript,
+  }) : assert(
+         kind == BuyV2ProductContentMediaKind.cataloguePackshot ||
+             (source != null && source != ''),
+       ),
+       assert(
+         kind != BuyV2ProductContentMediaKind.networkVideo ||
+             (transcript != null && transcript != ''),
+       );
+
+  final String id;
+  final String label;
+  final String semanticLabel;
+  final BuyV2ProductContentMediaKind kind;
+  final String? source;
+  final String? posterSource;
+  final String? transcript;
+}
+
+@immutable
+class BuyV2ProductSpecification {
+  const BuyV2ProductSpecification({required this.label, required this.value});
+
+  final String label;
+  final String value;
+}
+
+@immutable
+class BuyV2ProductContentSnapshot {
+  const BuyV2ProductContentSnapshot({
+    required this.productId,
+    required this.state,
+    required this.sourceId,
+    this.media = const [],
+    this.highlights = const [],
+    this.specifications = const [],
+    this.description,
+    this.customerMessage,
+    this.observedAt,
+  });
+
+  final String productId;
+  final BuyV2ProductContentState state;
+  final String sourceId;
+  final List<BuyV2ProductMediaAsset> media;
+  final List<String> highlights;
+  final List<BuyV2ProductSpecification> specifications;
+  final String? description;
+  final String? customerMessage;
+  final DateTime? observedAt;
+}
+
+abstract interface class BuyV2ProductContentAdapter {
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product);
+}
+
+enum BuyV2MarketplaceTrustState { ready, loading, offline, unavailable }
+
+@immutable
+class BuyV2MarketplaceTrustSnapshot {
+  const BuyV2MarketplaceTrustSnapshot({
+    required this.productId,
+    required this.state,
+    required this.sourceId,
+    required this.partnerName,
+    required this.partnerType,
+    this.productRating,
+    this.productRatingCount,
+    this.verifiedBuyerRatingCount,
+    this.partnerRating,
+    this.partnerOrderCount,
+    this.partnerLocation,
+    this.serviceReliabilityLabel,
+    this.returnSummary,
+    this.customerMessage,
+    this.observedAt,
+  });
+
+  final String productId;
+  final BuyV2MarketplaceTrustState state;
+  final String sourceId;
+  final String partnerName;
+  final String partnerType;
+  final double? productRating;
+  final int? productRatingCount;
+  final int? verifiedBuyerRatingCount;
+  final double? partnerRating;
+  final int? partnerOrderCount;
+  final String? partnerLocation;
+  final String? serviceReliabilityLabel;
+  final String? returnSummary;
+  final String? customerMessage;
+  final DateTime? observedAt;
+}
+
+abstract interface class BuyV2MarketplaceTrustAdapter {
+  BuyV2MarketplaceTrustSnapshot snapshotFor(BuyV2Product product);
 }
 
 enum BuyV2CommerceLoadState { loading, ready, offline, unavailable }
@@ -556,8 +719,58 @@ final class BuyV2CatalogueProductFactsAdapter
           ? 'Prescription required'
           : 'Available to add',
       sourceId: 'approved-buy-catalogue',
+      fulfilmentMode: buyV2CatalogueFulfilmentModeFor(product),
     );
   }
+}
+
+final class BuyV2CatalogueProductContentAdapter
+    implements BuyV2ProductContentAdapter {
+  const BuyV2CatalogueProductContentAdapter();
+
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
+    final returnDetail = product.returnPolicy;
+    return BuyV2ProductContentSnapshot(
+      productId: product.id,
+      state: BuyV2ProductContentState.ready,
+      sourceId: 'approved-buy-catalogue',
+      media: [
+        BuyV2ProductMediaAsset(
+          id: '${product.id}-packshot',
+          label: 'Product image',
+          semanticLabel: '${product.title}, ${product.pack}',
+          kind: BuyV2ProductContentMediaKind.cataloguePackshot,
+        ),
+      ],
+      highlights: [product.variant, product.unitPrice, ?returnDetail],
+      specifications: [
+        BuyV2ProductSpecification(label: 'Brand', value: product.brand),
+        BuyV2ProductSpecification(label: 'Pack', value: product.pack),
+        BuyV2ProductSpecification(label: 'Variant', value: product.variant),
+      ],
+      description:
+          '${product.title} · ${product.variant}. '
+          '${product.pack} at ${product.unitPrice}.',
+    );
+  }
+}
+
+final class BuyV2CatalogueMarketplaceTrustAdapter
+    implements BuyV2MarketplaceTrustAdapter {
+  const BuyV2CatalogueMarketplaceTrustAdapter();
+
+  @override
+  BuyV2MarketplaceTrustSnapshot snapshotFor(BuyV2Product product) =>
+      BuyV2MarketplaceTrustSnapshot(
+        productId: product.id,
+        state: BuyV2MarketplaceTrustState.ready,
+        sourceId: 'approved-buy-catalogue',
+        partnerName: product.seller,
+        partnerType: product.partnerRole,
+        partnerLocation: product.origin,
+        returnSummary: product.returnPolicy,
+      );
 }
 
 enum BuyV2SponsoredPlacement {

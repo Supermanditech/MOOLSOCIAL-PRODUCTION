@@ -108,6 +108,7 @@ void main() {
     bool disableAnimations = false,
     BuyV2ScannerLauncher scannerLauncher = showBuyV2ProductScanner,
     VoidCallback? onOpenMool,
+    VoidCallback? onOpenChat,
     BuyV2InvoiceDownloader? invoiceDownloader,
     AuthenticatedAccountIdentity? accountIdentity,
     bool accountAuthenticated = false,
@@ -134,6 +135,7 @@ void main() {
         accountAuthenticated: accountAuthenticated,
         scannerLauncher: scannerLauncher,
         onOpenMool: onOpenMool,
+        onOpenChat: onOpenChat,
         invoiceDownloader: invoiceDownloader,
         offersSource: offersSource,
         onOpenMainAction: (action) {
@@ -1389,7 +1391,8 @@ void main() {
     final action = tester.getRect(
       find.byKey(ValueKey('buy-add-${product.id}')),
     );
-    expect(action.size, const Size(44, 44));
+    expect(action.height, 44);
+    expect(action.width, greaterThanOrEqualTo(60));
     expect(card.contains(action.center), isTrue);
     expect(action.right, lessThanOrEqualTo(card.right));
     expect(tester.takeException(), isNull);
@@ -1574,13 +1577,10 @@ void main() {
       findsNothing,
     );
     expect(
-      find.descendant(
-        of: primary,
-        matching: find.text('Add ${product.minimumOrder} packs'),
-      ),
+      find.descendant(of: primary, matching: find.text('Add to Cart')),
       findsOneWidget,
     );
-    expect(find.text('Add to cart', skipOffstage: false), findsNothing);
+    expect(find.text('Buy now'), findsNothing);
   });
 
   testWidgets(
@@ -1607,8 +1607,7 @@ void main() {
         220,
         scrollable: productScrollable,
       );
-      expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
-      expect(find.text(product.seller), findsNothing);
+      expect(find.textContaining(product.seller), findsWidgets);
       expect(find.textContaining('Verified'), findsNothing);
 
       final reviews = find.byKey(ValueKey('buy-product-reviews-${product.id}'));
@@ -1691,25 +1690,14 @@ void main() {
         );
 
         expect(find.text('Delivered in ${testCase.minutes} min'), findsWidgets);
-        expect(
-          find.text('Automatically assigned Mool Partner'),
-          findsOneWidget,
-        );
-        expect(
-          find.text(product.seller),
-          testCase.destination == BuyV2Destination.wholesale
-              ? findsOneWidget
-              : findsNothing,
-        );
+        expect(find.textContaining(product.seller), findsWidgets);
         expect(
           find.byKey(ValueKey('buy-shop-seller-action-${product.id}')),
           findsNothing,
         );
         expect(
           find.byKey(ValueKey('buy-wholesale-supplier-action-${product.id}')),
-          testCase.destination == BuyV2Destination.wholesale
-              ? findsOneWidget
-              : findsNothing,
+          findsNothing,
         );
 
         expect(session.addProduct(product.id), isTrue);
@@ -2096,14 +2084,15 @@ void main() {
     },
   );
 
-  testWidgets('Account and assist return to the exact purchase depth', (
+  testWidgets('Account and shared Chat preserve the exact purchase depth', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
+    var chatOpens = 0;
     final product = BuyV2Catalogue.products.firstWhere(
       (item) => item.destination == BuyV2Destination.wholesale,
     );
-    await tester.pumpWidget(app(session));
+    await tester.pumpWidget(app(session, onOpenChat: () => chatOpens += 1));
     session.openProduct(product.id);
     await tester.pumpAndSettle();
 
@@ -2128,9 +2117,7 @@ void main() {
     );
     await tester.tap(trackingHelp);
     await tester.pumpAndSettle();
-    expect(session.view, BuyV2View.assist);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
+    expect(chatOpens, 1);
     expect(session.destination, BuyV2Destination.orders);
     expect(session.view, BuyV2View.tracking);
     expect(session.selectedOrder.id, 'MS-240782');
@@ -3020,20 +3007,24 @@ void main() {
       final product = session.visibleProducts.first;
       final card = find.byKey(ValueKey('buy-product-${product.id}'));
       final add = find.byKey(ValueKey('buy-add-${product.id}'));
+      final fullPromise = buyV2BuyerDeliveryPromise(
+        session.productFactsFor(product),
+      );
+      final promisedMinutes = RegExp(r'(\d+)\s*min').firstMatch(fullPromise);
+      expect(promisedMinutes, isNotNull);
       final promise = find.descendant(
         of: card,
-        matching: find.text(
-          buyV2BuyerDeliveryPromise(session.productFactsFor(product)),
-        ),
+        matching: find.textContaining('${promisedMinutes!.group(1)} min'),
       );
 
       expect(add, findsOneWidget);
       expect(promise, findsOneWidget);
-      expect(find.textContaining(product.seller), findsNothing);
+      expect(find.textContaining(product.seller), findsOneWidget);
       final cardRect = tester.getRect(card);
       expect(cardRect.contains(tester.getCenter(add)), isTrue);
       expect(cardRect.contains(tester.getCenter(promise)), isTrue);
-      expect(tester.getSize(add), const Size(44, 44));
+      expect(tester.getSize(add).height, 44);
+      expect(tester.getSize(add).width, greaterThanOrEqualTo(60));
     },
   );
 
@@ -3359,6 +3350,11 @@ void main() {
     await tester.pumpAndSettle();
 
     final download = find.byKey(ValueKey('buy-download-invoice-${order.id}'));
+    await tester.scrollUntilVisible(
+      download,
+      240,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(download, findsOneWidget);
     expect(tester.getSize(download).height, 48);
     await tester.tap(download);
@@ -3413,9 +3409,15 @@ void main() {
       expect(_forbiddenBuyCopy.hasMatch(invoiceCopy), isFalse);
       expect(tester.takeException(), isNull);
 
-      await tester.tap(
-        find.byKey(ValueKey('buy-download-invoice-${order.id}')),
+      final download = find.byKey(ValueKey('buy-download-invoice-${order.id}'));
+      await tester.scrollUntilVisible(
+        download,
+        240,
+        scrollable: find.byType(Scrollable).last,
       );
+      await tester.ensureVisible(download);
+      await tester.pumpAndSettle();
+      await tester.tap(download);
       await tester.pumpAndSettle();
       expect(
         find.text(
@@ -3567,7 +3569,8 @@ void main() {
       final action = tester.getRect(
         find.byKey(ValueKey('buy-add-${product.id}')),
       );
-      expect(action.size, const Size(44, 44));
+      expect(action.height, 44);
+      expect(action.width, greaterThanOrEqualTo(60));
       expect(rect.contains(action.center), isTrue);
       expect(tester.takeException(), isNull);
     },
@@ -3947,18 +3950,23 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
-    String progressLabel() => tester
-        .widget<Semantics>(
-          find.byKey(const ValueKey('buy-horizontal-product-grid')),
-        )
-        .properties
-        .label!;
-
-    expect(progressLabel(), contains('Showing 8 of 12'));
+    expect(find.byKey(const ValueKey('buy-featured-products')), findsOneWidget);
+    expect(
+      find.byKey(
+        ValueKey('buy-featured-product-${session.visibleProducts.first.id}'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
     await tester.pumpAndSettle();
-    expect(progressLabel(), contains('Showing 8 of 12'));
+    expect(find.byKey(const ValueKey('buy-featured-products')), findsOneWidget);
+    expect(
+      find.byKey(
+        ValueKey('buy-featured-product-${session.visibleProducts.first.id}'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const ValueKey('buy-local-tab-orders')));
     await tester.pumpAndSettle();
@@ -3969,6 +3977,12 @@ void main() {
       240,
       scrollable: scrollableWithin(const PageStorageKey('buy-orders')),
     );
+    String progressLabel() => tester
+        .widget<Semantics>(
+          find.byKey(const ValueKey('buy-horizontal-product-grid')),
+        )
+        .properties
+        .label!;
     expect(progressLabel(), contains('Showing 8 of 18'));
 
     await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
