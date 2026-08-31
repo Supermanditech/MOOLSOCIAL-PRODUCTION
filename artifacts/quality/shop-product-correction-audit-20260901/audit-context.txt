@@ -1,0 +1,2 @@
+Rejected evidence source: Cursor r61.80 on Redmi TG8HCYTGGQT885OF.
+Read-only audit before corrective source work.
