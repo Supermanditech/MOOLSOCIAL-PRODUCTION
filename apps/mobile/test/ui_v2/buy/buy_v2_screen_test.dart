@@ -3938,12 +3938,20 @@ void main() {
     );
     expect(session.quantityFor('w-oil'), 2);
 
-    await tester.drag(
-      find.byKey(const PageStorageKey('buy-offers')),
-      const Offset(0, -180),
+    final tomatoAdd = find.byKey(const ValueKey('buy-add-s-tomato'));
+    await tester.scrollUntilVisible(
+      tomatoAdd,
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const PageStorageKey('buy-offers')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
+    await tester.ensureVisible(tomatoAdd);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('buy-add-s-tomato')));
+    await tester.tap(tomatoAdd);
     await tester.pumpAndSettle();
     expect(session.quantityFor('s-tomato'), 1);
     expect(session.itemCount, 3);

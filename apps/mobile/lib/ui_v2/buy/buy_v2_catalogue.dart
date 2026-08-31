@@ -5224,7 +5224,7 @@ class _FeaturedProductRail extends StatelessWidget {
     };
     return SizedBox(
       key: const ValueKey('buy-featured-products'),
-      height: accessibleText ? 338 : 302,
+      height: accessibleText ? 362 : 322,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -5607,6 +5607,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
         child: Semantics(
           label:
               '${product.title}, ${product.pack}, ${buyV2Money(facts.price)}, '
+              '${product.unitPrice}, '
               '${buyV2FulfilmentModeLabel(fulfilmentMode)}, '
               '$buyerPromise${automaticFulfilment ? ', ${facts.partner}, ${offerDecision!.statusLabel}' : ', fulfilled by ${facts.partner}'}',
           button: true,
@@ -5631,7 +5632,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      flex: 6,
+                      flex: 5,
                       child: Stack(
                         children: [
                           Positioned.fill(
@@ -5660,7 +5661,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                       ),
                     ),
                     Expanded(
-                      flex: 5,
+                      flex: 6,
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
                         child: Column(
@@ -5685,18 +5686,36 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                               style: context.buyMeta.copyWith(fontSize: 8),
                             ),
                             const SizedBox(height: 2),
-                            Text(
-                              buyV2Money(facts.price),
-                              style: const TextStyle(
-                                color: BuyV2Colors.navy,
-                                fontSize: 16,
-                                height: 1,
-                                fontWeight: FontWeight.w900,
-                              ),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  buyV2Money(facts.price),
+                                  style: const TextStyle(
+                                    color: BuyV2Colors.navy,
+                                    fontSize: 16,
+                                    height: 1,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    product.unitPrice,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.clip,
+                                    style: context.buyMeta.copyWith(
+                                      fontSize: 7.5,
+                                      height: 1,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${facts.partner} · ${_sellerTypeLabel(product.sellerType)}',
+                              facts.partner,
                               maxLines: 2,
                               overflow: TextOverflow.clip,
                               style: const TextStyle(
@@ -5704,6 +5723,17 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                                 fontSize: 7.5,
                                 height: 1.05,
                                 fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              _sellerTypeLabel(product.sellerType),
+                              maxLines: 1,
+                              overflow: TextOverflow.clip,
+                              style: const TextStyle(
+                                color: BuyV2Colors.muted,
+                                fontSize: 7,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -5971,6 +6001,7 @@ class BuyV2ProductCard extends StatelessWidget {
       child: Semantics(
         label:
             '${product.title}, ${product.pack}, ${buyV2Money(facts.price)}, '
+            '${product.unitPrice}, '
             '${buyV2FulfilmentModeLabel(fulfilmentMode)}, '
             '$buyerPromise${automaticFulfilment ? ', ${facts.partner}, ${offerDecision!.statusLabel}' : ', fulfilled by ${facts.partner}'}',
         button: true,
@@ -6054,14 +6085,34 @@ class BuyV2ProductCard extends StatelessWidget {
                               const SizedBox(height: 2)
                             else
                               const Spacer(),
-                            Text(
-                              buyV2Money(facts.price),
-                              style: TextStyle(
-                                color: BuyV2Colors.navy,
-                                fontSize: compact ? 16 : 18,
-                                height: 1,
-                                fontWeight: FontWeight.w900,
-                              ),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  buyV2Money(facts.price),
+                                  style: TextStyle(
+                                    color: BuyV2Colors.navy,
+                                    fontSize: compact ? 16 : 18,
+                                    height: 1,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                if (compact) ...[
+                                  const SizedBox(width: 3),
+                                  Flexible(
+                                    child: Text(
+                                      product.unitPrice,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.clip,
+                                      style: context.buyMeta.copyWith(
+                                        fontSize: 7,
+                                        height: 1,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                             if (!compact)
                               Text(
@@ -6180,7 +6231,10 @@ class BuyV2ProductCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            SizedBox(height: compact ? 2 : 6),
+                            if (compact)
+                              const Spacer()
+                            else
+                              const SizedBox(height: 6),
                             AnimatedSwitcher(
                               duration: BuyV2Motion.resolved(
                                 context,

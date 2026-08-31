@@ -102,9 +102,25 @@ void main() {
         expect(
           find.descendant(
             of: firstCard,
+            matching: find.text(products[0].unitPrice),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: firstCard,
             matching: find.textContaining('12 min'),
           ),
           findsOneWidget,
+        );
+        final add = find.descendant(
+          of: firstCard,
+          matching: find.byKey(ValueKey('buy-add-shell-${products[0].id}')),
+        );
+        expect(
+          firstRect.bottom - tester.getRect(add).bottom,
+          lessThanOrEqualTo(4),
+          reason: '$size must not leave a dead block below Add',
         );
         expect(tester.takeException(), isNull, reason: '$size overflow');
 
@@ -236,14 +252,62 @@ void main() {
       final card = find.byKey(ValueKey('buy-product-${product.id}')).first;
       expect(card, findsOneWidget);
       expect(
-        find.descendant(
-          of: card,
-          matching: find.textContaining(product.seller),
-        ),
+        find.descendant(of: card, matching: find.text(product.seller)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.text(product.sellerType)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.text(product.unitPrice)),
         findsOneWidget,
       );
       expect(
         find.descendant(of: card, matching: find.textContaining('12 min')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Fresh picks preserves complete seller facts at 140 percent text',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(360, 800),
+              textScaler: TextScaler.linear(1.4),
+            ),
+            child: BuyV2Screen(session: session),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final product = session.product('s-tomato');
+      final card = find.byKey(ValueKey('buy-product-${product.id}')).first;
+      expect(
+        find.descendant(of: card, matching: find.text(product.seller)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.text(product.sellerType)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.text(product.unitPrice)),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);

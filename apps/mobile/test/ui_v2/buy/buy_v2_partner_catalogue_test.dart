@@ -153,6 +153,8 @@ void main() {
           )
           .first,
     );
+    await tester.ensureVisible(add);
+    await tester.pumpAndSettle();
     expect(add, findsOneWidget);
     expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
     expect(
@@ -204,6 +206,8 @@ void main() {
             )
             .first,
       );
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
       await tester.tap(add);
       await tester.pumpAndSettle();
 
