@@ -124,6 +124,7 @@ void main() {
     final browseMore = find.byKey(
       const ValueKey('buy-more-products-browse-categories'),
     );
+    final semantics = tester.ensureSemantics();
     await tester.scrollUntilVisible(
       browseMore,
       220,
@@ -134,9 +135,10 @@ void main() {
           )
           .first,
     );
-    await tester.tap(browseMore);
+    tester.semantics.tap(find.semantics.byLabel('Browse categories').last);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('buy-category-sheet-route')), findsOne);
     expect(tester.takeException(), isNull);
+    semantics.dispose();
   });
 }

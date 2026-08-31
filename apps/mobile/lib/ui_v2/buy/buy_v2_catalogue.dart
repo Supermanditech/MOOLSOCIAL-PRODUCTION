@@ -4918,7 +4918,7 @@ class _FeaturedProductRail extends StatelessWidget {
     };
     return SizedBox(
       key: const ValueKey('buy-featured-products'),
-      height: accessibleText ? 310 : 290,
+      height: accessibleText ? 286 : 266,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -4935,16 +4935,43 @@ class _FeaturedProductRail extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                TextButton.icon(
+                Semantics(
                   key: const ValueKey('buy-featured-browse-categories'),
-                  onPressed: () => showBuyV2CategoryPicker(context, session),
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(44, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    foregroundColor: BuyV2Colors.navy,
+                  button: true,
+                  label: 'Browse categories',
+                  onTap: () => showBuyV2CategoryPicker(context, session),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => showBuyV2CategoryPicker(context, session),
+                      borderRadius: BorderRadius.circular(9),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 2,
+                          vertical: 4,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Swipe to explore',
+                              style: context.buyMeta.copyWith(
+                                color: BuyV2Colors.navy,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 14,
+                              color: BuyV2Colors.navy,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 14),
-                  label: const Text('Browse categories'),
                 ),
               ],
             ),
@@ -5186,16 +5213,43 @@ class _CatalogueSectionHeader extends StatelessWidget {
               style: context.buyTitle.copyWith(fontSize: 15),
             ),
           ),
-          TextButton.icon(
+          Semantics(
             key: const ValueKey('buy-more-products-browse-categories'),
-            onPressed: () => showBuyV2CategoryPicker(context, session),
-            style: TextButton.styleFrom(
-              minimumSize: const Size(44, 36),
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              foregroundColor: BuyV2Colors.navy,
+            button: true,
+            label: 'Browse categories',
+            onTap: () => showBuyV2CategoryPicker(context, session),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => showBuyV2CategoryPicker(context, session),
+                borderRadius: BorderRadius.circular(9),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 2,
+                    vertical: 4,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Swipe for more',
+                        style: context.buyMeta.copyWith(
+                          color: BuyV2Colors.navy,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 14,
+                        color: BuyV2Colors.navy,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-            icon: const Icon(Icons.arrow_forward_rounded, size: 14),
-            label: const Text('Browse categories'),
           ),
         ],
       ),
