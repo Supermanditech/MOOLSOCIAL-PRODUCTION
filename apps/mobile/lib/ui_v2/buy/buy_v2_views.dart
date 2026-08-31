@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../features/buy/buy_v2_cart_contracts.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
+import '../../features/buy/buy_v2_order_resolution_contracts.dart';
 import '../../features/buy/buy_v2_saved_products_store.dart';
 import '../../features/buy/buy_v2_session.dart';
 import '../../features/journey01/journey_services.dart';
@@ -8676,6 +8677,25 @@ class BuyV2TrackingView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
+        SizedBox(
+          height: BuyV2Metrics.minimumTap,
+          child: OutlinedButton.icon(
+            key: ValueKey('buy-tracking-manage-order-${order.id}'),
+            onPressed: () => showBuyV2OrderResolutionSheet(
+              context,
+              session: session,
+              order: order,
+              onOpenSupport: () => onOpenOrderHelp(order),
+            ),
+            icon: const Icon(Icons.assignment_return_outlined, size: 18),
+            label: Text(
+              order.status == BuyV2OrderStatus.delivered
+                  ? 'Return, replace or refund'
+                  : 'Manage order',
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
         if (order.invoiceAvailable)
           SizedBox(
             height: 44,
@@ -8728,6 +8748,298 @@ class BuyV2TrackingView extends StatelessWidget {
       ],
     );
   }
+}
+
+Future<void> showBuyV2OrderResolutionSheet(
+  BuildContext context, {
+  required BuyV2Session session,
+  required BuyV2Order order,
+  required VoidCallback onOpenSupport,
+}) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetContext) => _BuyV2OrderResolutionSheet(
+      session: session,
+      order: order,
+      onOpenSupport: onOpenSupport,
+    ),
+  );
+}
+
+class _BuyV2OrderResolutionSheet extends StatefulWidget {
+  const _BuyV2OrderResolutionSheet({
+    required this.session,
+    required this.order,
+    required this.onOpenSupport,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Order order;
+  final VoidCallback onOpenSupport;
+
+  @override
+  State<_BuyV2OrderResolutionSheet> createState() =>
+      _BuyV2OrderResolutionSheetState();
+}
+
+class _BuyV2OrderResolutionSheetState
+    extends State<_BuyV2OrderResolutionSheet> {
+  BuyV2OrderResolutionKind? selectedKind;
+  String? selectedReason;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.session.orderResolutionFor(widget.order.id) == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(widget.session.refreshOrderResolution(widget.order.id));
+        }
+      });
+    }
+  }
+
+  void openSupport() {
+    final action = widget.onOpenSupport;
+    Navigator.of(context).pop();
+    Future<void>.microtask(action);
+  }
+
+  Future<void> submit() async {
+    final kind = selectedKind;
+    final reason = selectedReason;
+    if (kind == null || reason == null) return;
+    final accepted = await widget.session.submitOrderResolution(
+      orderId: widget.order.id,
+      kind: kind,
+      reason: reason,
+    );
+    if (accepted && mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.session,
+      builder: (context, _) {
+        final snapshot = widget.session.orderResolutionFor(widget.order.id);
+        final busy = widget.session.orderResolutionBusy(widget.order.id);
+        final result = widget.session.orderResolutionResultFor(widget.order.id);
+        final ready = snapshot?.state == BuyV2OrderResolutionState.ready;
+        final options = ready
+            ? snapshot!.options
+            : const <BuyV2OrderResolutionOption>[];
+        final selectedOption = options
+            .where((option) => option.kind == selectedKind)
+            .firstOrNull;
+        return SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            key: const ValueKey('buy-order-resolution-sheet'),
+            padding: EdgeInsets.fromLTRB(
+              14,
+              0,
+              14,
+              18 +
+                  MediaQuery.viewPaddingOf(context).bottom +
+                  MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  widget.order.status == BuyV2OrderStatus.delivered
+                      ? 'Return, replace or refund'
+                      : 'Manage order',
+                  style: context.buyTitle.copyWith(fontSize: 19),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Order ${widget.order.id} · ${widget.order.itemSummary}',
+                  style: context.buyMeta,
+                ),
+                const SizedBox(height: 12),
+                if (snapshot == null ||
+                    snapshot.state == BuyV2OrderResolutionState.loading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: CircularProgressIndicator(strokeWidth: 3),
+                    ),
+                  )
+                else if (!ready) ...[
+                  Container(
+                    key: const ValueKey('buy-order-resolution-unavailable'),
+                    padding: const EdgeInsets.all(12),
+                    decoration: buyV2CardDecoration(
+                      color: BuyV2Colors.softOrange,
+                      radius: 15,
+                    ),
+                    child: Text(
+                      snapshot.customerMessage ??
+                          'Order changes are unavailable right now.',
+                      style: context.buyBody,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    key: const ValueKey('buy-order-resolution-retry'),
+                    onPressed: busy
+                        ? null
+                        : () => widget.session.refreshOrderResolution(
+                            widget.order.id,
+                          ),
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Try again'),
+                  ),
+                  const SizedBox(height: 7),
+                  FilledButton.icon(
+                    key: const ValueKey('buy-order-resolution-support'),
+                    onPressed: openSupport,
+                    icon: const Icon(Icons.chat_outlined),
+                    label: const Text('Contact support'),
+                  ),
+                ] else ...[
+                  Text('Choose what you need', style: context.buyBody),
+                  const SizedBox(height: 7),
+                  for (final option in options) ...[
+                    _OrderResolutionOptionTile(
+                      option: option,
+                      selected: option.kind == selectedKind,
+                      onTap: () => setState(() {
+                        selectedKind = option.kind;
+                        selectedReason = null;
+                      }),
+                    ),
+                    const SizedBox(height: 7),
+                  ],
+                  if (selectedOption != null) ...[
+                    const SizedBox(height: 3),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey(
+                        'buy-order-resolution-reason-${selectedOption.kind.name}',
+                      ),
+                      initialValue: selectedReason,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Reason',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        for (final reason in selectedOption.reasons)
+                          DropdownMenuItem(
+                            value: reason,
+                            child: Text(
+                              reason,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: busy
+                          ? null
+                          : (value) => setState(() => selectedReason = value),
+                    ),
+                    const SizedBox(height: 10),
+                    FilledButton(
+                      key: const ValueKey('buy-order-resolution-submit'),
+                      onPressed: busy || selectedReason == null ? null : submit,
+                      child: Text(busy ? 'Sending…' : 'Submit request'),
+                    ),
+                  ],
+                  if (result != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      result.customerMessage,
+                      key: const ValueKey('buy-order-resolution-result'),
+                      style: context.buyMeta.copyWith(
+                        color: result.accepted
+                            ? BuyV2Colors.green
+                            : BuyV2Colors.orange,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: openSupport,
+                    icon: const Icon(Icons.chat_outlined),
+                    label: const Text('Contact support instead'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _OrderResolutionOptionTile extends StatelessWidget {
+  const _OrderResolutionOptionTile({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final BuyV2OrderResolutionOption option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    selected: selected,
+    label: '${option.title}. ${option.detail}',
+    child: InkWell(
+      key: ValueKey('buy-order-resolution-${option.kind.name}'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 58),
+        padding: const EdgeInsets.all(10),
+        decoration: buyV2CardDecoration(
+          color: selected ? BuyV2Colors.softBlue : Colors.white,
+          radius: 14,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color: BuyV2Colors.navy,
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    option.title,
+                    style: context.buyBody.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(option.detail, style: context.buyMeta),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 typedef BuyV2AssistChatHandler =

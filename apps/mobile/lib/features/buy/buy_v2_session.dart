@@ -6,6 +6,7 @@ import 'buy_session.dart';
 import 'buy_v2_cart_contracts.dart';
 import 'buy_v2_content_contracts.dart';
 import 'buy_v2_models.dart';
+import 'buy_v2_order_resolution_contracts.dart';
 import 'buy_v2_search_relevance.dart';
 import 'buy_v2_saved_products_store.dart';
 
@@ -327,6 +328,7 @@ class BuyV2Session extends ChangeNotifier {
     this.checkoutQuoteAdapter,
     this.balancePaymentAdapter,
     this.deliveryExceptionAdapter,
+    BuyV2OrderResolutionAdapter? orderResolutionAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
     bool? reviewDataEnabled,
   }) : cartBenefitsAdapter =
@@ -348,7 +350,13 @@ class BuyV2Session extends ChangeNotifier {
            ((reviewDataEnabled ??
                    (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
                ? const _BuyV2DeviceReviewCommerceAdapter()
-               : const _BuyV2UnavailableCommerceAdapter()) {
+               : const _BuyV2UnavailableCommerceAdapter()),
+       orderResolutionAdapter =
+           orderResolutionAdapter ??
+           ((reviewDataEnabled ??
+                   (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
+               ? const BuyV2UiReviewOrderResolutionAdapter()
+               : const BuyV2UnavailableOrderResolutionAdapter()) {
     if (cartBenefitsAdapter is BuyV2LiveCartBenefitsAdapter) {
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.idle;
     }
@@ -387,6 +395,7 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2CheckoutQuoteAdapter? checkoutQuoteAdapter;
   final BuyV2BalancePaymentAdapter? balancePaymentAdapter;
   final BuyV2DeliveryExceptionAdapter? deliveryExceptionAdapter;
+  final BuyV2OrderResolutionAdapter orderResolutionAdapter;
   final BuyV2CommerceAdapter commerceAdapter;
   final bool reviewDataEnabled;
 
@@ -625,6 +634,10 @@ class BuyV2Session extends ChangeNotifier {
   final Set<String> _orderRefreshBusyIds = {};
   final Map<String, BuyV2CommerceLoadState> _orderRefreshStates = {};
   final Map<String, String> _orderRefreshMessages = {};
+  final Map<String, BuyV2OrderResolutionSnapshot> _orderResolutionSnapshots =
+      {};
+  final Map<String, BuyV2OrderResolutionResult> _orderResolutionResults = {};
+  final Set<String> _orderResolutionBusyIds = {};
   final Map<String, BuyV2BalancePaymentResult> _balancePaymentResults = {};
   final Set<String> _balancePaymentBusyOrderIds = {};
   int _balancePaymentAttemptSequence = 0;
@@ -3887,6 +3900,152 @@ class BuyV2Session extends ChangeNotifier {
         .whereType<BuyV2Product>()
         .where((product) => product.destination == order.destination)
         .toList(growable: false);
+  }
+
+  BuyV2OrderResolutionSnapshot? orderResolutionFor(String orderId) =>
+      _orderResolutionSnapshots[orderId];
+
+  BuyV2OrderResolutionResult? orderResolutionResultFor(String orderId) =>
+      _orderResolutionResults[orderId];
+
+  bool orderResolutionBusy(String orderId) =>
+      _orderResolutionBusyIds.contains(orderId);
+
+  Future<bool> refreshOrderResolution(String orderId) async {
+    final order = _orders
+        .where((candidate) => candidate.id == orderId)
+        .firstOrNull;
+    if (order == null || _orderResolutionBusyIds.contains(orderId)) {
+      return false;
+    }
+    _orderResolutionBusyIds.add(orderId);
+    _orderResolutionSnapshots[orderId] = BuyV2OrderResolutionSnapshot(
+      orderId: orderId,
+      state: BuyV2OrderResolutionState.loading,
+      sourceId: 'loading',
+    );
+    notifyListeners();
+    try {
+      final snapshot = await orderResolutionAdapter.load(order);
+      _orderResolutionSnapshots[orderId] = _validOrderResolutionSnapshot(
+        order,
+        snapshot,
+      );
+      return _orderResolutionSnapshots[orderId]!.state ==
+          BuyV2OrderResolutionState.ready;
+    } on Object {
+      _orderResolutionSnapshots[orderId] = BuyV2OrderResolutionSnapshot(
+        orderId: orderId,
+        state: BuyV2OrderResolutionState.unavailable,
+        sourceId: 'order-resolution-error',
+        customerMessage:
+            'Order changes could not be checked. Try again or contact support.',
+      );
+      return false;
+    } finally {
+      _orderResolutionBusyIds.remove(orderId);
+      notifyListeners();
+    }
+  }
+
+  BuyV2OrderResolutionSnapshot _validOrderResolutionSnapshot(
+    BuyV2Order order,
+    BuyV2OrderResolutionSnapshot snapshot,
+  ) {
+    if (snapshot.orderId != order.id || snapshot.sourceId.trim().isEmpty) {
+      return BuyV2OrderResolutionSnapshot(
+        orderId: order.id,
+        state: BuyV2OrderResolutionState.unavailable,
+        sourceId: 'invalid-order-resolution',
+        customerMessage:
+            'Order changes are unavailable right now. Contact support for help.',
+      );
+    }
+    if (snapshot.state != BuyV2OrderResolutionState.ready) return snapshot;
+    final kinds = <BuyV2OrderResolutionKind>{};
+    final options = snapshot.options
+        .where((option) {
+          final allowed = switch (option.kind) {
+            BuyV2OrderResolutionKind.cancel =>
+              order.status == BuyV2OrderStatus.preparing ||
+                  order.status == BuyV2OrderStatus.confirmed,
+            BuyV2OrderResolutionKind.returnItems ||
+            BuyV2OrderResolutionKind.replacement ||
+            BuyV2OrderResolutionKind.refund =>
+              order.status == BuyV2OrderStatus.delivered,
+          };
+          return allowed &&
+              kinds.add(option.kind) &&
+              option.title.trim().isNotEmpty &&
+              option.detail.trim().isNotEmpty &&
+              option.reasons.isNotEmpty &&
+              option.reasons.every((reason) => reason.trim().isNotEmpty);
+        })
+        .toList(growable: false);
+    if (options.isEmpty) {
+      return BuyV2OrderResolutionSnapshot(
+        orderId: order.id,
+        state: BuyV2OrderResolutionState.unavailable,
+        sourceId: snapshot.sourceId,
+        customerMessage:
+            snapshot.customerMessage ??
+            'This order cannot be changed at its current stage. Contact support for help.',
+      );
+    }
+    return BuyV2OrderResolutionSnapshot(
+      orderId: order.id,
+      state: BuyV2OrderResolutionState.ready,
+      sourceId: snapshot.sourceId,
+      options: List.unmodifiable(options),
+      customerMessage: snapshot.customerMessage,
+    );
+  }
+
+  Future<bool> submitOrderResolution({
+    required String orderId,
+    required BuyV2OrderResolutionKind kind,
+    required String reason,
+  }) async {
+    final cleanReason = reason.trim();
+    final snapshot = _orderResolutionSnapshots[orderId];
+    final option = snapshot?.options
+        .where((candidate) => candidate.kind == kind)
+        .firstOrNull;
+    if (snapshot?.state != BuyV2OrderResolutionState.ready ||
+        option == null ||
+        !option.reasons.contains(cleanReason) ||
+        _orderResolutionBusyIds.contains(orderId)) {
+      notice = 'Choose an available request and reason to continue.';
+      notifyListeners();
+      return false;
+    }
+    _orderResolutionBusyIds.add(orderId);
+    notifyListeners();
+    try {
+      final result = await orderResolutionAdapter.submit(
+        BuyV2OrderResolutionRequest(
+          orderId: orderId,
+          kind: kind,
+          reason: cleanReason,
+        ),
+      );
+      final valid =
+          result.customerMessage.trim().isNotEmpty &&
+          (!result.accepted || (result.reference?.trim().isNotEmpty ?? false));
+      if (!valid) {
+        notice = 'This request could not be confirmed. Try again.';
+        return false;
+      }
+      _orderResolutionResults[orderId] = result;
+      notice = result.accepted ? result.customerMessage : null;
+      return result.accepted;
+    } on Object {
+      notice = 'This request could not be sent. Try again or contact support.';
+      return false;
+    } finally {
+      _orderResolutionBusyIds.remove(orderId);
+      notifyListeners();
+    }
   }
 
   void toggleTrackingAlerts() {
