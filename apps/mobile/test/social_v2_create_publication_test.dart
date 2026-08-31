@@ -1442,6 +1442,7 @@ void main() {
         expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
         final draft = find.byKey(const Key('screen04-create-draft-entry'));
         await tester.ensureVisible(draft);
+        await tester.pumpAndSettle();
         await tester.tap(draft);
         await tester.pumpAndSettle();
         expect(

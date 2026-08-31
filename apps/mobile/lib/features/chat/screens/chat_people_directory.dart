@@ -586,20 +586,6 @@ class _PeopleEmpty extends StatelessWidget {
                   icon: const Icon(Icons.close_rounded),
                   label: const Text('Clear search'),
                 ),
-                FilledButton.icon(
-                  key: Key(
-                    connectedOnly
-                        ? 'chat-people-empty-discover'
-                        : 'chat-people-empty-open-feed',
-                  ),
-                  onPressed: connectedOnly ? onDiscover : onOpenFeed,
-                  icon: Icon(
-                    connectedOnly
-                        ? Icons.person_search_outlined
-                        : Icons.dynamic_feed_outlined,
-                  ),
-                  label: Text(connectedOnly ? 'Discover' : 'Open Feed'),
-                ),
               ],
             )
           else if (publicFeedOpened) ...[

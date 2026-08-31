@@ -835,10 +835,6 @@ void main() {
       );
       expect(find.text('No matching people'), findsOneWidget);
       expect(clearEmptySearch, findsOneWidget);
-      expect(
-        find.byKey(const Key('chat-people-empty-discover')),
-        findsOneWidget,
-      );
       final media = MediaQuery.of(tester.element(clearEmptySearch));
       expect(
         tester.getBottomRight(clearEmptySearch).dy,

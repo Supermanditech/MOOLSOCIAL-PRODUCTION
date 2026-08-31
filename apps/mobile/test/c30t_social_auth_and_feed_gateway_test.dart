@@ -254,6 +254,7 @@ void main() {
       Key('screen04-create-photo-entry'),
       Key('screen04-create-carousel-entry'),
       Key('screen04-create-poll-entry'),
+      Key('screen04-create-image-poll-entry'),
       Key('screen04-create-quiz-entry'),
     ]) {
       expect(find.byKey(key), findsOneWidget);

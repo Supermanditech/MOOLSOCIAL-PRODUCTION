@@ -127,8 +127,8 @@ void main() {
     expect(publish, findsOneWidget);
     expect(text, findsOneWidget);
     expect(formats, findsOneWidget);
+    expect(carousel, findsNothing);
     expect(tester.getSemantics(formats).rect.height, greaterThanOrEqualTo(44));
-    expect(tester.getSemantics(carousel).rect.height, greaterThanOrEqualTo(44));
     expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
     expect(find.byType(Screen04Header), findsNothing);
 

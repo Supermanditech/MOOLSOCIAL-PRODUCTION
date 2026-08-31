@@ -3656,13 +3656,26 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                   width: width,
                   child: _SocialCreateFormatTile(
                     key: const Key('screen04-create-poll-entry'),
-                    title: 'Poll',
-                    detail: 'Invite people into a useful live choice',
+                    title: 'Quick Poll',
+                    detail: 'Ask one question with four clear choices',
                     icon: Icons.poll_outlined,
                     accent: Color(0xFF07856A),
                     badge: 'Conversation',
                     enabled: !hasUserContent,
                     onTap: () => _openCreateEditor('quick-poll'),
+                  ),
+                ),
+                SizedBox(
+                  width: width,
+                  child: _SocialCreateFormatTile(
+                    key: const Key('screen04-create-image-poll-entry'),
+                    title: 'Image Poll',
+                    detail: 'Let people choose between four visual options',
+                    icon: Icons.grid_view_rounded,
+                    accent: Color(0xFF006A78),
+                    badge: 'Visual vote',
+                    enabled: !hasUserContent,
+                    onTap: () => _openCreateEditor('image-poll'),
                   ),
                 ),
                 SizedBox(

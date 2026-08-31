@@ -16,6 +16,15 @@ enum SocialCreateIntentV2 { text, image, carousel, imagePoll, quickPoll, quiz }
 
 enum _SocialPostTool { none, image, imagePoll, quickPoll, quiz }
 
+typedef _KeyboardCreateAction = ({
+  Key key,
+  Key? ownerKey,
+  IconData icon,
+  String label,
+  bool selected,
+  VoidCallback onTap,
+});
+
 class SocialCreateDraftV2 {
   bool _initialized = false;
   SocialCreateFormatV2 _format = SocialCreateFormatV2.post;
@@ -419,19 +428,39 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     });
   }
 
-  Future<void> _selectFormat(SocialCreateFormatV2 format) async {
-    if (format == SocialCreateFormatV2.reel && !widget.allowReel) return;
+  Future<void> _selectIntent(SocialCreateIntentV2 intent) async {
+    final nextFormat = intent == SocialCreateIntentV2.carousel
+        ? SocialCreateFormatV2.carousel
+        : SocialCreateFormatV2.post;
+    final nextTool = switch (intent) {
+      SocialCreateIntentV2.image => _SocialPostTool.image,
+      SocialCreateIntentV2.imagePoll => _SocialPostTool.imagePoll,
+      SocialCreateIntentV2.quickPoll => _SocialPostTool.quickPoll,
+      SocialCreateIntentV2.quiz => _SocialPostTool.quiz,
+      _ => _SocialPostTool.none,
+    };
+    if (_format == nextFormat && _postTool == nextTool) {
+      if (nextTool != _SocialPostTool.image) _bodyFocus.requestFocus();
+      return;
+    }
     HapticFeedback.selectionClick();
     setState(() {
       _invalidateMediaSelection();
-      _format = format;
-      if (format != SocialCreateFormatV2.post) _postTool = _SocialPostTool.none;
+      _format = nextFormat;
+      _postTool = nextTool;
+      if (nextFormat == SocialCreateFormatV2.post &&
+          nextTool != _SocialPostTool.image) {
+        _media.clear();
+      }
       _persistDraftState();
     });
-    if (format == SocialCreateFormatV2.post) {
-      _bodyFocus.requestFocus();
-    } else if (format == SocialCreateFormatV2.carousel && _media.length < 2) {
+    if (nextTool == _SocialPostTool.image) {
+      await _choosePostImage();
+    } else if (nextFormat == SocialCreateFormatV2.carousel &&
+        _media.length < 2) {
       await _chooseCarousel();
+    } else {
+      _bodyFocus.requestFocus();
     }
   }
 
@@ -586,22 +615,6 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       if (mounted && request == _mediaSelectionRequest) {
         setState(() => _selectingMedia = false);
       }
-    }
-  }
-
-  void _selectPostTool(_SocialPostTool tool) {
-    HapticFeedback.selectionClick();
-    setState(() {
-      _invalidateMediaSelection();
-      _format = SocialCreateFormatV2.post;
-      _postTool = _postTool == tool ? _SocialPostTool.none : tool;
-      if (_postTool != _SocialPostTool.image) _media.clear();
-      _persistDraftState();
-    });
-    if (_postTool == _SocialPostTool.image) {
-      _choosePostImage();
-    } else {
-      _bodyFocus.requestFocus();
     }
   }
 
@@ -1056,6 +1069,16 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                 ),
               ),
             ),
+            Material(
+              key: const Key('screen04-create-format-decision'),
+              color: Colors.white,
+              elevation: 1,
+              shadowColor: const Color(0x18000050),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
+                child: _buildFormatDecisionBar(keyboardOpen),
+              ),
+            ),
             Expanded(
               child: SingleChildScrollView(
                 key: const Key('screen04-create-scrollable-composer'),
@@ -1063,38 +1086,6 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
                 child: _buildWorkbenchCard(),
-              ),
-            ),
-            Material(
-              key: const Key('screen04-create-thumb-workbench'),
-              color: Colors.white,
-              elevation: 12,
-              shadowColor: const Color(0x26000050),
-              child: SafeArea(
-                top: false,
-                bottom: !keyboardOpen,
-                minimum: EdgeInsets.only(bottom: keyboardOpen ? 4 : 20),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 5, 8, 3),
-                  child: AnimatedSwitcher(
-                    key: const Key('screen04-create-ime-workbench-switcher'),
-                    duration: const Duration(milliseconds: 160),
-                    reverseDuration: const Duration(milliseconds: 120),
-                    child: keyboardOpen
-                        ? _buildKeyboardFormatStrip()
-                        : Column(
-                            key: const ValueKey('create-full-format-workbench'),
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_format == SocialCreateFormatV2.post) ...[
-                                _buildPostToolActions(),
-                                const SizedBox(height: 5),
-                              ],
-                              _buildFormatActions(),
-                            ],
-                          ),
-                  ),
-                ),
               ),
             ),
           ],
@@ -1113,15 +1104,16 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     _ => 'New text post',
   };
 
-  Widget _buildKeyboardFormatStrip() {
+  Widget _buildFormatDecisionBar(bool keyboardOpen) {
     Widget compactAction({
       required Key key,
       required IconData icon,
       required String label,
       required bool selected,
       required VoidCallback onTap,
+      double width = 94,
     }) => SizedBox(
-      width: 94,
+      width: width,
       child: _FormatAction(
         key: key,
         icon: icon,
@@ -1131,126 +1123,146 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       ),
     );
 
-    final actions =
-        <
-          ({
-            Key key,
-            Key? ownerKey,
-            IconData icon,
-            String label,
-            bool selected,
-            VoidCallback onTap,
-          })
-        >[
-          (
-            key: const Key('screen04-create-tool-post'),
-            ownerKey: const Key('social-create-moolsocial-post'),
-            icon: Icons.edit_note_rounded,
-            label: 'Text',
-            selected:
-                _format == SocialCreateFormatV2.post &&
-                _postTool == _SocialPostTool.none,
-            onTap: () => _selectFormat(SocialCreateFormatV2.post),
-          ),
-          (
-            key: const Key('screen04-create-tool-carousel'),
-            ownerKey: null,
-            icon: Icons.view_carousel_outlined,
-            label: 'Carousel',
-            selected: _format == SocialCreateFormatV2.carousel,
-            onTap: () => _selectFormat(SocialCreateFormatV2.carousel),
-          ),
-          (
-            key: const Key('screen04-create-tool-image'),
-            ownerKey: null,
-            icon: Icons.image_outlined,
-            label: 'Image',
-            selected:
-                _format == SocialCreateFormatV2.post &&
-                _postTool == _SocialPostTool.image,
-            onTap: () => _selectPostTool(_SocialPostTool.image),
-          ),
-          (
-            key: const Key('screen04-create-tool-image-poll'),
-            ownerKey: null,
-            icon: Icons.grid_view_rounded,
-            label: 'Image Poll',
-            selected:
-                _format == SocialCreateFormatV2.post &&
-                _postTool == _SocialPostTool.imagePoll,
-            onTap: () => _selectPostTool(_SocialPostTool.imagePoll),
-          ),
-          (
-            key: const Key('screen04-create-tool-quick-poll'),
-            ownerKey: null,
-            icon: Icons.poll_outlined,
-            label: 'Quick Poll',
-            selected:
-                _format == SocialCreateFormatV2.post &&
-                _postTool == _SocialPostTool.quickPoll,
-            onTap: () => _selectPostTool(_SocialPostTool.quickPoll),
-          ),
-          (
-            key: const Key('screen04-create-tool-quiz'),
-            ownerKey: null,
-            icon: Icons.check_circle_outline_rounded,
-            label: 'Quiz',
-            selected:
-                _format == SocialCreateFormatV2.post &&
-                _postTool == _SocialPostTool.quiz,
-            onTap: () => _selectPostTool(_SocialPostTool.quiz),
-          ),
-        ];
+    final actions = <_KeyboardCreateAction>[
+      (
+        key: const Key('screen04-create-tool-post'),
+        ownerKey: const Key('social-create-moolsocial-post'),
+        icon: Icons.edit_note_rounded,
+        label: 'Text',
+        selected:
+            _format == SocialCreateFormatV2.post &&
+            _postTool == _SocialPostTool.none,
+        onTap: () => _selectIntent(SocialCreateIntentV2.text),
+      ),
+      (
+        key: const Key('screen04-create-tool-carousel'),
+        ownerKey: null,
+        icon: Icons.view_carousel_outlined,
+        label: 'Carousel',
+        selected: _format == SocialCreateFormatV2.carousel,
+        onTap: () => _selectIntent(SocialCreateIntentV2.carousel),
+      ),
+      (
+        key: const Key('screen04-create-tool-image'),
+        ownerKey: null,
+        icon: Icons.image_outlined,
+        label: 'Image',
+        selected:
+            _format == SocialCreateFormatV2.post &&
+            _postTool == _SocialPostTool.image,
+        onTap: () => _selectIntent(SocialCreateIntentV2.image),
+      ),
+      (
+        key: const Key('screen04-create-tool-image-poll'),
+        ownerKey: null,
+        icon: Icons.grid_view_rounded,
+        label: 'Image Poll',
+        selected:
+            _format == SocialCreateFormatV2.post &&
+            _postTool == _SocialPostTool.imagePoll,
+        onTap: () => _selectIntent(SocialCreateIntentV2.imagePoll),
+      ),
+      (
+        key: const Key('screen04-create-tool-quick-poll'),
+        ownerKey: null,
+        icon: Icons.poll_outlined,
+        label: 'Quick Poll',
+        selected:
+            _format == SocialCreateFormatV2.post &&
+            _postTool == _SocialPostTool.quickPoll,
+        onTap: () => _selectIntent(SocialCreateIntentV2.quickPoll),
+      ),
+      (
+        key: const Key('screen04-create-tool-quiz'),
+        ownerKey: null,
+        icon: Icons.check_circle_outline_rounded,
+        label: 'Quiz',
+        selected:
+            _format == SocialCreateFormatV2.post &&
+            _postTool == _SocialPostTool.quiz,
+        onTap: () => _selectIntent(SocialCreateIntentV2.quiz),
+      ),
+      if (widget.allowReel)
+        (
+          key: const Key('screen04-create-tool-reel'),
+          ownerKey: null,
+          icon: Icons.play_arrow_rounded,
+          label: 'Reel',
+          selected: _format == SocialCreateFormatV2.reel,
+          onTap: _openReelSourcePicker,
+        ),
+      if (widget.onCreateYouTubeShort != null)
+        (
+          key: const Key('screen04-create-youtube-short'),
+          ownerKey: null,
+          icon: Icons.play_circle_outline_rounded,
+          label: 'YouTube Short',
+          selected: false,
+          onTap: widget.onCreateYouTubeShort!,
+        ),
+    ];
     final orderedActions = [
       ...actions.where((action) => action.selected),
       ...actions.where((action) => !action.selected),
     ];
 
-    return SizedBox(
-      key: const ValueKey('create-keyboard-format-workbench'),
-      height: 52,
-      child: Row(
-        children: [
-          Expanded(
-            child: ListView(
-              key: const Key('screen04-create-ime-format-strip'),
-              scrollDirection: Axis.horizontal,
-              children: [
-                for (var index = 0; index < orderedActions.length; index++) ...[
-                  if (orderedActions[index].ownerKey case final ownerKey?)
-                    KeyedSubtree(
-                      key: ownerKey,
-                      child: compactAction(
-                        key: orderedActions[index].key,
-                        icon: orderedActions[index].icon,
-                        label: orderedActions[index].label,
-                        selected: orderedActions[index].selected,
-                        onTap: orderedActions[index].onTap,
-                      ),
-                    )
-                  else
-                    compactAction(
-                      key: orderedActions[index].key,
-                      icon: orderedActions[index].icon,
-                      label: orderedActions[index].label,
-                      selected: orderedActions[index].selected,
-                      onTap: orderedActions[index].onTap,
-                    ),
-                  if (index < orderedActions.length - 1)
-                    const SizedBox(width: 6),
-                ],
-              ],
+    Widget action(_KeyboardCreateAction value, {required double width}) {
+      final child = compactAction(
+        key: value.key,
+        icon: value.icon,
+        label: value.label,
+        selected: value.selected,
+        onTap: value.onTap,
+        width: width,
+      );
+      final ownerKey = value.ownerKey;
+      return ownerKey == null
+          ? child
+          : KeyedSubtree(key: ownerKey, child: child);
+    }
+
+    if (keyboardOpen) {
+      final active = orderedActions.first;
+      return SizedBox(
+        key: const ValueKey('create-keyboard-format-workbench'),
+        height: 52,
+        child: Row(
+          children: [
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: KeyedSubtree(
+                  key: const Key('screen04-create-ime-format-strip'),
+                  child: action(active, width: 146),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          IconButton.filledTonal(
-            key: const Key('screen04-create-keyboard-done'),
-            tooltip: 'Hide keyboard',
-            onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
-            icon: const Icon(Icons.keyboard_hide_rounded),
-          ),
-        ],
-      ),
+            const SizedBox(width: 6),
+            IconButton.filledTonal(
+              key: const Key('screen04-create-keyboard-done'),
+              tooltip: 'Hide keyboard',
+              onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
+              icon: const Icon(Icons.keyboard_hide_rounded),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      key: const Key('screen04-create-ime-format-strip'),
+      builder: (context, constraints) {
+        const gap = 6.0;
+        final width = (constraints.maxWidth - (gap * 2)) / 3;
+        return Wrap(
+          key: const ValueKey('create-keyboard-format-workbench'),
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final value in orderedActions) action(value, width: width),
+          ],
+        );
+      },
     );
   }
 
@@ -1359,59 +1371,6 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       'Build curiosity, then reveal the right answer clearly.',
     _ => 'Write an insight people will want to read and respond to.',
   };
-
-  Widget _buildFormatActions() {
-    return Row(
-      children: [
-        if (widget.onCreateYouTubeShort != null) ...[
-          Expanded(
-            child: _FormatAction(
-              key: const Key('screen04-create-youtube-short'),
-              icon: Icons.play_circle_outline_rounded,
-              label: 'YouTube Short',
-              selected: false,
-              onTap: widget.onCreateYouTubeShort!,
-            ),
-          ),
-          const SizedBox(width: 6),
-        ],
-        if (widget.allowReel) ...[
-          Expanded(
-            child: _FormatAction(
-              key: const Key('screen04-create-tool-reel'),
-              icon: Icons.play_arrow_rounded,
-              label: 'Reel',
-              selected: _format == SocialCreateFormatV2.reel,
-              onTap: _openReelSourcePicker,
-            ),
-          ),
-          const SizedBox(width: 6),
-        ],
-        Expanded(
-          child: _FormatAction(
-            key: const Key('screen04-create-tool-carousel'),
-            icon: Icons.view_carousel_outlined,
-            label: 'Carousel',
-            selected: _format == SocialCreateFormatV2.carousel,
-            onTap: () => _selectFormat(SocialCreateFormatV2.carousel),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: KeyedSubtree(
-            key: const Key('social-create-moolsocial-post'),
-            child: _FormatAction(
-              key: const Key('screen04-create-tool-post'),
-              icon: Icons.edit_note_rounded,
-              label: 'Text',
-              selected: _format == SocialCreateFormatV2.post,
-              onTap: () => _selectFormat(SocialCreateFormatV2.post),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildPost() {
     final question =
@@ -1683,61 +1642,6 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
           _buildTextChoices(quiz: _postTool == _SocialPostTool.quiz),
         ],
       ],
-    );
-  }
-
-  Widget _buildPostToolActions() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const gap = 5.0;
-        final width = (constraints.maxWidth - (gap * 3)) / 4;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: [
-            SizedBox(
-              width: width,
-              child: _ToolAction(
-                key: const Key('screen04-create-tool-image'),
-                icon: Icons.image_outlined,
-                label: 'Image',
-                selected: _postTool == _SocialPostTool.image,
-                onTap: () => _selectPostTool(_SocialPostTool.image),
-              ),
-            ),
-            SizedBox(
-              width: width,
-              child: _ToolAction(
-                key: const Key('screen04-create-tool-image-poll'),
-                icon: Icons.grid_view_rounded,
-                label: 'Image Poll',
-                selected: _postTool == _SocialPostTool.imagePoll,
-                onTap: () => _selectPostTool(_SocialPostTool.imagePoll),
-              ),
-            ),
-            SizedBox(
-              width: width,
-              child: _ToolAction(
-                key: const Key('screen04-create-tool-quick-poll'),
-                icon: Icons.poll_outlined,
-                label: 'Quick Poll',
-                selected: _postTool == _SocialPostTool.quickPoll,
-                onTap: () => _selectPostTool(_SocialPostTool.quickPoll),
-              ),
-            ),
-            SizedBox(
-              width: width,
-              child: _ToolAction(
-                key: const Key('screen04-create-tool-quiz'),
-                icon: Icons.check_circle_outline_rounded,
-                label: 'Quiz',
-                selected: _postTool == _SocialPostTool.quiz,
-                onTap: () => _selectPostTool(_SocialPostTool.quiz),
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -2425,70 +2329,6 @@ class _SelectedMediaLine extends StatelessWidget {
           ),
           TextButton(onPressed: onTap, child: Text(action)),
         ],
-      ),
-    );
-  }
-}
-
-class _ToolAction extends StatelessWidget {
-  const _ToolAction({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final additionalHeight = textScale > 1 ? (textScale - 1) * 14.0 : 0.0;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      child: Material(
-        color: selected ? const Color(0x10000080) : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-          side: BorderSide(
-            color: selected ? SocialV2Colors.navy : SocialV2Colors.line,
-          ),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(15),
-          child: SizedBox(
-            height: 56.0 + additionalHeight,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, size: 18, color: SocialV2Colors.navy),
-                  const SizedBox(height: 2),
-                  Text(
-                    label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: SocialV2Colors.navy,
-                      fontSize: 9.5,
-                      height: 1.02,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
