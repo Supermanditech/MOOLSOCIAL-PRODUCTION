@@ -774,6 +774,33 @@ void main() {
       );
     },
   );
+
+  test('RT-04C-01 UI review does not wait on unavailable durability', () async {
+    var settles = 0;
+    final review = await confirmSocialCreateDraftFlush(
+      persisted: true,
+      reviewPreviewEnabled: true,
+      authenticated: false,
+      settleDurable: () async {
+        settles += 1;
+        return false;
+      },
+    );
+    expect(review, isTrue);
+    expect(settles, 0);
+
+    final production = await confirmSocialCreateDraftFlush(
+      persisted: true,
+      reviewPreviewEnabled: false,
+      authenticated: true,
+      settleDurable: () async {
+        settles += 1;
+        return true;
+      },
+    );
+    expect(production, isTrue);
+    expect(settles, 1);
+  });
 }
 
 Future<void> _pumpConsumer(

@@ -63,6 +63,31 @@ bool acceptSocialCreateDraftFlush({
   required bool authenticated,
 }) => persisted && (durable || (reviewPreviewEnabled && !authenticated));
 
+@visibleForTesting
+Future<bool> confirmSocialCreateDraftFlush({
+  required bool persisted,
+  required bool reviewPreviewEnabled,
+  required bool authenticated,
+  required Future<bool> Function() settleDurable,
+}) async {
+  if (acceptSocialCreateDraftFlush(
+    persisted: persisted,
+    durable: false,
+    reviewPreviewEnabled: reviewPreviewEnabled,
+    authenticated: authenticated,
+  )) {
+    return true;
+  }
+  if (!persisted) return false;
+  final durable = await settleDurable();
+  return acceptSocialCreateDraftFlush(
+    persisted: true,
+    durable: durable,
+    reviewPreviewEnabled: reviewPreviewEnabled,
+    authenticated: authenticated,
+  );
+}
+
 enum SocialV2ShareOutcome { selected, dismissed, unavailable }
 
 @immutable
@@ -1591,13 +1616,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         return _persistCreateDraft(request);
       },
     );
-    if (!persisted) return false;
-    final durable = await _createDraftStateCache.settleDurableWritesConfirmed();
-    return acceptSocialCreateDraftFlush(
+    return confirmSocialCreateDraftFlush(
       persisted: persisted,
-      durable: durable,
       reviewPreviewEnabled: widget.enableCreateReviewPreview,
       authenticated: widget.session.isAuthenticated,
+      settleDurable: _createDraftStateCache.settleDurableWritesConfirmed,
     );
   }
 
