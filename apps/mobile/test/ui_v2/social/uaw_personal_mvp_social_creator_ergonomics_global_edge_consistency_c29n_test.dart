@@ -138,7 +138,11 @@ void main() {
     final imeWorkbench = find.byKey(
       const Key('create-keyboard-format-workbench'),
     );
+    final bottomComposer = find.byKey(
+      const Key('screen04-create-bottom-composer'),
+    );
     expect(imeWorkbench, findsOneWidget);
+    expect(bottomComposer, findsOneWidget);
     expect(
       tester.getSize(imeWorkbench).height,
       lessThanOrEqualTo(52),
@@ -150,6 +154,15 @@ void main() {
     );
     expect(tester.getBottomRight(publish).dy, lessThanOrEqualTo(keyboardTop));
     expect(tester.getBottomRight(formats).dy, lessThanOrEqualTo(keyboardTop));
+    expect(
+      tester.getBottomRight(bottomComposer).dy,
+      lessThanOrEqualTo(keyboardTop),
+    );
+    expect(
+      tester.getBottomRight(bottomComposer).dy,
+      greaterThanOrEqualTo(keyboardTop - 1),
+      reason: 'The writing composer must stay docked directly above the IME.',
+    );
     expect(find.text('New text post'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -199,7 +212,14 @@ void main() {
       final keyboardTop = 568 - 240;
       expect(
         tester.getBottomRight(lastChoice).dy,
-        lessThanOrEqualTo(keyboardTop),
+        lessThanOrEqualTo(
+          tester
+              .getTopLeft(
+                find.byKey(const Key('screen04-create-bottom-composer')),
+              )
+              .dy,
+        ),
+        reason: 'Poll choices must scroll above the docked composer and IME.',
       );
       expect(
         tester

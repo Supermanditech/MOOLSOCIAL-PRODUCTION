@@ -1069,12 +1069,36 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
               ),
             ),
             Expanded(
-              child: SingleChildScrollView(
-                key: const Key('screen04-create-scrollable-composer'),
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-                child: _buildWorkbenchCard(),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      key: const Key('screen04-create-scrollable-composer'),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+                      child: _buildWorkbenchCard(),
+                    ),
+                  ),
+                  Material(
+                    key: const Key('screen04-create-bottom-composer'),
+                    color: Colors.white,
+                    elevation: 8,
+                    shadowColor: const Color(0x28000050),
+                    child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          8,
+                          keyboardOpen ? 5 : 8,
+                          8,
+                          keyboardOpen ? 5 : 8,
+                        ),
+                        child: _buildWritingComposer(keyboardOpen),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1338,7 +1362,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
               ),
               const SizedBox(height: 9),
             ],
-            _buildPost(),
+            _buildFormatWorkspace(),
           ],
         ),
       ),
@@ -1361,170 +1385,178 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     _ => 'Write an insight people will want to read and respond to.',
   };
 
-  Widget _buildPost() {
-    final keyboardOpen = View.of(context).viewInsets.bottom > 0;
+  Widget _buildWritingComposer(bool keyboardOpen) {
     final question =
         _format == SocialCreateFormatV2.post &&
         (_postTool == _SocialPostTool.imagePoll ||
             _postTool == _SocialPostTool.quickPoll ||
             _postTool == _SocialPostTool.quiz);
+    return Container(
+      key: const Key('screen04-create-writing-canvas'),
+      padding: EdgeInsets.fromLTRB(
+        12,
+        keyboardOpen ? 6 : 11,
+        12,
+        keyboardOpen ? 4 : 8,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFDADBE8)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!keyboardOpen) ...[
+              Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 19,
+                    backgroundColor: SocialV2Colors.navy,
+                    foregroundColor: Colors.white,
+                    child: Icon(Icons.person_rounded, size: 19),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.authorName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: SocialV2Colors.navy,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          widget.authorHandle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: SocialV2Colors.muted,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.public_rounded,
+                    color: SocialV2Colors.green,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Public',
+                    style: TextStyle(
+                      color: SocialV2Colors.green,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+            TextField(
+              key: const Key('screen04-create-post-text'),
+              controller: _body,
+              focusNode: _bodyFocus,
+              minLines: keyboardOpen ? 1 : 4,
+              maxLines: keyboardOpen ? 5 : 10,
+              maxLength: 1200,
+              scrollPadding: const EdgeInsets.only(bottom: 104),
+              textCapitalization: TextCapitalization.sentences,
+              keyboardAppearance: Brightness.light,
+              style: const TextStyle(
+                color: SocialV2Colors.navy,
+                fontSize: 16,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: InputDecoration(
+                hintText: switch (_format) {
+                  SocialCreateFormatV2.reel => 'Give people a reason to watch…',
+                  SocialCreateFormatV2.carousel =>
+                    'What connects this swipe story?',
+                  SocialCreateFormatV2.post =>
+                    question
+                        ? _postTool == _SocialPostTool.quiz
+                              ? 'What will make people curious?'
+                              : 'Ask one clear, useful question…'
+                        : 'Share a moment, insight or question…',
+                },
+                counterText: '',
+                hintStyle: const TextStyle(
+                  color: Color(0xFF8B8DA4),
+                  fontSize: 16,
+                  height: 1.35,
+                  fontWeight: FontWeight.w500,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            if (!keyboardOpen) ...[
+              const Divider(height: 14),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final actions = <Widget>[
+                    _CreateCanvasInlineAction(
+                      key: const Key('screen04-create-inline-emoji'),
+                      icon: Icons.emoji_emotions_outlined,
+                      label: 'Emoji',
+                      onTap: () => unawaited(_openEmojiPalette()),
+                    ),
+                    _CreateCanvasInlineAction(
+                      key: const Key('screen04-create-inline-mention'),
+                      icon: Icons.alternate_email_rounded,
+                      label: 'Mention',
+                      onTap: () => _insertComposerText('@'),
+                    ),
+                    _CreateCanvasInlineAction(
+                      key: const Key('screen04-create-inline-topic'),
+                      icon: Icons.tag_rounded,
+                      label: 'Topic',
+                      onTap: () => _insertComposerText('#'),
+                    ),
+                    _CreateCanvasInlineAction(
+                      key: const Key('screen04-create-inline-gif'),
+                      icon: Icons.gif_box_outlined,
+                      label: 'GIF',
+                      onTap: _showGifAvailability,
+                    ),
+                  ];
+                  final width = (constraints.maxWidth - 18) / 4;
+                  return Wrap(
+                    spacing: 6,
+                    children: [
+                      for (final action in actions)
+                        SizedBox(width: width, child: action),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormatWorkspace() {
     return Column(
       key: const ValueKey('screen04-create-post-workbench'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          key: const Key('screen04-create-writing-canvas'),
-          padding: const EdgeInsets.fromLTRB(12, 11, 12, 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFDADBE8)),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 19,
-                      backgroundColor: SocialV2Colors.navy,
-                      foregroundColor: Colors.white,
-                      child: Icon(Icons.person_rounded, size: 19),
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.authorName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: SocialV2Colors.navy,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          Text(
-                            widget.authorHandle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: SocialV2Colors.muted,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.public_rounded,
-                      color: SocialV2Colors.green,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'Public',
-                      style: TextStyle(
-                        color: SocialV2Colors.green,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  key: const Key('screen04-create-post-text'),
-                  controller: _body,
-                  focusNode: _bodyFocus,
-                  minLines: 4,
-                  maxLines: 10,
-                  maxLength: 1200,
-                  scrollPadding: const EdgeInsets.only(bottom: 104),
-                  textCapitalization: TextCapitalization.sentences,
-                  keyboardAppearance: Brightness.light,
-                  style: const TextStyle(
-                    color: SocialV2Colors.navy,
-                    fontSize: 16,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: switch (_format) {
-                      SocialCreateFormatV2.reel =>
-                        'Give people a reason to watch…',
-                      SocialCreateFormatV2.carousel =>
-                        'What connects this swipe story?',
-                      SocialCreateFormatV2.post =>
-                        question
-                            ? _postTool == _SocialPostTool.quiz
-                                  ? 'What will make people curious?'
-                                  : 'Ask one clear, useful question…'
-                            : 'Share a moment, insight or question…',
-                    },
-                    counterText: '',
-                    hintStyle: const TextStyle(
-                      color: Color(0xFF8B8DA4),
-                      fontSize: 16,
-                      height: 1.35,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-                if (!keyboardOpen) ...[
-                  const Divider(height: 14),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final actions = <Widget>[
-                        _CreateCanvasInlineAction(
-                          key: const Key('screen04-create-inline-emoji'),
-                          icon: Icons.emoji_emotions_outlined,
-                          label: 'Emoji',
-                          onTap: () => unawaited(_openEmojiPalette()),
-                        ),
-                        _CreateCanvasInlineAction(
-                          key: const Key('screen04-create-inline-mention'),
-                          icon: Icons.alternate_email_rounded,
-                          label: 'Mention',
-                          onTap: () => _insertComposerText('@'),
-                        ),
-                        _CreateCanvasInlineAction(
-                          key: const Key('screen04-create-inline-topic'),
-                          icon: Icons.tag_rounded,
-                          label: 'Topic',
-                          onTap: () => _insertComposerText('#'),
-                        ),
-                        _CreateCanvasInlineAction(
-                          key: const Key('screen04-create-inline-gif'),
-                          icon: Icons.gif_box_outlined,
-                          label: 'GIF',
-                          onTap: _showGifAvailability,
-                        ),
-                      ];
-                      final width = (constraints.maxWidth - 18) / 4;
-                      return Wrap(
-                        spacing: 6,
-                        children: [
-                          for (final action in actions)
-                            SizedBox(width: width, child: action),
-                        ],
-                      );
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
         if (_postTool == _SocialPostTool.image && _media.isNotEmpty) ...[
           const SizedBox(height: 8),
           AspectRatio(
