@@ -928,6 +928,7 @@ class _ProductQuickActionButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: label,
+      onTap: onPressed,
       excludeSemantics: true,
       child: InkWell(
         onTap: onPressed,

@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsAction;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -112,9 +114,17 @@ void main() {
       findsOneWidget,
     );
     for (final label in const ['Save', 'Share', 'Compare', 'Ask seller']) {
+      final semanticAction = find.descendant(
+        of: actions,
+        matching: find.bySemanticsLabel(label),
+      );
+      expect(semanticAction, findsOneWidget);
       expect(
-        find.descendant(of: actions, matching: find.bySemanticsLabel(label)),
-        findsOneWidget,
+        tester
+            .getSemantics(semanticAction)
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
       );
     }
 
