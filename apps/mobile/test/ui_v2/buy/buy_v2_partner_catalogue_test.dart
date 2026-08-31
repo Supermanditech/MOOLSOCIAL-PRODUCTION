@@ -257,6 +257,7 @@ void main() {
         const ValueKey('buy-shop-seller-full-catalogue-list'),
       );
       expect(fullCatalogue, findsOneWidget);
+      expect(tester.getSize(fullCatalogue).height, lessThan(650));
       expect(find.text('Safe Protein Store'), findsWidgets);
       final fullEggs = find
           .descendant(

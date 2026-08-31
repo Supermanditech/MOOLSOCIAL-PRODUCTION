@@ -3227,7 +3227,7 @@ Future<String?> _showBuyV2FullStoreCatalogue(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     builder: (sheetContext) => FractionallySizedBox(
-      heightFactor: .98,
+      heightFactor: products.length >= 6 ? .98 : .64,
       child: SafeArea(
         top: false,
         child: ListView(
