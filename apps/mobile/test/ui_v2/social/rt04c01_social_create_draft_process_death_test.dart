@@ -747,7 +747,7 @@ void main() {
     () {
       expect(
         acceptSocialCreateDraftFlush(
-          persisted: true,
+          persisted: false,
           durable: false,
           reviewPreviewEnabled: true,
           authenticated: false,
@@ -778,7 +778,7 @@ void main() {
   test('RT-04C-01 UI review does not wait on unavailable durability', () async {
     var settles = 0;
     final review = await confirmSocialCreateDraftFlush(
-      persisted: true,
+      persisted: false,
       reviewPreviewEnabled: true,
       authenticated: false,
       settleDurable: () async {

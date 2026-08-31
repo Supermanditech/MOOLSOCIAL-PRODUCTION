@@ -61,7 +61,7 @@ bool acceptSocialCreateDraftFlush({
   required bool durable,
   required bool reviewPreviewEnabled,
   required bool authenticated,
-}) => persisted && (durable || (reviewPreviewEnabled && !authenticated));
+}) => (reviewPreviewEnabled && !authenticated) || (persisted && durable);
 
 @visibleForTesting
 Future<bool> confirmSocialCreateDraftFlush({
