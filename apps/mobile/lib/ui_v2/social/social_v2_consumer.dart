@@ -3076,6 +3076,11 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
             .where((item) => item.type != SocialPublishedContentType.reel)
             .where(
               (item) =>
+                  item.authorId == null ||
+                  !session.socialAuthorBlocked(item.authorId!),
+            )
+            .where(
+              (item) =>
                   normalizedFeedQuery.isEmpty ||
                   item.authorName.toLowerCase().contains(normalizedFeedQuery) ||
                   item.authorHandle.toLowerCase().contains(
@@ -7653,6 +7658,52 @@ class _SocialAuthorPanelV2State extends State<_SocialAuthorPanelV2> {
     );
   }
 
+  Future<void> _toggleBlock(SocialAuthorProfile profile) async {
+    if (!widget.authenticated) {
+      widget.onAuthenticationRequired();
+      return;
+    }
+    final blocked = widget.session.socialAuthorBlocked(_authorId);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: Key('social-author-block-confirm-$_authorId'),
+        title: Text(
+          blocked
+              ? 'Unblock ${profile.authorName}?'
+              : 'Block ${profile.authorName}?',
+        ),
+        content: Text(
+          blocked
+              ? 'Their public posts can appear again. Private messages still follow your message-request settings.'
+              : 'Their posts leave your Feed and Discover. They cannot start a new conversation with you while blocked.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            key: const Key('social-author-block-save'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(blocked ? 'Unblock' : 'Block'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    final saved = await widget.session.setSocialAuthorBlocked(
+      _authorId,
+      !blocked,
+    );
+    if (!mounted || saved) return;
+    showSocialV2Message(
+      context,
+      widget.session.socialBlockError(_authorId) ??
+          'The block setting did not change.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.session,
@@ -7660,7 +7711,11 @@ class _SocialAuthorPanelV2State extends State<_SocialAuthorPanelV2> {
       final profile = widget.session.socialAuthorProfile(_authorId);
       final loading = widget.session.socialAuthorLoading(_authorId);
       final followBusy = widget.session.socialFollowBusy(_authorId);
-      final error = widget.session.socialAuthorError(_authorId);
+      final blocked = widget.session.socialAuthorBlocked(_authorId);
+      final blockBusy = widget.session.socialBlockBusy(_authorId);
+      final error =
+          widget.session.socialBlockError(_authorId) ??
+          widget.session.socialAuthorError(_authorId);
       return Column(
         key: Key('social-author-panel-$_authorId'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -7734,11 +7789,13 @@ class _SocialAuthorPanelV2State extends State<_SocialAuthorPanelV2> {
                         Expanded(
                           child: FilledButton(
                             key: Key('social-author-follow-$_authorId'),
-                            onPressed: followBusy
+                            onPressed: followBusy || blocked
                                 ? null
                                 : () => _toggleFollow(profile),
                             child: Text(
-                              followBusy
+                              blocked
+                                  ? 'Blocked'
+                                  : followBusy
                                   ? 'Updating…'
                                   : profile.followed
                                   ? 'Unfollow'
@@ -7754,19 +7811,42 @@ class _SocialAuthorPanelV2State extends State<_SocialAuthorPanelV2> {
                             key: Key(
                               'social-author-message-request-$_authorId',
                             ),
-                            onPressed: widget.onRequestMessage,
+                            onPressed: blocked ? null : widget.onRequestMessage,
                             icon: const Icon(
                               Icons.mark_chat_unread_outlined,
                               size: 18,
                             ),
                             label: Text(
-                              widget.authenticated
+                              blocked
+                                  ? 'Blocked'
+                                  : widget.authenticated
                                   ? 'Request chat'
                                   : 'Sign in to message',
                             ),
                           ),
                         ),
                       ],
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        key: Key('social-author-block-$_authorId'),
+                        onPressed: blockBusy
+                            ? null
+                            : () => _toggleBlock(profile),
+                        icon: Icon(
+                          blocked
+                              ? Icons.lock_open_rounded
+                              : Icons.block_rounded,
+                        ),
+                        label: Text(
+                          blockBusy
+                              ? 'Updating…'
+                              : blocked
+                              ? 'Unblock profile'
+                              : 'Block profile',
+                        ),
+                      ),
                     ),
                   ],
                 ],

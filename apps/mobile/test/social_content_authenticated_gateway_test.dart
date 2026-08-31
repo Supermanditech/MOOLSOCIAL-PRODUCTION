@@ -577,6 +577,37 @@ void main() {
     expect(transport.headers.single['authorization'], 'Bearer id-token');
   });
 
+  test(
+    'Block author requires exact server-confirmed relationship state',
+    () async {
+      final credentials = _Credentials();
+      final transport = _Transport((body) {
+        expect(body, {
+          'operation': 'blockAuthor',
+          'authorId': 'author-1',
+          'blocked': true,
+        });
+        return jsonEncode({
+          'ok': true,
+          'data': {'authorId': 'author-1', 'blocked': true},
+        });
+      });
+      final gateway = AuthenticatedSocialContentGateway(
+        endpoint: Uri.parse(
+          'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialContent',
+        ),
+        credentials: credentials,
+        transport: transport,
+      );
+
+      expect(
+        await gateway.setAuthorBlocked(authorId: 'author-1', blocked: true),
+        isTrue,
+      );
+      expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse]);
+    },
+  );
+
   test('reply rejects an acknowledged post owned by another request', () async {
     final gateway = AuthenticatedSocialContentGateway(
       endpoint: Uri.parse(

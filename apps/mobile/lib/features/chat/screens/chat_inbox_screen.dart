@@ -276,6 +276,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     for (final item in social.socialPublishedItems) {
       final authorId = item.authorId?.trim();
       if (authorId == null || authorId.isEmpty) continue;
+      if (social.socialAuthorBlocked(authorId)) continue;
       final profile = social.socialAuthorProfile(authorId);
       if (profile?.isSelf == true) continue;
       peopleById.putIfAbsent(

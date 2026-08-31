@@ -90,6 +90,9 @@ class SharedSession extends ChangeNotifier {
   bool socialNotificationsHasMore = false;
   String? socialNotificationsError;
   final Set<String> _socialNotificationsReading = {};
+  final Set<String> _blockedSocialAuthors = {};
+  final Set<String> _socialBlocksInFlight = {};
+  final Map<String, String> _socialBlockErrors = {};
 
   List<SocialPublishedItem> get socialPublishedItems =>
       List<SocialPublishedItem>.unmodifiable(_socialPublishedItems);
@@ -174,6 +177,14 @@ class SharedSession extends ChangeNotifier {
 
   bool socialNotificationReading(String notificationId) =>
       _socialNotificationsReading.contains(notificationId);
+
+  bool socialAuthorBlocked(String authorId) =>
+      _blockedSocialAuthors.contains(authorId);
+
+  bool socialBlockBusy(String authorId) =>
+      _socialBlocksInFlight.contains(authorId);
+
+  String? socialBlockError(String authorId) => _socialBlockErrors[authorId];
 
   void saveSocialReplyDraft(String postId, String value) {
     if (value.isEmpty) {
@@ -655,6 +666,54 @@ class SharedSession extends ChangeNotifier {
     }
   }
 
+  Future<bool> setSocialAuthorBlocked(String authorId, bool blocked) async {
+    if (_socialBlocksInFlight.contains(authorId)) return false;
+    if (!online || !authorized) {
+      _socialBlockErrors[authorId] = !online
+          ? 'You are offline. The block setting did not change.'
+          : 'Sign in again before changing this block setting.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialModerationGateway;
+    if (gateway == null) {
+      _socialBlockErrors[authorId] =
+          'Blocking is unavailable right now. Nothing changed.';
+      notifyListeners();
+      return false;
+    }
+    _socialBlocksInFlight.add(authorId);
+    _socialBlockErrors.remove(authorId);
+    notifyListeners();
+    try {
+      final saved = await gateway.setAuthorBlocked(
+        authorId: authorId,
+        blocked: blocked,
+      );
+      if (saved != blocked) {
+        _socialBlockErrors[authorId] =
+            'MoolSocial could not confirm this block setting.';
+        return false;
+      }
+      if (blocked) {
+        _blockedSocialAuthors.add(authorId);
+      } else {
+        _blockedSocialAuthors.remove(authorId);
+      }
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      _socialBlockErrors[authorId] = error.message;
+      return false;
+    } on Object {
+      _socialBlockErrors[authorId] =
+          'The block setting could not change. Nothing changed.';
+      return false;
+    } finally {
+      _socialBlocksInFlight.remove(authorId);
+      notifyListeners();
+    }
+  }
+
   String filterFor(SharedScreenSpec spec) =>
       filters[spec.screen] ?? spec.filters.first;
 
@@ -722,6 +781,9 @@ class SharedSession extends ChangeNotifier {
     socialNotificationsHasMore = false;
     socialNotificationsError = null;
     _socialNotificationsReading.clear();
+    _blockedSocialAuthors.clear();
+    _socialBlocksInFlight.clear();
+    _socialBlockErrors.clear();
     notifyListeners();
   }
 

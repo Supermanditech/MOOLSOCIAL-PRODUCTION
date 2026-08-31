@@ -759,6 +759,77 @@ void main() {
     },
   );
 
+  testWidgets(
+    'C30T public profile Block and Unblock wait for acknowledgement',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final journey = JourneySession(
+        store: MemoryJourneyStore(snapshot: readySnapshot),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+      );
+      final creator = CreatorSession();
+      final retailer = RetailerSession();
+      final socialGateway = ReviewSocialContentGateway();
+      final shared = SharedSession(socialContentGateway: socialGateway);
+      addTearDown(journey.dispose);
+      addTearDown(creator.dispose);
+      addTearDown(retailer.dispose);
+      addTearDown(shared.dispose);
+      final item = await socialGateway.publish(
+        const SocialPublishDraft(
+          idempotencyKey: 'block-public-author',
+          type: SocialPublishedContentType.post,
+          authorName: 'Riya Sharma',
+          authorHandle: '@riyasharma',
+          body: 'A public post that can leave the Feed after blocking.',
+          audience: 'Public',
+          mediaPaths: <String>[],
+          mediaAreAssets: false,
+          choices: <SocialPublishedChoice>[],
+        ),
+      );
+      await journey.start();
+      await shared.loadSocialFeed(refresh: true);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SocialUniversalV2(
+            session: journey,
+            creatorSession: creator,
+            retailerSession: retailer,
+            sharedSession: shared,
+            initialSubAction: 'feed',
+            youtubePublicAccessOverride: false,
+            youtubeCreatorAccessOverride: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key('social-author-profile-${item.id}')));
+      await tester.pumpAndSettle();
+      final block = find.byKey(Key('social-author-block-${item.authorId}'));
+      await tester.ensureVisible(block);
+      await tester.tap(block);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('social-author-block-save')));
+      await tester.pumpAndSettle();
+
+      expect(shared.socialAuthorBlocked(item.authorId!), isTrue);
+      expect(socialGateway.blockedAuthors[item.authorId], isTrue);
+      expect(find.text('Unblock profile'), findsOneWidget);
+      await tester.tap(block);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('social-author-block-save')));
+      await tester.pumpAndSettle();
+      expect(shared.socialAuthorBlocked(item.authorId!), isFalse);
+      expect(socialGateway.blockedAuthors[item.authorId], isFalse);
+      expect(find.text('Block profile'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('C30T guest Report preserves the exact post action', (
     tester,
   ) async {

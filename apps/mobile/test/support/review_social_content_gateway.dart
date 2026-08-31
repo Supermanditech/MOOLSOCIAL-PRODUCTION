@@ -24,6 +24,7 @@ class ReviewSocialContentGateway
   int _commentSequence = 0;
   final List<(String, SocialReportReason, String)> reports = [];
   final Set<String> readNotifications = {};
+  final Map<String, bool> blockedAuthors = {};
 
   String? get latestItemId => _items.firstOrNull?.id;
 
@@ -249,6 +250,18 @@ class ReviewSocialContentGateway
     if (!reports.any((entry) => entry.$3 == idempotencyKey)) {
       reports.add((postId, reason, idempotencyKey));
     }
+  }
+
+  @override
+  Future<bool> setAuthorBlocked({
+    required String authorId,
+    required bool blocked,
+  }) async {
+    if (!_items.any((item) => item.authorId == authorId)) {
+      throw _authorNotFound();
+    }
+    blockedAuthors[authorId] = blocked;
+    return blocked;
   }
 
   SocialPublishedItem _vote(SocialPublishedItem item, int? choiceIndex) {

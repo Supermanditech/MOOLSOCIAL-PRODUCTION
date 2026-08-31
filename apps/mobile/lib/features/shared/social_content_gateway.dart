@@ -192,6 +192,11 @@ abstract interface class SocialModerationGateway {
     required SocialReportReason reason,
     required String idempotencyKey,
   });
+
+  Future<bool> setAuthorBlocked({
+    required String authorId,
+    required bool blocked,
+  });
 }
 
 abstract interface class SocialSavedGateway {
@@ -273,6 +278,12 @@ class UnavailableSocialContentGateway
     required SocialReportReason reason,
     required String idempotencyKey,
   }) => Future<void>.error(_unavailable());
+
+  @override
+  Future<bool> setAuthorBlocked({
+    required String authorId,
+    required bool blocked,
+  }) => Future<bool>.error(_unavailable());
 
   @override
   Future<SocialFeedPage> saved({String? cursor, int limit = 20}) =>
@@ -506,6 +517,12 @@ class UiReviewSocialContentGateway
     required SocialReportReason reason,
     required String idempotencyKey,
   }) => Future<void>.error(_writeUnavailable());
+
+  @override
+  Future<bool> setAuthorBlocked({
+    required String authorId,
+    required bool blocked,
+  }) => Future<bool>.error(_writeUnavailable());
 
   @override
   Future<SocialFeedPage> saved({String? cursor, int limit = 20}) async =>
@@ -926,6 +943,28 @@ class AuthenticatedSocialContentGateway
         message: 'MoolSocial could not confirm this report.',
       );
     }
+  }
+
+  @override
+  Future<bool> setAuthorBlocked({
+    required String authorId,
+    required bool blocked,
+  }) async {
+    final data = _map(
+      await _invoke(
+        'blockAuthor',
+        limitedUseAppCheck: true,
+        body: {'authorId': authorId, 'blocked': blocked},
+      ),
+    );
+    if (_requiredString(data['authorId']) != authorId ||
+        data['blocked'] != blocked) {
+      throw const SocialContentGatewayException(
+        code: 'invalid_response',
+        message: 'MoolSocial could not confirm this block setting.',
+      );
+    }
+    return blocked;
   }
 
   Future<Object?> _invoke(
