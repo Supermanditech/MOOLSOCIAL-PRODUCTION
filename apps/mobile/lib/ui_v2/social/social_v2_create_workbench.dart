@@ -1173,14 +1173,6 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
         onTap: () => _selectIntent(SocialCreateIntentV2.carousel),
       ),
       (
-        key: const Key('screen04-create-inline-gif'),
-        ownerKey: null,
-        icon: Icons.gif_box_outlined,
-        label: 'GIF',
-        selected: false,
-        onTap: _showGifAvailability,
-      ),
-      (
         key: const Key('screen04-create-tool-image-poll'),
         ownerKey: null,
         icon: Icons.grid_view_rounded,
@@ -1209,6 +1201,14 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
             _format == SocialCreateFormatV2.post &&
             _postTool == _SocialPostTool.quiz,
         onTap: () => _selectIntent(SocialCreateIntentV2.quiz),
+      ),
+      (
+        key: const Key('screen04-create-inline-gif'),
+        ownerKey: null,
+        icon: Icons.gif_box_outlined,
+        label: 'GIF',
+        selected: false,
+        onTap: _showGifAvailability,
       ),
       (
         key: const Key('screen04-create-inline-emoji'),

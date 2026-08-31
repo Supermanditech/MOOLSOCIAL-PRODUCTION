@@ -80,7 +80,7 @@ void main() {
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
+    tester.view.physicalSize = const Size(360, 800);
     addTearDown(tester.view.reset);
     final owners = _Owners();
     addTearDown(owners.dispose);
@@ -111,6 +111,19 @@ void main() {
         reason: '$key must keep a production touch target.',
       );
     }
+    expect(
+      tester
+          .getBottomRight(find.byKey(const Key('screen04-create-tool-quiz')))
+          .dx,
+      lessThanOrEqualTo(
+        tester
+            .getBottomRight(
+              find.byKey(const Key('screen04-create-ime-format-strip')),
+            )
+            .dx,
+      ),
+      reason: 'All seven primary Create formats must fit on a 360dp phone.',
+    );
     expect(
       find.byKey(const Key('screen04-create-youtube-short')),
       findsNothing,
