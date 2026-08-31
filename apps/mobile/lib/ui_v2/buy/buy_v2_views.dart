@@ -3983,6 +3983,15 @@ class _ProductFeedbackIdentity extends StatelessWidget {
   }
 }
 
+double _productFeedbackSheetHeight(BuildContext context) {
+  final media = MediaQuery.of(context);
+  return (media.size.height -
+          media.viewInsets.bottom -
+          media.viewPadding.vertical -
+          56)
+      .clamp(300.0, 460.0);
+}
+
 class _ProductReviewSheet extends StatefulWidget {
   const _ProductReviewSheet({
     required this.session,
@@ -4071,11 +4080,13 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
         label: '$routeTitle form',
         child: ConstrainedBox(
           key: const ValueKey('buy-product-review-sheet'),
-          constraints: const BoxConstraints(maxHeight: 620),
+          constraints: BoxConstraints.tightFor(
+            height: _productFeedbackSheetHeight(context),
+          ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _ProductFeedbackSheetHeader(
@@ -4356,11 +4367,13 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
       label: '$title form',
       child: ConstrainedBox(
         key: const ValueKey('buy-product-report-sheet'),
-        constraints: const BoxConstraints(maxHeight: 620),
+        constraints: BoxConstraints.tightFor(
+          height: _productFeedbackSheetHeight(context),
+        ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const _ProductFeedbackSheetHeader(

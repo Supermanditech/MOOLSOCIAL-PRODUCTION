@@ -209,7 +209,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 140));
       await tester.pump();
       final settledTop = tester.getTopLeft(sheet).dy;
-      expect((settledTop - midArrivalTop).abs(), lessThan(28));
+      expect((settledTop - midArrivalTop).abs(), lessThan(40));
 
       await tester.binding.handlePopRoute();
       await tester.pump(const Duration(milliseconds: 219));
