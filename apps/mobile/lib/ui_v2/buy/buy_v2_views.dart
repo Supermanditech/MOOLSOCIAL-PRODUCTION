@@ -439,7 +439,7 @@ class BuyV2ProductView extends StatelessWidget {
     final partnerProducts = switch (product.destination) {
       BuyV2Destination.shop ||
       BuyV2Destination.medicine => session.sellerContinuationsFor(product),
-      BuyV2Destination.wholesale ||
+      BuyV2Destination.wholesale => session.partnerCatalogueFor(product),
       BuyV2Destination.orders => const <BuyV2Product>[],
     };
     final rxBlocked =
@@ -458,7 +458,7 @@ class BuyV2ProductView extends StatelessWidget {
         Expanded(
           child: ListView(
             key: PageStorageKey('buy-product-${product.id}'),
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            padding: EdgeInsets.fromLTRB(10, 8, 10, wholesale ? 112 : 104),
             children: [
               _ReturnAffordance(
                 label: returnLabel ?? product.destination.label,
@@ -634,7 +634,6 @@ class BuyV2ProductView extends StatelessWidget {
                   buyerPromise: buyerPromise,
                   quantity: quantity,
                   onAdd: addProduct,
-                  onBuyNow: () => session.buyProductNow(product.id),
                   onDecrease: () => session.decrease(product.id),
                   onIncrease: () => session.increase(product.id),
                 )
@@ -785,7 +784,9 @@ class BuyV2ProductView extends StatelessWidget {
                 product: product,
                 trust: trust,
                 onViewSeller:
-                    product.destination == BuyV2Destination.shop &&
+                    (product.destination == BuyV2Destination.shop ||
+                            product.destination ==
+                                BuyV2Destination.wholesale) &&
                         partnerProducts.isNotEmpty &&
                         onOpenPartnerCatalogue != null
                     ? () => onOpenPartnerCatalogue!(product)
@@ -826,7 +827,6 @@ class BuyV2ProductView extends StatelessWidget {
             decision: offerDecision!,
             quantity: quantity,
             onAdd: addProduct,
-            onBuyNow: () => session.buyProductNow(product.id),
             onDecrease: () => session.decrease(product.id),
             onIncrease: () => session.increase(product.id),
             onRetryOffer: () => session.refreshProductFacts(product.id),
@@ -1684,28 +1684,16 @@ class _WholesaleTradeDecisionPanelState
               ),
               _DecisionRow(
                 icon: Icons.storefront_outlined,
-                label: 'Fulfilment',
-                value: buyV2AutomaticFulfilmentLabel(product.destination),
+                label: 'Seller',
+                value:
+                    '${facts.partner} · ${_sellerTypeLabel(product.sellerType)}',
               ),
-              if (supplierProducts.isEmpty ||
-                  widget.onOpenPartnerCatalogue == null)
-                _DecisionRow(
-                  icon: Icons.storefront_outlined,
-                  label: product.partnerRole,
-                  value: facts.partner,
-                )
-              else
-                _DecisionActionRow(
-                  key: ValueKey('buy-wholesale-supplier-action-${product.id}'),
-                  icon: Icons.storefront_outlined,
-                  label: 'Visit store',
-                  value: facts.partner,
-                  detail:
-                      '${supplierProducts.length} more current trade products',
-                  semanticLabel:
-                      'Visit ${facts.partner} for ${supplierProducts.length} more products',
-                  onTap: () => widget.onOpenPartnerCatalogue!(product),
-                ),
+              _DecisionRow(
+                icon: Icons.storefront_outlined,
+                label: 'Seller',
+                value:
+                    '${facts.partner} · ${_sellerTypeLabel(product.sellerType)}',
+              ),
               _DecisionRow(
                 icon: Icons.local_shipping_outlined,
                 label: 'Freight',
@@ -1849,7 +1837,7 @@ class _WholesaleTradePriceSummary extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${product.pack} · ${product.unitPrice} · MoolSocial price',
+                '${product.pack} · ${product.unitPrice} · ${facts.partner}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 10,
@@ -2041,7 +2029,6 @@ class _WholesaleTradeActionDock extends StatelessWidget {
     required this.decision,
     required this.quantity,
     required this.onAdd,
-    required this.onBuyNow,
     required this.onDecrease,
     required this.onIncrease,
     required this.onRetryOffer,
@@ -2054,7 +2041,6 @@ class _WholesaleTradeActionDock extends StatelessWidget {
   final BuyV2ProductOfferDecision decision;
   final int quantity;
   final VoidCallback onAdd;
-  final VoidCallback onBuyNow;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
   final VoidCallback onRetryOffer;
@@ -2136,13 +2122,11 @@ class _WholesaleTradeActionDock extends StatelessWidget {
       actionGroup = _ProductPurchaseActionRow(
         product: product,
         quantity: quantity,
-        buyNowKey: ValueKey('buy-wholesale-buy-now-${product.id}'),
         addSemanticLabel:
             'Add minimum order of ${product.minimumOrder} packs of '
             '${product.title} to Cart for ${buyV2Money(orderTotal)}. '
             '$deliveryDecision',
         onAdd: onAdd,
-        onBuyNow: onBuyNow,
         onDecrease: onDecrease,
         onIncrease: onIncrease,
       );
@@ -2197,7 +2181,6 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
     required this.buyerPromise,
     required this.quantity,
     required this.onAdd,
-    required this.onBuyNow,
     required this.onDecrease,
     required this.onIncrease,
   });
@@ -2209,7 +2192,6 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
   final String buyerPromise;
   final int quantity;
   final VoidCallback onAdd;
-  final VoidCallback onBuyNow;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
 
@@ -2257,7 +2239,7 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
               _DecisionRow(
                 icon: Icons.currency_rupee_rounded,
                 label: 'Delivered price',
-                value: '${buyV2Money(facts.price)} · MoolSocial price',
+                value: '${buyV2Money(facts.price)} · ${facts.partner}',
               ),
               if (mrp != null && mrp > facts.price)
                 _DecisionRow(
@@ -2337,8 +2319,9 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                 ),
               _DecisionRow(
                 icon: Icons.storefront_outlined,
-                label: 'Fulfilment',
-                value: buyV2AutomaticFulfilmentLabel(product.destination),
+                label: 'Seller',
+                value:
+                    '${facts.partner} · ${_sellerTypeLabel(product.sellerType)}',
               ),
               _DecisionRow(
                 icon: Icons.location_on_outlined,
@@ -2347,10 +2330,10 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                     session.selectedAddressOrNull?.shortLine ??
                     'Choose a delivery address',
               ),
-              const _DecisionRow(
+              _DecisionRow(
                 icon: Icons.verified_outlined,
-                label: 'Price published by',
-                value: 'MoolSocial',
+                label: 'Listing verified',
+                value: facts.partner,
               ),
               if (product.destination == BuyV2Destination.shop)
                 _DecisionRow(
@@ -2375,7 +2358,6 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                       '${buyV2FulfilmentModeLabel(fulfilmentMode)} · $buyerPromise',
                   rxBlocked: false,
                   onAdd: onAdd,
-                  onBuyNow: onBuyNow,
                   onDecrease: onDecrease,
                   onIncrease: onIncrease,
                 ),
@@ -3493,8 +3475,9 @@ class _MarketplaceTrustPanel extends StatelessWidget {
           ),
         _DecisionRow(
           icon: Icons.storefront_outlined,
-          label: trust.partnerType,
-          value: trust.partnerName,
+          label: 'Seller',
+          value:
+              '${trust.partnerName} · ${_sellerTypeLabel(product.sellerType)}',
         ),
         if (onViewSeller != null)
           _DecisionActionRow(
@@ -3506,19 +3489,20 @@ class _MarketplaceTrustPanel extends StatelessWidget {
                 '$sellerProductCount more ${sellerProductCount == 1 ? 'product' : 'products'} from this store',
             semanticLabel:
                 'Visit ${trust.partnerName} for $sellerProductCount more ${sellerProductCount == 1 ? 'product' : 'products'}',
+            emphasized: true,
             onTap: onViewSeller!,
           ),
         if (partnerRating case final rating?)
           _DecisionRow(
             icon: Icons.workspace_premium_outlined,
-            label: 'Seller rating',
+            label: 'Store rating',
             value: rating.toStringAsFixed(1),
             valueColor: BuyV2Colors.green,
           ),
         if (trust.partnerLocation case final location?)
           _DecisionRow(
             icon: Icons.location_on_outlined,
-            label: 'Seller location',
+            label: 'Store location',
             value: location,
           ),
         if (trust.partnerOrderCount case final orderCount?)
@@ -11715,6 +11699,7 @@ class _DecisionActionRow extends StatelessWidget {
     required this.detail,
     required this.semanticLabel,
     required this.onTap,
+    this.emphasized = false,
   });
 
   final IconData icon;
@@ -11723,6 +11708,7 @@ class _DecisionActionRow extends StatelessWidget {
   final String detail;
   final String semanticLabel;
   final VoidCallback onTap;
+  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
@@ -11734,16 +11720,19 @@ class _DecisionActionRow extends StatelessWidget {
         onTap: onTap,
         child: ExcludeSemantics(
           child: Material(
-            color: Colors.transparent,
+            color: emphasized ? BuyV2Colors.softBlue : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
             child: InkWell(
               onTap: onTap,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(
                   minHeight: BuyV2Metrics.minimumTap,
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  padding: emphasized
+                      ? const EdgeInsets.all(9)
+                      : const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -11753,7 +11742,15 @@ class _DecisionActionRow extends StatelessWidget {
                         width: 72,
                         child: Text(
                           label,
-                          style: context.buyMeta.copyWith(fontSize: 8),
+                          style: context.buyMeta.copyWith(
+                            color: emphasized
+                                ? BuyV2Colors.navy
+                                : BuyV2Colors.muted,
+                            fontSize: 8,
+                            fontWeight: emphasized
+                                ? FontWeight.w900
+                                : FontWeight.w700,
+                          ),
                         ),
                       ),
                       Expanded(
@@ -11779,8 +11776,10 @@ class _DecisionActionRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 5),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
+                      Icon(
+                        emphasized
+                            ? Icons.storefront_rounded
+                            : Icons.arrow_forward_rounded,
                         color: BuyV2Colors.navy,
                         size: 18,
                       ),
@@ -11796,6 +11795,17 @@ class _DecisionActionRow extends StatelessWidget {
   }
 }
 
+String _sellerTypeLabel(String source) {
+  final value = source.trim().toLowerCase();
+  if (value.contains('manufacturer')) return 'Manufacturer';
+  if (value.contains('wholesaler')) return 'Wholesaler';
+  if (value.contains('distributor')) return 'Distributor';
+  if (value.contains('retailer')) return 'Retailer';
+  if (value.contains('shop')) return 'Dealer';
+  if (value.contains('producer')) return 'Producer';
+  return 'Seller';
+}
+
 class _ProductOwnedActionPanel extends StatelessWidget {
   const _ProductOwnedActionPanel({
     super.key,
@@ -11804,7 +11814,6 @@ class _ProductOwnedActionPanel extends StatelessWidget {
     this.deliveryDecision,
     required this.rxBlocked,
     required this.onAdd,
-    this.onBuyNow,
     required this.onDecrease,
     required this.onIncrease,
   });
@@ -11814,7 +11823,6 @@ class _ProductOwnedActionPanel extends StatelessWidget {
   final String? deliveryDecision;
   final bool rxBlocked;
   final VoidCallback onAdd;
-  final VoidCallback? onBuyNow;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
 
@@ -11961,28 +11969,6 @@ class _ProductOwnedActionPanel extends StatelessWidget {
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            if (onBuyNow case final buyNow?) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  price,
-                  const SizedBox(height: 8),
-                  _ProductPurchaseActionRow(
-                    product: product,
-                    quantity: quantity,
-                    buyNowKey: ValueKey('buy-product-buy-now-${product.id}'),
-                    addSemanticLabel:
-                        'Add ${product.minimumOrder == 1 ? product.title : 'minimum order of ${product.minimumOrder} packs of ${product.title}'} '
-                        'to Cart for ${buyV2Money(product.price * product.minimumOrder)}. '
-                        '${deliveryDecision ?? product.deliveryPromise}',
-                    onAdd: onAdd,
-                    onBuyNow: buyNow,
-                    onDecrease: onDecrease,
-                    onIncrease: onIncrease,
-                  ),
-                ],
-              );
-            }
             final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
             final stack = largeText || constraints.maxWidth < 276;
             if (stack) {
@@ -12014,20 +12000,16 @@ class _ProductPurchaseActionRow extends StatelessWidget {
   const _ProductPurchaseActionRow({
     required this.product,
     required this.quantity,
-    required this.buyNowKey,
     this.addSemanticLabel,
     required this.onAdd,
-    required this.onBuyNow,
     required this.onDecrease,
     required this.onIncrease,
   });
 
   final BuyV2Product product;
   final int quantity;
-  final Key buyNowKey;
   final String? addSemanticLabel;
   final VoidCallback onAdd;
-  final VoidCallback onBuyNow;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
 
@@ -12078,23 +12060,7 @@ class _ProductPurchaseActionRow extends StatelessWidget {
       key: ValueKey('buy-product-purchase-actions-${product.id}'),
       container: true,
       explicitChildNodes: true,
-      child: SizedBox(
-        height: 50,
-        child: Row(
-          children: [
-            Expanded(child: cartAction),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FilledButton.icon(
-                key: buyNowKey,
-                onPressed: onBuyNow,
-                icon: const Icon(Icons.flash_on_rounded, size: 18),
-                label: const Text('Buy now'),
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: SizedBox(height: 50, child: cartAction),
     );
   }
 }
@@ -14144,7 +14110,7 @@ class _CartLine extends StatelessWidget {
                         const SizedBox(height: 3),
                         Text(
                           automaticFulfilment
-                              ? '$buyerPromise · MoolSocial price'
+                              ? '$buyerPromise · ${facts.partner}'
                               : '${product.deliveryPromise} · ${product.seller}',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,

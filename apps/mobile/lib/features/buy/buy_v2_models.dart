@@ -825,7 +825,7 @@ abstract final class BuyV2Catalogue {
       seller: seller,
       sellerType: sellerType,
       deliveryPromise: wholesale
-          ? _wholesalePromise(originCity)
+          ? _wholesalePromise(seed.wholesaleDelivery)
           : _shopPromise(seed.shopDelivery),
       origin: wholesale
           ? '$originCity → Jodhpur 342003'
@@ -846,18 +846,24 @@ abstract final class BuyV2Catalogue {
   }
 
   static String _shopPromise(String source) {
+    final value = source.trim();
     final minutes = RegExp(
       r'(\d+)\s+minutes',
       caseSensitive: false,
-    ).firstMatch(source);
+    ).firstMatch(value);
     if (minutes != null) {
       return 'Delivered in ${minutes.group(1)} min';
     }
-    return 'Delivery time confirmed at checkout';
+    if (RegExp(
+      r'^(today|tomorrow)\s+by\s+',
+      caseSensitive: false,
+    ).hasMatch(value)) {
+      return 'Delivered ${value.toLowerCase()}';
+    }
+    return value;
   }
 
-  static String _wholesalePromise(String originCity) =>
-      'Delivery schedule confirmed at checkout';
+  static String _wholesalePromise(String source) => source.trim();
 
   static String _supplierOrigin(String seller, String sellerType) {
     final name = seller.toLowerCase();

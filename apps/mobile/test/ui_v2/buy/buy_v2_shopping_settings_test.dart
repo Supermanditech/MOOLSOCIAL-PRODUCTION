@@ -162,6 +162,13 @@ void main() {
       find.byKey(const ValueKey('buy-recently-viewed-info-sheet')),
       findsOneWidget,
     );
+    final add = find.byKey(const ValueKey('buy-recently-viewed-add-s-milk'));
+    expect(add, findsOneWidget);
+    expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    expect(session.quantityFor('s-milk'), 1);
+    expect(find.text('Added'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-settings-recently-viewed')),
       findsNothing,

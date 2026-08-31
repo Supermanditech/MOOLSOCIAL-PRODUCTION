@@ -115,7 +115,7 @@ void main() {
             .first,
       );
       expect(find.text('Recently viewed'), findsOneWidget);
-    expect(find.text('2 × 1 L pouches'), findsWidgets);
+      expect(find.text('2 × 1 L pouches'), findsWidgets);
 
       final exactVariant = find.byKey(
         const ValueKey('buy-recently-viewed-product-s-milk-2l'),

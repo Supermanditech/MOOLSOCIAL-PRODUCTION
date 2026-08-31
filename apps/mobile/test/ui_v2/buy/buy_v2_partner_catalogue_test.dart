@@ -121,9 +121,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('store grid wires Add and Buy now to their exact outcomes', (
-    tester,
-  ) async {
+  testWidgets('store grid keeps one full-size Add action', (tester) async {
     final core = BuySession();
     final session = BuyV2Session(core: core);
     addTearDown(session.dispose);
@@ -140,9 +138,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final add = find.byKey(const ValueKey('buy-add-s-chicken'));
-    final buyNow = find.byKey(const ValueKey('buy-grid-buy-now-s-chicken'));
     await tester.scrollUntilVisible(
-      buyNow,
+      add,
       180,
       scrollable: find
           .descendant(
@@ -156,19 +153,19 @@ void main() {
           )
           .first,
     );
-    await tester.ensureVisible(add);
     expect(add, findsOneWidget);
-    expect(buyNow, findsOneWidget);
     expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
-    expect(tester.getSize(buyNow).height, greaterThanOrEqualTo(44));
+    expect(
+      find.byKey(const ValueKey('buy-grid-buy-now-s-chicken')),
+      findsNothing,
+    );
 
-    await tester.tap(buyNow);
+    await tester.tap(add);
     await tester.pumpAndSettle();
-    expect(session.view, BuyV2View.checkout);
     expect(session.quantityFor('s-chicken'), 1);
     expect(
       find.byKey(const ValueKey('buy-shop-seller-sheet-s-eggs')),
-      findsNothing,
+      findsOneWidget,
     );
     expect(tester.takeException(), isNull);
   });

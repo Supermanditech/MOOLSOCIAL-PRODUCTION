@@ -1580,10 +1580,7 @@ void main() {
       find.descendant(of: primary, matching: find.text('Add to Cart')),
       findsOneWidget,
     );
-    expect(
-      find.byKey(ValueKey('buy-wholesale-buy-now-${product.id}')),
-      findsOneWidget,
-    );
+    expect(find.text('Buy now'), findsNothing);
   });
 
   testWidgets(
@@ -1610,8 +1607,7 @@ void main() {
         220,
         scrollable: productScrollable,
       );
-      expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
-      expect(find.text(product.seller), findsNothing);
+      expect(find.textContaining(product.seller), findsWidgets);
       expect(find.textContaining('Verified'), findsNothing);
 
       final reviews = find.byKey(ValueKey('buy-product-reviews-${product.id}'));
@@ -1694,25 +1690,14 @@ void main() {
         );
 
         expect(find.text('Delivered in ${testCase.minutes} min'), findsWidgets);
-        expect(
-          find.text('Automatically assigned Mool Partner'),
-          findsOneWidget,
-        );
-        expect(
-          find.text(product.seller),
-          testCase.destination == BuyV2Destination.wholesale
-              ? findsOneWidget
-              : findsNothing,
-        );
+        expect(find.textContaining(product.seller), findsWidgets);
         expect(
           find.byKey(ValueKey('buy-shop-seller-action-${product.id}')),
           findsNothing,
         );
         expect(
           find.byKey(ValueKey('buy-wholesale-supplier-action-${product.id}')),
-          testCase.destination == BuyV2Destination.wholesale
-              ? findsOneWidget
-              : findsNothing,
+          findsNothing,
         );
 
         expect(session.addProduct(product.id), isTrue);
@@ -3034,7 +3019,7 @@ void main() {
 
       expect(add, findsOneWidget);
       expect(promise, findsOneWidget);
-      expect(find.textContaining(product.seller), findsNothing);
+      expect(find.textContaining(product.seller), findsOneWidget);
       final cardRect = tester.getRect(card);
       expect(cardRect.contains(tester.getCenter(add)), isTrue);
       expect(cardRect.contains(tester.getCenter(promise)), isTrue);
