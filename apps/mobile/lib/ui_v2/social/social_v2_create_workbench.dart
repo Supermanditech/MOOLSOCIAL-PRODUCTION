@@ -1160,6 +1160,81 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       ),
     );
 
+    final actions =
+        <
+          ({
+            Key key,
+            Key? ownerKey,
+            IconData icon,
+            String label,
+            bool selected,
+            VoidCallback onTap,
+          })
+        >[
+          (
+            key: const Key('screen04-create-tool-post'),
+            ownerKey: const Key('social-create-moolsocial-post'),
+            icon: Icons.edit_note_rounded,
+            label: 'Text',
+            selected:
+                _format == SocialCreateFormatV2.post &&
+                _postTool == _SocialPostTool.none,
+            onTap: () => _selectFormat(SocialCreateFormatV2.post),
+          ),
+          (
+            key: const Key('screen04-create-tool-carousel'),
+            ownerKey: null,
+            icon: Icons.view_carousel_outlined,
+            label: 'Carousel',
+            selected: _format == SocialCreateFormatV2.carousel,
+            onTap: () => _selectFormat(SocialCreateFormatV2.carousel),
+          ),
+          (
+            key: const Key('screen04-create-tool-image'),
+            ownerKey: null,
+            icon: Icons.image_outlined,
+            label: 'Image',
+            selected:
+                _format == SocialCreateFormatV2.post &&
+                _postTool == _SocialPostTool.image,
+            onTap: () => _selectPostTool(_SocialPostTool.image),
+          ),
+          (
+            key: const Key('screen04-create-tool-image-poll'),
+            ownerKey: null,
+            icon: Icons.grid_view_rounded,
+            label: 'Image Poll',
+            selected:
+                _format == SocialCreateFormatV2.post &&
+                _postTool == _SocialPostTool.imagePoll,
+            onTap: () => _selectPostTool(_SocialPostTool.imagePoll),
+          ),
+          (
+            key: const Key('screen04-create-tool-quick-poll'),
+            ownerKey: null,
+            icon: Icons.poll_outlined,
+            label: 'Quick Poll',
+            selected:
+                _format == SocialCreateFormatV2.post &&
+                _postTool == _SocialPostTool.quickPoll,
+            onTap: () => _selectPostTool(_SocialPostTool.quickPoll),
+          ),
+          (
+            key: const Key('screen04-create-tool-quiz'),
+            ownerKey: null,
+            icon: Icons.check_circle_outline_rounded,
+            label: 'Quiz',
+            selected:
+                _format == SocialCreateFormatV2.post &&
+                _postTool == _SocialPostTool.quiz,
+            onTap: () => _selectPostTool(_SocialPostTool.quiz),
+          ),
+        ];
+    final orderedActions = [
+      ...actions.where((action) => action.selected),
+      ...actions.where((action) => !action.selected),
+    ];
+
     return SizedBox(
       key: const ValueKey('create-keyboard-format-workbench'),
       height: 52,
@@ -1170,66 +1245,29 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
               key: const Key('screen04-create-ime-format-strip'),
               scrollDirection: Axis.horizontal,
               children: [
-                KeyedSubtree(
-                  key: const Key('social-create-moolsocial-post'),
-                  child: compactAction(
-                    key: const Key('screen04-create-tool-post'),
-                    icon: Icons.edit_note_rounded,
-                    label: 'Text',
-                    selected:
-                        _format == SocialCreateFormatV2.post &&
-                        _postTool == _SocialPostTool.none,
-                    onTap: () => _selectFormat(SocialCreateFormatV2.post),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                compactAction(
-                  key: const Key('screen04-create-tool-carousel'),
-                  icon: Icons.view_carousel_outlined,
-                  label: 'Carousel',
-                  selected: _format == SocialCreateFormatV2.carousel,
-                  onTap: () => _selectFormat(SocialCreateFormatV2.carousel),
-                ),
-                const SizedBox(width: 6),
-                compactAction(
-                  key: const Key('screen04-create-tool-image'),
-                  icon: Icons.image_outlined,
-                  label: 'Image',
-                  selected:
-                      _format == SocialCreateFormatV2.post &&
-                      _postTool == _SocialPostTool.image,
-                  onTap: () => _selectPostTool(_SocialPostTool.image),
-                ),
-                const SizedBox(width: 6),
-                compactAction(
-                  key: const Key('screen04-create-tool-image-poll'),
-                  icon: Icons.grid_view_rounded,
-                  label: 'Image Poll',
-                  selected:
-                      _format == SocialCreateFormatV2.post &&
-                      _postTool == _SocialPostTool.imagePoll,
-                  onTap: () => _selectPostTool(_SocialPostTool.imagePoll),
-                ),
-                const SizedBox(width: 6),
-                compactAction(
-                  key: const Key('screen04-create-tool-quick-poll'),
-                  icon: Icons.poll_outlined,
-                  label: 'Quick Poll',
-                  selected:
-                      _format == SocialCreateFormatV2.post &&
-                      _postTool == _SocialPostTool.quickPoll,
-                  onTap: () => _selectPostTool(_SocialPostTool.quickPoll),
-                ),
-                const SizedBox(width: 6),
-                compactAction(
-                  key: const Key('screen04-create-tool-quiz'),
-                  icon: Icons.check_circle_outline_rounded,
-                  label: 'Quiz',
-                  selected:
-                      _format == SocialCreateFormatV2.post &&
-                      _postTool == _SocialPostTool.quiz,
-                  onTap: () => _selectPostTool(_SocialPostTool.quiz),
-                ),
+                for (var index = 0; index < orderedActions.length; index++) ...[
+                  if (orderedActions[index].ownerKey case final ownerKey?)
+                    KeyedSubtree(
+                      key: ownerKey,
+                      child: compactAction(
+                        key: orderedActions[index].key,
+                        icon: orderedActions[index].icon,
+                        label: orderedActions[index].label,
+                        selected: orderedActions[index].selected,
+                        onTap: orderedActions[index].onTap,
+                      ),
+                    )
+                  else
+                    compactAction(
+                      key: orderedActions[index].key,
+                      icon: orderedActions[index].icon,
+                      label: orderedActions[index].label,
+                      selected: orderedActions[index].selected,
+                      onTap: orderedActions[index].onTap,
+                    ),
+                  if (index < orderedActions.length - 1)
+                    const SizedBox(width: 6),
+                ],
               ],
             ),
           ),
@@ -2139,20 +2177,29 @@ class _CreateCanvasStageRail extends StatelessWidget {
     ),
     child: Row(
       children: [
-        const _CreateCanvasStage(
-          icon: Icons.edit_note_rounded,
-          label: 'Build',
-          active: true,
+        const Expanded(
+          child: _CreateCanvasStage(
+            icon: Icons.edit_note_rounded,
+            label: 'Build',
+            active: true,
+          ),
         ),
         const _CreateCanvasStageLine(),
-        _CreateCanvasStage(
-          key: const Key('screen04-create-open-preview'),
-          icon: Icons.visibility_outlined,
-          label: 'Preview',
-          onTap: onPreview,
+        Expanded(
+          child: _CreateCanvasStage(
+            key: const Key('screen04-create-open-preview'),
+            icon: Icons.visibility_outlined,
+            label: 'Preview',
+            onTap: onPreview,
+          ),
         ),
         const _CreateCanvasStageLine(),
-        const _CreateCanvasStage(icon: Icons.public_rounded, label: 'Publish'),
+        const Expanded(
+          child: _CreateCanvasStage(
+            icon: Icons.public_rounded,
+            label: 'Publish',
+          ),
+        ),
       ],
     ),
   );
@@ -2181,29 +2228,34 @@ class _CreateCanvasStage extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 44),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                color: active || onTap != null
-                    ? const Color(0xFF6D4AFF)
-                    : SocialV2Colors.muted,
-                size: 16,
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    color: active || onTap != null
+                        ? const Color(0xFF6D4AFF)
+                        : SocialV2Colors.muted,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: active || onTap != null
+                          ? SocialV2Colors.navy
+                          : SocialV2Colors.muted,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: active || onTap != null
-                      ? SocialV2Colors.navy
-                      : SocialV2Colors.muted,
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -2215,12 +2267,8 @@ class _CreateCanvasStageLine extends StatelessWidget {
   const _CreateCanvasStageLine();
 
   @override
-  Widget build(BuildContext context) => const Expanded(
-    child: Padding(
-      padding: EdgeInsets.symmetric(horizontal: 7),
-      child: Divider(color: Color(0xFFD8D7E5)),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      const SizedBox(width: 22, child: Divider(color: Color(0xFFD8D7E5)));
 }
 
 class _CreateCanvasInlineAction extends StatelessWidget {

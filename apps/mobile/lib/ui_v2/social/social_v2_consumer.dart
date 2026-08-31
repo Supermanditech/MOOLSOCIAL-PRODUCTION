@@ -8183,6 +8183,7 @@ class _SocialCommentsPanelV2State extends State<_SocialCommentsPanelV2> {
       _replyController.text,
     );
     if (!mounted || !posted) return;
+    _replyFocusNode.unfocus();
     _replyController.clear();
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/retailer/retailer_session.dart';
+import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
 import 'package:moolsocial/ui_v2/social/screen04_universal_components.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
@@ -152,6 +153,65 @@ void main() {
     expect(find.text('New text post'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'Social keyboard matrix keeps compact large-text poll editing contextual',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+      tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final owners = _Owners();
+      addTearDown(owners.dispose);
+
+      await tester.pumpWidget(_app(owners.consumer(state: 'quick-poll')));
+      await tester.pumpAndSettle();
+      final initialLayoutError = tester.takeException();
+      expect(
+        initialLayoutError,
+        isNull,
+        reason: 'Initial compact Quick Poll must not overflow.',
+      );
+
+      final strip = find.byKey(const Key('screen04-create-ime-format-strip'));
+      final active = find.byKey(const Key('screen04-create-tool-quick-poll'));
+      final question = find.byKey(const Key('screen04-create-post-text'));
+      final lastChoice = find.byKey(
+        const Key('screen04-create-quick-poll-choice-3'),
+      );
+      expect(strip, findsOneWidget);
+      expect(active, findsOneWidget);
+      expect(find.text('New quick poll'), findsOneWidget);
+      expect(tester.getTopLeft(active).dx, lessThan(120));
+
+      await tester.enterText(question, 'Which local idea should happen next?');
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'Entering the poll question must not overflow.',
+      );
+      await tester.ensureVisible(lastChoice);
+      await tester.enterText(lastChoice, 'A shared neighbourhood library');
+      await tester.pumpAndSettle();
+
+      final keyboardTop = 568 - 240;
+      expect(
+        tester.getBottomRight(lastChoice).dy,
+        lessThanOrEqualTo(keyboardTop),
+      );
+      expect(
+        tester
+            .getBottomRight(
+              find.byKey(const Key('screen04-create-keyboard-done')),
+            )
+            .dy,
+        lessThanOrEqualTo(keyboardTop),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Widget _app(Widget child) => MaterialApp(
@@ -165,12 +225,14 @@ class _Owners {
   final creator = CreatorSession();
   final retailer = RetailerSession();
   final shared = SharedSession();
+  final draftCache = SocialCreateDraftStateCache();
 
   SocialUniversalV2 consumer({required String state}) => SocialUniversalV2(
     session: journey,
     creatorSession: creator,
     retailerSession: retailer,
     sharedSession: shared,
+    createDraftStateCache: draftCache,
     initialSubAction: 'create',
     initialState: state,
     youtubePublicAccessOverride: false,

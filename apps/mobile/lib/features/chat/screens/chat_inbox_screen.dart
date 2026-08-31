@@ -657,6 +657,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     }
     final hasSearchQuery = _searchController.text.trim().isNotEmpty;
     final searchFocused = _searchFocusNode.hasFocus;
+    final searchActive = hasSearchQuery || searchFocused;
     return CustomScrollView(
       key: const PageStorageKey('chat-inbox-scroll'),
       slivers: [
@@ -720,7 +721,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                   ),
                 ),
               ),
-              if (threads.isNotEmpty) ...[
+              if (threads.isNotEmpty && !searchActive) ...[
                 const SizedBox(height: MoolSpacing.xs),
                 Align(
                   alignment: Alignment.centerRight,
@@ -738,7 +739,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 ),
               ],
               const SizedBox(height: MoolSpacing.sm),
-              if (_entryContext.showThreadFilters) ...[
+              if (_entryContext.showThreadFilters && !searchActive) ...[
                 _FilterStrip(session: widget.session),
                 const SizedBox(height: MoolSpacing.sm),
               ],
@@ -761,6 +762,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 socialOnly: _entryContext.id == ChatEntryContextId.social,
                 onReset: () {
                   _searchController.clear();
+                  _searchFocusNode.unfocus();
                   widget.session.chooseAll();
                   setState(() {});
                 },

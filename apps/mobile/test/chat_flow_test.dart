@@ -269,6 +269,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('inline Chat search prioritizes results on compact large text', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/social?sub=feed',
+      journey: journey,
+      chat: chat,
+      size: const Size(320, 568),
+    );
+
+    await tapVisible(tester, const Key('chat-open-inline-search'));
+    tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+    final field = find.byKey(const Key('chat-search-field'));
+    await tester.enterText(field, 'Order');
+    await tester.pumpAndSettle();
+
+    final result = find.byKey(const Key('chat-open-thread-order-support'));
+    final navigation = find.byKey(const Key('chat-native-navigation'));
+    expect(result, findsOneWidget);
+    expect(find.byKey(const Key('chat-new')), findsNothing);
+    expect(find.byKey(const Key('chat-filter-all')), findsNothing);
+    expect(tester.getBottomRight(field).dy, lessThanOrEqualTo(568 - 240));
+    expect(
+      tester.getTopLeft(result).dy,
+      lessThan(tester.getTopLeft(navigation).dy),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Inbox, thread and composer motion resolve static when reduced', (
     tester,
   ) async {
