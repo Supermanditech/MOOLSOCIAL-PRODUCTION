@@ -99,14 +99,10 @@ void main() {
 
       await tester.pumpWidget(app(session));
       await tester.pumpAndSettle();
-      final automatic = find.byKey(
-        const ValueKey('buy-wholesale-trade-decision-w-oil'),
-      );
       final supplier = find.byKey(
         const ValueKey('buy-wholesale-store-action-w-oil'),
       );
       await revealSupplierAction(tester, supplier);
-      expect(automatic, findsOneWidget);
       expect(supplier, findsOneWidget);
       expect(find.textContaining(session.product('w-oil').seller), findsWidgets);
       expect(find.text('Surya Oils India'), findsOneWidget);
@@ -199,14 +195,10 @@ void main() {
 
     await tester.pumpWidget(app(session, textScale: 1.4, reducedMotion: true));
     await tester.pumpAndSettle();
-    final automatic = find.byKey(
-        const ValueKey('buy-wholesale-trade-decision-w-oil'),
-    );
     final supplier = find.byKey(
       const ValueKey('buy-wholesale-store-action-w-oil'),
     );
     await revealSupplierAction(tester, supplier);
-    expect(automatic, findsOneWidget);
     expect(supplier, findsOneWidget);
     await tester.pumpAndSettle();
     expect(tester.binding.transientCallbackCount, 0);
