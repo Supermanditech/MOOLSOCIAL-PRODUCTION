@@ -3621,10 +3621,16 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
-            final width = (constraints.maxWidth - 10) / 2;
+            final textScale = MediaQuery.textScalerOf(context).scale(1);
+            final columns = constraints.maxWidth >= 330 && textScale <= 1.15
+                ? 3
+                : 2;
+            const gap = 10.0;
+            final width =
+                (constraints.maxWidth - (gap * (columns - 1))) / columns;
             return Wrap(
-              spacing: 10,
-              runSpacing: 10,
+              spacing: gap,
+              runSpacing: gap,
               children: [
                 SizedBox(
                   width: width,

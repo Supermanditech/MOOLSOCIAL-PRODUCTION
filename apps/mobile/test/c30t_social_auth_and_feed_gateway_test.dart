@@ -259,6 +259,15 @@ void main() {
     ]) {
       expect(find.byKey(key), findsOneWidget);
     }
+    expect(
+      tester
+          .getBottomRight(find.byKey(const Key('screen04-create-quiz-entry')))
+          .dy,
+      lessThanOrEqualTo(
+        tester.getTopLeft(find.byKey(const Key('screen04-context-tabs'))).dy,
+      ),
+      reason: 'Every Step 1 format must remain above the Social rail.',
+    );
     expect(journey.stage, JourneyStage.ready);
     expect(journey.isAuthenticated, isTrue);
   });
