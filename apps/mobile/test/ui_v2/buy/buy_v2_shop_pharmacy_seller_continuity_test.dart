@@ -146,8 +146,8 @@ void main() {
     );
     await revealAction(tester, action);
     final semanticAction = find.bySemanticsLabel(
-      'View 4 more products from Sardarpura Health Pharmacy in the current '
-      'Medicine catalogue. Not medical advice',
+      'View 4 more products from Sardarpura Health Pharmacy that are '
+      'available now. Not medical advice',
     );
     expect(semanticAction, findsOneWidget);
     expect(

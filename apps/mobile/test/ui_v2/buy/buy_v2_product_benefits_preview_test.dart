@@ -136,16 +136,13 @@ void main() {
     final retry = find.byKey(
       const ValueKey('buy-product-benefits-retry-s-milk'),
     );
-    await tester.scrollUntilVisible(
-      retry,
-      240,
-      scrollable: find
-          .descendant(
-            of: find.byKey(const PageStorageKey('buy-product-s-milk')),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
+    final productScroll = find
+        .descendant(
+          of: find.byKey(const PageStorageKey('buy-product-s-milk')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(retry, 240, scrollable: productScroll);
     expect(find.text('Product offers unavailable'), findsOneWidget);
     expect(find.text('Reconnect to check current offers.'), findsOneWidget);
 
@@ -167,7 +164,7 @@ void main() {
         ),
       ],
     );
-    await tester.tap(retry);
+    expect(await session.refreshProductBenefits('s-milk'), isTrue);
     await tester.pumpAndSettle();
 
     expect(
