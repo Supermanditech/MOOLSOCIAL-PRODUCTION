@@ -3046,7 +3046,7 @@ Future<void> showBuyV2PartnerCatalogue(
       clipBehavior: Clip.antiAlias,
       transitionAnimationController: transitionController,
       builder: (sheetContext) => FractionallySizedBox(
-        heightFactor: .92,
+        heightFactor: .98,
         child: SafeArea(
           top: false,
           child: Semantics(
