@@ -1234,7 +1234,7 @@ void main() {
       'Keep this production draft.',
     );
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-image')));
+    await _tapCreateTool(tester, 'screen04-create-tool-image');
     await tester.pumpAndSettle();
 
     expect(
@@ -1349,6 +1349,7 @@ void main() {
     expect(workbench, findsOneWidget);
     for (final key in const [
       'screen04-create-tool-image',
+      'screen04-create-tool-camera',
       'screen04-create-tool-carousel',
       'screen04-create-tool-image-poll',
       'screen04-create-tool-quick-poll',
@@ -1362,21 +1363,26 @@ void main() {
       findsNothing,
     );
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-image')));
+    await _tapCreateTool(tester, 'screen04-create-tool-image');
     await tester.pumpAndSettle();
     expect(workbench, findsOneWidget);
     expect(find.text('market.png'), findsNothing);
+    expect(owners.picker.lastImageSource, SocialMediaSource.gallery);
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-carousel')));
+    await _tapCreateTool(tester, 'screen04-create-tool-camera');
+    await tester.pumpAndSettle();
+    expect(owners.picker.lastImageSource, SocialMediaSource.camera);
+
+    await _tapCreateTool(tester, 'screen04-create-tool-carousel');
     await tester.pumpAndSettle();
     expect(workbench, findsOneWidget);
     expect(find.text('2 / 10 photos'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-post')));
+    await _tapCreateTool(tester, 'screen04-create-tool-post');
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('screen04-create-post-text')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-image-poll')));
+    await _tapCreateTool(tester, 'screen04-create-tool-image-poll');
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('screen04-create-image-poll-choice-0')),
@@ -1387,7 +1393,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-quick-poll')));
+    await _tapCreateTool(tester, 'screen04-create-tool-quick-poll');
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('screen04-create-quick-poll-choice-0')),
@@ -1398,7 +1404,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-quiz')));
+    await _tapCreateTool(tester, 'screen04-create-tool-quiz');
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('screen04-create-quiz-choice-0')),
@@ -1458,7 +1464,7 @@ void main() {
       await leaveAndReturn();
       expect(find.text('Keep this unfinished public draft.'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('screen04-create-tool-image')));
+      await _tapCreateTool(tester, 'screen04-create-tool-image');
       await tester.pumpAndSettle();
       expect(find.text('New image post'), findsOneWidget);
       expect(find.byType(SocialMediaPreviewV2), findsOneWidget);
@@ -1466,18 +1472,16 @@ void main() {
       expect(find.text('New image post'), findsOneWidget);
       expect(find.byType(SocialMediaPreviewV2), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('screen04-create-tool-carousel')));
+      await _tapCreateTool(tester, 'screen04-create-tool-carousel');
       await tester.pumpAndSettle();
       expect(find.text('2 / 10 photos'), findsOneWidget);
       await leaveAndReturn();
       expect(find.text('New carousel'), findsOneWidget);
       expect(find.text('2 / 10 photos'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('screen04-create-tool-post')));
+      await _tapCreateTool(tester, 'screen04-create-tool-post');
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('screen04-create-tool-image-poll')),
-      );
+      await _tapCreateTool(tester, 'screen04-create-tool-image-poll');
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('screen04-create-image-poll-choice-0')),
@@ -1492,9 +1496,7 @@ void main() {
       expect(find.text('Blue basket'), findsOneWidget);
       expect(find.byType(SocialMediaPreviewV2), findsOneWidget);
 
-      await tester.tap(
-        find.byKey(const Key('screen04-create-tool-quick-poll')),
-      );
+      await _tapCreateTool(tester, 'screen04-create-tool-quick-poll');
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('screen04-create-quick-poll-choice-1')),
@@ -1504,7 +1506,7 @@ void main() {
       expect(find.text('New quick poll'), findsOneWidget);
       expect(find.text('Tomorrow morning'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('screen04-create-tool-quiz')));
+      await _tapCreateTool(tester, 'screen04-create-tool-quiz');
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('screen04-create-quiz-choice-2')),
@@ -1545,10 +1547,10 @@ void main() {
       );
 
       expect(tester.testTextInput.isVisible, isFalse);
-      await tester.tap(find.byKey(const Key('screen04-create-youtube-short')));
+      await _tapCreateTool(tester, 'screen04-create-youtube-short');
       await tester.pump();
       expect(youtubeCalls, 1);
-      await tester.tap(find.byKey(const Key('screen04-create-tool-quiz')));
+      await _tapCreateTool(tester, 'screen04-create-tool-quiz');
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('screen04-create-quiz-choice-3')),
@@ -1681,6 +1683,13 @@ Future<void> _pump(WidgetTester tester, Widget child) async {
     ),
   );
   await tester.pump();
+}
+
+Future<void> _tapCreateTool(WidgetTester tester, String key) async {
+  final tool = find.byKey(Key(key));
+  await tester.ensureVisible(tool);
+  await tester.pump();
+  await tester.tap(tool);
 }
 
 class _Owners {
@@ -1943,14 +1952,17 @@ class _FakeSocialMediaPicker implements SocialMediaPicker {
     kind: SocialMediaKind.video,
     isAsset: true,
   );
+  SocialMediaSource? lastImageSource;
 
   @override
   Future<List<SocialPickedMedia>> pickCarousel({int limit = 10}) async =>
       const [_image, _image];
 
   @override
-  Future<SocialPickedMedia?> pickImage(SocialMediaSource source) async =>
-      _image;
+  Future<SocialPickedMedia?> pickImage(SocialMediaSource source) async {
+    lastImageSource = source;
+    return _image;
+  }
 
   @override
   Future<SocialPickedMedia?> pickReel(SocialMediaSource source) async => _reel;

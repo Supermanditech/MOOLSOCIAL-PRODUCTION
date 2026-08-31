@@ -92,12 +92,24 @@ void main() {
     for (final key in const [
       'screen04-create-tool-post',
       'screen04-create-tool-image',
+      'screen04-create-tool-camera',
       'screen04-create-tool-carousel',
       'screen04-create-tool-image-poll',
       'screen04-create-tool-quick-poll',
       'screen04-create-tool-quiz',
     ]) {
-      expect(find.byKey(Key(key)), findsOneWidget, reason: key);
+      final action = find.byKey(Key(key));
+      expect(action, findsOneWidget, reason: key);
+      expect(
+        tester.getSize(action).width,
+        greaterThanOrEqualTo(44),
+        reason: '$key must keep a production touch target.',
+      );
+      expect(
+        tester.getSize(action).height,
+        greaterThanOrEqualTo(44),
+        reason: '$key must keep a production touch target.',
+      );
     }
     expect(
       find.byKey(const Key('screen04-create-youtube-short')),
@@ -127,7 +139,7 @@ void main() {
     expect(publish, findsOneWidget);
     expect(text, findsOneWidget);
     expect(formats, findsOneWidget);
-    expect(carousel, findsNothing);
+    expect(carousel, findsOneWidget);
     expect(tester.getSemantics(formats).rect.height, greaterThanOrEqualTo(44));
     expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
     expect(find.byType(Screen04Header), findsNothing);
@@ -138,30 +150,37 @@ void main() {
     final imeWorkbench = find.byKey(
       const Key('create-keyboard-format-workbench'),
     );
-    final bottomComposer = find.byKey(
-      const Key('screen04-create-bottom-composer'),
+    final bottomToolShelf = find.byKey(
+      const Key('screen04-create-format-decision'),
     );
     expect(imeWorkbench, findsOneWidget);
-    expect(bottomComposer, findsOneWidget);
+    expect(bottomToolShelf, findsOneWidget);
     expect(
       tester.getSize(imeWorkbench).height,
-      lessThanOrEqualTo(52),
-      reason: 'The format selector must collapse while the IME is open.',
+      lessThanOrEqualTo(62),
+      reason: 'The live Create tool shelf must stay compact above the IME.',
     );
     expect(
       find.byKey(const Key('screen04-create-keyboard-done')),
-      findsOneWidget,
+      findsNothing,
+    );
+    expect(
+      tester
+          .getBottomRight(find.byKey(const Key('screen04-create-tool-quiz')))
+          .dx,
+      lessThanOrEqualTo(tester.getBottomRight(imeWorkbench).dx),
+      reason: 'Every primary Create format must remain visible above the IME.',
     );
     expect(tester.getBottomRight(publish).dy, lessThanOrEqualTo(keyboardTop));
     expect(tester.getBottomRight(formats).dy, lessThanOrEqualTo(keyboardTop));
     expect(
-      tester.getBottomRight(bottomComposer).dy,
+      tester.getBottomRight(bottomToolShelf).dy,
       lessThanOrEqualTo(keyboardTop),
     );
     expect(
-      tester.getBottomRight(bottomComposer).dy,
+      tester.getBottomRight(bottomToolShelf).dy,
       greaterThanOrEqualTo(keyboardTop - 1),
-      reason: 'The writing composer must stay docked directly above the IME.',
+      reason: 'The live Create tools must stay docked directly above the IME.',
     );
     expect(find.text('New text post'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -197,7 +216,15 @@ void main() {
       expect(strip, findsOneWidget);
       expect(active, findsOneWidget);
       expect(find.text('New quick poll'), findsOneWidget);
-      expect(tester.getTopLeft(active).dx, lessThan(120));
+      expect(
+        tester.getTopLeft(active).dx,
+        greaterThan(
+          tester
+              .getTopLeft(find.byKey(const Key('screen04-create-tool-post')))
+              .dx,
+        ),
+        reason: 'Selecting a format must not reorder the live tool shelf.',
+      );
 
       await tester.enterText(question, 'Which local idea should happen next?');
       expect(
@@ -215,20 +242,13 @@ void main() {
         lessThanOrEqualTo(
           tester
               .getTopLeft(
-                find.byKey(const Key('screen04-create-bottom-composer')),
+                find.byKey(const Key('screen04-create-format-decision')),
               )
               .dy,
         ),
-        reason: 'Poll choices must scroll above the docked composer and IME.',
+        reason: 'Poll choices must scroll above the live tool shelf and IME.',
       );
-      expect(
-        tester
-            .getBottomRight(
-              find.byKey(const Key('screen04-create-keyboard-done')),
-            )
-            .dy,
-        lessThanOrEqualTo(keyboardTop),
-      );
+      expect(tester.getBottomRight(strip).dy, lessThanOrEqualTo(keyboardTop));
       expect(tester.takeException(), isNull);
     },
   );

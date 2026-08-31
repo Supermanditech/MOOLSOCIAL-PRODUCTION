@@ -538,14 +538,14 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     }
   }
 
-  Future<void> _choosePostImage() async {
+  Future<void> _choosePostImage([
+    SocialMediaSource source = SocialMediaSource.gallery,
+  ]) async {
     if (_selectingMedia) return;
     final request = ++_mediaSelectionRequest;
     setState(() => _selectingMedia = true);
     try {
-      final selected = await widget.mediaPicker.pickImage(
-        SocialMediaSource.gallery,
-      );
+      final selected = await widget.mediaPicker.pickImage(source);
       if (!_mediaSelectionIsCurrent(
             request,
             format: SocialCreateFormatV2.post,
@@ -577,6 +577,20 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
         setState(() => _selectingMedia = false);
       }
     }
+  }
+
+  Future<void> _choosePostCameraImage() async {
+    if (_format != SocialCreateFormatV2.post ||
+        _postTool != _SocialPostTool.image) {
+      HapticFeedback.selectionClick();
+      setState(() {
+        _invalidateMediaSelection();
+        _format = SocialCreateFormatV2.post;
+        _postTool = _SocialPostTool.image;
+        _persistDraftState();
+      });
+    }
+    await _choosePostImage(SocialMediaSource.camera);
   }
 
   Future<void> _chooseImagePollMedia(int index) async {
@@ -1020,6 +1034,12 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                           ),
                         ),
                         IconButton(
+                          key: const Key('screen04-create-open-preview'),
+                          tooltip: 'Preview post',
+                          onPressed: _openPreview,
+                          icon: const Icon(Icons.visibility_outlined),
+                        ),
+                        IconButton(
                           key: const Key('screen04-create-discard'),
                           tooltip: 'Discard draft',
                           onPressed: _confirmDiscard,
@@ -1058,47 +1078,26 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                 ),
               ),
             ),
+            Expanded(
+              child: SingleChildScrollView(
+                key: const Key('screen04-create-scrollable-composer'),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+                child: _buildWorkbenchCard(keyboardOpen),
+              ),
+            ),
             Material(
               key: const Key('screen04-create-format-decision'),
               color: Colors.white,
-              elevation: 1,
-              shadowColor: const Color(0x18000050),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
-                child: _buildFormatDecisionBar(keyboardOpen),
-              ),
-            ),
-            Expanded(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      key: const Key('screen04-create-scrollable-composer'),
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-                      child: _buildWorkbenchCard(),
-                    ),
-                  ),
-                  Material(
-                    key: const Key('screen04-create-bottom-composer'),
-                    color: Colors.white,
-                    elevation: 8,
-                    shadowColor: const Color(0x28000050),
-                    child: SafeArea(
-                      top: false,
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          8,
-                          keyboardOpen ? 5 : 8,
-                          8,
-                          keyboardOpen ? 5 : 8,
-                        ),
-                        child: _buildWritingComposer(keyboardOpen),
-                      ),
-                    ),
-                  ),
-                ],
+              elevation: 8,
+              shadowColor: const Color(0x28000050),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
+                  child: _buildFormatDecisionBar(),
+                ),
               ),
             ),
           ],
@@ -1117,14 +1116,14 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
     _ => 'New text post',
   };
 
-  Widget _buildFormatDecisionBar(bool keyboardOpen) {
+  Widget _buildFormatDecisionBar() {
     Widget compactAction({
       required Key key,
       required IconData icon,
       required String label,
       required bool selected,
       required VoidCallback onTap,
-      double width = 94,
+      double width = 44,
     }) => SizedBox(
       width: width,
       child: _FormatAction(
@@ -1148,14 +1147,6 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
         onTap: () => _selectIntent(SocialCreateIntentV2.text),
       ),
       (
-        key: const Key('screen04-create-tool-carousel'),
-        ownerKey: null,
-        icon: Icons.view_carousel_outlined,
-        label: 'Carousel',
-        selected: _format == SocialCreateFormatV2.carousel,
-        onTap: () => _selectIntent(SocialCreateIntentV2.carousel),
-      ),
-      (
         key: const Key('screen04-create-tool-image'),
         ownerKey: null,
         icon: Icons.image_outlined,
@@ -1164,6 +1155,30 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
             _format == SocialCreateFormatV2.post &&
             _postTool == _SocialPostTool.image,
         onTap: () => _selectIntent(SocialCreateIntentV2.image),
+      ),
+      (
+        key: const Key('screen04-create-tool-camera'),
+        ownerKey: null,
+        icon: Icons.photo_camera_outlined,
+        label: 'Camera',
+        selected: false,
+        onTap: () => unawaited(_choosePostCameraImage()),
+      ),
+      (
+        key: const Key('screen04-create-tool-carousel'),
+        ownerKey: null,
+        icon: Icons.view_carousel_outlined,
+        label: 'Carousel',
+        selected: _format == SocialCreateFormatV2.carousel,
+        onTap: () => _selectIntent(SocialCreateIntentV2.carousel),
+      ),
+      (
+        key: const Key('screen04-create-inline-gif'),
+        ownerKey: null,
+        icon: Icons.gif_box_outlined,
+        label: 'GIF',
+        selected: false,
+        onTap: _showGifAvailability,
       ),
       (
         key: const Key('screen04-create-tool-image-poll'),
@@ -1195,6 +1210,30 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
             _postTool == _SocialPostTool.quiz,
         onTap: () => _selectIntent(SocialCreateIntentV2.quiz),
       ),
+      (
+        key: const Key('screen04-create-inline-emoji'),
+        ownerKey: null,
+        icon: Icons.emoji_emotions_outlined,
+        label: 'Emoji',
+        selected: false,
+        onTap: () => unawaited(_openEmojiPalette()),
+      ),
+      (
+        key: const Key('screen04-create-inline-mention'),
+        ownerKey: null,
+        icon: Icons.alternate_email_rounded,
+        label: 'Mention',
+        selected: false,
+        onTap: () => _insertComposerText('@'),
+      ),
+      (
+        key: const Key('screen04-create-inline-topic'),
+        ownerKey: null,
+        icon: Icons.tag_rounded,
+        label: 'Topic',
+        selected: false,
+        onTap: () => _insertComposerText('#'),
+      ),
       if (widget.allowReel)
         (
           key: const Key('screen04-create-tool-reel'),
@@ -1214,19 +1253,13 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
           onTap: widget.onCreateYouTubeShort!,
         ),
     ];
-    final orderedActions = [
-      ...actions.where((action) => action.selected),
-      ...actions.where((action) => !action.selected),
-    ];
-
-    Widget action(_KeyboardCreateAction value, {required double width}) {
+    Widget action(_KeyboardCreateAction value) {
       final child = compactAction(
         key: value.key,
         icon: value.icon,
         label: value.label,
         selected: value.selected,
         onTap: value.onTap,
-        width: width,
       );
       final ownerKey = value.ownerKey;
       return ownerKey == null
@@ -1234,127 +1267,39 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
           : KeyedSubtree(key: ownerKey, child: child);
     }
 
-    if (keyboardOpen) {
-      final active = orderedActions.first;
-      return SizedBox(
-        key: const ValueKey('create-keyboard-format-workbench'),
-        height: 52,
-        child: Row(
-          children: [
-            Expanded(
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: KeyedSubtree(
-                  key: const Key('screen04-create-ime-format-strip'),
-                  child: action(active, width: 146),
-                ),
+    return SizedBox(
+      key: const ValueKey('create-keyboard-format-workbench'),
+      height: 52,
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              key: const Key('screen04-create-ime-format-strip'),
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (var index = 0; index < actions.length; index++) ...[
+                    if (index > 0) const SizedBox(width: 3),
+                    action(actions[index]),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(width: 6),
-            IconButton.filledTonal(
-              key: const Key('screen04-create-keyboard-done'),
-              tooltip: 'Hide keyboard',
-              onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
-              icon: const Icon(Icons.keyboard_hide_rounded),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return LayoutBuilder(
-      key: const Key('screen04-create-ime-format-strip'),
-      builder: (context, constraints) {
-        const gap = 6.0;
-        final width = (constraints.maxWidth - (gap * 2)) / 3;
-        return Wrap(
-          key: const ValueKey('create-keyboard-format-workbench'),
-          spacing: gap,
-          runSpacing: gap,
-          children: [
-            for (final value in orderedActions) action(value, width: width),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildWorkbenchCard() {
+  Widget _buildWorkbenchCard(bool keyboardOpen) {
     return Material(
       color: Colors.transparent,
       child: Container(
         key: const Key('screen04-create-workbench'),
-        padding: const EdgeInsets.all(11),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFF7F4FF), Color(0xFFFFFBF4)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFDCD5FF)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x12000050),
-              blurRadius: 16,
-              offset: Offset(0, 7),
-            ),
-          ],
-        ),
+        padding: const EdgeInsets.all(3),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF7C3AED), SocialV2Colors.navy],
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Create canvas',
-                        style: TextStyle(
-                          color: SocialV2Colors.navy,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _canvasGuidance,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: SocialV2Colors.muted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const _PublicBadge(),
-              ],
-            ),
-            const SizedBox(height: 10),
-            _CreateCanvasStageRail(onPreview: _openPreview),
-            const SizedBox(height: 10),
             if (_draft.quotedPost case final quotedPost?) ...[
               SocialQuotedPostPreviewV2(
                 key: const Key('social-create-quoted-post'),
@@ -1362,28 +1307,14 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
               ),
               const SizedBox(height: 9),
             ],
+            _buildWritingComposer(keyboardOpen),
+            const SizedBox(height: 9),
             _buildFormatWorkspace(),
           ],
         ),
       ),
     );
   }
-
-  String get _canvasGuidance => switch ((_format, _postTool)) {
-    (SocialCreateFormatV2.carousel, _) =>
-      'Arrange a swipe story, then add the thread that connects it.',
-    (SocialCreateFormatV2.reel, _) =>
-      'Shape the opening moment before you share the full story.',
-    (SocialCreateFormatV2.post, _SocialPostTool.image) =>
-      'Let one strong image lead and give people useful context.',
-    (SocialCreateFormatV2.post, _SocialPostTool.imagePoll) =>
-      'Make each visual choice clear before inviting a vote.',
-    (SocialCreateFormatV2.post, _SocialPostTool.quickPoll) =>
-      'Ask one focused question that people can answer quickly.',
-    (SocialCreateFormatV2.post, _SocialPostTool.quiz) =>
-      'Build curiosity, then reveal the right answer clearly.',
-    _ => 'Write an insight people will want to read and respond to.',
-  };
 
   Widget _buildWritingComposer(bool keyboardOpen) {
     final question =
@@ -1393,12 +1324,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
             _postTool == _SocialPostTool.quiz);
     return Container(
       key: const Key('screen04-create-writing-canvas'),
-      padding: EdgeInsets.fromLTRB(
-        12,
-        keyboardOpen ? 6 : 11,
-        12,
-        keyboardOpen ? 4 : 8,
-      ),
+      padding: const EdgeInsets.fromLTRB(12, 11, 12, 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
@@ -1409,67 +1335,65 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (!keyboardOpen) ...[
-              Row(
-                children: [
-                  const CircleAvatar(
-                    radius: 19,
-                    backgroundColor: SocialV2Colors.navy,
-                    foregroundColor: Colors.white,
-                    child: Icon(Icons.person_rounded, size: 19),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.authorName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: SocialV2Colors.navy,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                          ),
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 19,
+                  backgroundColor: SocialV2Colors.navy,
+                  foregroundColor: Colors.white,
+                  child: Icon(Icons.person_rounded, size: 19),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.authorName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: SocialV2Colors.navy,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
                         ),
-                        Text(
-                          widget.authorHandle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: SocialV2Colors.muted,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      ),
+                      Text(
+                        widget.authorHandle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: SocialV2Colors.muted,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const Icon(
-                    Icons.public_rounded,
+                ),
+                const Icon(
+                  Icons.public_rounded,
+                  color: SocialV2Colors.green,
+                  size: 18,
+                ),
+                const SizedBox(width: 4),
+                const Text(
+                  'Public',
+                  style: TextStyle(
                     color: SocialV2Colors.green,
-                    size: 18,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
                   ),
-                  const SizedBox(width: 4),
-                  const Text(
-                    'Public',
-                    style: TextStyle(
-                      color: SocialV2Colors.green,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-            ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             TextField(
               key: const Key('screen04-create-post-text'),
               controller: _body,
               focusNode: _bodyFocus,
-              minLines: keyboardOpen ? 1 : 4,
-              maxLines: keyboardOpen ? 5 : 10,
+              minLines: keyboardOpen ? 3 : 5,
+              maxLines: 12,
               maxLength: 1200,
               scrollPadding: const EdgeInsets.only(bottom: 104),
               textCapitalization: TextCapitalization.sentences,
@@ -1505,47 +1429,6 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                 contentPadding: EdgeInsets.zero,
               ),
             ),
-            if (!keyboardOpen) ...[
-              const Divider(height: 14),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final actions = <Widget>[
-                    _CreateCanvasInlineAction(
-                      key: const Key('screen04-create-inline-emoji'),
-                      icon: Icons.emoji_emotions_outlined,
-                      label: 'Emoji',
-                      onTap: () => unawaited(_openEmojiPalette()),
-                    ),
-                    _CreateCanvasInlineAction(
-                      key: const Key('screen04-create-inline-mention'),
-                      icon: Icons.alternate_email_rounded,
-                      label: 'Mention',
-                      onTap: () => _insertComposerText('@'),
-                    ),
-                    _CreateCanvasInlineAction(
-                      key: const Key('screen04-create-inline-topic'),
-                      icon: Icons.tag_rounded,
-                      label: 'Topic',
-                      onTap: () => _insertComposerText('#'),
-                    ),
-                    _CreateCanvasInlineAction(
-                      key: const Key('screen04-create-inline-gif'),
-                      icon: Icons.gif_box_outlined,
-                      label: 'GIF',
-                      onTap: _showGifAvailability,
-                    ),
-                  ];
-                  final width = (constraints.maxWidth - 18) / 4;
-                  return Wrap(
-                    spacing: 6,
-                    children: [
-                      for (final action in actions)
-                        SizedBox(width: width, child: action),
-                    ],
-                  );
-                },
-              ),
-            ],
           ],
         ),
       ),
@@ -2060,173 +1943,6 @@ class _CreateFeedPreview extends StatelessWidget {
   }
 }
 
-class _CreateCanvasStageRail extends StatelessWidget {
-  const _CreateCanvasStageRail({required this.onPreview});
-
-  final VoidCallback onPreview;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    key: const Key('screen04-create-stage-rail'),
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: .82),
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      children: [
-        const Expanded(
-          child: _CreateCanvasStage(
-            icon: Icons.edit_note_rounded,
-            label: 'Build',
-            active: true,
-          ),
-        ),
-        const _CreateCanvasStageLine(),
-        Expanded(
-          child: _CreateCanvasStage(
-            key: const Key('screen04-create-open-preview'),
-            icon: Icons.visibility_outlined,
-            label: 'Preview',
-            onTap: onPreview,
-          ),
-        ),
-        const _CreateCanvasStageLine(),
-        const Expanded(
-          child: _CreateCanvasStage(
-            icon: Icons.public_rounded,
-            label: 'Publish',
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _CreateCanvasStage extends StatelessWidget {
-  const _CreateCanvasStage({
-    required this.icon,
-    required this.label,
-    this.active = false,
-    this.onTap,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.transparent,
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 44),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    icon,
-                    color: active || onTap != null
-                        ? const Color(0xFF6D4AFF)
-                        : SocialV2Colors.muted,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: active || onTap != null
-                          ? SocialV2Colors.navy
-                          : SocialV2Colors.muted,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _CreateCanvasStageLine extends StatelessWidget {
-  const _CreateCanvasStageLine();
-
-  @override
-  Widget build(BuildContext context) =>
-      const SizedBox(width: 22, child: Divider(color: Color(0xFFD8D7E5)));
-}
-
-class _CreateCanvasInlineAction extends StatelessWidget {
-  const _CreateCanvasInlineAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => OutlinedButton(
-    onPressed: onTap,
-    style: OutlinedButton.styleFrom(
-      minimumSize: const Size.fromHeight(44),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      backgroundColor: const Color(0xFFF5F3FF),
-      foregroundColor: SocialV2Colors.navy,
-      side: const BorderSide(color: Color(0xFFE1DCFF)),
-      textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
-    ),
-    child: FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [Icon(icon, size: 16), const SizedBox(width: 4), Text(label)],
-      ),
-    ),
-  );
-}
-
-class _PublicBadge extends StatelessWidget {
-  const _PublicBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 28),
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: SocialV2Colors.green,
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: const Text(
-        'Public',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 9,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
-}
-
 class _SourceAction extends StatelessWidget {
   const _SourceAction({
     required this.icon,
@@ -2270,41 +1986,41 @@ class _FormatAction extends StatelessWidget {
       button: true,
       selected: selected,
       label: label,
-      child: Material(
-        color: selected ? SocialV2Colors.navy : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-          side: BorderSide(
-            color: selected ? SocialV2Colors.navy : SocialV2Colors.line,
+      child: Tooltip(
+        message: label,
+        child: Material(
+          color: selected ? SocialV2Colors.navy : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+            side: BorderSide(
+              color: selected ? SocialV2Colors.navy : SocialV2Colors.line,
+            ),
           ),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(15),
-          child: SizedBox(
-            height: 50,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: 17,
-                  color: selected ? Colors.white : SocialV2Colors.navy,
-                ),
-                const SizedBox(width: 5),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: selected ? Colors.white : SocialV2Colors.navy,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                    ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(15),
+            child: SizedBox(
+              height: 48,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 22,
+                    color: selected ? Colors.white : SocialV2Colors.navy,
                   ),
-                ),
-              ],
+                  if (selected)
+                    const Positioned(
+                      top: 3,
+                      right: 3,
+                      child: Icon(
+                        Icons.check_circle_rounded,
+                        size: 12,
+                        color: Colors.white,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

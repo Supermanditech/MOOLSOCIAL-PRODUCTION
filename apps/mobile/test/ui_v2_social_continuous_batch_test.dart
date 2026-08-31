@@ -524,7 +524,7 @@ void main() {
         );
         expect(
           find.byKey(const Key('screen04-create-stage-rail')),
-          findsOneWidget,
+          findsNothing,
         );
         expect(
           find.byKey(const Key('screen04-create-inline-emoji')),
@@ -541,13 +541,13 @@ void main() {
           Key('screen04-create-inline-gif'),
         ]) {
           final rect = tester.getRect(find.byKey(key));
-          final canvas = tester.getRect(
-            find.byKey(const Key('screen04-create-writing-canvas')),
+          final shelf = tester.getRect(
+            find.byKey(const Key('screen04-create-format-decision')),
           );
-          expect(rect.left, greaterThanOrEqualTo(canvas.left));
-          expect(rect.right, lessThanOrEqualTo(canvas.right));
+          expect(rect.top, greaterThanOrEqualTo(shelf.top));
+          expect(rect.bottom, lessThanOrEqualTo(shelf.bottom));
           expect(rect.height, greaterThanOrEqualTo(44));
-          expect(rect.width, lessThan(100));
+          expect(rect.width, lessThan(72));
         }
         final emojiRect = tester.getRect(
           find.byKey(const Key('screen04-create-inline-emoji')),
@@ -588,6 +588,9 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        await tester.ensureVisible(
+          find.byKey(const Key('screen04-create-inline-emoji')),
+        );
         await tester.tap(find.byKey(const Key('screen04-create-inline-emoji')));
         await tester.pumpAndSettle();
         expect(find.text('Add a feeling'), findsOneWidget);
@@ -603,6 +606,9 @@ void main() {
           'Preview draft✨',
         );
 
+        await tester.ensureVisible(
+          find.byKey(const Key('screen04-create-inline-gif')),
+        );
         await tester.tap(find.byKey(const Key('screen04-create-inline-gif')));
         await tester.pumpAndSettle();
         expect(find.textContaining('approved media service'), findsOneWidget);
