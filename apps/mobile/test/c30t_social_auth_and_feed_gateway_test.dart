@@ -437,6 +437,12 @@ void main() {
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);
       await tester.pumpAndSettle();
       expect(
+        find.byKey(Key('social-reply-context-${item.id}')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Replying to Riya Sharma'), findsOneWidget);
+      expect(find.text('No replies yet'), findsNothing);
+      expect(
         tester.getBottomRight(submit).dy,
         lessThanOrEqualTo(544),
         reason: 'The reply action must stay above a 300dp keyboard.',

@@ -8142,6 +8142,7 @@ class _SocialCommentsPanelV2State extends State<_SocialCommentsPanelV2> {
   }
 
   void _handleReplyFocus() {
+    if (mounted) setState(() {});
     if (!_replyFocusNode.hasFocus) return;
     Future<void>.delayed(const Duration(milliseconds: 280), () {
       final submitContext = _replySubmitRevealKey.currentContext;
@@ -8185,6 +8186,55 @@ class _SocialCommentsPanelV2State extends State<_SocialCommentsPanelV2> {
     _replyController.clear();
   }
 
+  Widget _buildReplyContext() {
+    final item = widget.item;
+    return Container(
+      key: Key('social-reply-context-${item.id}'),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F1FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFDCD5FF)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.reply_rounded, color: SocialV2Colors.navy, size: 20),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Replying to ${item.authorName} · ${item.authorHandle}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: SocialV2Colors.navy,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  item.body.trim().isEmpty ? 'Public post' : item.body.trim(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: SocialV2Colors.muted,
+                    fontSize: 11,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -8196,18 +8246,19 @@ class _SocialCommentsPanelV2State extends State<_SocialCommentsPanelV2> {
         final loaded = widget.session.socialCommentsLoaded(postId);
         final posting = widget.session.socialReplyBusy(postId);
         final error = widget.session.socialCommentError(postId);
+        final composing = _replyFocusNode.hasFocus;
         return Column(
           key: Key('social-comments-panel-$postId'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (loading && !loaded)
+            if (!composing && loading && !loaded)
               const Center(child: CircularProgressIndicator.adaptive())
-            else if (comments.isEmpty)
+            else if (!composing && comments.isEmpty)
               const SocialV2Notice(
                 title: 'No replies yet',
                 detail: 'Be the first to add a respectful public reply.',
               )
-            else
+            else if (!composing)
               for (final comment in comments)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -8239,7 +8290,7 @@ class _SocialCommentsPanelV2State extends State<_SocialCommentsPanelV2> {
                     ),
                   ),
                 ),
-            if (error != null) ...[
+            if (!composing && error != null) ...[
               SocialV2Notice(
                 title: 'Reply not completed',
                 detail: error,
@@ -8247,7 +8298,9 @@ class _SocialCommentsPanelV2State extends State<_SocialCommentsPanelV2> {
               ),
               const SizedBox(height: 8),
             ],
-            if (loaded && widget.session.socialCommentsHasMore(postId))
+            if (!composing &&
+                loaded &&
+                widget.session.socialCommentsHasMore(postId))
               OutlinedButton.icon(
                 key: Key('social-comments-more-$postId'),
                 onPressed: loading
@@ -8256,7 +8309,7 @@ class _SocialCommentsPanelV2State extends State<_SocialCommentsPanelV2> {
                 icon: const Icon(Icons.expand_more_rounded),
                 label: const Text('Load older replies'),
               ),
-            if (error != null && !loaded)
+            if (!composing && error != null && !loaded)
               OutlinedButton.icon(
                 key: Key('social-comments-retry-$postId'),
                 onPressed: loading
@@ -8269,6 +8322,10 @@ class _SocialCommentsPanelV2State extends State<_SocialCommentsPanelV2> {
                 label: const Text('Retry replies'),
               ),
             const Divider(height: 24),
+            if (composing) ...[
+              _buildReplyContext(),
+              const SizedBox(height: 10),
+            ],
             TextField(
               key: Key('social-reply-field-$postId'),
               controller: _replyController,
