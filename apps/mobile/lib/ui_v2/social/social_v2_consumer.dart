@@ -3584,14 +3584,32 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
                 ),
               ),
               const SizedBox(height: 12),
-              const Row(
-                children: [
-                  _CreateJourneyStep(number: '1', label: 'Spark'),
-                  _CreateJourneyLine(),
-                  _CreateJourneyStep(number: '2', label: 'Shape'),
-                  _CreateJourneyLine(),
-                  _CreateJourneyStep(number: '3', label: 'Preview'),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact =
+                      constraints.maxWidth < 300 ||
+                      MediaQuery.textScalerOf(context).scale(1) > 1.2;
+                  if (compact) {
+                    return const Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        _CreateJourneyStep(number: '1', label: 'Spark'),
+                        _CreateJourneyStep(number: '2', label: 'Shape'),
+                        _CreateJourneyStep(number: '3', label: 'Preview'),
+                      ],
+                    );
+                  }
+                  return const Row(
+                    children: [
+                      _CreateJourneyStep(number: '1', label: 'Spark'),
+                      _CreateJourneyLine(),
+                      _CreateJourneyStep(number: '2', label: 'Shape'),
+                      _CreateJourneyLine(),
+                      _CreateJourneyStep(number: '3', label: 'Preview'),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
