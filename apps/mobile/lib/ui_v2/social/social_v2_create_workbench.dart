@@ -1589,10 +1589,9 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                         onTap: _showGifAvailability,
                       ),
                     ];
-                    final width = (constraints.maxWidth - 6) / 2;
+                    final width = (constraints.maxWidth - 18) / 4;
                     return Wrap(
                       spacing: 6,
-                      runSpacing: 6,
                       children: [
                         for (final action in actions)
                           SizedBox(width: width, child: action),
@@ -2284,17 +2283,22 @@ class _CreateCanvasInlineAction extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => OutlinedButton.icon(
+  Widget build(BuildContext context) => OutlinedButton(
     onPressed: onTap,
-    icon: Icon(icon, size: 16),
-    label: Text(label),
     style: OutlinedButton.styleFrom(
       minimumSize: const Size.fromHeight(44),
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       backgroundColor: const Color(0xFFF5F3FF),
       foregroundColor: SocialV2Colors.navy,
       side: const BorderSide(color: Color(0xFFE1DCFF)),
       textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+    ),
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [Icon(icon, size: 16), const SizedBox(width: 4), Text(label)],
+      ),
     ),
   );
 }

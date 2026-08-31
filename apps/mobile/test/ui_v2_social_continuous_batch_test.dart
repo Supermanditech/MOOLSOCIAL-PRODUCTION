@@ -559,7 +559,15 @@ void main() {
           expect(rect.left, greaterThanOrEqualTo(canvas.left));
           expect(rect.right, lessThanOrEqualTo(canvas.right));
           expect(rect.height, greaterThanOrEqualTo(44));
+          expect(rect.width, lessThan(100));
         }
+        final emojiRect = tester.getRect(
+          find.byKey(const Key('screen04-create-inline-emoji')),
+        );
+        final gifRect = tester.getRect(
+          find.byKey(const Key('screen04-create-inline-gif')),
+        );
+        expect(gifRect.top, emojiRect.top);
         expect(find.text('Sign in to post'), findsOneWidget);
         await tester.enterText(
           find.byKey(const Key('screen04-create-post-text')),
