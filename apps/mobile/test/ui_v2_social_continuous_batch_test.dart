@@ -528,16 +528,20 @@ void main() {
         );
         expect(
           find.byKey(const Key('screen04-create-more-tools')),
-          findsOneWidget,
+          findsNothing,
         );
         expect(
           find.byKey(const Key('screen04-create-inline-emoji')),
           findsNothing,
         );
-        expect(
-          find.byKey(const Key('screen04-create-inline-gif')),
-          findsNothing,
-        );
+        for (final key in const [
+          Key('screen04-create-inline-gif'),
+          Key('screen04-create-inline-mention'),
+          Key('screen04-create-inline-topic'),
+        ]) {
+          expect(find.byKey(key), findsOneWidget);
+          expect(tester.getSize(find.byKey(key)).height, 44);
+        }
         expect(find.text('Sign in to post'), findsNothing);
         expect(find.text('Post'), findsOneWidget);
         expect(
@@ -570,26 +574,12 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        await tester.tap(find.byKey(const Key('screen04-create-more-tools')));
-        await tester.pumpAndSettle();
-        expect(find.text('More creation tools'), findsOneWidget);
-        for (final key in const [
-          Key('screen04-create-inline-gif'),
-          Key('screen04-create-inline-emoji'),
-          Key('screen04-create-inline-mention'),
-          Key('screen04-create-inline-topic'),
-        ]) {
-          expect(find.byKey(key), findsOneWidget);
-          expect(
-            tester.getSize(find.byKey(key)).height,
-            greaterThanOrEqualTo(44),
-          );
-        }
-        await tester.tap(find.byKey(const Key('screen04-create-inline-emoji')));
-        await tester.pumpAndSettle();
-        expect(find.text('Add a feeling'), findsOneWidget);
-        await tester.tap(find.text('✨'));
-        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('screen04-create-inline-mention')),
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('screen04-create-inline-topic')));
+        await tester.pump();
         expect(
           tester
               .widget<TextField>(
@@ -597,11 +587,9 @@ void main() {
               )
               .controller!
               .text,
-          'Preview draft✨',
+          'Preview draft@#',
         );
 
-        await tester.tap(find.byKey(const Key('screen04-create-more-tools')));
-        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('screen04-create-inline-gif')));
         await tester.pumpAndSettle();
         expect(find.textContaining('approved media service'), findsOneWidget);

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
+import 'package:moolsocial/features/chat/chat_entry_context.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/retailer/retailer_session.dart';
@@ -13,6 +14,83 @@ import 'package:moolsocial/ui_v2/universal/mool_contextual_chat_v2.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'Social Chat keeps its Social identity and exact Social return route',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final owners = _Owners();
+      addTearDown(owners.dispose);
+      String? capturedReturnRoute;
+      late final GoRouter router;
+      router = GoRouter(
+        initialLocation: '/app/social?sub=feed',
+        routes: [
+          GoRoute(
+            path: '/app/chat',
+            builder: (context, state) {
+              capturedReturnRoute = state.uri.queryParameters['return'];
+              final entry = ChatEntryContext.resolve(capturedReturnRoute ?? '');
+              return Scaffold(
+                body: Column(
+                  children: [
+                    Text(entry.title),
+                    Text(entry.subtitle),
+                    FilledButton(
+                      key: const ValueKey('social-chat-return'),
+                      onPressed: () => context.go(capturedReturnRoute!),
+                      child: const Text('Return to Social'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/app/:world',
+            builder: (context, state) => SocialUniversalV2(
+              session: owners.journey,
+              creatorSession: owners.creator,
+              retailerSession: owners.retailer,
+              sharedSession: owners.shared,
+              initialWorld: state.pathParameters['world'] ?? 'social',
+              initialSubAction: state.uri.queryParameters['sub'],
+              youtubePublicAccessOverride: false,
+              youtubeCreatorAccessOverride: false,
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(_routedApp(router));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('social-global-chat')));
+      await tester.pumpAndSettle();
+
+      expect(capturedReturnRoute, '/app/social?sub=feed');
+      expect(
+        ChatEntryContext.resolve(capturedReturnRoute!).id,
+        ChatEntryContextId.social,
+      );
+      expect(find.text('Social Chat'), findsOneWidget);
+      expect(find.text('People and creators'), findsOneWidget);
+      expect(find.text('Shop Chat'), findsNothing);
+      expect(find.text('All your conversations'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('social-chat-return')));
+      await tester.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, '/app/social');
+      expect(
+        router.routeInformationProvider.value.uri.queryParameters['sub'],
+        'feed',
+      );
+      expect(find.byKey(const Key('screen04-rail-feed')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'Food Travel Care and Work subactions open exact standalone Chat context',

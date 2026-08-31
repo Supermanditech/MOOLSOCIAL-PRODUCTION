@@ -1346,6 +1346,10 @@ void main() {
     await _pump(tester, owners.consumer(sub: 'create'));
 
     final workbench = find.byKey(const Key('screen04-create-workbench'));
+    final writing = find.byKey(const Key('screen04-create-writing-canvas'));
+    final formatWorkspace = find.byKey(
+      const ValueKey('screen04-create-post-workbench'),
+    );
     expect(workbench, findsOneWidget);
     for (final key in const [
       'screen04-create-tool-image',
@@ -1368,19 +1372,35 @@ void main() {
     expect(workbench, findsOneWidget);
     expect(find.text('market.png'), findsNothing);
     expect(owners.picker.lastImageSource, SocialMediaSource.gallery);
+    expect(
+      tester.getTopLeft(formatWorkspace).dy,
+      lessThan(tester.getTopLeft(writing).dy),
+    );
 
     await _tapCreateTool(tester, 'screen04-create-tool-camera');
     await tester.pumpAndSettle();
     expect(owners.picker.lastImageSource, SocialMediaSource.camera);
+    expect(
+      tester.getTopLeft(formatWorkspace).dy,
+      lessThan(tester.getTopLeft(writing).dy),
+    );
 
     await _tapCreateTool(tester, 'screen04-create-tool-carousel');
     await tester.pumpAndSettle();
     expect(workbench, findsOneWidget);
     expect(find.text('2 / 10 photos'), findsOneWidget);
+    expect(
+      tester.getTopLeft(formatWorkspace).dy,
+      lessThan(tester.getTopLeft(writing).dy),
+    );
 
     await _tapCreateTool(tester, 'screen04-create-tool-post');
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('screen04-create-post-text')), findsOneWidget);
+    expect(
+      tester.getTopLeft(writing).dy,
+      lessThan(tester.getTopLeft(formatWorkspace).dy),
+    );
 
     await _tapCreateTool(tester, 'screen04-create-tool-image-poll');
     await tester.pumpAndSettle();

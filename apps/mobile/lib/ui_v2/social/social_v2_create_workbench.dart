@@ -440,7 +440,13 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       _ => _SocialPostTool.none,
     };
     if (_format == nextFormat && _postTool == nextTool) {
-      if (nextTool != _SocialPostTool.image) _bodyFocus.requestFocus();
+      if (nextTool == _SocialPostTool.image) {
+        await _choosePostImage();
+      } else if (nextFormat == SocialCreateFormatV2.carousel) {
+        await _chooseCarousel();
+      } else {
+        _bodyFocus.requestFocus();
+      }
       return;
     }
     HapticFeedback.selectionClick();
@@ -649,175 +655,6 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       ),
     );
     _bodyFocus.requestFocus();
-  }
-
-  Future<void> _openEmojiPalette() async {
-    final emoji = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Add a feeling',
-                style: TextStyle(
-                  color: SocialV2Colors.navy,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Choose one or use your keyboard for every emoji.',
-                style: TextStyle(color: SocialV2Colors.muted),
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final value in const [
-                    '✨',
-                    '❤️',
-                    '👏',
-                    '😊',
-                    '🎉',
-                    '💡',
-                    '🌱',
-                    '🙏',
-                  ])
-                    Semantics(
-                      button: true,
-                      label: 'Insert $value',
-                      child: InkWell(
-                        key: Key('screen04-create-emoji-$value'),
-                        onTap: () => Navigator.pop(sheetContext, value),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          width: 56,
-                          height: 56,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF4F1FF),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Text(
-                            value,
-                            style: const TextStyle(fontSize: 26),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (!mounted || emoji == null) return;
-    _insertComposerText(emoji);
-  }
-
-  Future<void> _openMoreCreateTools() async {
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 2, 16, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'More creation tools',
-                style: TextStyle(
-                  color: SocialV2Colors.navy,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Add expression or context without leaving your draft.',
-                style: TextStyle(color: SocialV2Colors.muted),
-              ),
-              const SizedBox(height: 12),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  const gap = 8.0;
-                  final width = (constraints.maxWidth - gap) / 2;
-                  Widget tool({
-                    required Key key,
-                    required IconData icon,
-                    required String label,
-                    required String value,
-                  }) => SizedBox(
-                    width: width,
-                    child: OutlinedButton.icon(
-                      key: key,
-                      onPressed: () => Navigator.pop(sheetContext, value),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(52),
-                        alignment: Alignment.centerLeft,
-                      ),
-                      icon: Icon(icon),
-                      label: Text(label),
-                    ),
-                  );
-                  return Wrap(
-                    spacing: gap,
-                    runSpacing: gap,
-                    children: [
-                      tool(
-                        key: const Key('screen04-create-inline-gif'),
-                        icon: Icons.gif_box_outlined,
-                        label: 'GIF',
-                        value: 'gif',
-                      ),
-                      tool(
-                        key: const Key('screen04-create-inline-emoji'),
-                        icon: Icons.emoji_emotions_outlined,
-                        label: 'Emoji',
-                        value: 'emoji',
-                      ),
-                      tool(
-                        key: const Key('screen04-create-inline-mention'),
-                        icon: Icons.alternate_email_rounded,
-                        label: 'Mention',
-                        value: 'mention',
-                      ),
-                      tool(
-                        key: const Key('screen04-create-inline-topic'),
-                        icon: Icons.tag_rounded,
-                        label: 'Topic',
-                        value: 'topic',
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (!mounted || action == null) return;
-    switch (action) {
-      case 'gif':
-        _showGifAvailability();
-      case 'emoji':
-        await _openEmojiPalette();
-      case 'mention':
-        _insertComposerText('@');
-      case 'topic':
-        _insertComposerText('#');
-    }
   }
 
   void _showGifAvailability() {
@@ -1100,7 +937,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
               child: SafeArea(
                 bottom: false,
                 child: SizedBox(
-                  height: 58,
+                  height: 54,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Row(
@@ -1131,43 +968,10 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
                           ),
                         ),
                         IconButton(
-                          key: const Key('screen04-create-open-preview'),
-                          tooltip: 'Preview post',
-                          onPressed: _openPreview,
-                          icon: const Icon(Icons.visibility_outlined),
-                        ),
-                        IconButton(
                           key: const Key('screen04-create-discard'),
                           tooltip: 'Discard draft',
                           onPressed: _confirmDiscard,
                           icon: const Icon(Icons.delete_outline_rounded),
-                        ),
-                        SizedBox(
-                          width: 96,
-                          height: 44,
-                          child: FilledButton.icon(
-                            key: const Key('screen04-create-publish-post'),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(96, 44),
-                              maximumSize: const Size(96, 44),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                              ),
-                            ),
-                            onPressed:
-                                widget.previewOnly ||
-                                    widget.session.busy ||
-                                    _selectingMedia
-                                ? null
-                                : _publish,
-                            icon: const Icon(
-                              Icons.arrow_upward_rounded,
-                              size: 18,
-                            ),
-                            label: Text(
-                              widget.session.busy ? 'Posting…' : 'Post',
-                            ),
-                          ),
                         ),
                       ],
                     ),
@@ -1192,8 +996,16 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
               child: SafeArea(
                 top: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
-                  child: _buildFormatDecisionBar(),
+                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+                  child: Column(
+                    key: const Key('screen04-create-composer-dock'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildFormatDecisionBar(),
+                      const SizedBox(height: 4),
+                      _buildComposerActionBar(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1232,7 +1044,7 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       ),
     );
 
-    final actions = <_KeyboardCreateAction>[
+    final primaryActions = <_KeyboardCreateAction>[
       (
         key: const Key('screen04-create-tool-post'),
         ownerKey: const Key('social-create-moolsocial-post'),
@@ -1299,14 +1111,8 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
             _postTool == _SocialPostTool.quiz,
         onTap: () => _selectIntent(SocialCreateIntentV2.quiz),
       ),
-      (
-        key: const Key('screen04-create-more-tools'),
-        ownerKey: null,
-        icon: Icons.add_circle_outline_rounded,
-        label: 'More',
-        selected: false,
-        onTap: () => unawaited(_openMoreCreateTools()),
-      ),
+    ];
+    final videoActions = <_KeyboardCreateAction>[
       if (widget.allowReel)
         (
           key: const Key('screen04-create-tool-reel'),
@@ -1341,46 +1147,127 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
           : KeyedSubtree(key: ownerKey, child: child);
     }
 
-    if (actions.length > 8) {
-      return SizedBox(
-        key: const ValueKey('create-keyboard-format-workbench'),
-        height: 54,
-        child: SingleChildScrollView(
-          key: const Key('screen04-create-ime-format-strip'),
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (var index = 0; index < actions.length; index++) ...[
-                if (index > 0) const SizedBox(width: 6),
-                action(actions[index], width: 82),
-              ],
-            ],
-          ),
-        ),
-      );
-    }
-
     return LayoutBuilder(
       key: const Key('screen04-create-ime-format-strip'),
       builder: (context, constraints) {
-        const gap = 6.0;
-        final width = (constraints.maxWidth - (gap * 3)) / 4;
+        final gap = constraints.maxWidth <= 340 ? .5 : 4.0;
+        final width = (constraints.maxWidth - (gap * 6)) / 7;
+        final primaryGroup = SizedBox(
+          width: constraints.maxWidth,
+          child: Row(
+            children: [
+              for (var index = 0; index < primaryActions.length; index++) ...[
+                if (index > 0) SizedBox(width: gap),
+                action(primaryActions[index], width: width),
+              ],
+            ],
+          ),
+        );
         return SizedBox(
           key: const ValueKey('create-keyboard-format-workbench'),
-          height: 110,
-          child: Wrap(
-            spacing: gap,
-            runSpacing: gap,
-            children: [
-              for (final value in actions) action(value, width: width),
-            ],
+          height: 50,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                primaryGroup,
+                for (final value in videoActions) ...[
+                  const SizedBox(width: 5),
+                  action(
+                    value,
+                    width: value.label == 'YouTube Short' ? 92 : 62,
+                  ),
+                ],
+              ],
+            ),
           ),
         );
       },
     );
   }
 
+  Widget _buildComposerActionBar() {
+    return SizedBox(
+      key: const Key('screen04-create-composer-action-row'),
+      height: 44,
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              key: const Key('screen04-create-inline-tools'),
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _ComposerUtilityAction(
+                    key: const Key('screen04-create-inline-gif'),
+                    width: 44,
+                    icon: Icons.gif_box_outlined,
+                    label: 'GIF',
+                    onTap: _showGifAvailability,
+                  ),
+                  const SizedBox(width: 2),
+                  _ComposerUtilityAction(
+                    key: const Key('screen04-create-inline-mention'),
+                    width: 60,
+                    icon: Icons.alternate_email_rounded,
+                    label: 'Mention',
+                    onTap: () => _insertComposerText('@'),
+                  ),
+                  const SizedBox(width: 2),
+                  _ComposerUtilityAction(
+                    key: const Key('screen04-create-inline-topic'),
+                    width: 52,
+                    icon: Icons.tag_rounded,
+                    label: 'Topic',
+                    onTap: () => _insertComposerText('#'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            key: const Key('screen04-create-open-preview'),
+            tooltip: 'Preview post',
+            constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+            padding: EdgeInsets.zero,
+            style: IconButton.styleFrom(
+              foregroundColor: SocialV2Colors.navy,
+              backgroundColor: const Color(0xFFF4F1FF),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            onPressed: _openPreview,
+            icon: const Icon(Icons.visibility_outlined, size: 19),
+          ),
+          const SizedBox(width: 4),
+          SizedBox(
+            width: 88,
+            height: 44,
+            child: FilledButton(
+              key: const Key('screen04-create-publish-post'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(88, 44),
+                maximumSize: const Size(88, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              onPressed:
+                  widget.previewOnly || widget.session.busy || _selectingMedia
+                  ? null
+                  : _publish,
+              child: Text(widget.session.busy ? 'Posting…' : 'Post'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildWorkbenchCard(bool keyboardOpen) {
+    final workspaceFirst =
+        _format != SocialCreateFormatV2.post ||
+        _postTool != _SocialPostTool.none;
     return Material(
       color: Colors.transparent,
       child: Container(
@@ -1396,9 +1283,15 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
               ),
               const SizedBox(height: 9),
             ],
+            if (workspaceFirst) ...[
+              _buildFormatWorkspace(),
+              const SizedBox(height: 9),
+            ],
             _buildWritingComposer(keyboardOpen),
-            const SizedBox(height: 9),
-            _buildFormatWorkspace(),
+            if (!workspaceFirst) ...[
+              const SizedBox(height: 9),
+              _buildFormatWorkspace(),
+            ],
           ],
         ),
       ),
@@ -1529,8 +1422,30 @@ class _SocialCreateWorkbenchV2State extends State<SocialCreateWorkbenchV2> {
       key: const ValueKey('screen04-create-post-workbench'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_postTool == _SocialPostTool.image && _media.isEmpty) ...[
+          Row(
+            children: [
+              Expanded(
+                child: _SourceAction(
+                  key: const Key('screen04-create-image-gallery'),
+                  icon: Icons.image_outlined,
+                  label: 'Choose image',
+                  onTap: _choosePostImage,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _SourceAction(
+                  key: const Key('screen04-create-image-camera'),
+                  icon: Icons.photo_camera_outlined,
+                  label: 'Take photo',
+                  onTap: _choosePostCameraImage,
+                ),
+              ),
+            ],
+          ),
+        ],
         if (_postTool == _SocialPostTool.image && _media.isNotEmpty) ...[
-          const SizedBox(height: 8),
           AspectRatio(
             aspectRatio: 16 / 9,
             child: ClipRRect(
@@ -2055,6 +1970,64 @@ class _SourceAction extends StatelessWidget {
   }
 }
 
+class _ComposerUtilityAction extends StatelessWidget {
+  const _ComposerUtilityAction({
+    required this.width,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    super.key,
+  });
+
+  final double width;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(13),
+            side: const BorderSide(color: SocialV2Colors.line),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(13),
+            child: SizedBox(
+              width: width,
+              height: 44,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 16, color: SocialV2Colors.navy),
+                  const SizedBox(height: 1),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: SocialV2Colors.navy,
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _FormatAction extends StatelessWidget {
   const _FormatAction({
     required this.icon,
@@ -2089,7 +2062,7 @@ class _FormatAction extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(15),
             child: SizedBox(
-              height: 52,
+              height: 50,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
@@ -2098,22 +2071,23 @@ class _FormatAction extends StatelessWidget {
                     children: [
                       Icon(
                         icon,
-                        size: 19,
+                        size: 17,
                         color: selected ? Colors.white : SocialV2Colors.navy,
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 1),
                         child: Text(
                           label,
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: selected
                                 ? Colors.white
                                 : SocialV2Colors.navy,
-                            fontSize: 9,
+                            fontSize: 8.2,
+                            height: 1,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -2122,11 +2096,11 @@ class _FormatAction extends StatelessWidget {
                   ),
                   if (selected)
                     const Positioned(
-                      top: 3,
-                      right: 3,
+                      top: 2,
+                      right: 2,
                       child: Icon(
                         Icons.check_circle_rounded,
-                        size: 12,
+                        size: 10,
                         color: Colors.white,
                       ),
                     ),
