@@ -128,6 +128,60 @@ void main() {
     expect(session.cartLines, isEmpty);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'authoritative product video enters the gallery and preserves Back',
+    (tester) async {
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        productContentAdapter: const _VideoContentAdapter(),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      expect(session.openProduct('s-milk'), isTrue);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: session.destination,
+            initialView: session.view,
+            productId: session.selectedProductId,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('buy-product-video-s-milk-video')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('This product video is unavailable right now.'),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(
+          const ValueKey('buy-product-video-error-transcript-s-milk-video'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Video transcript'), findsOneWidget);
+      expect(find.textContaining('sealed milk pouch'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-product-video-transcript-close')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.catalogue);
+      expect(session.destination, BuyV2Destination.shop);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 final class _ContentAdapter implements BuyV2ProductContentAdapter {
@@ -165,4 +219,28 @@ final class _ContentAdapter implements BuyV2ProductContentAdapter {
       description: 'Fresh toned milk supplied in a sealed pouch.',
     );
   }
+}
+
+final class _VideoContentAdapter implements BuyV2ProductContentAdapter {
+  const _VideoContentAdapter();
+
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(
+    BuyV2Product product,
+  ) => BuyV2ProductContentSnapshot(
+    productId: product.id,
+    state: BuyV2ProductContentState.ready,
+    sourceId: 'firebase-product-media-contract-test',
+    media: [
+      BuyV2ProductMediaAsset(
+        id: '${product.id}-video',
+        label: 'See the sealed pack',
+        semanticLabel: '${product.title} sealed-pack product video',
+        kind: BuyV2ProductContentMediaKind.networkVideo,
+        source: 'pending-firebase-product-video',
+        transcript:
+            'The video shows the sealed milk pouch from the front and back.',
+      ),
+    ],
+  );
 }

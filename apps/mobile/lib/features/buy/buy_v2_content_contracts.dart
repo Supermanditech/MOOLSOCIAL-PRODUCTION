@@ -153,7 +153,12 @@ abstract interface class BuyV2ProductFactsAdapter {
 
 enum BuyV2ProductContentState { ready, loading, offline, unavailable }
 
-enum BuyV2ProductContentMediaKind { cataloguePackshot, asset, network }
+enum BuyV2ProductContentMediaKind {
+  cataloguePackshot,
+  asset,
+  network,
+  networkVideo,
+}
 
 @immutable
 class BuyV2ProductMediaAsset {
@@ -163,9 +168,15 @@ class BuyV2ProductMediaAsset {
     required this.semanticLabel,
     required this.kind,
     this.source,
+    this.posterSource,
+    this.transcript,
   }) : assert(
          kind == BuyV2ProductContentMediaKind.cataloguePackshot ||
              (source != null && source != ''),
+       ),
+       assert(
+         kind != BuyV2ProductContentMediaKind.networkVideo ||
+             (transcript != null && transcript != ''),
        );
 
   final String id;
@@ -173,6 +184,8 @@ class BuyV2ProductMediaAsset {
   final String semanticLabel;
   final BuyV2ProductContentMediaKind kind;
   final String? source;
+  final String? posterSource;
+  final String? transcript;
 }
 
 @immutable

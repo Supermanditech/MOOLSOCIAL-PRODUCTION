@@ -20,6 +20,7 @@ import 'buy_v2_invoice.dart';
 import 'buy_v2_payment_sheet_motion.dart';
 import 'buy_v2_prescription_sheet_motion.dart';
 import 'buy_v2_product_feedback_sheet_motion.dart';
+import 'buy_v2_product_video.dart';
 import 'buy_v2_supplier_sheet_motion.dart';
 
 String _productCountLabel(int count) =>
@@ -471,9 +472,16 @@ class BuyV2ProductView extends StatelessWidget {
                             : content.media)
                       _BuyV2ProductMediaItem(
                         label: media.label,
-                        child: _ProductContentMediaSurface(
+                        zoomable:
+                            media.kind !=
+                            BuyV2ProductContentMediaKind.networkVideo,
+                        video:
+                            media.kind ==
+                            BuyV2ProductContentMediaKind.networkVideo,
+                        builder: (active) => _ProductContentMediaSurface(
                           product: product,
                           media: media,
+                          active: active,
                         ),
                       ),
                   ],
@@ -2886,10 +2894,12 @@ class _ProductContentMediaSurface extends StatelessWidget {
   const _ProductContentMediaSurface({
     required this.product,
     required this.media,
+    required this.active,
   });
 
   final BuyV2Product product;
   final BuyV2ProductMediaAsset media;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
@@ -2900,6 +2910,9 @@ class _ProductContentMediaSurface extends StatelessWidget {
       animateFirstFrame: true,
     );
 
+    if (media.kind == BuyV2ProductContentMediaKind.networkVideo) {
+      return BuyV2ProductVideo(product: product, media: media, active: active);
+    }
     return Semantics(
       image: true,
       label: media.semanticLabel,
@@ -2921,16 +2934,26 @@ class _ProductContentMediaSurface extends StatelessWidget {
               : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
           errorBuilder: (_, _, _) => fallback(),
         ),
+        BuyV2ProductContentMediaKind.networkVideo => throw StateError(
+          'Video media is handled before the image switch.',
+        ),
       },
     );
   }
 }
 
 class _BuyV2ProductMediaItem {
-  const _BuyV2ProductMediaItem({required this.label, required this.child});
+  const _BuyV2ProductMediaItem({
+    required this.label,
+    required this.builder,
+    required this.zoomable,
+    required this.video,
+  });
 
   final String label;
-  final Widget child;
+  final Widget Function(bool active) builder;
+  final bool zoomable;
+  final bool video;
 }
 
 class _BuyV2ZoomableMedia extends StatefulWidget {
@@ -3118,6 +3141,7 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
   Widget build(BuildContext context) {
     final product = widget.product;
     final hasMultipleMedia = widget.media.length > 1;
+    final hasVideo = widget.media.any((media) => media.video);
     final viewportHeight = MediaQuery.sizeOf(context).height;
     final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
     final galleryHeight = widget.compact
@@ -3128,8 +3152,9 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
     return Semantics(
       container: true,
       label: hasMultipleMedia
-          ? 'Product image gallery for ${product.title}, '
-                '${widget.media.length} images. Swipe to browse.'
+          ? 'Product ${hasVideo ? 'media' : 'image'} gallery for '
+                '${product.title}, ${widget.media.length} items. '
+                'Swipe to browse.'
           : 'Product media for ${product.title}',
       child: Container(
         height: galleryHeight,
@@ -3158,40 +3183,46 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
                     : const NeverScrollableScrollPhysics(),
                 itemCount: widget.media.length,
                 onPageChanged: (value) => setState(() => _page = value),
-                itemBuilder: (context, index) => Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    8,
-                    9,
-                    8,
-                    hasMultipleMedia ? 35 : 9,
-                  ),
-                  child: DecoratedBox(
-                    key: ValueKey('buy-product-gallery-image-$index'),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x1D000040),
-                          blurRadius: 20,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
+                itemBuilder: (context, index) {
+                  final media = widget.media[index];
+                  final child = media.builder(index == _page);
+                  return Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      8,
+                      9,
+                      8,
+                      hasMultipleMedia ? 35 : 9,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(3),
-                      child: _BuyV2ZoomableMedia(
-                        key: ValueKey(
-                          'buy-product-media-zoom-owner-'
-                          '${product.id}-$index',
-                        ),
-                        product: product,
-                        label: widget.media[index].label,
-                        child: widget.media[index].child,
+                    child: DecoratedBox(
+                      key: ValueKey('buy-product-gallery-image-$index'),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x1D000040),
+                            blurRadius: 20,
+                            offset: Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(3),
+                        child: media.zoomable
+                            ? _BuyV2ZoomableMedia(
+                                key: ValueKey(
+                                  'buy-product-media-zoom-owner-'
+                                  '${product.id}-$index',
+                                ),
+                                product: product,
+                                label: media.label,
+                                child: child,
+                              )
+                            : child,
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
             Positioned(
