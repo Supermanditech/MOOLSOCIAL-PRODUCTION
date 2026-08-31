@@ -729,6 +729,51 @@ void main() {
     await cache.clearIfRevision(4);
     expect(cache.snapshot, isNull);
   });
+
+  test('RT-04C-01 confirmed flush retries superseded draft writes', () async {
+    var calls = 0;
+    final persisted = await settleLatestSocialCreateDraftPersistence(
+      attempt: () async {
+        calls += 1;
+        return calls == 3;
+      },
+    );
+    expect(persisted, isTrue);
+    expect(calls, 3);
+  });
+
+  test(
+    'RT-04C-01 only explicit guest UI review accepts session durability',
+    () {
+      expect(
+        acceptSocialCreateDraftFlush(
+          persisted: true,
+          durable: false,
+          reviewPreviewEnabled: true,
+          authenticated: false,
+        ),
+        isTrue,
+      );
+      expect(
+        acceptSocialCreateDraftFlush(
+          persisted: true,
+          durable: false,
+          reviewPreviewEnabled: false,
+          authenticated: false,
+        ),
+        isFalse,
+      );
+      expect(
+        acceptSocialCreateDraftFlush(
+          persisted: true,
+          durable: false,
+          reviewPreviewEnabled: true,
+          authenticated: true,
+        ),
+        isFalse,
+      );
+    },
+  );
 }
 
 Future<void> _pumpConsumer(

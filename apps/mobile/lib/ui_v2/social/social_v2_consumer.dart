@@ -43,6 +43,26 @@ typedef Screen04YouTubePublicSearchLoader =
 typedef Screen04YouTubePublicChannelLoader =
     Future<Screen04YouTubePublicChannelCatalogue> Function(String channelId);
 
+@visibleForTesting
+Future<bool> settleLatestSocialCreateDraftPersistence({
+  required Future<bool> Function() attempt,
+  int maximumAttempts = 3,
+}) async {
+  assert(maximumAttempts > 0);
+  for (var index = 0; index < maximumAttempts; index++) {
+    if (await attempt()) return true;
+  }
+  return false;
+}
+
+@visibleForTesting
+bool acceptSocialCreateDraftFlush({
+  required bool persisted,
+  required bool durable,
+  required bool reviewPreviewEnabled,
+  required bool authenticated,
+}) => persisted && (durable || (reviewPreviewEnabled && !authenticated));
+
 enum SocialV2ShareOutcome { selected, dismissed, unavailable }
 
 @immutable
@@ -1565,11 +1585,20 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
   }
 
   Future<bool> _flushCreateDraft() async {
-    final request = ++_createDraftPersistenceRequest;
-    if (!await _persistCreateDraft(request)) return false;
+    final persisted = await settleLatestSocialCreateDraftPersistence(
+      attempt: () {
+        final request = ++_createDraftPersistenceRequest;
+        return _persistCreateDraft(request);
+      },
+    );
+    if (!persisted) return false;
     final durable = await _createDraftStateCache.settleDurableWritesConfirmed();
-    if (durable) return true;
-    return widget.enableCreateReviewPreview && _createReviewPreviewActive;
+    return acceptSocialCreateDraftFlush(
+      persisted: persisted,
+      durable: durable,
+      reviewPreviewEnabled: widget.enableCreateReviewPreview,
+      authenticated: widget.session.isAuthenticated,
+    );
   }
 
   void _closeCreate() {
