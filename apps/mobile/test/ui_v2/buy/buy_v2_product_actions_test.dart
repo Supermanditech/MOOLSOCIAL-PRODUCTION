@@ -111,6 +111,12 @@ void main() {
       find.byKey(const ValueKey('buy-product-action-ask-seller-s-milk')),
       findsOneWidget,
     );
+    for (final label in const ['Save', 'Share', 'Compare', 'Ask seller']) {
+      expect(
+        find.descendant(of: actions, matching: find.bySemanticsLabel(label)),
+        findsOneWidget,
+      );
+    }
 
     await tester.tap(
       find.byKey(const ValueKey('buy-product-action-save-s-milk')),
