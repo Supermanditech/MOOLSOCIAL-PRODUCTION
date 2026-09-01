@@ -858,7 +858,7 @@ class BuyV2ProductView extends StatelessWidget {
                   else
                     _DecisionRow(
                       icon: Icons.route_outlined,
-                      label: 'Source route',
+                      label: 'Where it comes from',
                       value: product.origin,
                     ),
                   if (returnSummary case final returnPolicy?)
@@ -1033,7 +1033,7 @@ class BuyV2ProductCompliancePanel extends StatelessWidget {
     final consumerCare = _nonBlankComplianceValue(compliance?.consumerCare);
     return _DecisionPanel(
       key: ValueKey('buy-product-compliance-${product.id}'),
-      title: 'Product compliance',
+      title: 'Product and pack information',
       children: [
         _DecisionRow(
           icon: Icons.category_outlined,
@@ -6301,7 +6301,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                             case final provider?)
                           'Delivery provider · $provider'
                         else
-                          'Fulfiller assigned automatically after placement',
+                          'Delivery partner confirmed after your order is placed',
                         if (deliveryGroups[index].deliveryServiceLevel
                             case final serviceLevel?)
                           'Service · $serviceLevel',

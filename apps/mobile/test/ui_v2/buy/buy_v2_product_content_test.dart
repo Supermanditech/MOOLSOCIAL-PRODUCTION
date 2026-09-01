@@ -127,7 +127,7 @@ void main() {
     await tester.pumpAndSettle();
 
     for (final value in const [
-      'Product compliance',
+      'Product and pack information',
       'Refined sunflower oil',
       '5 L',
       'Surya Oils India',
