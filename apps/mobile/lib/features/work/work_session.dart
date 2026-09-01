@@ -60,6 +60,7 @@ class WorkSession extends ChangeNotifier {
   String unsupportedWorkspace = '';
   String unsupportedArea = '';
   String unsupportedFamily = '';
+  String unsupportedOtherActivity = '';
 
   WorkWorkspace? activeWorkspace;
   final List<WorkWorkspace> otherWorkspaces = <WorkWorkspace>[];
@@ -506,6 +507,7 @@ class WorkSession extends ChangeNotifier {
     required String workspace,
     required String family,
     required String area,
+    String otherActivity = '',
   }) async {
     if (workspace.trim().length < 3) {
       errorMessage = 'Enter your business, profession or service.';
@@ -522,9 +524,17 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (family.trim() == 'Other' && otherActivity.trim().length < 3) {
+      errorMessage = 'Enter the activity you want to offer.';
+      notifyListeners();
+      return false;
+    }
     unsupportedWorkspace = workspace.trim();
     unsupportedFamily = family.trim();
     unsupportedArea = area.trim();
+    unsupportedOtherActivity = family.trim() == 'Other'
+        ? otherActivity.trim()
+        : '';
     unsupportedRequestSent = true;
     errorMessage = null;
     noticeMessage =

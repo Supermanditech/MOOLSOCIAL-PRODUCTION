@@ -157,14 +157,12 @@ void main() {
         'Furniture repair',
       );
       expect(tester.getBottomRight(actions).dy, lessThanOrEqualTo(468));
-      expect(
-        find.byKey(const Key('work-send-profile-request')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('work-profile-request-back')),
-        findsOneWidget,
-      );
+      final send = find.byKey(const Key('work-send-profile-request'));
+      final back = find.byKey(const Key('work-profile-request-back'));
+      expect(send, findsOneWidget);
+      expect(back, findsOneWidget);
+      expect(tester.getBottomRight(send).dy, lessThanOrEqualTo(436));
+      expect(tester.getBottomRight(back).dy, lessThanOrEqualTo(436));
       expect(tester.takeException(), isNull);
 
       await tester.tap(find.byKey(const Key('work-profile-request-back')));

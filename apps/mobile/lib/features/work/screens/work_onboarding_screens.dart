@@ -324,8 +324,10 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
 
   final TextEditingController _workspace = TextEditingController();
   final TextEditingController _area = TextEditingController();
+  final TextEditingController _otherActivity = TextEditingController();
   final FocusNode _workspaceFocus = FocusNode();
   final FocusNode _areaFocus = FocusNode();
+  final FocusNode _otherActivityFocus = FocusNode();
   String _category = '';
   String? _error;
   bool _submitting = false;
@@ -334,8 +336,10 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
   void dispose() {
     _workspace.dispose();
     _area.dispose();
+    _otherActivity.dispose();
     _workspaceFocus.dispose();
     _areaFocus.dispose();
+    _otherActivityFocus.dispose();
     super.dispose();
   }
 
@@ -346,6 +350,8 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
         ? 'Enter your business, profession or service.'
         : _category.isEmpty
         ? 'Choose the closest category.'
+        : _category == 'Other' && _otherActivity.text.trim().length < 3
+        ? 'Enter the activity you want to offer.'
         : _area.text.trim().length < 3
         ? 'Enter your city or service area.'
         : null;
@@ -361,6 +367,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
       workspace: _workspace.text,
       family: _category,
       area: _area.text,
+      otherActivity: _otherActivity.text,
     );
     if (!mounted) return;
     if (sent) {
@@ -381,7 +388,6 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
   @override
   Widget build(BuildContext context) {
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    final keyboardVisible = keyboardInset > 0;
     final reportedBottomInset = _workViewBottomInset(context);
     final gestureSafeBottom = reportedBottomInset < 24
         ? 24.0
@@ -389,14 +395,12 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
     return SafeArea(
       top: false,
       minimum: EdgeInsets.only(bottom: gestureSafeBottom + MoolSpacing.xs),
-      child: AnimatedPadding(
-        duration: MoolMotion.accessible(context, MoolMotion.quick),
-        curve: MoolMotion.change,
+      child: Padding(
         padding: EdgeInsets.only(bottom: keyboardInset),
         child: Align(
           alignment: Alignment.bottomCenter,
-          child: FractionallySizedBox(
-            heightFactor: keyboardVisible ? .96 : .82,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 500),
             child: Material(
               key: const Key('work-profile-request-sheet'),
               color: Colors.white,
@@ -540,6 +544,22 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                               : (value) =>
                                     setState(() => _category = value ?? ''),
                         ),
+                        if (_category == 'Other') ...[
+                          const SizedBox(height: MoolSpacing.sm),
+                          TextField(
+                            key: const Key('work-request-other-activity'),
+                            controller: _otherActivity,
+                            focusNode: _otherActivityFocus,
+                            enabled: !_submitting,
+                            textInputAction: TextInputAction.next,
+                            scrollPadding: const EdgeInsets.only(bottom: 120),
+                            onSubmitted: (_) => _areaFocus.requestFocus(),
+                            decoration: const InputDecoration(
+                              labelText: 'Describe your activity',
+                              hintText: 'For example, handloom repair',
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: MoolSpacing.sm),
                         TextField(
                           key: const Key('work-request-area'),
@@ -566,7 +586,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                         MoolSpacing.md,
                         MoolSpacing.sm,
                         MoolSpacing.md,
-                        MoolSpacing.xs,
+                        MoolSpacing.xs + 24,
                       ),
                       child: Row(
                         children: [

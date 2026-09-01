@@ -333,10 +333,28 @@ void main() {
       await tapVisible(tester, const Key('work-request-family'));
       await tester.tap(find.text('Other').last);
       await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-request-other-activity')),
+        findsOneWidget,
+      );
+      await tapVisible(tester, const Key('work-send-profile-request'));
+      expect(
+        find.text('Enter the activity you want to offer.'),
+        findsOneWidget,
+      );
+      await enter(
+        tester,
+        const Key('work-request-other-activity'),
+        'Community library and reading services',
+      );
       await enter(tester, const Key('work-request-area'), 'Jodhpur');
       await tapVisible(tester, const Key('work-send-profile-request'));
 
       expect(work.unsupportedRequestSent, isTrue);
+      expect(
+        work.unsupportedOtherActivity,
+        'Community library and reading services',
+      );
       expect(work.activeWorkspace, isNull);
       expect(
         find.textContaining('MoolSocial will review your request'),
