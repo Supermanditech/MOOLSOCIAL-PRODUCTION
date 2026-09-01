@@ -2271,6 +2271,7 @@ String? _canonicalPersistedReadyRoute(String? location) {
   if (path == '/app/work') return '/app/work';
   if (path == '/app/work/home') return '/app/work/earn';
   if (path == '/app/work/earn' ||
+      path == '/app/work/filters' ||
       (path.startsWith('/app/work/opportunity/') &&
           path != '/app/work/opportunity/delivery')) {
     return '/app/work/earn';

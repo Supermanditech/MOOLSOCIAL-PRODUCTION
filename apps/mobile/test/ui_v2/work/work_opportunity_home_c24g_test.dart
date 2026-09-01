@@ -199,6 +199,15 @@ void main() {
 
     final context = tester.element(find.byKey(const Key('work-search')));
     expect(MoolServiceHomeTokens.accessibleDuration(context), Duration.zero);
+    final liveStatus = find.byKey(
+      const Key('work-opportunity-live-status-quick-delivery-biker'),
+    );
+    final fade = tester.widget<FadeTransition>(
+      find
+          .descendant(of: liveStatus, matching: find.byType(FadeTransition))
+          .first,
+    );
+    expect(fade.opacity.value, 1);
     expect(tester.takeException(), isNull);
   });
 }

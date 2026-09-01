@@ -139,10 +139,9 @@ void main() {
       );
 
       await tapVisible(tester, const Key('work-apply-opportunity'));
-      expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
-      expect(work.savedOpportunity?.id, 'quick-delivery-biker');
+      expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+      expect(work.selectedOpportunity?.id, 'quick-delivery-biker');
 
-      await tapVisible(tester, const Key('my-work-start'));
       await chooseRetailer(tester);
       await enter(tester, const Key('work-name'), 'Mahadev Fresh Mart');
       await enter(tester, const Key('work-area'), 'Sardarpura, Jodhpur');
@@ -185,9 +184,9 @@ void main() {
   );
 
   testWidgets(
-    'verified workspace application failure replays once without duplication',
+    'Apply Now enters Workspace onboarding with the exact opportunity',
     (tester) async {
-      final gateway = ReviewWorkGateway()..failApplication = true;
+      final gateway = ReviewWorkGateway();
       final work = WorkSession(gateway: gateway)..seedVerifiedWorkspace();
       await mount(
         tester,
@@ -196,15 +195,10 @@ void main() {
       );
 
       await tapVisible(tester, const Key('work-apply-opportunity'));
-      expect(
-        find.text('Application was not sent. Your opportunity is still saved.'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+      expect(work.selectedOpportunity?.id, 'quick-delivery-biker');
       expect(work.applicationId, isNull);
-      await tapVisible(tester, const Key('work-apply-opportunity'));
-      expect(work.applicationId, isNotNull);
-      expect(gateway.applicationCalls, 2);
-      expect(find.textContaining('Application sent'), findsOneWidget);
+      expect(gateway.applicationCalls, 0);
     },
   );
 
@@ -217,6 +211,7 @@ void main() {
 
     await tapVisible(tester, const Key('work-filter-button'));
     await tapVisible(tester, const Key('work-filter-jobs'));
+    await tapVisible(tester, const Key('work-filter-show-results'));
     expect(find.text('Quick Delivery Biker'), findsOneWidget);
     expect(find.text('Social Content Creator'), findsNothing);
 

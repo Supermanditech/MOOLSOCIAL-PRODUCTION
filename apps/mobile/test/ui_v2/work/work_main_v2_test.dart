@@ -123,6 +123,9 @@ void main() {
     expect(find.byKey(const Key('work-earn-hero')), findsNothing);
     expect(find.text('Find paid work with clear terms'), findsNothing);
     expect(find.text('Opportunities'), findsNothing);
+    expect(find.textContaining('Filter on the go'), findsNothing);
+    expect(find.textContaining('MoolSocial-owned'), findsNothing);
+    expect(find.textContaining('USER-OWNED'), findsNothing);
 
     final card = find.byKey(const Key('work-opportunity-quick-delivery-biker'));
     expect(card, findsOneWidget);
@@ -159,8 +162,28 @@ void main() {
     expect(tester.getSize(card).height, lessThan(360));
     expect(find.byType(SliverList), findsWidgets);
     expect(
-      find.byKey(const Key('work-opportunity-workspace-quick-delivery-biker')),
+      find.byKey(const Key('work-persistent-workspace-assistance')),
       findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('work-opportunity-workspace-quick-delivery-biker')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(
+        const Key('work-opportunity-live-status-quick-delivery-biker'),
+      ),
+      findsOneWidget,
+    );
+    for (final metric in const ['needed', 'joined', 'progress', 'left']) {
+      expect(
+        find.byKey(Key('work-opportunity-$metric-quick-delivery-biker')),
+        findsOneWidget,
+      );
+    }
+    expect(
+      find.descendant(of: card, matching: find.byType(FadeTransition)),
+      findsWidgets,
     );
 
     await tester.tap(find.byKey(const Key('work-earn-global-profile')));
@@ -201,18 +224,71 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('inline city area and pincode chips combine immediately', (
+  testWidgets('searchable filter page remains usable with compact large text', (
+    tester,
+  ) async {
+    await mountWork(
+      tester,
+      initialLocation: '/app/work/filters',
+      size: const Size(320, 700),
+      textScale: 1.4,
+    );
+
+    expect(find.byKey(const Key('work-filter-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-filter-city-field')), findsOneWidget);
+    expect(find.byKey(const Key('work-inline-filter-panel')), findsNothing);
+    expect(
+      tester.getSize(find.byKey(const Key('work-filter-show-results'))).height,
+      greaterThanOrEqualTo(48),
+    );
+    await tester.enterText(
+      find.byKey(const Key('work-filter-city-field')),
+      'Jodh',
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-filter-city-Jodhpur')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('payment table remains aligned with compact large text', (
+    tester,
+  ) async {
+    await mountWork(
+      tester,
+      initialLocation: '/app/work/opportunity/doctor-onboarding-specialist',
+      size: const Size(320, 700),
+      textScale: 1.4,
+    );
+    final detailScroll = find
+        .descendant(
+          of: find.byKey(const Key('work-opportunity-screen')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('work-detail-payment')),
+      240,
+      scrollable: detailScroll,
+    );
+    expect(find.byKey(const Key('work-payment-table')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('searchable city area and pincode filters combine exactly', (
     tester,
   ) async {
     final (_, work) = await mountWork(tester);
     await tester.tap(find.byKey(const Key('work-filter-button')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('work-inline-filter-panel')), findsOneWidget);
+    expect(find.byKey(const Key('work-filter-screen')), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing);
-    final city = find.byKey(const Key('work-filter-city-Jodhpur'));
-    await tester.ensureVisible(city);
+    await tester.enterText(
+      find.byKey(const Key('work-filter-city-field')),
+      'Jodhpur',
+    );
     await tester.pumpAndSettle();
+    final city = find.byKey(const Key('work-filter-city-Jodhpur'));
     await tester.tap(city);
     await tester.pumpAndSettle();
     final area = find.byKey(const Key('work-filter-area-Ratanada'));
@@ -222,6 +298,8 @@ void main() {
     final pincode = find.byKey(const Key('work-filter-pincode-342011'));
     await tester.ensureVisible(pincode);
     await tester.tap(pincode);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-filter-show-results')));
     await tester.pumpAndSettle();
 
     expect(work.selectedCity, 'Jodhpur');
@@ -246,15 +324,21 @@ void main() {
     final (_, work) = await mountWork(tester);
     await tester.tap(find.byKey(const Key('work-filter-button')));
     await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('work-filter-city-field')),
+      'Delhi',
+    );
+    await tester.pumpAndSettle();
     final delhi = find.byKey(const Key('work-filter-city-Delhi'));
-    await tester.ensureVisible(delhi);
     await tester.tap(delhi);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-filter-show-results')));
     await tester.pumpAndSettle();
 
     expect(work.selectedCity, 'Delhi');
-    expect(find.text('No exact match in Delhi'), findsOneWidget);
+    expect(find.text('No openings found in Delhi'), findsOneWidget);
     expect(find.byKey(const Key('work-related-opportunities')), findsOneWidget);
-    expect(find.text('More paid work beyond Delhi'), findsOneWidget);
+    expect(find.text('Open opportunities in other locations'), findsOneWidget);
     expect(
       find.byKey(const Key('work-opportunity-quick-delivery-biker')),
       findsOneWidget,
@@ -264,12 +348,10 @@ void main() {
   testWidgets('opportunity detail is role-specific and complete', (
     tester,
   ) async {
-    await mountWork(tester);
+    final (_, work) = await mountWork(tester);
     await openSearch(tester, 'doctor');
     await tester.tap(
-      find.byKey(
-        const Key('work-opportunity-apply-doctor-onboarding-specialist'),
-      ),
+      find.byKey(const Key('work-opportunity-doctor-onboarding-specialist')),
     );
     await tester.pumpAndSettle();
 
@@ -281,8 +363,6 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Apply Now'), findsOneWidget);
-    expect(find.byKey(const Key('work-detail-about-role')), findsOneWidget);
-    expect(find.byKey(const Key('work-detail-what-youll-do')), findsOneWidget);
     final detailScroll = find
         .descendant(
           of: find.byKey(const Key('work-opportunity-screen')),
@@ -290,6 +370,8 @@ void main() {
         )
         .first;
     for (final key in const [
+      Key('work-detail-about-role'),
+      Key('work-detail-what-youll-do'),
       Key('work-detail-who-you-are'),
       Key('work-detail-nice-to-have'),
       Key('work-detail-why-join'),
@@ -302,10 +384,22 @@ void main() {
       );
       expect(find.byKey(key), findsOneWidget);
     }
-    expect(find.textContaining('Medical representative'), findsWidgets);
+    expect(
+      work.selectedOpportunity?.niceToHave.join(' '),
+      contains('Medical representative'),
+    );
+    expect(find.byKey(const Key('work-payment-table')), findsOneWidget);
+    expect(
+      find.byKey(const Key('work-payment-monthly-highlight')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('work-apply-opportunity')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(work.selectedOpportunity?.id, 'doctor-onboarding-specialist');
   });
 
-  testWidgets('successful Apply can be cancelled or confirmed Withdraw', (
+  testWidgets('Apply Now opens exact Workspace onboarding without applying', (
     tester,
   ) async {
     final gateway = ReviewWorkGateway();
@@ -317,23 +411,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('work-apply-opportunity')));
-    await tester.pumpAndSettle();
-    expect(gateway.applicationCalls, 1);
-    expect(find.byKey(const Key('work-withdraw-application')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('work-withdraw-application')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-withdraw-cancel')));
-    await tester.pumpAndSettle();
-    expect(gateway.withdrawalCalls, 0);
-
-    await tester.tap(find.byKey(const Key('work-withdraw-application')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-withdraw-confirm')));
-    await tester.pumpAndSettle();
-    expect(gateway.withdrawalCalls, 1);
-    expect(find.byKey(const Key('work-apply-opportunity')), findsOneWidget);
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(work.selectedOpportunity?.id, 'social-content-creator');
+    expect(gateway.applicationCalls, 0);
   });
 
   testWidgets('Workspace and Chat return to the exact filtered Earn state', (

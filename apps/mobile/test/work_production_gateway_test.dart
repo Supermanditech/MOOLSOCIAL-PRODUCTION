@@ -54,6 +54,23 @@ void main() {
       expect(opportunity.niceToHave, isNotEmpty);
       expect(opportunity.whyJoin, isNotEmpty);
       expect(opportunity.funded, isTrue);
+      expect(opportunity.peopleNeeded, greaterThan(0));
+      expect(opportunity.peopleJoined, greaterThanOrEqualTo(0));
+      expect(opportunity.applicationsInProgress, greaterThanOrEqualTo(0));
+      expect(
+        opportunity.peopleJoined + opportunity.applicationsInProgress,
+        lessThanOrEqualTo(opportunity.peopleNeeded),
+      );
+      expect(
+        opportunity.positionsRemaining,
+        opportunity.peopleNeeded -
+            opportunity.peopleJoined -
+            opportunity.applicationsInProgress,
+      );
+      expect(
+        opportunity.finalDeadline,
+        matches(RegExp(r'^\d{2} \w{3} \d{4}$')),
+      );
     }
   });
 

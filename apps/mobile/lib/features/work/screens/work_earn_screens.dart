@@ -60,7 +60,6 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
   );
   final FocusNode _searchFocus = FocusNode(debugLabel: 'work-earn-search');
   bool _searchOpen = false;
-  bool _filtersOpen = false;
 
   @override
   void dispose() {
@@ -86,12 +85,13 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
     context.go('/app/work/opportunity/${opportunity.id}');
   }
 
-  void _toggleFilters() {
-    _searchFocus.unfocus();
-    setState(() => _filtersOpen = !_filtersOpen);
+  void _openWorkspaceSetup(BuildContext context) {
+    widget.session.startAnotherWork();
+    context.push('/app/work/workspace/choose');
   }
 
-  void _openWorkspaceSetup(BuildContext context) {
+  void _startApplication(BuildContext context, WorkOpportunity opportunity) {
+    widget.session.openOpportunity(opportunity.id);
     widget.session.startAnotherWork();
     context.push('/app/work/workspace/choose');
   }
@@ -150,7 +150,7 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
                 widget.session.search('');
               },
               filterCount: filterCount,
-              onFilter: _toggleFilters,
+              onFilter: () => context.push('/app/work/filters'),
               onProfile: () => _openProfile(context),
             ),
             fallbackBackRoute: '/app/mool?from=work',
@@ -158,128 +158,128 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
             showHeaderChat: false,
             showTrailingAction: false,
             activeLocalAction: 'earn',
-            body: RefreshIndicator(
-              onRefresh: widget.session.refreshFeed,
-              child: CustomScrollView(
-                key: const Key('work-earn-screen'),
-                slivers: [
-                  if (widget.session.busy) ...[
-                    const SliverToBoxAdapter(
-                      child: LinearProgressIndicator(
-                        key: Key('work-feed-loading'),
-                        minHeight: 3,
-                      ),
-                    ),
-                  ],
-                  SliverToBoxAdapter(
-                    child: AnimatedSize(
-                      duration: MoolMotion.accessible(
-                        context,
-                        MoolMotion.standard,
-                      ),
-                      alignment: Alignment.topCenter,
-                      child: _filtersOpen
-                          ? _InlineOpportunityFilters(
-                              session: widget.session,
-                              onCollapse: _toggleFilters,
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                  ),
-                  if (opportunities.isEmpty)
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(
-                        MoolServiceHomeTokens.pagePadding,
-                        MoolSpacing.sm,
-                        MoolServiceHomeTokens.pagePadding,
-                        MoolSpacing.sm,
-                      ),
-                      sliver: SliverToBoxAdapter(
-                        child: WorkEmptyState(
-                          title: widget.session.selectedCity.isEmpty
-                              ? 'No paid work matches'
-                              : 'No exact match in ${widget.session.selectedCity}',
-                          detail: related.isEmpty
-                              ? 'Clear the search or filters to see other funded requirements.'
-                              : 'Nearby supply changes often. Continue with similar funded work available elsewhere.',
-                          actionLabel: 'Reset search and filters',
-                          onAction: _resetDiscovery,
-                        ),
-                      ),
-                    ),
-                  if (opportunities.isNotEmpty)
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(
-                        MoolServiceHomeTokens.pagePadding,
-                        MoolSpacing.sm,
-                        MoolServiceHomeTokens.pagePadding,
-                        0,
-                      ),
-                      sliver: SliverList.builder(
-                        itemCount: opportunities.length,
-                        itemBuilder: (context, index) => Padding(
-                          padding: const EdgeInsets.only(
-                            bottom: MoolSpacing.sm,
+            body: Column(
+              children: [
+                _PersistentWorkspaceAssistance(
+                  onPressed: () => _openWorkspaceSetup(context),
+                ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: widget.session.refreshFeed,
+                    child: CustomScrollView(
+                      key: const Key('work-earn-screen'),
+                      slivers: [
+                        if (widget.session.busy) ...[
+                          const SliverToBoxAdapter(
+                            child: LinearProgressIndicator(
+                              key: Key('work-feed-loading'),
+                              minHeight: 3,
+                            ),
                           ),
-                          child: _WorkReveal(
-                            order: index,
-                            child: _OpportunityCard(
-                              opportunity: opportunities[index],
-                              onOpen: () => _openOpportunity(
-                                context,
-                                opportunities[index],
+                        ],
+                        if (opportunities.isEmpty)
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(
+                              MoolServiceHomeTokens.pagePadding,
+                              MoolSpacing.sm,
+                              MoolServiceHomeTokens.pagePadding,
+                              MoolSpacing.sm,
+                            ),
+                            sliver: SliverToBoxAdapter(
+                              child: WorkEmptyState(
+                                title: widget.session.selectedCity.isEmpty
+                                    ? 'No paid work matches'
+                                    : 'No openings found in ${widget.session.selectedCity}',
+                                detail: related.isEmpty
+                                    ? 'Try another search or location to discover available opportunities.'
+                                    : 'Explore similar opportunities currently open in other locations.',
+                                actionLabel: 'Reset search and filters',
+                                onAction: _resetDiscovery,
                               ),
-                              onWorkspaceSetup: () =>
-                                  _openWorkspaceSetup(context),
                             ),
                           ),
-                        ),
-                      ),
-                    ),
-                  if (related.isNotEmpty) ...[
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(
-                        MoolServiceHomeTokens.pagePadding,
-                        MoolSpacing.md,
-                        MoolServiceHomeTokens.pagePadding,
-                        MoolSpacing.sm,
-                      ),
-                      sliver: SliverToBoxAdapter(
-                        child: _RelatedWorkHeading(
-                          city: widget.session.selectedCity,
-                        ),
-                      ),
-                    ),
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: MoolServiceHomeTokens.pagePadding,
-                      ),
-                      sliver: SliverList.builder(
-                        itemCount: related.length,
-                        itemBuilder: (context, index) => Padding(
-                          padding: const EdgeInsets.only(
-                            bottom: MoolSpacing.sm,
-                          ),
-                          child: _WorkReveal(
-                            order: index,
-                            child: _OpportunityCard(
-                              opportunity: related[index],
-                              recommended: true,
-                              onOpen: () =>
-                                  _openOpportunity(context, related[index]),
-                              onWorkspaceSetup: () =>
-                                  _openWorkspaceSetup(context),
+                        if (opportunities.isNotEmpty)
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(
+                              MoolServiceHomeTokens.pagePadding,
+                              MoolSpacing.sm,
+                              MoolServiceHomeTokens.pagePadding,
+                              0,
+                            ),
+                            sliver: SliverList.builder(
+                              itemCount: opportunities.length,
+                              itemBuilder: (context, index) => Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: MoolSpacing.sm,
+                                ),
+                                child: _WorkReveal(
+                                  order: index,
+                                  child: _OpportunityCard(
+                                    opportunity: opportunities[index],
+                                    onOpen: () => _openOpportunity(
+                                      context,
+                                      opportunities[index],
+                                    ),
+                                    onApply: () => _startApplication(
+                                      context,
+                                      opportunities[index],
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
+                        if (related.isNotEmpty) ...[
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(
+                              MoolServiceHomeTokens.pagePadding,
+                              MoolSpacing.md,
+                              MoolServiceHomeTokens.pagePadding,
+                              MoolSpacing.sm,
+                            ),
+                            sliver: SliverToBoxAdapter(
+                              child: _RelatedWorkHeading(
+                                city: widget.session.selectedCity,
+                              ),
+                            ),
+                          ),
+                          SliverPadding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: MoolServiceHomeTokens.pagePadding,
+                            ),
+                            sliver: SliverList.builder(
+                              itemCount: related.length,
+                              itemBuilder: (context, index) => Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: MoolSpacing.sm,
+                                ),
+                                child: _WorkReveal(
+                                  order: index,
+                                  child: _OpportunityCard(
+                                    opportunity: related[index],
+                                    recommended: true,
+                                    onOpen: () => _openOpportunity(
+                                      context,
+                                      related[index],
+                                    ),
+                                    onApply: () => _startApplication(
+                                      context,
+                                      related[index],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SliverToBoxAdapter(
+                          child: SizedBox(height: MoolSpacing.xxl),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: MoolSpacing.xxl),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           );
         },
@@ -491,14 +491,39 @@ class _WorkFilterButton extends StatelessWidget {
   }
 }
 
-class _InlineOpportunityFilters extends StatelessWidget {
-  const _InlineOpportunityFilters({
-    required this.session,
-    required this.onCollapse,
-  });
+class WorkOpportunityFilterScreen extends StatelessWidget {
+  const WorkOpportunityFilterScreen({required this.session, super.key});
 
   final WorkSession session;
-  final VoidCallback onCollapse;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: session,
+      builder: (context, _) => WorkPageScaffold(
+        session: session,
+        title: 'Find paid work',
+        subtitle: 'Choose the work and location that suit you',
+        fallbackBackRoute: '/app/work/earn',
+        activeLocalAction: 'earn',
+        showHeaderChat: false,
+        showTrailingAction: false,
+        bottomAction: WorkPrimaryButton(
+          keyName: 'work-filter-show-results',
+          label: 'Show ${session.filteredOpportunities.length} opportunities',
+          onPressed: () => context.pop(),
+          icon: Icons.search_rounded,
+        ),
+        body: _OpportunityFilterContent(session: session),
+      ),
+    );
+  }
+}
+
+class _OpportunityFilterContent extends StatelessWidget {
+  const _OpportunityFilterContent({required this.session});
+
+  final WorkSession session;
 
   @override
   Widget build(BuildContext context) {
@@ -529,173 +554,313 @@ class _InlineOpportunityFilters extends StatelessWidget {
             .toSet()
             .toList()
           ..sort();
-    return Container(
-      key: const Key('work-inline-filter-panel'),
-      margin: const EdgeInsets.fromLTRB(
-        MoolServiceHomeTokens.pagePadding,
-        MoolSpacing.xs,
-        MoolServiceHomeTokens.pagePadding,
-        0,
+    return ListView(
+      key: const Key('work-filter-screen'),
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.md,
+        MoolSpacing.sm,
+        MoolSpacing.md,
+        MoolSpacing.xl,
       ),
-      padding: const EdgeInsets.all(MoolSpacing.sm),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(MoolRadii.floating),
-        border: Border.all(color: const Color(0xFFC9CCE1)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x11000050),
-            blurRadius: 16,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      children: [
+        WorkCard(
+          keyName: 'work-filter-type-section',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Filter on the go',
-                      style: TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                      ),
+              const _FilterSectionTitle(
+                icon: Icons.work_outline_rounded,
+                title: 'Work type',
+                detail: 'Select the opportunities you want to see.',
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              _FilterChoiceRow(
+                semanticLabel: 'Work type',
+                children: [
+                  for (final value in WorkFeedFilter.values)
+                    ChoiceChip(
+                      key: ValueKey('work-filter-${value.name}'),
+                      label: Text(value.label),
+                      selected: session.filter == value,
+                      onSelected: (_) => session.setFilter(value),
                     ),
-                    Text(
-                      'Tap once to update nearby paid work.',
-                      style: TextStyle(
-                        color: MoolColors.muted,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (session.filter != WorkFeedFilter.forYou ||
-                  session.hasOpportunityLocationFilter)
-                TextButton(
-                  key: const Key('work-filter-clear'),
-                  onPressed: () {
-                    session.setFilter(WorkFeedFilter.forYou);
-                    session.clearOpportunityFilters();
-                  },
-                  child: const Text('Clear'),
-                ),
-              IconButton(
-                key: const Key('work-filter-collapse'),
-                tooltip: 'Collapse filters',
-                onPressed: onCollapse,
-                icon: const Icon(Icons.expand_less_rounded),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          _FilterChoiceRow(
-            semanticLabel: 'Paid work type filters',
+        ),
+        const SizedBox(height: MoolSpacing.md),
+        WorkCard(
+          keyName: 'work-filter-location-section',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final value in WorkFeedFilter.values)
-                ChoiceChip(
-                  key: ValueKey('work-filter-${value.name}'),
-                  label: Text(value.label),
-                  selected: session.filter == value,
-                  onSelected: (_) => session.setFilter(value),
-                ),
-            ],
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          _FilterChoiceRow(
-            semanticLabel: 'City filters',
-            children: [
-              ChoiceChip(
-                key: const Key('work-filter-city-all'),
-                label: const Text('All India'),
-                selected: session.selectedCity.isEmpty,
-                onSelected: (_) => session.clearOpportunityFilters(),
+              const _FilterSectionTitle(
+                icon: Icons.location_on_outlined,
+                title: 'Preferred location',
+                detail: 'Search by city, then narrow by area or PIN code.',
               ),
-              for (final city in cities)
-                ChoiceChip(
-                  key: ValueKey('work-filter-city-$city'),
-                  label: Text(city),
-                  selected: session.selectedCity == city,
-                  onSelected: (_) => session.setOpportunityLocationFilters(
-                    city: session.selectedCity == city ? '' : city,
-                  ),
-                ),
-            ],
-          ),
-          AnimatedSwitcher(
-            duration: MoolMotion.accessible(context, MoolMotion.quick),
-            child: session.selectedCity.isEmpty
-                ? const SizedBox.shrink()
-                : Padding(
-                    key: ValueKey('work-location-${session.selectedCity}'),
-                    padding: const EdgeInsets.only(top: MoolSpacing.xs),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (areas.isNotEmpty)
-                          _FilterChoiceRow(
-                            semanticLabel: 'Area filters',
-                            children: [
-                              ChoiceChip(
-                                key: const Key('work-filter-area-all'),
-                                label: const Text('All areas'),
-                                selected: session.selectedArea.isEmpty,
-                                onSelected: (_) =>
-                                    session.setOpportunityLocationFilters(
-                                      city: session.selectedCity,
-                                    ),
+              const SizedBox(height: MoolSpacing.sm),
+              Autocomplete<String>(
+                key: const Key('work-filter-city-search'),
+                initialValue: TextEditingValue(text: session.selectedCity),
+                displayStringForOption: (city) => city,
+                optionsBuilder: (value) {
+                  final query = value.text.trim().toLowerCase();
+                  return cities.where(
+                    (city) => query.isEmpty
+                        ? true
+                        : city.toLowerCase().contains(query),
+                  );
+                },
+                onSelected: (city) =>
+                    session.setOpportunityLocationFilters(city: city),
+                fieldViewBuilder:
+                    (context, controller, focusNode, onSubmitted) => TextField(
+                      key: const Key('work-filter-city-field'),
+                      controller: controller,
+                      focusNode: focusNode,
+                      textInputAction: TextInputAction.search,
+                      decoration: InputDecoration(
+                        labelText: 'City',
+                        hintText: 'Start typing a city name',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: session.selectedCity.isEmpty
+                            ? null
+                            : IconButton(
+                                key: const Key('work-filter-city-clear'),
+                                tooltip: 'Clear city',
+                                onPressed: () {
+                                  controller.clear();
+                                  session.clearOpportunityFilters();
+                                },
+                                icon: const Icon(Icons.close_rounded),
                               ),
-                              for (final area in areas)
-                                ChoiceChip(
-                                  key: ValueKey('work-filter-area-$area'),
-                                  label: Text(area),
-                                  selected: session.selectedArea == area,
-                                  onSelected: (_) =>
-                                      session.setOpportunityLocationFilters(
-                                        city: session.selectedCity,
-                                        area: session.selectedArea == area
-                                            ? ''
-                                            : area,
-                                      ),
-                                ),
-                            ],
+                      ),
+                      onSubmitted: (_) => onSubmitted(),
+                    ),
+                optionsViewBuilder: (context, onSelected, options) {
+                  final visible = options.take(8).toList(growable: false);
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 8,
+                      borderRadius: BorderRadius.circular(MoolRadii.control),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: 360,
+                          maxHeight: 300,
+                        ),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: visible.length,
+                          itemBuilder: (context, index) => ListTile(
+                            key: ValueKey('work-filter-city-${visible[index]}'),
+                            dense: true,
+                            title: Text(visible[index]),
+                            onTap: () => onSelected(visible[index]),
                           ),
-                        if (pincodes.isNotEmpty) ...[
-                          const SizedBox(height: MoolSpacing.xs),
-                          _FilterChoiceRow(
-                            semanticLabel: 'Pincode filters',
-                            children: [
-                              for (final pincode in pincodes)
-                                ChoiceChip(
-                                  key: ValueKey('work-filter-pincode-$pincode'),
-                                  label: Text('PIN $pincode'),
-                                  selected: session.selectedPincode == pincode,
-                                  onSelected: (_) =>
-                                      session.setOpportunityLocationFilters(
-                                        city: session.selectedCity,
-                                        area: session.selectedArea,
-                                        pincode:
-                                            session.selectedPincode == pincode
-                                            ? ''
-                                            : pincode,
-                                      ),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              if (session.selectedCity.isNotEmpty) ...[
+                const SizedBox(height: MoolSpacing.md),
+                if (areas.isNotEmpty) ...[
+                  const Text(
+                    'Area',
+                    style: TextStyle(
+                      color: MoolColors.navy,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
+                  const SizedBox(height: MoolSpacing.xs),
+                  _FilterChoiceRow(
+                    semanticLabel: 'Area',
+                    children: [
+                      ChoiceChip(
+                        key: const Key('work-filter-area-all'),
+                        label: const Text('All areas'),
+                        selected: session.selectedArea.isEmpty,
+                        onSelected: (_) =>
+                            session.setOpportunityLocationFilters(
+                              city: session.selectedCity,
+                            ),
+                      ),
+                      for (final area in areas)
+                        ChoiceChip(
+                          key: ValueKey('work-filter-area-$area'),
+                          label: Text(area),
+                          selected: session.selectedArea == area,
+                          onSelected: (_) =>
+                              session.setOpportunityLocationFilters(
+                                city: session.selectedCity,
+                                area: session.selectedArea == area ? '' : area,
+                              ),
+                        ),
+                    ],
+                  ),
+                ],
+                if (pincodes.isNotEmpty) ...[
+                  const SizedBox(height: MoolSpacing.md),
+                  const Text(
+                    'PIN code',
+                    style: TextStyle(
+                      color: MoolColors.navy,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: MoolSpacing.xs),
+                  _FilterChoiceRow(
+                    semanticLabel: 'PIN code',
+                    children: [
+                      for (final pincode in pincodes)
+                        ChoiceChip(
+                          key: ValueKey('work-filter-pincode-$pincode'),
+                          label: Text(pincode),
+                          selected: session.selectedPincode == pincode,
+                          onSelected: (_) =>
+                              session.setOpportunityLocationFilters(
+                                city: session.selectedCity,
+                                area: session.selectedArea,
+                                pincode: session.selectedPincode == pincode
+                                    ? ''
+                                    : pincode,
+                              ),
+                        ),
+                    ],
+                  ),
+                ],
+                if (areas.isEmpty && pincodes.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(MoolSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF4E5),
+                      borderRadius: BorderRadius.circular(MoolRadii.control),
+                    ),
+                    child: Text(
+                      'No openings are currently listed in ${session.selectedCity}. Similar opportunities will remain available after you view results.',
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: 11.5,
+                        height: 1.35,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+        if (session.filter != WorkFeedFilter.forYou ||
+            session.hasOpportunityLocationFilter) ...[
+          const SizedBox(height: MoolSpacing.sm),
+          TextButton.icon(
+            key: const Key('work-filter-clear'),
+            onPressed: () {
+              session.setFilter(WorkFeedFilter.forYou);
+              session.clearOpportunityFilters();
+            },
+            icon: const Icon(Icons.restart_alt_rounded),
+            label: const Text('Clear all filters'),
           ),
         ],
+      ],
+    );
+  }
+}
+
+class _FilterSectionTitle extends StatelessWidget {
+  const _FilterSectionTitle({
+    required this.icon,
+    required this.title,
+    required this.detail,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: MoolColors.navy),
+        const SizedBox(width: MoolSpacing.xs),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                detail,
+                style: const TextStyle(
+                  color: MoolColors.muted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PersistentWorkspaceAssistance extends StatelessWidget {
+  const _PersistentWorkspaceAssistance({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: const Key('work-persistent-workspace-assistance'),
+      color: const Color(0xFFFFF4E5),
+      child: InkWell(
+        onTap: onPressed,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: MoolSpacing.md,
+            vertical: 8,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.add_business_outlined,
+                color: MoolColors.navy,
+                size: 21,
+              ),
+              SizedBox(width: MoolSpacing.xs),
+              Expanded(
+                child: Text(
+                  'Create your Workspace, upload your documents and get setup support from a MoolSocial representative.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 10.5,
+                    height: 1.18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: MoolColors.orange),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -711,17 +876,10 @@ class _FilterChoiceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       label: semanticLabel,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (var index = 0; index < children.length; index += 1) ...[
-              children[index],
-              if (index != children.length - 1)
-                const SizedBox(width: MoolSpacing.xs),
-            ],
-          ],
-        ),
+      child: Wrap(
+        spacing: MoolSpacing.xs,
+        runSpacing: MoolSpacing.xs,
+        children: [...children],
       ),
     );
   }
@@ -752,15 +910,15 @@ class _RelatedWorkHeading extends StatelessWidget {
               children: [
                 Text(
                   city.isEmpty
-                      ? 'You may also like these funded roles'
-                      : 'More paid work beyond $city',
+                      ? 'Similar opportunities'
+                      : 'Open opportunities in other locations',
                   style: const TextStyle(
                     color: MoolColors.navy,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 const Text(
-                  'Keep browsing while matching work in your location is updated.',
+                  'Explore roles that match your skills while new openings are added in your selected location.',
                   style: TextStyle(
                     color: MoolColors.muted,
                     fontSize: 10.5,
@@ -780,27 +938,27 @@ class _OpportunityCard extends StatelessWidget {
   const _OpportunityCard({
     required this.opportunity,
     required this.onOpen,
-    required this.onWorkspaceSetup,
+    required this.onApply,
     this.recommended = false,
   });
 
   final WorkOpportunity opportunity;
   final VoidCallback onOpen;
-  final VoidCallback onWorkspaceSetup;
+  final VoidCallback onApply;
   final bool recommended;
 
   @override
   Widget build(BuildContext context) {
     final color = _cardColor(opportunity.cardColorToken);
     final owner = opportunity.posterType == WorkOpportunityPosterType.moolSocial
-        ? 'MoolSocial-owned'
-        : 'MoolSocial user-owned';
+        ? 'Posted by MoolSocial'
+        : 'Posted by a verified ${opportunity.posterType.label.toLowerCase()}';
     final posterLine = opportunity.publisher == opportunity.posterType.label
         ? opportunity.posterType.label
         : '${opportunity.posterType.label} · ${opportunity.publisher}';
     return Semantics(
       label:
-          '$owner. ${opportunity.posterType.label}. ${opportunity.title}. ${opportunity.qualificationHeadline}. ${opportunity.requiredWork}. Monthly payment ${opportunity.monthlyPayment}. ${opportunity.deadline}.',
+          '$owner. ${opportunity.posterType.label}. ${opportunity.title}. ${opportunity.qualificationHeadline}. ${opportunity.requiredWork}. Monthly payment ${opportunity.monthlyPayment}. ${opportunity.positionsRemaining} positions remaining. Deadline ${opportunity.finalDeadline}.',
       container: true,
       button: true,
       onTap: onOpen,
@@ -1036,42 +1194,18 @@ class _OpportunityCard extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.timer_outlined,
-                                  size: 13,
-                                  color: color,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    opportunity.deadline,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: color,
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(height: 6),
+                            _LiveHiringStatus(
+                              opportunity: opportunity,
+                              accent: color,
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 6),
-                      _WorkspaceSetupCta(
-                        keyName: 'work-opportunity-workspace-${opportunity.id}',
-                        onPressed: onWorkspaceSetup,
-                        compact: true,
-                      ),
-                      const SizedBox(height: 6),
                       _AttentionApplyButton(
                         keyName: 'work-opportunity-apply-${opportunity.id}',
-                        onPressed: onOpen,
+                        onPressed: onApply,
                         accent: color,
                         compact: true,
                       ),
@@ -1087,16 +1221,234 @@ class _OpportunityCard extends StatelessWidget {
   }
 }
 
-class _WorkspaceSetupCta extends StatelessWidget {
-  const _WorkspaceSetupCta({
+class _LiveHiringStatus extends StatefulWidget {
+  const _LiveHiringStatus({required this.opportunity, required this.accent});
+
+  final WorkOpportunity opportunity;
+  final Color accent;
+
+  @override
+  State<_LiveHiringStatus> createState() => _LiveHiringStatusState();
+}
+
+class _LiveHiringStatusState extends State<_LiveHiringStatus>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 460),
+    value: 1,
+  );
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started || MediaQuery.disableAnimationsOf(context)) return;
+    _started = true;
+    _controller.repeat(reverse: true, count: 4).whenComplete(() {
+      if (mounted) _controller.value = 1;
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final opportunity = widget.opportunity;
+    final pulse = Tween<double>(
+      begin: .48,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    return Container(
+      key: Key('work-opportunity-live-status-${opportunity.id}'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7FB),
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        border: Border.all(color: const Color(0xFFD8DAE8)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    FadeTransition(
+                      opacity: pulse,
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFD92D20),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Expanded(
+                      child: Text(
+                        'LIVE AVAILABILITY',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: MoolColors.navy,
+                          fontSize: 8,
+                          letterSpacing: .25,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(
+                        text: 'Deadline ',
+                        style: TextStyle(
+                          color: MoolColors.muted,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      TextSpan(
+                        text: opportunity.finalDeadline,
+                        style: TextStyle(
+                          color: widget.accent,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  key: Key('work-opportunity-deadline-${opportunity.id}'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(fontSize: 8.5),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          FadeTransition(
+            opacity: pulse,
+            child: Row(
+              children: [
+                _LiveMetric(
+                  keyName: 'work-opportunity-needed-${opportunity.id}',
+                  value: opportunity.peopleNeeded,
+                  label: 'Needed',
+                  color: MoolColors.navy,
+                ),
+                _LiveMetric(
+                  keyName: 'work-opportunity-joined-${opportunity.id}',
+                  value: opportunity.peopleJoined,
+                  label: 'Joined',
+                  color: MoolColors.success,
+                ),
+                _LiveMetric(
+                  keyName: 'work-opportunity-progress-${opportunity.id}',
+                  value: opportunity.applicationsInProgress,
+                  label: 'In progress',
+                  color: MoolColors.orange,
+                ),
+                _LiveMetric(
+                  keyName: 'work-opportunity-left-${opportunity.id}',
+                  value: opportunity.positionsRemaining,
+                  label: 'Left',
+                  color: widget.accent,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(MoolRadii.capsule),
+            child: SizedBox(
+              height: 4,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: opportunity.peopleJoined,
+                    child: const ColoredBox(color: MoolColors.success),
+                  ),
+                  Expanded(
+                    flex: opportunity.applicationsInProgress,
+                    child: const ColoredBox(color: MoolColors.orange),
+                  ),
+                  Expanded(
+                    flex: opportunity.positionsRemaining,
+                    child: ColoredBox(
+                      color: widget.accent.withValues(alpha: .18),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LiveMetric extends StatelessWidget {
+  const _LiveMetric({
     required this.keyName,
-    required this.onPressed,
-    this.compact = false,
+    required this.value,
+    required this.label,
+    required this.color,
   });
 
   final String keyName;
+  final int value;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            '$value',
+            key: Key(keyName),
+            style: TextStyle(
+              color: color,
+              fontSize: 16,
+              height: 1,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: MoolColors.muted,
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkspaceSetupCta extends StatelessWidget {
+  const _WorkspaceSetupCta({required this.keyName, required this.onPressed});
+
+  final String keyName;
   final VoidCallback onPressed;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -1110,7 +1462,7 @@ class _WorkspaceSetupCta extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: MoolSpacing.xs,
-            vertical: compact ? 6 : MoolSpacing.sm,
+            vertical: MoolSpacing.sm,
           ),
           child: Row(
             children: [
@@ -1321,7 +1673,7 @@ class WorkOpportunityScreen extends StatelessWidget {
       return WorkPageScaffold(
         session: session,
         title: 'Paid work unavailable',
-        subtitle: 'This requirement is no longer available',
+        subtitle: 'This opportunity is no longer available',
         fallbackBackRoute: '/app/work/earn',
         activeLocalAction: 'earn',
         body: ListView(
@@ -1329,7 +1681,7 @@ class WorkOpportunityScreen extends StatelessWidget {
           children: [
             WorkEmptyState(
               title: 'This paid-work link is unavailable',
-              detail: 'Return to Earn Today to review current funded work.',
+              detail: 'Return to Earn Today to view current opportunities.',
               actionLabel: 'Open Earn Today',
               onAction: () => context.go('/app/work/earn'),
             ),
@@ -1350,7 +1702,7 @@ class WorkOpportunityScreen extends StatelessWidget {
         return WorkPageScaffold(
           session: session,
           title: 'Opportunity details',
-          subtitle: '${opportunity.posterType.label} paid requirement',
+          subtitle: 'Posted by ${opportunity.posterType.label}',
           fallbackBackRoute: '/app/work/earn',
           activeLocalAction: 'earn',
           showHeaderChat: false,
@@ -1391,15 +1743,9 @@ class WorkOpportunityScreen extends StatelessWidget {
                       keyName: 'work-apply-opportunity',
                       accent: _cardColor(opportunity.cardColorToken),
                       onPressed: opportunity.available && !session.busy
-                          ? () async {
-                              final success = await session
-                                  .applySelectedOpportunity();
-                              if (!context.mounted) return;
-                              if (!success &&
-                                  opportunity.requiresWorkspace &&
-                                  !session.hasVerifiedWorkspace) {
-                                context.go('/app/work/my-work');
-                              }
+                          ? () {
+                              session.startAnotherWork();
+                              context.push('/app/work/workspace/choose');
                             }
                           : null,
                     ),
@@ -1507,7 +1853,7 @@ class WorkOpportunityScreen extends StatelessWidget {
                         ),
                       ),
                       const Text(
-                        'Updates and exact next steps will appear in Work Chat.',
+                        'Application updates and next steps will appear in Work Chat.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: MoolColors.muted),
                       ),
@@ -1520,7 +1866,7 @@ class WorkOpportunityScreen extends StatelessWidget {
                 const WorkCard(
                   color: Color(0xFFFFF4E5),
                   child: Text(
-                    'Application withdrawn. You may apply again while this paid requirement remains open.',
+                    'Application withdrawn. You may apply again while this opportunity remains open.',
                     style: TextStyle(
                       color: MoolColors.ink,
                       fontWeight: FontWeight.w700,
@@ -1595,8 +1941,8 @@ class _OpportunityDetailHero extends StatelessWidget {
               children: [
                 Text(
                   opportunity.posterType == WorkOpportunityPosterType.moolSocial
-                      ? 'MOOLSOCIAL-OWNED · ${opportunity.publisher}'
-                      : 'USER-OWNED · ${opportunity.posterType.label} · ${opportunity.publisher}',
+                      ? 'POSTED BY MOOLSOCIAL · ${opportunity.publisher}'
+                      : 'POSTED BY VERIFIED ${opportunity.posterType.label.toUpperCase()} · ${opportunity.publisher}',
                   style: TextStyle(
                     color: accent,
                     fontSize: 10,
@@ -1626,6 +1972,8 @@ class _OpportunityDetailHero extends StatelessWidget {
                 ),
                 const SizedBox(height: MoolSpacing.sm),
                 _DecisionSnapshot(opportunity: opportunity, accent: accent),
+                const SizedBox(height: MoolSpacing.sm),
+                _LiveHiringStatus(opportunity: opportunity, accent: accent),
               ],
             ),
           ),
@@ -1860,6 +2208,15 @@ class _PaymentDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final rows = <(String, String)>[
+      ('Payment for this work', opportunity.paymentAmount),
+      if (opportunity.hourlyPayment case final hourly?)
+        ('Hourly payment', hourly),
+      if (opportunity.assignmentPayment case final assignment?)
+        ('Payment per assignment', assignment),
+      ('Payment schedule', opportunity.payout),
+      ('Available budget', opportunity.fundingNote),
+    ];
     return _DetailSection(
       keyName: 'work-detail-payment',
       title: 'Payment details',
@@ -1869,60 +2226,118 @@ class _PaymentDetails extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _PaymentRow(
-            label: 'Payment amount',
-            value: opportunity.paymentAmount,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(MoolSpacing.sm),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF007A4D), Color(0xFF005F3C)],
+              ),
+              borderRadius: BorderRadius.circular(MoolRadii.control),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'MONTHLY EARNING POTENTIAL',
+                  style: TextStyle(
+                    color: Color(0xFFD8FFEA),
+                    fontSize: 9,
+                    letterSpacing: .45,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  opportunity.monthlyPayment,
+                  key: const Key('work-payment-monthly-highlight'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    height: 1.18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
           ),
-          _PaymentRow(
-            label: 'Monthly payment',
-            value: opportunity.monthlyPayment,
-            emphasized: true,
+          const SizedBox(height: MoolSpacing.sm),
+          Container(
+            key: const Key('work-payment-table'),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFB8DCC9)),
+              borderRadius: BorderRadius.circular(MoolRadii.control),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Table(
+              columnWidths: const {
+                0: FlexColumnWidth(.9),
+                1: FlexColumnWidth(1.35),
+              },
+              border: const TableBorder(
+                horizontalInside: BorderSide(color: Color(0xFFD7E9DF)),
+                verticalInside: BorderSide(color: Color(0xFFD7E9DF)),
+              ),
+              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+              children: [
+                const TableRow(
+                  decoration: BoxDecoration(color: Color(0xFFE8F7F0)),
+                  children: [
+                    _PaymentCell(text: 'Payment type', header: true),
+                    _PaymentCell(text: 'Amount and schedule', header: true),
+                  ],
+                ),
+                for (var index = 0; index < rows.length; index += 1)
+                  TableRow(
+                    decoration: BoxDecoration(
+                      color: index.isEven
+                          ? Colors.white
+                          : const Color(0xFFF7FBF9),
+                    ),
+                    children: [
+                      _PaymentCell(text: rows[index].$1),
+                      _PaymentCell(text: rows[index].$2, value: true),
+                    ],
+                  ),
+              ],
+            ),
           ),
-          if (opportunity.hourlyPayment case final hourly?)
-            _PaymentRow(label: 'Hourly payment', value: hourly),
-          if (opportunity.assignmentPayment case final assignment?)
-            _PaymentRow(label: 'Assignment payment', value: assignment),
-          _PaymentRow(label: 'Payout timing', value: opportunity.payout),
-          _PaymentRow(label: 'Funding', value: opportunity.fundingNote),
         ],
       ),
     );
   }
 }
 
-class _PaymentRow extends StatelessWidget {
-  const _PaymentRow({
-    required this.label,
-    required this.value,
-    this.emphasized = false,
+class _PaymentCell extends StatelessWidget {
+  const _PaymentCell({
+    required this.text,
+    this.header = false,
+    this.value = false,
   });
 
-  final String label;
-  final String value;
-  final bool emphasized;
+  final String text;
+  final bool header;
+  final bool value;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: MoolSpacing.xs),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text(label, style: const TextStyle(color: MoolColors.muted)),
-          ),
-          const SizedBox(width: MoolSpacing.sm),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: TextStyle(
-                color: MoolColors.ink,
-                fontWeight: emphasized ? FontWeight.w900 : FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(
+        horizontal: MoolSpacing.xs,
+        vertical: 9,
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: header
+              ? const Color(0xFF005F3C)
+              : value
+              ? MoolColors.ink
+              : MoolColors.muted,
+          fontSize: header ? 10.5 : 11,
+          height: 1.3,
+          fontWeight: header || value ? FontWeight.w900 : FontWeight.w700,
+        ),
       ),
     );
   }
@@ -1958,7 +2373,7 @@ Future<void> _confirmWithdrawal(
           ),
           const SizedBox(height: MoolSpacing.xs),
           const Text(
-            'This removes only this application. You can apply again while the requirement remains open.',
+            'This removes only this application. You can apply again while the opportunity remains open.',
             style: TextStyle(color: MoolColors.muted, height: 1.4),
           ),
           const SizedBox(height: MoolSpacing.md),

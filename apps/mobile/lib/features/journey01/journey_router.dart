@@ -1508,6 +1508,11 @@ GoRouter createJourneyRouter(
         ),
       ),
       GoRoute(
+        path: '/app/work/filters',
+        builder: (context, state) =>
+            WorkOpportunityFilterScreen(session: workSession),
+      ),
+      GoRoute(
         path: '/app/work/opportunity/:opportunityId',
         builder: (context, state) => WorkOpportunityScreen(
           session: workSession,
