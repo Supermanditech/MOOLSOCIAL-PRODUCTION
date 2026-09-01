@@ -89,7 +89,7 @@ void main() {
     expect(find.byKey(const Key('work-local-workspace')), findsOneWidget);
     expect(find.byKey(const Key('work-global-chat')), findsNothing);
     expect(find.byKey(const Key('mool-global-chat')), findsOneWidget);
-    expect(find.byKey(const Key('work-main-global-profile')), findsOneWidget);
+    expect(find.byKey(const Key('work-earn-global-profile')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('work-local-workspace')));
     await tester.pumpAndSettle();

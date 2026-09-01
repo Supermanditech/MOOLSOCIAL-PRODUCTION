@@ -136,11 +136,11 @@ void main() {
           returnKey: 'eat-home-screen',
         ),
         (
-          origin: '/app/work/home',
+          origin: '/app/work/earn',
           title: 'Work Chat',
           threadId: 'work-opportunity',
           excludedThreadIds: ['mahadev', 'shop-partner', 'clinic-care'],
-          returnKey: 'work-main-v2',
+          returnKey: 'work-earn-screen',
         ),
         (
           origin: '/app/pay/home',

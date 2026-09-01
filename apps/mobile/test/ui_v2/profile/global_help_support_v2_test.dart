@@ -3,12 +3,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/work/screens/work_earn_screens.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/ui_v2/profile/global_help_support_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_privacy_preferences_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
-import 'package:moolsocial/ui_v2/work/work_main_v2.dart';
 
 void main() {
   Future<GoRouter> pumpFromWork(
@@ -24,11 +24,11 @@ void main() {
     addTearDown(journey.dispose);
     addTearDown(work.dispose);
     final router = GoRouter(
-      initialLocation: '/app/work/home',
+      initialLocation: '/app/work/earn',
       routes: [
         GoRoute(
-          path: '/app/work/home',
-          builder: (context, state) => WorkMainV2(session: work),
+          path: '/app/work/earn',
+          builder: (context, state) => WorkEarnScreen(session: work),
         ),
         GoRoute(
           path: '/app/ask',
@@ -93,7 +93,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    router.go(globalHelpLocationForReturn('/app/work/home'));
+    router.go(globalHelpLocationForReturn('/app/work/earn'));
     await tester.pumpAndSettle();
     return router;
   }
@@ -110,8 +110,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('global-help-back')));
     await tester.pumpAndSettle();
-    expect(router.routeInformationProvider.value.uri.path, '/app/work/home');
-    expect(find.byKey(const Key('work-main-v2')), findsOne);
+    expect(router.routeInformationProvider.value.uri.path, '/app/work/earn');
+    expect(find.byKey(const Key('work-earn-screen')), findsOne);
   });
 
   testWidgets('Help topics open exact approved profile destinations', (
@@ -167,7 +167,7 @@ void main() {
         .data!;
     final helpUri = Uri.parse(helpReturn);
     expect(helpUri.path, '/app/ask');
-    expect(helpUri.queryParameters['return'], '/app/work/home');
+    expect(helpUri.queryParameters['return'], '/app/work/earn');
   });
 
   testWidgets('compact Help remains proportional without overflow', (
@@ -235,7 +235,7 @@ void main() {
     (tester) async {
       final journey = JourneySession(store: MemoryJourneyStore());
       addTearDown(journey.dispose);
-      const workOrigin = '/app/work/home';
+      const workOrigin = '/app/work/earn';
       final helpLocation = globalHelpLocationForReturn(workOrigin);
       final securityLocation = globalSecurityLocationForReturn(helpLocation);
       final preferencesLocation = globalPreferencesLocationForReturn(

@@ -4,9 +4,13 @@ import 'package:go_router/go_router.dart';
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_service_home.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/profile/global_profile_panel_v2.dart';
 import '../widgets/work_widgets.dart';
 import '../work_models.dart';
 import '../work_session.dart';
+
+const _workAccent = Color(0xFF4D46A8);
+const _workNavy = Color(0xFF000080);
 
 class WorkEarnScreen extends StatefulWidget {
   const WorkEarnScreen({required this.session, super.key});
@@ -33,6 +37,10 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
     context.go('/app/work/opportunity/${opportunity.id}');
   }
 
+  void _openProfileRoute(BuildContext context, String route) {
+    context.push(route);
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -42,15 +50,17 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
         return WorkPageScaffold(
           session: widget.session,
           title: 'Earn Today',
-          subtitle: 'Pay, location and timing before you apply',
-          fallbackBackRoute: '/app/work',
+          subtitle: 'Paid work with clear terms',
+          fallbackBackRoute: '/app/mool?from=work',
           showBack: false,
+          showHeaderChat: false,
           activeLocalAction: 'earn',
-          trailing: IconButton.outlined(
-            key: const Key('work-refresh-feed'),
-            tooltip: 'Refresh work',
-            onPressed: widget.session.busy ? null : widget.session.refreshFeed,
-            icon: const Icon(Icons.refresh_rounded),
+          trailing: MoolGlobalProfileShortcutV2(
+            keyName: 'work-earn-global-profile',
+            onPressed: () => showGlobalProfilePanelV2(
+              context,
+              onOpenRoute: (route) => _openProfileRoute(context, route),
+            ),
           ),
           body: RefreshIndicator(
             onRefresh: widget.session.refreshFeed,
@@ -63,6 +73,8 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
                 MoolSpacing.xxl,
               ),
               children: [
+                const _EarnTodayHero(),
+                const SizedBox(height: MoolSpacing.md),
                 MoolServiceSearchField(
                   key: const Key('work-search-surface'),
                   fieldKey: const Key('work-search'),
@@ -99,19 +111,47 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
                   ],
                 ),
                 const SizedBox(height: MoolServiceHomeTokens.sectionGap),
-                MoolServiceSectionHeader(
-                  title: 'Work matching this view',
-                  subtitle: opportunities.isEmpty
-                      ? 'Try another filter or clear the search'
-                      : '${opportunities.length} opportunities · eligibility and approval apply',
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: MoolServiceSectionHeader(
+                        title: 'Opportunities',
+                        subtitle: opportunities.isEmpty
+                            ? 'No matches in this view'
+                            : '${opportunities.length} opportunities · review eligibility before applying',
+                      ),
+                    ),
+                    const SizedBox(width: MoolSpacing.xs),
+                    IconButton.outlined(
+                      key: const Key('work-refresh-feed'),
+                      tooltip: 'Refresh opportunities',
+                      onPressed: widget.session.busy
+                          ? null
+                          : widget.session.refreshFeed,
+                      icon: widget.session.busy
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.refresh_rounded),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: MoolSpacing.sm),
+                if (widget.session.busy) ...[
+                  const LinearProgressIndicator(
+                    key: Key('work-feed-loading'),
+                    minHeight: 3,
+                  ),
+                  const SizedBox(height: MoolSpacing.sm),
+                ],
                 if (opportunities.isEmpty)
                   WorkEmptyState(
                     title: 'No opportunities in this view',
                     detail:
-                        'Choose For You or clear the search. You can also start a verified work profile.',
-                    actionLabel: 'Show all work',
+                        'Choose For You or clear the search to see every available opportunity.',
+                    actionLabel: 'Reset view',
                     onAction: () {
                       _search.clear();
                       widget.session.search('');
@@ -126,20 +166,6 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
                     ),
                     const SizedBox(height: MoolSpacing.sm),
                   ],
-                MoolServiceCard(
-                  key: const Key('work-start-my-work'),
-                  title: 'Need a verified Workspace?',
-                  subtitle:
-                      'Set up one existing work or business profile, then return to an opportunity.',
-                  icon: Icons.work_outline_rounded,
-                  accent: _workAccent,
-                  emphasized: true,
-                  semanticLabel: 'Open Workspace setup',
-                  onTap: () {
-                    widget.session.startMyWork();
-                    context.go('/app/work/my-work');
-                  },
-                ),
               ],
             ),
           ),
@@ -149,7 +175,63 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
   }
 }
 
-const _workAccent = Color(0xFF4D46A8);
+class _EarnTodayHero extends StatelessWidget {
+  const _EarnTodayHero();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('work-earn-hero'),
+      padding: const EdgeInsets.all(MoolSpacing.md),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_workNavy, _workAccent],
+        ),
+        borderRadius: BorderRadius.circular(MoolRadii.floating),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x26000080),
+            blurRadius: 22,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          WorkPill(
+            label: 'MoolSocial Work',
+            color: Color(0xFFFFD27A),
+            icon: Icons.bolt_rounded,
+          ),
+          SizedBox(height: MoolSpacing.sm),
+          Text(
+            'Find paid work with clear terms',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              height: 1.08,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -.4,
+            ),
+          ),
+          SizedBox(height: MoolSpacing.sm),
+          Text(
+            'See the pay, location, timing and required work before you apply.',
+            style: TextStyle(
+              color: Color(0xFFE7E7FF),
+              fontSize: 13,
+              height: 1.4,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _OpportunityCard extends StatelessWidget {
   const _OpportunityCard({required this.opportunity, required this.onReview});
@@ -183,30 +265,20 @@ class _OpportunityCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${opportunity.kind} · ${opportunity.publisherType}',
-                      style: const TextStyle(
-                        color: MoolColors.success,
-                        fontSize: MoolServiceHomeTokens.metadataSize,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      opportunity.title,
+                      opportunity.publisher,
                       style: const TextStyle(
                         color: MoolColors.ink,
-                        fontSize: MoolServiceHomeTokens.cardTitleSize,
-                        height: 1.2,
+                        fontSize: 14,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      opportunity.publisher,
+                      '${opportunity.kind} · ${opportunity.publisherType}',
                       style: const TextStyle(
-                        color: MoolColors.muted,
+                        color: MoolColors.success,
                         fontSize: MoolServiceHomeTokens.metadataSize,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
@@ -216,8 +288,18 @@ class _OpportunityCard extends StatelessWidget {
           ),
           const SizedBox(height: MoolSpacing.sm),
           Text(
+            opportunity.title,
+            style: const TextStyle(
+              color: MoolColors.ink,
+              fontSize: 18,
+              height: 1.2,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
             opportunity.summary,
-            maxLines: 3,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: MoolColors.muted,
@@ -227,31 +309,63 @@ class _OpportunityCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: MoolSpacing.sm),
-          Wrap(
-            spacing: MoolSpacing.sm,
-            runSpacing: MoolSpacing.xs,
-            children: [
-              _WorkFact(
-                icon: Icons.payments_outlined,
-                label: opportunity.payment,
-              ),
-              _WorkFact(
-                icon: Icons.place_outlined,
-                label: opportunity.location,
-              ),
-              _WorkFact(
-                icon: Icons.schedule_rounded,
-                label: opportunity.deadline,
-              ),
-              _WorkFact(
-                icon: Icons.verified_outlined,
-                label: opportunity.fundingNote,
-              ),
-              _WorkFact(
-                icon: Icons.account_balance_wallet_outlined,
-                label: opportunity.payout,
-              ),
-            ],
+          Container(
+            key: Key('work-opportunity-pay-${opportunity.id}'),
+            width: double.infinity,
+            padding: const EdgeInsets.all(MoolSpacing.sm),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7E8),
+              borderRadius: BorderRadius.circular(MoolRadii.control),
+            ),
+            child: Row(
+              children: [
+                const CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Color(0xFFFFE7AF),
+                  foregroundColor: Color(0xFF855A00),
+                  child: Icon(Icons.payments_outlined, size: 19),
+                ),
+                const SizedBox(width: MoolSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        opportunity.payment,
+                        style: const TextStyle(
+                          color: MoolColors.ink,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'Payout: ${opportunity.payout}',
+                        style: const TextStyle(
+                          color: MoolColors.muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          _WorkFact(icon: Icons.place_outlined, label: opportunity.location),
+          _WorkFact(icon: Icons.schedule_rounded, label: opportunity.deadline),
+          _WorkFact(
+            icon: Icons.people_alt_outlined,
+            label: opportunity.capacity,
+          ),
+          _WorkFact(
+            icon: Icons.badge_outlined,
+            label: 'Best fit: ${opportunity.requiredWork}',
+          ),
+          _WorkFact(
+            icon: Icons.info_outline_rounded,
+            label: opportunity.fundingNote,
           ),
           const SizedBox(height: MoolSpacing.sm),
           SizedBox(
@@ -278,19 +392,19 @@ class _WorkFact extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 24),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 14, color: MoolColors.muted),
-          const SizedBox(width: 4),
-          Flexible(
+          Icon(icon, size: 15, color: _workAccent),
+          const SizedBox(width: 7),
+          Expanded(
             child: Text(
               label,
               style: const TextStyle(
-                color: MoolColors.muted,
-                fontSize: MoolServiceHomeTokens.metadataSize,
+                color: MoolColors.ink,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             ),

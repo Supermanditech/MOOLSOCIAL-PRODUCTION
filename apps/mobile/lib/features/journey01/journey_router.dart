@@ -97,7 +97,6 @@ import '../../ui_v2/profile/global_privacy_preferences_v2.dart';
 import '../../ui_v2/profile/global_profile_panel_v2.dart';
 import '../../ui_v2/profile/global_help_support_v2.dart';
 import '../../ui_v2/profile/global_security_v2.dart';
-import '../../ui_v2/work/work_main_v2.dart';
 import '../../ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart';
 import '../../ui_v2/screens/screen02_first_setup/first_setup_screen_v2.dart';
 import '../../ui_v2/screens/screen03_login/login_screen_v2.dart';
@@ -1499,7 +1498,7 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/work/home',
-        builder: (context, state) => WorkMainV2(session: workSession),
+        redirect: (context, state) => '/app/work/earn',
       ),
       GoRoute(
         path: '/app/work/earn',
@@ -1548,7 +1547,7 @@ GoRouter createJourneyRouter(
         redirect: (context, state) {
           if (legacyPresentationForTestsOnly) return null;
           final section = state.pathParameters['section'] ?? 'social';
-          if (section == 'work') return '/app/work/home';
+          if (section == 'work') return '/app/work/earn';
           final actionChoiceRoot = personalMvpActionChoiceRoots[section];
           if (actionChoiceRoot == null || actionChoiceRoot.actions.isEmpty) {
             return null;

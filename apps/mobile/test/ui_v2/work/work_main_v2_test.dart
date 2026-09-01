@@ -1,357 +1,190 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
+import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_router.dart';
-import 'package:moolsocial/features/work/work_models.dart';
+import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
-import 'package:moolsocial/ui_v2/work/work_main_v2.dart';
 
 void main() {
-  Future<GoRouter> pumpWorkMain(
-    WidgetTester tester,
-    WorkSession session, {
+  Future<(JourneySession, WorkSession)> mountWork(
+    WidgetTester tester, {
+    String initialLocation = '/app/work/earn',
     Size size = const Size(390, 844),
     double textScale = 1,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
+    tester.platformDispatcher.textScaleFactorTestValue = textScale;
     addTearDown(tester.view.reset);
-    final router = GoRouter(
-      initialLocation: '/app/work/home',
-      routes: [
-        GoRoute(
-          path: '/app/work/home',
-          builder: (context, state) => WorkMainV2(session: session),
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    final journey = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'manual',
+          areaLabel: 'Jodhpur',
+          setupComplete: true,
         ),
-        GoRoute(
-          path: '/app/work/earn',
-          builder: (context, state) => const Scaffold(
-            body: Text('Earn destination', key: Key('earn-destination')),
-          ),
-        ),
-        GoRoute(
-          path: '/app/work/my-work',
-          builder: (context, state) => const Scaffold(
-            body: Text(
-              'Workspace destination',
-              key: Key('workspace-destination'),
-            ),
-          ),
-        ),
-        GoRoute(
-          path: '/app/account/identity',
-          builder: (context, state) => const Scaffold(
-            body: Text(
-              'Global profile',
-              key: Key('global-profile-destination'),
-            ),
-          ),
-        ),
-        GoRoute(
-          path: '/app/work/workspace/choose',
-          builder: (context, state) => const Scaffold(
-            body: Text(
-              'Choose workspace',
-              key: Key('workspace-application-destination'),
-            ),
-          ),
-        ),
-        GoRoute(
-          path: '/app/chat/inbox',
-          builder: (context, state) =>
-              const Scaffold(body: Text('Chat review')),
-        ),
-        GoRoute(
-          path: '/app/mool',
-          builder: (context, state) => const Scaffold(body: Text('Mool menu')),
-        ),
-      ],
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
     );
-    addTearDown(router.dispose);
+    await journey.start();
+    final work = WorkSession();
+    addTearDown(journey.dispose);
+    addTearDown(work.dispose);
+
     await tester.pumpWidget(
-      MaterialApp.router(
-        routerConfig: router,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: TextScaler.linear(textScale)),
-          child: child!,
-        ),
+      MoolSocialApp(
+        session: journey,
+        workSession: work,
+        initialLocation: initialLocation,
       ),
     );
     await tester.pumpAndSettle();
-    return router;
+    return (journey, work);
   }
 
-  test('Mool Work enters the global Work home', () {
-    expect(moolActionFamilyById('work').route, '/app/work/home');
+  test('Work opens Earn Today as its stable default action', () {
+    final family = moolActionFamilyById('work');
+    expect(family.route, '/app/work/earn');
     expect(moolDefaultActionForFamily('work').route, '/app/work/earn');
+    expect(family.actions.map((action) => (action.label, action.route)), const [
+      ('Earn Today', '/app/work/earn'),
+      ('Workspace', '/app/work/my-work'),
+    ]);
   });
 
-  test('review-only guest navigation can inspect Chat without sign-in', () {
+  test('review-only guests retain the existing Work Chat boundary', () {
     expect(
       journeyRouteRequiresAuthentication(
-        Uri.parse('/app/chat/inbox?return=/app/work/home'),
+        Uri.parse('/app/chat/inbox?return=/app/work/earn'),
         allowGuestReady: true,
       ),
       isFalse,
     );
     expect(
       journeyRouteRequiresAuthentication(
-        Uri.parse('/app/chat/inbox?return=/app/work/home'),
-        allowGuestReady: false,
-      ),
-      isTrue,
-    );
-    expect(
-      journeyRouteRequiresAuthentication(
-        Uri.parse('/app/social?sub=create'),
+        Uri.parse('/app/chat/inbox?return=/app/work/earn'),
         allowGuestReady: false,
       ),
       isTrue,
     );
   });
 
-  testWidgets('Work home has one global profile and no duplicate header Chat', (
+  testWidgets('the retired Work Home route redirects to Earn Today', (
     tester,
   ) async {
-    final session = WorkSession();
-    addTearDown(session.dispose);
-    await pumpWorkMain(tester, session);
+    await mountWork(tester, initialLocation: '/app/work/home');
 
-    expect(find.byKey(const Key('work-main-v2')), findsOne);
-    expect(find.text('One global profile'), findsOne);
-    expect(find.text('Find paid opportunities'), findsOne);
-    expect(find.text('Create a provider workspace'), findsOne);
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-main-v2')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('moolsocial-family-root-work')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('work-local-earn')), findsOneWidget);
+    expect(find.byKey(const Key('work-local-workspace')), findsOneWidget);
+    expect(find.byKey(const Key('mool-global-chat')), findsOneWidget);
+
+    final cells = [
+      find.byKey(const Key('mool-compact-launcher')),
+      find.byKey(const Key('work-local-earn')),
+      find.byKey(const Key('work-local-workspace')),
+      find.byKey(const Key('mool-global-chat')),
+    ];
+    final widths = cells.map((cell) => tester.getSize(cell).width).toList();
+    for (final width in widths.skip(1)) {
+      expect(width, closeTo(widths.first, 1));
+    }
+    final centers = cells.map((cell) => tester.getCenter(cell).dx).toList();
+    final firstGap = centers[1] - centers[0];
+    expect(centers[2] - centers[1], closeTo(firstGap, 1));
+    expect(centers[3] - centers[2], closeTo(firstGap, 1));
+  });
+
+  testWidgets('Earn Today is the complete first Work surface', (tester) async {
+    await mountWork(tester);
+
+    expect(find.byKey(const Key('work-earn-hero')), findsOneWidget);
+    expect(find.text('Find paid work with clear terms'), findsOneWidget);
+    expect(find.byKey(const Key('work-search')), findsOneWidget);
+    expect(find.byKey(const Key('work-filter-list')), findsOneWidget);
+    expect(find.byKey(const Key('work-refresh-feed')), findsOneWidget);
+    expect(
+      find.byKey(const Key('work-opportunity-mool-explainer')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('work-start-my-work')), findsNothing);
+    expect(find.text('Need a verified Workspace?'), findsNothing);
     expect(find.byKey(const Key('work-global-chat')), findsNothing);
-    expect(find.byKey(const Key('mool-global-chat')), findsOne);
+    expect(find.byKey(const Key('work-earn-global-profile')), findsOneWidget);
 
-    final profileButton = tester.getRect(
-      find.byKey(const Key('work-main-global-profile')),
-    );
-    expect(profileButton.size, const Size(44, 44));
-    expect(profileButton.center.dx, greaterThan(300));
-    expect(
-      tester
-          .getSemantics(find.byKey(const Key('work-main-global-profile')))
-          .label,
-      contains('Open your MoolSocial profile'),
-    );
-
-    await tester.tap(find.byKey(const Key('work-main-global-profile')));
+    await tester.tap(find.byKey(const Key('work-earn-global-profile')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('global-profile-panel-v2')), findsOne);
-    final panel = tester.getRect(
-      find.byKey(const Key('global-profile-panel-v2')),
-    );
-    expect(panel.right, closeTo(390, 1));
-    expect(panel.left, greaterThan(90));
-    expect(panel.top, greaterThanOrEqualTo(8));
-    expect(panel.bottom, lessThanOrEqualTo(844));
-    expect(panel.height, greaterThan(800));
-    expect(find.text('Your MoolSocial profile'), findsOne);
-    expect(find.byKey(const Key('global-profile-access-card')), findsNothing);
-    expect(
-      find.byKey(const Key('global-profile-context-work-workspace-create')),
-      findsOne,
-    );
-    expect(find.text('Personal account'), findsOne);
-    expect(find.text('Account settings'), findsOne);
-    expect(find.text('Your account'), findsNothing);
-    expect(find.text('Privacy and preferences'), findsOne);
-    expect(find.byKey(const Key('global-profile-ask')), findsNothing);
-    expect(find.text('Help and support'), findsNothing);
-    expect(find.text('Create a provider workspace'), findsWidgets);
-    final contextTitle = find.descendant(
-      of: find.byKey(const Key('global-profile-context-work-workspace-create')),
-      matching: find.text('Create a provider workspace'),
-    );
-    expect(contextTitle, findsOneWidget);
-    expect(tester.widget<Text>(contextTitle).maxLines, 2);
-    expect(find.byKey(const Key('global-profile-quick-actions')), findsNothing);
-    expect(
-      find.byKey(const Key('global-profile-active-workspace')),
-      findsNothing,
-    );
-    expect(find.text('Orders'), findsNothing);
-    expect(find.text('Payments'), findsNothing);
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('global-profile-panel-v2')),
-        matching: find.textContaining('Mool Partner'),
-      ),
-      findsNothing,
-    );
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('global-profile-close')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+  });
+
+  testWidgets('Earn Today reaches Workspace and native Back returns exactly', (
+    tester,
+  ) async {
+    await mountWork(tester);
+
+    await tester.tap(find.byKey(const Key('work-local-workspace')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+  });
+
+  testWidgets('Work Chat returns to the exact Earn Today origin', (
+    tester,
+  ) async {
+    await mountWork(tester);
+
+    await tester.tap(find.byKey(const Key('mool-global-chat')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+  });
+
+  testWidgets('compact large-text Earn Today has no layout exception', (
+    tester,
+  ) async {
+    await mountWork(tester, size: const Size(320, 700), textScale: 1.4);
+
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-earn-hero')), findsOneWidget);
+    expect(find.byKey(const Key('work-local-earn')), findsOneWidget);
+    expect(find.byKey(const Key('work-local-workspace')), findsOneWidget);
+    final firstCard = find.byKey(const Key('work-opportunity-mool-explainer'));
     await tester.scrollUntilVisible(
-      find.byKey(
-        const Key('global-profile-context-action-work-workspace-create'),
-      ),
+      firstCard,
       240,
-      scrollable: find.descendant(
-        of: find.byKey(const Key('global-profile-panel-v2')),
-        matching: find.byType(Scrollable),
-      ),
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('work-earn-screen')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(
-        const Key('global-profile-context-action-work-workspace-create'),
-      ),
-    );
-    await tester.pumpAndSettle();
+    expect(firstCard, findsOneWidget);
     expect(
-      find.byKey(const Key('workspace-application-destination')),
-      findsOne,
+      find.byKey(const Key('work-opportunity-pay-mool-explainer')),
+      findsOneWidget,
     );
-  });
-
-  testWidgets(
-    'OPPO first fold keeps both primary Work actions above the rail',
-    (tester) async {
-      final session = WorkSession();
-      addTearDown(session.dispose);
-      await pumpWorkMain(tester, session, size: const Size(360, 800));
-
-      final workspace = tester.getRect(
-        find.byKey(const Key('work-main-workspace')),
-      );
-      final rail = tester.getRect(
-        find.byKey(const Key('moolsocial-single-home-launcher-shell')),
-      );
-      expect(workspace.bottom, lessThanOrEqualTo(rail.top));
-      expect(workspace.height, greaterThanOrEqualTo(100));
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets('workspace controls appear only after live activation', (
-    tester,
-  ) async {
-    final session = WorkSession()..seedVerifiedWorkspace();
-    session.reviewStage = WorkReviewStage.live;
-    addTearDown(session.dispose);
-    await pumpWorkMain(tester, session);
-
-    await tester.tap(find.byKey(const Key('work-main-global-profile')));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('global-profile-active-workspace')),
-      findsNothing,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(
-          const Key('global-profile-context-work-workspace-active'),
-        ),
-        matching: find.text('Mahadev Fresh Mart'),
-      ),
-      findsOne,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(
-          const Key('global-profile-context-work-workspace-active'),
-        ),
-        matching: find.textContaining('Grocery / Kirana Shop'),
-      ),
-      findsOne,
-    );
-    expect(find.text('Personal account'), findsOne);
-    expect(find.text('Account settings'), findsOne);
-    expect(find.text('Your account'), findsNothing);
-    expect(find.text('Personal profile'), findsOne);
-    expect(find.byKey(const Key('global-profile-quick-actions')), findsNothing);
-    expect(find.byKey(const Key('global-profile-access-card')), findsNothing);
-    await tester.tap(
-      find.byKey(
-        const Key('global-profile-context-action-work-workspace-active'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('workspace-destination')), findsOne);
-  });
-
-  testWidgets('pending application keeps partner controls locked', (
-    tester,
-  ) async {
-    final session = WorkSession()
-      ..reviewCaseId = 'WP-PENDING'
-      ..reviewStage = WorkReviewStage.gstPending;
-    addTearDown(session.dispose);
-    await pumpWorkMain(tester, session);
-
-    await tester.tap(find.byKey(const Key('work-main-global-profile')));
-    await tester.pumpAndSettle();
-    expect(find.text('Workspace application'), findsOne);
-    expect(find.text('View application'), findsOne);
-    expect(
-      find.byKey(
-        const Key('global-profile-context-work-workspace-application'),
-      ),
-      findsOne,
-    );
-    expect(
-      find.byKey(const Key('global-profile-active-workspace')),
-      findsNothing,
-    );
-    expect(find.byKey(const Key('global-profile-quick-actions')), findsNothing);
-    expect(find.byKey(const Key('global-profile-access-card')), findsNothing);
-
-    await tester.tap(
-      find.byKey(
-        const Key('global-profile-context-action-work-workspace-application'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('workspace-destination')), findsOne);
-  });
-
-  testWidgets('Work choices open their exact destinations', (tester) async {
-    final session = WorkSession();
-    addTearDown(session.dispose);
-    final router = await pumpWorkMain(tester, session);
-
-    await tester.tap(find.byKey(const Key('work-main-earn')));
-    await tester.pumpAndSettle();
-    expect(router.routeInformationProvider.value.uri.path, '/app/work/earn');
-
-    router.go('/app/work/home');
-    await tester.pumpAndSettle();
-    final scrollable = find
-        .descendant(
-          of: find.byKey(const Key('work-main-v2')),
-          matching: find.byType(Scrollable),
-        )
-        .first;
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('work-main-workspace')),
-      220,
-      scrollable: scrollable,
-    );
-    await tester.ensureVisible(find.byKey(const Key('work-main-workspace')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-main-workspace')));
-    await tester.pumpAndSettle();
-    expect(router.routeInformationProvider.value.uri.path, '/app/work/my-work');
-  });
-
-  testWidgets('compact 140 percent Work home has no overflow', (tester) async {
-    final session = WorkSession();
-    addTearDown(session.dispose);
-    await pumpWorkMain(
-      tester,
-      session,
-      size: const Size(320, 700),
-      textScale: 1.4,
-    );
-
-    expect(find.byKey(const Key('work-main-v2')), findsOne);
-    expect(find.byKey(const Key('mool-global-chat')), findsOne);
-    await tester.tap(find.byKey(const Key('work-main-global-profile')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('global-profile-panel-v2')), findsOne);
+    expect(find.byKey(const Key('work-review-mool-explainer')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

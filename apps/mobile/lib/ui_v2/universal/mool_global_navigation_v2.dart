@@ -243,7 +243,7 @@ const moolActionFamilies = <MoolActionFamilySpec>[
     id: 'work',
     label: 'Work',
     icon: Icons.work_outline_rounded,
-    route: '/app/work/home',
+    route: '/app/work/earn',
     actions: [
       MoolDirectActionSpec(
         id: 'earn',
@@ -422,6 +422,7 @@ class MoolDestinationNavigationV2 extends StatefulWidget {
     required this.selectedLocalIndex,
     required this.localActionCount,
     this.familyRootSelected = false,
+    this.showFamilyRootAction = true,
     required this.onOpenMool,
     required this.onOpenAction,
     required this.onOpenChat,
@@ -439,6 +440,7 @@ class MoolDestinationNavigationV2 extends StatefulWidget {
   final int selectedLocalIndex;
   final int localActionCount;
   final bool familyRootSelected;
+  final bool showFamilyRootAction;
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec> onOpenAction;
   final VoidCallback? onOpenChat;
@@ -520,7 +522,8 @@ class _MoolDestinationNavigationV2State
                         compactExpanded: true,
                       ),
                     ),
-                    if (family.id != 'social') ...[
+                    if (family.id != 'social' &&
+                        widget.showFamilyRootAction) ...[
                       Expanded(
                         child: _MoolFamilyRootButton(
                           family: family,

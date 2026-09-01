@@ -2269,6 +2269,7 @@ String? _canonicalPersistedReadyRoute(String? location) {
     return '/app/book/salon';
   }
   if (path == '/app/work') return '/app/work';
+  if (path == '/app/work/home') return '/app/work/earn';
   if (path == '/app/work/earn' ||
       (path.startsWith('/app/work/opportunity/') &&
           path != '/app/work/opportunity/delivery')) {

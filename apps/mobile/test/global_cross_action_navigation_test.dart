@@ -53,7 +53,7 @@ void main() {
         ('eat', Key('eat-home-screen')),
         ('ride', Key('ride-booking-screen')),
         ('book', Key('doctor-discovery-home')),
-        ('work', Key('work-main-v2')),
+        ('work', Key('work-earn-screen')),
       ];
 
       for (final target in targets) {
@@ -140,8 +140,8 @@ void main() {
         null,
       ),
       (
-        '/app/work/home',
-        Key('work-main-v2'),
+        '/app/work/earn',
+        Key('work-earn-screen'),
         Key('work-local-workspace'),
         Key('my-work-screen'),
         null,

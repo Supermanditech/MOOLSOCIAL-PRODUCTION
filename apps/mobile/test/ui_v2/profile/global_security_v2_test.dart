@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/work/screens/work_earn_screens.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
-import 'package:moolsocial/ui_v2/work/work_main_v2.dart';
 
 void main() {
   Future<JourneySession> readyJourney() async {
@@ -44,11 +44,11 @@ void main() {
     tester.view.physicalSize = size;
     addTearDown(tester.view.reset);
     final router = GoRouter(
-      initialLocation: '/app/work/home',
+      initialLocation: '/app/work/earn',
       routes: [
         GoRoute(
-          path: '/app/work/home',
-          builder: (context, state) => WorkMainV2(session: work),
+          path: '/app/work/earn',
+          builder: (context, state) => WorkEarnScreen(session: work),
         ),
         GoRoute(
           path: '/app/account/security',
@@ -84,7 +84,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-main-global-profile')));
+    await tester.tap(find.byKey(const Key('work-earn-global-profile')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('global-profile-security')));
     await tester.pumpAndSettle();
@@ -116,7 +116,7 @@ void main() {
         key: UniqueKey(),
         session: journey,
         workSession: work,
-        initialLocation: '/app/work/home',
+        initialLocation: '/app/work/earn',
       ),
     );
     await tester.pumpAndSettle();
@@ -126,7 +126,7 @@ void main() {
   }
 
   Future<void> openSecurityFromWork(WidgetTester tester) async {
-    await tester.tap(find.byKey(const Key('work-main-global-profile')));
+    await tester.tap(find.byKey(const Key('work-earn-global-profile')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('global-profile-security')));
     await tester.pumpAndSettle();
@@ -203,7 +203,7 @@ void main() {
     expect(journey.stage, JourneyStage.signIn);
     final returnUri = Uri.parse(journey.returnTo!);
     expect(returnUri.path, '/app/account/security');
-    expect(returnUri.queryParameters['return'], '/app/work/home');
+    expect(returnUri.queryParameters['return'], '/app/work/earn');
   });
 
   testWidgets('real router keeps Security sign-in open and Back recovers', (
@@ -233,11 +233,11 @@ void main() {
       tester.element(find.byKey(const Key('global-security-v2'))),
     ).uri;
     expect(recovered.path, '/app/account/security');
-    expect(recovered.queryParameters['return'], '/app/work/home');
+    expect(recovered.queryParameters['return'], '/app/work/earn');
 
     await tester.tap(find.byKey(const Key('global-security-back')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-main-v2')), findsOneWidget);
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
   });
 
   testWidgets('successful Security sign-in returns to Security then Work', (
@@ -261,7 +261,7 @@ void main() {
     expect(find.byKey(const Key('global-security-v2')), findsOneWidget);
     await tester.tap(find.byKey(const Key('global-security-back')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-main-v2')), findsOneWidget);
+    expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
   });
 
   testWidgets('sign-out cancellation is safe and confirmation exits once', (

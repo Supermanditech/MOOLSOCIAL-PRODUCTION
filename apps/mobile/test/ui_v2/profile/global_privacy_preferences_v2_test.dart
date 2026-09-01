@@ -6,10 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/work/screens/work_earn_screens.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_privacy_preferences_v2.dart';
-import 'package:moolsocial/ui_v2/work/work_main_v2.dart';
 
 void main() {
   Future<GoRouter> pumpFromWork(
@@ -32,11 +32,11 @@ void main() {
     );
     addTearDown(tester.view.reset);
     final router = GoRouter(
-      initialLocation: '/app/work/home',
+      initialLocation: '/app/work/earn',
       routes: [
         GoRoute(
-          path: '/app/work/home',
-          builder: (context, state) => WorkMainV2(session: work),
+          path: '/app/work/earn',
+          builder: (context, state) => WorkEarnScreen(session: work),
         ),
         GoRoute(
           path: '/app/account/workspaces/preferences',
@@ -78,7 +78,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-main-global-profile')));
+    await tester.tap(find.byKey(const Key('work-earn-global-profile')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('global-profile-preferences')));
     await tester.pumpAndSettle();
@@ -133,8 +133,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('global-preferences-back')));
     await tester.pumpAndSettle();
-    expect(router.routeInformationProvider.value.uri.path, '/app/work/home');
-    expect(find.byKey(const Key('work-main-v2')), findsOne);
+    expect(router.routeInformationProvider.value.uri.path, '/app/work/earn');
+    expect(find.byKey(const Key('work-earn-screen')), findsOne);
   });
 
   testWidgets('invalid area remains editable and exact retry succeeds', (
