@@ -112,6 +112,62 @@ void main() {
   );
 
   testWidgets(
+    'Workspace request sheet clears Android and keyboard insets without losing input',
+    (tester) async {
+      final work = WorkSession();
+      await mount(tester, route: '/app/work/workspace/choose', work: work);
+
+      final request = find.byKey(const Key('work-profile-not-shown'));
+      await tester.scrollUntilVisible(
+        request,
+        300,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('work-choose-screen')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+        maxScrolls: 60,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(request);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('work-profile-request-sheet')),
+        findsOneWidget,
+      );
+      final actions = find.byKey(const Key('work-profile-request-actions'));
+      expect(tester.getBottomRight(actions).dy, lessThanOrEqualTo(756));
+
+      final name = find.byKey(const Key('work-request-profile-name'));
+      await tester.tap(name);
+      await tester.enterText(name, 'Furniture repair');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextField>(name).controller?.text,
+        'Furniture repair',
+      );
+      expect(tester.getBottomRight(actions).dy, lessThanOrEqualTo(456));
+      expect(
+        find.byKey(const Key('work-send-profile-request')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('work-profile-request-back')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byKey(const Key('work-profile-request-back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-profile-request-sheet')), findsNothing);
+    },
+  );
+
+  testWidgets(
     'proof source and review declaration clear system and sticky actions',
     (tester) async {
       final work = selectedRetailer()
@@ -136,6 +192,7 @@ void main() {
       await tester.runAsync(() async {
         await work.addProof('shop-front', WorkProofSource.upload);
         await work.addProof('owner-authority', WorkProofSource.upload);
+        await work.addProof('payout-bank-account', WorkProofSource.upload);
       });
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-proof-review')));

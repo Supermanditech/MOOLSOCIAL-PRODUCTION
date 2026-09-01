@@ -246,8 +246,29 @@ const _gstDocument = WorkDocumentChecklistItem(
   icon: Icons.receipt_long_outlined,
 );
 
+const _payoutBankDocument = WorkDocumentChecklistItem(
+  title: 'Payout bank account proof',
+  detail:
+      'A cancelled cheque or recent bank statement PDF showing the account holder name, account number and IFSC for approved sales, service or work payments.',
+  importance: WorkDocumentImportance.required,
+  icon: Icons.account_balance_outlined,
+);
+
+List<WorkDocumentChecklistItem> _withRequiredPayoutBank(
+  List<WorkDocumentChecklistItem> profileDocuments,
+) => List<WorkDocumentChecklistItem>.unmodifiable([
+  ...profileDocuments.where(
+    (document) =>
+        document.title != _gstDocument.title &&
+        document.title != 'Payout account document',
+  ),
+  _payoutBankDocument,
+  _gstDocument,
+]);
+
 extension WorkProfileDocumentChecklist on WorkProfileOption {
-  List<WorkDocumentChecklistItem> get verificationDocuments => switch (id) {
+  List<WorkDocumentChecklistItem>
+  get verificationDocuments => _withRequiredPayoutBank(switch (id) {
     'retailer-grocery' => const [
       _identityDocument,
       WorkDocumentChecklistItem(
@@ -571,7 +592,7 @@ extension WorkProfileDocumentChecklist on WorkProfileOption {
       ),
       _gstDocument,
     ],
-  };
+  });
 }
 
 class WorkProofRequirement {

@@ -139,6 +139,12 @@ void main() {
       final gst = profile.verificationDocuments.singleWhere(
         (document) => document.title == 'GST registration certificate',
       );
+      final payoutBank = profile.verificationDocuments.singleWhere(
+        (document) => document.title == 'Payout bank account proof',
+      );
+      expect(payoutBank.importance, WorkDocumentImportance.required);
+      expect(payoutBank.detail, contains('cancelled cheque'));
+      expect(payoutBank.detail, contains('bank statement PDF'));
       expect(gst.importance, WorkDocumentImportance.ifApplicable);
       expect(gst.detail, contains('Required when GST registration applies'));
       expect(gst.detail.toLowerCase(), isNot(contains('turnover')));
@@ -164,6 +170,18 @@ void main() {
               (document) => document.title != 'GST registration certificate',
             )
             .map((document) => document.title),
+      );
+      expect(
+        session.selectedWorkspaceDocuments.map((document) => document.label),
+        contains('Payout bank account proof'),
+      );
+      expect(
+        session.selectedWorkspaceDocuments
+            .singleWhere(
+              (document) => document.label == 'Payout bank account proof',
+            )
+            .id,
+        'payout-bank-account',
       );
     }
     final gstProof = workProofs.singleWhere((proof) => proof.id == 'gst');

@@ -154,6 +154,7 @@ void main() {
       await tapVisible(tester, const Key('work-details-continue'));
       await addProof(tester, 'shop-front');
       await addProof(tester, 'owner-authority');
+      await addProof(tester, 'payout-bank-account');
       await tapVisible(tester, const Key('work-proof-review'));
       await tapVisible(tester, const Key('work-declaration'));
       await tapVisible(tester, const Key('work-submit-profile'));
@@ -319,7 +320,10 @@ void main() {
       );
       await tapVisible(tester, const Key('work-profile-not-shown'));
       await tapVisible(tester, const Key('work-send-profile-request'));
-      expect(find.text('Describe the work profile you need.'), findsOneWidget);
+      expect(
+        find.text('Enter your business, profession or service.'),
+        findsOneWidget,
+      );
 
       await enter(
         tester,
@@ -335,7 +339,7 @@ void main() {
       expect(work.unsupportedRequestSent, isTrue);
       expect(work.activeWorkspace, isNull);
       expect(
-        find.textContaining('your request is with our team'),
+        find.textContaining('MoolSocial will review your request'),
         findsOneWidget,
       );
     },
@@ -401,6 +405,22 @@ void main() {
           );
       expect(gstDocument.importance, WorkDocumentImportance.ifApplicable);
       await tester.scrollUntilVisible(
+        find.text('Payout bank account proof'),
+        240,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('work-requirements-screen')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Payout bank account proof'), findsOneWidget);
+      expect(
+        find.textContaining('cancelled cheque or recent bank statement PDF'),
+        findsOneWidget,
+      );
+      await tester.scrollUntilVisible(
         find.text('GST registration certificate'),
         240,
         scrollable: find
@@ -459,6 +479,7 @@ void main() {
       );
       await tapVisible(tester, const Key('work-proof-source-upload'));
       await addProof(tester, 'owner-authority');
+      await addProof(tester, 'payout-bank-account');
       await tapVisible(tester, const Key('work-proof-review'));
 
       await tapVisible(tester, const Key('work-submit-profile'));

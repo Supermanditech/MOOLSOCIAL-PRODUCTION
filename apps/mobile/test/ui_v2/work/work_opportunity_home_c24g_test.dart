@@ -243,6 +243,13 @@ void main() {
     );
     expect(find.text('Required when applicable'), findsWidgets);
     expect(find.textContaining('GST certificate is optional'), findsNothing);
+    await _scrollTo(
+      tester,
+      find.byKey(const Key('work-gst-compliance-guidance')),
+      const Key('work-requirements-screen'),
+    );
+    expect(find.textContaining('Central and State/UT'), findsOneWidget);
+    expect(find.textContaining('Rajasthan'), findsNothing);
 
     await tester.tap(find.byKey(const Key('work-back')));
     await tester.pumpAndSettle();

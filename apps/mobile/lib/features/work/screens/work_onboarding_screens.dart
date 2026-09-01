@@ -289,104 +289,308 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
   }
 
   Future<void> _showUnsupportedRequest(BuildContext context) {
-    final workspace = TextEditingController();
-    final area = TextEditingController();
-    var family = '';
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            MoolSpacing.lg,
-            0,
-            MoolSpacing.lg,
-            MediaQuery.viewInsetsOf(context).bottom + MoolSpacing.lg,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Request a work profile',
-                  style: TextStyle(
-                    color: MoolColors.ink,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const Text(
-                  'Tell us what you do and where you operate. We’ll review your request and guide you to the right Workspace.',
-                  style: TextStyle(color: MoolColors.muted),
-                ),
-                const SizedBox(height: MoolSpacing.md),
-                TextField(
-                  key: const Key('work-request-profile-name'),
-                  controller: workspace,
-                  decoration: const InputDecoration(
-                    labelText: 'Workspace you need',
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                DropdownButtonFormField<String>(
-                  key: const Key('work-request-family'),
-                  initialValue: family.isEmpty ? null : family,
-                  decoration: const InputDecoration(
-                    labelText: 'Closest work area',
-                  ),
-                  items:
-                      const [
-                            'Products & Trade',
-                            'Food Business',
-                            'Health & Medicine',
-                            'Services & Salon',
-                            'Travel Partners',
-                            'Delivery & Logistics',
-                            'Create & Work',
-                            'Other',
-                          ]
-                          .map(
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text(value),
+      useSafeArea: false,
+      showDragHandle: false,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) =>
+          _WorkspaceRequestSheet(session: widget.session),
+    );
+  }
+}
+
+class _WorkspaceRequestSheet extends StatefulWidget {
+  const _WorkspaceRequestSheet({required this.session});
+
+  final WorkSession session;
+
+  @override
+  State<_WorkspaceRequestSheet> createState() => _WorkspaceRequestSheetState();
+}
+
+class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
+  static const _categories = <String>[
+    'Products & Trade',
+    'Food Business',
+    'Health & Medicine',
+    'Services & Salon',
+    'Travel Partners',
+    'Delivery & Logistics',
+    'Create & Work',
+    'Other',
+  ];
+
+  final TextEditingController _workspace = TextEditingController();
+  final TextEditingController _area = TextEditingController();
+  final FocusNode _workspaceFocus = FocusNode();
+  final FocusNode _areaFocus = FocusNode();
+  String _category = '';
+  String? _error;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _workspace.dispose();
+    _area.dispose();
+    _workspaceFocus.dispose();
+    _areaFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_submitting) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    final validationError = _workspace.text.trim().length < 3
+        ? 'Enter your business, profession or service.'
+        : _category.isEmpty
+        ? 'Choose the closest category.'
+        : _area.text.trim().length < 3
+        ? 'Enter your city or service area.'
+        : null;
+    if (validationError != null) {
+      setState(() => _error = validationError);
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    final sent = await widget.session.sendUnsupportedRequest(
+      workspace: _workspace.text,
+      family: _category,
+      area: _area.text,
+    );
+    if (!mounted) return;
+    if (sent) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _submitting = false;
+      _error = widget.session.errorMessage;
+    });
+  }
+
+  void _close() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final keyboardVisible = keyboardInset > 0;
+    return SafeArea(
+      top: false,
+      minimum: EdgeInsets.only(
+        bottom: _workViewBottomInset(context) + MoolSpacing.xs,
+      ),
+      child: AnimatedPadding(
+        duration: MoolMotion.accessible(context, MoolMotion.quick),
+        curve: MoolMotion.change,
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: FractionallySizedBox(
+            heightFactor: keyboardVisible ? .96 : .82,
+            child: Material(
+              key: const Key('work-profile-request-sheet'),
+              color: Colors.white,
+              clipBehavior: Clip.antiAlias,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(MoolRadii.sheet),
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      MoolSpacing.md,
+                      MoolSpacing.xs,
+                      MoolSpacing.xs,
+                      MoolSpacing.xs,
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD8DAE8),
+                            borderRadius: BorderRadius.circular(
+                              MoolRadii.capsule,
                             ),
-                          )
-                          .toList(),
-                  onChanged: (value) =>
-                      setSheetState(() => family = value ?? ''),
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                TextField(
-                  key: const Key('work-request-area'),
-                  controller: area,
-                  decoration: const InputDecoration(
-                    labelText: 'Operating city or area',
+                          ),
+                        ),
+                        const SizedBox(height: MoolSpacing.xs),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Tell us what you do',
+                                    style: TextStyle(
+                                      color: MoolColors.ink,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Share your business, profession or service. MoolSocial will guide you to the right Workspace.',
+                                    style: TextStyle(
+                                      color: MoolColors.muted,
+                                      fontSize: 11,
+                                      height: 1.3,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              key: const Key('work-profile-request-close'),
+                              tooltip: 'Back to Workspaces',
+                              onPressed: _close,
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: MoolSpacing.md),
-                FilledButton(
-                  key: const Key('work-send-profile-request'),
-                  onPressed: () async {
-                    final sent = await widget.session.sendUnsupportedRequest(
-                      workspace: workspace.text,
-                      family: family,
-                      area: area.text,
-                    );
-                    if (sent && sheetContext.mounted) {
-                      Navigator.pop(sheetContext);
-                    }
-                  },
-                  child: const Text('Send request'),
-                ),
-                TextButton(
-                  key: const Key('work-profile-request-back'),
-                  onPressed: () => Navigator.pop(sheetContext),
-                  child: const Text('Back to cards'),
-                ),
-              ],
+                  if (_error case final error?)
+                    Semantics(
+                      liveRegion: true,
+                      child: Container(
+                        key: const Key('work-profile-request-error'),
+                        width: double.infinity,
+                        margin: const EdgeInsets.fromLTRB(
+                          MoolSpacing.md,
+                          0,
+                          MoolSpacing.md,
+                          MoolSpacing.xs,
+                        ),
+                        padding: const EdgeInsets.all(MoolSpacing.xs),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFE9E7),
+                          borderRadius: BorderRadius.circular(
+                            MoolRadii.control,
+                          ),
+                        ),
+                        child: Text(
+                          error,
+                          style: const TextStyle(
+                            color: Color(0xFF9D1C15),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  Expanded(
+                    child: ListView(
+                      key: const Key('work-profile-request-scroll'),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(
+                        MoolSpacing.md,
+                        MoolSpacing.xs,
+                        MoolSpacing.md,
+                        MoolSpacing.md,
+                      ),
+                      children: [
+                        TextField(
+                          key: const Key('work-request-profile-name'),
+                          controller: _workspace,
+                          focusNode: _workspaceFocus,
+                          enabled: !_submitting,
+                          textInputAction: TextInputAction.next,
+                          scrollPadding: const EdgeInsets.only(bottom: 120),
+                          onSubmitted: (_) => _areaFocus.requestFocus(),
+                          decoration: const InputDecoration(
+                            labelText: 'Business, profession or service',
+                            hintText: 'For example, furniture repair',
+                          ),
+                        ),
+                        const SizedBox(height: MoolSpacing.sm),
+                        DropdownButtonFormField<String>(
+                          key: const Key('work-request-family'),
+                          initialValue: _category.isEmpty ? null : _category,
+                          decoration: const InputDecoration(
+                            labelText: 'Closest category',
+                          ),
+                          items: _categories
+                              .map(
+                                (value) => DropdownMenuItem(
+                                  value: value,
+                                  child: Text(value),
+                                ),
+                              )
+                              .toList(growable: false),
+                          onTap: () =>
+                              FocusManager.instance.primaryFocus?.unfocus(),
+                          onChanged: _submitting
+                              ? null
+                              : (value) =>
+                                    setState(() => _category = value ?? ''),
+                        ),
+                        const SizedBox(height: MoolSpacing.sm),
+                        TextField(
+                          key: const Key('work-request-area'),
+                          controller: _area,
+                          focusNode: _areaFocus,
+                          enabled: !_submitting,
+                          textInputAction: TextInputAction.done,
+                          scrollPadding: const EdgeInsets.only(bottom: 120),
+                          decoration: const InputDecoration(
+                            labelText: 'City or service area',
+                            hintText: 'For example, Jodhpur',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Material(
+                    key: const Key('work-profile-request-actions'),
+                    color: Colors.white,
+                    elevation: 8,
+                    shadowColor: const Color(0x22000050),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        MoolSpacing.md,
+                        MoolSpacing.sm,
+                        MoolSpacing.md,
+                        MoolSpacing.xs,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              key: const Key('work-profile-request-back'),
+                              onPressed: _submitting ? null : _close,
+                              child: const Text('Back to Workspaces'),
+                            ),
+                          ),
+                          const SizedBox(width: MoolSpacing.xs),
+                          Expanded(
+                            child: FilledButton(
+                              key: const Key('work-send-profile-request'),
+                              onPressed: _submitting ? null : _submit,
+                              child: Text(
+                                _submitting ? 'Sending…' : 'Send to MoolSocial',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -673,7 +877,7 @@ class _GstComplianceNotice extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Aggregate turnover is calculated across India for the same PAN. If you supply both goods and services or a compulsory-registration rule may apply, confirm your requirement with a GST professional.',
+                  'Aggregate turnover is calculated across India for the same PAN. Keep your GST certificate ready if registered. If you are unsure whether registration applies, confirm the current Central and State/UT rules with a GST professional.',
                   style: TextStyle(
                     color: MoolColors.muted,
                     fontSize: 10,
@@ -695,9 +899,9 @@ String _gstComplianceText(WorkGstMatchCategory category) => switch (category) {
   WorkGstMatchCategory.wholesaleDistributor ||
   WorkGstMatchCategory.manufacturerSupplier ||
   WorkGstMatchCategory.pharmacySupplier =>
-    'For a Rajasthan business supplying only goods, GST registration is generally required after annual aggregate turnover exceeds ₹40 lakh. The general threshold is ₹20 lakh when taxable services are also supplied.',
+    'For businesses supplying goods, GST registration depends on annual PAN-wide aggregate turnover, the State or Union Territory of supply, the nature of the supplies and any compulsory-registration rule.',
   WorkGstMatchCategory.healthcareProvider =>
-    'Qualifying health-care services may be GST-exempt. Taxable or mixed supplies can change the requirement; the general Rajasthan service threshold is ₹20 lakh of annual aggregate turnover.',
+    'Qualifying health-care services may be GST-exempt. Taxable or mixed supplies can change the requirement under the current Central and State/UT GST rules.',
   WorkGstMatchCategory.bikeTravelProvider ||
   WorkGstMatchCategory.autoTravelProvider ||
   WorkGstMatchCategory.cabTravelProvider ||
@@ -705,9 +909,9 @@ String _gstComplianceText(WorkGstMatchCategory category) => switch (category) {
   WorkGstMatchCategory.quickDeliveryBiker ||
   WorkGstMatchCategory.wholesaleFleetDelivery ||
   WorkGstMatchCategory.bulkDeliveryFleet =>
-    'Transport and delivery GST treatment depends on the exact service and payment arrangement. The general Rajasthan service threshold is ₹20 lakh of annual aggregate turnover; reverse-charge and compulsory-registration rules may change the requirement.',
+    'Transport and delivery GST treatment depends on the exact service, payment arrangement, place of supply, reverse-charge treatment and any compulsory-registration rule.',
   _ =>
-    'For services in Rajasthan, GST registration is generally required after annual aggregate turnover exceeds ₹20 lakh. Compulsory-registration rules may apply earlier.',
+    'For service businesses, GST registration depends on annual PAN-wide aggregate turnover, the State or Union Territory of supply, the nature of the service and any compulsory-registration rule.',
 };
 
 class _DocumentsReadyAction extends StatefulWidget {
@@ -1653,7 +1857,7 @@ class _BusinessIdentityNotice extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Add a GST certificate when registration applies to your ${profile.label} Workspace. The next page explains the applicable Rajasthan threshold and exceptions.',
+                  'Add a GST certificate when registration applies to your ${profile.label} Workspace. Applicability follows the current Central and State/UT GST rules.',
                   style: const TextStyle(
                     color: MoolColors.muted,
                     fontSize: 10,
@@ -1892,7 +2096,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                   Expanded(
                     child: const WorkSectionTitle(
                       title: 'Documents',
-                      detail: 'India / Rajasthan · profile-specific',
+                      detail: 'India · Workspace-specific',
                     ),
                   ),
                   TextButton(

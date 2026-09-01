@@ -179,6 +179,8 @@ class WorkSession extends ChangeNotifier {
       if (document.title == 'GST registration certificate') continue;
       final id = index == 0
           ? 'personal-kyc'
+          : document.title == 'Payout bank account proof'
+          ? 'payout-bank-account'
           : document.title.toLowerCase().contains('address')
           ? 'shop-front'
           : document.title.toLowerCase().contains('authority') ||
@@ -506,12 +508,12 @@ class WorkSession extends ChangeNotifier {
     required String area,
   }) async {
     if (workspace.trim().length < 3) {
-      errorMessage = 'Describe the work profile you need.';
+      errorMessage = 'Enter your business, profession or service.';
       notifyListeners();
       return false;
     }
     if (family.trim().isEmpty) {
-      errorMessage = 'Choose the closest work area.';
+      errorMessage = 'Choose the closest category.';
       notifyListeners();
       return false;
     }
@@ -526,7 +528,7 @@ class WorkSession extends ChangeNotifier {
     unsupportedRequestSent = true;
     errorMessage = null;
     noticeMessage =
-        'Thanks—your request is with our team. We’ll follow up in Workspace and Chat.';
+        'Thank you—MoolSocial will review your request and update you in Workspace and Chat.';
     notifyListeners();
     return true;
   }
