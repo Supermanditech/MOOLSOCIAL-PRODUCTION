@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -507,47 +508,141 @@ class BuyV2ProductView extends StatelessWidget {
               BuyV2FiniteIncomingTransition(
                 key: ValueKey('buy-product-title-reveal-${product.id}'),
                 stateKey: 'buy-product-title-${product.id}',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.brand,
-                      style: context.buyEyebrow.copyWith(fontSize: 8),
+                child: Container(
+                  key: ValueKey('buy-product-purchase-hero-${product.id}'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFF8EE), Color(0xFFF4F7FF)],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      product.title,
-                      key: ValueKey('buy-product-title-${product.id}'),
-                      style: context.buyTitle.copyWith(fontSize: 18),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      product.composition ?? product.variant,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.buyBody.copyWith(fontSize: 10),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      product.pack,
-                      style: context.buyMeta.copyWith(fontSize: 9),
-                    ),
-                    if (!automaticFulfilment) ...[
-                      const SizedBox(height: 8),
-                      _ProductOwnedActionPanel(
-                        key: ValueKey(
-                          'buy-product-inline-action-${product.id}',
-                        ),
-                        product: product,
-                        quantity: quantity,
-                        deliveryDecision: buyerPromise,
-                        rxBlocked: rxBlocked,
-                        onAdd: addProduct,
-                        onDecrease: () => session.decrease(product.id),
-                        onIncrease: () => session.increase(product.id),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: BuyV2Colors.line),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${product.brand} · ${_sellerTypeLabel(product.sellerType)}',
+                              style: context.buyEyebrow.copyWith(fontSize: 8),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  facts.orderabilityLabel
+                                      .toLowerCase()
+                                      .contains('available')
+                                  ? BuyV2Colors.softGreen
+                                  : BuyV2Colors.softOrange,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              facts.orderabilityLabel,
+                              style: context.buyMeta.copyWith(
+                                color: BuyV2Colors.green,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 5),
+                      Text(
+                        product.title,
+                        key: ValueKey('buy-product-title-${product.id}'),
+                        style: context.buyTitle.copyWith(fontSize: 20),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        product.composition ?? product.variant,
+                        maxLines: 3,
+                        overflow: TextOverflow.clip,
+                        style: context.buyBody.copyWith(fontSize: 10),
+                      ),
+                      const SizedBox(height: 7),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            buyV2Money(facts.price),
+                            key: ValueKey(
+                              'buy-product-hero-price-${product.id}',
+                            ),
+                            style: context.buyTitle.copyWith(
+                              color: BuyV2Colors.navy,
+                              fontSize: 25,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${product.pack} · ${product.unitPrice}',
+                              maxLines: 2,
+                              overflow: TextOverflow.clip,
+                              style: context.buyMeta.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _ProductHeroFact(
+                        key: ValueKey('buy-product-hero-store-${product.id}'),
+                        icon: Icons.storefront_outlined,
+                        value:
+                            '${facts.partner} · ${_sellerTypeLabel(product.sellerType)}',
+                      ),
+                      const SizedBox(height: 5),
+                      _ProductHeroFact(
+                        key: ValueKey(
+                          'buy-product-hero-delivery-${product.id}',
+                        ),
+                        icon: product.destination == BuyV2Destination.wholesale
+                            ? Icons.local_shipping_outlined
+                            : Icons.schedule_rounded,
+                        value: buyerPromise,
+                        color: BuyV2Colors.green,
+                      ),
+                      if (wholesale) ...[
+                        const SizedBox(height: 5),
+                        _ProductHeroFact(
+                          icon: Icons.inventory_2_outlined,
+                          value:
+                              'Minimum order · ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'}',
+                        ),
+                      ],
+                      if (product.returnPolicy case final returnPolicy?) ...[
+                        const SizedBox(height: 5),
+                        _ProductHeroFact(
+                          icon: Icons.assignment_return_outlined,
+                          value: returnPolicy,
+                        ),
+                      ],
+                      if (!automaticFulfilment) ...[
+                        const SizedBox(height: 9),
+                        _ProductOwnedActionPanel(
+                          key: ValueKey(
+                            'buy-product-inline-action-${product.id}',
+                          ),
+                          product: product,
+                          quantity: quantity,
+                          deliveryDecision: buyerPromise,
+                          rxBlocked: rxBlocked,
+                          onAdd: addProduct,
+                          onDecrease: () => session.decrease(product.id),
+                          onIncrease: () => session.increase(product.id),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
               if (variants.length > 1) ...[
@@ -833,6 +928,41 @@ class BuyV2ProductView extends StatelessWidget {
             businessVerified: session.businessVerified,
             onOpenWorkspace: () => context.push('/app/work/workspace'),
           ),
+      ],
+    );
+  }
+}
+
+class _ProductHeroFact extends StatelessWidget {
+  const _ProductHeroFact({
+    required this.icon,
+    required this.value,
+    this.color = BuyV2Colors.ink,
+    super.key,
+  });
+
+  final IconData icon;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 17, color: color),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            value,
+            style: context.buyBody.copyWith(
+              color: color,
+              fontSize: 10,
+              height: 1.25,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -3658,6 +3788,11 @@ Future<void> _showProductReviewSheet(
   BuyV2Product product,
 ) async {
   final existing = session.customerReviewFor(product.id);
+  final callerViewPadding = MediaQuery.viewPaddingOf(context);
+  final exportedBottomClearance =
+      defaultTargetPlatform == TargetPlatform.android
+      ? callerViewPadding.top
+      : callerViewPadding.bottom;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -3675,7 +3810,9 @@ Future<void> _showProductReviewSheet(
       ),
       curve: Curves.easeOut,
       padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+        bottom:
+            MediaQuery.viewInsetsOf(sheetContext).bottom +
+            exportedBottomClearance,
       ),
       child: _ProductReviewSheet(
         session: session,
@@ -3697,6 +3834,11 @@ Future<void> _showProductReportSheet(
     'Product image does not match',
     'Partner information needs attention',
   ];
+  final callerViewPadding = MediaQuery.viewPaddingOf(context);
+  final exportedBottomClearance =
+      defaultTargetPlatform == TargetPlatform.android
+      ? callerViewPadding.top
+      : callerViewPadding.bottom;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -3708,10 +3850,21 @@ Future<void> _showProductReportSheet(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     sheetAnimationStyle: BuyV2ProductFeedbackSheetMotion.resolve(context),
-    builder: (sheetContext) => _ProductReportSheet(
-      session: session,
-      product: product,
-      reasons: reasons,
+    builder: (sheetContext) => AnimatedPadding(
+      duration: BuyV2ProductFeedbackSheetMotion.resolveKeyboardInsetDuration(
+        sheetContext,
+      ),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(
+        bottom:
+            MediaQuery.viewInsetsOf(sheetContext).bottom +
+            exportedBottomClearance,
+      ),
+      child: _ProductReportSheet(
+        session: session,
+        product: product,
+        reasons: reasons,
+      ),
     ),
   );
 }
@@ -3751,7 +3904,7 @@ class _ProductFeedbackSheetHeader extends StatelessWidget {
               Text(
                 title,
                 maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                overflow: TextOverflow.clip,
                 style: context.buyTitle.copyWith(fontSize: 17),
               ),
               const SizedBox(height: 2),
@@ -3773,6 +3926,70 @@ class _ProductFeedbackSheetHeader extends StatelessWidget {
       ],
     );
   }
+}
+
+class _ProductFeedbackIdentity extends StatelessWidget {
+  const _ProductFeedbackIdentity({required this.product});
+
+  final BuyV2Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: ValueKey('buy-feedback-product-${product.id}'),
+      container: true,
+      label:
+          '${product.title}, ${product.pack}, ${product.seller}, product ${product.id}',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: BuyV2Colors.softBlue,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: BuyV2Colors.line),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.inventory_2_outlined,
+              color: BuyV2Colors.navy,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.clip,
+                    style: context.buyBody.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    '${product.pack} · ${product.seller}',
+                    maxLines: 2,
+                    overflow: TextOverflow.clip,
+                    style: context.buyMeta,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+double _productFeedbackSheetHeight(BuildContext context) {
+  final media = MediaQuery.of(context);
+  return (media.size.height -
+          media.viewInsets.bottom -
+          media.viewPadding.vertical -
+          56)
+      .clamp(300.0, 460.0);
 }
 
 class _ProductReviewSheet extends StatefulWidget {
@@ -3849,7 +4066,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
   Widget build(BuildContext context) {
     final stateDuration =
         BuyV2ProductFeedbackSheetMotion.resolveFormStateDuration(context);
-    final title = 'Review ${widget.product.title}';
+    final routeTitle = 'Review ${widget.product.title}';
     return PopScope<void>(
       canPop: !_commentFocus.hasFocus,
       onPopInvokedWithResult: (didPop, _) {
@@ -3860,24 +4077,28 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
         scopesRoute: true,
         namesRoute: true,
         explicitChildNodes: true,
-        label: '$title form',
+        label: '$routeTitle form',
         child: ConstrainedBox(
           key: const ValueKey('buy-product-review-sheet'),
-          constraints: const BoxConstraints(maxHeight: 620),
-          child: SingleChildScrollView(
+          constraints: BoxConstraints.tightFor(
+            height: _productFeedbackSheetHeight(context),
+          ),
+          child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _ProductFeedbackSheetHeader(
                   icon: Icons.rate_review_outlined,
-                  title: title,
+                  title: 'Write a review',
                   detail:
                       'Rate what you received. Keep personal or medical information out.',
                   closeKey: const ValueKey('buy-close-product-review'),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+                _ProductFeedbackIdentity(product: widget.product),
+                const SizedBox(height: 8),
                 Semantics(
                   label: _rating == 0
                       ? 'No rating selected'
@@ -3912,7 +4133,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                                   ? Icons.star_rounded
                                   : Icons.star_border_rounded,
                               color: BuyV2Colors.orange,
-                              size: 28,
+                              size: 24,
                             ),
                           ),
                         ),
@@ -3920,109 +4141,129 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                   ),
                 ),
                 const SizedBox(height: 9),
-                Semantics(
-                  container: true,
-                  excludeSemantics: true,
-                  textField: true,
-                  multiline: true,
-                  focusable: true,
-                  focused: _commentFocus.hasFocus,
-                  isRequired: true,
-                  maxValueLength: 500,
-                  currentValueLength: _commentController.text.characters.length,
-                  label: 'Your review',
-                  value: _commentController.text,
-                  hint: 'Required. Up to 500 characters.',
-                  onTap: _commentFocus.requestFocus,
-                  onFocus: _commentFocus.requestFocus,
-                  onSetText: (value) {
-                    final nextValue =
-                        LengthLimitingTextInputFormatter(
-                          500,
-                          maxLengthEnforcement: MaxLengthEnforcement.enforced,
-                        ).formatEditUpdate(
-                          _commentController.value,
-                          TextEditingValue(
-                            text: value,
-                            selection: TextSelection.collapsed(
-                              offset: value.length,
+                Flexible(
+                  child: SingleChildScrollView(
+                    key: const ValueKey('buy-product-review-fields-scroll'),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Semantics(
+                          container: true,
+                          excludeSemantics: true,
+                          textField: true,
+                          multiline: true,
+                          focusable: true,
+                          focused: _commentFocus.hasFocus,
+                          isRequired: true,
+                          maxValueLength: 500,
+                          currentValueLength:
+                              _commentController.text.characters.length,
+                          label: 'Your review',
+                          value: _commentController.text,
+                          hint: 'Required. Up to 500 characters.',
+                          onTap: _commentFocus.requestFocus,
+                          onFocus: _commentFocus.requestFocus,
+                          onSetText: (value) {
+                            final nextValue =
+                                LengthLimitingTextInputFormatter(
+                                  500,
+                                  maxLengthEnforcement:
+                                      MaxLengthEnforcement.enforced,
+                                ).formatEditUpdate(
+                                  _commentController.value,
+                                  TextEditingValue(
+                                    text: value,
+                                    selection: TextSelection.collapsed(
+                                      offset: value.length,
+                                    ),
+                                  ),
+                                );
+                            _commentFocus.requestFocus();
+                            _commentController.value = nextValue;
+                            setState(() => _submissionRejected = false);
+                          },
+                          child: TextFormField(
+                            key: ValueKey(
+                              'buy-review-comment-${widget.product.id}',
+                            ),
+                            controller: _commentController,
+                            focusNode: _commentFocus,
+                            autofocus: false,
+                            onChanged: (_) => setState(() {
+                              _submissionRejected = false;
+                            }),
+                            enabled: !_submitting,
+                            minLines: 2,
+                            maxLines: 4,
+                            maxLength: 500,
+                            scrollPadding: EdgeInsets.only(
+                              bottom:
+                                  MediaQuery.viewInsetsOf(context).bottom + 132,
+                            ),
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: const InputDecoration(
+                              labelText: 'Your review',
+                              hintText:
+                                  'What was useful, good or needs improvement?',
+                              counterText: '',
+                              border: OutlineInputBorder(),
                             ),
                           ),
-                        );
-                    _commentFocus.requestFocus();
-                    _commentController.value = nextValue;
-                    setState(() => _submissionRejected = false);
-                  },
-                  child: TextFormField(
-                    key: ValueKey('buy-review-comment-${widget.product.id}'),
-                    controller: _commentController,
-                    focusNode: _commentFocus,
-                    autofocus: false,
-                    onChanged: (_) => setState(() {
-                      _submissionRejected = false;
-                    }),
-                    enabled: !_submitting,
-                    minLines: 3,
-                    maxLines: 5,
-                    maxLength: 500,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      labelText: 'Your review',
-                      hintText: 'What was useful, good or needs improvement?',
-                      counterText: '',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Required · up to 500 characters',
-                          style: context.buyMeta.copyWith(fontSize: 9),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_commentController.text.characters.length}/500',
-                        style: context.buyMeta.copyWith(fontSize: 9),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 5),
-                AnimatedSwitcher(
-                  duration: stateDuration,
-                  child: Semantics(
-                    key: ValueKey(
-                      _submissionRejected
-                          ? 'review-submit-rejected'
-                          : _submitting
-                          ? 'review-submitting'
-                          : _isValid
-                          ? 'review-ready'
-                          : 'review-incomplete',
-                    ),
-                    liveRegion: true,
-                    child: Text(
-                      _submissionRejected
-                          ? (widget.session.notice ??
-                                'This review could not be saved.')
-                          : _submitting
-                          ? 'Saving your review…'
-                          : _isValid
-                          ? 'Ready to save to this product.'
-                          : 'Choose a rating and write a review to enable Save.',
-                      style: context.buyMeta.copyWith(
-                        color: _submissionRejected
-                            ? BuyV2Colors.orange
-                            : _isValid
-                            ? BuyV2Colors.green
-                            : BuyV2Colors.muted,
-                        fontWeight: FontWeight.w800,
-                      ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Required · up to 500 characters',
+                                  style: context.buyMeta.copyWith(fontSize: 9),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${_commentController.text.characters.length}/500',
+                                style: context.buyMeta.copyWith(fontSize: 9),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        AnimatedSwitcher(
+                          duration: stateDuration,
+                          child: Semantics(
+                            key: ValueKey(
+                              _submissionRejected
+                                  ? 'review-submit-rejected'
+                                  : _submitting
+                                  ? 'review-submitting'
+                                  : _isValid
+                                  ? 'review-ready'
+                                  : 'review-incomplete',
+                            ),
+                            liveRegion: true,
+                            child: Text(
+                              _submissionRejected
+                                  ? (widget.session.notice ??
+                                        'This review could not be saved.')
+                                  : _submitting
+                                  ? 'Saving your review…'
+                                  : _isValid
+                                  ? 'Ready to save to this product.'
+                                  : 'Choose a rating and write a review to enable Save.',
+                              style: context.buyMeta.copyWith(
+                                color: _submissionRejected
+                                    ? BuyV2Colors.orange
+                                    : _isValid
+                                    ? BuyV2Colors.green
+                                    : BuyV2Colors.muted,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -4126,11 +4367,13 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
       label: '$title form',
       child: ConstrainedBox(
         key: const ValueKey('buy-product-report-sheet'),
-        constraints: const BoxConstraints(maxHeight: 620),
-        child: SingleChildScrollView(
+        constraints: BoxConstraints.tightFor(
+          height: _productFeedbackSheetHeight(context),
+        ),
+        child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const _ProductFeedbackSheetHeader(
@@ -4139,103 +4382,124 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
                 detail: 'Choose the one listing detail that needs attention.',
                 closeKey: ValueKey('buy-close-product-report'),
               ),
-              const SizedBox(height: 11),
-              for (var index = 0; index < widget.reasons.length; index++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Semantics(
-                    button: true,
-                    selected: _selectedReason == widget.reasons[index],
-                    label: widget.reasons[index],
-                    child: AnimatedContainer(
-                      duration: stateDuration,
-                      curve: Curves.easeOut,
-                      decoration: BoxDecoration(
-                        color: _selectedReason == widget.reasons[index]
-                            ? BuyV2Colors.softOrange
-                            : BuyV2Colors.canvas,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: _selectedReason == widget.reasons[index]
-                              ? BuyV2Colors.orange
-                              : Colors.transparent,
-                        ),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          key: ValueKey('buy-report-reason-$index'),
-                          borderRadius: BorderRadius.circular(14),
-                          onTap: _submitting
-                              ? null
-                              : () => setState(() {
-                                  _selectedReason = widget.reasons[index];
-                                  _submissionRejected = false;
-                                }),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    widget.reasons[index],
-                                    style: context.buyBody.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(
-                                  _selectedReason == widget.reasons[index]
-                                      ? Icons.check_circle_rounded
-                                      : Icons.circle_outlined,
+              const SizedBox(height: 8),
+              _ProductFeedbackIdentity(product: widget.product),
+              const SizedBox(height: 8),
+              Flexible(
+                child: SingleChildScrollView(
+                  key: const ValueKey('buy-product-report-reasons-scroll'),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (
+                        var index = 0;
+                        index < widget.reasons.length;
+                        index++
+                      )
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Semantics(
+                            button: true,
+                            selected: _selectedReason == widget.reasons[index],
+                            label: widget.reasons[index],
+                            child: AnimatedContainer(
+                              duration: stateDuration,
+                              curve: Curves.easeOut,
+                              decoration: BoxDecoration(
+                                color: _selectedReason == widget.reasons[index]
+                                    ? BuyV2Colors.softOrange
+                                    : BuyV2Colors.canvas,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
                                   color:
                                       _selectedReason == widget.reasons[index]
                                       ? BuyV2Colors.orange
-                                      : BuyV2Colors.muted,
-                                  size: 20,
+                                      : Colors.transparent,
                                 ),
-                              ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  key: ValueKey('buy-report-reason-$index'),
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: _submitting
+                                      ? null
+                                      : () => setState(() {
+                                          _selectedReason =
+                                              widget.reasons[index];
+                                          _submissionRejected = false;
+                                        }),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            widget.reasons[index],
+                                            style: context.buyBody.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Icon(
+                                          _selectedReason ==
+                                                  widget.reasons[index]
+                                              ? Icons.check_circle_rounded
+                                              : Icons.circle_outlined,
+                                          color:
+                                              _selectedReason ==
+                                                  widget.reasons[index]
+                                              ? BuyV2Colors.orange
+                                              : BuyV2Colors.muted,
+                                          size: 20,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      AnimatedSwitcher(
+                        duration: stateDuration,
+                        child: Semantics(
+                          key: ValueKey(
+                            _submissionRejected
+                                ? 'report-submit-rejected'
+                                : _submitting
+                                ? 'report-submitting'
+                                : _selectedReason == null
+                                ? 'report-incomplete'
+                                : 'report-ready',
+                          ),
+                          liveRegion: true,
+                          child: Text(
+                            _submissionRejected
+                                ? (widget.session.notice ??
+                                      'This report could not be sent.')
+                                : _submitting
+                                ? 'Sending your report…'
+                                : _selectedReason == null
+                                ? 'Choose one reason to enable Send.'
+                                : 'Ready to send this listing issue.',
+                            style: context.buyMeta.copyWith(
+                              color: _submissionRejected
+                                  ? BuyV2Colors.orange
+                                  : _selectedReason == null
+                                  ? BuyV2Colors.muted
+                                  : BuyV2Colors.green,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-              AnimatedSwitcher(
-                duration: stateDuration,
-                child: Semantics(
-                  key: ValueKey(
-                    _submissionRejected
-                        ? 'report-submit-rejected'
-                        : _submitting
-                        ? 'report-submitting'
-                        : _selectedReason == null
-                        ? 'report-incomplete'
-                        : 'report-ready',
-                  ),
-                  liveRegion: true,
-                  child: Text(
-                    _submissionRejected
-                        ? (widget.session.notice ??
-                              'This report could not be sent.')
-                        : _submitting
-                        ? 'Sending your report…'
-                        : _selectedReason == null
-                        ? 'Choose one reason to enable Send.'
-                        : 'Ready to send this listing issue.',
-                    style: context.buyMeta.copyWith(
-                      color: _submissionRejected
-                          ? BuyV2Colors.orange
-                          : _selectedReason == null
-                          ? BuyV2Colors.muted
-                          : BuyV2Colors.green,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    ],
                   ),
                 ),
               ),

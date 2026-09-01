@@ -55,9 +55,12 @@ void main() {
       expect(find.byKey(ValueKey('buy-product-variant-$id')), findsOneWidget);
     }
 
-    await tester.tap(
-      find.byKey(const ValueKey('buy-product-variant-s-milk-500ml')),
+    final halfLitre = find.byKey(
+      const ValueKey('buy-product-variant-s-milk-500ml'),
     );
+    await tester.ensureVisible(halfLitre);
+    await tester.pumpAndSettle();
+    await tester.tap(halfLitre);
     await tester.pumpAndSettle();
     expect(session.selectedProduct?.id, 's-milk-500ml');
     expect(find.text('500 ml pouch'), findsWidgets);
