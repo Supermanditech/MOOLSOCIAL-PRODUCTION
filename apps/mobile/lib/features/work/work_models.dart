@@ -141,12 +141,49 @@ class WorkTerm {
   final String detail;
 }
 
+enum WorkGstMatchCategory {
+  retailGoodsSupplier,
+  wholesaleDistributor,
+  manufacturerSupplier,
+  foodServiceProvider,
+  healthcareProvider,
+  pharmacySupplier,
+  personalCareProvider,
+  localServiceProvider,
+  individualTransportProvider,
+  fleetTransportOperator,
+  digitalContentProvider,
+  independentProfessional,
+}
+
+extension WorkGstMatchCategoryLabel on WorkGstMatchCategory {
+  String get label => switch (this) {
+    WorkGstMatchCategory.retailGoodsSupplier => 'Retail goods supplier',
+    WorkGstMatchCategory.wholesaleDistributor => 'Wholesale distributor',
+    WorkGstMatchCategory.manufacturerSupplier => 'Manufacturer or supplier',
+    WorkGstMatchCategory.foodServiceProvider => 'Food service provider',
+    WorkGstMatchCategory.healthcareProvider => 'Healthcare provider',
+    WorkGstMatchCategory.pharmacySupplier => 'Pharmacy or medicine supplier',
+    WorkGstMatchCategory.personalCareProvider =>
+      'Personal care service provider',
+    WorkGstMatchCategory.localServiceProvider => 'Local service provider',
+    WorkGstMatchCategory.individualTransportProvider =>
+      'Individual transport provider',
+    WorkGstMatchCategory.fleetTransportOperator =>
+      'Fleet or transport operator',
+    WorkGstMatchCategory.digitalContentProvider =>
+      'Digital content service provider',
+    WorkGstMatchCategory.independentProfessional => 'Independent professional',
+  };
+}
+
 class WorkProfileOption {
   const WorkProfileOption({
     required this.id,
     required this.familyId,
     required this.familyLabel,
     required this.label,
+    required this.gstMatchCategory,
     required this.sellSide,
     required this.buySide,
     required this.tools,
@@ -157,6 +194,7 @@ class WorkProfileOption {
   final String familyId;
   final String familyLabel;
   final String label;
+  final WorkGstMatchCategory gstMatchCategory;
   final String sellSide;
   final String buySide;
   final String tools;
@@ -986,6 +1024,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'products-trade',
     familyLabel: 'Products & Trade',
     label: 'Grocery / Kirana Shop',
+    gstMatchCategory: WorkGstMatchCategory.retailGoodsSupplier,
     sellSide: 'Sell products to local customers',
     buySide: 'Buy verified wholesale packs',
     tools: 'Orders, stock, delivery and business book',
@@ -996,6 +1035,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'products-trade',
     familyLabel: 'Products & Trade',
     label: 'Speciality Retail Shop',
+    gstMatchCategory: WorkGstMatchCategory.retailGoodsSupplier,
     sellSide: 'Sell category products',
     buySide: 'Procure from eligible suppliers',
     tools: 'Catalogue, stock, orders and invoices',
@@ -1006,6 +1046,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'products-trade',
     familyLabel: 'Products & Trade',
     label: 'Wholesaler / Distributor',
+    gstMatchCategory: WorkGstMatchCategory.wholesaleDistributor,
     sellSide: 'List case packs and trade terms',
     buySide: 'Source from manufacturers',
     tools: 'Business orders, credit and dispatch',
@@ -1016,6 +1057,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'products-trade',
     familyLabel: 'Products & Trade',
     label: 'Manufacturer / Supplier',
+    gstMatchCategory: WorkGstMatchCategory.manufacturerSupplier,
     sellSide: 'Reach eligible trade buyers',
     buySide: 'Source materials and services',
     tools: 'Sales targets, distribution and fulfilment',
@@ -1026,6 +1068,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'food-business',
     familyLabel: 'Food Business',
     label: 'Restaurant / Café',
+    gstMatchCategory: WorkGstMatchCategory.foodServiceProvider,
     sellSide: 'Serve delivery, pickup and tables',
     buySide: 'Procure food and supplies',
     tools: 'Menu, kitchen, orders and tables',
@@ -1036,6 +1079,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'food-business',
     familyLabel: 'Food Business',
     label: 'Cloud Kitchen / Tiffin',
+    gstMatchCategory: WorkGstMatchCategory.foodServiceProvider,
     sellSide: 'Sell meals and subscriptions',
     buySide: 'Procure ingredients and packaging',
     tools: 'Menu, plans, delivery and kitchen',
@@ -1046,6 +1090,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'health',
     familyLabel: 'Health & Medicine',
     label: 'Clinic / Doctor',
+    gstMatchCategory: WorkGstMatchCategory.healthcareProvider,
     sellSide: 'Offer verified appointments',
     buySide: 'Manage approved supplies',
     tools: 'Appointments, consent and follow-up',
@@ -1056,6 +1101,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'health',
     familyLabel: 'Health & Medicine',
     label: 'Pharmacy',
+    gstMatchCategory: WorkGstMatchCategory.pharmacySupplier,
     sellSide: 'Fulfil eligible medicine orders',
     buySide: 'Procure from licensed suppliers',
     tools: 'Prescription checks, stock and orders',
@@ -1066,6 +1112,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'services',
     familyLabel: 'Services & Salon',
     label: 'Salon / Wellness',
+    gstMatchCategory: WorkGstMatchCategory.personalCareProvider,
     sellSide: 'Offer appointments and packages',
     buySide: 'Procure professional products',
     tools: 'Slots, staff, bills and repeat visits',
@@ -1076,6 +1123,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'services',
     familyLabel: 'Services & Salon',
     label: 'Local Service Provider',
+    gstMatchCategory: WorkGstMatchCategory.localServiceProvider,
     sellSide: 'Accept defined service tasks',
     buySide: 'Source tools and supplies',
     tools: 'Availability, proof, payout and support',
@@ -1086,6 +1134,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'ride',
     familyLabel: 'Ride & Transport',
     label: 'Ride / Delivery Captain',
+    gstMatchCategory: WorkGstMatchCategory.individualTransportProvider,
     sellSide: 'Accept eligible trips and routes',
     buySide: 'Access vehicle services',
     tools: 'Trips, safety, earnings and documents',
@@ -1096,6 +1145,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'ride',
     familyLabel: 'Ride & Transport',
     label: 'Fleet / Transport Business',
+    gstMatchCategory: WorkGstMatchCategory.fleetTransportOperator,
     sellSide: 'Offer verified capacity',
     buySide: 'Source routes and services',
     tools: 'Vehicles, drivers, routes and settlement',
@@ -1106,6 +1156,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'create-work',
     familyLabel: 'Create & Work',
     label: 'Creator',
+    gstMatchCategory: WorkGstMatchCategory.digitalContentProvider,
     sellSide: 'Complete funded creator campaigns',
     buySide: 'Hire creator support services',
     tools: 'YouTube Connect, campaigns and earnings',
@@ -1116,6 +1167,7 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'create-work',
     familyLabel: 'Create & Work',
     label: 'Freelancer / Job Seeker',
+    gstMatchCategory: WorkGstMatchCategory.independentProfessional,
     sellSide: 'Apply for funded work and roles',
     buySide: 'Access professional services',
     tools: 'Applications, proof, payout and profile',

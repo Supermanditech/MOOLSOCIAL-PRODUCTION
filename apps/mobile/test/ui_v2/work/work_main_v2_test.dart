@@ -228,6 +228,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    final chooserScroll = find
+        .descendant(
+          of: find.byKey(const Key('work-choose-screen')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
     for (final family in const [
       'products-trade',
       'food-business',
@@ -236,6 +242,11 @@ void main() {
       'ride',
       'create-work',
     ]) {
+      await tester.scrollUntilVisible(
+        find.byKey(Key('work-family-$family')),
+        220,
+        scrollable: chooserScroll,
+      );
       expect(find.byKey(Key('work-family-$family')), findsOneWidget);
     }
   });
@@ -441,6 +452,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(
+      find.byKey(const Key('workspace-opportunity-context')),
+      findsOneWidget,
+    );
     expect(work.selectedOpportunity?.id, 'social-content-creator');
     expect(gateway.applicationCalls, 0);
   });
@@ -454,7 +469,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('work-local-workspace')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(find.byKey(const Key('my-work-screen')), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(work.searchQuery, 'doctor');

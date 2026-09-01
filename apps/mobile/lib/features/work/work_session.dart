@@ -246,6 +246,10 @@ class WorkSession extends ChangeNotifier {
   Future<void> loadInitialWorkspaceState() async {
     if (initialWorkspaceStateLoaded || busy) return;
     await refreshFeed();
+    if (noticeMessage == 'Work opportunities refreshed.') {
+      clearMessages();
+      notifyListeners();
+    }
   }
 
   void toggleOpportunity(String id) {
@@ -446,7 +450,7 @@ class WorkSession extends ChangeNotifier {
 
   bool continueToProof() {
     if (selectedProfile == null) {
-      errorMessage = 'Choose the exact work profile you operate.';
+      errorMessage = 'Choose the work profile that best matches what you do.';
       notifyListeners();
       return false;
     }
@@ -487,7 +491,7 @@ class WorkSession extends ChangeNotifier {
     unsupportedRequestSent = true;
     errorMessage = null;
     noticeMessage =
-        'Request sent. No workspace was created. We will update My Work and Chat.';
+        'Thanks—your request is with our team. We’ll follow up in Workspace and Chat.';
     notifyListeners();
     return true;
   }
@@ -720,7 +724,7 @@ class WorkSession extends ChangeNotifier {
           );
           noticeMessage = result.status == WorkRemoteReviewStatus.live
               ? 'Your Workspace is live.'
-              : 'Work profile approved. Finish the exact setup before customers can see it.';
+              : 'Work profile approved. Finish setup before customers can view your Workspace.';
           return true;
       }
     } on WorkGatewayException catch (error) {

@@ -278,7 +278,7 @@ void main() {
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
     expect(find.byKey(const Key('mvp-action-root-work')), findsNothing);
     await tapVisible(tester, const Key('work-local-workspace'));
-    expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
     await tapVisible(tester, const Key('work-local-earn'));
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
   });

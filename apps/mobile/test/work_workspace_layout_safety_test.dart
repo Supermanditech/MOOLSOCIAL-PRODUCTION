@@ -90,8 +90,8 @@ void main() {
       final work = selectedRetailer();
       await mount(tester, route: '/app/work/workspace/choose', work: work);
 
-      expect(find.text('Choose Your Work'), findsOneWidget);
-      expect(find.text('Select one exact profile at a time'), findsOneWidget);
+      expect(find.text('Choose your work'), findsOneWidget);
+      expect(find.text('Products & Trade'), findsWidgets);
       expectHeaderAndStickyAction(tester);
       final alternate = find.byKey(const Key('work-alternate-mobile'));
       await reveal(tester, alternate);

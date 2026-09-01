@@ -143,7 +143,7 @@ void main() {
         '/app/work/earn',
         Key('work-earn-screen'),
         Key('work-local-workspace'),
-        Key('my-work-screen'),
+        Key('work-choose-screen'),
         null,
       ),
     ];

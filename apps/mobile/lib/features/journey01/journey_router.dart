@@ -1522,7 +1522,7 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/work/my-work',
-        builder: (context, state) => MyWorkScreen(session: workSession),
+        redirect: (context, state) => '/app/work/workspace/choose',
       ),
       GoRoute(
         path: '/app/work/workspace/choose',

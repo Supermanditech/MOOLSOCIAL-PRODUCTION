@@ -48,7 +48,7 @@ void main() {
         ('/app/book/salon', Key('salon-discovery-home')),
         ('/app/book/bus', Key('bus-booking-home')),
         ('/app/work/earn', Key('work-earn-screen')),
-        ('/app/work/my-work', Key('my-work-screen')),
+        ('/app/work/my-work', Key('work-choose-screen')),
         ('/app/chat?from=%2Fapp%2Fbuy%3Fsub%3Dshop', Key('chat-inbox-screen')),
         (
           '/app/chat/thread/shop-assist?return=%2Fapp%2Fbuy%3Fsub%3Dshop',

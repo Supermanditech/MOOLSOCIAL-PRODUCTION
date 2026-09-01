@@ -146,45 +146,40 @@ void main() {
     },
   );
 
-  testWidgets(
-    'C24G Workspace has one direct setup action and no fake metrics',
-    (tester) async {
-      final sessions = await _mount(
-        tester,
-        route: '/app/work/my-work',
-        size: const Size(320, 568),
-        textScale: 1.4,
-      );
-      addTearDown(sessions.dispose);
+  testWidgets('C24G Workspace opens the professional actor chooser directly', (
+    tester,
+  ) async {
+    final sessions = await _mount(
+      tester,
+      route: '/app/work/my-work',
+      size: const Size(320, 568),
+      textScale: 1.4,
+    );
+    addTearDown(sessions.dispose);
 
-      expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
-      expect(find.byKey(const Key('my-work-start')), findsOneWidget);
-      expect(find.byKey(const Key('my-work-choice-earn')), findsNothing);
-      expect(find.byKey(const Key('my-work-choice-business')), findsNothing);
-      expect(find.byKey(const Key('my-work-choice-create')), findsNothing);
-      expect(find.text('18 orders'), findsNothing);
-      expect(find.text('₹12,840'), findsNothing);
-      expect(find.text('7 items'), findsNothing);
-      expect(
-        tester.getSize(find.byKey(const Key('my-work-start'))).height,
-        greaterThanOrEqualTo(48),
-      );
-      final semantics = tester
-          .getSemantics(
-            find.descendant(
-              of: find.byKey(const Key('my-work-start')),
-              matching: find.byType(FilledButton),
-            ),
-          )
-          .getSemanticsData();
-      expect(semantics.hasAction(SemanticsAction.tap), isTrue);
+    expect(find.byKey(const Key('my-work-screen')), findsNothing);
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(
+      find.byKey(const Key('workspace-actor-chooser-hero')),
+      findsOneWidget,
+    );
+    expect(find.text('18 orders'), findsNothing);
+    expect(find.text('₹12,840'), findsNothing);
+    expect(find.text('7 items'), findsNothing);
+    final family = find.byKey(const Key('work-family-products-trade'));
+    await _scrollTo(tester, family, const Key('work-choose-screen'));
+    expect(tester.getSize(family).height, greaterThanOrEqualTo(44));
+    final semantics = tester.getSemantics(family).getSemanticsData();
+    expect(semantics.hasAction(SemanticsAction.tap), isTrue);
 
-      await tester.tap(find.byKey(const Key('my-work-start')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    await tester.tap(family);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-profile-retailer-grocery')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('C24G shared Work motion settles immediately when reduced', (
     tester,

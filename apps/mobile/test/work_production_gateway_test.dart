@@ -74,6 +74,32 @@ void main() {
     }
   });
 
+  test('Workspace chooser covers the current provider user types', () {
+    expect(
+      workProfiles.map((profile) => profile.label),
+      containsAll(const [
+        'Grocery / Kirana Shop',
+        'Speciality Retail Shop',
+        'Wholesaler / Distributor',
+        'Manufacturer / Supplier',
+        'Restaurant / Café',
+        'Cloud Kitchen / Tiffin',
+        'Clinic / Doctor',
+        'Pharmacy',
+        'Salon / Wellness',
+        'Local Service Provider',
+        'Ride / Delivery Captain',
+        'Fleet / Transport Business',
+        'Creator',
+        'Freelancer / Job Seeker',
+      ]),
+    );
+    expect(
+      workProfiles.map((profile) => profile.gstMatchCategory).toSet(),
+      containsAll(WorkGstMatchCategory.values),
+    );
+  });
+
   test('opportunity filters combine city, area and exact six-digit PIN', () {
     final session = WorkSession();
     addTearDown(session.dispose);
