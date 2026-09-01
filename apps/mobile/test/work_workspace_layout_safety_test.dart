@@ -140,6 +140,7 @@ void main() {
     final label = tester.widget<Text>(confirm);
     expect(label.maxLines, 1);
     expect(label.softWrap, isFalse);
+    expect(find.text('6-digit code'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

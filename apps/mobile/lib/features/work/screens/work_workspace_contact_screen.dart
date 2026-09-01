@@ -622,7 +622,7 @@ class _ContactVerificationCard extends StatelessWidget {
                     textInputAction: TextInputAction.done,
                     maxLength: 6,
                     decoration: const InputDecoration(
-                      labelText: 'Enter 6-digit OTP',
+                      labelText: '6-digit code',
                       counterText: '',
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(
