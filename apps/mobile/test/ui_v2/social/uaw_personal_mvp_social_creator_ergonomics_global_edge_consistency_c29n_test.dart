@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
@@ -97,7 +98,6 @@ void main() {
       'screen04-create-tool-image-poll',
       'screen04-create-tool-quick-poll',
       'screen04-create-tool-quiz',
-      'screen04-create-more-tools',
     ]) {
       final action = find.byKey(Key(key));
       final label = switch (key) {
@@ -107,8 +107,7 @@ void main() {
         'screen04-create-tool-carousel' => 'Carousel',
         'screen04-create-tool-image-poll' => 'Image Poll',
         'screen04-create-tool-quick-poll' => 'Quick Poll',
-        'screen04-create-tool-quiz' => 'Quiz',
-        _ => 'More',
+        _ => 'Quiz',
       };
       expect(action, findsOneWidget, reason: key);
       expect(
@@ -118,8 +117,8 @@ void main() {
       );
       expect(
         tester.getSize(action).width,
-        greaterThanOrEqualTo(44),
-        reason: '$key must keep a production touch target.',
+        greaterThanOrEqualTo(68),
+        reason: '$key must stay readable instead of being squeezed.',
       );
       expect(
         tester.getSize(action).height,
@@ -127,24 +126,130 @@ void main() {
         reason: '$key must keep a production touch target.',
       );
     }
+    expect(find.byKey(const Key('screen04-create-more-tools')), findsNothing);
+    expect(find.byKey(const Key('screen04-create-inline-emoji')), findsNothing);
+    for (final key in const [
+      Key('screen04-create-inline-gif'),
+      Key('screen04-create-inline-mention'),
+      Key('screen04-create-inline-topic'),
+    ]) {
+      expect(find.byKey(key), findsOneWidget);
+      expect(tester.getSize(find.byKey(key)).height, 44);
+    }
+    final formatStrip = find.byKey(
+      const Key('screen04-create-ime-format-strip'),
+    );
+    final quiz = find.byKey(const Key('screen04-create-tool-quiz'));
     expect(
-      tester
-          .getBottomRight(find.byKey(const Key('screen04-create-tool-quiz')))
-          .dx,
-      lessThanOrEqualTo(
-        tester
-            .getBottomRight(
-              find.byKey(const Key('screen04-create-ime-format-strip')),
-            )
-            .dx,
-      ),
-      reason: 'All seven primary Create formats must fit on a 360dp phone.',
+      tester.getBottomRight(quiz).dx,
+      greaterThan(tester.getBottomRight(formatStrip).dx),
+      reason: 'The relaxed format rail must intentionally scroll.',
+    );
+    await tester.drag(formatStrip, const Offset(-260, 0));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(quiz).overlaps(tester.getRect(formatStrip)),
+      isTrue,
+      reason: 'A left swipe must reveal the later Create formats.',
+    );
+    final header = find.byKey(const Key('screen04-create-composer-header'));
+    final actionRow = find.byKey(
+      const Key('screen04-create-composer-action-row'),
+    );
+    final preview = find.byKey(const Key('screen04-create-open-preview'));
+    final publish = find.byKey(const Key('screen04-create-publish-post'));
+    expect(find.descendant(of: header, matching: preview), findsNothing);
+    expect(find.descendant(of: actionRow, matching: preview), findsOneWidget);
+    expect(find.descendant(of: actionRow, matching: publish), findsOneWidget);
+    expect(
+      tester.getCenter(preview).dx,
+      lessThan(tester.getCenter(publish).dx),
+    );
+    expect(tester.getSize(preview).width, greaterThanOrEqualTo(44));
+    expect(tester.getSize(preview).height, 44);
+    expect(tester.getSize(publish).height, 44);
+
+    final writing = find.byKey(const Key('screen04-create-writing-canvas'));
+    final workspace = find.byKey(
+      const ValueKey('screen04-create-post-workbench'),
+    );
+    expect(
+      tester.getTopLeft(writing).dy,
+      lessThan(tester.getTopLeft(workspace).dy),
+    );
+    for (final key in const [
+      Key('screen04-create-tool-image'),
+      Key('screen04-create-tool-camera'),
+      Key('screen04-create-tool-carousel'),
+      Key('screen04-create-tool-image-poll'),
+      Key('screen04-create-tool-quick-poll'),
+      Key('screen04-create-tool-quiz'),
+    ]) {
+      await tester.ensureVisible(find.byKey(key));
+      await tester.pump();
+      await tester.tap(find.byKey(key));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(workspace).dy,
+        lessThan(tester.getTopLeft(writing).dy),
+        reason: '$key must keep its fields above the writing composer.',
+      );
+    }
+    await tester.ensureVisible(
+      find.byKey(const Key('screen04-create-tool-post')),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('screen04-create-tool-post')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(writing).dy,
+      lessThan(tester.getTopLeft(workspace).dy),
     );
     expect(
       find.byKey(const Key('screen04-create-youtube-short')),
       findsNothing,
     );
     expect(find.text('Create a MoolSocial post'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('OPPO inset exports every Create dock action above navigation', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 44);
+    addTearDown(tester.view.reset);
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+
+    await tester.pumpWidget(_app(owners.consumer(state: 'text')));
+    await tester.pumpAndSettle();
+    debugDefaultTargetPlatformOverride = null;
+
+    final preview = find.byKey(const Key('screen04-create-open-preview'));
+    final clearance = tester.widget<Padding>(
+      find.byKey(
+        const Key('screen04-create-android-exported-semantics-clearance'),
+      ),
+    );
+    expect((clearance.padding as EdgeInsets).bottom, 41);
+    final media = MediaQuery.of(tester.element(preview));
+    final exportedSafeBottom = media.size.height - media.viewPadding.top;
+    for (final key in const [
+      Key('screen04-create-inline-gif'),
+      Key('screen04-create-inline-mention'),
+      Key('screen04-create-inline-topic'),
+      Key('screen04-create-open-preview'),
+      Key('screen04-create-publish-post'),
+    ]) {
+      final rect = tester.getRect(find.byKey(key));
+      expect(rect.width, greaterThanOrEqualTo(44), reason: '$key width');
+      expect(rect.height, greaterThanOrEqualTo(44), reason: '$key height');
+      expect(rect.bottom, lessThanOrEqualTo(exportedSafeBottom));
+    }
     expect(tester.takeException(), isNull);
   });
 
@@ -193,12 +298,16 @@ void main() {
       find.byKey(const Key('screen04-create-keyboard-done')),
       findsNothing,
     );
+    final formatStrip = find.byKey(
+      const Key('screen04-create-ime-format-strip'),
+    );
+    final quiz = find.byKey(const Key('screen04-create-tool-quiz'));
+    await tester.drag(formatStrip, const Offset(-260, 0));
+    await tester.pumpAndSettle();
     expect(
-      tester
-          .getBottomRight(find.byKey(const Key('screen04-create-tool-quiz')))
-          .dx,
-      lessThanOrEqualTo(tester.getBottomRight(imeWorkbench).dx),
-      reason: 'Every primary Create format must remain visible above the IME.',
+      tester.getRect(quiz).overlaps(tester.getRect(imeWorkbench)),
+      isTrue,
+      reason: 'The relaxed Create rail must remain swipeable above the IME.',
     );
     expect(tester.getBottomRight(publish).dy, lessThanOrEqualTo(keyboardTop));
     expect(tester.getBottomRight(formats).dy, lessThanOrEqualTo(keyboardTop));
@@ -239,12 +348,18 @@ void main() {
       final strip = find.byKey(const Key('screen04-create-ime-format-strip'));
       final active = find.byKey(const Key('screen04-create-tool-quick-poll'));
       final question = find.byKey(const Key('screen04-create-post-text'));
+      final topic = find.byKey(const Key('screen04-create-inline-topic'));
+      final preview = find.byKey(const Key('screen04-create-open-preview'));
       final lastChoice = find.byKey(
         const Key('screen04-create-quick-poll-choice-3'),
       );
       expect(strip, findsOneWidget);
       expect(active, findsOneWidget);
       expect(find.text('New quick poll'), findsOneWidget);
+      expect(
+        tester.getBottomRight(topic).dx,
+        lessThan(tester.getTopLeft(preview).dx),
+      );
       expect(
         tester.getTopLeft(active).dx,
         greaterThan(
