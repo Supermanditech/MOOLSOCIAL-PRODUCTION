@@ -127,14 +127,20 @@ void main() {
     (tester) async {
       final (_, work) = await mount(tester, route: '/app/work/earn');
 
-      await tapVisible(tester, const Key('work-opportunity-mool-explainer'));
+      await tapVisible(
+        tester,
+        const Key('work-opportunity-quick-delivery-biker'),
+      );
       expect(find.byKey(const Key('work-opportunity-screen')), findsOneWidget);
-      await tapVisible(tester, const Key('work-term-payment'));
-      expect(find.textContaining('₹1,500 is reserved'), findsOneWidget);
+      await tapVisible(tester, const Key('work-detail-payment'));
+      expect(
+        find.text('Up to ₹19,500 monthly for 30 completed shifts'),
+        findsWidgets,
+      );
 
       await tapVisible(tester, const Key('work-apply-opportunity'));
       expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
-      expect(work.savedOpportunity?.id, 'mool-explainer');
+      expect(work.savedOpportunity?.id, 'quick-delivery-biker');
 
       await tapVisible(tester, const Key('my-work-start'));
       await chooseRetailer(tester);
@@ -185,7 +191,7 @@ void main() {
       final work = WorkSession(gateway: gateway)..seedVerifiedWorkspace();
       await mount(
         tester,
-        route: '/app/work/opportunity/mool-explainer',
+        route: '/app/work/opportunity/quick-delivery-biker',
         workSession: work,
       );
 
@@ -198,7 +204,7 @@ void main() {
       await tapVisible(tester, const Key('work-apply-opportunity'));
       expect(work.applicationId, isNotNull);
       expect(gateway.applicationCalls, 2);
-      expect(find.text('Application sent'), findsOneWidget);
+      expect(find.textContaining('Application sent'), findsOneWidget);
     },
   );
 
@@ -209,24 +215,30 @@ void main() {
     final work = WorkSession(gateway: gateway);
     await mount(tester, route: '/app/work/earn', workSession: work);
 
+    await tapVisible(tester, const Key('work-filter-button'));
     await tapVisible(tester, const Key('work-filter-jobs'));
-    expect(find.text('City operations coordinator'), findsOneWidget);
-    expect(find.text('Make one MoolSocial explainer video'), findsNothing);
+    await tapVisible(tester, const Key('work-filter-apply'));
+    expect(find.text('Quick Delivery Biker'), findsOneWidget);
+    expect(find.text('Social Content Creator'), findsNothing);
 
+    await tapVisible(tester, const Key('work-search'));
     await enter(tester, const Key('work-search'), 'no funded work');
     expect(find.byKey(const Key('work-empty')), findsOneWidget);
     await tapVisible(tester, const Key('work-empty-action'));
     expect(work.filter, WorkFeedFilter.forYou);
     expect(work.searchQuery, isEmpty);
 
-    await tapVisible(tester, const Key('work-refresh-feed'));
+    final list = find.byKey(const Key('work-earn-screen'));
+    await tester.drag(list, const Offset(0, 320));
+    await tester.pumpAndSettle();
     expect(
       find.text(
         'Work could not be refreshed. Check your connection and try again.',
       ),
       findsOneWidget,
     );
-    await tapVisible(tester, const Key('work-refresh-feed'));
+    await tester.drag(list, const Offset(0, 320));
+    await tester.pumpAndSettle();
     expect(find.text('Work opportunities refreshed.'), findsOneWidget);
   });
 
@@ -531,9 +543,9 @@ void main() {
 
     await mount(tester, route: '/app/work/earn', size: const Size(360, 800));
     for (final key in const [
-      Key('work-refresh-feed'),
       Key('work-search'),
-      Key('work-filter-forYou'),
+      Key('work-filter-button'),
+      Key('work-opportunity-apply-quick-delivery-biker'),
       Key('mool-compact-launcher'),
     ]) {
       final finder = find.byKey(key);

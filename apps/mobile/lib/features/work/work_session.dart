@@ -20,10 +20,16 @@ class WorkSession extends ChangeNotifier {
   String? noticeMessage;
   WorkFeedFilter filter = WorkFeedFilter.forYou;
   String searchQuery = '';
+  String selectedCity = '';
+  String selectedArea = '';
+  String selectedPincode = '';
   String? expandedOpportunityId;
   WorkOpportunity? selectedOpportunity;
   WorkOpportunity? savedOpportunity;
   String? applicationId;
+  String? appliedOpportunityId;
+  String? withdrawnApplicationId;
+  final Map<String, String> applicationIdsByOpportunity = <String, String>{};
   final Set<String> expandedTerms = <String>{};
 
   String? selectedFamilyId;
@@ -69,6 +75,10 @@ class WorkSession extends ChangeNotifier {
 
   List<WorkOpportunity> get filteredOpportunities {
     final normalized = searchQuery.trim().toLowerCase();
+    final city = selectedCity.trim().toLowerCase();
+    final area = selectedArea.trim().toLowerCase();
+    final pincode = selectedPincode.trim();
+    final validPincode = RegExp(r'^\d{6}$').hasMatch(pincode);
     return workOpportunities.where((opportunity) {
       final filterMatch =
           filter == WorkFeedFilter.forYou ||
@@ -81,10 +91,30 @@ class WorkSession extends ChangeNotifier {
             opportunity.kind,
             opportunity.location,
             opportunity.requiredWork,
+            opportunity.qualificationHeadline,
+            opportunity.city,
+            opportunity.area,
+            opportunity.pincode,
+            opportunity.posterType.label,
           ].join(' ').toLowerCase().contains(normalized);
-      return filterMatch && searchMatch;
+      final cityMatch = city.isEmpty || opportunity.city.toLowerCase() == city;
+      final areaMatch = area.isEmpty || opportunity.area.toLowerCase() == area;
+      final pincodeMatch =
+          pincode.isEmpty ||
+          (validPincode && opportunity.pincode == selectedPincode.trim());
+      return filterMatch &&
+          searchMatch &&
+          cityMatch &&
+          areaMatch &&
+          pincodeMatch;
     }).toList();
   }
+
+  int get activeOpportunityFilterCount => [
+    selectedCity,
+    selectedArea,
+    selectedPincode,
+  ].where((value) => value.trim().isNotEmpty).length;
 
   List<String> get familyIds => workProfiles
       .map((profile) => profile.familyId)
@@ -152,6 +182,26 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setOpportunityLocationFilters({
+    String? city,
+    String? area,
+    String? pincode,
+  }) {
+    selectedCity = city?.trim() ?? '';
+    selectedArea = area?.trim() ?? '';
+    selectedPincode = pincode?.trim() ?? '';
+    clearMessages();
+    notifyListeners();
+  }
+
+  void clearOpportunityFilters() {
+    selectedCity = '';
+    selectedArea = '';
+    selectedPincode = '';
+    clearMessages();
+    notifyListeners();
+  }
+
   Future<void> refreshFeed() async {
     await _run(() async {
       final records = await gateway.loadFeed();
@@ -171,10 +221,14 @@ class WorkSession extends ChangeNotifier {
   }
 
   void openOpportunity(String id) {
-    selectedOpportunity = workOpportunities.firstWhere(
+    final opportunity = workOpportunities.firstWhere(
       (opportunity) => opportunity.id == id,
       orElse: () => workOpportunities.first,
     );
+    selectedOpportunity = opportunity;
+    applicationId = applicationIdsByOpportunity[opportunity.id];
+    appliedOpportunityId = applicationId == null ? null : opportunity.id;
+    withdrawnApplicationId = null;
     expandedTerms.clear();
     clearMessages();
   }
@@ -198,8 +252,18 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final existingApplicationId = applicationIdsByOpportunity[opportunity.id];
+    if (existingApplicationId != null) {
+      applicationId = existingApplicationId;
+      appliedOpportunityId = opportunity.id;
+      errorMessage = null;
+      noticeMessage =
+          'Your application for this opportunity is already submitted.';
+      notifyListeners();
+      return true;
+    }
     savedOpportunity = opportunity;
-    if (!hasVerifiedWorkspace) {
+    if (opportunity.requiresWorkspace && !hasVerifiedWorkspace) {
       noticeMessage = 'Opportunity saved. Start My Work, then return to apply.';
       errorMessage = null;
       notifyListeners();
@@ -207,10 +271,39 @@ class WorkSession extends ChangeNotifier {
     }
     return _runBool(
       () async {
-        applicationId = await gateway.apply(opportunity.id);
+        final createdApplicationId = await gateway.apply(opportunity.id);
+        applicationIdsByOpportunity[opportunity.id] = createdApplicationId;
+        applicationId = createdApplicationId;
+        appliedOpportunityId = opportunity.id;
+        withdrawnApplicationId = null;
       },
       success:
           'Application sent. The opportunity, terms and payout remain saved.',
+    );
+  }
+
+  Future<bool> withdrawSelectedOpportunity() async {
+    final opportunity = selectedOpportunity;
+    final currentApplicationId = opportunity == null
+        ? null
+        : applicationIdsByOpportunity[opportunity.id];
+    if (opportunity == null || currentApplicationId == null) {
+      errorMessage =
+          'There is no application to withdraw for this opportunity.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    return _runBool(
+      () async {
+        await gateway.withdraw(currentApplicationId, opportunity.id);
+        applicationIdsByOpportunity.remove(opportunity.id);
+        applicationId = null;
+        appliedOpportunityId = null;
+        withdrawnApplicationId = currentApplicationId;
+      },
+      success:
+          'Application withdrawn. You can apply again while this opportunity remains available.',
     );
   }
 

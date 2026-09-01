@@ -68,15 +68,18 @@ void main() {
         );
         addTearDown(sessions.dispose);
 
-        expect(find.byKey(const Key('work-search')), findsOneWidget);
-        expect(find.byKey(const Key('work-filter-list')), findsOneWidget);
         expect(
-          find.descendant(
-            of: find.byKey(const Key('work-filter-list')),
-            matching: find.byType(Scrollable),
-          ),
-          findsNothing,
+          find.byKey(const Key('work-earn-inline-header')),
+          findsOneWidget,
         );
+        expect(find.byKey(const Key('work-search')), findsOneWidget);
+        expect(find.byKey(const Key('work-filter-button')), findsOneWidget);
+        expect(
+          find.byKey(const Key('work-earn-global-profile')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('work-earn-hero')), findsNothing);
+        expect(find.text('Opportunities'), findsNothing);
         expect(find.byKey(const Key('work-local-navigation')), findsOneWidget);
         for (final key in const ['work-local-earn', 'work-local-workspace']) {
           final control = find.byKey(Key(key));
@@ -111,17 +114,25 @@ void main() {
       );
       addTearDown(sessions.dispose);
 
+      await tester.tap(find.byKey(const Key('work-search')));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const Key('work-search')), 'Jodhpur');
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-filter-nearby')));
-      await tester.pumpAndSettle();
 
-      final card = find.byKey(const Key('work-opportunity-mahadev-orders'));
+      final card = find.byKey(
+        const Key('work-opportunity-quick-delivery-biker'),
+      );
       await _scrollTo(tester, card, const Key('work-earn-screen'));
-      expect(find.text('₹20 per delivered order'), findsOneWidget);
-      expect(find.text('Jodhpur · 4 km'), findsOneWidget);
-      expect(find.text('Open while 20 funded orders remain'), findsOneWidget);
-      expect(find.text('Funded · maximum payout ₹400'), findsOneWidget);
+      expect(find.text('Quick Delivery Biker'), findsOneWidget);
+      expect(
+        find.text('Up to ₹19,500 monthly for 30 completed shifts'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Sardarpura, Jodhpur'), findsWidgets);
+      expect(
+        find.text('Bike, valid licence and Android phone required'),
+        findsOneWidget,
+      );
 
       final semantics = tester.getSemantics(card).getSemanticsData();
       expect(semantics.hasAction(SemanticsAction.tap), isTrue);
@@ -129,7 +140,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('work-opportunity-screen')), findsOneWidget);
-      expect(sessions.work.selectedOpportunity?.id, 'mahadev-orders');
+      expect(sessions.work.selectedOpportunity?.id, 'quick-delivery-biker');
     },
   );
 

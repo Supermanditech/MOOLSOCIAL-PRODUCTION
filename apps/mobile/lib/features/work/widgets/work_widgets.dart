@@ -13,10 +13,12 @@ class WorkPageScaffold extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.body,
+    this.headerTitle,
     this.fallbackBackRoute = '/app/work/earn',
     this.showBack = true,
     this.activeLocalAction = 'earn',
     this.showHeaderChat = true,
+    this.showTrailingAction = true,
     this.trailing,
     this.bottomAction,
     super.key,
@@ -26,10 +28,12 @@ class WorkPageScaffold extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget body;
+  final Widget? headerTitle;
   final String fallbackBackRoute;
   final bool showBack;
   final String activeLocalAction;
   final bool showHeaderChat;
+  final bool showTrailingAction;
   final Widget? trailing;
   final Widget? bottomAction;
 
@@ -95,12 +99,14 @@ class WorkPageScaffold extends StatelessWidget {
                 )
               : null,
           titleSpacing: showBack ? 4 : MoolSpacing.md,
-          title: MoolServiceHeaderTitle(
-            title: title,
-            subtitle: subtitle,
-            titleKey: const Key('work-page-title'),
-            subtitleKey: const Key('work-page-subtitle'),
-          ),
+          title:
+              headerTitle ??
+              MoolServiceHeaderTitle(
+                title: title,
+                subtitle: subtitle,
+                titleKey: const Key('work-page-title'),
+                subtitleKey: const Key('work-page-subtitle'),
+              ),
           actions: [
             if (showHeaderChat) ...[
               MoolGlobalChatShortcut(
@@ -109,25 +115,26 @@ class WorkPageScaffold extends StatelessWidget {
               ),
               const SizedBox(width: 4),
             ],
-            Padding(
-              padding: const EdgeInsets.only(right: MoolSpacing.sm),
-              child:
-                  trailing ??
-                  IconButton.outlined(
-                    key: const Key('work-help'),
-                    tooltip: 'Work help',
-                    onPressed: () => context.go(
-                      Uri(
-                        path: '/app/chat',
-                        queryParameters: {
-                          'type': 'support',
-                          'return': GoRouterState.of(context).uri.toString(),
-                        },
-                      ).toString(),
+            if (showTrailingAction)
+              Padding(
+                padding: const EdgeInsets.only(right: MoolSpacing.sm),
+                child:
+                    trailing ??
+                    IconButton.outlined(
+                      key: const Key('work-help'),
+                      tooltip: 'Work help',
+                      onPressed: () => context.go(
+                        Uri(
+                          path: '/app/chat',
+                          queryParameters: {
+                            'type': 'support',
+                            'return': GoRouterState.of(context).uri.toString(),
+                          },
+                        ).toString(),
+                      ),
+                      icon: const Icon(Icons.support_agent_outlined),
                     ),
-                    icon: const Icon(Icons.support_agent_outlined),
-                  ),
-            ),
+              ),
           ],
         ),
         body: SafeArea(

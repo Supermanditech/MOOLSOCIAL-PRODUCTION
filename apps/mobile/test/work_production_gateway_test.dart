@@ -15,6 +15,120 @@ void main() {
     expect(source, contains('workSession: WorkSession.production(),'));
   });
 
+  test('freelance fixtures expose complete funded role and poster data', () {
+    const requiredIds = {
+      'quick-delivery-biker',
+      'user-acquisition-onboarding',
+      'sales-specialist',
+      'content-creator',
+      'social-content-creator',
+      'retailer-onboarding-specialist',
+      'manufacturer-onboarding-specialist',
+      'wholesaler-onboarding-specialist',
+      'rider-onboarding-specialist',
+      'taxi-operator-onboarding-specialist',
+      'bike-rider-onboarding-specialist',
+      'bus-operator-onboarding-specialist',
+      'doctor-onboarding-specialist',
+      'wholesale-sales-specialist',
+      'bulk-sales-specialist',
+    };
+
+    expect(workOpportunities.map((item) => item.id), containsAll(requiredIds));
+    expect(
+      workOpportunities.map((item) => item.posterType).toSet(),
+      containsAll(WorkOpportunityPosterType.values),
+    );
+    for (final opportunity in workOpportunities) {
+      expect(opportunity.kind, contains('Freelance'));
+      expect(opportunity.publisher, isNotEmpty);
+      expect(opportunity.publisherType, isNotEmpty);
+      expect(opportunity.qualificationHeadline, isNotEmpty);
+      expect(opportunity.city, isNotEmpty);
+      expect(opportunity.area, isNotEmpty);
+      expect(opportunity.paymentAmount, isNotEmpty);
+      expect(opportunity.monthlyPayment, isNotEmpty);
+      expect(opportunity.aboutRole, isNotEmpty);
+      expect(opportunity.whatYoullDo, isNotEmpty);
+      expect(opportunity.whoYouAre, isNotEmpty);
+      expect(opportunity.niceToHave, isNotEmpty);
+      expect(opportunity.whyJoin, isNotEmpty);
+      expect(opportunity.funded, isTrue);
+    }
+  });
+
+  test('opportunity filters combine city, area and exact six-digit PIN', () {
+    final session = WorkSession();
+    addTearDown(session.dispose);
+
+    session.setOpportunityLocationFilters(
+      city: 'Jodhpur',
+      area: 'Sardarpura',
+      pincode: '342003',
+    );
+    expect(session.activeOpportunityFilterCount, 3);
+    expect(session.filteredOpportunities.map((item) => item.id), [
+      'quick-delivery-biker',
+      'user-acquisition-onboarding',
+    ]);
+
+    session.setOpportunityLocationFilters(pincode: '34200');
+    expect(session.filteredOpportunities, isEmpty);
+    session.clearOpportunityFilters();
+    expect(session.activeOpportunityFilterCount, 0);
+    expect(session.filteredOpportunities, isNotEmpty);
+  });
+
+  test(
+    'application and withdrawal remain bound to the exact opportunity',
+    () async {
+      final gateway = ReviewWorkGateway();
+      final session = WorkSession(gateway: gateway);
+      addTearDown(session.dispose);
+
+      session.openOpportunity('content-creator');
+      expect(await session.applySelectedOpportunity(), isTrue);
+      final contentApplicationId = session.applicationId;
+      expect(contentApplicationId, contains('CONTENT-CREATOR'));
+      expect(session.appliedOpportunityId, 'content-creator');
+
+      session.openOpportunity('social-content-creator');
+      expect(session.applicationId, isNull);
+      expect(await session.applySelectedOpportunity(), isTrue);
+      final socialApplicationId = session.applicationId;
+      expect(socialApplicationId, isNot(contentApplicationId));
+
+      session.openOpportunity('content-creator');
+      expect(session.applicationId, contentApplicationId);
+      expect(await session.withdrawSelectedOpportunity(), isTrue);
+      expect(session.withdrawnApplicationId, contentApplicationId);
+      expect(session.applicationId, isNull);
+      expect(
+        session.applicationIdsByOpportunity['social-content-creator'],
+        socialApplicationId,
+      );
+      expect(gateway.withdrawalCalls, 1);
+    },
+  );
+
+  test(
+    'failed withdrawal remains active and gives a retryable truth',
+    () async {
+      final gateway = ReviewWorkGateway()..failWithdrawal = true;
+      final session = WorkSession(gateway: gateway);
+      addTearDown(session.dispose);
+
+      session.openOpportunity('content-creator');
+      expect(await session.applySelectedOpportunity(), isTrue);
+      final applicationId = session.applicationId;
+      expect(await session.withdrawSelectedOpportunity(), isFalse);
+      expect(session.applicationId, applicationId);
+      expect(session.errorMessage, contains('remains active'));
+      expect(await session.withdrawSelectedOpportunity(), isTrue);
+      expect(gateway.withdrawalCalls, 2);
+    },
+  );
+
   test(
     'authenticated Workspace operations use exact bodies and App Check modes',
     () async {
@@ -87,6 +201,31 @@ void main() {
         SocialAppCheckTokenMode.limitedUse,
         SocialAppCheckTokenMode.limitedUse,
       ]);
+    },
+  );
+
+  test(
+    'authenticated withdrawal sends both exact identities as a mutation',
+    () async {
+      final transport = _RecordingTransport([_ok(const {})]);
+      final credentials = _RecordingCredentials();
+      final gateway = AuthenticatedWorkGateway(
+        endpoint: Uri.parse(
+          'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace',
+        ),
+        credentials: credentials,
+        transport: transport,
+        random: Random(7),
+      );
+
+      await gateway.withdraw('application-42', 'content-creator');
+
+      expect(transport.bodies.single, {
+        'operation': 'withdrawOpportunity',
+        'applicationId': 'application-42',
+        'opportunityId': 'content-creator',
+      });
+      expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse]);
     },
   );
 

@@ -231,6 +231,7 @@ class WorkReviewResult {
 abstract interface class WorkGateway {
   Future<List<WorkReviewResult>> loadFeed();
   Future<String> apply(String opportunityId);
+  Future<void> withdraw(String applicationId, String opportunityId);
   Future<void> sendOtp(String mobile);
   Future<String> saveProof(String proofId, WorkPickedProof proof);
   Future<WorkReviewResult> submitProfile(WorkProfileSubmission submission);
@@ -271,6 +272,9 @@ class UnavailableWorkGateway implements WorkGateway {
   );
   @override
   Future<String> apply(String opportunityId) async => throw _error;
+  @override
+  Future<void> withdraw(String applicationId, String opportunityId) async =>
+      throw _error;
   @override
   Future<WorkReviewResult> checkReview(String caseId) async => throw _error;
   @override
@@ -337,6 +341,12 @@ class AuthenticatedWorkGateway implements WorkGateway {
         'opportunityId': opportunityId,
       }, mutation: true),
     )['applicationId'],
+  );
+  @override
+  Future<void> withdraw(String applicationId, String opportunityId) => _invoke(
+    'withdrawOpportunity',
+    {'applicationId': applicationId, 'opportunityId': opportunityId},
+    mutation: true,
   );
   @override
   Future<void> sendOtp(String mobile) =>
@@ -476,6 +486,7 @@ class AuthenticatedWorkGateway implements WorkGateway {
 class ReviewWorkGateway implements WorkGateway {
   bool failFeed = false;
   bool failApplication = false;
+  bool failWithdrawal = false;
   bool failOtp = false;
   bool failProof = false;
   bool failSubmission = false;
@@ -483,6 +494,7 @@ class ReviewWorkGateway implements WorkGateway {
   bool failGst = false;
   bool failSetup = false;
   int applicationCalls = 0;
+  int withdrawalCalls = 0;
   int otpCalls = 0;
   int proofCalls = 0;
   int submissionCalls = 0;
@@ -514,6 +526,19 @@ class ReviewWorkGateway implements WorkGateway {
       );
     }
     return 'APP-${opportunityId.toUpperCase()}-${1200 + applicationCalls}';
+  }
+
+  @override
+  Future<void> withdraw(String applicationId, String opportunityId) async {
+    withdrawalCalls++;
+    await _wait();
+    if (failWithdrawal) {
+      failWithdrawal = false;
+      throw const WorkGatewayException(
+        'Application could not be withdrawn. It remains active; try again.',
+        retryable: true,
+      );
+    }
   }
 
   @override
