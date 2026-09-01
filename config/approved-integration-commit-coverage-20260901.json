@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "gateId": "MOOLSOCIAL-APPROVED-INTEGRATION-COMMIT-COVERAGE-20260901",
+  "baseline": {
+    "branch": "integration/moolsocial/codex-r6197-cursor-r6179-v1-20260831",
+    "commit": "ae021c0d711c2ff6bebcc9fe0ee664a8f0a9e235"
+  },
+  "approvedTips": [
+    {"id": "codex-phase1-post", "agent": "codex", "branch": "work/codex-ui/phase1-post-r6167-v1-20260831", "commit": "aaf5444713e2f5aa3952c5e66ce3199d3725c2f9"},
+    {"id": "cursor-buy-next-cycle", "agent": "cursor", "branch": "work/cursor-ui/buy-next-cycle-v1-20260831", "commit": "c7b77687d1671f23f95e603772dbd436a0ccd270"},
+    {"id": "cursor-buy-help-unification", "agent": "cursor", "branch": "work/cursor-ui/buy-mvp-help-unification-v1-20260831", "commit": "9be29fd6d9b9ada335dec4a3bd495e65fb7def5a"},
+    {"id": "cursor-gst-store-recovery", "agent": "cursor", "branch": "work/cursor-ui/shop-gst-store-recovery-v1-20260831", "commit": "caddfac595cd835ce5ebf22a0a8819b41c6f0575"},
+    {"id": "cursor-store-card-clarity", "agent": "cursor", "branch": "work/cursor-ui/shop-store-card-clarity-v1-20260831", "commit": "06d88307b30804788cb82282b34c4af49e2fd595"},
+    {"id": "cursor-shop-mvp", "agent": "cursor", "branch": "work/cursor-ui/shop-mvp-go-live-v1-20260829", "commit": "f513ecc78de2a6b72223f25bdd18203387e13be0"},
+    {"id": "cursor-shop-contract", "agent": "cursor", "branch": "work/codex-backend/shop-mvp-commerce-adapters-v1-20260829", "commit": "b52b6473090ea1060cf64983fd44040a696eb4e3"},
+    {"id": "codex-chat-final", "agent": "codex", "branch": "work/codex-chat/chat-final-integrated-qualification-v1-20260829", "commit": "cb59c6265b27a2954d59e42ffba0ecb60a9e3001"},
+    {"id": "codex-chat-group", "agent": "codex", "branch": "work/codex-chat/chat-group-membership-service-v1-20260829", "commit": "8ac00e87299d9f73d868c45c2c0aca62adc510ad"},
+    {"id": "codex-chat-media-voice", "agent": "codex", "branch": "work/codex-chat/chat-media-voice-delivery-v1-20260829", "commit": "2bd1234f6b038f737176adb830fff00f6d89c00c"},
+    {"id": "codex-chat-presence", "agent": "codex", "branch": "work/codex-chat/chat-call-presence-service-v1-20260829", "commit": "b68cbf19b456a8fa3d9608acd54a7dd432d25b67"},
+    {"id": "codex-chat-privacy", "agent": "codex", "branch": "work/codex-chat/chat-privacy-safety-service-v1-20260829", "commit": "6680f0c40264aa4dce330c52c382b70dd5b9ff8d"},
+    {"id": "codex-workspace-order", "agent": "codex", "branch": "work/codex-workspace/retailer-order-lifecycle-v1-20260829", "commit": "62fb05c4cf4e27dc47e1a1eb4d0db69672f183ce"},
+    {"id": "codex-workspace-catalogue", "agent": "codex", "branch": "work/codex-workspace/retailer-catalogue-availability-v1-20260829", "commit": "ae0e6d3e0b563bf2c4a2a706aaeae5ebe21fa3a2"},
+    {"id": "codex-workspace-onboarding", "agent": "codex", "branch": "work/codex-workspace/retailer-onboarding-documents-v1-20260829", "commit": "8738899b8dee58592e0605105c34757aca5d336e"},
+    {"id": "codex-workspace-identification", "agent": "codex", "branch": "work/codex-workspace/business-identification-v1-20260829", "commit": "70e413e53efb6daddb01413020a76cbd42b2b1d3"},
+    {"id": "codex-shop-product-correction", "agent": "codex", "branch": "work/codex-ui/shop-product-experience-correction-v1-20260901", "commit": "78ed25a5ff48a4b75686a61630bfdaca02f2d173"},
+    {"id": "codex-social-create-composer", "agent": "codex", "branch": "work/codex-ui/social-create-composer-contextual-layout-v1-20260831", "commit": "3461c9af55f43a7469ad4c0fb10240ac0ffcdf3e"}
+  ],
+  "rejectedTips": [
+    {"id": "cursor-rejected-store-interaction", "agent": "cursor", "branch": "work/cursor-ui/shop-store-interaction-repair-v1-20260831", "commit": "59f63db15d2aeb970dcfc5b4d39eaf312ca76168"},
+    {"id": "cursor-rejected-product-discovery", "agent": "cursor", "branch": "work/cursor-ui/shop-product-discovery-depth-v1-20260831", "commit": "0df24cc11f06ec5032a0f6def454c03b41c09e30"}
+  ]
+}
