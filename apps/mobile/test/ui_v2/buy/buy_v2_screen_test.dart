@@ -2993,7 +2993,7 @@ void main() {
       final add = find.byKey(ValueKey('buy-add-${product.id}'));
       final promise = find.descendant(
         of: card,
-        matching: find.textContaining('Quick 10m delivery'),
+        matching: find.textContaining('Quick local'),
       );
 
       expect(add, findsOneWidget);
@@ -4090,7 +4090,7 @@ void main() {
   );
 
   testWidgets(
-    'Shop Quick Courier and Wholesale Bulk selectors wire exact catalogues',
+    'Shop Quick Scheduled and Wholesale Bulk swipe selectors wire catalogues',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(390, 844);
@@ -4100,33 +4100,37 @@ void main() {
 
       await tester.pumpWidget(app(session));
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('buy-shop-sale-type-selector')),
-        findsOneWidget,
+      final shopSelector = find.byKey(
+        const ValueKey('buy-shop-sale-type-selector'),
       );
+      final shopThumb = find.byKey(const ValueKey('buy-shop-sale-type-thumb'));
+      expect(shopSelector, findsOneWidget);
+      expect(tester.getSize(shopSelector).height, 44);
+      final quickThumbLeft = tester.getTopLeft(shopThumb).dx;
       expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
       expect(
         find.byKey(const ValueKey('buy-product-s-tomato')),
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('buy-product-s-atta')), findsNothing);
-      expect(find.textContaining('Quick 10m delivery'), findsWidgets);
+      expect(find.text('Quick 10m'), findsOneWidget);
+      expect(find.text('Scheduled'), findsOneWidget);
 
-      await tester.tap(
-        find.byKey(const ValueKey('buy-shop-sale-type-courier')),
-      );
+      await tester.fling(shopSelector, const Offset(-140, 0), 800);
       await tester.pumpAndSettle();
       expect(session.shopSaleType, BuyV2ShopSaleType.courier);
+      expect(tester.getTopLeft(shopThumb).dx, greaterThan(quickThumbLeft));
       expect(find.byKey(const ValueKey('buy-product-s-tomato')), findsNothing);
       expect(find.byKey(const ValueKey('buy-product-s-atta')), findsOneWidget);
       expect(find.textContaining('Delivery today'), findsWidgets);
 
       await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('buy-wholesale-sale-type-selector')),
-        findsOneWidget,
+      final wholesaleSelector = find.byKey(
+        const ValueKey('buy-wholesale-sale-type-selector'),
       );
+      expect(wholesaleSelector, findsOneWidget);
+      expect(tester.getSize(wholesaleSelector).height, 44);
       expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.wholesale);
       expect(
         find.byKey(const ValueKey('buy-product-w-tomato')),
@@ -4134,9 +4138,7 @@ void main() {
       );
       expect(find.byKey(const ValueKey('buy-product-w-rice')), findsNothing);
 
-      await tester.tap(
-        find.byKey(const ValueKey('buy-wholesale-sale-type-bulk')),
-      );
+      await tester.fling(wholesaleSelector, const Offset(-140, 0), 800);
       await tester.pumpAndSettle();
       expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.bulk);
       expect(find.byKey(const ValueKey('buy-product-w-tomato')), findsNothing);

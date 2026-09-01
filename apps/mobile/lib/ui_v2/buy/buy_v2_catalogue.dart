@@ -669,127 +669,158 @@ class _BuyV2CatalogueViewState extends State<BuyV2CatalogueView> {
 }
 
 class _CatalogueSaleTypeSelector extends StatelessWidget {
-  const _CatalogueSaleTypeSelector({
-    required this.session,
-    this.compact = false,
-  });
+  const _CatalogueSaleTypeSelector({required this.session});
 
   final BuyV2Session session;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final shop = session.destination == BuyV2Destination.shop;
     final options = shop
         ? const [
-            (
-              id: 'quick',
-              title: 'Quick 10m',
-              detail: 'Nearby delivery',
-              icon: Icons.bolt_rounded,
-            ),
+            (id: 'quick', title: 'Quick 10m', icon: Icons.bolt_rounded),
             (
               id: 'courier',
-              title: 'Courier',
-              detail: 'Delivery date shown',
-              icon: Icons.local_shipping_outlined,
+              title: 'Scheduled',
+              icon: Icons.calendar_today_outlined,
             ),
           ]
         : const [
             (
               id: 'wholesale',
               title: 'Wholesale',
-              detail: 'Regular trade packs',
               icon: Icons.inventory_2_outlined,
             ),
-            (
-              id: 'bulk',
-              title: 'Bulk',
-              detail: 'Higher-volume orders',
-              icon: Icons.warehouse_outlined,
-            ),
+            (id: 'bulk', title: 'Bulk', icon: Icons.warehouse_outlined),
           ];
-    final selectedId = shop
+    final selectedIndex = shop
         ? session.shopSaleType == BuyV2ShopSaleType.quickDelivery
-              ? 'quick'
-              : 'courier'
+              ? 0
+              : 1
         : session.wholesaleSaleType == BuyV2WholesaleSaleType.wholesale
-        ? 'wholesale'
-        : 'bulk';
+        ? 0
+        : 1;
+
+    void select(int index) {
+      if (index == selectedIndex) return;
+      HapticFeedback.selectionClick();
+      if (shop) {
+        session.chooseShopSaleType(
+          index == 0
+              ? BuyV2ShopSaleType.quickDelivery
+              : BuyV2ShopSaleType.courier,
+        );
+      } else {
+        session.chooseWholesaleSaleType(
+          index == 0
+              ? BuyV2WholesaleSaleType.wholesale
+              : BuyV2WholesaleSaleType.bulk,
+        );
+      }
+    }
 
     return Semantics(
       key: ValueKey('buy-${shop ? 'shop' : 'wholesale'}-sale-type-selector'),
       container: true,
+      explicitChildNodes: true,
       label: shop
-          ? 'Choose Quick 10 minute or courier Shop products'
+          ? 'Choose Quick 10 minute or scheduled Shop products'
           : 'Choose Wholesale or Bulk products',
-      child: Container(
-        padding: compact
-            ? EdgeInsets.zero
-            : const EdgeInsets.fromLTRB(10, 6, 10, 7),
-        decoration: compact
-            ? null
-            : const BoxDecoration(
-                color: Colors.white,
-                border: Border(bottom: BorderSide(color: BuyV2Colors.line)),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final showIcons =
+              constraints.maxWidth >= 190 &&
+              MediaQuery.textScalerOf(context).scale(1) <= 1.2;
+          final segmentWidth = (constraints.maxWidth - 4) / 2;
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragEnd: (details) {
+              final velocity = details.primaryVelocity ?? 0;
+              if (velocity.abs() < 80) return;
+              select(velocity < 0 ? 1 : 0);
+            },
+            child: Container(
+              key: ValueKey(
+                'buy-${shop ? 'shop' : 'wholesale'}-sale-type-swipe',
               ),
-        child: Row(
-          children: [
-            for (var index = 0; index < options.length; index++) ...[
-              Expanded(
-                child: _CatalogueSaleTypeOption(
-                  key: ValueKey(
-                    'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
-                    '${options[index].id}',
+              height: 44,
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softBlue,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: BuyV2Colors.line),
+              ),
+              child: Stack(
+                children: [
+                  AnimatedPositioned(
+                    key: ValueKey(
+                      'buy-${shop ? 'shop' : 'wholesale'}-sale-type-thumb',
+                    ),
+                    duration: BuyV2Motion.resolved(
+                      context,
+                      BuyV2Motion.selection,
+                    ),
+                    curve: Curves.easeOutCubic,
+                    left: selectedIndex == 0 ? 0 : segmentWidth,
+                    top: 0,
+                    bottom: 0,
+                    width: segmentWidth,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: BuyV2Colors.navy,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x22000050),
+                            blurRadius: 7,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  title: options[index].title,
-                  detail: options[index].detail,
-                  icon: options[index].icon,
-                  selected: selectedId == options[index].id,
-                  compact: compact,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    if (shop) {
-                      session.chooseShopSaleType(
-                        options[index].id == 'quick'
-                            ? BuyV2ShopSaleType.quickDelivery
-                            : BuyV2ShopSaleType.courier,
-                      );
-                    } else {
-                      session.chooseWholesaleSaleType(
-                        options[index].id == 'wholesale'
-                            ? BuyV2WholesaleSaleType.wholesale
-                            : BuyV2WholesaleSaleType.bulk,
-                      );
-                    }
-                  },
-                ),
+                  Row(
+                    children: [
+                      for (var index = 0; index < options.length; index++)
+                        Expanded(
+                          child: _CatalogueSaleSegment(
+                            key: ValueKey(
+                              'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
+                              '${options[index].id}',
+                            ),
+                            title: options[index].title,
+                            icon: options[index].icon,
+                            selected: selectedIndex == index,
+                            showIcon: showIcons,
+                            onTap: () => select(index),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
-              if (index == 0) SizedBox(width: compact ? 4 : 7),
-            ],
-          ],
-        ),
+            ),
+          );
+        },
       ),
     );
   }
 }
 
-class _CatalogueSaleTypeOption extends StatelessWidget {
-  const _CatalogueSaleTypeOption({
+class _CatalogueSaleSegment extends StatelessWidget {
+  const _CatalogueSaleSegment({
     super.key,
     required this.title,
-    required this.detail,
     required this.icon,
     required this.selected,
-    required this.compact,
+    required this.showIcon,
     required this.onTap,
   });
 
   final String title;
-  final String detail;
   final IconData icon;
   final bool selected;
-  final bool compact;
+  final bool showIcon;
   final VoidCallback onTap;
 
   @override
@@ -797,63 +828,37 @@ class _CatalogueSaleTypeOption extends StatelessWidget {
     return Semantics(
       selected: selected,
       button: true,
-      label: '$title. $detail',
+      label: title,
       excludeSemantics: true,
       onTap: onTap,
       child: Material(
-        color: selected ? BuyV2Colors.navy : BuyV2Colors.softBlue,
-        borderRadius: BorderRadius.circular(15),
+        color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(15),
-          child: Container(
-            constraints: BoxConstraints(minHeight: compact ? 44 : 58),
-            padding: EdgeInsets.symmetric(
-              horizontal: compact ? 5 : 10,
-              vertical: compact ? 4 : 8,
-            ),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(
-                color: selected ? BuyV2Colors.navy : BuyV2Colors.line,
-              ),
-            ),
+          borderRadius: BorderRadius.circular(12),
+          child: Center(
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  icon,
-                  color: selected ? BuyV2Colors.orange : BuyV2Colors.navy,
-                  size: compact ? 16 : 20,
-                ),
-                SizedBox(width: compact ? 4 : 8),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.buyBody.copyWith(
-                          color: selected ? Colors.white : BuyV2Colors.navy,
-                          fontSize: compact ? 8 : null,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      if (!compact)
-                        Text(
-                          detail,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.buyMeta.copyWith(
-                            color: selected
-                                ? Colors.white70
-                                : BuyV2Colors.muted,
-                            fontSize: 7.5,
-                          ),
-                        ),
-                    ],
+                if (showIcon) ...[
+                  Icon(
+                    icon,
+                    size: 15,
+                    color: selected ? BuyV2Colors.orange : BuyV2Colors.navy,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: selected ? Colors.white : BuyV2Colors.navy,
+                      fontSize: showIcon ? 8.5 : 8,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ],
@@ -1476,7 +1481,7 @@ class _CatalogueOwnedFeature extends StatelessWidget {
   Widget build(BuildContext context) {
     if (session.destination == BuyV2Destination.shop ||
         session.destination == BuyV2Destination.wholesale) {
-      return _CatalogueSaleTypeSelector(session: session, compact: true);
+      return _CatalogueSaleTypeSelector(session: session);
     }
     final feature = switch (session.destination) {
       BuyV2Destination.shop => (
@@ -5976,7 +5981,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
     final cataloguePromise =
         product.destination == BuyV2Destination.shop &&
             session.shopSaleType == BuyV2ShopSaleType.quickDelivery
-        ? 'Quick 10m delivery'
+        ? 'Nearby'
         : product.destination == BuyV2Destination.shop &&
               session.shopSaleType == BuyV2ShopSaleType.courier
         ? buyerPromise.replaceFirst(RegExp(r'^Delivered\s+'), 'Delivery ')
@@ -6382,7 +6387,7 @@ class BuyV2ProductCard extends StatelessWidget {
     final cataloguePromise =
         product.destination == BuyV2Destination.shop &&
             session.shopSaleType == BuyV2ShopSaleType.quickDelivery
-        ? 'Quick 10m delivery'
+        ? 'Nearby'
         : product.destination == BuyV2Destination.shop &&
               session.shopSaleType == BuyV2ShopSaleType.courier
         ? buyerPromise.replaceFirst(RegExp(r'^Delivered\s+'), 'Delivery ')

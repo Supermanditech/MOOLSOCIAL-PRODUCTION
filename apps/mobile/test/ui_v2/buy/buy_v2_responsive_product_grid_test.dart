@@ -109,9 +109,13 @@ void main() {
         expect(
           find.descendant(
             of: firstCard,
-            matching: find.textContaining('Quick 10m delivery'),
+            matching: find.textContaining('Quick local'),
           ),
           findsOneWidget,
+        );
+        expect(
+          find.descendant(of: firstCard, matching: find.textContaining('10m')),
+          findsNothing,
         );
         final add = find.descendant(
           of: firstCard,
@@ -264,11 +268,12 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(
-          of: card,
-          matching: find.textContaining('Quick 10m delivery'),
-        ),
+        find.descendant(of: card, matching: find.textContaining('Quick local')),
         findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.textContaining('10m')),
+        findsNothing,
       );
       expect(tester.takeException(), isNull);
     },
