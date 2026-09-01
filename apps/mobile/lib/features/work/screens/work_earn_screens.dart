@@ -735,7 +735,7 @@ class WorkOpportunityScreen extends StatelessWidget {
         );
         return WorkPageScaffold(
           session: session,
-          title: opportunity.title,
+          title: 'Opportunity details',
           subtitle: '${opportunity.posterType.label} paid requirement',
           fallbackBackRoute: '/app/work/earn',
           activeLocalAction: 'earn',
@@ -762,7 +762,7 @@ class WorkOpportunityScreen extends StatelessWidget {
                 )
               : WorkPrimaryButton(
                   keyName: 'work-apply-opportunity',
-                  label: 'Apply · ${opportunity.monthlyPayment}',
+                  label: 'Apply now',
                   busy: session.busy,
                   onPressed: opportunity.available
                       ? () async {
