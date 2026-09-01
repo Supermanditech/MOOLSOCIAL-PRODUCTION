@@ -1419,8 +1419,8 @@ class _BuyV2PromotionCardState extends State<BuyV2PromotionCard>
                                   children: [
                                     Text(
                                       widget.title,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.clip,
                                       style: const TextStyle(
                                         color: BuyV2Colors.ink,
                                         fontSize: 10.5,

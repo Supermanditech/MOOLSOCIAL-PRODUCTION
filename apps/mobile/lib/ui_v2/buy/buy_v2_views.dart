@@ -427,6 +427,8 @@ class BuyV2ProductView extends StatelessWidget {
     final productBenefits = session.productBenefitsFor(product);
     final productBenefitsState = session.productBenefitsStateFor(product);
     final variants = session.productVariantsFor(product);
+    final purchaseProtection = product.purchaseProtection;
+    final returnSummary = purchaseProtection?.summary ?? product.returnPolicy;
     final automaticFulfilment =
         product.destination == BuyV2Destination.shop ||
         product.destination == BuyV2Destination.wholesale;
@@ -619,7 +621,7 @@ class BuyV2ProductView extends StatelessWidget {
                               'Minimum order · ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'}',
                         ),
                       ],
-                      if (product.returnPolicy case final returnPolicy?) ...[
+                      if (returnSummary case final returnPolicy?) ...[
                         const SizedBox(height: 5),
                         _ProductHeroFact(
                           icon: Icons.assignment_return_outlined,
@@ -705,7 +707,7 @@ class BuyV2ProductView extends StatelessWidget {
                       _WholesaleVerificationCard(
                         state: session.businessVerificationState,
                         onOpenWorkspace: () =>
-                            context.push('/app/work/workspace'),
+                            context.push('/app/work/workspace/choose'),
                       ),
                       const SizedBox(height: 8),
                     ],
@@ -859,12 +861,80 @@ class BuyV2ProductView extends StatelessWidget {
                       label: 'Source route',
                       value: product.origin,
                     ),
-                  if (product.returnPolicy case final returnPolicy?)
+                  if (returnSummary case final returnPolicy?)
                     _DecisionRow(
                       icon: Icons.assignment_return_outlined,
                       label: 'After delivery',
                       value: returnPolicy,
                     ),
+                  if (purchaseProtection case final protection?) ...[
+                    if (protection.remedies.isNotEmpty)
+                      _DecisionRow(
+                        icon: Icons.rule_rounded,
+                        label: 'Available remedies',
+                        value: protection.remedies.join(' · '),
+                      ),
+                    if (protection.windowLabel case final value?)
+                      _DecisionRow(
+                        icon: Icons.schedule_rounded,
+                        label: 'Request window',
+                        value: value,
+                      ),
+                    if (protection.conditionsLabel case final value?)
+                      _DecisionRow(
+                        icon: Icons.fact_check_outlined,
+                        label: 'Conditions',
+                        value: value,
+                      ),
+                    if (protection.verificationLabel case final value?)
+                      _DecisionRow(
+                        icon: Icons.verified_outlined,
+                        label: 'Verification',
+                        value: value,
+                      ),
+                    if (protection.initiationLabel case final value?)
+                      _DecisionRow(
+                        icon: Icons.playlist_add_check_rounded,
+                        label: 'How to request',
+                        value: value,
+                      ),
+                    if (protection.approvalLabel case final value?)
+                      _DecisionRow(
+                        icon: Icons.approval_outlined,
+                        label: 'Approval',
+                        value: value,
+                      ),
+                    if (protection.pickupLabel case final value?)
+                      _DecisionRow(
+                        icon: Icons.local_shipping_outlined,
+                        label: 'Pickup',
+                        value: value,
+                      ),
+                    if (protection.refundMethodLabel case final value?)
+                      _DecisionRow(
+                        icon: Icons.account_balance_wallet_outlined,
+                        label: 'Refund method',
+                        value: value,
+                      ),
+                    if (protection.refundTimelineLabel case final value?)
+                      _DecisionRow(
+                        icon: Icons.timelapse_rounded,
+                        label: 'Refund timeline',
+                        value: value,
+                      ),
+                    if (protection.warrantyLabel case final value?)
+                      _DecisionRow(
+                        icon: Icons.shield_outlined,
+                        label: 'Warranty',
+                        value: value,
+                      ),
+                    if (protection.nonReturnableReason case final value?)
+                      _DecisionRow(
+                        icon: Icons.info_outline_rounded,
+                        label: 'Non-returnable',
+                        value: value,
+                      ),
+                  ],
                 ],
               ),
               const SizedBox(height: 10),
@@ -926,7 +996,7 @@ class BuyV2ProductView extends StatelessWidget {
             onIncrease: () => session.increase(product.id),
             onRetryOffer: () => session.refreshProductFacts(product.id),
             businessVerified: session.businessVerified,
-            onOpenWorkspace: () => context.push('/app/work/workspace'),
+            onOpenWorkspace: () => context.push('/app/work/workspace/choose'),
           ),
       ],
     );
@@ -1715,7 +1785,13 @@ class _WholesaleTradeDecisionPanelState
         ? BuyV2Colors.green
         : BuyV2Colors.orange;
     final minimumTotal = facts.price * product.minimumOrder;
-    final signalSummary = _loading
+    final showSignal =
+        _loading ||
+        _failure != null ||
+        _signal?.state != BuyV2WholesaleTradeSignalState.unavailable;
+    final signalSummary = !showSignal
+        ? ''
+        : _loading
         ? 'Checking local market insight.'
         : _failure != null
         ? 'Local market insight could not be loaded.'
@@ -1739,13 +1815,15 @@ class _WholesaleTradeDecisionPanelState
             facts: facts,
             decision: decision,
           ),
-          const SizedBox(height: 8),
-          _WholesaleTradeSignalCard(
-            loading: _loading,
-            signal: _signal,
-            failed: _failure != null,
-            onRetry: _loadSignal,
-          ),
+          if (showSignal) ...[
+            const SizedBox(height: 8),
+            _WholesaleTradeSignalCard(
+              loading: _loading,
+              signal: _signal,
+              failed: _failure != null,
+              onRetry: _loadSignal,
+            ),
+          ],
           const SizedBox(height: 8),
           _DecisionPanel(
             key: ValueKey('buy-automatic-fulfilment-${product.id}'),
@@ -1810,12 +1888,6 @@ class _WholesaleTradeDecisionPanelState
                 icon: Icons.local_shipping_outlined,
                 label: 'Delivery mode',
                 value: buyV2FulfilmentModeLabel(fulfilmentMode),
-              ),
-              _DecisionRow(
-                icon: Icons.storefront_outlined,
-                label: 'Seller',
-                value:
-                    '${facts.partner} · ${_sellerTypeLabel(product.sellerType)}',
               ),
               _DecisionRow(
                 icon: Icons.storefront_outlined,
@@ -4784,7 +4856,8 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                 IconButton(
                   key: const ValueKey('buy-cart-empty'),
                   tooltip: 'Empty cart',
-                  onPressed: session.clearCart,
+                  onPressed: () =>
+                      unawaited(_confirmBuyV2CartClear(context, session)),
                   icon: const Icon(
                     Icons.delete_outline_rounded,
                     color: Color(0xFFB42318),
@@ -4914,6 +4987,127 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
         ),
       ],
     );
+  }
+}
+
+Future<void> _confirmBuyV2CartClear(
+  BuildContext context,
+  BuyV2Session session,
+) async {
+  if (session.checkoutRequiresResolution) {
+    session.clearCart();
+    return;
+  }
+  final scope = session.cartScope;
+  final removeCount = session.scopedItemCount;
+  if (removeCount == 0) return;
+  final remainingCount = session.itemCount - removeCount;
+  final clearEverything = scope == BuyV2CartScope.all;
+  final title = clearEverything
+      ? 'Empty entire Cart?'
+      : 'Remove ${scope.label} items?';
+  final detail = clearEverything
+      ? '$removeCount ${removeCount == 1 ? 'item' : 'items'} will be removed from your Cart.'
+      : remainingCount > 0
+      ? '$removeCount ${scope.label} ${removeCount == 1 ? 'item' : 'items'} will be removed. '
+            '$remainingCount other ${remainingCount == 1 ? 'item will' : 'items will'} stay in your Cart.'
+      : '$removeCount ${scope.label} ${removeCount == 1 ? 'item' : 'items'} will be removed. '
+            'You’ll return to ${scope.label}.';
+  final confirmed = await showModalBottomSheet<bool>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      top: false,
+      child: Semantics(
+        container: true,
+        scopesRoute: true,
+        namesRoute: true,
+        explicitChildNodes: true,
+        label: title,
+        child: Padding(
+          key: const ValueKey('buy-cart-clear-sheet'),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEBEA),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFB42318),
+                    ),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: sheetContext.buyTitle.copyWith(fontSize: 18),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(detail, style: sheetContext.buyMeta),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      key: const ValueKey('buy-cart-clear-cancel'),
+                      onPressed: () => Navigator.of(sheetContext).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                      ),
+                      child: const Text('Keep Cart'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      key: const ValueKey('buy-cart-clear-confirm'),
+                      onPressed: () => Navigator.of(sheetContext).pop(true),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                        backgroundColor: const Color(0xFFB42318),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text(
+                        clearEverything
+                            ? 'Empty Cart'
+                            : 'Remove ${scope.label}',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  if (confirmed == true && context.mounted) {
+    session.clearCartScope(scope);
   }
 }
 
@@ -5983,6 +6177,12 @@ class BuyV2CheckoutView extends StatelessWidget {
                         '${deliveryGroups[index].destination.label} fulfilment · '
                             '${_fulfilmentPromiseSummary(deliveryGroups[index])}',
                         '${deliveryGroups[index].destination.label} · ${buyV2Money(deliveryGroups[index].total)}',
+                        for (final line in deliveryGroups[index].lines)
+                          if (_purchaseProtectionLines(line.product)
+                              case final policyLines
+                              when policyLines.isNotEmpty)
+                            'After delivery · ${line.product.title}: '
+                                '${policyLines.join(' · ')}',
                         if (deliveryGroups[index].dispatchPromise
                             case final dispatchPromise?)
                           'Dispatch · $dispatchPromise',
@@ -7516,6 +7716,20 @@ class BuyV2OrderItemsView extends StatelessWidget {
                                 '${product.pack} · ${buyV2Money(product.price)}',
                                 style: context.buyMeta,
                               ),
+                              if (_purchaseProtectionLines(product)
+                                  case final policyLines
+                                  when policyLines.isNotEmpty) ...[
+                                const SizedBox(height: 3),
+                                Text(
+                                  'After delivery · ${policyLines.join(' · ')}',
+                                  maxLines: 4,
+                                  overflow: TextOverflow.clip,
+                                  style: context.buyMeta.copyWith(
+                                    color: BuyV2Colors.green,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 4),
                               Text(
                                 'View product details',
@@ -9507,40 +9721,16 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
           style: context.buyTitle.copyWith(fontSize: 14),
         ),
         const SizedBox(height: 6),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final vertical = accessibleText || constraints.maxWidth < 330;
-            final chat = _AssistChannel(
-              icon: Icons.chat_outlined,
-              title: 'Chat in app',
-              detail: 'Continue with support',
-              onTap: () {
-                HapticFeedback.selectionClick();
-                FocusScope.of(context).unfocus();
-                widget.onOpenChat(
-                  intent: _selectedIntent,
-                  details: _composerController.text,
-                );
-              },
-            );
-            final call = _AssistChannel(
-              icon: Icons.phone_outlined,
-              title: 'Call in app',
-              detail: 'Speak securely here',
-              onTap: () {
-                HapticFeedback.selectionClick();
-                session.showNotice('In-app support call selected.');
-              },
-            );
-            if (vertical) {
-              return Column(children: [chat, const SizedBox(height: 7), call]);
-            }
-            return Row(
-              children: [
-                Expanded(child: chat),
-                const SizedBox(width: 8),
-                Expanded(child: call),
-              ],
+        _AssistChannel(
+          icon: Icons.chat_outlined,
+          title: 'Chat in app',
+          detail: 'Continue with support',
+          onTap: () {
+            HapticFeedback.selectionClick();
+            FocusScope.of(context).unfocus();
+            widget.onOpenChat(
+              intent: _selectedIntent,
+              details: _composerController.text,
             );
           },
         ),
@@ -12509,6 +12699,32 @@ BuyV2Destination? _destinationForCartScope(BuyV2CartScope scope) =>
       BuyV2CartScope.wholesale => BuyV2Destination.wholesale,
       BuyV2CartScope.medicine => BuyV2Destination.medicine,
     };
+
+List<String> _purchaseProtectionLines(BuyV2Product product) {
+  final protection = product.purchaseProtection;
+  if (protection == null) {
+    return [?product.returnPolicy];
+  }
+  return [
+    protection.summary,
+    if (protection.remedies.isNotEmpty)
+      'Remedies: ${protection.remedies.join(', ')}',
+    if (protection.windowLabel case final value?) 'Window: $value',
+    if (protection.conditionsLabel case final value?) 'Conditions: $value',
+    if (protection.verificationLabel case final value?) 'Verification: $value',
+    if (protection.initiationLabel case final value?) 'Request: $value',
+    if (protection.approvalLabel case final value?) 'Approval: $value',
+    if (protection.pickupLabel case final value?) 'Pickup: $value',
+    if (protection.refundMethodLabel case final value?) 'Refund method: $value',
+    if (protection.refundTimelineLabel case final value?)
+      'Refund timeline: $value',
+    if (protection.warrantyLabel case final value?) 'Warranty: $value',
+    if (protection.nonReturnableReason case final value?)
+      'Non-returnable: $value',
+    if (protection.policyVersion case final value?) 'Policy: $value',
+    if (protection.effectiveFromLabel case final value?) 'Effective: $value',
+  ];
+}
 
 String _cartFamilyLabel(BuyV2Destination destination) => switch (destination) {
   BuyV2Destination.shop => 'Shop basket',

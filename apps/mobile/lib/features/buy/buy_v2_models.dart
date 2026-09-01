@@ -67,6 +67,40 @@ class BuyV2Category {
   final String glyph;
 }
 
+class BuyV2PurchaseProtection {
+  const BuyV2PurchaseProtection({
+    required this.summary,
+    this.remedies = const [],
+    this.windowLabel,
+    this.conditionsLabel,
+    this.verificationLabel,
+    this.initiationLabel,
+    this.approvalLabel,
+    this.pickupLabel,
+    this.refundMethodLabel,
+    this.refundTimelineLabel,
+    this.warrantyLabel,
+    this.nonReturnableReason,
+    this.policyVersion,
+    this.effectiveFromLabel,
+  });
+
+  final String summary;
+  final List<String> remedies;
+  final String? windowLabel;
+  final String? conditionsLabel;
+  final String? verificationLabel;
+  final String? initiationLabel;
+  final String? approvalLabel;
+  final String? pickupLabel;
+  final String? refundMethodLabel;
+  final String? refundTimelineLabel;
+  final String? warrantyLabel;
+  final String? nonReturnableReason;
+  final String? policyVersion;
+  final String? effectiveFromLabel;
+}
+
 class BuyV2Product {
   const BuyV2Product({
     required this.id,
@@ -93,6 +127,7 @@ class BuyV2Product {
     this.regulatoryNote,
     this.minimumOrder = 1,
     this.returnPolicy,
+    this.purchaseProtection,
     this.freightIncluded = false,
     this.manufacturerVerified = false,
     this.catalogueListing = true,
@@ -122,6 +157,7 @@ class BuyV2Product {
   final String? regulatoryNote;
   final int minimumOrder;
   final String? returnPolicy;
+  final BuyV2PurchaseProtection? purchaseProtection;
   final bool freightIncluded;
   final bool manufacturerVerified;
   final bool catalogueListing;
@@ -140,6 +176,7 @@ class BuyV2Product {
     String? confirmedOn,
     int? minimumOrder,
     bool? catalogueListing,
+    BuyV2PurchaseProtection? purchaseProtection,
   }) => BuyV2Product(
     id: id ?? this.id,
     canonicalId: canonicalId ?? this.canonicalId,
@@ -165,6 +202,7 @@ class BuyV2Product {
     regulatoryNote: regulatoryNote,
     minimumOrder: minimumOrder ?? this.minimumOrder,
     returnPolicy: returnPolicy,
+    purchaseProtection: purchaseProtection ?? this.purchaseProtection,
     freightIncluded: freightIncluded,
     manufacturerVerified: manufacturerVerified,
     catalogueListing: catalogueListing ?? this.catalogueListing,

@@ -733,7 +733,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       return;
     }
     context.push(
-      const BuyV2ChatRouteAdapter().orderHelpLocationFor(orderId: order.id),
+      const BuyV2ChatRouteAdapter().orderHelpLocationFor(order: order),
     );
   }
 
@@ -748,6 +748,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     context.push(
       const BuyV2ChatRouteAdapter().productQuestionLocationFor(
         product: product,
+        quantity: widget.session.quantityFor(product.id),
       ),
     );
   }
@@ -849,10 +850,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         paymentHandoff: widget.paymentHandoff,
       ),
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
-      BuyV2View.assist => BuyV2AssistView(
+      BuyV2View.assist => BuyV2TrackingView(
         session: session,
-        onOpenChat: ({intent, details}) =>
-            _openOrderHelpChat(session.assistOrder),
+        onOpenOrderHelp: _openOrderHelpChat,
+        invoiceDownloader: widget.invoiceDownloader,
+        paymentHandoff: widget.paymentHandoff,
       ),
       BuyV2View.account => BuyV2AccountView(
         session: session,

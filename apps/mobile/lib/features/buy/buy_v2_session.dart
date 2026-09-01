@@ -3908,9 +3908,13 @@ class BuyV2Session extends ChangeNotifier {
 
   bool openTracking(String orderId) {
     final previous = _navigationSurfaceIdentity;
-    destination = BuyV2Destination.orders;
-    final orderExists = _orders.any((order) => order.id == orderId);
-    if (!orderExists) {
+    final order = _orders
+        .where((candidate) => candidate.id == orderId)
+        .firstOrNull;
+    destination = order?.destination == BuyV2Destination.medicine
+        ? BuyV2Destination.medicine
+        : BuyV2Destination.orders;
+    if (order == null) {
       _selectedOrderId = null;
       view = BuyV2View.catalogue;
       notice = 'This order could not be found.';
@@ -3938,7 +3942,9 @@ class BuyV2Session extends ChangeNotifier {
 
   void returnToOrders() {
     final previous = _navigationSurfaceIdentity;
-    destination = BuyV2Destination.orders;
+    destination = selectedOrderOrNull?.destination == BuyV2Destination.medicine
+        ? BuyV2Destination.medicine
+        : BuyV2Destination.orders;
     view = BuyV2View.catalogue;
     notice = null;
     _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
@@ -3955,7 +3961,9 @@ class BuyV2Session extends ChangeNotifier {
     }
     final previous = _navigationSurfaceIdentity;
     _selectedOrderId = order.id;
-    destination = BuyV2Destination.orders;
+    destination = order.destination == BuyV2Destination.medicine
+        ? BuyV2Destination.medicine
+        : BuyV2Destination.orders;
     view = BuyV2View.orderItems;
     notice = null;
     _notifyNavigationIfChanged(
@@ -4261,6 +4269,7 @@ class BuyV2Session extends ChangeNotifier {
       _assistReturnDestination = destination;
       _assistReturnView = view;
     }
+    _selectedOrderId = assistOrder.id;
     view = BuyV2View.assist;
     notice = null;
     _notifyNavigationIfChanged(
@@ -4954,6 +4963,71 @@ class BuyV2Session extends ChangeNotifier {
     _persistCustomerState();
     _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
   }
+
+  bool clearCartScope(BuyV2CartScope scope) {
+    if (_holdCartForPaymentResolution()) return false;
+    final scopedLines = _linesForScope(scope);
+    if (scopedLines.isEmpty) return false;
+    if (scope == BuyV2CartScope.all) {
+      clearCart();
+      return true;
+    }
+
+    final previous = _navigationSurfaceIdentity;
+    final removedIds = scopedLines.map((line) => line.product.id).toSet();
+    _cart.removeWhere((id, _) => removedIds.contains(id));
+    _pruneCartSelections();
+
+    if (_cart.isEmpty) {
+      destination = _destinationForScope(scope);
+      view = BuyV2View.catalogue;
+      cartScope = BuyV2CartScope.all;
+      notice = null;
+      cartAcknowledgement = null;
+      _persistCustomerState();
+      _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
+      return true;
+    }
+
+    final remainingDestinations = cartDestinations;
+    if (remainingDestinations.length == 1) {
+      destination = remainingDestinations.single;
+      cartScope = _scopeForDestination(destination);
+    } else {
+      if (!remainingDestinations.contains(destination)) {
+        destination = remainingDestinations.first;
+      }
+      cartScope = BuyV2CartScope.all;
+    }
+    view = BuyV2View.cart;
+    notice = null;
+    final remainingCount = itemCount;
+    cartAcknowledgement =
+        '${scope.label} items removed · $remainingCount '
+        '${remainingCount == 1 ? 'item' : 'items'} remain';
+    _persistCustomerState();
+    _notifyNavigationIfChanged(
+      previous,
+      BuyV2NavigationMotionDirection.replace,
+    );
+    return true;
+  }
+
+  BuyV2Destination _destinationForScope(BuyV2CartScope scope) =>
+      switch (scope) {
+        BuyV2CartScope.shop => BuyV2Destination.shop,
+        BuyV2CartScope.wholesale => BuyV2Destination.wholesale,
+        BuyV2CartScope.medicine => BuyV2Destination.medicine,
+        BuyV2CartScope.all => destination,
+      };
+
+  BuyV2CartScope _scopeForDestination(BuyV2Destination value) =>
+      switch (value) {
+        BuyV2Destination.shop => BuyV2CartScope.shop,
+        BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+        BuyV2Destination.medicine => BuyV2CartScope.medicine,
+        BuyV2Destination.orders => BuyV2CartScope.all,
+      };
 
   void chooseCartScope(BuyV2CartScope value) {
     cartScope = value;

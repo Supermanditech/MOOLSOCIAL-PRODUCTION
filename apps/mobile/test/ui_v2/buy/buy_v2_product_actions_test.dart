@@ -21,7 +21,8 @@ void main() {
     );
     final uri = Uri.parse(location);
 
-    expect(uri.path, '/app/chat/thread/shop-partner');
+    expect(uri.path, startsWith('/app/chat/thread/shop-partner-shop-'));
+    expect(uri.queryParameters['supplier'], product.seller);
     expect(uri.queryParameters['draft'], contains('Toned fresh milk'));
     expect(uri.queryParameters['draft'], contains('2 × 1 L pouches'));
     expect(uri.queryParameters['directReturn'], 'true');

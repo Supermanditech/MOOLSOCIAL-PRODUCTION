@@ -535,6 +535,52 @@ void main() {
       expect(session.selectedOrder.id, order.id);
     });
 
+    test('one Shop checkout splits orders by fulfilling store', () {
+      final first = BuyV2Catalogue.products.firstWhere(
+        (item) => item.destination == BuyV2Destination.shop,
+      );
+      final second = BuyV2Catalogue.products.firstWhere(
+        (item) =>
+            item.destination == BuyV2Destination.shop &&
+            item.seller != first.seller,
+      );
+      expect(session.addProduct(first.id), isTrue);
+      expect(session.addProduct(second.id), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.confirmOrder(), isTrue);
+
+      expect(session.confirmedOrders, hasLength(2));
+      expect(session.confirmedOrders.map((order) => order.partner).toSet(), {
+        first.seller,
+        second.seller,
+      });
+      expect(
+        session.confirmedOrders.expand((order) => order.productIds).toSet(),
+        {first.id, second.id},
+      );
+      expect(
+        session.confirmedOrders.map((order) => order.purchaseId).toSet(),
+        hasLength(1),
+      );
+      for (final product in [first, second]) {
+        final purchased = session.confirmedOrders
+            .expand((order) => order.lines)
+            .singleWhere((line) => line.product.id == product.id)
+            .product;
+        expect(purchased.canonicalId, product.canonicalId);
+        expect(purchased.title, product.title);
+        expect(purchased.variant, product.variant);
+        expect(purchased.pack, product.pack);
+        expect(purchased.price, product.price);
+        expect(purchased.unitPrice, product.unitPrice);
+        expect(purchased.seller, product.seller);
+        expect(purchased.sellerType, product.sellerType);
+        expect(purchased.deliveryPromise, product.deliveryPromise);
+        expect(purchased.returnPolicy, product.returnPolicy);
+      }
+    });
+
     test(
       'product continuations are deterministic, local and same-catalogue',
       () {
@@ -1215,6 +1261,23 @@ void main() {
       expect(session.destination, BuyV2Destination.orders);
       expect(session.view, BuyV2View.tracking);
       expect(session.selectedOrder.id, 'MS-240782');
+    });
+
+    test('Medicine Tracking and Items remain Care-owned', () {
+      expect(session.openTracking('RX-240784'), isTrue);
+      expect(session.destination, BuyV2Destination.medicine);
+      expect(session.view, BuyV2View.tracking);
+
+      expect(session.openOrderItems('RX-240784'), isTrue);
+      expect(session.destination, BuyV2Destination.medicine);
+      expect(session.view, BuyV2View.orderItems);
+
+      session.goBack();
+      expect(session.destination, BuyV2Destination.medicine);
+      expect(session.view, BuyV2View.tracking);
+      session.goBack();
+      expect(session.destination, BuyV2Destination.medicine);
+      expect(session.view, BuyV2View.catalogue);
     });
 
     test(

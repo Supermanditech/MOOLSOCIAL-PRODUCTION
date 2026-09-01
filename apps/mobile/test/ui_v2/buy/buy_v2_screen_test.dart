@@ -243,7 +243,11 @@ void main() {
       find.byKey(const ValueKey('buy-destination-progress')),
       findsNothing,
     );
-    expect(find.byKey(const ValueKey('buy-assist-hero')), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-assist-hero')), findsNothing);
+    expect(
+      find.byKey(PageStorageKey('buy-tracking-${session.assistOrder.id}')),
+      findsOneWidget,
+    );
     expect(
       session.navigationMotionDirection,
       BuyV2NavigationMotionDirection.forward,
@@ -2639,82 +2643,47 @@ void main() {
 
     session.openAssist();
     await tester.pumpAndSettle();
-    await tester.drag(
-      find.byKey(const PageStorageKey('buy-assist')),
-      const Offset(0, -700),
+    expect(find.byKey(const ValueKey('buy-assist-hero')), findsNothing);
+    expect(
+      find.byKey(PageStorageKey('buy-tracking-${session.assistOrder.id}')),
+      findsOneWidget,
     );
-    await tester.pumpAndSettle();
-    expect(find.text('Chat in app'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-compact-cart-indicator')),
       findsNothing,
     );
   });
 
-  testWidgets(
-    'Buy Chat presents order progress honest intents and in-app channels',
-    (tester) async {
-      final session = BuyV2Session(core: BuySession());
-      await tester.pumpWidget(app(session));
-      await tester.pumpAndSettle();
+  testWidgets('retired Assist state uses tracking and shared Chat only', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    var chatOpens = 0;
+    await tester.pumpWidget(app(session, onOpenChat: () => chatOpens += 1));
+    await tester.pumpAndSettle();
 
-      session.openAssist();
-      await tester.pumpAndSettle();
+    session.openAssist();
+    await tester.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey('buy-assist-hero')), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('buy-assist-current-order')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('buy-assist-order-progress')),
-        findsOneWidget,
-      );
-      final currentOrder = session.orders.firstWhere(
-        (order) => order.status != BuyV2OrderStatus.delivered,
-      );
-      expect(
-        tester
-            .widget<LinearProgressIndicator>(
-              find.byKey(const ValueKey('buy-assist-order-progress')),
-            )
-            .value,
-        currentOrder.progress,
-      );
-      expect(find.textContaining('% complete'), findsOneWidget);
-
-      final intent = find.byKey(
-        const ValueKey('buy-assist-intent-Where is my order?'),
-      );
-      await tester.ensureVisible(intent);
-      await tester.tap(intent);
-      await tester.pumpAndSettle();
-      expect(find.textContaining('selected. Add details'), findsOneWidget);
-
-      final prepare = find.byKey(const ValueKey('buy-assist-prepare-question'));
-      expect(tester.widget<IconButton>(prepare).onPressed, isNull);
-      await tester.enterText(
-        find.byKey(const ValueKey('buy-assist-composer-field')),
-        'The delivery time changed',
-      );
-      await tester.pump();
-      expect(tester.widget<IconButton>(prepare).onPressed, isNotNull);
-      await tester.tap(prepare);
-      await tester.pump();
-      expect(
-        session.notice,
-        'Question ready. Choose Chat to select a conversation and continue.',
-      );
-
-      final chat = find.byKey(const ValueKey('buy-assist-channel-Chat in app'));
-      final call = find.byKey(const ValueKey('buy-assist-channel-Call in app'));
-      expect(chat, findsOneWidget);
-      expect(call, findsOneWidget);
-      expect(tester.getSize(chat).height, greaterThanOrEqualTo(44));
-      expect(tester.getSize(call).height, greaterThanOrEqualTo(44));
-      expect(tester.takeException(), isNull);
-    },
-  );
+    expect(find.byKey(const ValueKey('buy-assist-hero')), findsNothing);
+    expect(
+      find.byKey(PageStorageKey('buy-tracking-${session.assistOrder.id}')),
+      findsOneWidget,
+    );
+    final help = find.byKey(const ValueKey('buy-tracking-help'));
+    await tester.scrollUntilVisible(
+      help,
+      240,
+      scrollable: scrollableWithin(
+        PageStorageKey('buy-tracking-${session.assistOrder.id}'),
+      ),
+    );
+    await tester.tap(help);
+    await tester.pumpAndSettle();
+    expect(chatOpens, 1);
+    expect(find.text('Call in app'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('cart item count uses correct singular and plural copy', (
     tester,
