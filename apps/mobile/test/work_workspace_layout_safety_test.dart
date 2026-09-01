@@ -250,6 +250,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-proof-review')));
       await tester.pumpAndSettle();
+      for (final label in const ['Edit details', 'Edit documents']) {
+        final text = tester.widget<Text>(find.text(label));
+        expect(text.maxLines, 2);
+        expect(tester.getSize(find.text(label)).height, lessThanOrEqualTo(40));
+      }
       final declaration = find.byKey(const Key('work-declaration'));
       await reveal(tester, declaration);
       expect(

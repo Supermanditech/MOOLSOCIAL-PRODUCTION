@@ -2335,8 +2335,26 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                                       _reviewEditMode = true;
                                     });
                                   },
-                                  icon: const Icon(Icons.edit_outlined),
-                                  label: const Text('Edit details'),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size(0, 54),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 8,
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text(
+                                    'Edit details',
+                                    maxLines: 2,
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: MoolSpacing.xs),
@@ -2350,8 +2368,26 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                                       _reviewEditMode = true;
                                     });
                                   },
-                                  icon: const Icon(Icons.upload_file_outlined),
-                                  label: const Text('Edit documents'),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size(0, 54),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 8,
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.upload_file_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text(
+                                    'Edit documents',
+                                    maxLines: 2,
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
                               ),
                             ],
