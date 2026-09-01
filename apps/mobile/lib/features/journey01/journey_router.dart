@@ -88,7 +88,10 @@ import '../retailer/screens/retailer_sales_book_screen.dart';
 import '../retailer/screens/retailer_wholesale_catalog_screens.dart';
 import '../retailer/screens/retailer_wholesale_fulfilment_screens.dart';
 import '../work/screens/work_earn_screens.dart';
-import '../work/screens/work_onboarding_screens.dart';
+import '../work/screens/work_onboarding_screens.dart'
+    hide WorkWorkspaceContactScreen;
+import '../work/screens/work_workspace_contact_screen.dart';
+import '../work/work_models.dart';
 import '../work/work_session.dart';
 import '../../ui_v2/launch/launch_interruption_guard.dart';
 import '../../ui_v2/launch/launch_presentation_gate.dart';
@@ -112,6 +115,7 @@ import '../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../../ui_v2/universal/mvp_action_choice_root_v2.dart';
 import '../../ui_v2/universal/personal_mool_root_v2.dart';
 import 'journey_session.dart';
+import 'journey_services.dart';
 import 'screens/universal_shell.dart';
 
 bool journeyRouteRequiresAuthentication(
@@ -1536,8 +1540,10 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/work/workspace/contact',
-        builder: (context, state) =>
-            WorkWorkspaceContactScreen(session: workSession),
+        builder: (context, state) => WorkWorkspaceContactScreen(
+          session: workSession,
+          accountSnapshot: _workAccountSnapshot(session),
+        ),
       ),
       GoRoute(
         path: '/app/work/workspace/proof',
@@ -1714,6 +1720,51 @@ GoRouter createJourneyRouter(
     ],
   );
   return router;
+}
+
+WorkAccountSnapshot _workAccountSnapshot(JourneySession session) {
+  final identity = session.accountIdentity;
+  final methods = identity?.signInMethods ?? const <String>[];
+  final providerLabel = session.socialAuthProvider == null
+      ? methods
+                .where(
+                  (method) => !const {
+                    'phone',
+                    'mobile',
+                    'email',
+                  }.contains(method.toLowerCase()),
+                )
+                .firstOrNull ??
+            ''
+      : switch (session.socialAuthProvider!) {
+          SocialAuthProvider.google => 'Google',
+          SocialAuthProvider.youtube => 'YouTube',
+          SocialAuthProvider.x => 'X',
+          SocialAuthProvider.facebook => 'Facebook',
+          SocialAuthProvider.instagram => 'Instagram',
+          SocialAuthProvider.apple => 'Apple',
+        };
+  final email =
+      identity?.emailAddress?.trim() ?? session.emailAddress?.trim() ?? '';
+  final mobile =
+      identity?.phoneNumber?.trim() ?? session.phoneNumber?.trim() ?? '';
+  final providerAccount = identity?.providerAccountLabel?.trim();
+  return WorkAccountSnapshot(
+    displayName:
+        identity?.displayName?.trim() ??
+        session.profileDisplayName?.trim() ??
+        '',
+    email: email,
+    mobile: mobile,
+    providerLabel: providerLabel,
+    providerAccount: providerAccount?.isNotEmpty == true
+        ? providerAccount!
+        : email.isNotEmpty
+        ? email
+        : mobile,
+    emailConfirmed: email.isNotEmpty && session.isAuthenticated,
+    mobileConfirmed: mobile.isNotEmpty && session.isAuthenticated,
+  );
 }
 
 ChatThreadType? _chatFilter(String? value) => switch (value) {

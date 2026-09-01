@@ -207,6 +207,36 @@ class WorkProfileOption {
   final IconData icon;
 }
 
+enum WorkContactChannel { primaryMobile, email, alternateMobile }
+
+extension WorkContactChannelValue on WorkContactChannel {
+  String get apiValue => switch (this) {
+    WorkContactChannel.primaryMobile => 'primary_mobile',
+    WorkContactChannel.email => 'email',
+    WorkContactChannel.alternateMobile => 'alternate_mobile',
+  };
+}
+
+class WorkAccountSnapshot {
+  const WorkAccountSnapshot({
+    this.displayName = '',
+    this.email = '',
+    this.mobile = '',
+    this.providerLabel = '',
+    this.providerAccount = '',
+    this.emailConfirmed = false,
+    this.mobileConfirmed = false,
+  });
+
+  final String displayName;
+  final String email;
+  final String mobile;
+  final String providerLabel;
+  final String providerAccount;
+  final bool emailConfirmed;
+  final bool mobileConfirmed;
+}
+
 enum WorkDocumentImportance { required, ifApplicable, optional }
 
 extension WorkDocumentImportanceLabel on WorkDocumentImportance {

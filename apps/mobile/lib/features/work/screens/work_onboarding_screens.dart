@@ -2005,6 +2005,12 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.session.reviewCaseId != null) _step = 3;
+  }
+
+  @override
   void dispose() {
     _name.dispose();
     _area.dispose();
@@ -2020,16 +2026,31 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
     );
   }
 
+  void _goBack() {
+    if (_step > 0) {
+      setState(() => _step -= 1);
+      return;
+    }
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/app/work/workspace/contact');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: widget.session,
       builder: (context, _) => WorkPageScaffold(
         session: widget.session,
-        title: 'Complete your Workspace profile',
-        subtitle: widget.session.selectedProfile?.label ?? 'Work profile',
-        fallbackBackRoute: '/app/work/workspace/choose',
+        title: 'Complete your Workspace',
+        subtitle: widget.session.selectedProfile?.label ?? 'Workspace details',
+        fallbackBackRoute: '/app/work/workspace/contact',
         activeLocalAction: 'workspace',
+        showHeaderChat: false,
+        showTrailingAction: false,
+        onBack: _goBack,
         bottomAction: switch (_step) {
           0 => WorkPrimaryButton(
             keyName: 'work-details-continue',
@@ -2044,27 +2065,21 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
           1 => WorkPrimaryButton(
             keyName: 'work-proof-review',
             label: 'Review your information',
-            onPressed: () {
-              if (!widget.session.requiredProofsAdded) {
-                widget.session.showError(
-                  'Add each required document before continuing.',
-                );
-                return;
-              }
-              setState(() => _step = 2);
-            },
+            onPressed: () => setState(() => _step = 2),
           ),
-          _ => WorkPrimaryButton(
+          2 => WorkPrimaryButton(
             keyName: 'work-submit-profile',
             label: 'Submit for review',
             busy: widget.session.busy,
             onPressed: () async {
               final submitted = await widget.session.submitProfile();
-              if (submitted && context.mounted) {
-                context.go('/app/work/status');
-              }
+              if (submitted && mounted) setState(() => _step = 3);
             },
             icon: Icons.send_rounded,
+          ),
+          _ => _InlineReviewAction(
+            session: widget.session,
+            onUpdateDetails: () => setState(() => _step = 0),
           ),
         },
         body: ListView(
@@ -2107,34 +2122,38 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                   labelText: 'Primary activity',
                 ),
               ),
-              const SizedBox(height: MoolSpacing.md),
-              const WorkCard(
-                color: Color(0xFFEAF7E8),
-                child: _ContactRow(
-                  label: 'Account owner',
-                  value: '+91 98••• ••321',
-                  state: 'Verified',
-                ),
-              ),
             ] else if (_step == 1) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: const WorkSectionTitle(
-                      title: 'Documents',
-                      detail: 'India · Workspace-specific',
+              const WorkSectionTitle(
+                title: 'Documents',
+                detail: 'Add now or continue and provide them during review',
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              const WorkCard(
+                color: Color(0xFFEDEEFF),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.cloud_upload_outlined, color: MoolColors.navy),
+                    SizedBox(width: MoolSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        'Documents are not required to submit your Workspace. Add what you have now; MoolSocial may request missing documents before approval.',
+                        style: TextStyle(
+                          color: MoolColors.ink,
+                          fontSize: 11,
+                          height: 1.35,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                  ),
-                  TextButton(
-                    key: const Key('work-proof-back-details'),
-                    onPressed: () => setState(() => _step = 0),
-                    child: const Text('Back'),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: MoolSpacing.sm),
               for (final proof
-                  in widget.session.selectedWorkspaceDocuments) ...[
+                  in widget.session.selectedWorkspaceDocuments.where(
+                    (proof) => proof.id != 'personal-kyc',
+                  )) ...[
                 _ProofCard(
                   proof: proof,
                   added: widget.session.addedProofs.containsKey(proof.id),
@@ -2145,21 +2164,10 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                 ),
                 const SizedBox(height: MoolSpacing.xs),
               ],
-            ] else ...[
-              Row(
-                children: [
-                  const Expanded(
-                    child: WorkSectionTitle(
-                      title: 'Review and submit',
-                      detail: 'Check your profile, contacts and documents',
-                    ),
-                  ),
-                  TextButton(
-                    key: const Key('work-review-back-proof'),
-                    onPressed: () => setState(() => _step = 1),
-                    child: const Text('Back'),
-                  ),
-                ],
+            ] else if (_step == 2) ...[
+              const WorkSectionTitle(
+                title: 'Review and submit',
+                detail: 'Check your Workspace details and documents',
               ),
               const SizedBox(height: MoolSpacing.sm),
               WorkCard(
@@ -2179,7 +2187,8 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                     ),
                     _ReviewRow(
                       label: 'Documents',
-                      value: '${widget.session.addedProofs.length} items added',
+                      value:
+                          '${widget.session.addedProofs.length - 1} added · more can be added later',
                     ),
                   ],
                 ),
@@ -2193,7 +2202,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                   contentPadding: EdgeInsets.zero,
                   controlAffinity: ListTileControlAffinity.leading,
                   title: const Text(
-                    'I confirm these details and documents belong to me or I am authorized to operate this work profile.',
+                    'I confirm these Workspace details are correct and any documents added belong to me or I am authorized to use them.',
                     style: TextStyle(
                       color: MoolColors.ink,
                       fontWeight: FontWeight.w700,
@@ -2202,6 +2211,12 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                   onChanged: (value) =>
                       widget.session.setDeclaration(value ?? false),
                 ),
+              ),
+            ] else ...[
+              _InlineWorkspaceReviewStatus(
+                session: widget.session,
+                onAddDocuments: () => setState(() => _step = 1),
+                onUpdateDetails: () => setState(() => _step = 0),
               ),
             ],
           ],
@@ -2217,82 +2232,471 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        key: const Key('work-proof-source-safe-area'),
-        top: false,
-        minimum: EdgeInsets.only(
-          bottom: _workViewBottomInset(sheetContext) + 12,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            MoolSpacing.lg,
-            0,
-            MoolSpacing.lg,
-            MoolSpacing.xs,
+      useSafeArea: false,
+      showDragHandle: false,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) =>
+          _ProofSourceSheet(session: widget.session, proof: proof),
+    );
+  }
+}
+
+class _ProofSourceSheet extends StatefulWidget {
+  const _ProofSourceSheet({required this.session, required this.proof});
+
+  final WorkSession session;
+  final WorkProofRequirement proof;
+
+  @override
+  State<_ProofSourceSheet> createState() => _ProofSourceSheetState();
+}
+
+class _ProofSourceSheetState extends State<_ProofSourceSheet> {
+  String? _busySource;
+
+  Future<void> _pick(String id, WorkProofSource source) async {
+    if (_busySource != null) return;
+    setState(() => _busySource = id);
+    final added = await widget.session.addProof(widget.proof.id, source);
+    if (!mounted) return;
+    if (added) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() => _busySource = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reportedBottom = _workViewBottomInset(context);
+    final safeBottom = reportedBottom < 24 ? 24.0 : reportedBottom;
+    const sources =
+        <({String id, String label, IconData icon, WorkProofSource source})>[
+          (
+            id: 'camera',
+            label: 'Camera',
+            icon: Icons.camera_alt_outlined,
+            source: WorkProofSource.camera,
           ),
+          (
+            id: 'gallery',
+            label: 'Photo gallery',
+            icon: Icons.photo_library_outlined,
+            source: WorkProofSource.gallery,
+          ),
+          (
+            id: 'upload',
+            label: 'PDF or image',
+            icon: Icons.upload_file_outlined,
+            source: WorkProofSource.upload,
+          ),
+          (
+            id: 'cloud',
+            label: 'Cloud files',
+            icon: Icons.cloud_outlined,
+            source: WorkProofSource.cloudDrive,
+          ),
+        ];
+    return SafeArea(
+      key: const Key('work-proof-source-safe-area'),
+      top: false,
+      minimum: EdgeInsets.only(bottom: safeBottom + MoolSpacing.xs),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0, end: 1),
+        duration: MoolMotion.accessible(context, MoolMotion.standard),
+        curve: MoolMotion.enter,
+        builder: (context, value, child) => Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 16 * (1 - value)),
+            child: child,
+          ),
+        ),
+        child: Material(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(MoolRadii.sheet),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              MoolSpacing.md,
+              MoolSpacing.sm,
+              MoolSpacing.md,
+              MoolSpacing.xs + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD8DAE8),
+                      borderRadius: BorderRadius.circular(MoolRadii.capsule),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.sm),
+                Text(
+                  'Add ${widget.proof.label}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const Text(
+                  'Choose a source. Cloud files open your connected Google Drive, OneDrive or another available provider.',
+                  style: TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 10.5,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.md),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var index = 0; index < sources.length; index++) ...[
+                      Expanded(
+                        child: _ProofSourceTile(
+                          keyName: 'work-proof-source-${sources[index].id}',
+                          label: sources[index].label,
+                          icon: sources[index].icon,
+                          busy: _busySource == sources[index].id,
+                          onTap: _busySource == null
+                              ? () => _pick(
+                                  sources[index].id,
+                                  sources[index].source,
+                                )
+                              : null,
+                        ),
+                      ),
+                      if (index < sources.length - 1) const SizedBox(width: 6),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: MoolSpacing.sm),
+                TextButton(
+                  key: const Key('work-proof-source-cancel'),
+                  onPressed: _busySource == null
+                      ? () => Navigator.of(context).pop()
+                      : null,
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProofSourceTile extends StatelessWidget {
+  const _ProofSourceTile({
+    required this.keyName,
+    required this.label,
+    required this.icon,
+    required this.busy,
+    required this.onTap,
+  });
+
+  final String keyName;
+  final String label;
+  final IconData icon;
+  final bool busy;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFF4F4FA),
+      borderRadius: BorderRadius.circular(MoolRadii.control),
+      child: InkWell(
+        key: Key(keyName),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 82),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                busy
+                    ? const SizedBox.square(
+                        dimension: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(icon, color: MoolColors.navy, size: 24),
+                const SizedBox(height: 5),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 9.5,
+                    height: 1.12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineReviewAction extends StatelessWidget {
+  const _InlineReviewAction({
+    required this.session,
+    required this.onUpdateDetails,
+  });
+
+  final WorkSession session;
+  final VoidCallback onUpdateDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = session.remoteReviewStatus;
+    if (status == WorkRemoteReviewStatus.approved ||
+        status == WorkRemoteReviewStatus.live) {
+      return WorkPrimaryButton(
+        keyName: 'work-inline-review-approved',
+        label: 'Continue with this Workspace',
+        icon: Icons.task_alt_rounded,
+        onPressed: () => context.go('/app/work/ready'),
+      );
+    }
+    if (status == WorkRemoteReviewStatus.rejected ||
+        status == WorkRemoteReviewStatus.suspended) {
+      return WorkPrimaryButton(
+        keyName: 'work-inline-review-update',
+        label: 'Update Workspace information',
+        icon: Icons.edit_outlined,
+        onPressed: onUpdateDetails,
+      );
+    }
+    return WorkPrimaryButton(
+      keyName: 'work-inline-review-check',
+      label: 'Check review update',
+      busy: session.busy,
+      icon: Icons.refresh_rounded,
+      onPressed: session.checkReview,
+    );
+  }
+}
+
+class _InlineWorkspaceReviewStatus extends StatelessWidget {
+  const _InlineWorkspaceReviewStatus({
+    required this.session,
+    required this.onAddDocuments,
+    required this.onUpdateDetails,
+  });
+
+  final WorkSession session;
+  final VoidCallback onAddDocuments;
+  final VoidCallback onUpdateDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    final availableDocuments = session.selectedWorkspaceDocuments
+        .where((proof) => proof.id != 'personal-kyc')
+        .length;
+    final addedDocuments = session.addedProofs.keys
+        .where((id) => id != 'personal-kyc')
+        .length;
+    final missingDocuments = availableDocuments - addedDocuments;
+    final status = session.remoteReviewStatus;
+    final approved =
+        status == WorkRemoteReviewStatus.approved ||
+        status == WorkRemoteReviewStatus.live;
+    final stopped =
+        status == WorkRemoteReviewStatus.rejected ||
+        status == WorkRemoteReviewStatus.suspended;
+    final clarification =
+        !stopped && session.reviewReason?.trim().isNotEmpty == true;
+    final title = approved
+        ? 'Workspace approved'
+        : stopped
+        ? 'Workspace not approved'
+        : clarification
+        ? 'Clarification requested'
+        : missingDocuments > 0
+        ? 'Submitted · documents pending'
+        : 'Review in progress';
+    final detail = approved
+        ? 'Your Workspace review is complete.'
+        : stopped
+        ? session.reviewReason?.trim().isNotEmpty == true
+              ? session.reviewReason!.trim()
+              : 'MoolSocial could not approve this Workspace. Update the information and submit again.'
+        : clarification
+        ? session.reviewReason!.trim()
+        : missingDocuments > 0
+        ? 'Your Workspace is captured. Add documents now or wait for MoolSocial to request the exact items needed for approval.'
+        : 'MoolSocial is reviewing the submitted information.';
+    final accent = approved
+        ? MoolColors.success
+        : stopped
+        ? const Color(0xFFB42318)
+        : MoolColors.orange;
+    return Column(
+      key: const Key('work-inline-review-status'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        WorkCard(
+          color: accent.withValues(alpha: .09),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Icon(
+                approved
+                    ? Icons.verified_rounded
+                    : stopped
+                    ? Icons.report_gmailerrorred_rounded
+                    : Icons.hourglass_top_rounded,
+                color: accent,
+                size: 44,
+              ),
+              const SizedBox(height: MoolSpacing.xs),
               Text(
-                'Add ${proof.label}',
+                title,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: MoolColors.ink,
-                  fontSize: 21,
+                  fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const Text(
-                'Choose how you want to add this document.',
-                style: TextStyle(color: MoolColors.muted),
+              const SizedBox(height: 4),
+              Text(
+                detail,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: MoolColors.muted, height: 1.35),
               ),
-              const SizedBox(height: MoolSpacing.md),
-              for (final source in const [
-                (
-                  'camera',
-                  'Camera',
-                  Icons.camera_alt_outlined,
-                  WorkProofSource.camera,
-                ),
-                (
-                  'gallery',
-                  'Photo library',
-                  Icons.photo_library_outlined,
-                  WorkProofSource.gallery,
-                ),
-                (
-                  'upload',
-                  'Upload PDF or image',
-                  Icons.upload_file_outlined,
-                  WorkProofSource.upload,
-                ),
-              ]) ...[
-                OutlinedButton.icon(
-                  key: Key('work-proof-source-${source.$1}'),
-                  onPressed: () async {
-                    final added = await widget.session.addProof(
-                      proof.id,
-                      source.$4,
-                    );
-                    if (added && sheetContext.mounted) {
-                      Navigator.pop(sheetContext);
-                    }
-                  },
-                  icon: Icon(source.$3),
-                  label: Text(source.$2),
-                ),
+              if (session.reviewCaseId case final caseId?) ...[
                 const SizedBox(height: MoolSpacing.xs),
+                WorkPill(label: 'Reference $caseId', color: accent),
               ],
-              TextButton(
-                key: const Key('work-proof-source-cancel'),
-                onPressed: () => Navigator.pop(sheetContext),
-                child: const Text('Cancel'),
-              ),
             ],
           ),
         ),
+        const SizedBox(height: MoolSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: _ReviewStatusFact(
+                label: 'DETAILS',
+                value: 'Submitted',
+                color: MoolColors.success,
+              ),
+            ),
+            const SizedBox(width: MoolSpacing.xs),
+            Expanded(
+              child: _ReviewStatusFact(
+                label: 'DOCUMENTS',
+                value: '$addedDocuments of $availableDocuments',
+                color: missingDocuments == 0
+                    ? MoolColors.success
+                    : MoolColors.orange,
+              ),
+            ),
+            const SizedBox(width: MoolSpacing.xs),
+            Expanded(
+              child: _ReviewStatusFact(
+                label: 'DECISION',
+                value: approved
+                    ? 'Approved'
+                    : stopped
+                    ? 'Not approved'
+                    : 'Pending',
+                color: accent,
+              ),
+            ),
+          ],
+        ),
+        if (!approved) ...[
+          const SizedBox(height: MoolSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('work-inline-add-documents'),
+                  onPressed: onAddDocuments,
+                  icon: const Icon(Icons.upload_file_outlined),
+                  label: const Text('Add documents'),
+                ),
+              ),
+              const SizedBox(width: MoolSpacing.xs),
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('work-inline-update-details'),
+                  onPressed: onUpdateDetails,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Update details'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ReviewStatusFact extends StatelessWidget {
+  const _ReviewStatusFact({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        border: Border.all(color: color.withValues(alpha: .22)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: MoolColors.muted,
+              fontSize: 8,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2305,37 +2709,110 @@ class _ProgressHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['Details', 'Documents', 'Review'];
-    return Row(
+    const steps = <({String label, IconData icon})>[
+      (label: 'Details', icon: Icons.edit_note_rounded),
+      (label: 'Documents upload', icon: Icons.cloud_upload_outlined),
+      (label: 'Review', icon: Icons.fact_check_outlined),
+    ];
+    final activeStep = step.clamp(0, 2);
+    final progress = (activeStep + 1) / steps.length;
+    return Column(
+      key: const Key('work-workspace-progress'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var index = 0; index < labels.length; index += 1) ...[
-          Expanded(
-            child: Column(
-              children: [
-                AnimatedContainer(
-                  duration: MoolMotion.accessible(context, MoolMotion.quick),
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: index <= step
-                        ? MoolColors.navy
-                        : const Color(0xFFD8DAE8),
-                    borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xxs),
-                Text(
-                  labels[index],
-                  style: TextStyle(
-                    color: index == step ? MoolColors.navy : MoolColors.muted,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
+        Row(
+          children: [
+            Text(
+              step > 2 ? 'SUBMITTED FOR REVIEW' : 'STEP ${activeStep + 1} OF 3',
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontSize: 9,
+                letterSpacing: .35,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${(progress * 100).round()}%',
+              style: const TextStyle(
+                color: MoolColors.success,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0, end: progress),
+          duration: MoolMotion.accessible(context, MoolMotion.standard),
+          curve: MoolMotion.enter,
+          builder: (context, value, _) => ClipRRect(
+            borderRadius: BorderRadius.circular(MoolRadii.capsule),
+            child: LinearProgressIndicator(
+              minHeight: 6,
+              value: value,
+              backgroundColor: const Color(0xFFD8DAE8),
+              valueColor: const AlwaysStoppedAnimation(MoolColors.success),
             ),
           ),
-          if (index < labels.length - 1) const SizedBox(width: MoolSpacing.xs),
-        ],
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        Row(
+          children: [
+            for (var index = 0; index < steps.length; index++) ...[
+              Expanded(
+                child: AnimatedContainer(
+                  duration: MoolMotion.accessible(context, MoolMotion.quick),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: index <= activeStep
+                        ? const Color(0xFFEAF7E8)
+                        : const Color(0xFFF4F4FA),
+                    borderRadius: BorderRadius.circular(MoolRadii.control),
+                    border: Border.all(
+                      color: index == activeStep
+                          ? MoolColors.success
+                          : const Color(0xFFD8DAE8),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        index < activeStep || step > 2
+                            ? Icons.check_circle_rounded
+                            : steps[index].icon,
+                        size: 17,
+                        color: index <= activeStep
+                            ? MoolColors.success
+                            : MoolColors.muted,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        steps[index].label,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: index <= activeStep
+                              ? MoolColors.navy
+                              : MoolColors.muted,
+                          fontSize: 8.5,
+                          height: 1.05,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (index < steps.length - 1) const SizedBox(width: 5),
+            ],
+          ],
+        ),
       ],
     );
   }
@@ -2366,11 +2843,7 @@ class _ProofCard extends StatelessWidget {
                 : const Color(0xFFEDEEFF),
             foregroundColor: added ? Colors.white : MoolColors.navy,
             child: Icon(
-              added
-                  ? Icons.check_rounded
-                  : proof.required
-                  ? Icons.priority_high_rounded
-                  : Icons.add_rounded,
+              added ? Icons.check_rounded : Icons.cloud_upload_outlined,
             ),
           ),
           const SizedBox(width: MoolSpacing.sm),
@@ -2390,10 +2863,8 @@ class _ProofCard extends StatelessWidget {
                       ),
                     ),
                     WorkPill(
-                      label: proof.required ? 'Required' : 'Add later',
-                      color: proof.required
-                          ? MoolColors.navy
-                          : MoolColors.orange,
+                      label: added ? 'Added' : 'Add when ready',
+                      color: added ? MoolColors.success : MoolColors.orange,
                     ),
                   ],
                 ),

@@ -34,6 +34,15 @@ class WorkSession extends ChangeNotifier {
 
   String? selectedFamilyId;
   WorkProfileOption? selectedProfile;
+  String accountDisplayName = '';
+  String connectedProviderLabel = '';
+  String connectedProviderAccount = '';
+  String primaryMobile = '';
+  bool primaryMobileOtpSent = false;
+  bool primaryMobileVerified = false;
+  String contactEmail = '';
+  bool contactEmailOtpSent = false;
+  bool contactEmailVerified = false;
   String alternateMobile = '';
   bool alternateOtpSent = false;
   bool alternateVerified = false;
@@ -419,8 +428,6 @@ class WorkSession extends ChangeNotifier {
   void selectFamily(String familyId) {
     selectedFamilyId = familyId;
     selectedProfile = null;
-    alternateOtpSent = false;
-    alternateVerified = false;
     clearMessages();
     notifyListeners();
   }
@@ -440,6 +447,101 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  void hydrateAccountSnapshot(WorkAccountSnapshot snapshot) {
+    accountDisplayName = snapshot.displayName.trim();
+    connectedProviderLabel = snapshot.providerLabel.trim();
+    connectedProviderAccount = snapshot.providerAccount.trim();
+    if (primaryMobile.isEmpty) {
+      final digits = snapshot.mobile.replaceAll(RegExp(r'\D'), '');
+      final normalized = digits.length > 10
+          ? digits.substring(digits.length - 10)
+          : digits;
+      if (normalized.length == 10) {
+        primaryMobile = normalized;
+        primaryMobileVerified = snapshot.mobileConfirmed;
+      }
+    }
+    if (contactEmail.isEmpty) {
+      final normalized = snapshot.email.trim().toLowerCase();
+      if (_validEmail(normalized)) {
+        contactEmail = normalized;
+        contactEmailVerified = snapshot.emailConfirmed;
+      }
+    }
+  }
+
+  bool get workspaceContactsReady =>
+      primaryMobileVerified &&
+      contactEmailVerified &&
+      (alternateMobile.isEmpty || alternateVerified);
+
+  Future<bool> sendPrimaryMobileOtp(String mobile) async {
+    final normalized = mobile.replaceAll(RegExp(r'\D'), '');
+    if (normalized.length != 10) {
+      errorMessage = 'Enter a valid 10-digit main contact number.';
+      notifyListeners();
+      return false;
+    }
+    primaryMobile = normalized;
+    return _sendWorkspaceContactOtp(
+      WorkContactChannel.primaryMobile,
+      normalized,
+      onSent: () {
+        primaryMobileOtpSent = true;
+        primaryMobileVerified = false;
+      },
+    );
+  }
+
+  Future<bool> verifyPrimaryMobileOtp(String code) =>
+      _verifyWorkspaceContactOtp(
+        WorkContactChannel.primaryMobile,
+        primaryMobile,
+        code,
+        onVerified: () => primaryMobileVerified = true,
+      );
+
+  Future<bool> sendContactEmailOtp(String email) async {
+    final normalized = email.trim().toLowerCase();
+    if (!_validEmail(normalized)) {
+      errorMessage = 'Enter a valid email address.';
+      notifyListeners();
+      return false;
+    }
+    contactEmail = normalized;
+    return _sendWorkspaceContactOtp(
+      WorkContactChannel.email,
+      normalized,
+      onSent: () {
+        contactEmailOtpSent = true;
+        contactEmailVerified = false;
+      },
+    );
+  }
+
+  Future<bool> verifyContactEmailOtp(String code) => _verifyWorkspaceContactOtp(
+    WorkContactChannel.email,
+    contactEmail,
+    code,
+    onVerified: () => contactEmailVerified = true,
+  );
+
+  void changePrimaryMobile() {
+    primaryMobile = '';
+    primaryMobileOtpSent = false;
+    primaryMobileVerified = false;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void changeContactEmail() {
+    contactEmail = '';
+    contactEmailOtpSent = false;
+    contactEmailVerified = false;
+    clearMessages();
+    notifyListeners();
+  }
+
   Future<bool> sendAlternateOtp(String mobile) async {
     final normalized = mobile.replaceAll(RegExp(r'\D'), '');
     if (normalized.length != 10) {
@@ -447,35 +549,68 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    if (normalized == '9829012321') {
-      errorMessage = 'This is already your signed-in account number.';
+    if (normalized == primaryMobile) {
+      errorMessage = 'This is already your main contact number.';
       notifyListeners();
       return false;
     }
     alternateMobile = normalized;
-    return _runBool(() async {
-      await gateway.sendOtp(normalized);
-      alternateOtpSent = true;
-      alternateVerified = false;
-    }, success: 'OTP sent to +91 $normalized.');
+    return _sendWorkspaceContactOtp(
+      WorkContactChannel.alternateMobile,
+      normalized,
+      onSent: () {
+        alternateOtpSent = true;
+        alternateVerified = false;
+      },
+    );
   }
 
-  bool verifyAlternateOtp(String code) {
-    if (!alternateOtpSent) {
+  Future<bool> verifyAlternateOtp(String code) => _verifyWorkspaceContactOtp(
+    WorkContactChannel.alternateMobile,
+    alternateMobile,
+    code,
+    onVerified: () => alternateVerified = true,
+  );
+
+  Future<bool> _sendWorkspaceContactOtp(
+    WorkContactChannel channel,
+    String value, {
+    required VoidCallback onSent,
+  }) => _runBool(() async {
+    await gateway.sendContactOtp(channel: channel, value: value);
+    onSent();
+  }, success: 'OTP sent. Enter the 6-digit code to confirm this contact.');
+
+  Future<bool> _verifyWorkspaceContactOtp(
+    WorkContactChannel channel,
+    String value,
+    String code, {
+    required VoidCallback onVerified,
+  }) async {
+    final sent = switch (channel) {
+      WorkContactChannel.primaryMobile => primaryMobileOtpSent,
+      WorkContactChannel.email => contactEmailOtpSent,
+      WorkContactChannel.alternateMobile => alternateOtpSent,
+    };
+    if (!sent) {
       errorMessage = 'Send the OTP before verification.';
       notifyListeners();
       return false;
     }
-    if (code.trim() != '123456') {
-      errorMessage = 'Enter the 6-digit OTP sent to the alternate number.';
+    final normalizedCode = code.replaceAll(RegExp(r'\D'), '');
+    if (normalizedCode.length != 6) {
+      errorMessage = 'Enter the complete 6-digit OTP.';
       notifyListeners();
       return false;
     }
-    alternateVerified = true;
-    errorMessage = null;
-    noticeMessage = 'Alternate work number verified.';
-    notifyListeners();
-    return true;
+    return _runBool(() async {
+      await gateway.verifyContactOtp(
+        channel: channel,
+        value: value,
+        code: normalizedCode,
+      );
+      onVerified();
+    }, success: 'Contact confirmed for this Workspace.');
   }
 
   void removeAlternateMobile() {
@@ -492,8 +627,18 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (!primaryMobileVerified) {
+      errorMessage = 'Confirm your main contact number before continuing.';
+      notifyListeners();
+      return false;
+    }
+    if (!contactEmailVerified) {
+      errorMessage = 'Confirm your email address before continuing.';
+      notifyListeners();
+      return false;
+    }
     if (alternateMobile.isNotEmpty && !alternateVerified) {
-      errorMessage = 'Verify or remove the alternate work number.';
+      errorMessage = 'Confirm or remove the alternate contact number.';
       notifyListeners();
       return false;
     }
@@ -599,7 +744,7 @@ class WorkSession extends ChangeNotifier {
   void removeProof(String proofId) {
     if (proofId == 'personal-kyc') return;
     addedProofs.remove(proofId);
-    showNotice('Document removed. Add a replacement if it is required.');
+    showNotice('Document removed. You can add a replacement during review.');
   }
 
   void setDeclaration(bool value) {
@@ -610,8 +755,9 @@ class WorkSession extends ChangeNotifier {
 
   Future<bool> submitProfile() async {
     if (!validateDetails()) return false;
-    if (!requiredProofsAdded) {
-      errorMessage = 'Add each required document before submission.';
+    if (!workspaceContactsReady) {
+      errorMessage =
+          'Confirm the main contact and email before submitting this Workspace.';
       notifyListeners();
       return false;
     }
@@ -640,6 +786,11 @@ class WorkSession extends ChangeNotifier {
             area: workArea,
             primaryActivity: primaryActivity,
             proofReferences: Map<String, String>.unmodifiable(addedProofs),
+            primaryMobile: primaryMobile,
+            email: contactEmail,
+            alternateMobile: alternateMobile,
+            connectedProvider: connectedProviderLabel,
+            connectedProviderAccount: connectedProviderAccount,
             alternateMobileVerified: alternateVerified,
             idempotencyKey: _profileSubmissionKey!,
           ),
@@ -1056,3 +1207,6 @@ class WorkSession extends ChangeNotifier {
     }
   }
 }
+
+bool _validEmail(String value) =>
+    RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value);

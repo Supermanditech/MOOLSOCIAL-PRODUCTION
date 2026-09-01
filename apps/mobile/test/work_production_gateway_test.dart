@@ -287,6 +287,8 @@ void main() {
     'authenticated Workspace operations use exact bodies and App Check modes',
     () async {
       final transport = _RecordingTransport([
+        _ok(const {}),
+        _ok(const {}),
         _ok({'caseId': 'wp-1', 'status': 'pending', 'plan': 'free'}),
         _ok({
           'caseId': 'wp-1',
@@ -307,6 +309,16 @@ void main() {
         random: Random(1),
       );
 
+      await gateway.sendContactOtp(
+        channel: WorkContactChannel.primaryMobile,
+        value: '9829012321',
+      );
+      await gateway.verifyContactOtp(
+        channel: WorkContactChannel.primaryMobile,
+        value: '9829012321',
+        code: '123456',
+      );
+
       final submitted = await gateway.submitProfile(
         const WorkProfileSubmission(
           familyId: 'products-trade',
@@ -319,6 +331,10 @@ void main() {
             'shop-front': 'proof-shop',
             'owner-authority': 'proof-owner',
           },
+          primaryMobile: '9829012321',
+          email: 'asha@example.com',
+          connectedProvider: 'Google',
+          connectedProviderAccount: 'asha@example.com',
           alternateMobileVerified: false,
           idempotencyKey: 'work-submit-001',
         ),
@@ -342,14 +358,21 @@ void main() {
       expect(reviewed.status, WorkRemoteReviewStatus.approved);
       expect(reviewed.workspaceId, 'workspace-1');
       expect(transport.bodies.map((body) => body['operation']), [
+        'sendWorkspaceContactOtp',
+        'verifyWorkspaceContactOtp',
         'submitProfile',
         'reviewStatus',
         'submitGst',
         'finishRetailerSetup',
       ]);
-      expect(transport.bodies.first['idempotencyKey'], 'work-submit-001');
+      expect(transport.bodies.first, containsPair('channel', 'primary_mobile'));
+      expect(transport.bodies[1], containsPair('code', '123456'));
+      expect(transport.bodies[2]['idempotencyKey'], 'work-submit-001');
+      expect(transport.bodies[2], containsPair('email', 'asha@example.com'));
       expect(transport.bodies.last, containsPair('quantity', 24));
       expect(credentials.modes, [
+        SocialAppCheckTokenMode.limitedUse,
+        SocialAppCheckTokenMode.limitedUse,
         SocialAppCheckTokenMode.limitedUse,
         SocialAppCheckTokenMode.standard,
         SocialAppCheckTokenMode.limitedUse,

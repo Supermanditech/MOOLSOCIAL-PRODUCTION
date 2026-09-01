@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../shared/social_content_gateway.dart';
+import 'work_models.dart';
 
 const moolSocialWorkspaceUrl = String.fromEnvironment(
   'MOOLSOCIAL_WORKSPACE_URL',
@@ -26,7 +27,7 @@ class WorkGatewayException implements Exception {
   String toString() => message;
 }
 
-enum WorkProofSource { camera, gallery, upload }
+enum WorkProofSource { camera, gallery, upload, cloudDrive }
 
 class WorkPickedProof {
   const WorkPickedProof({
@@ -53,7 +54,8 @@ class NativeWorkProofPicker implements WorkProofPicker {
   @override
   Future<WorkPickedProof?> pick(WorkProofSource source) async {
     try {
-      if (source == WorkProofSource.upload) {
+      if (source == WorkProofSource.upload ||
+          source == WorkProofSource.cloudDrive) {
         final file = await FilePicker.pickFile(
           type: FileType.custom,
           allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
@@ -97,16 +99,19 @@ class NativeWorkProofPicker implements WorkProofPicker {
 
 class ReviewWorkProofPicker implements WorkProofPicker {
   @override
-  Future<WorkPickedProof?> pick(WorkProofSource source) async =>
-      WorkPickedProof(
-        fileName: source == WorkProofSource.upload
-            ? 'review-proof.pdf'
-            : 'review-proof.jpg',
-        contentType: source == WorkProofSource.upload
-            ? 'application/pdf'
-            : 'image/jpeg',
-        bytes: Uint8List.fromList(const [0xff, 0xd8, 0xff, 0xd9]),
-      );
+  Future<WorkPickedProof?> pick(
+    WorkProofSource source,
+  ) async => WorkPickedProof(
+    fileName:
+        source == WorkProofSource.upload || source == WorkProofSource.cloudDrive
+        ? 'review-proof.pdf'
+        : 'review-proof.jpg',
+    contentType:
+        source == WorkProofSource.upload || source == WorkProofSource.cloudDrive
+        ? 'application/pdf'
+        : 'image/jpeg',
+    bytes: Uint8List.fromList(const [0xff, 0xd8, 0xff, 0xd9]),
+  );
 }
 
 abstract interface class WorkProofUploadTransport {
@@ -190,6 +195,11 @@ class WorkProfileSubmission {
     required this.area,
     required this.primaryActivity,
     required this.proofReferences,
+    this.primaryMobile = '',
+    this.email = '',
+    this.alternateMobile = '',
+    this.connectedProvider = '',
+    this.connectedProviderAccount = '',
     required this.alternateMobileVerified,
     required this.idempotencyKey,
   });
@@ -199,6 +209,11 @@ class WorkProfileSubmission {
   final String area;
   final String primaryActivity;
   final Map<String, String> proofReferences;
+  final String primaryMobile;
+  final String email;
+  final String alternateMobile;
+  final String connectedProvider;
+  final String connectedProviderAccount;
   final bool alternateMobileVerified;
   final String idempotencyKey;
 }
@@ -232,7 +247,15 @@ abstract interface class WorkGateway {
   Future<List<WorkReviewResult>> loadFeed();
   Future<String> apply(String opportunityId);
   Future<void> withdraw(String applicationId, String opportunityId);
-  Future<void> sendOtp(String mobile);
+  Future<void> sendContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+  });
+  Future<void> verifyContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+    required String code,
+  });
   Future<String> saveProof(String proofId, WorkPickedProof proof);
   Future<WorkReviewResult> submitProfile(WorkProfileSubmission submission);
   Future<WorkReviewResult> checkReview(String caseId);
@@ -292,7 +315,16 @@ class UnavailableWorkGateway implements WorkGateway {
   Future<String> saveProof(String proofId, WorkPickedProof proof) async =>
       throw _error;
   @override
-  Future<void> sendOtp(String mobile) async => throw _error;
+  Future<void> sendContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+  }) async => throw _error;
+  @override
+  Future<void> verifyContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+    required String code,
+  }) async => throw _error;
   @override
   Future<WorkReviewResult> submitProfile(
     WorkProfileSubmission submission,
@@ -349,8 +381,23 @@ class AuthenticatedWorkGateway implements WorkGateway {
     mutation: true,
   );
   @override
-  Future<void> sendOtp(String mobile) =>
-      _invoke('sendAlternateOtp', {'mobile': mobile}, mutation: true);
+  Future<void> sendContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+  }) => _invoke('sendWorkspaceContactOtp', {
+    'channel': channel.apiValue,
+    'value': value,
+  }, mutation: true);
+  @override
+  Future<void> verifyContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+    required String code,
+  }) => _invoke('verifyWorkspaceContactOtp', {
+    'channel': channel.apiValue,
+    'value': value,
+    'code': code,
+  }, mutation: true);
   @override
   Future<String> saveProof(String proofId, WorkPickedProof proof) async {
     final prepared = _map(
@@ -403,6 +450,11 @@ class AuthenticatedWorkGateway implements WorkGateway {
             'area': value.area,
             'primaryActivity': value.primaryActivity,
             'proofReferences': value.proofReferences,
+            'primaryMobile': value.primaryMobile,
+            'email': value.email,
+            'alternateMobile': value.alternateMobile,
+            'connectedProvider': value.connectedProvider,
+            'connectedProviderAccount': value.connectedProviderAccount,
             'alternateMobileVerified': value.alternateMobileVerified,
             'idempotencyKey': value.idempotencyKey,
           }, mutation: true),
@@ -496,6 +548,10 @@ class ReviewWorkGateway implements WorkGateway {
   int applicationCalls = 0;
   int withdrawalCalls = 0;
   int otpCalls = 0;
+  int otpVerificationCalls = 0;
+  WorkContactChannel? lastOtpChannel;
+  String? lastOtpValue;
+  WorkProfileSubmission? lastSubmission;
   int proofCalls = 0;
   int submissionCalls = 0;
   int reviewCalls = 0;
@@ -542,13 +598,35 @@ class ReviewWorkGateway implements WorkGateway {
   }
 
   @override
-  Future<void> sendOtp(String mobile) async {
+  Future<void> sendContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+  }) async {
     otpCalls++;
+    lastOtpChannel = channel;
+    lastOtpValue = value;
     await _wait();
     if (failOtp) {
       failOtp = false;
       throw const WorkGatewayException(
         'OTP could not be sent. Check the number and try again.',
+      );
+    }
+  }
+
+  @override
+  Future<void> verifyContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+    required String code,
+  }) async {
+    otpVerificationCalls++;
+    lastOtpChannel = channel;
+    lastOtpValue = value;
+    await _wait();
+    if (code != '123456') {
+      throw const WorkGatewayException(
+        'Enter the 6-digit OTP sent to this contact.',
       );
     }
   }
@@ -569,6 +647,7 @@ class ReviewWorkGateway implements WorkGateway {
   @override
   Future<WorkReviewResult> submitProfile(WorkProfileSubmission value) async {
     submissionCalls++;
+    lastSubmission = value;
     await _wait();
     if (failSubmission) {
       failSubmission = false;

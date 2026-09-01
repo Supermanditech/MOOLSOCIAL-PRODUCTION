@@ -32,6 +32,15 @@ void main() {
       otpGateway: ReviewOtpGateway(signedIn: true),
     );
     await journey.start();
+    journey
+      ..accountIdentity = const AuthenticatedAccountIdentity(
+        displayName: 'Asha Sharma',
+        emailAddress: 'asha@example.com',
+        phoneNumber: '+91 98290 12321',
+        providerAccountLabel: 'asha@example.com',
+        signInMethods: ['Google', 'Phone'],
+      )
+      ..socialAuthProvider = SocialAuthProvider.google;
     addTearDown(journey.dispose);
     addTearDown(work.dispose);
     await tester.pumpWidget(
@@ -92,12 +101,14 @@ void main() {
     'selected Workspace profile keeps contact clear of sticky Continue',
     (tester) async {
       final work = selectedRetailer();
-      await mount(tester, route: '/app/work/workspace/choose', work: work);
+      await mount(tester, route: '/app/work/workspace/contact', work: work);
 
-      expect(find.text('Grow with MoolSocial'), findsOneWidget);
-      expect(find.text('Products & Trade'), findsWidgets);
+      expect(find.byKey(const Key('workspace-account-setup-hero')), findsOne);
+      expect(find.text('Google account'), findsOne);
+      expect(find.byKey(const Key('work-global-chat')), findsNothing);
+      expect(find.byKey(const Key('work-help')), findsNothing);
       expectHeaderAndStickyAction(tester);
-      final alternate = find.byKey(const Key('work-alternate-mobile'));
+      final alternate = find.byKey(const Key('work-alternate-contact-field'));
       await reveal(tester, alternate);
       expect(
         tester.getBottomRight(alternate).dy,
@@ -107,7 +118,7 @@ void main() {
               .dy,
         ),
       );
-      expect(find.byKey(const Key('work-continue-proof')), findsOneWidget);
+      expect(find.byKey(const Key('work-contact-continue')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -188,12 +199,23 @@ void main() {
         )
         ..continueToProof();
       await mount(tester, route: '/app/work/workspace/proof', work: work);
+      expect(find.byKey(const Key('work-global-chat')), findsNothing);
+      expect(find.byKey(const Key('work-help')), findsNothing);
       await tester.tap(find.byKey(const Key('work-details-continue')));
       await tester.pumpAndSettle();
       final addProof = find.byKey(const Key('work-add-proof-shop-front'));
       await reveal(tester, addProof);
       await tester.tap(addProof);
       await tester.pumpAndSettle();
+      for (final key in const [
+        'work-proof-source-camera',
+        'work-proof-source-gallery',
+        'work-proof-source-upload',
+        'work-proof-source-cloud',
+      ]) {
+        expect(find.byKey(Key(key)), findsOneWidget);
+        expect(tester.getSize(find.byKey(Key(key))).width, lessThan(90));
+      }
       final cancel = find.byKey(const Key('work-proof-source-cancel'));
       expect(tester.getBottomRight(cancel).dy, lessThanOrEqualTo(756));
       await tester.tap(cancel);
