@@ -382,11 +382,13 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
   Widget build(BuildContext context) {
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final keyboardVisible = keyboardInset > 0;
+    final reportedBottomInset = _workViewBottomInset(context);
+    final gestureSafeBottom = reportedBottomInset < 24
+        ? 24.0
+        : reportedBottomInset;
     return SafeArea(
       top: false,
-      minimum: EdgeInsets.only(
-        bottom: _workViewBottomInset(context) + MoolSpacing.xs,
-      ),
+      minimum: EdgeInsets.only(bottom: gestureSafeBottom + MoolSpacing.xs),
       child: AnimatedPadding(
         duration: MoolMotion.accessible(context, MoolMotion.quick),
         curve: MoolMotion.change,

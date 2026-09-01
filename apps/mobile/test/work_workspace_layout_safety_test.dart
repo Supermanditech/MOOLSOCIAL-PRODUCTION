@@ -12,10 +12,11 @@ void main() {
     WidgetTester tester, {
     required String route,
     required WorkSession work,
+    double bottomInset = 44,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(360, 800);
-    tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+    tester.view.viewPadding = FakeViewPadding(bottom: bottomInset);
     tester.platformDispatcher.textScaleFactorTestValue = 1.4;
     addTearDown(tester.view.reset);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -115,7 +116,12 @@ void main() {
     'Workspace request sheet clears Android and keyboard insets without losing input',
     (tester) async {
       final work = WorkSession();
-      await mount(tester, route: '/app/work/workspace/choose', work: work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/choose',
+        work: work,
+        bottomInset: 0,
+      );
 
       final request = find.byKey(const Key('work-profile-not-shown'));
       await tester.scrollUntilVisible(
@@ -138,7 +144,7 @@ void main() {
         findsOneWidget,
       );
       final actions = find.byKey(const Key('work-profile-request-actions'));
-      expect(tester.getBottomRight(actions).dy, lessThanOrEqualTo(756));
+      expect(tester.getBottomRight(actions).dy, lessThanOrEqualTo(768));
 
       final name = find.byKey(const Key('work-request-profile-name'));
       await tester.tap(name);
@@ -150,7 +156,7 @@ void main() {
         tester.widget<TextField>(name).controller?.text,
         'Furniture repair',
       );
-      expect(tester.getBottomRight(actions).dy, lessThanOrEqualTo(456));
+      expect(tester.getBottomRight(actions).dy, lessThanOrEqualTo(468));
       expect(
         find.byKey(const Key('work-send-profile-request')),
         findsOneWidget,
