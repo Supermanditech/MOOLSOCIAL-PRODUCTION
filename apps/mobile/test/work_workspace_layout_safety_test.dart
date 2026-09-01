@@ -145,6 +145,12 @@ void main() {
       );
       final actions = find.byKey(const Key('work-profile-request-actions'));
       expect(tester.getBottomRight(actions).dy, lessThanOrEqualTo(768));
+      final area = find.byKey(const Key('work-request-area'));
+      expect(area, findsOneWidget);
+      expect(
+        tester.getTopLeft(actions).dy - tester.getBottomLeft(area).dy,
+        lessThanOrEqualTo(48),
+      );
 
       final name = find.byKey(const Key('work-request-profile-name'));
       await tester.tap(name);

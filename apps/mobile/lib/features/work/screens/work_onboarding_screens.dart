@@ -409,6 +409,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                 top: Radius.circular(MoolRadii.sheet),
               ),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
@@ -497,9 +498,12 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                         ),
                       ),
                     ),
-                  Expanded(
+                  Flexible(
+                    fit: FlexFit.loose,
                     child: ListView(
                       key: const Key('work-profile-request-scroll'),
+                      shrinkWrap: true,
+                      primary: false,
                       keyboardDismissBehavior:
                           ScrollViewKeyboardDismissBehavior.onDrag,
                       padding: const EdgeInsets.fromLTRB(
