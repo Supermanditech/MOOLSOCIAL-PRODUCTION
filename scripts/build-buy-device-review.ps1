@@ -88,6 +88,20 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($branch)) {
 if ($branch.Trim() -eq 'main') {
   throw 'Device-review builds are forbidden on main.'
 }
+$approvedCommitCoverageGate = Join-Path `
+  $PSScriptRoot `
+  'check-approved-integration-commit-coverage.ps1'
+$approvedCommitCoverageManifest = Join-Path `
+  $repositoryRoot `
+  'config\approved-integration-commit-coverage-20260901.json'
+& $approvedCommitCoverageGate `
+  -RepositoryRoot $repositoryRoot `
+  -ManifestPath $approvedCommitCoverageManifest `
+  -CandidateHead HEAD | Out-Null
+$approvedCommitCoveragePassed = $?
+if (-not $approvedCommitCoveragePassed) {
+  throw 'Approved integration commit coverage gate failed.'
+}
 if ($RuntimeProfile -ceq 'CursorUiReview' -and $BuildMode -cne 'debug') {
   throw 'Cursor UI Review permits debug APK builds only.'
 }
