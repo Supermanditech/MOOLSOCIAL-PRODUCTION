@@ -8,6 +8,7 @@ import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 
 void main() {
   test('release app defaults to the fail-closed production Work session', () {
@@ -74,7 +75,7 @@ void main() {
     }
   });
 
-  test('Workspace chooser covers the current provider user types', () {
+  test('Workspace chooser covers the current business and work choices', () {
     expect(
       workProfiles.map((profile) => profile.label),
       containsAll(const [
@@ -168,6 +169,28 @@ void main() {
     final gstProof = workProofs.singleWhere((proof) => proof.id == 'gst');
     expect(gstProof.importance, WorkDocumentImportance.ifApplicable);
     expect(gstProof.required, isFalse);
+
+    expect(
+      workWorkspaceBenefits.keys.toSet(),
+      workProfiles.map((profile) => profile.id).toSet(),
+    );
+    for (final content in workWorkspaceBenefits.values) {
+      expect(content.problem.trim(), isNotEmpty);
+      expect(content.preview.trim(), isNotEmpty);
+      expect(content.benefits, hasLength(4));
+      expect(content.difference.trim(), isNotEmpty);
+      final visibleCopy = [
+        content.problem,
+        content.preview,
+        content.difference,
+        ...content.benefits.expand(
+          (benefit) => [benefit.title, benefit.detail],
+        ),
+      ].join(' ').toLowerCase();
+      expect(visibleCopy, isNot(matches(RegExp(r'\bactor\b'))));
+      expect(visibleCopy, isNot(contains('user type')));
+      expect(visibleCopy, isNot(contains('internal')));
+    }
   });
 
   test('opportunity filters combine city, area and exact six-digit PIN', () {

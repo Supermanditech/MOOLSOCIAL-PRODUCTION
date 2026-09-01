@@ -148,7 +148,7 @@ void main() {
     },
   );
 
-  testWidgets('C24G Workspace opens the professional actor chooser directly', (
+  testWidgets('C24G Workspace opens the professional chooser directly', (
     tester,
   ) async {
     final sessions = await _mount(
@@ -161,10 +161,7 @@ void main() {
 
     expect(find.byKey(const Key('my-work-screen')), findsNothing);
     expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
-    expect(
-      find.byKey(const Key('workspace-actor-chooser-hero')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('workspace-chooser-hero')), findsOneWidget);
     expect(find.text('Grow your business with MoolSocial'), findsOneWidget);
     expect(find.text('Signed in'), findsOneWidget);
     expect(find.text('Build your Workspace'), findsNothing);
@@ -175,15 +172,53 @@ void main() {
     expect(find.text('18 orders'), findsNothing);
     expect(find.text('₹12,840'), findsNothing);
     expect(find.text('7 items'), findsNothing);
-    final actor = find.byKey(const Key('work-profile-retailer-grocery'));
-    await _scrollTo(tester, actor, const Key('work-choose-screen'));
-    expect(tester.getSize(actor).height, greaterThanOrEqualTo(44));
-    final semantics = tester.getSemantics(actor).getSemanticsData();
+    final workspace = find.byKey(const Key('work-profile-retailer-grocery'));
+    await _scrollTo(tester, workspace, const Key('work-choose-screen'));
+    expect(tester.getSize(workspace).height, greaterThanOrEqualTo(44));
+    final semantics = tester.getSemantics(workspace).getSemanticsData();
     expect(semantics.hasAction(SemanticsAction.tap), isTrue);
-    expect(find.text('Growth opportunity'), findsWidgets);
-    expect(find.text('Workspace advantage'), findsWidgets);
+    expect(find.text('Growth opportunity'), findsNothing);
+    expect(find.text('Workspace advantage'), findsNothing);
+    expect(find.text('See how MoolSocial helps'), findsWidgets);
 
-    await tester.tap(actor);
+    await tester.tap(workspace);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-requirements-screen')), findsNothing);
+    expect(
+      find.byKey(const Key('workspace-benefits-retailer-grocery')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'A customer who forgets your shop becomes someone else’s customer.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('What changes with MoolSocial'), findsOneWidget);
+    expect(find.text('Bring customers back'), findsOneWidget);
+    expect(find.text('Choose this Workspace'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('work-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(
+      find.byKey(const Key('workspace-benefits-retailer-grocery')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('work-requirements-screen')), findsNothing);
+
+    await tester.tap(workspace);
+    await tester.pumpAndSettle();
+
+    await _scrollTo(
+      tester,
+      find.byKey(const Key('work-profile-choose-retailer-grocery')),
+      const Key('work-choose-screen'),
+    );
+    await tester.tap(
+      find.byKey(const Key('work-profile-choose-retailer-grocery')),
+    );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-requirements-screen')), findsOneWidget);
     expect(
@@ -213,23 +248,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
     expect(sessions.work.selectedProfile, isNull);
-
-    await tester.tap(find.byKey(const Key('work-profile-retailer-grocery')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-requirements-ready')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-contact-screen')), findsOneWidget);
-    expect(
-      find.byKey(const Key('workspace-business-identity-notice')),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.byKey(const Key('work-contact-continue')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-proof-screen')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('work-back')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-contact-screen')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -314,10 +332,18 @@ void main() {
         expect(
           find.descendant(
             of: card,
-            matching: find.text('Choose this Workspace'),
+            matching: find.text('See how MoolSocial helps'),
           ),
           findsOneWidget,
-          reason: '$label keeps one clear animated action',
+          reason: '$label keeps one clear expandable action',
+        );
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.text('Choose this Workspace'),
+          ),
+          findsNothing,
+          reason: '$label does not navigate before benefits are opened',
         );
       }
       expect(tester.takeException(), isNull);

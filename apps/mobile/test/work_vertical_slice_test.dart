@@ -112,6 +112,7 @@ void main() {
 
   Future<void> chooseRetailer(WidgetTester tester) async {
     await tapVisible(tester, const Key('work-profile-retailer-grocery'));
+    await tapVisible(tester, const Key('work-profile-choose-retailer-grocery'));
     await tapVisible(tester, const Key('work-requirements-ready'));
     await tapVisible(tester, const Key('work-contact-continue'));
     expect(find.byKey(const Key('work-proof-screen')), findsOneWidget);
@@ -255,6 +256,10 @@ void main() {
       );
 
       await tapVisible(tester, const Key('work-profile-retailer-grocery'));
+      await tapVisible(
+        tester,
+        const Key('work-profile-choose-retailer-grocery'),
+      );
       await tapVisible(tester, const Key('work-requirements-ready'));
       await enter(tester, const Key('work-alternate-mobile'), '123');
       await tapVisible(tester, const Key('work-send-alternate-otp'));
@@ -372,6 +377,15 @@ void main() {
       );
 
       await tapVisible(tester, const Key('work-profile-retailer-grocery'));
+      expect(find.byKey(const Key('work-requirements-screen')), findsNothing);
+      expect(
+        find.byKey(const Key('workspace-benefits-retailer-grocery')),
+        findsOneWidget,
+      );
+      await tapVisible(
+        tester,
+        const Key('work-profile-choose-retailer-grocery'),
+      );
       expect(find.byKey(const Key('work-requirements-screen')), findsOneWidget);
       expect(find.text('Account owner identity'), findsOneWidget);
       expect(find.text('Shop address document'), findsOneWidget);

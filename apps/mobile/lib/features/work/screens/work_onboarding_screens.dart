@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
 import '../widgets/work_widgets.dart';
+import '../widgets/work_workspace_benefit_card.dart';
 import '../work_models.dart';
 import '../work_services.dart';
 import '../work_session.dart';
+import '../work_workspace_benefits.dart';
 
 double _workViewBottomInset(BuildContext context) {
   final view = View.of(context);
@@ -28,6 +30,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
     text: widget.session.alternateMobile,
   );
   final TextEditingController _otp = TextEditingController();
+  String? _expandedProfileId;
 
   @override
   void initState() {
@@ -51,6 +54,26 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
       builder: (context, _) {
         final family = widget.session.selectedFamilyId;
         final profile = widget.session.selectedProfile;
+
+        void collapseBenefits() {
+          setState(() => _expandedProfileId = null);
+        }
+
+        void toggleBenefits(String profileId) {
+          setState(() {
+            _expandedProfileId = _expandedProfileId == profileId
+                ? null
+                : profileId;
+          });
+        }
+
+        void chooseWorkspace(WorkProfileOption option) {
+          widget.session.selectFamily(option.familyId);
+          widget.session.selectProfile(option.id);
+          setState(() => _expandedProfileId = null);
+          context.push('/app/work/workspace/requirements');
+        }
+
         return WorkPageScaffold(
           session: widget.session,
           title: 'Grow with MoolSocial',
@@ -58,8 +81,15 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
               ? 'Choose the Workspace that matches what you do'
               : widget.session.familyLabel(family),
           fallbackBackRoute: '/app/work/earn',
-          showBack: family != null || Navigator.of(context).canPop(),
-          onBack: family == null ? null : widget.session.changeFamily,
+          showBack:
+              _expandedProfileId != null ||
+              family != null ||
+              Navigator.of(context).canPop(),
+          onBack: _expandedProfileId != null
+              ? collapseBenefits
+              : family == null
+              ? null
+              : widget.session.changeFamily,
           activeLocalAction: 'workspace',
           showHeaderChat: false,
           showTrailingAction: false,
@@ -111,20 +141,18 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                 for (final familyId in widget.session.familyIds) ...[
                   WorkSectionTitle(
                     title: widget.session.familyLabel(familyId),
-                    detail: _workspaceActorGroupPresentation(familyId).examples,
+                    detail: _workspaceGroupPresentation(familyId).examples,
                   ),
                   const SizedBox(height: MoolSpacing.sm),
                   for (final option in widget.session.profilesForFamily(
                     familyId,
                   )) ...[
-                    _ProfileCard(
+                    WorkWorkspaceBenefitCard(
                       option: option,
-                      selected: false,
-                      onTap: () {
-                        widget.session.selectFamily(option.familyId);
-                        widget.session.selectProfile(option.id);
-                        context.push('/app/work/workspace/requirements');
-                      },
+                      content: workWorkspaceBenefitFor(option.id),
+                      expanded: _expandedProfileId == option.id,
+                      onToggle: () => toggleBenefits(option.id),
+                      onChoose: () => chooseWorkspace(option),
                     ),
                     const SizedBox(height: MoolSpacing.sm),
                   ],
@@ -162,15 +190,17 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                   for (final option in widget.session.profilesForFamily(
                     family,
                   )) ...[
-                    _ProfileCard(
+                    WorkWorkspaceBenefitCard(
                       option: option,
-                      selected: false,
-                      onTap: () => widget.session.selectProfile(option.id),
+                      content: workWorkspaceBenefitFor(option.id),
+                      expanded: _expandedProfileId == option.id,
+                      onToggle: () => toggleBenefits(option.id),
+                      onChoose: () => chooseWorkspace(option),
                     ),
                     const SizedBox(height: MoolSpacing.sm),
                   ]
                 else ...[
-                  _ProfileCard(option: profile, selected: true),
+                  _SelectedProfileCard(option: profile),
                   const SizedBox(height: MoolSpacing.md),
                   const WorkSectionTitle(
                     title: 'Workspace contact',
@@ -881,7 +911,7 @@ class _WorkWorkspaceContactScreenState
                     ),
                   ]
                 : [
-                    _ProfileCard(option: profile, selected: true),
+                    _SelectedProfileCard(option: profile),
                     const SizedBox(height: MoolSpacing.md),
                     const WorkSectionTitle(
                       title: 'Contact for this Workspace',
@@ -1014,7 +1044,7 @@ class _WorkspaceEntryHeroState extends State<_WorkspaceEntryHero>
       builder: (context, child) => Transform.scale(
         scale: .99 + (.01 * pulse.value),
         child: Container(
-          key: const Key('workspace-actor-chooser-hero'),
+          key: const Key('workspace-chooser-hero'),
           padding: const EdgeInsets.all(MoolSpacing.sm),
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -1479,8 +1509,8 @@ Future<void> _showSettlementSummary(
   );
 }
 
-class _WorkspaceActorGroupPresentation {
-  const _WorkspaceActorGroupPresentation({
+class _WorkspaceGroupPresentation {
+  const _WorkspaceGroupPresentation({
     required this.accent,
     required this.tint,
     required this.examples,
@@ -1491,262 +1521,93 @@ class _WorkspaceActorGroupPresentation {
   final String examples;
 }
 
-_WorkspaceActorGroupPresentation _workspaceActorGroupPresentation(
-  String familyId,
-) => switch (familyId) {
-  'products-trade' => const _WorkspaceActorGroupPresentation(
-    accent: Color(0xFF0047AB),
-    tint: Color(0xFFEAF2FF),
-    examples: 'Retailer · Wholesaler · Manufacturer',
-  ),
-  'food-business' => const _WorkspaceActorGroupPresentation(
-    accent: Color(0xFFA65A00),
-    tint: Color(0xFFFFF4E5),
-    examples: 'Restaurant · Café · Cloud kitchen',
-  ),
-  'health' => const _WorkspaceActorGroupPresentation(
-    accent: Color(0xFF007A4D),
-    tint: Color(0xFFE8F7F0),
-    examples: 'Doctor · Clinic · Pharmacy',
-  ),
-  'services' => const _WorkspaceActorGroupPresentation(
-    accent: Color(0xFF9C1C6B),
-    tint: Color(0xFFFFEDF7),
-    examples: 'Salon · Beauty · Wellness',
-  ),
-  'travel' => const _WorkspaceActorGroupPresentation(
-    accent: Color(0xFF006D77),
-    tint: Color(0xFFE8F7F8),
-    examples: 'Bike · Auto · Cab · Bus',
-  ),
-  'delivery' => const _WorkspaceActorGroupPresentation(
-    accent: Color(0xFFB54708),
-    tint: Color(0xFFFFF1E7),
-    examples: 'Quick delivery · Wholesale fleet · Bulk fleet',
-  ),
-  _ => const _WorkspaceActorGroupPresentation(
-    accent: Color(0xFF5B21B6),
-    tint: Color(0xFFF2EDFF),
-    examples: 'Creator · Freelancer · Job seeker',
-  ),
-};
+_WorkspaceGroupPresentation _workspaceGroupPresentation(String familyId) =>
+    switch (familyId) {
+      'products-trade' => const _WorkspaceGroupPresentation(
+        accent: Color(0xFF0047AB),
+        tint: Color(0xFFEAF2FF),
+        examples: 'Retailer · Wholesaler · Manufacturer',
+      ),
+      'food-business' => const _WorkspaceGroupPresentation(
+        accent: Color(0xFFA65A00),
+        tint: Color(0xFFFFF4E5),
+        examples: 'Restaurant · Café · Cloud kitchen',
+      ),
+      'health' => const _WorkspaceGroupPresentation(
+        accent: Color(0xFF007A4D),
+        tint: Color(0xFFE8F7F0),
+        examples: 'Doctor · Clinic · Pharmacy',
+      ),
+      'services' => const _WorkspaceGroupPresentation(
+        accent: Color(0xFF9C1C6B),
+        tint: Color(0xFFFFEDF7),
+        examples: 'Salon · Beauty · Wellness',
+      ),
+      'travel' => const _WorkspaceGroupPresentation(
+        accent: Color(0xFF006D77),
+        tint: Color(0xFFE8F7F8),
+        examples: 'Bike · Auto · Cab · Bus',
+      ),
+      'delivery' => const _WorkspaceGroupPresentation(
+        accent: Color(0xFFB54708),
+        tint: Color(0xFFFFF1E7),
+        examples: 'Quick delivery · Wholesale fleet · Bulk fleet',
+      ),
+      _ => const _WorkspaceGroupPresentation(
+        accent: Color(0xFF5B21B6),
+        tint: Color(0xFFF2EDFF),
+        examples: 'Creator · Freelancer · Job seeker',
+      ),
+    };
 
-class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({
-    required this.option,
-    required this.selected,
-    this.onTap,
-  });
+class _SelectedProfileCard extends StatelessWidget {
+  const _SelectedProfileCard({required this.option});
 
   final WorkProfileOption option;
-  final bool selected;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final presentation = _workspaceActorGroupPresentation(option.familyId);
+    final presentation = _workspaceGroupPresentation(option.familyId);
     return WorkCard(
       keyName: 'work-profile-${option.id}',
-      onTap: onTap,
-      color: selected ? presentation.tint : Colors.white,
+      color: presentation.tint,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               CircleAvatar(
-                backgroundColor: selected
-                    ? presentation.accent
-                    : presentation.tint,
-                foregroundColor: selected ? Colors.white : presentation.accent,
+                backgroundColor: presentation.accent,
+                foregroundColor: Colors.white,
                 child: Icon(option.icon),
               ),
               const SizedBox(width: MoolSpacing.sm),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      option.label,
-                      style: const TextStyle(
-                        color: MoolColors.ink,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    if (!selected)
-                      Text(
-                        option.sellSide,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: MoolColors.muted,
-                          fontSize: 10.5,
-                          height: 1.25,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              if (selected)
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: MoolColors.success,
-                ),
-            ],
-          ),
-          if (!selected) ...[
-            const Divider(height: MoolSpacing.lg),
-            _ActorPreviewLine(
-              icon: Icons.trending_up_rounded,
-              label: 'Growth opportunity',
-              value: option.sellSide,
-              accent: presentation.accent,
-            ),
-            _ActorPreviewLine(
-              icon: Icons.dashboard_customize_outlined,
-              label: 'Workspace advantage',
-              value: option.tools,
-              accent: presentation.accent,
-            ),
-            const SizedBox(height: MoolSpacing.xs),
-            Align(
-              alignment: Alignment.centerRight,
-              child: _WorkspaceActionCue(accent: presentation.accent),
-            ),
-          ] else ...[
-            const Divider(height: MoolSpacing.lg),
-            _PreviewRow(label: 'Reach customers', value: option.sellSide),
-            _PreviewRow(label: 'Source smarter', value: option.buySide),
-            _PreviewRow(label: 'Run your Workspace', value: option.tools),
-            const SizedBox(height: MoolSpacing.xs),
-            _BusinessIdentityNotice(profile: option),
-            const SizedBox(height: MoolSpacing.xs),
-            const Text(
-              'Next, add the documents for this Workspace. Verification begins after you submit them.',
-              style: TextStyle(
-                color: MoolColors.success,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _WorkspaceActionCue extends StatefulWidget {
-  const _WorkspaceActionCue({required this.accent});
-
-  final Color accent;
-
-  @override
-  State<_WorkspaceActionCue> createState() => _WorkspaceActionCueState();
-}
-
-class _WorkspaceActionCueState extends State<_WorkspaceActionCue>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 420),
-    value: 1,
-  );
-  bool _started = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_started || MediaQuery.disableAnimationsOf(context)) return;
-    _started = true;
-    _controller.repeat(reverse: true, count: 4).whenComplete(() {
-      if (mounted) _controller.value = 1;
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final motion = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutCubic,
-    );
-    return FadeTransition(
-      opacity: Tween<double>(begin: .72, end: 1).animate(motion),
-      child: ScaleTransition(
-        scale: Tween<double>(begin: .98, end: 1).animate(motion),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: widget.accent.withValues(alpha: .08),
-            borderRadius: BorderRadius.circular(MoolRadii.capsule),
-            border: Border.all(color: widget.accent.withValues(alpha: .25)),
-          ),
-          child: Text(
-            'Choose this Workspace',
-            style: TextStyle(
-              color: widget.accent,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ActorPreviewLine extends StatelessWidget {
-  const _ActorPreviewLine({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.accent,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: accent, size: 17),
-          const SizedBox(width: MoolSpacing.xs),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: accent,
-                    fontSize: 9.5,
+                child: Text(
+                  option.label,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontSize: 10.5,
-                    height: 1.25,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+              ),
+              const Icon(Icons.check_circle_rounded, color: MoolColors.success),
+            ],
+          ),
+          const Divider(height: MoolSpacing.lg),
+          _PreviewRow(label: 'Reach customers', value: option.sellSide),
+          _PreviewRow(label: 'Source smarter', value: option.buySide),
+          _PreviewRow(label: 'Run your Workspace', value: option.tools),
+          const SizedBox(height: MoolSpacing.xs),
+          _BusinessIdentityNotice(profile: option),
+          const SizedBox(height: MoolSpacing.xs),
+          const Text(
+            'Next, add the documents for this Workspace. Verification begins after you submit them.',
+            style: TextStyle(
+              color: MoolColors.success,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
