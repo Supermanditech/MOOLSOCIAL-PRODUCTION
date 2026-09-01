@@ -1593,9 +1593,7 @@ class _ProfileCard extends StatelessWidget {
                 const Icon(
                   Icons.check_circle_rounded,
                   color: MoolColors.success,
-                )
-              else
-                Icon(Icons.chevron_right_rounded, color: presentation.accent),
+                ),
             ],
           ),
           if (!selected) ...[

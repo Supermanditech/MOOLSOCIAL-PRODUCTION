@@ -288,8 +288,8 @@ void main() {
             of: card,
             matching: find.byIcon(Icons.chevron_right_rounded),
           ),
-          findsOneWidget,
-          reason: '$label has one navigation affordance',
+          findsNothing,
+          reason: '$label has no redundant top chevron',
         );
         expect(
           find.descendant(
@@ -310,6 +310,14 @@ void main() {
           ),
           findsNothing,
           reason: '$label has no redundant Explore This Role prompt',
+        );
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.text('Choose this Workspace'),
+          ),
+          findsOneWidget,
+          reason: '$label keeps one clear animated action',
         );
       }
       expect(tester.takeException(), isNull);
