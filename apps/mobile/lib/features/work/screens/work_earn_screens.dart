@@ -439,6 +439,9 @@ class _OpportunityCard extends StatelessWidget {
     final owner = opportunity.posterType == WorkOpportunityPosterType.moolSocial
         ? 'MoolSocial-owned'
         : 'MoolSocial user-owned';
+    final posterLine = opportunity.publisher == opportunity.posterType.label
+        ? 'Posted by ${opportunity.posterType.label}'
+        : 'Posted by ${opportunity.posterType.label} · ${opportunity.publisher}';
     return Semantics(
       button: true,
       label:
@@ -453,7 +456,7 @@ class _OpportunityCard extends StatelessWidget {
         child: InkWell(
           onTap: onOpen,
           child: Padding(
-            padding: const EdgeInsets.all(MoolSpacing.md),
+            padding: const EdgeInsets.all(MoolSpacing.sm),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -472,9 +475,9 @@ class _OpportunityCard extends StatelessWidget {
                       ),
                   ],
                 ),
-                const SizedBox(height: MoolSpacing.sm),
+                const SizedBox(height: MoolSpacing.xs),
                 Text(
-                  'Posted by ${opportunity.posterType.label} · ${opportunity.publisher}',
+                  posterLine,
                   key: Key('work-opportunity-poster-type-${opportunity.id}'),
                   style: const TextStyle(
                     color: Colors.white,
@@ -482,18 +485,18 @@ class _OpportunityCard extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   opportunity.title,
                   key: Key('work-opportunity-position-${opportunity.id}'),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 18,
                     height: 1.12,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: MoolSpacing.xs),
+                const SizedBox(height: 4),
                 Text(
                   opportunity.summary,
                   key: Key('work-opportunity-description-${opportunity.id}'),
@@ -501,12 +504,12 @@ class _OpportunityCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFFF4F4FF),
-                    fontSize: 12,
-                    height: 1.35,
+                    fontSize: 11.5,
+                    height: 1.25,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: MoolSpacing.sm),
+                const SizedBox(height: MoolSpacing.xs),
                 _CardFact(
                   key: Key(
                     'work-opportunity-candidate-requirements-${opportunity.id}',
@@ -525,10 +528,10 @@ class _OpportunityCard extends StatelessWidget {
                   text:
                       '${opportunity.area}, ${opportunity.city} · ${opportunity.pincode}',
                 ),
-                const SizedBox(height: MoolSpacing.sm),
+                const SizedBox(height: MoolSpacing.xs),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(MoolSpacing.sm),
+                  padding: const EdgeInsets.all(MoolSpacing.xs),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: .16),
                     borderRadius: BorderRadius.circular(MoolRadii.control),
@@ -543,7 +546,7 @@ class _OpportunityCard extends StatelessWidget {
                         ),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -551,7 +554,7 @@ class _OpportunityCard extends StatelessWidget {
                         'Monthly payment',
                         style: TextStyle(
                           color: Color(0xFFEFEFFF),
-                          fontSize: 10,
+                          fontSize: 9.5,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -562,7 +565,7 @@ class _OpportunityCard extends StatelessWidget {
                         ),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 19,
+                          fontSize: 16,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -573,7 +576,7 @@ class _OpportunityCard extends StatelessWidget {
                         ),
                         style: const TextStyle(
                           color: Color(0xFFEFEFFF),
-                          fontSize: 10,
+                          fontSize: 9.5,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -585,7 +588,7 @@ class _OpportunityCard extends StatelessWidget {
                           ),
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -597,14 +600,14 @@ class _OpportunityCard extends StatelessWidget {
                           ),
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                     ],
                   ),
                 ),
-                const SizedBox(height: MoolSpacing.sm),
+                const SizedBox(height: MoolSpacing.xs),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
@@ -613,7 +616,7 @@ class _OpportunityCard extends StatelessWidget {
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: color,
-                      minimumSize: const Size.fromHeight(48),
+                      minimumSize: const Size.fromHeight(44),
                     ),
                     icon: const Icon(Icons.arrow_forward_rounded),
                     label: const Text('Apply'),
@@ -662,19 +665,19 @@ class _CardFact extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 5),
+      padding: const EdgeInsets.only(bottom: 3),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 15, color: Colors.white),
-          const SizedBox(width: 7),
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               text,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 11,
-                height: 1.3,
+                fontSize: 10.5,
+                height: 1.25,
                 fontWeight: FontWeight.w700,
               ),
             ),
