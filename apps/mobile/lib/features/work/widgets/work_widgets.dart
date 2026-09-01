@@ -19,6 +19,7 @@ class WorkPageScaffold extends StatelessWidget {
     this.activeLocalAction = 'earn',
     this.showHeaderChat = true,
     this.showTrailingAction = true,
+    this.onBack,
     this.trailing,
     this.bottomAction,
     super.key,
@@ -34,6 +35,7 @@ class WorkPageScaffold extends StatelessWidget {
   final String activeLocalAction;
   final bool showHeaderChat;
   final bool showTrailingAction;
+  final VoidCallback? onBack;
   final Widget? trailing;
   final Widget? bottomAction;
 
@@ -42,6 +44,10 @@ class WorkPageScaffold extends StatelessWidget {
     final canPop = Navigator.of(context).canPop();
     void leaveContentDepth() {
       session.clearMessages();
+      if (onBack != null) {
+        onBack!();
+        return;
+      }
       if (context.canPop()) {
         context.pop();
       } else {
@@ -75,7 +81,7 @@ class WorkPageScaffold extends StatelessWidget {
     }
 
     return PopScope<Object?>(
-      canPop: canPop,
+      canPop: onBack == null && canPop,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) {
           leaveContentDepth();

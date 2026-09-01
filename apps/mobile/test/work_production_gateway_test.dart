@@ -98,6 +98,36 @@ void main() {
       workProfiles.map((profile) => profile.gstMatchCategory).toSet(),
       containsAll(WorkGstMatchCategory.values),
     );
+    for (final profile in workProfiles) {
+      expect(profile.verificationDocuments, isNotEmpty);
+      expect(
+        profile.verificationDocuments.any(
+          (document) => document.importance == WorkDocumentImportance.required,
+        ),
+        isTrue,
+      );
+      final gst = profile.verificationDocuments.singleWhere(
+        (document) => document.title == 'GST registration certificate',
+      );
+      expect(gst.importance, WorkDocumentImportance.optional);
+      expect(
+        profile.verificationDocuments.map((document) => document.title).toSet(),
+        hasLength(profile.verificationDocuments.length),
+      );
+
+      final session = WorkSession()
+        ..selectFamily(profile.familyId)
+        ..selectProfile(profile.id);
+      addTearDown(session.dispose);
+      expect(
+        session.selectedWorkspaceDocuments.map((document) => document.label),
+        profile.verificationDocuments
+            .where(
+              (document) => document.title != 'GST registration certificate',
+            )
+            .map((document) => document.title),
+      );
+    }
   });
 
   test('opportunity filters combine city, area and exact six-digit PIN', () {

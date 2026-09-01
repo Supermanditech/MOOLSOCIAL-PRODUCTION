@@ -162,7 +162,34 @@ class WorkSession extends ChangeNotifier {
       .firstWhere((profile) => profile.familyId == familyId)
       .familyLabel;
 
-  bool get requiredProofsAdded => workProofs
+  List<WorkProofRequirement> get selectedWorkspaceDocuments {
+    final profile = selectedProfile;
+    if (profile == null) return workProofs;
+    final documents = <WorkProofRequirement>[];
+    for (var index = 0; index < profile.verificationDocuments.length; index++) {
+      final document = profile.verificationDocuments[index];
+      if (document.title == 'GST registration certificate') continue;
+      final id = index == 0
+          ? 'personal-kyc'
+          : document.title.toLowerCase().contains('address')
+          ? 'shop-front'
+          : document.title.toLowerCase().contains('authority') ||
+                document.title.toLowerCase().contains('authorised')
+          ? 'owner-authority'
+          : '${profile.id}-document-$index';
+      documents.add(
+        WorkProofRequirement(
+          id: id,
+          label: document.title,
+          detail: document.detail,
+          required: document.importance == WorkDocumentImportance.required,
+        ),
+      );
+    }
+    return List<WorkProofRequirement>.unmodifiable(documents);
+  }
+
+  bool get requiredProofsAdded => selectedWorkspaceDocuments
       .where((proof) => proof.required)
       .every((proof) => addedProofs.containsKey(proof.id));
 
@@ -410,7 +437,7 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     if (normalized == '9829012321') {
-      errorMessage = 'This is already your verified account number.';
+      errorMessage = 'This is already your signed-in account number.';
       notifyListeners();
       return false;
     }

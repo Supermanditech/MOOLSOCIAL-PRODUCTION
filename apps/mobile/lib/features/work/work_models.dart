@@ -201,6 +201,345 @@ class WorkProfileOption {
   final IconData icon;
 }
 
+enum WorkDocumentImportance { required, ifApplicable, optional }
+
+extension WorkDocumentImportanceLabel on WorkDocumentImportance {
+  String get label => switch (this) {
+    WorkDocumentImportance.required => 'Required',
+    WorkDocumentImportance.ifApplicable => 'If applicable',
+    WorkDocumentImportance.optional => 'Optional',
+  };
+}
+
+class WorkDocumentChecklistItem {
+  const WorkDocumentChecklistItem({
+    required this.title,
+    required this.detail,
+    required this.importance,
+    required this.icon,
+  });
+
+  final String title;
+  final String detail;
+  final WorkDocumentImportance importance;
+  final IconData icon;
+}
+
+const _identityDocument = WorkDocumentChecklistItem(
+  title: 'Account owner identity',
+  detail: 'PAN, Aadhaar or another accepted government identity document.',
+  importance: WorkDocumentImportance.required,
+  icon: Icons.badge_outlined,
+);
+
+const _gstDocument = WorkDocumentChecklistItem(
+  title: 'GST registration certificate',
+  detail:
+      'Add it if registered. It helps us confirm business identity and prevent impersonation.',
+  importance: WorkDocumentImportance.optional,
+  icon: Icons.receipt_long_outlined,
+);
+
+extension WorkProfileDocumentChecklist on WorkProfileOption {
+  List<WorkDocumentChecklistItem> get verificationDocuments => switch (id) {
+    'retailer-grocery' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Shop address document',
+        detail:
+            'Ownership, rent, lease, consent or a recent utility document for the shop.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.storefront_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Food business registration or licence',
+        detail: 'FSSAI registration or licence when food products require it.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.restaurant_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Owner or operator authority',
+        detail: 'Authorisation when the account owner is not the shop owner.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'retailer-speciality' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Store address document',
+        detail:
+            'Ownership, rent, lease, consent or a recent utility document for the store.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.shopping_bag_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Category licence or registration',
+        detail: 'Any licence required for the products you sell.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.verified_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Owner or operator authority',
+        detail: 'Authorisation when the account owner is not the store owner.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'wholesaler' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Business registration document',
+        detail:
+            'Registration or constitution document for the wholesale business.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.business_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Warehouse or business address document',
+        detail: 'Ownership, rent, lease, consent or utility document.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.warehouse_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Authorised representative document',
+        detail: 'Authorisation if another person manages this Workspace.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'manufacturer' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Business registration document',
+        detail: 'Company, partnership, LLP, proprietorship or Udyam document.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.business_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Manufacturing unit address document',
+        detail:
+            'Ownership, rent, lease, consent or utility document for the unit.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.factory_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Manufacturing licence',
+        detail: 'Licence or approval required for your product category.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.approval_outlined,
+      ),
+      _gstDocument,
+    ],
+    'restaurant' || 'cloud-kitchen' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'FSSAI registration or licence',
+        detail: 'The food registration or licence applicable to your business.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.restaurant_menu_rounded,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Kitchen or restaurant address document',
+        detail: 'Ownership, rent, lease, consent or utility document.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.location_city_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Owner or operator authority',
+        detail: 'Authorisation when the account owner is not the operator.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'clinic' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Professional registration certificate',
+        detail:
+            'Current medical council or applicable professional registration.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.medical_services_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Clinic address document',
+        detail: 'Address document when appointments are offered from a clinic.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.local_hospital_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Clinic operator authority',
+        detail: 'Authorisation when the doctor does not own the clinic.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'pharmacy' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Drug licence',
+        detail: 'Current retail or wholesale drug licence for the pharmacy.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.local_pharmacy_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Pharmacist or authorised-person document',
+        detail:
+            'Registration or authorisation for the responsible professional.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.badge_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Pharmacy address document',
+        detail: 'Ownership, rent, lease, consent or utility document.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.store_outlined,
+      ),
+      _gstDocument,
+    ],
+    'salon' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Salon address document',
+        detail: 'Ownership, rent, lease, consent or utility document.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.content_cut_rounded,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Shop or local registration',
+        detail: 'Local registration or licence required for your salon.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.approval_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Owner or operator authority',
+        detail: 'Authorisation when the account owner is not the salon owner.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'service-provider' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Operating address or service-area document',
+        detail: 'A document connecting you with the area you serve.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.place_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Skill certificate or professional licence',
+        detail: 'Certification or licence required for your service.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.workspace_premium_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Business or team authorisation',
+        detail: 'Authorisation when you represent a service business or team.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'captain' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Driving licence',
+        detail: 'Current licence for the vehicle category you operate.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.badge_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Vehicle registration certificate',
+        detail: 'Current RC for the vehicle used for rides or deliveries.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.two_wheeler_rounded,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Vehicle insurance and permit',
+        detail: 'Current insurance and any permit required for the service.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.health_and_safety_outlined,
+      ),
+      _gstDocument,
+    ],
+    'fleet' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Transport business registration',
+        detail: 'Registration or constitution document for the fleet business.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.business_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Vehicle RC, permit and insurance',
+        detail: 'Current documents for vehicles added to the Workspace.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.local_shipping_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Fleet operator authority',
+        detail: 'Authorisation for the person managing the fleet.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'creator' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Portfolio or channel ownership',
+        detail:
+            'A public portfolio, channel or account showing your original work.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.video_camera_front_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Payout account document',
+        detail:
+            'A bank document that confirms where approved earnings are paid.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.account_balance_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Agency or brand authorisation',
+        detail: 'Authorisation when you represent a creator agency or brand.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    _ => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Portfolio, qualification or experience document',
+        detail: 'A document or link that demonstrates the work you offer.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.work_outline_rounded,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Payout account document',
+        detail:
+            'A bank document that confirms where approved earnings are paid.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.account_balance_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Professional licence',
+        detail: 'A current licence when your profession requires one.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.workspace_premium_outlined,
+      ),
+      _gstDocument,
+    ],
+  };
+}
+
 class WorkProofRequirement {
   const WorkProofRequirement({
     required this.id,
@@ -1194,8 +1533,8 @@ const workProofs = <WorkProofRequirement>[
   ),
   WorkProofRequirement(
     id: 'shop-front',
-    label: 'Shop or work-place proof',
-    detail: 'Clear current photo with the work name or operating location',
+    label: 'Shop or workplace document',
+    detail: 'A clear current document showing the work name or location',
     required: true,
   ),
   WorkProofRequirement(

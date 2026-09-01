@@ -183,10 +183,35 @@ void main() {
 
     await tester.tap(actor);
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-requirements-screen')), findsOneWidget);
+    expect(
+      find.byKey(const Key('work-requirements-role-summary')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('work-requirements-ready')), findsOneWidget);
+    expect(find.textContaining('GST category'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('work-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(sessions.work.selectedProfile, isNull);
+
+    await tester.tap(find.byKey(const Key('work-profile-retailer-grocery')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-requirements-ready')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-contact-screen')), findsOneWidget);
     expect(
       find.byKey(const Key('workspace-business-identity-notice')),
       findsOneWidget,
     );
+
+    await tester.tap(find.byKey(const Key('work-contact-continue')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-proof-screen')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-contact-screen')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

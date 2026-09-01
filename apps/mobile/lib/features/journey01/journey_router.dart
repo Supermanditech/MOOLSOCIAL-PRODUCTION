@@ -1530,6 +1530,16 @@ GoRouter createJourneyRouter(
             WorkChooseActivityScreen(session: workSession),
       ),
       GoRoute(
+        path: '/app/work/workspace/requirements',
+        builder: (context, state) =>
+            WorkDocumentRequirementsScreen(session: workSession),
+      ),
+      GoRoute(
+        path: '/app/work/workspace/contact',
+        builder: (context, state) =>
+            WorkWorkspaceContactScreen(session: workSession),
+      ),
+      GoRoute(
         path: '/app/work/workspace/proof',
         builder: (context, state) =>
             WorkProfileProofScreen(session: workSession),

@@ -112,7 +112,8 @@ void main() {
 
   Future<void> chooseRetailer(WidgetTester tester) async {
     await tapVisible(tester, const Key('work-profile-retailer-grocery'));
-    await tapVisible(tester, const Key('work-continue-proof'));
+    await tapVisible(tester, const Key('work-requirements-ready'));
+    await tapVisible(tester, const Key('work-contact-continue'));
     expect(find.byKey(const Key('work-proof-screen')), findsOneWidget);
   }
 
@@ -254,6 +255,7 @@ void main() {
       );
 
       await tapVisible(tester, const Key('work-profile-retailer-grocery'));
+      await tapVisible(tester, const Key('work-requirements-ready'));
       await enter(tester, const Key('work-alternate-mobile'), '123');
       await tapVisible(tester, const Key('work-send-alternate-otp'));
       expect(
@@ -264,7 +266,7 @@ void main() {
       await enter(tester, const Key('work-alternate-mobile'), '9829012321');
       await tapVisible(tester, const Key('work-send-alternate-otp'));
       expect(
-        find.text('This is already your verified account number.'),
+        find.text('This is already your signed-in account number.'),
         findsOneWidget,
       );
 
@@ -286,7 +288,7 @@ void main() {
       await enter(tester, const Key('work-alternate-otp'), '123456');
       await tapVisible(tester, const Key('work-verify-alternate'));
       expect(work.alternateVerified, isTrue);
-      await tapVisible(tester, const Key('work-continue-proof'));
+      await tapVisible(tester, const Key('work-contact-continue'));
       expect(find.byKey(const Key('work-proof-screen')), findsOneWidget);
     },
   );
@@ -298,7 +300,20 @@ void main() {
         tester,
         route: '/app/work/workspace/choose',
       );
-      await tapVisible(tester, const Key('work-profile-not-shown'));
+      final missingRole = find.byKey(const Key('work-profile-not-shown'));
+      await tester.scrollUntilVisible(
+        missingRole,
+        260,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('work-choose-screen')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+        maxScrolls: 40,
+      );
+      await tester.tap(missingRole);
+      await tester.pumpAndSettle();
       await tapVisible(tester, const Key('work-send-profile-request'));
       expect(find.text('Describe the work profile you need.'), findsOneWidget);
 
@@ -323,29 +338,20 @@ void main() {
   );
 
   testWidgets(
-    'selected work profile is informative and does not advertise a no-op tap',
+    'selected role opens its complete document requirements and Back restores roles',
     (tester) async {
       await mount(tester, route: '/app/work/workspace/choose');
 
       await tapVisible(tester, const Key('work-profile-retailer-grocery'));
+      expect(find.byKey(const Key('work-requirements-screen')), findsOneWidget);
+      expect(find.text('Account owner identity'), findsOneWidget);
+      expect(find.text('Shop address document'), findsOneWidget);
+      expect(find.text('GST registration certificate'), findsOneWidget);
+      expect(find.byKey(const Key('work-requirements-ready')), findsOneWidget);
 
-      final selectedCard = find.byKey(
-        const Key('work-profile-retailer-grocery'),
-      );
-      expect(selectedCard, findsOneWidget);
-      final inkWell = tester.widget<InkWell>(
-        find.descendant(of: selectedCard, matching: find.byType(InkWell)).first,
-      );
-      expect(inkWell.onTap, isNull);
-      expect(
-        find.text('Review your selection before continuing.'),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('workspace-business-identity-notice')),
-        findsOneWidget,
-      );
-      expect(find.text('Optional business identity check'), findsOneWidget);
+      await tapVisible(tester, const Key('work-back'));
+      expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+      expect(find.byKey(const Key('work-requirements-screen')), findsNothing);
     },
   );
 
