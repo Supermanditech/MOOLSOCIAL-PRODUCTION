@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3907,
-    "sha256": "4A5A254414028E04A8FBAD2C51565664676DB985F3F3EDF19572B6FE38033F4A"
+    "entryCount": 3917,
+    "sha256": "4E8EFF0936DFE8E00C18B69CAC266BAA8EA0A903C373996C6118D8903BED51EA"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -43,6 +43,11 @@
         "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md",
         "docs/quality/UAW-PRIMARY-SHOP-V2-PROTECTED-CANDIDATE-GATE-20260828.md",
         "docs/quality/UAW-PRIMARY-V74-BUY-PROTECTION-BRAND-GATE-FIX-20260828.md",
+        "artifacts/quality/buy-cursor-full-r63-0-review-20260901/redmi-install-attempt1-version-downgrade.md",
+        "artifacts/quality/buy-cursor-full-r63-1-review-20260901/post-build-host-retry-package-metadata.md",
+        "artifacts/quality/buy-cursor-full-r63-1-review-20260901/redmi-confirmation-product-count-defect.md",
+        "docs/quality/UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902-MVP-STATE.json",
+        "docs/quality/UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902.md",
         "scripts/check-brand-integrity.ps1",
         "scripts/check-buy-protected-baseline.ps1",
         "scripts/check-codex-development-regression-memory.ps1",
@@ -1423,6 +1428,31 @@
         "bootstrapOwners": [
           "config/codex-subagent-coordination-policy.json",
           "config/cross-agent-incremental-ticket-gate.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_buy_mvp_ticket14_v1_20260902",
+        "state": "founder_authorized_2026_09_02",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_shop_mvp_go_live_v1_20260829",
+        "workId": "buy-mvp-ticket14-v1-20260902",
+        "ticketId": "UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902",
+        "branch": "work/cursor-ui/buy-mvp-ticket14-v1-20260902",
+        "baselineHead": "958e767e6f910e40b8f475d99173011f0f07ea78",
+        "bootstrapCommitSubject": "coordination(buy-mvp-ticket14-v1-20260902): bind founder-authorized Ticket 14 continuation",
+        "bootstrapOwners": [
+          "artifacts/quality/buy-cursor-full-r63-0-review-20260901/redmi-install-attempt1-version-downgrade.md",
+          "artifacts/quality/buy-cursor-full-r63-1-review-20260901/post-build-host-retry-package-metadata.md",
+          "artifacts/quality/buy-cursor-full-r63-1-review-20260901/redmi-confirmation-product-count-defect.md",
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902-MVP-STATE.json",
+          "docs/quality/UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,

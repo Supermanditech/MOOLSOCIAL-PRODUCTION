@@ -44633,6 +44633,106 @@
       "prevention": "Select the qualified binding by lane plus exact current task /root/repair_shop_chat_shared_v1_20260829, require one match, and rerun the full handoff gate.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260901-3945-CURSOR-REVIEW-VERSION-CODE-NOT-MONOTONIC",
+      "status": "registered_installed_version_preflight_required",
+      "appliesTo": ["primary", "build", "android", "redmi", "cursor_ui"],
+      "mistake": "The r63.0 Cursor review APK built successfully but Redmi rejected installation because version code 2026090101 was lower than the already installed Cursor-review version code 2026090111; no device or app-data mutation occurred.",
+      "rootCause": "Candidate preparation checked package identity and source monotonicity but did not read the exact installed Redmi review-package version code before allocating the new build number.",
+      "prevention": "Before authorizing every review APK, query the exact target device and exact isolated review package, require the candidate version code to be greater than the installed value, preserve a rejected install without forcing downgrade, and allocate a new one-build successor candidate.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/build-buy-device-review.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/buy-cursor-full-r63-0-review-20260901/redmi-install-attempt1-version-downgrade.md"]
+    },
+    {
+      "id": "REG-20260901-3946-BUY-CONFIRMATION-UNIT-COUNT-LABELED-AS-PRODUCTS",
+      "status": "registered_distinct_product_count_required",
+      "appliesTo": ["primary", "cursor_ui", "buy", "checkout", "confirmation", "redmi"],
+      "mistake": "Redmi review showed one wholesale product with two packs as 2 products and a two-product split purchase with three total units as 3 products on the confirmation header.",
+      "rootCause": "The confirmation header formatted confirmedItemCount with product wording, conflating quantity units or packs with distinct product lines.",
+      "prevention": "Retain confirmed item quantity for commercial accounting, separately store the distinct confirmed product-line count, render the header from the product count, and test one-product multi-pack plus mixed split purchases before every review APK.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/buy-cursor-full-r63-1-review-20260901/redmi-confirmation-product-count-defect.md"]
+    },
+    {
+      "id": "REG-20260901-3947-POST-BUILD-NO-PUB-USED-AFTER-PACKAGE-METADATA-RESTORE",
+      "status": "registered_pub_get_after_build_cleanup_required",
+      "appliesTo": ["primary", "build", "flutter", "analysis", "testing", "cursor_ui"],
+      "mistake": "The post-device-fix host retry invoked Flutter analysis and a view test with --no-pub after the guarded build wrapper restored generated package metadata, so the declared share_plus package could not resolve.",
+      "rootCause": "The retry treated the pre-build package configuration as still active after clean-support restoration instead of regenerating .dart_tool metadata.",
+      "prevention": "After every guarded build or preflight cleanup, run flutter pub get before any --no-pub analyzer or test that imports package dependencies, then rerun the full affected inventory.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "apps/mobile/pubspec.yaml", "scripts/build-buy-device-review.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "artifacts/quality/buy-cursor-full-r63-1-review-20260901/post-build-host-retry-package-metadata.md"]
+    },
+    {
+      "id": "REG-20260902-3948-POWERSHELL-INLINE-IF-USED-AS-EXPRESSION",
+      "status": "registered_precompute_conditional_value_required",
+      "appliesTo": ["primary", "tooling", "git", "implementation"],
+      "mistake": "A read-only pre-edit status digest command placed a PowerShell if statement directly inside a parenthesized string-concatenation expression, so PowerShell attempted to resolve if as a command and stopped before the policy projection.",
+      "rootCause": "The command was composed using expression syntax that PowerShell does not support for statement-form conditionals.",
+      "prevention": "Precompute conditional scalar values in a separate statement before string concatenation, keep branch, HEAD and status digest outputs independently readable, and rerun the complete pre-edit check only after this regression is registered.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json"]
+    },
+    {
+      "id": "REG-20260902-3949-RECURSIVE-GOVERNANCE-SEARCH-CROSSED-EVIDENCE-ESTATE",
+      "status": "registered_literal_governance_owner_search_required",
+      "appliesTo": ["primary", "tooling", "coordination", "implementation"],
+      "mistake": "A coordination-binding discovery search recursively scanned config and the large retained docs/quality evidence estate, exceeded the command timeout and returned no complete result.",
+      "rootCause": "The search scope was broader than the exact governance owners needed to resolve the current worktree binding.",
+      "prevention": "Search only the literal coordination, incremental-ticket and MVP gate owners first; add one explicitly named evidence file only when a direct reference requires it, and never use the retained quality estate as an initial recursive binding lookup.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json"]
+    },
+    {
+      "id": "REG-20260902-3950-GIT-WORKTREE-ADD-TIMEOUT-COMPLETION-AMBIGUOUS",
+      "status": "registered_post_timeout_read_only_worktree_audit_required",
+      "appliesTo": ["primary", "tooling", "git", "coordination", "implementation"],
+      "mistake": "The founder-authorized Ticket 14 continuation worktree add command exceeded the command timeout and returned no terminal Git result, leaving path and branch creation ambiguous.",
+      "rootCause": "The worktree operation was given a timeout that did not account for the repository's large checkout and endpoint-filter latency.",
+      "prevention": "After a worktree-add timeout, do not retry or remove anything; first inspect the exact target path, branch ref and porcelain worktree inventory read-only, accept an already-correct completed result, and use a longer bounded timeout only when creation is proven absent.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json"]
+    },
+    {
+      "id": "REG-20260902-3951-FRESH-CONTINUATION-ASSUMED-UNCOMMITTED-REGISTRY-PRESENT",
+      "status": "registered_read_exact_fresh_registry_tail_required",
+      "appliesTo": ["primary", "tooling", "git", "coordination", "implementation"],
+      "mistake": "The first fresh-continuation registry patch assumed the pushed source tip contained regression entries 3945 through 3950, but those entries were intentionally uncommitted in the preserved founder-review worktree, so apply_patch rejected the absent context without changing the new worktree.",
+      "rootCause": "Source commit identity was incorrectly treated as including separate local governance and device-evidence dirt from the predecessor worktree.",
+      "prevention": "After creating a continuation from a pushed source tip, read the exact registry tail and binding generation in that worktree before constructing the bootstrap patch, then append every missing permanent entry in numeric order without assuming predecessor local dirt is committed.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json"]
+    },
+    {
+      "id": "REG-20260902-3952-COORDINATION-POLICY-PATCH-USED-STALE-OWNER-ORDER",
+      "status": "registered_independent_exact_policy_section_patches_required",
+      "appliesTo": ["primary", "tooling", "coordination", "implementation"],
+      "mistake": "The Ticket 14 bootstrap policy patch combined registry binding, root-owner and continuation updates around a remembered root-owner ordering that did not match the exact fresh policy, so apply_patch rejected the file without changing it.",
+      "rootCause": "Three independent policy sections were coupled to one stale multi-line context instead of using exact local anchors from the fresh worktree.",
+      "prevention": "Read the literal registry binding, the exact root claim tail and continuation array tail, then patch each policy section independently and parse the complete JSON before updating the coordination checker generation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260902-3953-MULTILINE-POLICY-OWNER-ANCHOR-REJECTED",
+      "status": "registered_single_adjacent_line_policy_insertion_required",
+      "appliesTo": ["primary", "tooling", "coordination", "implementation"],
+      "mistake": "The independently scoped root-owner policy hunk still failed verification when anchored on several visually matching owner lines, while the registry-binding hunk had already applied successfully.",
+      "rootCause": "The patch relied on a multi-line owner sequence in a large frequently amended policy instead of the smallest unique adjacent insertion point.",
+      "prevention": "Use one unique adjacent owner line as the insertion anchor, patch only that local section, read back the exact root claim, then refresh the registry hash binding before running any coordination gate.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260902-3954-COORDINATION-BOOTSTRAP-USED-OTHER-PRIMARY-TASK-OWNER",
+      "status": "registered_exact_current_primary_claim_owner_required",
+      "appliesTo": ["primary", "coordination", "implementation"],
+      "mistake": "The first Ticket 14 coordination-bootstrap attempt requested scripts/check-codex-subagent-coordination-policy.ps1 for /root, but that owner is recorded under the existing repair primary task, so the gate rejected the claim before bootstrap.",
+      "rootCause": "Primary-only status was confused with ownership by the exact current primary task.",
+      "prevention": "Project the /root active claim before invoking bootstrap and pass one exact owner recorded for /root, while allowing the bootstrap manifest to verify other primary-owned coordination files independently.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
     }
   ]
 }
