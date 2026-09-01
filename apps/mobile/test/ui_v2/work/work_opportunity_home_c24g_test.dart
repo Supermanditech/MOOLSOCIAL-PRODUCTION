@@ -95,7 +95,9 @@ void main() {
 
         expect(
           tester
-              .widget<ListView>(find.byKey(const Key('work-earn-screen')))
+              .widget<CustomScrollView>(
+                find.byKey(const Key('work-earn-screen')),
+              )
               .scrollDirection,
           Axis.vertical,
         );

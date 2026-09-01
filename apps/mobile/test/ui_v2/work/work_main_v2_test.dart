@@ -156,6 +156,12 @@ void main() {
     );
     final surface = tester.widget<Material>(card);
     expect(surface.color, isNot(Colors.transparent));
+    expect(tester.getSize(card).height, lessThan(360));
+    expect(find.byType(SliverList), findsWidgets);
+    expect(
+      find.byKey(const Key('work-opportunity-workspace-quick-delivery-biker')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('work-earn-global-profile')));
     await tester.pumpAndSettle();
@@ -195,34 +201,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('city area and pincode filters combine exactly', (tester) async {
+  testWidgets('inline city area and pincode chips combine immediately', (
+    tester,
+  ) async {
     final (_, work) = await mountWork(tester);
     await tester.tap(find.byKey(const Key('work-filter-button')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('work-filter-sheet-route')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('work-filter-city')));
+    expect(find.byKey(const Key('work-inline-filter-panel')), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    final city = find.byKey(const Key('work-filter-city-Jodhpur'));
+    await tester.ensureVisible(city);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Jodhpur').last);
-    await tester.enterText(
-      find.byKey(const Key('work-filter-area')),
-      'Ratanada',
-    );
-    await tester.enterText(
-      find.byKey(const Key('work-filter-pincode')),
-      '342011',
-    );
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('work-filter-apply')),
-      220,
-      scrollable: find
-          .descendant(
-            of: find.byKey(const Key('work-filter-scroll')),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    await tester.tap(find.byKey(const Key('work-filter-apply')));
+    await tester.tap(city);
+    await tester.pumpAndSettle();
+    final area = find.byKey(const Key('work-filter-area-Ratanada'));
+    await tester.ensureVisible(area);
+    await tester.tap(area);
+    await tester.pumpAndSettle();
+    final pincode = find.byKey(const Key('work-filter-pincode-342011'));
+    await tester.ensureVisible(pincode);
+    await tester.tap(pincode);
     await tester.pumpAndSettle();
 
     expect(work.selectedCity, 'Jodhpur');
@@ -233,8 +232,32 @@ void main() {
       findsOneWidget,
     );
     expect(
+      work.filteredOpportunities.any(
+        (opportunity) => opportunity.id == 'quick-delivery-biker',
+      ),
+      isFalse,
+    );
+    expect(find.byKey(const Key('work-related-opportunities')), findsOneWidget);
+  });
+
+  testWidgets('a city with no exact listing keeps nationwide discovery open', (
+    tester,
+  ) async {
+    final (_, work) = await mountWork(tester);
+    await tester.tap(find.byKey(const Key('work-filter-button')));
+    await tester.pumpAndSettle();
+    final delhi = find.byKey(const Key('work-filter-city-Delhi'));
+    await tester.ensureVisible(delhi);
+    await tester.tap(delhi);
+    await tester.pumpAndSettle();
+
+    expect(work.selectedCity, 'Delhi');
+    expect(find.text('No exact match in Delhi'), findsOneWidget);
+    expect(find.byKey(const Key('work-related-opportunities')), findsOneWidget);
+    expect(find.text('More paid work beyond Delhi'), findsOneWidget);
+    expect(
       find.byKey(const Key('work-opportunity-quick-delivery-biker')),
-      findsNothing,
+      findsOneWidget,
     );
   });
 
@@ -251,6 +274,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('work-opportunity-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-global-chat')), findsNothing);
+    expect(find.byKey(const Key('work-help')), findsNothing);
+    expect(
+      find.byKey(const Key('work-detail-workspace-setup')),
+      findsOneWidget,
+    );
+    expect(find.text('Apply Now'), findsOneWidget);
     expect(find.byKey(const Key('work-detail-about-role')), findsOneWidget);
     expect(find.byKey(const Key('work-detail-what-youll-do')), findsOneWidget);
     final detailScroll = find

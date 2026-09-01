@@ -6,7 +6,6 @@ import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_service_home.dart';
 import '../../../core/design/mool_theme.dart';
 import '../../../ui_v2/profile/global_profile_panel_v2.dart';
-import '../widgets/work_opportunity_filter_sheet.dart';
 import '../widgets/work_widgets.dart';
 import '../work_models.dart';
 import '../work_session.dart';
@@ -61,6 +60,7 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
   );
   final FocusNode _searchFocus = FocusNode(debugLabel: 'work-earn-search');
   bool _searchOpen = false;
+  bool _filtersOpen = false;
 
   @override
   void dispose() {
@@ -86,31 +86,14 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
     context.go('/app/work/opportunity/${opportunity.id}');
   }
 
-  Future<void> _openFilters(BuildContext context) async {
-    final cities =
-        workOpportunities
-            .map((opportunity) => opportunity.city.trim())
-            .where((city) => city.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort();
-    final selected = await showWorkOpportunityFilterSheet(
-      context,
-      initial: WorkOpportunityFilterSelection(
-        type: widget.session.filter,
-        city: widget.session.selectedCity,
-        area: widget.session.selectedArea,
-        pincode: widget.session.selectedPincode,
-      ),
-      cities: cities,
-    );
-    if (selected == null || !mounted) return;
-    widget.session.setFilter(selected.type);
-    widget.session.setOpportunityLocationFilters(
-      city: selected.city,
-      area: selected.area,
-      pincode: selected.pincode,
-    );
+  void _toggleFilters() {
+    _searchFocus.unfocus();
+    setState(() => _filtersOpen = !_filtersOpen);
+  }
+
+  void _openWorkspaceSetup(BuildContext context) {
+    widget.session.startAnotherWork();
+    context.push('/app/work/workspace/choose');
   }
 
   void _resetDiscovery() {
@@ -146,6 +129,7 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
         animation: widget.session,
         builder: (context, _) {
           final opportunities = widget.session.filteredOpportunities;
+          final related = widget.session.relatedOpportunities;
           final filterCount =
               widget.session.activeOpportunityFilterCount +
               (widget.session.filter == WorkFeedFilter.forYou ? 0 : 1);
@@ -166,7 +150,7 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
                 widget.session.search('');
               },
               filterCount: filterCount,
-              onFilter: () => _openFilters(context),
+              onFilter: _toggleFilters,
               onProfile: () => _openProfile(context),
             ),
             fallbackBackRoute: '/app/mool?from=work',
@@ -176,44 +160,124 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
             activeLocalAction: 'earn',
             body: RefreshIndicator(
               onRefresh: widget.session.refreshFeed,
-              child: ListView(
+              child: CustomScrollView(
                 key: const Key('work-earn-screen'),
-                padding: const EdgeInsets.fromLTRB(
-                  MoolServiceHomeTokens.pagePadding,
-                  MoolSpacing.xs,
-                  MoolServiceHomeTokens.pagePadding,
-                  MoolSpacing.xxl,
-                ),
-                children: [
+                slivers: [
                   if (widget.session.busy) ...[
-                    const LinearProgressIndicator(
-                      key: Key('work-feed-loading'),
-                      minHeight: 3,
-                    ),
-                    const SizedBox(height: MoolSpacing.sm),
-                  ],
-                  if (opportunities.isEmpty)
-                    WorkEmptyState(
-                      title: 'No paid work matches',
-                      detail:
-                          'Clear the search or location filters to see other funded requirements.',
-                      actionLabel: 'Reset search and filters',
-                      onAction: _resetDiscovery,
-                    )
-                  else
-                    for (
-                      var index = 0;
-                      index < opportunities.length;
-                      index += 1
-                    ) ...[
-                      _OpportunityCard(
-                        opportunity: opportunities[index],
-                        onOpen: () =>
-                            _openOpportunity(context, opportunities[index]),
+                    const SliverToBoxAdapter(
+                      child: LinearProgressIndicator(
+                        key: Key('work-feed-loading'),
+                        minHeight: 3,
                       ),
-                      if (index != opportunities.length - 1)
-                        const SizedBox(height: MoolSpacing.sm),
-                    ],
+                    ),
+                  ],
+                  SliverToBoxAdapter(
+                    child: AnimatedSize(
+                      duration: MoolMotion.accessible(
+                        context,
+                        MoolMotion.standard,
+                      ),
+                      alignment: Alignment.topCenter,
+                      child: _filtersOpen
+                          ? _InlineOpportunityFilters(
+                              session: widget.session,
+                              onCollapse: _toggleFilters,
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ),
+                  if (opportunities.isEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        MoolServiceHomeTokens.pagePadding,
+                        MoolSpacing.sm,
+                        MoolServiceHomeTokens.pagePadding,
+                        MoolSpacing.sm,
+                      ),
+                      sliver: SliverToBoxAdapter(
+                        child: WorkEmptyState(
+                          title: widget.session.selectedCity.isEmpty
+                              ? 'No paid work matches'
+                              : 'No exact match in ${widget.session.selectedCity}',
+                          detail: related.isEmpty
+                              ? 'Clear the search or filters to see other funded requirements.'
+                              : 'Nearby supply changes often. Continue with similar funded work available elsewhere.',
+                          actionLabel: 'Reset search and filters',
+                          onAction: _resetDiscovery,
+                        ),
+                      ),
+                    ),
+                  if (opportunities.isNotEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        MoolServiceHomeTokens.pagePadding,
+                        MoolSpacing.sm,
+                        MoolServiceHomeTokens.pagePadding,
+                        0,
+                      ),
+                      sliver: SliverList.builder(
+                        itemCount: opportunities.length,
+                        itemBuilder: (context, index) => Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: MoolSpacing.sm,
+                          ),
+                          child: _WorkReveal(
+                            order: index,
+                            child: _OpportunityCard(
+                              opportunity: opportunities[index],
+                              onOpen: () => _openOpportunity(
+                                context,
+                                opportunities[index],
+                              ),
+                              onWorkspaceSetup: () =>
+                                  _openWorkspaceSetup(context),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (related.isNotEmpty) ...[
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        MoolServiceHomeTokens.pagePadding,
+                        MoolSpacing.md,
+                        MoolServiceHomeTokens.pagePadding,
+                        MoolSpacing.sm,
+                      ),
+                      sliver: SliverToBoxAdapter(
+                        child: _RelatedWorkHeading(
+                          city: widget.session.selectedCity,
+                        ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: MoolServiceHomeTokens.pagePadding,
+                      ),
+                      sliver: SliverList.builder(
+                        itemCount: related.length,
+                        itemBuilder: (context, index) => Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: MoolSpacing.sm,
+                          ),
+                          child: _WorkReveal(
+                            order: index,
+                            child: _OpportunityCard(
+                              opportunity: related[index],
+                              recommended: true,
+                              onOpen: () =>
+                                  _openOpportunity(context, related[index]),
+                              onWorkspaceSetup: () =>
+                                  _openWorkspaceSetup(context),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: MoolSpacing.xxl),
+                  ),
                 ],
               ),
             ),
@@ -427,11 +491,303 @@ class _WorkFilterButton extends StatelessWidget {
   }
 }
 
+class _InlineOpportunityFilters extends StatelessWidget {
+  const _InlineOpportunityFilters({
+    required this.session,
+    required this.onCollapse,
+  });
+
+  final WorkSession session;
+  final VoidCallback onCollapse;
+
+  @override
+  Widget build(BuildContext context) {
+    final cities = <String>{
+      'Delhi',
+      ...workOpportunities
+          .map((opportunity) => opportunity.city.trim())
+          .where((city) => city.isNotEmpty && city != 'India'),
+    }.toList()..sort();
+    final areas =
+        workOpportunities
+            .where((opportunity) => opportunity.city == session.selectedCity)
+            .map((opportunity) => opportunity.area)
+            .where((area) => area.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    final pincodes =
+        workOpportunities
+            .where(
+              (opportunity) =>
+                  opportunity.city == session.selectedCity &&
+                  (session.selectedArea.isEmpty ||
+                      opportunity.area == session.selectedArea),
+            )
+            .map((opportunity) => opportunity.pincode)
+            .where((pincode) => pincode.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    return Container(
+      key: const Key('work-inline-filter-panel'),
+      margin: const EdgeInsets.fromLTRB(
+        MoolServiceHomeTokens.pagePadding,
+        MoolSpacing.xs,
+        MoolServiceHomeTokens.pagePadding,
+        0,
+      ),
+      padding: const EdgeInsets.all(MoolSpacing.sm),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(MoolRadii.floating),
+        border: Border.all(color: const Color(0xFFC9CCE1)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x11000050),
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Filter on the go',
+                      style: TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      'Tap once to update nearby paid work.',
+                      style: TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (session.filter != WorkFeedFilter.forYou ||
+                  session.hasOpportunityLocationFilter)
+                TextButton(
+                  key: const Key('work-filter-clear'),
+                  onPressed: () {
+                    session.setFilter(WorkFeedFilter.forYou);
+                    session.clearOpportunityFilters();
+                  },
+                  child: const Text('Clear'),
+                ),
+              IconButton(
+                key: const Key('work-filter-collapse'),
+                tooltip: 'Collapse filters',
+                onPressed: onCollapse,
+                icon: const Icon(Icons.expand_less_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          _FilterChoiceRow(
+            semanticLabel: 'Paid work type filters',
+            children: [
+              for (final value in WorkFeedFilter.values)
+                ChoiceChip(
+                  key: ValueKey('work-filter-${value.name}'),
+                  label: Text(value.label),
+                  selected: session.filter == value,
+                  onSelected: (_) => session.setFilter(value),
+                ),
+            ],
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          _FilterChoiceRow(
+            semanticLabel: 'City filters',
+            children: [
+              ChoiceChip(
+                key: const Key('work-filter-city-all'),
+                label: const Text('All India'),
+                selected: session.selectedCity.isEmpty,
+                onSelected: (_) => session.clearOpportunityFilters(),
+              ),
+              for (final city in cities)
+                ChoiceChip(
+                  key: ValueKey('work-filter-city-$city'),
+                  label: Text(city),
+                  selected: session.selectedCity == city,
+                  onSelected: (_) => session.setOpportunityLocationFilters(
+                    city: session.selectedCity == city ? '' : city,
+                  ),
+                ),
+            ],
+          ),
+          AnimatedSwitcher(
+            duration: MoolMotion.accessible(context, MoolMotion.quick),
+            child: session.selectedCity.isEmpty
+                ? const SizedBox.shrink()
+                : Padding(
+                    key: ValueKey('work-location-${session.selectedCity}'),
+                    padding: const EdgeInsets.only(top: MoolSpacing.xs),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (areas.isNotEmpty)
+                          _FilterChoiceRow(
+                            semanticLabel: 'Area filters',
+                            children: [
+                              ChoiceChip(
+                                key: const Key('work-filter-area-all'),
+                                label: const Text('All areas'),
+                                selected: session.selectedArea.isEmpty,
+                                onSelected: (_) =>
+                                    session.setOpportunityLocationFilters(
+                                      city: session.selectedCity,
+                                    ),
+                              ),
+                              for (final area in areas)
+                                ChoiceChip(
+                                  key: ValueKey('work-filter-area-$area'),
+                                  label: Text(area),
+                                  selected: session.selectedArea == area,
+                                  onSelected: (_) =>
+                                      session.setOpportunityLocationFilters(
+                                        city: session.selectedCity,
+                                        area: session.selectedArea == area
+                                            ? ''
+                                            : area,
+                                      ),
+                                ),
+                            ],
+                          ),
+                        if (pincodes.isNotEmpty) ...[
+                          const SizedBox(height: MoolSpacing.xs),
+                          _FilterChoiceRow(
+                            semanticLabel: 'Pincode filters',
+                            children: [
+                              for (final pincode in pincodes)
+                                ChoiceChip(
+                                  key: ValueKey('work-filter-pincode-$pincode'),
+                                  label: Text('PIN $pincode'),
+                                  selected: session.selectedPincode == pincode,
+                                  onSelected: (_) =>
+                                      session.setOpportunityLocationFilters(
+                                        city: session.selectedCity,
+                                        area: session.selectedArea,
+                                        pincode:
+                                            session.selectedPincode == pincode
+                                            ? ''
+                                            : pincode,
+                                      ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChoiceRow extends StatelessWidget {
+  const _FilterChoiceRow({required this.semanticLabel, required this.children});
+
+  final String semanticLabel;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: semanticLabel,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (var index = 0; index < children.length; index += 1) ...[
+              children[index],
+              if (index != children.length - 1)
+                const SizedBox(width: MoolSpacing.xs),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RelatedWorkHeading extends StatelessWidget {
+  const _RelatedWorkHeading({required this.city});
+
+  final String city;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('work-related-opportunities'),
+      padding: const EdgeInsets.all(MoolSpacing.sm),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF4E5),
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        border: Border.all(color: const Color(0xFFFFC37A)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.explore_outlined, color: MoolColors.navy),
+          const SizedBox(width: MoolSpacing.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  city.isEmpty
+                      ? 'You may also like these funded roles'
+                      : 'More paid work beyond $city',
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const Text(
+                  'Keep browsing while matching work in your location is updated.',
+                  style: TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _OpportunityCard extends StatelessWidget {
-  const _OpportunityCard({required this.opportunity, required this.onOpen});
+  const _OpportunityCard({
+    required this.opportunity,
+    required this.onOpen,
+    required this.onWorkspaceSetup,
+    this.recommended = false,
+  });
 
   final WorkOpportunity opportunity;
   final VoidCallback onOpen;
+  final VoidCallback onWorkspaceSetup;
+  final bool recommended;
 
   @override
   Widget build(BuildContext context) {
@@ -440,190 +796,290 @@ class _OpportunityCard extends StatelessWidget {
         ? 'MoolSocial-owned'
         : 'MoolSocial user-owned';
     final posterLine = opportunity.publisher == opportunity.posterType.label
-        ? 'Posted by ${opportunity.posterType.label}'
-        : 'Posted by ${opportunity.posterType.label} · ${opportunity.publisher}';
+        ? opportunity.posterType.label
+        : '${opportunity.posterType.label} · ${opportunity.publisher}';
     return Semantics(
-      button: true,
       label:
-          '$owner. ${opportunity.posterType.label}. ${opportunity.title}. ${opportunity.qualificationHeadline}. Monthly payment ${opportunity.monthlyPayment}.',
+          '$owner. ${opportunity.posterType.label}. ${opportunity.title}. ${opportunity.qualificationHeadline}. ${opportunity.requiredWork}. Monthly payment ${opportunity.monthlyPayment}. ${opportunity.deadline}.',
+      container: true,
+      button: true,
       onTap: onOpen,
-      excludeSemantics: true,
       child: Material(
         key: Key('work-opportunity-${opportunity.id}'),
-        color: color,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(MoolRadii.floating),
+        elevation: 1.5,
+        shadowColor: const Color(0x22000050),
         clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onOpen,
-          child: Padding(
-            padding: const EdgeInsets.all(MoolSpacing.sm),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: MoolSpacing.xs,
-                  runSpacing: MoolSpacing.xs,
-                  children: [
-                    _WhiteTag(
-                      key: Key('work-opportunity-owner-${opportunity.id}'),
-                      label: owner,
-                    ),
-                    if (opportunity.funded)
-                      _WhiteTag(
-                        key: Key('work-opportunity-funding-${opportunity.id}'),
-                        label: 'Funded',
-                      ),
-                  ],
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-                Text(
-                  posterLine,
-                  key: Key('work-opportunity-poster-type-${opportunity.id}'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  opportunity.title,
-                  key: Key('work-opportunity-position-${opportunity.id}'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    height: 1.12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  opportunity.summary,
-                  key: Key('work-opportunity-description-${opportunity.id}'),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFF4F4FF),
-                    fontSize: 11.5,
-                    height: 1.25,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-                _CardFact(
-                  key: Key(
-                    'work-opportunity-candidate-requirements-${opportunity.id}',
-                  ),
-                  icon: Icons.verified_user_outlined,
-                  text: opportunity.qualificationHeadline,
-                ),
-                _CardFact(
-                  key: Key('work-opportunity-requirement-${opportunity.id}'),
-                  icon: Icons.assignment_outlined,
-                  text: opportunity.requiredWork,
-                ),
-                _CardFact(
-                  key: Key('work-opportunity-location-${opportunity.id}'),
-                  icon: Icons.place_outlined,
-                  text:
-                      '${opportunity.area}, ${opportunity.city} · ${opportunity.pincode}',
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(MoolSpacing.xs),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .16),
-                    borderRadius: BorderRadius.circular(MoolRadii.control),
-                  ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ColoredBox(color: color, child: const SizedBox(width: 6)),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(MoolSpacing.sm),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        opportunity.paymentAmount,
-                        key: Key(
-                          'work-opportunity-pay-amount-${opportunity.id}',
-                        ),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
+                      InkWell(
+                        onTap: onOpen,
+                        borderRadius: BorderRadius.circular(MoolRadii.control),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    borderRadius: BorderRadius.circular(
+                                      MoolRadii.capsule,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    recommended ? 'RECOMMENDED' : 'HIRING NOW',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8.5,
+                                      letterSpacing: .35,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  key: Key(
+                                    'work-opportunity-owner-${opportunity.id}',
+                                  ),
+                                  child: Text(
+                                    posterLine,
+                                    key: Key(
+                                      'work-opportunity-poster-type-${opportunity.id}',
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.end,
+                                    style: const TextStyle(
+                                      color: MoolColors.muted,
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              opportunity.title,
+                              key: Key(
+                                'work-opportunity-position-${opportunity.id}',
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: MoolColors.navy,
+                                fontSize: 15.5,
+                                height: 1.12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              opportunity.summary,
+                              key: Key(
+                                'work-opportunity-description-${opportunity.id}',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: MoolColors.muted,
+                                fontSize: 10.5,
+                                height: 1.25,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            _CardFact(
+                              key: Key(
+                                'work-opportunity-candidate-requirements-${opportunity.id}',
+                              ),
+                              icon: Icons.verified_outlined,
+                              text: opportunity.qualificationHeadline,
+                              color: MoolColors.ink,
+                              maxLines: 1,
+                            ),
+                            _CardFact(
+                              key: Key(
+                                'work-opportunity-requirement-${opportunity.id}',
+                              ),
+                              icon: Icons.work_outline_rounded,
+                              text: opportunity.requiredWork,
+                              color: MoolColors.ink,
+                              maxLines: 1,
+                            ),
+                            _CardFact(
+                              key: Key(
+                                'work-opportunity-location-${opportunity.id}',
+                              ),
+                              icon: Icons.place_outlined,
+                              text: opportunity.pincode.isEmpty
+                                  ? '${opportunity.area}, ${opportunity.city}'
+                                  : '${opportunity.area}, ${opportunity.city} · ${opportunity.pincode}',
+                              color: MoolColors.muted,
+                              maxLines: 1,
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: MoolSpacing.xs,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: .07),
+                                borderRadius: BorderRadius.circular(
+                                  MoolRadii.control,
+                                ),
+                                border: Border.all(
+                                  color: color.withValues(alpha: .22),
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'MONTHLY PAYMENT',
+                                          style: TextStyle(
+                                            color: MoolColors.muted,
+                                            fontSize: 8,
+                                            letterSpacing: .3,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        Text(
+                                          opportunity.monthlyPayment,
+                                          key: Key(
+                                            'work-opportunity-pay-monthly-${opportunity.id}',
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: color,
+                                            fontSize: 12,
+                                            height: 1.15,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: MoolSpacing.xs),
+                                  Text(
+                                    opportunity.paymentAmount,
+                                    key: Key(
+                                      'work-opportunity-pay-amount-${opportunity.id}',
+                                    ),
+                                    textAlign: TextAlign.end,
+                                    style: const TextStyle(
+                                      color: MoolColors.ink,
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (opportunity.hourlyPayment != null ||
+                                opportunity.assignmentPayment != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Wrap(
+                                  spacing: MoolSpacing.sm,
+                                  runSpacing: 2,
+                                  children: [
+                                    if (opportunity.hourlyPayment
+                                        case final hourly?)
+                                      Text(
+                                        'Hourly $hourly',
+                                        key: Key(
+                                          'work-opportunity-pay-hourly-${opportunity.id}',
+                                        ),
+                                        style: const TextStyle(
+                                          color: MoolColors.muted,
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    if (opportunity.assignmentPayment
+                                        case final assignment?)
+                                      Text(
+                                        'Assignment $assignment',
+                                        key: Key(
+                                          'work-opportunity-pay-assignment-${opportunity.id}',
+                                        ),
+                                        style: const TextStyle(
+                                          color: MoolColors.muted,
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.timer_outlined,
+                                  size: 13,
+                                  color: color,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    opportunity.deadline,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: color,
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const Text(
-                        'Monthly payment',
-                        style: TextStyle(
-                          color: Color(0xFFEFEFFF),
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      const SizedBox(height: 6),
+                      _WorkspaceSetupCta(
+                        keyName: 'work-opportunity-workspace-${opportunity.id}',
+                        onPressed: onWorkspaceSetup,
+                        compact: true,
                       ),
-                      Text(
-                        opportunity.monthlyPayment,
-                        key: Key(
-                          'work-opportunity-pay-monthly-${opportunity.id}',
-                        ),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      const SizedBox(height: 6),
+                      _AttentionApplyButton(
+                        keyName: 'work-opportunity-apply-${opportunity.id}',
+                        onPressed: onOpen,
+                        accent: color,
+                        compact: true,
                       ),
-                      Text(
-                        'Primary format · monthly',
-                        key: Key(
-                          'work-opportunity-pay-format-${opportunity.id}',
-                        ),
-                        style: const TextStyle(
-                          color: Color(0xFFEFEFFF),
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (opportunity.hourlyPayment case final hourly?)
-                        Text(
-                          'Hourly: $hourly',
-                          key: Key(
-                            'work-opportunity-pay-hourly-${opportunity.id}',
-                          ),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      if (opportunity.assignmentPayment case final assignment?)
-                        Text(
-                          'Per assignment: $assignment',
-                          key: Key(
-                            'work-opportunity-pay-assignment-${opportunity.id}',
-                          ),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
                     ],
                   ),
                 ),
-                const SizedBox(height: MoolSpacing.xs),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    key: Key('work-opportunity-apply-${opportunity.id}'),
-                    onPressed: onOpen,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: color,
-                      minimumSize: const Size.fromHeight(44),
-                    ),
-                    icon: const Icon(Icons.arrow_forward_rounded),
-                    label: const Text('Apply'),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -631,36 +1087,192 @@ class _OpportunityCard extends StatelessWidget {
   }
 }
 
-class _WhiteTag extends StatelessWidget {
-  const _WhiteTag({required this.label, super.key});
+class _WorkspaceSetupCta extends StatelessWidget {
+  const _WorkspaceSetupCta({
+    required this.keyName,
+    required this.onPressed,
+    this.compact = false,
+  });
 
-  final String label;
+  final String keyName;
+  final VoidCallback onPressed;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .17),
-        borderRadius: BorderRadius.circular(MoolRadii.capsule),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
+    return Material(
+      color: const Color(0xFFFFF4E5),
+      borderRadius: BorderRadius.circular(MoolRadii.control),
+      child: InkWell(
+        key: Key(keyName),
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: MoolSpacing.xs,
+            vertical: compact ? 6 : MoolSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.add_business_outlined,
+                color: MoolColors.navy,
+                size: 19,
+              ),
+              const SizedBox(width: MoolSpacing.xs),
+              const Expanded(
+                child: Text(
+                  'Create your workspace and upload documents for account setup and help from a MoolSocial representative.',
+                  style: TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 10,
+                    height: 1.2,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: MoolColors.orange,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+class _AttentionApplyButton extends StatefulWidget {
+  const _AttentionApplyButton({
+    required this.keyName,
+    required this.onPressed,
+    required this.accent,
+    this.compact = false,
+  });
+
+  final String keyName;
+  final VoidCallback? onPressed;
+  final Color accent;
+  final bool compact;
+
+  @override
+  State<_AttentionApplyButton> createState() => _AttentionApplyButtonState();
+}
+
+class _AttentionApplyButtonState extends State<_AttentionApplyButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+    value: 1,
+  );
+  bool _motionStarted = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_motionStarted || MediaQuery.disableAnimationsOf(context)) return;
+    _motionStarted = true;
+    _controller.repeat(reverse: true, count: 4).whenComplete(() {
+      if (mounted) _controller.value = 1;
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(
+        begin: .72,
+        end: 1,
+      ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut)),
+      child: SizedBox(
+        width: double.infinity,
+        height: widget.compact ? 44 : 48,
+        child: FilledButton(
+          key: Key(widget.keyName),
+          onPressed: widget.onPressed,
+          style: FilledButton.styleFrom(
+            backgroundColor: MoolColors.navy,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: MoolColors.muted.withValues(alpha: .28),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(MoolRadii.control),
+              side: BorderSide(color: widget.accent, width: 2),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: MoolColors.orange,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: MoolSpacing.xs),
+              const Text(
+                'Apply Now',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkReveal extends StatelessWidget {
+  const _WorkReveal({required this.order, required this.child});
+
+  final int order;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: MoolMotion.accessible(
+        context,
+        Duration(milliseconds: 220 + (order.clamp(0, 4) * 45)),
+      ),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 12 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
 class _CardFact extends StatelessWidget {
-  const _CardFact({required this.icon, required this.text, super.key});
+  const _CardFact({
+    required this.icon,
+    required this.text,
+    this.color = Colors.white,
+    this.maxLines,
+    super.key,
+  });
 
   final IconData icon;
   final String text;
+  final Color color;
+  final int? maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -669,13 +1281,15 @@ class _CardFact extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 14, color: Colors.white),
+          Icon(icon, size: 14, color: color),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                color: Colors.white,
+              maxLines: maxLines,
+              overflow: maxLines == null ? null : TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
                 fontSize: 10.5,
                 height: 1.25,
                 fontWeight: FontWeight.w700,
@@ -739,6 +1353,8 @@ class WorkOpportunityScreen extends StatelessWidget {
           subtitle: '${opportunity.posterType.label} paid requirement',
           fallbackBackRoute: '/app/work/earn',
           activeLocalAction: 'earn',
+          showHeaderChat: false,
+          showTrailingAction: false,
           bottomAction: applied
               ? Column(
                   mainAxisSize: MainAxisSize.min,
@@ -760,23 +1376,34 @@ class WorkOpportunityScreen extends StatelessWidget {
                     ),
                   ],
                 )
-              : WorkPrimaryButton(
-                  keyName: 'work-apply-opportunity',
-                  label: 'Apply now',
-                  busy: session.busy,
-                  onPressed: opportunity.available
-                      ? () async {
-                          final success = await session
-                              .applySelectedOpportunity();
-                          if (!context.mounted) return;
-                          if (!success &&
-                              opportunity.requiresWorkspace &&
-                              !session.hasVerifiedWorkspace) {
-                            context.go('/app/work/my-work');
-                          }
-                        }
-                      : null,
-                  icon: Icons.send_rounded,
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _WorkspaceSetupCta(
+                      keyName: 'work-detail-workspace-setup',
+                      onPressed: () {
+                        session.startAnotherWork();
+                        context.push('/app/work/workspace/choose');
+                      },
+                    ),
+                    const SizedBox(height: MoolSpacing.xs),
+                    _AttentionApplyButton(
+                      keyName: 'work-apply-opportunity',
+                      accent: _cardColor(opportunity.cardColorToken),
+                      onPressed: opportunity.available && !session.busy
+                          ? () async {
+                              final success = await session
+                                  .applySelectedOpportunity();
+                              if (!context.mounted) return;
+                              if (!success &&
+                                  opportunity.requiresWorkspace &&
+                                  !session.hasVerifiedWorkspace) {
+                                context.go('/app/work/my-work');
+                              }
+                            }
+                          : null,
+                    ),
+                  ],
                 ),
           body: ListView(
             key: const Key('work-opportunity-screen'),
@@ -787,34 +1414,79 @@ class WorkOpportunityScreen extends StatelessWidget {
               MoolSpacing.xl,
             ),
             children: [
-              _OpportunityDetailHero(opportunity: opportunity),
+              _WorkReveal(
+                order: 0,
+                child: _OpportunityDetailHero(opportunity: opportunity),
+              ),
               const SizedBox(height: MoolSpacing.md),
-              _DetailSection(
-                keyName: 'work-detail-about-role',
-                title: 'About the Role',
-                child: Text(opportunity.aboutRole),
+              _WorkReveal(
+                order: 1,
+                child: _DetailSection(
+                  keyName: 'work-detail-about-role',
+                  title: 'About the Role',
+                  icon: Icons.badge_outlined,
+                  accent: const Color(0xFF0047AB),
+                  tint: const Color(0xFFEAF2FF),
+                  child: Text(opportunity.aboutRole),
+                ),
               ),
-              _DetailSection(
-                keyName: 'work-detail-what-youll-do',
-                title: 'What You’ll Do',
-                child: _BulletList(items: opportunity.whatYoullDo),
+              _WorkReveal(
+                order: 2,
+                child: _DetailSection(
+                  keyName: 'work-detail-what-youll-do',
+                  title: 'What You’ll Do',
+                  icon: Icons.task_alt_rounded,
+                  accent: const Color(0xFF007A4D),
+                  tint: const Color(0xFFE8F7F0),
+                  child: _BulletList(
+                    items: opportunity.whatYoullDo,
+                    bulletColor: const Color(0xFF007A4D),
+                  ),
+                ),
               ),
-              _DetailSection(
-                keyName: 'work-detail-who-you-are',
-                title: 'Who You Are',
-                child: _BulletList(items: opportunity.whoYouAre),
+              _WorkReveal(
+                order: 3,
+                child: _DetailSection(
+                  keyName: 'work-detail-who-you-are',
+                  title: 'Who You Are',
+                  icon: Icons.verified_user_outlined,
+                  accent: const Color(0xFF5B21B6),
+                  tint: const Color(0xFFF2EDFF),
+                  child: _BulletList(
+                    items: opportunity.whoYouAre,
+                    bulletColor: const Color(0xFF5B21B6),
+                  ),
+                ),
               ),
-              _DetailSection(
-                keyName: 'work-detail-nice-to-have',
-                title: 'Nice to Have',
-                child: _BulletList(items: opportunity.niceToHave),
+              _WorkReveal(
+                order: 4,
+                child: _DetailSection(
+                  keyName: 'work-detail-nice-to-have',
+                  title: 'Nice to Have',
+                  icon: Icons.auto_awesome_outlined,
+                  accent: const Color(0xFFA65A00),
+                  tint: const Color(0xFFFFF4E5),
+                  child: _BulletList(
+                    items: opportunity.niceToHave,
+                    bulletColor: const Color(0xFFA65A00),
+                  ),
+                ),
               ),
-              _DetailSection(
-                keyName: 'work-detail-why-join',
-                title: 'Why Join MoolSocial',
-                child: Text(opportunity.whyJoin),
+              _WorkReveal(
+                order: 4,
+                child: _DetailSection(
+                  keyName: 'work-detail-why-join',
+                  title: 'Why Join MoolSocial',
+                  icon: Icons.bolt_rounded,
+                  accent: MoolColors.orange,
+                  tint: const Color(0xFFFFF7ED),
+                  child: Text(opportunity.whyJoin),
+                ),
               ),
-              _PaymentDetails(opportunity: opportunity),
+              _WorkReveal(
+                order: 4,
+                child: _PaymentDetails(opportunity: opportunity),
+              ),
               if (applied) ...[
                 const SizedBox(height: MoolSpacing.md),
                 WorkCard(
@@ -871,48 +1543,91 @@ class _OpportunityDetailHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = _cardColor(opportunity.cardColorToken);
     return Container(
-      padding: const EdgeInsets.all(MoolSpacing.md),
       decoration: BoxDecoration(
-        color: _cardColor(opportunity.cardColorToken),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(MoolRadii.floating),
+        border: Border.all(color: accent.withValues(alpha: .42)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x16000050),
+            blurRadius: 18,
+            offset: Offset(0, 7),
+          ),
+        ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            opportunity.posterType == WorkOpportunityPosterType.moolSocial
-                ? 'MoolSocial-owned · ${opportunity.publisher}'
-                : 'User-owned · ${opportunity.posterType.label} · ${opportunity.publisher}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
+          Container(
+            width: double.infinity,
+            color: accent,
+            padding: const EdgeInsets.symmetric(
+              horizontal: MoolSpacing.md,
+              vertical: MoolSpacing.xs,
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.local_fire_department_rounded,
+                  color: Colors.white,
+                  size: 17,
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    opportunity.deadline,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: MoolSpacing.xs),
-          Text(
-            opportunity.title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              height: 1.12,
-              fontWeight: FontWeight.w900,
+          Padding(
+            padding: const EdgeInsets.all(MoolSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  opportunity.posterType == WorkOpportunityPosterType.moolSocial
+                      ? 'MOOLSOCIAL-OWNED · ${opportunity.publisher}'
+                      : 'USER-OWNED · ${opportunity.posterType.label} · ${opportunity.publisher}',
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 10,
+                    letterSpacing: .35,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  opportunity.title,
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 22,
+                    height: 1.12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+                Text(
+                  opportunity.summary,
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 12,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.sm),
+                _DecisionSnapshot(opportunity: opportunity, accent: accent),
+              ],
             ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          _CardFact(
-            icon: Icons.verified_user_outlined,
-            text: opportunity.qualificationHeadline,
-          ),
-          _CardFact(
-            icon: Icons.place_outlined,
-            text:
-                '${opportunity.area}, ${opportunity.city} · ${opportunity.pincode}',
-          ),
-          _CardFact(
-            icon: Icons.payments_outlined,
-            text: 'Monthly payment: ${opportunity.monthlyPayment}',
           ),
         ],
       ),
@@ -925,38 +1640,79 @@ class _DetailSection extends StatelessWidget {
     required this.keyName,
     required this.title,
     required this.child,
+    required this.icon,
+    required this.accent,
+    required this.tint,
   });
 
   final String keyName;
   final String title;
   final Widget child;
+  final IconData icon;
+  final Color accent;
+  final Color tint;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: MoolSpacing.md),
-      child: WorkCard(
-        keyName: keyName,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      key: Key(keyName),
+      margin: const EdgeInsets.only(bottom: MoolSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(MoolRadii.floating),
+        border: Border.all(color: accent.withValues(alpha: .28)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: MoolColors.navy,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
+            ColoredBox(color: accent, child: const SizedBox(width: 5)),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(MoolSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: MoolSpacing.xs,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: tint,
+                        borderRadius: BorderRadius.circular(MoolRadii.control),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(icon, color: accent, size: 19),
+                          const SizedBox(width: MoolSpacing.xs),
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: TextStyle(
+                                color: accent,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: MoolSpacing.sm),
+                    DefaultTextStyle(
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: 12.5,
+                        height: 1.38,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      child: child,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: MoolSpacing.sm),
-            DefaultTextStyle(
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 13,
-                height: 1.45,
-                fontWeight: FontWeight.w600,
-              ),
-              child: child,
             ),
           ],
         ),
@@ -965,10 +1721,106 @@ class _DetailSection extends StatelessWidget {
   }
 }
 
+class _DecisionSnapshot extends StatelessWidget {
+  const _DecisionSnapshot({required this.opportunity, required this.accent});
+
+  final WorkOpportunity opportunity;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(MoolSpacing.sm),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        border: Border.all(color: accent.withValues(alpha: .22)),
+      ),
+      child: Column(
+        children: [
+          _DecisionRow(
+            icon: Icons.verified_user_outlined,
+            label: 'You need',
+            value: opportunity.qualificationHeadline,
+            accent: accent,
+          ),
+          const Divider(height: MoolSpacing.md),
+          _DecisionRow(
+            icon: Icons.place_outlined,
+            label: 'Where',
+            value: opportunity.pincode.isEmpty
+                ? '${opportunity.area}, ${opportunity.city}'
+                : '${opportunity.area}, ${opportunity.city} · ${opportunity.pincode}',
+            accent: accent,
+          ),
+          const Divider(height: MoolSpacing.md),
+          _DecisionRow(
+            icon: Icons.payments_outlined,
+            label: 'You can earn',
+            value: opportunity.monthlyPayment,
+            accent: accent,
+            emphasized: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DecisionRow extends StatelessWidget {
+  const _DecisionRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.accent,
+    this.emphasized = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color accent;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: accent, size: 19),
+        const SizedBox(width: MoolSpacing.xs),
+        SizedBox(
+          width: 74,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: MoolColors.muted,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: emphasized ? accent : MoolColors.ink,
+              fontSize: 11.5,
+              height: 1.28,
+              fontWeight: emphasized ? FontWeight.w900 : FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _BulletList extends StatelessWidget {
-  const _BulletList({required this.items});
+  const _BulletList({required this.items, this.bulletColor = MoolColors.navy});
 
   final List<String> items;
+  final Color bulletColor;
 
   @override
   Widget build(BuildContext context) {
@@ -980,11 +1832,15 @@ class _BulletList extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: CircleAvatar(
-                    radius: 3,
-                    backgroundColor: MoolColors.navy,
+                Padding(
+                  padding: const EdgeInsets.only(top: 5),
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: bulletColor,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
                 const SizedBox(width: MoolSpacing.sm),
@@ -1007,6 +1863,9 @@ class _PaymentDetails extends StatelessWidget {
     return _DetailSection(
       keyName: 'work-detail-payment',
       title: 'Payment details',
+      icon: Icons.account_balance_wallet_outlined,
+      accent: const Color(0xFF007A4D),
+      tint: const Color(0xFFE8F7F0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

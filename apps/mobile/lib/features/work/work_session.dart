@@ -116,6 +116,39 @@ class WorkSession extends ChangeNotifier {
     selectedPincode,
   ].where((value) => value.trim().isNotEmpty).length;
 
+  bool get hasOpportunityLocationFilter =>
+      selectedCity.trim().isNotEmpty ||
+      selectedArea.trim().isNotEmpty ||
+      selectedPincode.trim().isNotEmpty;
+
+  List<WorkOpportunity> get relatedOpportunities {
+    if (!hasOpportunityLocationFilter) return const <WorkOpportunity>[];
+    final exactIds = filteredOpportunities
+        .map((opportunity) => opportunity.id)
+        .toSet();
+    final normalized = searchQuery.trim().toLowerCase();
+    return workOpportunities
+        .where((opportunity) {
+          if (exactIds.contains(opportunity.id)) return false;
+          final filterMatch =
+              filter == WorkFeedFilter.forYou ||
+              opportunity.filters.contains(filter);
+          final searchMatch =
+              normalized.isEmpty ||
+              [
+                opportunity.title,
+                opportunity.publisher,
+                opportunity.kind,
+                opportunity.requiredWork,
+                opportunity.qualificationHeadline,
+                opportunity.posterType.label,
+              ].join(' ').toLowerCase().contains(normalized);
+          return filterMatch && searchMatch;
+        })
+        .take(4)
+        .toList(growable: false);
+  }
+
   List<String> get familyIds => workProfiles
       .map((profile) => profile.familyId)
       .toSet()

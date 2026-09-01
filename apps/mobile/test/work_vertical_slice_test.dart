@@ -217,7 +217,6 @@ void main() {
 
     await tapVisible(tester, const Key('work-filter-button'));
     await tapVisible(tester, const Key('work-filter-jobs'));
-    await tapVisible(tester, const Key('work-filter-apply'));
     expect(find.text('Quick Delivery Biker'), findsOneWidget);
     expect(find.text('Social Content Creator'), findsNothing);
 
