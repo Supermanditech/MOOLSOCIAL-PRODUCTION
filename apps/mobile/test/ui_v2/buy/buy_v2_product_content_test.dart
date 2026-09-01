@@ -128,6 +128,8 @@ void main() {
 
     for (final value in const [
       'Product and pack information',
+      'Generic name',
+      'Net quantity',
       'Refined sunflower oil',
       '5 L',
       'Surya Oils India',
@@ -145,7 +147,13 @@ void main() {
   });
 
   testWidgets('missing optional compliance facts stay hidden', (tester) async {
-    final product = BuyV2Catalogue.products.first;
+    final product = BuyV2Catalogue.products.first.copyWith(
+      compliance: const BuyV2ProductCompliance(
+        genericName: '  ',
+        netQuantity: '',
+        manufacturerName: '   ',
+      ),
+    );
 
     await tester.pumpWidget(
       MaterialApp(
@@ -158,7 +166,11 @@ void main() {
     expect(find.text(product.title), findsOneWidget);
     expect(find.text(product.pack), findsOneWidget);
     expect(find.text(product.unitPrice), findsOneWidget);
+    expect(find.text('Product'), findsOneWidget);
+    expect(find.text('Pack'), findsOneWidget);
     for (final label in const [
+      'Generic name',
+      'Net quantity',
       'Manufacturer',
       'Packer',
       'Importer',
@@ -172,6 +184,87 @@ void main() {
     }
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'published protection fields remain complete at compact large text',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 700);
+      tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final product = BuyV2Catalogue.products.first.copyWith(
+        purchaseProtection: const BuyV2PurchaseProtection(
+          summary: 'Replacement or refund available',
+          remedies: ['Replacement', 'Refund', '  '],
+          windowLabel: 'Within 7 days of delivery',
+          conditionsLabel: 'Unused with original packaging',
+          verificationLabel: 'Photo or pickup inspection',
+          initiationLabel: 'Open the order and select Get help',
+          approvalLabel: 'After condition review',
+          pickupLabel: 'Pickup in original packaging',
+          refundMethodLabel: 'Original payment method',
+          refundTimelineLabel: 'After verification',
+          warrantyLabel: 'One-year manufacturer warranty',
+          nonReturnableReason: 'Change-of-mind return unavailable',
+          policyVersion: 'POLICY-7',
+          effectiveFromLabel: '1 September 2026',
+        ),
+      );
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: _SingleProductCommerceAdapter(product),
+        reviewDataEnabled: false,
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await session.restoreCommerce();
+      expect(session.openProduct(product.id), isTrue);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: product.destination,
+            initialView: BuyV2View.product,
+            productId: product.id,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final productScroll = find
+          .descendant(
+            of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.text('Applies from'),
+        220,
+        scrollable: productScroll,
+      );
+      for (final value in const [
+        'Replacement or refund available',
+        'Available options',
+        'Replacement · Refund',
+        'Request window',
+        'How to request',
+        'Refund method',
+        'Refund timeline',
+        'Warranty',
+        'Policy reference',
+        'POLICY-7',
+        'Applies from',
+        '1 September 2026',
+      ]) {
+        expect(find.text(value), findsOneWidget, reason: value);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'product gallery and details use one authoritative content owner',
@@ -345,6 +438,59 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+final class _SingleProductCommerceAdapter implements BuyV2CommerceAdapter {
+  const _SingleProductCommerceAdapter(this.product);
+
+  final BuyV2Product product;
+
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: [product],
+  );
+
+  @override
+  Future<BuyV2AddressRequestResult> createAddressRequest({
+    String recipient = '',
+  }) => throw UnsupportedError('Not used by this focused test.');
+
+  @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() =>
+      throw UnsupportedError('Not used by this focused test.');
+
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrder(
+    BuyV2OrderPlacementRequest request,
+  ) => throw UnsupportedError('Not used by this focused test.');
+
+  @override
+  Future<BuyV2OrderPlacementResult> reconcileOrder({
+    required String idempotencyKey,
+    required String paymentReference,
+  }) => throw UnsupportedError('Not used by this focused test.');
+
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({required String orderId}) =>
+      throw UnsupportedError('Not used by this focused test.');
+
+  @override
+  Future<BuyV2MutationResult> reportProduct({
+    required BuyV2Product product,
+    required String reason,
+  }) => throw UnsupportedError('Not used by this focused test.');
+
+  @override
+  Future<BuyV2OrderAlertsResult> setOrderAlerts({required bool enabled}) =>
+      throw UnsupportedError('Not used by this focused test.');
+
+  @override
+  Future<BuyV2MutationResult> submitProductReview({
+    required BuyV2Product product,
+    required int rating,
+    required String comment,
+  }) => throw UnsupportedError('Not used by this focused test.');
 }
 
 final class _ContentAdapter implements BuyV2ProductContentAdapter {

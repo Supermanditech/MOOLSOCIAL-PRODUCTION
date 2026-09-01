@@ -185,11 +185,69 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
     expect(adapter.loadCalls, greaterThanOrEqualTo(2));
 
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    final callsWhilePaused = adapter.loadCalls;
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(adapter.loadCalls, callsWhilePaused);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(adapter.loadCalls, greaterThan(callsWhilePaused));
+
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
     final callsAfterDispose = adapter.loadCalls;
     await tester.pump(const Duration(milliseconds: 350));
     expect(adapter.loadCalls, callsAfterDispose);
+  });
+
+  testWidgets('map fallback remains readable at compact 140 percent text', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 568);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final adapter = _LiveDeliveryAdapter();
+    final session = BuyV2Session(
+      core: BuySession(),
+      liveDeliveryAdapter: adapter,
+    );
+    addTearDown(session.dispose);
+    expect(session.openTracking('PO-240783'), isTrue);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(
+          session: session,
+          initialDestination: session.destination,
+          initialView: session.view,
+          orderId: 'PO-240783',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final panel = find.byKey(const ValueKey('buy-live-delivery-PO-240783'));
+    await tester.scrollUntilVisible(
+      panel,
+      240,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Map view is not available right now.'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        RegExp(r'Delivery map unavailable.*About 12 minutes'),
+      ),
+      findsOneWidget,
+    );
+    semantics.dispose();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('completed orders do not request a live courier location', (

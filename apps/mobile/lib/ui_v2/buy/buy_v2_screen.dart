@@ -723,20 +723,29 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
 
   void _openOrderHelpChat(BuyV2Order order) {
     final onOpenChat = widget.onOpenChat;
+    final chatLabel = order.destination == BuyV2Destination.medicine
+        ? 'Care Chat'
+        : 'Shop Chat';
     final router = GoRouter.maybeOf(context);
     if (router == null) {
       if (onOpenChat != null) {
         onOpenChat();
       } else {
         widget.session.showNotice(
-          'Shop Chat is unavailable right now. Your order is unchanged.',
+          '$chatLabel is unavailable right now. Your order is unchanged.',
         );
       }
       return;
     }
-    context.push(
-      const BuyV2ChatRouteAdapter().orderHelpLocationFor(order: order),
-    );
+    try {
+      context.push(
+        const BuyV2ChatRouteAdapter().orderHelpLocationFor(order: order),
+      );
+    } on ArgumentError {
+      widget.session.showNotice(
+        '$chatLabel is unavailable right now. Your order is unchanged.',
+      );
+    }
   }
 
   void _openProductQuestion(BuyV2Product product) {
@@ -744,15 +753,28 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     FocusScope.of(context).unfocus();
     final router = GoRouter.maybeOf(context);
     if (router == null) {
-      widget.onOpenChat?.call();
+      final onOpenChat = widget.onOpenChat;
+      if (onOpenChat != null) {
+        onOpenChat();
+      } else {
+        widget.session.showNotice(
+          'Supplier Chat is unavailable right now. Your product is unchanged.',
+        );
+      }
       return;
     }
-    context.push(
-      const BuyV2ChatRouteAdapter().productQuestionLocationFor(
-        product: product,
-        quantity: widget.session.quantityFor(product.id),
-      ),
-    );
+    try {
+      context.push(
+        const BuyV2ChatRouteAdapter().productQuestionLocationFor(
+          product: product,
+          quantity: widget.session.quantityFor(product.id),
+        ),
+      );
+    } on ArgumentError {
+      widget.session.showNotice(
+        'Supplier Chat is unavailable right now. Your product is unchanged.',
+      );
+    }
   }
 
   void _openPartnerCatalogue(BuyV2Product product, {bool brandOnly = false}) {

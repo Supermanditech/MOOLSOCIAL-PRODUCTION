@@ -41,12 +41,13 @@ void main() {
       final session = fixture.session;
       expect(session.addProduct('s-tomato'), isTrue);
       expect(session.addProduct('w-tomato'), isTrue);
+      final expectedRemaining = session.quantityFor('w-tomato');
       session.openCart(scope: BuyV2CartScope.shop);
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const ValueKey('buy-cart-empty')));
       await tester.pumpAndSettle();
-      expect(find.text('Remove Shop items?'), findsOneWidget);
+      expect(find.text('Remove Shop item?'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('buy-cart-clear-sheet')),
         findsOneWidget,
@@ -67,6 +68,11 @@ void main() {
       expect(session.view, BuyV2View.cart);
       expect(session.destination, BuyV2Destination.wholesale);
       expect(session.cartScope, BuyV2CartScope.wholesale);
+      expect(
+        session.cartAcknowledgement,
+        'Shop item removed · $expectedRemaining '
+        '${expectedRemaining == 1 ? 'item remains' : 'items remain'}',
+      );
       expect(find.byKey(const ValueKey('buy-cart-clear-sheet')), findsNothing);
       expect(tester.takeException(), isNull);
     },
@@ -139,6 +145,10 @@ void main() {
     final confirm = find.byKey(const ValueKey('buy-cart-clear-confirm'));
     expect(tester.getSize(cancel).height, greaterThanOrEqualTo(44));
     expect(tester.getSize(confirm).height, greaterThanOrEqualTo(44));
+    expect(
+      tester.getRect(cancel).bottom,
+      lessThan(tester.getRect(confirm).top),
+    );
     expect(tester.takeException(), isNull);
   });
 }

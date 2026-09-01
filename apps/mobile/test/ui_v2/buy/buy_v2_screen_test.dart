@@ -20,7 +20,8 @@ final _forbiddenBuyCopy = RegExp(
   r'state machine|endpoint|payload|backend|provider callback|next screen|'
   r'for (?:review|testing)|source route|product compliance|'
   r'fulfiller assigned|fulfilment|route owner|internal identifier|'
-  r'debug build|ui review)\b',
+  r'debug build|ui review|source id|adapter|review data|not-connected|'
+  r'invalid-details|connection-unavailable)\b',
   caseSensitive: false,
 );
 

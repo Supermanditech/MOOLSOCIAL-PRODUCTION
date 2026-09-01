@@ -52,6 +52,9 @@ void main() {
       find.text('After delivery · ${product.returnPolicy}'),
       findsOneWidget,
     );
+    final policy = find.byKey(ValueKey('buy-order-item-policy-${product.id}'));
+    expect(policy, findsOneWidget);
+    expect(tester.widget<Text>(policy).maxLines, isNull);
     expect(tester.takeException(), isNull);
   });
 }

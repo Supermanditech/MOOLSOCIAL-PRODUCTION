@@ -5083,6 +5083,10 @@ class BuyV2Session extends ChangeNotifier {
 
     final previous = _navigationSurfaceIdentity;
     final removedIds = scopedLines.map((line) => line.product.id).toSet();
+    final removedCount = scopedLines.fold<int>(
+      0,
+      (total, line) => total + line.quantity,
+    );
     _cart.removeWhere((id, _) => removedIds.contains(id));
     _pruneCartSelections();
 
@@ -5111,8 +5115,8 @@ class BuyV2Session extends ChangeNotifier {
     notice = null;
     final remainingCount = itemCount;
     cartAcknowledgement =
-        '${scope.label} items removed · $remainingCount '
-        '${remainingCount == 1 ? 'item' : 'items'} remain';
+        '${scope.label} ${removedCount == 1 ? 'item' : 'items'} removed · '
+        '$remainingCount ${remainingCount == 1 ? 'item remains' : 'items remain'}';
     _persistCustomerState();
     _notifyNavigationIfChanged(
       previous,

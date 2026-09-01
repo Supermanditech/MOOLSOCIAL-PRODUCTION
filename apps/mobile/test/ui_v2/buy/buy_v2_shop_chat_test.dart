@@ -228,6 +228,11 @@ void main() {
     expect(orderLine['lineTotal'], product.price * 3);
     expect(orderLine['returnPolicy'], product.returnPolicy);
     expect(uri.queryParameters['paymentTerms'], 'Pay now');
+    expect(uri.queryParameters['draft'], contains('SKU ${product.id}'));
+    expect(uri.queryParameters['draft'], contains('Quantity 3'));
+    expect(uri.queryParameters['draft'], contains('Items: ${product.title}'));
+    expect(uri.queryParameters['draft'], contains('Order total:'));
+    expect(uri.queryParameters['draft'], contains('Payment terms: Pay now'));
     expect(uri.queryParameters['adminVisible'], 'true');
     expect(uri.queryParameters['escalationReason'], 'supplier-non-response');
     expect(uri.queryParameters['callAuthority'], 'moolsocial-admin-only');
@@ -266,6 +271,9 @@ void main() {
     expect(uri.queryParameters['callAuthority'], 'moolsocial-admin-only');
     expect(uri.queryParameters['draft'], contains(product.seller));
     expect(uri.queryParameters['draft'], contains(product.title));
+    expect(uri.queryParameters['draft'], contains('SKU: ${product.id}'));
+    expect(uri.queryParameters['draft'], contains('Quantity: 3'));
+    expect(uri.queryParameters['draft'], contains('Price:'));
     final snapshot =
         jsonDecode(uri.queryParameters['productSnapshot']!)
             as Map<String, dynamic>;
@@ -394,6 +402,12 @@ void main() {
     expect(uri.queryParameters['refundMethod'], 'Original payment method');
     expect(uri.queryParameters['warranty'], 'One-year manufacturer warranty');
     expect(uri.queryParameters['policyVersion'], 'POLICY-7');
+    expect(uri.queryParameters['draft'], contains('Replacement available'));
+    expect(uri.queryParameters['draft'], contains('Replacement, Refund'));
+    expect(
+      uri.queryParameters['draft'],
+      contains('Warranty: One-year manufacturer warranty'),
+    );
   });
 
   test('supplier Chat snapshot carries product compliance facts', () {
@@ -423,6 +437,43 @@ void main() {
     expect(compliance['countryOfOrigin'], 'India');
     expect(compliance['fssaiLicenseNumber'], '10000000000000');
     expect(compliance['consumerCare'], 'Surya Oils Consumer Care');
+    expect(uri.queryParameters['draft'], contains('Generic name:'));
+    expect(uri.queryParameters['draft'], contains('Country of origin: India'));
+  });
+
+  test('blank optional supplier facts stay absent from Chat context', () {
+    final product = BuyV2Catalogue.products.first.copyWith(
+      compliance: const BuyV2ProductCompliance(
+        genericName: '  ',
+        netQuantity: '',
+        manufacturerName: '   ',
+      ),
+      purchaseProtection: const BuyV2PurchaseProtection(
+        summary: ' ',
+        remedies: [' ', 'Replacement'],
+        warrantyLabel: '  ',
+      ),
+    );
+    final uri = Uri.parse(
+      const BuyV2ChatRouteAdapter().productQuestionLocationFor(
+        product: product,
+      ),
+    );
+    final snapshot =
+        jsonDecode(uri.queryParameters['productSnapshot']!)
+            as Map<String, dynamic>;
+    final compliance = snapshot['compliance'] as Map<String, dynamic>;
+    final protection = snapshot['purchaseProtection'] as Map<String, dynamic>;
+
+    expect(compliance['genericName'], isNull);
+    expect(compliance['netQuantity'], isNull);
+    expect(compliance['manufacturer'], isNull);
+    expect(protection['summary'], isNull);
+    expect(protection['remedies'], ['Replacement']);
+    expect(protection['warranty'], isNull);
+    expect(uri.queryParameters['policy'], product.returnPolicy);
+    expect(uri.queryParameters['draft'], isNot(contains('Generic name:')));
+    expect(uri.queryParameters['draft'], isNot(contains('Warranty:')));
   });
 
   testWidgets('Buy Chat action opens only the shared Chat module', (
@@ -714,6 +765,80 @@ void main() {
   });
 
   testWidgets(
+    'product supplier Chat keeps exact context above the compact keyboard',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+      tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final product = BuyV2Catalogue.products.firstWhere(
+        (candidate) =>
+            candidate.destination == BuyV2Destination.wholesale &&
+            candidate.sellerType.toLowerCase().contains('manufacturer'),
+      );
+      final journey = await readyJourney();
+      final chat = ChatSession();
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: Uri(
+            path: '/app/buy',
+            queryParameters: {
+              'sub': 'wholesale',
+              'view': 'product',
+              'product': product.id,
+            },
+          ).toString(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final productScroll = find
+          .descendant(
+            of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final ask = find.bySemanticsLabel('Ask manufacturer');
+      await tester.scrollUntilVisible(ask, 220, scrollable: productScroll);
+      await tester.tap(ask);
+      await tester.pumpAndSettle();
+
+      final field = find.byKey(const Key('chat-message-field'));
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+      expect(field, findsOneWidget);
+      final draft = tester.widget<TextField>(field).controller?.text ?? '';
+      expect(draft, contains(product.seller));
+      expect(draft, contains('SKU: ${product.id}'));
+      expect(draft, contains('Quantity: ${product.minimumOrder}'));
+      expect(draft, contains('Price:'));
+
+      await tester.tap(field);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(field).bottom, lessThanOrEqualTo(400));
+      expect(tester.takeException(), isNull);
+
+      tester.view.viewInsets = const FakeViewPadding();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(PageStorageKey('buy-product-${product.id}')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'order Help stays in one supplier conversation with one composer',
     (tester) async {
       tester.view.devicePixelRatio = 1;
@@ -758,6 +883,7 @@ void main() {
           ?.text;
       expect(orderDraft, contains('Help with order PO-240783'));
       expect(orderDraft, contains('Marwar Foods Distribution'));
+      expect(orderDraft, contains('Items:'));
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();

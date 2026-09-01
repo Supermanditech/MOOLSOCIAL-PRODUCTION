@@ -431,7 +431,14 @@ class BuyV2ProductView extends StatelessWidget {
     final productBenefitsState = session.productBenefitsStateFor(product);
     final variants = session.productVariantsFor(product);
     final purchaseProtection = product.purchaseProtection;
-    final returnSummary = purchaseProtection?.summary ?? product.returnPolicy;
+    final returnSummary =
+        _nonBlankComplianceValue(purchaseProtection?.summary) ??
+        _nonBlankComplianceValue(product.returnPolicy);
+    final protectionRemedies =
+        (purchaseProtection?.remedies ?? const <String>[])
+            .map(_nonBlankComplianceValue)
+            .whereType<String>()
+            .toList(growable: false);
     final automaticFulfilment =
         product.destination == BuyV2Destination.shop ||
         product.destination == BuyV2Destination.wholesale;
@@ -871,70 +878,94 @@ class BuyV2ProductView extends StatelessWidget {
                       value: returnPolicy,
                     ),
                   if (purchaseProtection case final protection?) ...[
-                    if (protection.remedies.isNotEmpty)
+                    if (protectionRemedies.isNotEmpty)
                       _DecisionRow(
                         icon: Icons.rule_rounded,
-                        label: 'Available remedies',
-                        value: protection.remedies.join(' · '),
+                        label: 'Available options',
+                        value: protectionRemedies.join(' · '),
                       ),
-                    if (protection.windowLabel case final value?)
+                    if (_nonBlankComplianceValue(protection.windowLabel)
+                        case final value?)
                       _DecisionRow(
                         icon: Icons.schedule_rounded,
                         label: 'Request window',
                         value: value,
                       ),
-                    if (protection.conditionsLabel case final value?)
+                    if (_nonBlankComplianceValue(protection.conditionsLabel)
+                        case final value?)
                       _DecisionRow(
                         icon: Icons.fact_check_outlined,
                         label: 'Conditions',
                         value: value,
                       ),
-                    if (protection.verificationLabel case final value?)
+                    if (_nonBlankComplianceValue(protection.verificationLabel)
+                        case final value?)
                       _DecisionRow(
                         icon: Icons.verified_outlined,
                         label: 'Verification',
                         value: value,
                       ),
-                    if (protection.initiationLabel case final value?)
+                    if (_nonBlankComplianceValue(protection.initiationLabel)
+                        case final value?)
                       _DecisionRow(
                         icon: Icons.playlist_add_check_rounded,
                         label: 'How to request',
                         value: value,
                       ),
-                    if (protection.approvalLabel case final value?)
+                    if (_nonBlankComplianceValue(protection.approvalLabel)
+                        case final value?)
                       _DecisionRow(
                         icon: Icons.approval_outlined,
                         label: 'Approval',
                         value: value,
                       ),
-                    if (protection.pickupLabel case final value?)
+                    if (_nonBlankComplianceValue(protection.pickupLabel)
+                        case final value?)
                       _DecisionRow(
                         icon: Icons.local_shipping_outlined,
                         label: 'Pickup',
                         value: value,
                       ),
-                    if (protection.refundMethodLabel case final value?)
+                    if (_nonBlankComplianceValue(protection.refundMethodLabel)
+                        case final value?)
                       _DecisionRow(
                         icon: Icons.account_balance_wallet_outlined,
                         label: 'Refund method',
                         value: value,
                       ),
-                    if (protection.refundTimelineLabel case final value?)
+                    if (_nonBlankComplianceValue(protection.refundTimelineLabel)
+                        case final value?)
                       _DecisionRow(
                         icon: Icons.timelapse_rounded,
                         label: 'Refund timeline',
                         value: value,
                       ),
-                    if (protection.warrantyLabel case final value?)
+                    if (_nonBlankComplianceValue(protection.warrantyLabel)
+                        case final value?)
                       _DecisionRow(
                         icon: Icons.shield_outlined,
                         label: 'Warranty',
                         value: value,
                       ),
-                    if (protection.nonReturnableReason case final value?)
+                    if (_nonBlankComplianceValue(protection.nonReturnableReason)
+                        case final value?)
                       _DecisionRow(
                         icon: Icons.info_outline_rounded,
                         label: 'Non-returnable',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.policyVersion)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.description_outlined,
+                        label: 'Policy reference',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.effectiveFromLabel)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.event_available_outlined,
+                        label: 'Applies from',
                         value: value,
                       ),
                   ],
@@ -1040,12 +1071,12 @@ class BuyV2ProductCompliancePanel extends StatelessWidget {
       children: [
         _DecisionRow(
           icon: Icons.category_outlined,
-          label: 'Generic name',
+          label: genericName == null ? 'Product' : 'Generic name',
           value: genericName ?? product.title,
         ),
         _DecisionRow(
           icon: Icons.scale_outlined,
-          label: 'Net quantity',
+          label: netQuantity == null ? 'Pack' : 'Net quantity',
           value: netQuantity ?? product.pack,
         ),
         if (product.mrp case final mrp?)
@@ -1166,6 +1197,13 @@ class _ProductQuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final saved = session.isSaved(product.id);
+    final sellerType = product.sellerType.toLowerCase();
+    final supplierQuestionLabel = sellerType.contains('manufacturer')
+        ? 'Ask manufacturer'
+        : product.destination == BuyV2Destination.wholesale
+        ? 'Ask supplier'
+        : 'Ask seller';
+    final accessibleActions = MediaQuery.textScalerOf(context).scale(10) > 14;
     final compareProducts = <BuyV2Product>[
       product,
       ...session
@@ -1208,7 +1246,7 @@ class _ProductQuickActions extends StatelessWidget {
       if (onAskSeller != null)
         (
           icon: Icons.chat_bubble_outline_rounded,
-          label: 'Ask seller',
+          label: supplierQuestionLabel,
           onPressed: () => onAskSeller!(product),
         ),
     ];
@@ -1217,7 +1255,7 @@ class _ProductQuickActions extends StatelessWidget {
       container: true,
       label: 'Product actions for ${product.title}',
       child: Container(
-        height: 56,
+        height: accessibleActions ? 72 : 56,
         decoration: buyV2CardDecoration(
           color: BuyV2Colors.softBlue.withValues(alpha: .42),
           radius: 15,
@@ -5119,7 +5157,7 @@ Future<void> _confirmBuyV2CartClear(
   final clearEverything = scope == BuyV2CartScope.all;
   final title = clearEverything
       ? 'Empty entire Cart?'
-      : 'Remove ${scope.label} items?';
+      : 'Remove ${scope.label} ${removeCount == 1 ? 'item' : 'items'}?';
   final detail = clearEverything
       ? '$removeCount ${removeCount == 1 ? 'item' : 'items'} will be removed from your Cart.'
       : remainingCount > 0
@@ -5183,36 +5221,49 @@ Future<void> _confirmBuyV2CartClear(
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      key: const ValueKey('buy-cart-clear-cancel'),
-                      onPressed: () => Navigator.of(sheetContext).pop(false),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 48),
-                      ),
-                      child: const Text('Keep Cart'),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final keepCart = OutlinedButton(
+                    key: const ValueKey('buy-cart-clear-cancel'),
+                    onPressed: () => Navigator.of(sheetContext).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 48),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      key: const ValueKey('buy-cart-clear-confirm'),
-                      onPressed: () => Navigator.of(sheetContext).pop(true),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(0, 48),
-                        backgroundColor: const Color(0xFFB42318),
-                        foregroundColor: Colors.white,
-                      ),
-                      child: Text(
-                        clearEverything
-                            ? 'Empty Cart'
-                            : 'Remove ${scope.label}',
-                      ),
+                    child: const Text('Keep Cart'),
+                  );
+                  final removeItems = FilledButton(
+                    key: const ValueKey('buy-cart-clear-confirm'),
+                    onPressed: () => Navigator.of(sheetContext).pop(true),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      backgroundColor: const Color(0xFFB42318),
+                      foregroundColor: Colors.white,
                     ),
-                  ),
-                ],
+                    child: Text(
+                      clearEverything ? 'Empty Cart' : 'Remove ${scope.label}',
+                    ),
+                  );
+                  final stackActions =
+                      constraints.maxWidth < 320 ||
+                      MediaQuery.textScalerOf(context).scale(14) > 20;
+                  if (stackActions) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        keepCart,
+                        const SizedBox(height: 8),
+                        removeItems,
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: keepCart),
+                      const SizedBox(width: 10),
+                      Expanded(child: removeItems),
+                    ],
+                  );
+                },
               ),
             ],
           ),
@@ -7836,8 +7887,9 @@ class BuyV2OrderItemsView extends StatelessWidget {
                                 const SizedBox(height: 3),
                                 Text(
                                   'After delivery · ${policyLines.join(' · ')}',
-                                  maxLines: 4,
-                                  overflow: TextOverflow.clip,
+                                  key: ValueKey(
+                                    'buy-order-item-policy-${product.id}',
+                                  ),
                                   style: context.buyMeta.copyWith(
                                     color: BuyV2Colors.green,
                                     fontWeight: FontWeight.w800,
@@ -8559,12 +8611,19 @@ class BuyV2LiveDeliveryPanel extends StatefulWidget {
   State<BuyV2LiveDeliveryPanel> createState() => _BuyV2LiveDeliveryPanelState();
 }
 
-class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel> {
+class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel>
+    with WidgetsBindingObserver {
   Timer? _timer;
+
+  bool get _isForeground {
+    final state = WidgetsBinding.instance.lifecycleState;
+    return state == null || state == AppLifecycleState.resumed;
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _start();
   }
 
@@ -8581,8 +8640,10 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel> {
   }
 
   void _start() {
+    _timer?.cancel();
+    if (!_isForeground) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (mounted && _isForeground) {
         unawaited(widget.session.refreshLiveDelivery(widget.order.id));
       }
     });
@@ -8599,8 +8660,18 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _start();
+    } else {
+      _timer?.cancel();
+    }
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -8618,6 +8689,7 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel> {
         ready &&
         updatedAt != null &&
         DateTime.now().difference(updatedAt) > const Duration(minutes: 2);
+    final accessibleMap = MediaQuery.textScalerOf(context).scale(10) > 14;
     return Container(
       key: ValueKey('buy-live-delivery-${widget.order.id}'),
       padding: const EdgeInsets.all(10),
@@ -8640,9 +8712,12 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel> {
                 ),
               ),
               if (busy)
-                const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                Semantics(
+                  label: 'Refreshing delivery location',
+                  child: const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
                 ),
             ],
           ),
@@ -8668,12 +8743,14 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel> {
             ],
           ] else ...[
             Semantics(
-              label: 'Courier location map. ${snapshot.etaLabel}.',
+              label: widget.mapBuilder == null
+                  ? 'Delivery map unavailable. ${snapshot.etaLabel}. Delivery details follow.'
+                  : 'Delivery partner location map. ${snapshot.etaLabel}.',
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(13),
                 child: SizedBox(
                   key: ValueKey('buy-live-delivery-map-${widget.order.id}'),
-                  height: 158,
+                  height: accessibleMap ? 210 : 158,
                   child:
                       widget.mapBuilder?.call(context, snapshot) ??
                       ColoredBox(
@@ -13067,26 +13144,44 @@ BuyV2Destination? _destinationForCartScope(BuyV2CartScope scope) =>
 List<String> _purchaseProtectionLines(BuyV2Product product) {
   final protection = product.purchaseProtection;
   if (protection == null) {
-    return [?product.returnPolicy];
+    return [?_nonBlankComplianceValue(product.returnPolicy)];
   }
+  final remedies = protection.remedies
+      .map(_nonBlankComplianceValue)
+      .whereType<String>()
+      .toList(growable: false);
   return [
-    protection.summary,
-    if (protection.remedies.isNotEmpty)
-      'Remedies: ${protection.remedies.join(', ')}',
-    if (protection.windowLabel case final value?) 'Window: $value',
-    if (protection.conditionsLabel case final value?) 'Conditions: $value',
-    if (protection.verificationLabel case final value?) 'Verification: $value',
-    if (protection.initiationLabel case final value?) 'Request: $value',
-    if (protection.approvalLabel case final value?) 'Approval: $value',
-    if (protection.pickupLabel case final value?) 'Pickup: $value',
-    if (protection.refundMethodLabel case final value?) 'Refund method: $value',
-    if (protection.refundTimelineLabel case final value?)
+    ?_nonBlankComplianceValue(protection.summary),
+    if (remedies.isNotEmpty) 'Available options: ${remedies.join(', ')}',
+    if (_nonBlankComplianceValue(protection.windowLabel) case final value?)
+      'Request window: $value',
+    if (_nonBlankComplianceValue(protection.conditionsLabel) case final value?)
+      'Conditions: $value',
+    if (_nonBlankComplianceValue(protection.verificationLabel)
+        case final value?)
+      'Verification: $value',
+    if (_nonBlankComplianceValue(protection.initiationLabel) case final value?)
+      'How to request: $value',
+    if (_nonBlankComplianceValue(protection.approvalLabel) case final value?)
+      'Approval: $value',
+    if (_nonBlankComplianceValue(protection.pickupLabel) case final value?)
+      'Pickup: $value',
+    if (_nonBlankComplianceValue(protection.refundMethodLabel)
+        case final value?)
+      'Refund method: $value',
+    if (_nonBlankComplianceValue(protection.refundTimelineLabel)
+        case final value?)
       'Refund timeline: $value',
-    if (protection.warrantyLabel case final value?) 'Warranty: $value',
-    if (protection.nonReturnableReason case final value?)
+    if (_nonBlankComplianceValue(protection.warrantyLabel) case final value?)
+      'Warranty: $value',
+    if (_nonBlankComplianceValue(protection.nonReturnableReason)
+        case final value?)
       'Non-returnable: $value',
-    if (protection.policyVersion case final value?) 'Policy: $value',
-    if (protection.effectiveFromLabel case final value?) 'Effective: $value',
+    if (_nonBlankComplianceValue(protection.policyVersion) case final value?)
+      'Policy reference: $value',
+    if (_nonBlankComplianceValue(protection.effectiveFromLabel)
+        case final value?)
+      'Applies from: $value',
   ];
 }
 

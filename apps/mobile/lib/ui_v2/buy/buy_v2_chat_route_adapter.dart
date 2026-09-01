@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../features/buy/buy_v2_models.dart';
+import 'buy_v2_design.dart';
 
 /// Buy contributes only commerce context and exact return wiring to the
 /// authoritative shared Chat module.
@@ -61,7 +62,7 @@ class BuyV2ChatRouteAdapter {
       queryParameters: {
         'draft': order == null
             ? 'Help with order $normalizedOrderId'
-            : 'Help with order $normalizedOrderId from ${order.partner}',
+            : _orderHelpDraft(order),
         'return': Uri(
           path: '/app/buy',
           queryParameters: {
@@ -84,7 +85,7 @@ class BuyV2ChatRouteAdapter {
           'supplier': order.partner,
           'supplierType': order.partnerType,
           'orderId': order.id,
-          'purchaseId': ?order.purchaseId,
+          'purchaseId': ?_clean(order.purchaseId),
           'orderTotal': order.total.toString(),
           'productIds': order.productIds.join(','),
           'skuIds': order.lines.map((line) => line.product.id).join(','),
@@ -105,8 +106,8 @@ class BuyV2ChatRouteAdapter {
             ),
           'delivery': order.promise,
           'deliveryDestination': order.destinationLabel,
-          'paymentMethod': ?order.paymentMethod,
-          'paymentTerms': ?order.paymentTermLabel,
+          'paymentMethod': ?_clean(order.paymentMethod),
+          'paymentTerms': ?_clean(order.paymentTermLabel),
           'adminVisible': 'true',
           'escalationReason': 'supplier-non-response',
           'callAuthority': 'moolsocial-admin-only',
@@ -120,6 +121,8 @@ class BuyV2ChatRouteAdapter {
     int quantity = 0,
   }) {
     final requestedQuantity = quantity > 0 ? quantity : product.minimumOrder;
+    final protection = product.purchaseProtection;
+    final remedies = _cleanValues(protection?.remedies ?? const []);
     final returnRoute = Uri(
       path: '/app/buy',
       queryParameters: {
@@ -134,9 +137,7 @@ class BuyV2ChatRouteAdapter {
         supplier: product.seller,
       ),
       queryParameters: {
-        'draft':
-            'Question for ${product.seller} about ${product.title} · '
-            '${product.pack} · quantity $requestedQuantity',
+        'draft': _productQuestionDraft(product, requestedQuantity),
         'return': returnRoute,
         'directReturn': 'true',
         'context': product.destination == BuyV2Destination.medicine
@@ -162,22 +163,21 @@ class BuyV2ChatRouteAdapter {
         'origin': product.origin,
         'productSnapshot': jsonEncode(_productSnapshot(product)),
         'policy':
-            ?(product.purchaseProtection?.summary ?? product.returnPolicy),
-        if (product.purchaseProtection case final protection?) ...{
-          if (protection.remedies.isNotEmpty)
-            'remedies': protection.remedies.join(','),
-          'policyWindow': ?protection.windowLabel,
-          'policyConditions': ?protection.conditionsLabel,
-          'policyVerification': ?protection.verificationLabel,
-          'policyInitiation': ?protection.initiationLabel,
-          'policyApproval': ?protection.approvalLabel,
-          'policyPickup': ?protection.pickupLabel,
-          'refundMethod': ?protection.refundMethodLabel,
-          'refundTimeline': ?protection.refundTimelineLabel,
-          'warranty': ?protection.warrantyLabel,
-          'nonReturnableReason': ?protection.nonReturnableReason,
-          'policyVersion': ?protection.policyVersion,
-          'policyEffectiveFrom': ?protection.effectiveFromLabel,
+            ?(_clean(protection?.summary) ?? _clean(product.returnPolicy)),
+        if (protection != null) ...{
+          if (remedies.isNotEmpty) 'remedies': remedies.join(','),
+          'policyWindow': ?_clean(protection.windowLabel),
+          'policyConditions': ?_clean(protection.conditionsLabel),
+          'policyVerification': ?_clean(protection.verificationLabel),
+          'policyInitiation': ?_clean(protection.initiationLabel),
+          'policyApproval': ?_clean(protection.approvalLabel),
+          'policyPickup': ?_clean(protection.pickupLabel),
+          'refundMethod': ?_clean(protection.refundMethodLabel),
+          'refundTimeline': ?_clean(protection.refundTimelineLabel),
+          'warranty': ?_clean(protection.warrantyLabel),
+          'nonReturnableReason': ?_clean(protection.nonReturnableReason),
+          'policyVersion': ?_clean(protection.policyVersion),
+          'policyEffectiveFrom': ?_clean(protection.effectiveFromLabel),
         },
         'adminVisible': 'true',
         'escalationReason': 'supplier-non-response',
@@ -196,6 +196,7 @@ class BuyV2ChatRouteAdapter {
   Map<String, Object?> _productSnapshot(BuyV2Product product) {
     final protection = product.purchaseProtection;
     final compliance = product.compliance;
+    final remedies = _cleanValues(protection?.remedies ?? const []);
     return <String, Object?>{
       'productId': product.canonicalId,
       'skuId': product.id,
@@ -213,38 +214,105 @@ class BuyV2ChatRouteAdapter {
       'delivery': product.deliveryPromise,
       'origin': product.origin,
       'minimumOrder': product.minimumOrder,
-      'returnPolicy': product.returnPolicy,
+      'returnPolicy': _clean(product.returnPolicy),
       'compliance': <String, Object?>{
-        'genericName': compliance?.genericName ?? product.title,
-        'netQuantity': compliance?.netQuantity ?? product.pack,
-        'manufacturer': compliance?.manufacturerName,
-        'packer': compliance?.packerName,
-        'importer': compliance?.importerName,
-        'countryOfOrigin': compliance?.countryOfOrigin,
-        'manufacturedOrPackedOn': compliance?.manufacturedOrPackedOnLabel,
-        'bestBeforeOrUseBy': compliance?.bestBeforeOrUseByLabel,
-        'fssaiLicenseNumber': compliance?.fssaiLicenseNumber,
-        'consumerCare': compliance?.consumerCare,
+        'genericName': _clean(compliance?.genericName),
+        'netQuantity': _clean(compliance?.netQuantity),
+        'manufacturer': _clean(compliance?.manufacturerName),
+        'packer': _clean(compliance?.packerName),
+        'importer': _clean(compliance?.importerName),
+        'countryOfOrigin': _clean(compliance?.countryOfOrigin),
+        'manufacturedOrPackedOn': _clean(
+          compliance?.manufacturedOrPackedOnLabel,
+        ),
+        'bestBeforeOrUseBy': _clean(compliance?.bestBeforeOrUseByLabel),
+        'fssaiLicenseNumber': _clean(compliance?.fssaiLicenseNumber),
+        'consumerCare': _clean(compliance?.consumerCare),
       },
       if (protection != null)
         'purchaseProtection': <String, Object?>{
-          'summary': protection.summary,
-          'remedies': protection.remedies,
-          'window': protection.windowLabel,
-          'conditions': protection.conditionsLabel,
-          'verification': protection.verificationLabel,
-          'initiation': protection.initiationLabel,
-          'approval': protection.approvalLabel,
-          'pickup': protection.pickupLabel,
-          'refundMethod': protection.refundMethodLabel,
-          'refundTimeline': protection.refundTimelineLabel,
-          'warranty': protection.warrantyLabel,
-          'nonReturnableReason': protection.nonReturnableReason,
-          'policyVersion': protection.policyVersion,
-          'effectiveFrom': protection.effectiveFromLabel,
+          'summary': _clean(protection.summary),
+          'remedies': remedies,
+          'window': _clean(protection.windowLabel),
+          'conditions': _clean(protection.conditionsLabel),
+          'verification': _clean(protection.verificationLabel),
+          'initiation': _clean(protection.initiationLabel),
+          'approval': _clean(protection.approvalLabel),
+          'pickup': _clean(protection.pickupLabel),
+          'refundMethod': _clean(protection.refundMethodLabel),
+          'refundTimeline': _clean(protection.refundTimelineLabel),
+          'warranty': _clean(protection.warrantyLabel),
+          'nonReturnableReason': _clean(protection.nonReturnableReason),
+          'policyVersion': _clean(protection.policyVersion),
+          'effectiveFrom': _clean(protection.effectiveFromLabel),
         },
     };
   }
+
+  String _productQuestionDraft(BuyV2Product product, int quantity) {
+    final compliance = product.compliance;
+    final protection = product.purchaseProtection;
+    final remedies = _cleanValues(protection?.remedies ?? const []);
+    return [
+      'Hello ${product.seller},',
+      'I have a question about ${product.title}.',
+      'SKU: ${product.id}',
+      'Brand: ${product.brand}',
+      'Variant: ${product.variant}',
+      'Pack: ${product.pack}',
+      'Quantity: $quantity',
+      'Price: ${buyV2Money(product.price)}',
+      'Unit price: ${product.unitPrice}',
+      if (product.mrp case final mrp?) 'MRP: ${buyV2Money(mrp)}',
+      'Delivery: ${product.deliveryPromise}',
+      if (_clean(compliance?.genericName) case final value?)
+        'Generic name: $value',
+      if (_clean(compliance?.netQuantity) case final value?)
+        'Net quantity: $value',
+      if (_clean(compliance?.manufacturerName) case final value?)
+        'Manufacturer: $value',
+      if (_clean(compliance?.countryOfOrigin) case final value?)
+        'Country of origin: $value',
+      if (_clean(compliance?.bestBeforeOrUseByLabel) case final value?)
+        'Best before / use by: $value',
+      if ((_clean(protection?.summary) ?? _clean(product.returnPolicy))
+          case final value?)
+        'After delivery: $value',
+      if (remedies.isNotEmpty) 'Available options: ${remedies.join(', ')}',
+      if (_clean(protection?.warrantyLabel) case final value?)
+        'Warranty: $value',
+    ].join('\n');
+  }
+
+  String _orderHelpDraft(BuyV2Order order) {
+    return [
+      'Hello ${order.partner},',
+      'Help with order ${order.id}.',
+      if (_clean(order.purchaseId) case final purchaseId?)
+        'Purchase: $purchaseId',
+      'Items: ${order.itemSummary}',
+      for (final line in order.lines)
+        '${line.product.title} · SKU ${line.product.id} · '
+            'Quantity ${line.quantity} · '
+            '${buyV2Money(line.product.price * line.quantity)}',
+      if (order.lines.isEmpty && order.productIds.isNotEmpty)
+        'Product references: ${order.productIds.join(', ')}',
+      'Order total: ${buyV2Money(order.total)}',
+      'Delivery: ${order.promise}',
+      if (_clean(order.paymentMethod) case final paymentMethod?)
+        'Payment: $paymentMethod',
+      if (_clean(order.paymentTermLabel) case final paymentTerms?)
+        'Payment terms: $paymentTerms',
+    ].join('\n');
+  }
+
+  String? _clean(String? value) {
+    final normalized = value?.trim();
+    return normalized == null || normalized.isEmpty ? null : normalized;
+  }
+
+  List<String> _cleanValues(Iterable<String> values) =>
+      values.map(_clean).whereType<String>().toList(growable: false);
 
   String _supplierConversationKeyFor({
     required BuyV2Destination destination,
