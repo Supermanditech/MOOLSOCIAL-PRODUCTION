@@ -348,10 +348,19 @@ void main() {
         profileLabel: 'Grocery / Kirana Shop',
         area: 'Sardarpura, Jodhpur',
         verified: true,
+      )
+      ..showNotice(
+        'Work profile approved. Finish setup before customers can view your Workspace.',
       );
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
     expect(find.byKey(const Key('work-dashboard-hero')), findsOneWidget);
+    expect(find.textContaining('Work profile approved'), findsNothing);
+    final heroName = find.descendant(
+      of: find.byKey(const Key('work-dashboard-hero')),
+      matching: find.text('Mahadev Fresh Mart'),
+    );
+    expect(tester.widget<Text>(heroName).maxLines, 1);
     expectHeaderAndStickyAction(tester);
     final account = find.byKey(const Key('work-dashboard-account-state'));
     await reveal(tester, account);

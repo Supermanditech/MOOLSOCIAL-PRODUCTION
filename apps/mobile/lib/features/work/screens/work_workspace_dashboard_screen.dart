@@ -7,10 +7,25 @@ import '../widgets/work_widgets.dart';
 import '../work_models.dart';
 import '../work_session.dart';
 
-class WorkWorkspaceDashboardScreen extends StatelessWidget {
+class WorkWorkspaceDashboardScreen extends StatefulWidget {
   const WorkWorkspaceDashboardScreen({required this.session, super.key});
 
   final WorkSession session;
+
+  @override
+  State<WorkWorkspaceDashboardScreen> createState() =>
+      _WorkWorkspaceDashboardScreenState();
+}
+
+class _WorkWorkspaceDashboardScreenState
+    extends State<WorkWorkspaceDashboardScreen> {
+  WorkSession get session => widget.session;
+
+  @override
+  void initState() {
+    super.initState();
+    session.clearMessages();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -232,7 +247,7 @@ class _WorkspaceDashboardHero extends StatelessWidget {
                     ),
                     Text(
                       workspace.name,
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
@@ -243,11 +258,6 @@ class _WorkspaceDashboardHero extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-              WorkPill(
-                label: live ? 'Live' : 'Ready',
-                color: const Color(0xFF9EE89B),
-                icon: live ? Icons.public_rounded : Icons.verified_rounded,
               ),
             ],
           ),
