@@ -804,9 +804,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     if (!session.openProduct(product.id) || !mounted) return false;
 
     final openCart = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
+      PageRouteBuilder<bool>(
         settings: const RouteSettings(name: 'buy-store-product'),
-        builder: (routeContext) => Scaffold(
+        transitionDuration: BuyV2Motion.contentChange,
+        reverseTransitionDuration: BuyV2Motion.contentChange,
+        pageBuilder: (routeContext, _, _) => Scaffold(
           backgroundColor: Colors.white,
           body: SafeArea(
             child: AnimatedBuilder(
@@ -834,6 +836,25 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
             ),
           ),
         ),
+        transitionsBuilder: (context, animation, _, child) {
+          if (MediaQuery.disableAnimationsOf(context)) return child;
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return FadeTransition(
+            key: const ValueKey('buy-store-product-route-motion'),
+            opacity: Tween<double>(begin: .86, end: 1).animate(curved),
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(.035, 0),
+                end: Offset.zero,
+              ).animate(curved),
+              child: child,
+            ),
+          );
+        },
       ),
     );
     if (!mounted) return openCart ?? false;

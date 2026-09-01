@@ -3434,9 +3434,13 @@ Future<void> showBuyV2PartnerCatalogue(
                   ),
                 ),
                 if (session.itemCount > 0)
-                  BuyV2StoreCartBar(
-                    session: session,
-                    onOpenCart: () => Navigator.of(sheetContext).pop('cart:'),
+                  BuyV2FiniteIncomingTransition(
+                    key: const ValueKey('buy-store-cart-entrance-motion'),
+                    stateKey: '$ownerPrefix-store-cart-${session.itemCount}',
+                    child: BuyV2StoreCartBar(
+                      session: session,
+                      onOpenCart: () => Navigator.of(sheetContext).pop('cart:'),
+                    ),
                   ),
               ],
             ),
@@ -3538,16 +3542,21 @@ class BuyV2StoreCartBar extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        message,
-                        key: const ValueKey('buy-store-cart-feedback'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      LayoutBuilder(
+                        builder: (context, constraints) =>
+                            BuyV2FiniteValueTransition(
+                              key: const ValueKey('buy-store-cart-feedback'),
+                              stateKey: message,
+                              text: message,
+                              ownerSize: Size(constraints.maxWidth, 14),
+                              textAlign: TextAlign.start,
+                              duration: BuyV2Motion.contentChange,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
                       ),
                       Text(
                         '$itemCount $itemLabel · ${buyV2Money(session.cartTotal)}',
@@ -6641,12 +6650,26 @@ class BuyV2ProductCard extends StatelessWidget {
                             else
                               const SizedBox(height: 6),
                             AnimatedSwitcher(
+                              key: ValueKey(
+                                'buy-product-action-motion-${product.id}',
+                              ),
                               duration: BuyV2Motion.resolved(
                                 context,
                                 BuyV2Motion.stateChange,
                               ),
                               switchInCurve: Curves.easeOutCubic,
                               switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                    opacity: animation,
+                                    child: ScaleTransition(
+                                      scale: Tween<double>(
+                                        begin: .97,
+                                        end: 1,
+                                      ).animate(animation),
+                                      child: child,
+                                    ),
+                                  ),
                               child: quantity > 0
                                   ? _QuantityStepper(
                                       key: ValueKey(

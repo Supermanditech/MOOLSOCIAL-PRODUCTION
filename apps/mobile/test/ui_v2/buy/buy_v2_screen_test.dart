@@ -4054,9 +4054,19 @@ void main() {
       expect(session.quantityFor('s-chicken'), 1);
       expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsOneWidget);
       expect(
+        find.byKey(const ValueKey('buy-store-cart-entrance-motion')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-product-action-motion-s-chicken')),
+        findsOneWidget,
+      );
+      expect(
         tester
-            .widget<Text>(find.byKey(const ValueKey('buy-store-cart-feedback')))
-            .data,
+            .widget<BuyV2FiniteValueTransition>(
+              find.byKey(const ValueKey('buy-store-cart-feedback')),
+            )
+            .text,
         contains('added'),
       );
 
@@ -4065,6 +4075,10 @@ void main() {
       await tester.tap(chicken);
       await tester.pumpAndSettle();
       expect(session.selectedProductId, 's-chicken');
+      expect(
+        find.byKey(const ValueKey('buy-store-product-route-motion')),
+        findsOneWidget,
+      );
       expect(find.text('Back to Safe Protein Store'), findsOneWidget);
       expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsOneWidget);
 
