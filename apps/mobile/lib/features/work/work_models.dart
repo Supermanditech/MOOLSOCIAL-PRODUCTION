@@ -149,9 +149,13 @@ enum WorkGstMatchCategory {
   healthcareProvider,
   pharmacySupplier,
   personalCareProvider,
-  localServiceProvider,
-  individualTransportProvider,
-  fleetTransportOperator,
+  bikeTravelProvider,
+  autoTravelProvider,
+  cabTravelProvider,
+  busTravelProvider,
+  quickDeliveryBiker,
+  wholesaleFleetDelivery,
+  bulkDeliveryFleet,
   digitalContentProvider,
   independentProfessional,
 }
@@ -166,11 +170,13 @@ extension WorkGstMatchCategoryLabel on WorkGstMatchCategory {
     WorkGstMatchCategory.pharmacySupplier => 'Pharmacy or medicine supplier',
     WorkGstMatchCategory.personalCareProvider =>
       'Personal care service provider',
-    WorkGstMatchCategory.localServiceProvider => 'Local service provider',
-    WorkGstMatchCategory.individualTransportProvider =>
-      'Individual transport provider',
-    WorkGstMatchCategory.fleetTransportOperator =>
-      'Fleet or transport operator',
+    WorkGstMatchCategory.bikeTravelProvider => 'Bike travel provider',
+    WorkGstMatchCategory.autoTravelProvider => 'Auto travel provider',
+    WorkGstMatchCategory.cabTravelProvider => 'Cab travel provider',
+    WorkGstMatchCategory.busTravelProvider => 'Bus travel provider',
+    WorkGstMatchCategory.quickDeliveryBiker => 'Quick delivery biker',
+    WorkGstMatchCategory.wholesaleFleetDelivery => 'Wholesale fleet delivery',
+    WorkGstMatchCategory.bulkDeliveryFleet => 'Bulk delivery fleet',
     WorkGstMatchCategory.digitalContentProvider =>
       'Digital content service provider',
     WorkGstMatchCategory.independentProfessional => 'Independent professional',
@@ -206,7 +212,7 @@ enum WorkDocumentImportance { required, ifApplicable, optional }
 extension WorkDocumentImportanceLabel on WorkDocumentImportance {
   String get label => switch (this) {
     WorkDocumentImportance.required => 'Required',
-    WorkDocumentImportance.ifApplicable => 'If applicable',
+    WorkDocumentImportance.ifApplicable => 'Required when applicable',
     WorkDocumentImportance.optional => 'Optional',
   };
 }
@@ -235,8 +241,8 @@ const _identityDocument = WorkDocumentChecklistItem(
 const _gstDocument = WorkDocumentChecklistItem(
   title: 'GST registration certificate',
   detail:
-      'Add it if registered. It helps us confirm business identity and prevent impersonation.',
-  importance: WorkDocumentImportance.optional,
+      'Required when GST registration applies to this Workspace. Applicability is confirmed during verification.',
+  importance: WorkDocumentImportance.ifApplicable,
   icon: Icons.receipt_long_outlined,
 );
 
@@ -424,29 +430,9 @@ extension WorkProfileDocumentChecklist on WorkProfileOption {
       ),
       _gstDocument,
     ],
-    'service-provider' => const [
-      _identityDocument,
-      WorkDocumentChecklistItem(
-        title: 'Operating address or service-area document',
-        detail: 'A document connecting you with the area you serve.',
-        importance: WorkDocumentImportance.required,
-        icon: Icons.place_outlined,
-      ),
-      WorkDocumentChecklistItem(
-        title: 'Skill certificate or professional licence',
-        detail: 'Certification or licence required for your service.',
-        importance: WorkDocumentImportance.ifApplicable,
-        icon: Icons.workspace_premium_outlined,
-      ),
-      WorkDocumentChecklistItem(
-        title: 'Business or team authorisation',
-        detail: 'Authorisation when you represent a service business or team.',
-        importance: WorkDocumentImportance.ifApplicable,
-        icon: Icons.assignment_ind_outlined,
-      ),
-      _gstDocument,
-    ],
-    'captain' => const [
+    'travel-bike-provider' ||
+    'travel-auto-provider' ||
+    'travel-cab-provider' => const [
       _identityDocument,
       WorkDocumentChecklistItem(
         title: 'Driving licence',
@@ -456,19 +442,66 @@ extension WorkProfileDocumentChecklist on WorkProfileOption {
       ),
       WorkDocumentChecklistItem(
         title: 'Vehicle registration certificate',
-        detail: 'Current RC for the vehicle used for rides or deliveries.',
+        detail: 'Current RC for the vehicle used for passenger travel.',
         importance: WorkDocumentImportance.required,
-        icon: Icons.two_wheeler_rounded,
+        icon: Icons.directions_car_outlined,
       ),
       WorkDocumentChecklistItem(
         title: 'Vehicle insurance and permit',
-        detail: 'Current insurance and any permit required for the service.',
+        detail:
+            'Current insurance and the permit applicable to the travel service.',
         importance: WorkDocumentImportance.required,
         icon: Icons.health_and_safety_outlined,
       ),
       _gstDocument,
     ],
-    'fleet' => const [
+    'travel-bus-provider' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Bus driving licence or operator authority',
+        detail:
+            'Current vehicle-category licence or authority from the bus operator.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.badge_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Bus registration certificate',
+        detail: 'Current RC for each bus added to the Workspace.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.directions_bus_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Passenger-service permit and insurance',
+        detail:
+            'Current insurance and the permit applicable to the passenger service.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.health_and_safety_outlined,
+      ),
+      _gstDocument,
+    ],
+    'quick-delivery-biker' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Driving licence',
+        detail: 'Current licence for the delivery bike category.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.badge_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Bike registration certificate',
+        detail: 'Current RC for the bike used for delivery work.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.two_wheeler_rounded,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Bike insurance and permit',
+        detail: 'Current insurance and any permit applicable to delivery work.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.health_and_safety_outlined,
+      ),
+      _gstDocument,
+    ],
+    'wholesale-fleet-delivery' || 'bulk-delivery-fleet' => const [
       _identityDocument,
       WorkDocumentChecklistItem(
         title: 'Transport business registration',
@@ -478,7 +511,8 @@ extension WorkProfileDocumentChecklist on WorkProfileOption {
       ),
       WorkDocumentChecklistItem(
         title: 'Vehicle RC, permit and insurance',
-        detail: 'Current documents for vehicles added to the Workspace.',
+        detail:
+            'Current documents for delivery vehicles added to the Workspace.',
         importance: WorkDocumentImportance.required,
         icon: Icons.local_shipping_outlined,
       ),
@@ -545,13 +579,14 @@ class WorkProofRequirement {
     required this.id,
     required this.label,
     required this.detail,
-    required this.required,
+    required this.importance,
   });
 
   final String id;
   final String label;
   final String detail;
-  final bool required;
+  final WorkDocumentImportance importance;
+  bool get required => importance == WorkDocumentImportance.required;
 }
 
 class WorkWorkspace {
@@ -1466,38 +1501,80 @@ const workProfiles = <WorkProfileOption>[
     icon: Icons.content_cut_rounded,
   ),
   WorkProfileOption(
-    id: 'service-provider',
-    familyId: 'services',
-    familyLabel: 'Services & Salon',
-    label: 'Local Service Provider',
-    gstMatchCategory: WorkGstMatchCategory.localServiceProvider,
-    sellSide:
-        'Win clearly defined local service requests from nearby customers.',
-    buySide: 'Source the tools and supplies needed for quality service.',
-    tools:
-        'Manage availability, service records, customer support and earnings.',
-    icon: Icons.handyman_outlined,
-  ),
-  WorkProfileOption(
-    id: 'captain',
-    familyId: 'ride',
-    familyLabel: 'Ride & Transport',
-    label: 'Ride / Delivery Captain',
-    gstMatchCategory: WorkGstMatchCategory.individualTransportProvider,
-    sellSide: 'Access eligible ride, delivery and route opportunities.',
-    buySide: 'Find vehicle care and operating services.',
-    tools: 'Track trips, safety, documents and earnings.',
+    id: 'travel-bike-provider',
+    familyId: 'travel',
+    familyLabel: 'Travel Partners',
+    label: 'Bike Travel Provider',
+    gstMatchCategory: WorkGstMatchCategory.bikeTravelProvider,
+    sellSide: 'Offer eligible passenger bike trips in your operating area.',
+    buySide: 'Find bike care and operating services.',
+    tools: 'Manage trip availability, safety, documents and earnings.',
     icon: Icons.two_wheeler_rounded,
   ),
   WorkProfileOption(
-    id: 'fleet',
-    familyId: 'ride',
-    familyLabel: 'Ride & Transport',
-    label: 'Fleet / Transport Business',
-    gstMatchCategory: WorkGstMatchCategory.fleetTransportOperator,
-    sellSide: 'Grow your transport business with verified service capacity.',
-    buySide: 'Discover suitable routes and operating services.',
-    tools: 'Manage vehicles, drivers, routes and settlements.',
+    id: 'travel-auto-provider',
+    familyId: 'travel',
+    familyLabel: 'Travel Partners',
+    label: 'Auto Travel Provider',
+    gstMatchCategory: WorkGstMatchCategory.autoTravelProvider,
+    sellSide: 'Offer eligible auto trips in your operating area.',
+    buySide: 'Find auto care and operating services.',
+    tools: 'Manage trip availability, safety, documents and earnings.',
+    icon: Icons.electric_rickshaw_outlined,
+  ),
+  WorkProfileOption(
+    id: 'travel-cab-provider',
+    familyId: 'travel',
+    familyLabel: 'Travel Partners',
+    label: 'Cab Travel Provider',
+    gstMatchCategory: WorkGstMatchCategory.cabTravelProvider,
+    sellSide: 'Offer eligible cab trips in your operating area.',
+    buySide: 'Find cab care and operating services.',
+    tools: 'Manage trip availability, safety, documents and earnings.',
+    icon: Icons.local_taxi_outlined,
+  ),
+  WorkProfileOption(
+    id: 'travel-bus-provider',
+    familyId: 'travel',
+    familyLabel: 'Travel Partners',
+    label: 'Bus Travel Provider',
+    gstMatchCategory: WorkGstMatchCategory.busTravelProvider,
+    sellSide: 'Offer eligible passenger bus routes and service capacity.',
+    buySide: 'Find route and fleet operating services.',
+    tools: 'Manage buses, drivers, routes, safety and settlements.',
+    icon: Icons.directions_bus_outlined,
+  ),
+  WorkProfileOption(
+    id: 'quick-delivery-biker',
+    familyId: 'delivery',
+    familyLabel: 'Delivery & Logistics',
+    label: 'Quick Delivery Biker',
+    gstMatchCategory: WorkGstMatchCategory.quickDeliveryBiker,
+    sellSide: 'Accept eligible local quick-delivery assignments.',
+    buySide: 'Find bike care and delivery operating services.',
+    tools: 'Manage delivery availability, routes, proof and earnings.',
+    icon: Icons.delivery_dining_outlined,
+  ),
+  WorkProfileOption(
+    id: 'wholesale-fleet-delivery',
+    familyId: 'delivery',
+    familyLabel: 'Delivery & Logistics',
+    label: 'Wholesale Fleet Delivery',
+    gstMatchCategory: WorkGstMatchCategory.wholesaleFleetDelivery,
+    sellSide: 'Offer verified fleet capacity for wholesale deliveries.',
+    buySide: 'Find suitable wholesale routes and operating services.',
+    tools: 'Manage vehicles, drivers, wholesale routes and settlements.',
+    icon: Icons.local_shipping_outlined,
+  ),
+  WorkProfileOption(
+    id: 'bulk-delivery-fleet',
+    familyId: 'delivery',
+    familyLabel: 'Delivery & Logistics',
+    label: 'Bulk Delivery Fleet',
+    gstMatchCategory: WorkGstMatchCategory.bulkDeliveryFleet,
+    sellSide: 'Offer verified vehicle capacity for bulk deliveries.',
+    buySide: 'Find suitable bulk routes and operating services.',
+    tools: 'Manage vehicles, drivers, bulk routes and settlements.',
     icon: Icons.local_shipping_outlined,
   ),
   WorkProfileOption(
@@ -1529,24 +1606,24 @@ const workProofs = <WorkProofRequirement>[
     id: 'personal-kyc',
     label: 'Personal identity',
     detail: 'Signed-in account identity · included with this application',
-    required: true,
+    importance: WorkDocumentImportance.required,
   ),
   WorkProofRequirement(
     id: 'shop-front',
     label: 'Shop or workplace document',
     detail: 'A clear current document showing the work name or location',
-    required: true,
+    importance: WorkDocumentImportance.required,
   ),
   WorkProofRequirement(
     id: 'owner-authority',
     label: 'Owner or operator authority',
     detail: 'Registration, licence, bill or authorization showing your link',
-    required: true,
+    importance: WorkDocumentImportance.required,
   ),
   WorkProofRequirement(
     id: 'gst',
     label: 'GST certificate',
-    detail: 'Add now when applicable, or continue with a visible reminder',
-    required: false,
+    detail: 'Required when GST registration applies to this Workspace',
+    importance: WorkDocumentImportance.ifApplicable,
   ),
 ];

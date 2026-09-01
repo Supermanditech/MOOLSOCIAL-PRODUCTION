@@ -312,8 +312,7 @@ void main() {
             .first,
         maxScrolls: 40,
       );
-      await tester.tap(missingRole);
-      await tester.pumpAndSettle();
+      await tapVisible(tester, const Key('work-profile-not-shown'));
       await tapVisible(tester, const Key('work-send-profile-request'));
       expect(find.text('Describe the work profile you need.'), findsOneWidget);
 
@@ -342,11 +341,72 @@ void main() {
     (tester) async {
       await mount(tester, route: '/app/work/workspace/choose');
 
+      final profileLabels = workProfiles
+          .map((profile) => profile.label)
+          .toList();
+      expect(profileLabels, isNot(contains('Local Service Provider')));
+      expect(profileLabels, isNot(contains('Ride / Delivery Captain')));
+      expect(
+        profileLabels,
+        containsAll(const [
+          'Bike Travel Provider',
+          'Auto Travel Provider',
+          'Cab Travel Provider',
+          'Bus Travel Provider',
+          'Quick Delivery Biker',
+          'Wholesale Fleet Delivery',
+          'Bulk Delivery Fleet',
+        ]),
+      );
+      expect(
+        workProfiles
+            .where(
+              (profile) => const {
+                'Travel Partners',
+                'Delivery & Logistics',
+              }.contains(profile.familyLabel),
+            )
+            .map((profile) => profile.familyLabel)
+            .toSet(),
+        const {'Travel Partners', 'Delivery & Logistics'},
+      );
+
       await tapVisible(tester, const Key('work-profile-retailer-grocery'));
       expect(find.byKey(const Key('work-requirements-screen')), findsOneWidget);
       expect(find.text('Account owner identity'), findsOneWidget);
       expect(find.text('Shop address document'), findsOneWidget);
+      expect(
+        find.textContaining('Requirements marked “Required when applicable”'),
+        findsOneWidget,
+      );
+      final gstDocument = workProfiles
+          .singleWhere((profile) => profile.id == 'retailer-grocery')
+          .verificationDocuments
+          .singleWhere(
+            (document) => document.title == 'GST registration certificate',
+          );
+      expect(gstDocument.importance, WorkDocumentImportance.ifApplicable);
+      await tester.scrollUntilVisible(
+        find.text('GST registration certificate'),
+        240,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('work-requirements-screen')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
       expect(find.text('GST registration certificate'), findsOneWidget);
+      expect(
+        find.text(
+          'Required when GST registration applies to this Workspace. '
+          'Applicability is confirmed during verification.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Required when applicable'), findsWidgets);
+      expect(find.textContaining('GST certificate is optional'), findsNothing);
       expect(find.byKey(const Key('work-requirements-ready')), findsOneWidget);
 
       await tapVisible(tester, const Key('work-back'));

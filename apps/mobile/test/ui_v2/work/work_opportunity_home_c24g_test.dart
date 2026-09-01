@@ -3,9 +3,11 @@ import 'dart:ui' show SemanticsAction;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/core/design/mool_design_system.dart';
 import 'package:moolsocial/core/design/mool_service_home.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 
@@ -189,7 +191,23 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('work-requirements-ready')), findsOneWidget);
+    expect(find.text('I have these documents ready'), findsOneWidget);
+    expect(find.text('Continue to secure Workspace setup'), findsOneWidget);
     expect(find.textContaining('GST category'), findsNothing);
+    await _scrollTo(
+      tester,
+      find.text('GST registration certificate'),
+      const Key('work-requirements-screen'),
+    );
+    expect(
+      find.text(
+        'Required when GST registration applies to this Workspace. '
+        'Applicability is confirmed during verification.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Required when applicable'), findsWidgets);
+    expect(find.textContaining('GST certificate is optional'), findsNothing);
 
     await tester.tap(find.byKey(const Key('work-back')));
     await tester.pumpAndSettle();
@@ -214,6 +232,89 @@ void main() {
     expect(find.byKey(const Key('work-contact-screen')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'C24G Workspace separates Travel Partners and Delivery roles with one affordance',
+    (tester) async {
+      final sessions = await _mount(
+        tester,
+        route: '/app/work/my-work',
+        size: const Size(390, 844),
+      );
+      addTearDown(sessions.dispose);
+
+      final labels = workProfiles.map((profile) => profile.label).toList();
+      expect(labels, isNot(contains('Local Service Provider')));
+      expect(labels, isNot(contains('Ride / Delivery Captain')));
+      expect(
+        labels,
+        containsAll(const [
+          'Bike Travel Provider',
+          'Auto Travel Provider',
+          'Cab Travel Provider',
+          'Bus Travel Provider',
+          'Quick Delivery Biker',
+          'Wholesale Fleet Delivery',
+          'Bulk Delivery Fleet',
+        ]),
+      );
+
+      const expectedSectionsAndRoles = [
+        'Travel Partners',
+        'Bike Travel Provider',
+        'Auto Travel Provider',
+        'Cab Travel Provider',
+        'Bus Travel Provider',
+        'Delivery & Logistics',
+        'Quick Delivery Biker',
+        'Wholesale Fleet Delivery',
+        'Bulk Delivery Fleet',
+      ];
+      for (final label in expectedSectionsAndRoles) {
+        final labelFinder = find.text(label);
+        await _scrollTo(tester, labelFinder, const Key('work-choose-screen'));
+        expect(labelFinder, findsOneWidget, reason: label);
+
+        if (label == 'Travel Partners' || label == 'Delivery & Logistics') {
+          continue;
+        }
+        final card = find.ancestor(
+          of: labelFinder,
+          matching: find.byType(MoolCardSurface),
+        );
+        expect(card, findsOneWidget, reason: '$label card');
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.byIcon(Icons.chevron_right_rounded),
+          ),
+          findsOneWidget,
+          reason: '$label has one navigation affordance',
+        );
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.byIcon(Icons.arrow_forward_rounded),
+          ),
+          findsNothing,
+          reason: '$label does not duplicate the chevron',
+        );
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Text &&
+                  widget.data?.trim().toLowerCase() == 'explore this role',
+            ),
+          ),
+          findsNothing,
+          reason: '$label has no redundant Explore This Role prompt',
+        );
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('C24G shared Work motion settles immediately when reduced', (
     tester,

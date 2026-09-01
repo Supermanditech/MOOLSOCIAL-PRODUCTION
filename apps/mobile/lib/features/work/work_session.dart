@@ -162,6 +162,14 @@ class WorkSession extends ChangeNotifier {
       .firstWhere((profile) => profile.familyId == familyId)
       .familyLabel;
 
+  WorkGstMatchCategory? get selectedGstMatchCategory =>
+      selectedProfile?.gstMatchCategory;
+
+  WorkDocumentChecklistItem? get selectedGstChecklistItem => selectedProfile
+      ?.verificationDocuments
+      .where((document) => document.title == 'GST registration certificate')
+      .firstOrNull;
+
   List<WorkProofRequirement> get selectedWorkspaceDocuments {
     final profile = selectedProfile;
     if (profile == null) return workProofs;
@@ -182,7 +190,7 @@ class WorkSession extends ChangeNotifier {
           id: id,
           label: document.title,
           detail: document.detail,
-          required: document.importance == WorkDocumentImportance.required,
+          importance: document.importance,
         ),
       );
     }
@@ -901,8 +909,8 @@ class WorkSession extends ChangeNotifier {
         ),
         WorkWorkspace(
           id: 'WK-510003',
-          name: 'Delivery Work',
-          profileLabel: 'Ride / Delivery Captain',
+          name: 'Quick Delivery Work',
+          profileLabel: 'Quick Delivery Biker',
           area: 'Jodhpur',
           verified: true,
         ),

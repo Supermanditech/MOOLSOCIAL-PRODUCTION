@@ -55,7 +55,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
           session: widget.session,
           title: 'Grow with MoolSocial',
           subtitle: family == null
-              ? 'Choose your business or professional role'
+              ? 'Choose the Workspace that matches what you do'
               : widget.session.familyLabel(family),
           fallbackBackRoute: '/app/work/earn',
           showBack: family != null || Navigator.of(context).canPop(),
@@ -105,7 +105,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                 const WorkSectionTitle(
                   title: 'Choose how you want to grow',
                   detail:
-                      'Select the role that best represents your business, profession or service.',
+                      'Select the Workspace that best represents your business, profession or service.',
                 ),
                 const SizedBox(height: MoolSpacing.md),
                 for (final familyId in widget.session.familyIds) ...[
@@ -135,7 +135,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                   onPressed: () => _showUnsupportedRequest(context),
                   icon: const Icon(Icons.chat_bubble_outline_rounded),
                   label: const Text(
-                    'Can’t find your role? Tell us what you do',
+                    'Can’t find your Workspace? Tell us what you do',
                   ),
                 ),
               ] else ...[
@@ -144,16 +144,16 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                     Expanded(
                       child: WorkSectionTitle(
                         title:
-                            'Choose a ${widget.session.familyLabel(family)} profile',
+                            'Choose a ${widget.session.familyLabel(family)} Workspace',
                         detail: profile == null
-                            ? 'Select the role that best matches what you do.'
+                            ? 'Select the Workspace that best matches what you do.'
                             : 'See how this Workspace can help you grow.',
                       ),
                     ),
                     TextButton(
                       key: const Key('work-change-family'),
                       onPressed: widget.session.changeFamily,
-                      child: const Text('Browse roles'),
+                      child: const Text('Browse Workspaces'),
                     ),
                   ],
                 ),
@@ -313,7 +313,8 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                             'Food Business',
                             'Health & Medicine',
                             'Services & Salon',
-                            'Ride & Transport',
+                            'Travel Partners',
+                            'Delivery & Logistics',
                             'Create & Work',
                             'Other',
                           ]
@@ -385,8 +386,8 @@ class WorkDocumentRequirementsScreen extends StatelessWidget {
     if (profile == null) {
       return WorkPageScaffold(
         session: session,
-        title: 'Choose a role first',
-        subtitle: 'Return to Workspace roles to continue',
+        title: 'Choose a Workspace first',
+        subtitle: 'Return to Workspace choices to continue',
         fallbackBackRoute: '/app/work/my-work',
         activeLocalAction: 'workspace',
         showHeaderChat: false,
@@ -396,9 +397,9 @@ class WorkDocumentRequirementsScreen extends StatelessWidget {
           padding: const EdgeInsets.all(MoolSpacing.md),
           children: [
             WorkEmptyState(
-              title: 'No role selected',
-              detail: 'Choose the role that best matches what you do.',
-              actionLabel: 'Browse roles',
+              title: 'No Workspace selected',
+              detail: 'Choose the Workspace that best matches what you do.',
+              actionLabel: 'Browse Workspaces',
               onAction: returnToRoles,
             ),
           ],
@@ -415,10 +416,7 @@ class WorkDocumentRequirementsScreen extends StatelessWidget {
       showHeaderChat: false,
       showTrailingAction: false,
       onBack: returnToRoles,
-      bottomAction: WorkPrimaryButton(
-        keyName: 'work-requirements-ready',
-        label: 'I Have the Above Documents Handy',
-        icon: Icons.arrow_forward_rounded,
+      bottomAction: _DocumentsReadyAction(
         onPressed: () => context.push('/app/work/workspace/contact'),
       ),
       body: ListView(
@@ -483,7 +481,7 @@ class WorkDocumentRequirementsScreen extends StatelessWidget {
             ),
           ),
           const Text(
-            'Requirements marked “If applicable” depend on how your work is registered and operated.',
+            'Requirements marked “Required when applicable” depend on how your work is registered and operated.',
             style: TextStyle(
               color: MoolColors.muted,
               fontSize: 10.5,
@@ -503,31 +501,7 @@ class WorkDocumentRequirementsScreen extends StatelessWidget {
             ),
             const SizedBox(height: MoolSpacing.sm),
           ],
-          Container(
-            padding: const EdgeInsets.all(MoolSpacing.sm),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF4E5),
-              borderRadius: BorderRadius.circular(MoolRadii.control),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline_rounded, color: MoolColors.orange),
-                SizedBox(width: MoolSpacing.xs),
-                Expanded(
-                  child: Text(
-                    'You’ll add documents on the next page. A GST certificate is optional unless it is specifically required for your Workspace.',
-                    style: TextStyle(
-                      color: MoolColors.ink,
-                      fontSize: 10.5,
-                      height: 1.35,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _GstComplianceNotice(profile: profile),
         ],
       ),
     );
@@ -625,6 +599,217 @@ class _DocumentRequirementCard extends StatelessWidget {
   }
 }
 
+class _GstComplianceNotice extends StatelessWidget {
+  const _GstComplianceNotice({required this.profile});
+
+  final WorkProfileOption profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('work-gst-compliance-guidance'),
+      padding: const EdgeInsets.all(MoolSpacing.sm),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF4E5),
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        border: Border.all(color: const Color(0xFFF0C58A)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.gavel_rounded, color: MoolColors.orange),
+          const SizedBox(width: MoolSpacing.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'GST registration requirement',
+                  style: TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _gstComplianceText(profile.gstMatchCategory),
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 10.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Aggregate turnover is calculated across India for the same PAN. If you supply both goods and services or a compulsory-registration rule may apply, confirm your requirement with a GST professional.',
+                  style: TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 10,
+                    height: 1.32,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _gstComplianceText(WorkGstMatchCategory category) => switch (category) {
+  WorkGstMatchCategory.retailGoodsSupplier ||
+  WorkGstMatchCategory.wholesaleDistributor ||
+  WorkGstMatchCategory.manufacturerSupplier ||
+  WorkGstMatchCategory.pharmacySupplier =>
+    'For a Rajasthan business supplying only goods, GST registration is generally required after annual aggregate turnover exceeds ₹40 lakh. The general threshold is ₹20 lakh when taxable services are also supplied.',
+  WorkGstMatchCategory.healthcareProvider =>
+    'Qualifying health-care services may be GST-exempt. Taxable or mixed supplies can change the requirement; the general Rajasthan service threshold is ₹20 lakh of annual aggregate turnover.',
+  WorkGstMatchCategory.bikeTravelProvider ||
+  WorkGstMatchCategory.autoTravelProvider ||
+  WorkGstMatchCategory.cabTravelProvider ||
+  WorkGstMatchCategory.busTravelProvider ||
+  WorkGstMatchCategory.quickDeliveryBiker ||
+  WorkGstMatchCategory.wholesaleFleetDelivery ||
+  WorkGstMatchCategory.bulkDeliveryFleet =>
+    'Transport and delivery GST treatment depends on the exact service and payment arrangement. The general Rajasthan service threshold is ₹20 lakh of annual aggregate turnover; reverse-charge and compulsory-registration rules may change the requirement.',
+  _ =>
+    'For services in Rajasthan, GST registration is generally required after annual aggregate turnover exceeds ₹20 lakh. Compulsory-registration rules may apply earlier.',
+};
+
+class _DocumentsReadyAction extends StatefulWidget {
+  const _DocumentsReadyAction({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  State<_DocumentsReadyAction> createState() => _DocumentsReadyActionState();
+}
+
+class _DocumentsReadyActionState extends State<_DocumentsReadyAction>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 520),
+    value: 1,
+  );
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started || MediaQuery.disableAnimationsOf(context)) return;
+    _started = true;
+    _controller.repeat(reverse: true, count: 4).whenComplete(() {
+      if (mounted) _controller.value = 1;
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final motion = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutCubic,
+    );
+    return AnimatedBuilder(
+      animation: motion,
+      builder: (context, child) => Transform.scale(
+        scale: .99 + (.01 * motion.value),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                MoolColors.navy,
+                Color.lerp(
+                  const Color(0xFF3535B8),
+                  const Color(0xFF006D5B),
+                  motion.value,
+                )!,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(MoolRadii.floating),
+            boxShadow: [
+              BoxShadow(
+                color: MoolColors.orange.withValues(
+                  alpha: .12 + (.1 * motion.value),
+                ),
+                blurRadius: 12 + (6 * motion.value),
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(MoolRadii.floating),
+        child: InkWell(
+          key: const Key('work-requirements-ready'),
+          onTap: widget.onPressed,
+          borderRadius: BorderRadius.circular(MoolRadii.floating),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: MoolSpacing.sm,
+              vertical: 10,
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Color(0x26FFFFFF),
+                  foregroundColor: Colors.white,
+                  child: Icon(Icons.fact_check_outlined),
+                ),
+                SizedBox(width: MoolSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'I have these documents ready',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Continue to secure Workspace setup',
+                        style: TextStyle(
+                          color: Color(0xFFE8E8FF),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: MoolSpacing.xs),
+                CircleAvatar(
+                  radius: 17,
+                  backgroundColor: MoolColors.orange,
+                  foregroundColor: MoolColors.navy,
+                  child: Icon(Icons.arrow_forward_rounded, size: 19),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class WorkWorkspaceContactScreen extends StatefulWidget {
   const WorkWorkspaceContactScreen({required this.session, super.key});
 
@@ -658,7 +843,7 @@ class _WorkWorkspaceContactScreenState
         return WorkPageScaffold(
           session: widget.session,
           title: 'Set up your Workspace',
-          subtitle: profile?.label ?? 'Choose a role first',
+          subtitle: profile?.label ?? 'Choose a Workspace first',
           fallbackBackRoute: '/app/work/workspace/requirements',
           activeLocalAction: 'workspace',
           showHeaderChat: false,
@@ -685,9 +870,10 @@ class _WorkWorkspaceContactScreenState
             children: profile == null
                 ? [
                     WorkEmptyState(
-                      title: 'No role selected',
-                      detail: 'Choose the role that best matches what you do.',
-                      actionLabel: 'Browse roles',
+                      title: 'No Workspace selected',
+                      detail:
+                          'Choose the Workspace that best matches what you do.',
+                      actionLabel: 'Browse Workspaces',
                       onAction: () {
                         widget.session.changeFamily();
                         context.go('/app/work/my-work');
@@ -922,7 +1108,7 @@ class _WorkspaceEntryHeroState extends State<_WorkspaceEntryHero>
                 Expanded(
                   child: _WorkspaceStep(
                     icon: Icons.explore_rounded,
-                    label: 'CHOOSE YOUR ROLE',
+                    label: 'CHOOSE YOUR WORKSPACE',
                   ),
                 ),
                 Icon(Icons.arrow_forward_rounded, color: MoolColors.orange),
@@ -953,7 +1139,7 @@ class _WorkspaceEntryHeroState extends State<_WorkspaceEntryHero>
               SizedBox(width: 5),
               Expanded(
                 child: Text(
-                  'Business verification begins after you choose a role and provide its documents.',
+                  'Business verification begins after you choose a Workspace and provide its documents.',
                   style: TextStyle(
                     color: Color(0xFFE8E8FF),
                     fontSize: 9.5,
@@ -1326,12 +1512,17 @@ _WorkspaceActorGroupPresentation _workspaceActorGroupPresentation(
   'services' => const _WorkspaceActorGroupPresentation(
     accent: Color(0xFF9C1C6B),
     tint: Color(0xFFFFEDF7),
-    examples: 'Salon · Wellness · Local services',
+    examples: 'Salon · Beauty · Wellness',
   ),
-  'ride' => const _WorkspaceActorGroupPresentation(
+  'travel' => const _WorkspaceActorGroupPresentation(
     accent: Color(0xFF006D77),
     tint: Color(0xFFE8F7F8),
-    examples: 'Rider · Delivery captain · Fleet',
+    examples: 'Bike · Auto · Cab · Bus',
+  ),
+  'delivery' => const _WorkspaceActorGroupPresentation(
+    accent: Color(0xFFB54708),
+    tint: Color(0xFFFFF1E7),
+    examples: 'Quick delivery · Wholesale fleet · Bulk fleet',
   ),
   _ => const _WorkspaceActorGroupPresentation(
     accent: Color(0xFF5B21B6),
@@ -1422,24 +1613,9 @@ class _ProfileCard extends StatelessWidget {
               accent: presentation.accent,
             ),
             const SizedBox(height: MoolSpacing.xs),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  'Explore this role',
-                  style: TextStyle(
-                    color: presentation.accent,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  color: presentation.accent,
-                  size: 18,
-                ),
-              ],
+            Align(
+              alignment: Alignment.centerRight,
+              child: _WorkspaceActionCue(accent: presentation.accent),
             ),
           ] else ...[
             const Divider(height: MoolSpacing.lg),
@@ -1447,7 +1623,7 @@ class _ProfileCard extends StatelessWidget {
             _PreviewRow(label: 'Source smarter', value: option.buySide),
             _PreviewRow(label: 'Run your Workspace', value: option.tools),
             const SizedBox(height: MoolSpacing.xs),
-            const _BusinessIdentityNotice(),
+            _BusinessIdentityNotice(profile: option),
             const SizedBox(height: MoolSpacing.xs),
             const Text(
               'Next, add the documents for this Workspace. Verification begins after you submit them.',
@@ -1459,6 +1635,71 @@ class _ProfileCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _WorkspaceActionCue extends StatefulWidget {
+  const _WorkspaceActionCue({required this.accent});
+
+  final Color accent;
+
+  @override
+  State<_WorkspaceActionCue> createState() => _WorkspaceActionCueState();
+}
+
+class _WorkspaceActionCueState extends State<_WorkspaceActionCue>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+    value: 1,
+  );
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started || MediaQuery.disableAnimationsOf(context)) return;
+    _started = true;
+    _controller.repeat(reverse: true, count: 4).whenComplete(() {
+      if (mounted) _controller.value = 1;
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final motion = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutCubic,
+    );
+    return FadeTransition(
+      opacity: Tween<double>(begin: .72, end: 1).animate(motion),
+      child: ScaleTransition(
+        scale: Tween<double>(begin: .98, end: 1).animate(motion),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: widget.accent.withValues(alpha: .08),
+            borderRadius: BorderRadius.circular(MoolRadii.capsule),
+            border: Border.all(color: widget.accent.withValues(alpha: .25)),
+          ),
+          child: Text(
+            'Choose this Workspace',
+            style: TextStyle(
+              color: widget.accent,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1517,7 +1758,9 @@ class _ActorPreviewLine extends StatelessWidget {
 }
 
 class _BusinessIdentityNotice extends StatelessWidget {
-  const _BusinessIdentityNotice();
+  const _BusinessIdentityNotice({required this.profile});
+
+  final WorkProfileOption profile;
 
   @override
   Widget build(BuildContext context) {
@@ -1543,16 +1786,16 @@ class _BusinessIdentityNotice extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Optional business identity check',
+                  'GST registration check',
                   style: TextStyle(
                     color: MoolColors.navy,
                     fontSize: 11.5,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const Text(
-                  'Have a GST certificate? Add it to help confirm your registered business details and protect this Workspace from impersonation.',
-                  style: TextStyle(
+                Text(
+                  'Add a GST certificate when registration applies to your ${profile.label} Workspace. The next page explains the applicable Rajasthan threshold and exceptions.',
+                  style: const TextStyle(
                     color: MoolColors.muted,
                     fontSize: 10,
                     height: 1.32,

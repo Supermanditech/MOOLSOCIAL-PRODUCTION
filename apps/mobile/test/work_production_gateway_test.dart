@@ -87,12 +87,41 @@ void main() {
         'Clinic / Doctor',
         'Pharmacy',
         'Salon / Wellness',
-        'Local Service Provider',
-        'Ride / Delivery Captain',
-        'Fleet / Transport Business',
+        'Bike Travel Provider',
+        'Auto Travel Provider',
+        'Cab Travel Provider',
+        'Bus Travel Provider',
+        'Quick Delivery Biker',
+        'Wholesale Fleet Delivery',
+        'Bulk Delivery Fleet',
         'Creator',
         'Freelancer / Job Seeker',
       ]),
+    );
+    expect(
+      workProfiles.map((profile) => profile.id),
+      isNot(containsAll(const ['service-provider', 'captain', 'fleet'])),
+    );
+    expect(
+      workProfiles
+          .where((profile) => profile.familyId == 'travel')
+          .map((profile) => profile.label),
+      [
+        'Bike Travel Provider',
+        'Auto Travel Provider',
+        'Cab Travel Provider',
+        'Bus Travel Provider',
+      ],
+    );
+    expect(
+      workProfiles
+          .where((profile) => profile.familyId == 'delivery')
+          .map((profile) => profile.label),
+      [
+        'Quick Delivery Biker',
+        'Wholesale Fleet Delivery',
+        'Bulk Delivery Fleet',
+      ],
     );
     expect(
       workProfiles.map((profile) => profile.gstMatchCategory).toSet(),
@@ -109,7 +138,10 @@ void main() {
       final gst = profile.verificationDocuments.singleWhere(
         (document) => document.title == 'GST registration certificate',
       );
-      expect(gst.importance, WorkDocumentImportance.optional);
+      expect(gst.importance, WorkDocumentImportance.ifApplicable);
+      expect(gst.detail, contains('Required when GST registration applies'));
+      expect(gst.detail.toLowerCase(), isNot(contains('turnover')));
+      expect(gst.detail, isNot(matches(RegExp(r'₹|lakh|crore'))));
       expect(
         profile.verificationDocuments.map((document) => document.title).toSet(),
         hasLength(profile.verificationDocuments.length),
@@ -119,6 +151,11 @@ void main() {
         ..selectFamily(profile.familyId)
         ..selectProfile(profile.id);
       addTearDown(session.dispose);
+      expect(session.selectedGstMatchCategory, profile.gstMatchCategory);
+      expect(
+        session.selectedGstChecklistItem?.importance,
+        WorkDocumentImportance.ifApplicable,
+      );
       expect(
         session.selectedWorkspaceDocuments.map((document) => document.label),
         profile.verificationDocuments
@@ -128,6 +165,9 @@ void main() {
             .map((document) => document.title),
       );
     }
+    final gstProof = workProofs.singleWhere((proof) => proof.id == 'gst');
+    expect(gstProof.importance, WorkDocumentImportance.ifApplicable);
+    expect(gstProof.required, isFalse);
   });
 
   test('opportunity filters combine city, area and exact six-digit PIN', () {

@@ -155,7 +155,7 @@ class WorkPageScaffold extends StatelessWidget {
               child: Column(
                 children: [
                   WorkMessageBanner(session: session),
-                  Expanded(child: body),
+                  Expanded(child: _WorkPageReveal(child: body)),
                   if (bottomAction != null)
                     Material(
                       key: const Key('work-sticky-action-bar'),
@@ -171,7 +171,7 @@ class WorkPageScaffold extends StatelessWidget {
                         ),
                         child: SizedBox(
                           width: double.infinity,
-                          child: bottomAction,
+                          child: _WorkActionReveal(child: bottomAction!),
                         ),
                       ),
                     ),
@@ -228,6 +228,53 @@ class WorkPageScaffold extends StatelessWidget {
           onOpenChat: openChat,
         ),
       ),
+    );
+  }
+}
+
+class _WorkPageReveal extends StatelessWidget {
+  const _WorkPageReveal({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: MoolMotion.accessible(context, MoolMotion.standard),
+      curve: MoolMotion.enter,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 10 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _WorkActionReveal extends StatelessWidget {
+  const _WorkActionReveal({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: MoolMotion.accessible(context, MoolMotion.deliberate),
+      curve: MoolMotion.enter,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.scale(
+          scale: .97 + (.03 * value),
+          alignment: Alignment.bottomCenter,
+          child: child,
+        ),
+      ),
+      child: child,
     );
   }
 }
