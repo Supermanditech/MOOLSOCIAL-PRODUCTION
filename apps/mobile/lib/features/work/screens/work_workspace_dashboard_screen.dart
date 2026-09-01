@@ -172,7 +172,7 @@ class _WorkWorkspaceDashboardScreenState
                       key: const Key('work-dashboard-add-workspace'),
                       onPressed: () {
                         session.startAnotherWork();
-                        context.go('/app/work/workspace/choose');
+                        context.push('/app/work/workspace/choose');
                       },
                       icon: const Icon(Icons.add_business_outlined),
                       label: const Text('Add Workspace'),

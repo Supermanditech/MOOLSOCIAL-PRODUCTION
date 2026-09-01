@@ -1024,6 +1024,11 @@ void main() {
     expect(find.textContaining('Clinic / Doctor'), findsWidgets);
     expect(find.textContaining('Set up my shop'), findsNothing);
     expect(find.text('View approved record'), findsOneWidget);
+    await tapVisible(tester, const Key('work-dashboard-add-workspace'));
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(find.byKey(const Key('workspace-existing-summary')), findsOneWidget);
+    await tapVisible(tester, const Key('work-back'));
+    expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
   });
 
   testWidgets(
