@@ -258,6 +258,10 @@ abstract interface class WorkGateway {
   });
   Future<String> saveProof(String proofId, WorkPickedProof proof);
   Future<WorkReviewResult> submitProfile(WorkProfileSubmission submission);
+  Future<WorkReviewResult> submitCorrection(
+    String caseId,
+    WorkProfileSubmission submission,
+  );
   Future<WorkReviewResult> checkReview(String caseId);
   Future<String> submitGst(String caseId, String gstin, String proofReference);
   Future<void> finishSetup({
@@ -300,6 +304,11 @@ class UnavailableWorkGateway implements WorkGateway {
       throw _error;
   @override
   Future<WorkReviewResult> checkReview(String caseId) async => throw _error;
+  @override
+  Future<WorkReviewResult> submitCorrection(
+    String caseId,
+    WorkProfileSubmission submission,
+  ) async => throw _error;
   @override
   Future<void> finishSetup({
     required String workspaceId,
@@ -461,6 +470,14 @@ class AuthenticatedWorkGateway implements WorkGateway {
         ),
       );
   @override
+  Future<WorkReviewResult> submitCorrection(
+    String caseId,
+    WorkProfileSubmission value,
+  ) async => throw const WorkGatewayException(
+    'Sending corrections to an existing review is not available yet. Your changes remain saved; contact MoolSocial Support for this review.',
+    retryable: false,
+  );
+  @override
   Future<WorkReviewResult> checkReview(String caseId) async =>
       _decodeReview(_map(await _invoke('reviewStatus', {'caseId': caseId})));
   @override
@@ -554,6 +571,7 @@ class ReviewWorkGateway implements WorkGateway {
   WorkProfileSubmission? lastSubmission;
   int proofCalls = 0;
   int submissionCalls = 0;
+  int correctionCalls = 0;
   int reviewCalls = 0;
   int gstCalls = 0;
   int setupCalls = 0;
@@ -657,6 +675,27 @@ class ReviewWorkGateway implements WorkGateway {
     }
     return WorkReviewResult(
       caseId: 'WP-${240700 + submissionCalls}',
+      status: WorkRemoteReviewStatus.pending,
+      plan: 'free',
+    );
+  }
+
+  @override
+  Future<WorkReviewResult> submitCorrection(
+    String caseId,
+    WorkProfileSubmission value,
+  ) async {
+    correctionCalls++;
+    lastSubmission = value;
+    await _wait();
+    if (failSubmission) {
+      failSubmission = false;
+      throw const WorkGatewayException(
+        'Workspace corrections were not sent. Your changes remain saved.',
+      );
+    }
+    return WorkReviewResult(
+      caseId: caseId,
       status: WorkRemoteReviewStatus.pending,
       plan: 'free',
     );

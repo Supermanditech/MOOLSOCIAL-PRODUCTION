@@ -17,14 +17,14 @@ GlobalProfileContextAction _workProfileContext(
   ValueChanged<String> onOpenRoute,
 ) {
   final workspace = session.activeWorkspace;
-  if (session.reviewStage == WorkReviewStage.live && workspace != null) {
+  if (session.hasVerifiedWorkspace && workspace != null) {
     return GlobalProfileContextAction(
       id: 'work-workspace-active',
       title: workspace.name,
       detail: '${workspace.profileLabel} · ${workspace.area}',
       actionLabel: 'Open Workspace',
       icon: Icons.dashboard_customize_outlined,
-      onPressed: () => onOpenRoute('/app/work/workspace/choose'),
+      onPressed: () => onOpenRoute('/app/work/workspace/dashboard'),
     );
   }
   if (session.reviewCaseId != null) {
@@ -34,7 +34,7 @@ GlobalProfileContextAction _workProfileContext(
       detail: 'Review status and provide requested information.',
       actionLabel: 'View application',
       icon: Icons.fact_check_outlined,
-      onPressed: () => onOpenRoute('/app/work/status'),
+      onPressed: () => onOpenRoute('/app/work/workspace/proof'),
     );
   }
   return GlobalProfileContextAction(

@@ -647,12 +647,14 @@ class WorkWorkspace {
     required this.profileLabel,
     required this.area,
     required this.verified,
+    this.profileId,
     this.gstReminder = false,
   });
 
   final String id;
   final String name;
   final String profileLabel;
+  final String? profileId;
   final String area;
   final bool verified;
   final bool gstReminder;

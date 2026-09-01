@@ -313,4 +313,50 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('profile dashboard remains usable on compact large-text layout', (
+    tester,
+  ) async {
+    final work = selectedRetailer()
+      ..hydrateAccountSnapshot(
+        const WorkAccountSnapshot(
+          email: 'asha@example.com',
+          mobile: '+91 98290 12321',
+          providerLabel: 'Google',
+          providerAccount: 'asha@example.com',
+          emailConfirmed: true,
+          mobileConfirmed: true,
+        ),
+      )
+      ..saveDetails(
+        name: 'Mahadev Fresh Mart',
+        area: 'Sardarpura, Jodhpur',
+        activity: 'Grocery retail',
+      )
+      ..reviewCaseId = 'WP-240701'
+      ..workspaceId = 'WK-510001'
+      ..reviewStage = WorkReviewStage.approved
+      ..remoteReviewStatus = WorkRemoteReviewStatus.approved
+      ..activeWorkspace = const WorkWorkspace(
+        id: 'WK-510001',
+        name: 'Mahadev Fresh Mart',
+        profileLabel: 'Grocery / Kirana Shop',
+        area: 'Sardarpura, Jodhpur',
+        verified: true,
+      );
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    expect(find.byKey(const Key('work-dashboard-hero')), findsOneWidget);
+    expectHeaderAndStickyAction(tester);
+    final account = find.byKey(const Key('work-dashboard-account-state'));
+    await reveal(tester, account);
+    expect(
+      tester.getBottomRight(account).dy,
+      lessThanOrEqualTo(
+        tester.getTopRight(find.byKey(const Key('work-sticky-action-bar'))).dy,
+      ),
+    );
+    expect(find.byKey(const Key('work-dashboard-earn')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

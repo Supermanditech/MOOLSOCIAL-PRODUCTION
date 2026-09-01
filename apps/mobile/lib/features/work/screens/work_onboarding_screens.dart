@@ -1507,13 +1507,9 @@ class _ExistingWorkspaceSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final route = session.reviewStage == WorkReviewStage.live
-        ? '/app/retailer/home'
-        : session.reviewStage == WorkReviewStage.approved
-        ? '/app/work/ready'
-        : session.reviewStage == WorkReviewStage.setup
-        ? '/app/work/retailer/setup'
-        : '/app/work/status';
+    final route = session.hasVerifiedWorkspace
+        ? '/app/work/workspace/dashboard'
+        : '/app/work/workspace/proof';
     return WorkCard(
       keyName: 'workspace-existing-summary',
       color: const Color(0xFFEAF7E8),
@@ -1617,30 +1613,59 @@ class _WorkspaceApplicationSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final status = session.remoteReviewStatus;
+    final rejected = status == WorkRemoteReviewStatus.rejected;
+    final suspended = status == WorkRemoteReviewStatus.suspended;
+    final clarification =
+        status == WorkRemoteReviewStatus.pending &&
+        session.reviewReason?.trim().isNotEmpty == true;
+    final accent = rejected || suspended
+        ? const Color(0xFFB42318)
+        : MoolColors.orange;
+    final title = rejected
+        ? 'Workspace changes required'
+        : suspended
+        ? 'Workspace unavailable'
+        : clarification
+        ? 'Clarification requested'
+        : 'Workspace review in progress';
+    final detail = session.reviewReason?.trim().isNotEmpty == true
+        ? session.reviewReason!.trim()
+        : session.reviewCaseId ?? 'Submitted for review';
     return WorkCard(
       keyName: 'workspace-application-summary',
-      color: const Color(0xFFFFF4E5),
+      color: accent.withValues(alpha: .09),
       child: Row(
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             backgroundColor: Colors.white,
-            foregroundColor: MoolColors.orange,
-            child: Icon(Icons.schedule_rounded),
+            foregroundColor: accent,
+            child: Icon(
+              rejected
+                  ? Icons.edit_note_rounded
+                  : suspended
+                  ? Icons.pause_circle_outline_rounded
+                  : clarification
+                  ? Icons.mark_unread_chat_alt_outlined
+                  : Icons.schedule_rounded,
+            ),
           ),
           const SizedBox(width: MoolSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Workspace review in progress',
-                  style: TextStyle(
+                Text(
+                  title,
+                  style: const TextStyle(
                     color: MoolColors.navy,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 Text(
-                  session.reviewCaseId ?? 'Submitted for review',
+                  detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: MoolColors.muted, fontSize: 11),
                 ),
               ],
@@ -1648,7 +1673,7 @@ class _WorkspaceApplicationSummary extends StatelessWidget {
           ),
           TextButton(
             key: const Key('workspace-check-review'),
-            onPressed: () => context.push('/app/work/status'),
+            onPressed: () => context.push('/app/work/workspace/proof'),
             child: const Text('View'),
           ),
         ],
@@ -1994,6 +2019,9 @@ class WorkProfileProofScreen extends StatefulWidget {
 
 class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
   int _step = 0;
+  bool _correctionMode = false;
+  bool _reviewEditMode = false;
+  String? _correctionInstruction;
   late final TextEditingController _name = TextEditingController(
     text: widget.session.workName,
   );
@@ -2027,6 +2055,32 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
   }
 
   void _goBack() {
+    if (_step >= 3) {
+      context.go(
+        widget.session.hasVerifiedWorkspace
+            ? '/app/work/workspace/dashboard'
+            : '/app/work/workspace/choose',
+      );
+      return;
+    }
+    if (_reviewEditMode && (_step == 0 || _step == 1)) {
+      setState(() {
+        _step = 2;
+        _reviewEditMode = false;
+      });
+      return;
+    }
+    if (_correctionMode && (_step == 0 || _step == 1)) {
+      if (widget.session.reviewCaseId != null) {
+        setState(() {
+          _step = 3;
+          _correctionMode = false;
+        });
+      } else {
+        context.go('/app/work/workspace/choose');
+      }
+      return;
+    }
     if (_step > 0) {
       setState(() => _step -= 1);
       return;
@@ -2036,6 +2090,18 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
     } else {
       context.go('/app/work/workspace/contact');
     }
+  }
+
+  void _beginCorrection(int step) {
+    final instruction = widget.session.reviewReason?.trim();
+    if (!widget.session.beginReviewCorrection()) return;
+    setState(() {
+      _step = step;
+      _correctionMode = true;
+      _correctionInstruction = instruction?.isEmpty == true
+          ? null
+          : instruction;
+    });
   }
 
   @override
@@ -2054,32 +2120,52 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
         bottomAction: switch (_step) {
           0 => WorkPrimaryButton(
             keyName: 'work-details-continue',
-            label: 'Continue to documents',
+            label: _reviewEditMode
+                ? 'Save and return to review'
+                : 'Continue to documents',
             onPressed: () {
               _saveFields();
               if (widget.session.validateDetails()) {
-                setState(() => _step = 1);
+                setState(() {
+                  _step = _reviewEditMode ? 2 : 1;
+                  _reviewEditMode = false;
+                });
               }
             },
           ),
           1 => WorkPrimaryButton(
             keyName: 'work-proof-review',
-            label: 'Review your information',
-            onPressed: () => setState(() => _step = 2),
+            label: _reviewEditMode
+                ? 'Save and return to review'
+                : 'Review your information',
+            onPressed: () => setState(() {
+              _step = 2;
+              _reviewEditMode = false;
+            }),
           ),
           2 => WorkPrimaryButton(
             keyName: 'work-submit-profile',
-            label: 'Submit for review',
+            label: widget.session.reviewCorrectionDraft
+                ? 'Send corrections for review'
+                : _correctionMode
+                ? 'Resubmit for review'
+                : 'Submit for review',
             busy: widget.session.busy,
             onPressed: () async {
               final submitted = await widget.session.submitProfile();
-              if (submitted && mounted) setState(() => _step = 3);
+              if (submitted && mounted) {
+                setState(() {
+                  _step = 3;
+                  _correctionMode = false;
+                  _correctionInstruction = null;
+                });
+              }
             },
             icon: Icons.send_rounded,
           ),
           _ => _InlineReviewAction(
             session: widget.session,
-            onUpdateDetails: () => setState(() => _step = 0),
+            onUpdateDetails: () => _beginCorrection(0),
           ),
         },
         body: ListView(
@@ -2093,6 +2179,10 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
           children: [
             _ProgressHeader(step: _step),
             const SizedBox(height: MoolSpacing.md),
+            if (_correctionMode && _correctionInstruction != null) ...[
+              _CorrectionInstructionCard(instruction: _correctionInstruction!),
+              const SizedBox(height: MoolSpacing.md),
+            ],
             if (_step == 0) ...[
               const WorkSectionTitle(
                 title: 'Work details',
@@ -2165,58 +2255,137 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                 const SizedBox(height: MoolSpacing.xs),
               ],
             ] else if (_step == 2) ...[
-              const WorkSectionTitle(
-                title: 'Review and submit',
-                detail: 'Check your Workspace details and documents',
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              WorkCard(
+              _ReviewStepMotion(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _ReviewRow(
-                      label: 'Workspace',
-                      value:
-                          widget.session.selectedProfile?.label ??
-                          'Not selected',
+                    const WorkSectionTitle(
+                      title: 'Review and submit',
+                      detail: 'Check your Workspace details and documents',
                     ),
-                    _ReviewRow(label: 'Name', value: widget.session.workName),
-                    _ReviewRow(label: 'Area', value: widget.session.workArea),
-                    _ReviewRow(
-                      label: 'Activity',
-                      value: widget.session.primaryActivity,
+                    const SizedBox(height: MoolSpacing.sm),
+                    WorkCard(
+                      child: Column(
+                        children: [
+                          _ReviewRow(
+                            label: 'Workspace',
+                            value:
+                                widget.session.selectedProfile?.label ??
+                                'Not selected',
+                          ),
+                          _ReviewRow(
+                            label: 'Name',
+                            value: widget.session.workName,
+                          ),
+                          _ReviewRow(
+                            label: 'Area',
+                            value: widget.session.workArea,
+                          ),
+                          _ReviewRow(
+                            label: 'Activity',
+                            value: widget.session.primaryActivity,
+                          ),
+                          _ReviewRow(
+                            label: 'Documents',
+                            value:
+                                '${widget.session.addedProofs.length - 1} added · more can be added later',
+                          ),
+                          for (final proof
+                              in widget.session.selectedWorkspaceDocuments)
+                            if (proof.id != 'personal-kyc' &&
+                                widget.session.addedProofs.containsKey(
+                                  proof.id,
+                                ))
+                              _ReviewRow(label: 'Added', value: proof.label),
+                        ],
+                      ),
                     ),
-                    _ReviewRow(
-                      label: 'Documents',
-                      value:
-                          '${widget.session.addedProofs.length - 1} added · more can be added later',
+                    const SizedBox(height: MoolSpacing.sm),
+                    WorkCard(
+                      keyName: 'work-review-corrections',
+                      color: const Color(0xFFEDEEFF),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Need to correct something?',
+                            style: TextStyle(
+                              color: MoolColors.ink,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const Text(
+                            'Update the information or documents before sending this Workspace for review.',
+                            style: TextStyle(
+                              color: MoolColors.muted,
+                              fontSize: 10.5,
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: MoolSpacing.xs),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  key: const Key('work-review-edit-details'),
+                                  onPressed: () {
+                                    widget.session.setDeclaration(false);
+                                    setState(() {
+                                      _step = 0;
+                                      _reviewEditMode = true;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: const Text('Edit details'),
+                                ),
+                              ),
+                              const SizedBox(width: MoolSpacing.xs),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  key: const Key('work-review-edit-documents'),
+                                  onPressed: () {
+                                    widget.session.setDeclaration(false);
+                                    setState(() {
+                                      _step = 1;
+                                      _reviewEditMode = true;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.upload_file_outlined),
+                                  label: const Text('Edit documents'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: MoolSpacing.md),
+                    WorkCard(
+                      color: const Color(0xFFFFF4E5),
+                      child: CheckboxListTile(
+                        key: const Key('work-declaration'),
+                        value: widget.session.declarationAccepted,
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: const Text(
+                          'I confirm these Workspace details are correct and any documents added belong to me or I am authorized to use them.',
+                          style: TextStyle(
+                            color: MoolColors.ink,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        onChanged: (value) =>
+                            widget.session.setDeclaration(value ?? false),
+                      ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.md),
-              WorkCard(
-                color: const Color(0xFFFFF4E5),
-                child: CheckboxListTile(
-                  key: const Key('work-declaration'),
-                  value: widget.session.declarationAccepted,
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: const Text(
-                    'I confirm these Workspace details are correct and any documents added belong to me or I am authorized to use them.',
-                    style: TextStyle(
-                      color: MoolColors.ink,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  onChanged: (value) =>
-                      widget.session.setDeclaration(value ?? false),
                 ),
               ),
             ] else ...[
               _InlineWorkspaceReviewStatus(
                 session: widget.session,
-                onAddDocuments: () => setState(() => _step = 1),
-                onUpdateDetails: () => setState(() => _step = 0),
+                onAddDocuments: () => _beginCorrection(1),
+                onUpdateDetails: () => _beginCorrection(0),
               ),
             ],
           ],
@@ -2472,13 +2641,21 @@ class _InlineReviewAction extends StatelessWidget {
         status == WorkRemoteReviewStatus.live) {
       return WorkPrimaryButton(
         keyName: 'work-inline-review-approved',
-        label: 'Continue with this Workspace',
+        label: 'Open Workspace dashboard',
         icon: Icons.task_alt_rounded,
-        onPressed: () => context.go('/app/work/ready'),
+        onPressed: () => context.go('/app/work/workspace/dashboard'),
       );
     }
-    if (status == WorkRemoteReviewStatus.rejected ||
-        status == WorkRemoteReviewStatus.suspended) {
+    if (status == WorkRemoteReviewStatus.suspended) {
+      return WorkPrimaryButton(
+        keyName: 'work-inline-review-support',
+        label: 'Open support Chat',
+        icon: Icons.support_agent_rounded,
+        onPressed: () =>
+            context.go('/app/chat/inbox?return=/app/work/workspace/proof'),
+      );
+    }
+    if (status == WorkRemoteReviewStatus.rejected) {
       return WorkPrimaryButton(
         keyName: 'work-inline-review-update',
         label: 'Update Workspace information',
@@ -2492,6 +2669,52 @@ class _InlineReviewAction extends StatelessWidget {
       busy: session.busy,
       icon: Icons.refresh_rounded,
       onPressed: session.checkReview,
+    );
+  }
+}
+
+class _CorrectionInstructionCard extends StatelessWidget {
+  const _CorrectionInstructionCard({required this.instruction});
+
+  final String instruction;
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkCard(
+      keyName: 'work-correction-instruction',
+      color: const Color(0xFFFFF4E5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.mark_unread_chat_alt_outlined,
+            color: MoolColors.orange,
+          ),
+          const SizedBox(width: MoolSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'What needs your attention',
+                  style: TextStyle(
+                    color: MoolColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  instruction,
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 10.5,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2520,15 +2743,17 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
     final approved =
         status == WorkRemoteReviewStatus.approved ||
         status == WorkRemoteReviewStatus.live;
-    final stopped =
-        status == WorkRemoteReviewStatus.rejected ||
-        status == WorkRemoteReviewStatus.suspended;
+    final rejected = status == WorkRemoteReviewStatus.rejected;
+    final suspended = status == WorkRemoteReviewStatus.suspended;
+    final stopped = rejected || suspended;
     final clarification =
         !stopped && session.reviewReason?.trim().isNotEmpty == true;
     final title = approved
         ? 'Workspace approved'
-        : stopped
+        : rejected
         ? 'Workspace not approved'
+        : suspended
+        ? 'Workspace unavailable'
         : clarification
         ? 'Clarification requested'
         : missingDocuments > 0
@@ -2536,7 +2761,7 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
         : 'Review in progress';
     final detail = approved
         ? 'Your Workspace review is complete.'
-        : stopped
+        : rejected || suspended
         ? session.reviewReason?.trim().isNotEmpty == true
               ? session.reviewReason!.trim()
               : 'MoolSocial could not approve this Workspace. Update the information and submit again.'
@@ -2550,105 +2775,136 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
         : stopped
         ? const Color(0xFFB42318)
         : MoolColors.orange;
-    return Column(
-      key: const Key('work-inline-review-status'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        WorkCard(
-          color: accent.withValues(alpha: .09),
-          child: Column(
-            children: [
-              Icon(
-                approved
-                    ? Icons.verified_rounded
-                    : stopped
-                    ? Icons.report_gmailerrorred_rounded
-                    : Icons.hourglass_top_rounded,
-                color: accent,
-                size: 44,
-              ),
-              const SizedBox(height: MoolSpacing.xs),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
+    return _ReviewStepMotion(
+      child: Column(
+        key: const Key('work-inline-review-status'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          WorkCard(
+            color: accent.withValues(alpha: .09),
+            child: Column(
+              children: [
+                Icon(
+                  approved
+                      ? Icons.verified_rounded
+                      : stopped
+                      ? Icons.report_gmailerrorred_rounded
+                      : Icons.hourglass_top_rounded,
+                  color: accent,
+                  size: 44,
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                detail,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: MoolColors.muted, height: 1.35),
-              ),
-              if (session.reviewCaseId case final caseId?) ...[
                 const SizedBox(height: MoolSpacing.xs),
-                WorkPill(label: 'Reference $caseId', color: accent),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  detail,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: MoolColors.muted, height: 1.35),
+                ),
+                if (session.reviewCaseId case final caseId?) ...[
+                  const SizedBox(height: MoolSpacing.xs),
+                  WorkPill(label: 'Reference $caseId', color: accent),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: MoolSpacing.md),
-        Row(
-          children: [
-            Expanded(
-              child: _ReviewStatusFact(
-                label: 'DETAILS',
-                value: 'Submitted',
-                color: MoolColors.success,
-              ),
-            ),
-            const SizedBox(width: MoolSpacing.xs),
-            Expanded(
-              child: _ReviewStatusFact(
-                label: 'DOCUMENTS',
-                value: '$addedDocuments of $availableDocuments',
-                color: missingDocuments == 0
-                    ? MoolColors.success
-                    : MoolColors.orange,
-              ),
-            ),
-            const SizedBox(width: MoolSpacing.xs),
-            Expanded(
-              child: _ReviewStatusFact(
-                label: 'DECISION',
-                value: approved
-                    ? 'Approved'
-                    : stopped
-                    ? 'Not approved'
-                    : 'Pending',
-                color: accent,
-              ),
-            ),
-          ],
-        ),
-        if (!approved) ...[
           const SizedBox(height: MoolSpacing.md),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
-                  key: const Key('work-inline-add-documents'),
-                  onPressed: onAddDocuments,
-                  icon: const Icon(Icons.upload_file_outlined),
-                  label: const Text('Add documents'),
+                child: _ReviewStatusFact(
+                  label: 'DETAILS',
+                  value: 'Submitted',
+                  color: MoolColors.success,
                 ),
               ),
               const SizedBox(width: MoolSpacing.xs),
               Expanded(
-                child: OutlinedButton.icon(
-                  key: const Key('work-inline-update-details'),
-                  onPressed: onUpdateDetails,
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Update details'),
+                child: _ReviewStatusFact(
+                  label: 'DOCUMENTS',
+                  value: '$addedDocuments of $availableDocuments',
+                  color: missingDocuments == 0
+                      ? MoolColors.success
+                      : MoolColors.orange,
+                ),
+              ),
+              const SizedBox(width: MoolSpacing.xs),
+              Expanded(
+                child: _ReviewStatusFact(
+                  label: 'DECISION',
+                  value: approved
+                      ? 'Approved'
+                      : rejected
+                      ? 'Not approved'
+                      : suspended
+                      ? 'Unavailable'
+                      : 'Pending',
+                  color: accent,
                 ),
               ),
             ],
           ),
+          if (!approved && !stopped) ...[
+            const SizedBox(height: MoolSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('work-inline-add-documents'),
+                    onPressed: onAddDocuments,
+                    icon: const Icon(Icons.upload_file_outlined),
+                    label: const Text('Add documents'),
+                  ),
+                ),
+                const SizedBox(width: MoolSpacing.xs),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('work-inline-update-details'),
+                    onPressed: onUpdateDetails,
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Update details'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
-      ],
+      ),
+    );
+  }
+}
+
+class _ReviewStepMotion extends StatelessWidget {
+  const _ReviewStepMotion({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: MoolMotion.accessible(context, MoolMotion.standard),
+      curve: MoolMotion.enter,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 14 * (1 - value)),
+          child: Transform.scale(
+            scale: .985 + (.015 * value),
+            alignment: Alignment.topCenter,
+            child: child,
+          ),
+        ),
+      ),
+      child: child,
     );
   }
 }
@@ -2944,7 +3200,10 @@ class WorkVerificationStatusScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: session,
       builder: (context, _) {
-        final approved = session.reviewStage == WorkReviewStage.approved;
+        final approved = {
+          WorkReviewStage.approved,
+          WorkReviewStage.live,
+        }.contains(session.reviewStage);
         final rejected =
             session.remoteReviewStatus == WorkRemoteReviewStatus.rejected;
         final suspended =
@@ -2961,11 +3220,13 @@ class WorkVerificationStatusScreen extends StatelessWidget {
           subtitle: session.reviewCaseId ?? 'Review status',
           fallbackBackRoute: '/app/work/workspace/choose',
           activeLocalAction: 'workspace',
+          showHeaderChat: false,
+          showTrailingAction: false,
           bottomAction: approved
               ? WorkPrimaryButton(
                   keyName: 'work-open-ready',
-                  label: 'Continue to workspace setup',
-                  onPressed: () => context.go('/app/work/ready'),
+                  label: 'Open Workspace dashboard',
+                  onPressed: () => context.go('/app/work/workspace/dashboard'),
                 )
               : rejected
               ? WorkPrimaryButton(
@@ -2992,7 +3253,7 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                   onPressed: () async {
                     final ready = await session.checkReview();
                     if (ready && context.mounted) {
-                      context.go('/app/work/ready');
+                      context.go('/app/work/workspace/dashboard');
                     }
                   },
                   icon: Icons.refresh_rounded,
@@ -3706,7 +3967,7 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
             busy: widget.session.busy,
             onPressed: () async {
               if (complete) {
-                context.go('/app/retailer/home');
+                context.go('/app/work/workspace/dashboard');
                 return;
               }
               _saveFields();

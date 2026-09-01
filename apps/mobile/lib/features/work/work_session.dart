@@ -60,6 +60,7 @@ class WorkSession extends ChangeNotifier {
   String subscriptionPlan = 'free';
   String? reviewReason;
   WorkRemoteReviewStatus? remoteReviewStatus;
+  bool reviewCorrectionDraft = false;
   String? _profileSubmissionKey;
   bool gstReminder = false;
   String gstin = '';
@@ -213,13 +214,7 @@ class WorkSession extends ChangeNotifier {
       .where((proof) => proof.required)
       .every((proof) => addedProofs.containsKey(proof.id));
 
-  bool get hasVerifiedWorkspace =>
-      activeWorkspace?.verified == true &&
-      {
-        WorkReviewStage.approved,
-        WorkReviewStage.setup,
-        WorkReviewStage.live,
-      }.contains(reviewStage);
+  bool get hasVerifiedWorkspace => activeWorkspace?.verified == true;
 
   bool get retailerReady =>
       retailerProductAdded &&
@@ -411,12 +406,13 @@ class WorkSession extends ChangeNotifier {
       ..['personal-kyc'] = 'ACCOUNT-KYC';
     declarationAccepted = false;
     reviewCaseId = null;
-    workspaceId = null;
+    workspaceId = activeWorkspace?.id;
     subscriptionPlan = 'free';
     reviewReason = null;
     remoteReviewStatus = null;
+    reviewCorrectionDraft = false;
     _profileSubmissionKey = null;
-    reviewStage = WorkReviewStage.drafting;
+    if (activeWorkspace == null) reviewStage = WorkReviewStage.drafting;
     gstReminder = false;
     gstin = '';
     gstAttachmentAdded = false;
@@ -433,9 +429,14 @@ class WorkSession extends ChangeNotifier {
   }
 
   void selectProfile(String profileId) {
-    selectedProfile = workProfiles.firstWhere(
+    final nextProfile = workProfiles.firstWhere(
       (profile) => profile.id == profileId,
     );
+    if (selectedProfile?.id != nextProfile.id) {
+      addedProofs.removeWhere((id, _) => id != 'personal-kyc');
+      declarationAccepted = false;
+    }
+    selectedProfile = nextProfile;
     clearMessages();
     notifyListeners();
   }
@@ -754,6 +755,60 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool beginReviewCorrection() {
+    if (remoteReviewStatus == WorkRemoteReviewStatus.suspended) {
+      errorMessage =
+          'This Workspace is unavailable. Contact MoolSocial Support for the next step.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    if (remoteReviewStatus == WorkRemoteReviewStatus.approved ||
+        remoteReviewStatus == WorkRemoteReviewStatus.live) {
+      errorMessage =
+          'This Workspace is already approved. Open its dashboard to manage it.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    if (remoteReviewStatus == WorkRemoteReviewStatus.rejected) {
+      reviseRejectedProfile();
+      return true;
+    }
+    if (reviewCaseId == null) {
+      errorMessage = 'Submit the Workspace before sending a correction.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    reviewCorrectionDraft = true;
+    declarationAccepted = false;
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  WorkProfileSubmission _currentProfileSubmission() {
+    final profile = selectedProfile!;
+    _profileSubmissionKey ??=
+        'work-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
+    return WorkProfileSubmission(
+      familyId: profile.familyId,
+      profileId: profile.id,
+      name: workName,
+      area: workArea,
+      primaryActivity: primaryActivity,
+      proofReferences: Map<String, String>.unmodifiable(addedProofs),
+      primaryMobile: primaryMobile,
+      email: contactEmail,
+      alternateMobile: alternateMobile,
+      connectedProvider: connectedProviderLabel,
+      connectedProviderAccount: connectedProviderAccount,
+      alternateMobileVerified: alternateVerified,
+      idempotencyKey: _profileSubmissionKey!,
+    );
+  }
+
   Future<bool> submitProfile() async {
     if (!validateDetails()) return false;
     if (!workspaceContactsReady) {
@@ -767,35 +822,35 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    if (reviewCaseId != null) {
+    final existingCaseId = reviewCaseId;
+    if (existingCaseId != null && reviewCorrectionDraft) {
+      return _runBool(
+        () async {
+          final result = await gateway.submitCorrection(
+            existingCaseId,
+            _currentProfileSubmission(),
+          );
+          reviewCaseId = result.caseId;
+          subscriptionPlan = result.plan;
+          reviewReason = result.reason;
+          remoteReviewStatus = result.status;
+          reviewStage = WorkReviewStage.gstPending;
+          reviewCorrectionDraft = false;
+        },
+        success:
+            'Your Workspace correction was sent with the existing review reference.',
+      );
+    }
+    if (existingCaseId != null) {
       noticeMessage =
-          'This work profile is already under review as $reviewCaseId.';
+          'This Workspace is already under review as $existingCaseId.';
       errorMessage = null;
       notifyListeners();
       return true;
     }
     return _runBool(
       () async {
-        final profile = selectedProfile!;
-        _profileSubmissionKey ??=
-            'work-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
-        final result = await gateway.submitProfile(
-          WorkProfileSubmission(
-            familyId: profile.familyId,
-            profileId: profile.id,
-            name: workName,
-            area: workArea,
-            primaryActivity: primaryActivity,
-            proofReferences: Map<String, String>.unmodifiable(addedProofs),
-            primaryMobile: primaryMobile,
-            email: contactEmail,
-            alternateMobile: alternateMobile,
-            connectedProvider: connectedProviderLabel,
-            connectedProviderAccount: connectedProviderAccount,
-            alternateMobileVerified: alternateVerified,
-            idempotencyKey: _profileSubmissionKey!,
-          ),
-        );
+        final result = await gateway.submitProfile(_currentProfileSubmission());
         reviewCaseId = result.caseId;
         subscriptionPlan = result.plan;
         reviewReason = result.reason;
@@ -910,13 +965,23 @@ class WorkSession extends ChangeNotifier {
             );
           }
           workspaceId = approvedWorkspaceId;
+          reviewCorrectionDraft = false;
           reviewStage = result.status == WorkRemoteReviewStatus.live
               ? WorkReviewStage.live
               : WorkReviewStage.approved;
+          final previousWorkspace = activeWorkspace;
+          if (previousWorkspace != null &&
+              previousWorkspace.id != approvedWorkspaceId &&
+              otherWorkspaces.every(
+                (workspace) => workspace.id != previousWorkspace.id,
+              )) {
+            otherWorkspaces.add(previousWorkspace);
+          }
           activeWorkspace = WorkWorkspace(
             id: approvedWorkspaceId,
             name: workName,
             profileLabel: selectedProfile?.label ?? 'Work profile',
+            profileId: selectedProfile?.id,
             area: workArea,
             verified: true,
             gstReminder: gstReminder && gstin.isEmpty,
@@ -948,6 +1013,7 @@ class WorkSession extends ChangeNotifier {
     workspaceId = null;
     reviewReason = null;
     remoteReviewStatus = null;
+    reviewCorrectionDraft = false;
     _profileSubmissionKey = null;
     declarationAccepted = false;
     reviewStage = WorkReviewStage.drafting;
@@ -1053,6 +1119,7 @@ class WorkSession extends ChangeNotifier {
       id: 'WK-510001',
       name: 'Mahadev Fresh Mart',
       profileLabel: 'Grocery / Kirana Shop',
+      profileId: 'retailer-grocery',
       area: 'Sardarpura, Jodhpur',
       verified: true,
     );
@@ -1068,6 +1135,7 @@ class WorkSession extends ChangeNotifier {
           id: 'WK-510002',
           name: 'Creator Work',
           profileLabel: 'Creator',
+          profileId: 'creator',
           area: 'Remote India',
           verified: true,
         ),
@@ -1075,6 +1143,7 @@ class WorkSession extends ChangeNotifier {
           id: 'WK-510003',
           name: 'Quick Delivery Work',
           profileLabel: 'Quick Delivery Biker',
+          profileId: 'quick-delivery-biker',
           area: 'Jodhpur',
           verified: true,
         ),
@@ -1117,6 +1186,7 @@ class WorkSession extends ChangeNotifier {
         id: id,
         name: name,
         profileLabel: option.label,
+        profileId: option.id,
         area: area,
         verified: true,
       );

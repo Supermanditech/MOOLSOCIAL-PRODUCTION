@@ -319,26 +319,25 @@ void main() {
         code: '123456',
       );
 
-      final submitted = await gateway.submitProfile(
-        const WorkProfileSubmission(
-          familyId: 'products-trade',
-          profileId: 'retailer-grocery',
-          name: 'Mahadev Fresh Mart',
-          area: 'Sardarpura, Jodhpur',
-          primaryActivity: 'Grocery and household products',
-          proofReferences: {
-            'personal-kyc': 'account-kyc',
-            'shop-front': 'proof-shop',
-            'owner-authority': 'proof-owner',
-          },
-          primaryMobile: '9829012321',
-          email: 'asha@example.com',
-          connectedProvider: 'Google',
-          connectedProviderAccount: 'asha@example.com',
-          alternateMobileVerified: false,
-          idempotencyKey: 'work-submit-001',
-        ),
+      const profileSubmission = WorkProfileSubmission(
+        familyId: 'products-trade',
+        profileId: 'retailer-grocery',
+        name: 'Mahadev Fresh Mart',
+        area: 'Sardarpura, Jodhpur',
+        primaryActivity: 'Grocery and household products',
+        proofReferences: {
+          'personal-kyc': 'account-kyc',
+          'shop-front': 'proof-shop',
+          'owner-authority': 'proof-owner',
+        },
+        primaryMobile: '9829012321',
+        email: 'asha@example.com',
+        connectedProvider: 'Google',
+        connectedProviderAccount: 'asha@example.com',
+        alternateMobileVerified: false,
+        idempotencyKey: 'work-submit-001',
       );
+      final submitted = await gateway.submitProfile(profileSubmission);
       final reviewed = await gateway.checkReview('wp-1');
       expect(
         await gateway.submitGst('wp-1', '08ABCDE1234F1Z5', 'proof-gst-1'),
@@ -378,6 +377,49 @@ void main() {
         SocialAppCheckTokenMode.limitedUse,
         SocialAppCheckTokenMode.limitedUse,
       ]);
+    },
+  );
+
+  test(
+    'production correction fails closed until backend support exists',
+    () async {
+      final transport = _RecordingTransport([]);
+      final gateway = AuthenticatedWorkGateway(
+        endpoint: Uri.parse(
+          'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace',
+        ),
+        credentials: _RecordingCredentials(),
+        transport: transport,
+        random: Random(11),
+      );
+
+      await expectLater(
+        gateway.submitCorrection(
+          'wp-1',
+          const WorkProfileSubmission(
+            familyId: 'products-trade',
+            profileId: 'retailer-grocery',
+            name: 'Mahadev Fresh Mart',
+            area: 'Jodhpur',
+            primaryActivity: 'Grocery retail',
+            proofReferences: {'personal-kyc': 'account-kyc'},
+            primaryMobile: '9829012321',
+            email: 'asha@example.com',
+            connectedProvider: 'Google',
+            connectedProviderAccount: 'asha@example.com',
+            alternateMobileVerified: false,
+            idempotencyKey: 'work-submit-001',
+          ),
+        ),
+        throwsA(
+          isA<WorkGatewayException>().having(
+            (error) => error.message,
+            'message',
+            contains('not available yet'),
+          ),
+        ),
+      );
+      expect(transport.bodies, isEmpty);
     },
   );
 

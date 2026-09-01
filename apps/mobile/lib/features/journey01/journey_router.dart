@@ -91,6 +91,7 @@ import '../work/screens/work_earn_screens.dart';
 import '../work/screens/work_onboarding_screens.dart'
     hide WorkWorkspaceContactScreen;
 import '../work/screens/work_workspace_contact_screen.dart';
+import '../work/screens/work_workspace_dashboard_screen.dart';
 import '../work/work_models.dart';
 import '../work/work_session.dart';
 import '../../ui_v2/launch/launch_interruption_guard.dart';
@@ -1526,7 +1527,9 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/work/my-work',
-        redirect: (context, state) => '/app/work/workspace/choose',
+        redirect: (context, state) => workSession.hasVerifiedWorkspace
+            ? '/app/work/workspace/dashboard'
+            : '/app/work/workspace/choose',
       ),
       GoRoute(
         path: '/app/work/workspace/choose',
@@ -1557,7 +1560,12 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/work/ready',
-        builder: (context, state) => WorkspaceReadyScreen(session: workSession),
+        redirect: (context, state) => '/app/work/workspace/dashboard',
+      ),
+      GoRoute(
+        path: '/app/work/workspace/dashboard',
+        builder: (context, state) =>
+            WorkWorkspaceDashboardScreen(session: workSession),
       ),
       GoRoute(
         path: '/app/work/retailer/setup',
