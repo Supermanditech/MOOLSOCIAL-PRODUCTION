@@ -871,6 +871,7 @@ void main() {
           session.confirmedOrders.map((order) => order.id).toSet(),
           hasLength(groups.length),
         );
+        expect(session.confirmedProductCount, checkoutLines.length);
         expect(session.confirmedItemCount, checkoutItemCount);
         expect(session.confirmedTotal, checkoutTotal);
         expect(session.itemCount, 0);

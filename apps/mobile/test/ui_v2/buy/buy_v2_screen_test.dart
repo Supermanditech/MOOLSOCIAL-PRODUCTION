@@ -3125,6 +3125,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Order placed'), findsOneWidget);
+      expect(find.textContaining('2 products ·'), findsOneWidget);
+      expect(find.textContaining('3 products ·'), findsNothing);
       expect(find.text('Your deliveries'), findsOneWidget);
       expect(find.text('Delivery 1 of 2'), findsOneWidget);
       expect(find.text('Delivery 2 of 2'), findsOneWidget);

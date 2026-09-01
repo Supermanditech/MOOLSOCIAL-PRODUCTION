@@ -7085,7 +7085,7 @@ class BuyV2ConfirmationView extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${_productCountLabel(session.confirmedItemCount)} · ${buyV2Money(session.confirmedTotal)}',
+                '${_productCountLabel(session.confirmedProductCount)} · ${buyV2Money(session.confirmedTotal)}',
                 style: context.buyBody,
               ),
               if (session.confirmedBalanceDue > 0) ...[

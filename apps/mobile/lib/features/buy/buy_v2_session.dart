@@ -704,6 +704,7 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2PriceChange> _checkoutPriceChanges = [];
   BuyV2CheckoutAvailabilityIssue? _checkoutAvailabilityIssue;
   String? _confirmedPurchaseId;
+  int _confirmedProductCount = 0;
   int _confirmedItemCount = 0;
   int _confirmedTotal = 0;
   int _confirmedAmountPaidNow = 0;
@@ -3445,6 +3446,8 @@ class BuyV2Session extends ChangeNotifier {
 
   String? get confirmedPurchaseId => _confirmedPurchaseId;
 
+  int get confirmedProductCount => _confirmedProductCount;
+
   bool get checkoutPromiseReviewRequired =>
       _pendingCheckoutPromiseSnapshot != null;
 
@@ -5811,6 +5814,7 @@ class BuyV2Session extends ChangeNotifier {
     _confirmedDestinations = _confirmedOrders
         .map((order) => order.destination)
         .toSet();
+    _confirmedProductCount = lines.length;
     _confirmedItemCount = checkoutItemCount;
     _confirmedTotal = checkoutPayableTotal;
     _confirmedAmountPaidNow = checkoutAmountDueNow;
