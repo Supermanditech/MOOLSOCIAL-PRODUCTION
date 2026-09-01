@@ -79,7 +79,7 @@ class _WorkWorkspaceContactScreenState
                   keyName: 'work-contact-continue',
                   label: session.workspaceContactsReady
                       ? 'Continue to Workspace details'
-                      : 'Confirm main contact and email',
+                      : 'Confirm your phone and email',
                   onPressed: _continue,
                 ),
           body: ListView(
@@ -114,14 +114,14 @@ class _WorkWorkspaceContactScreenState
                     const WorkSectionTitle(
                       title: 'How MoolSocial can reach you',
                       detail:
-                          'Information already available is filled in. Confirm only what is missing or changed.',
+                          'Your existing details are filled in. Confirm anything new or changed.',
                     ),
                     const SizedBox(height: MoolSpacing.sm),
                     _ContactVerificationCard(
                       keyName: 'work-primary-contact',
-                      title: 'Main contact number',
+                      title: 'Number customers can reach you on',
                       detail:
-                          'Required for orders, payments and urgent support',
+                          'Use a phone you keep with you and answer for customer calls, orders and payment updates.',
                       requiredContact: true,
                       controller: _primaryMobile,
                       otpController: _primaryOtp,
@@ -176,7 +176,7 @@ class _WorkWorkspaceContactScreenState
                       keyName: 'work-alternate-contact',
                       title: 'Alternate contact number',
                       detail:
-                          'Optional backup for work alerts when the main number is unavailable',
+                          'Optional backup if you cannot answer your usual phone',
                       requiredContact: false,
                       controller: _alternate,
                       otpController: _alternateOtp,
@@ -345,7 +345,7 @@ class _WorkspaceAccountHeroState extends State<_WorkspaceAccountHero>
               const SizedBox(width: 6),
               Expanded(
                 child: _HeroFact(
-                  label: 'MAIN CONTACT',
+                  label: 'PHONE',
                   value: session.primaryMobileVerified ? 'Ready' : 'Needed',
                   ready: session.primaryMobileVerified,
                 ),
@@ -553,6 +553,11 @@ class _ContactVerificationCard extends StatelessWidget {
             scrollPadding: const EdgeInsets.only(bottom: 150),
             decoration: InputDecoration(
               prefixText: prefixText,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
               suffixIcon: confirmed
                   ? const Icon(
                       Icons.check_circle_rounded,
@@ -591,11 +596,18 @@ class _ContactVerificationCard extends StatelessWidget {
           ] else if (!otpSent)
             Align(
               alignment: Alignment.centerRight,
-              child: FilledButton.tonalIcon(
-                key: Key('$keyName-send-otp'),
-                onPressed: busy ? null : onSend,
-                icon: const Icon(Icons.sms_outlined, size: 18),
-                label: const Text('Send OTP'),
+              child: SizedBox(
+                width: 132,
+                child: FilledButton.tonalIcon(
+                  key: Key('$keyName-send-otp'),
+                  onPressed: busy ? null : onSend,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  icon: const Icon(Icons.sms_outlined, size: 18),
+                  label: const Text('Send OTP', maxLines: 1, softWrap: false),
+                ),
               ),
             )
           else ...[
@@ -610,18 +622,27 @@ class _ContactVerificationCard extends StatelessWidget {
                     textInputAction: TextInputAction.done,
                     maxLength: 6,
                     decoration: const InputDecoration(
-                      labelText: '6-digit OTP',
+                      labelText: 'Enter 6-digit OTP',
                       counterText: '',
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: MoolSpacing.xs),
                 SizedBox(
-                  width: 104,
+                  width: 124,
                   child: FilledButton(
                     key: Key('$keyName-confirm-otp'),
                     onPressed: busy ? null : onVerify,
-                    child: const Text('Confirm'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    child: const Text('Confirm', maxLines: 1, softWrap: false),
                   ),
                 ),
               ],
@@ -641,7 +662,7 @@ class _ContactReadinessSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final missing = <String>[
-      if (!session.primaryMobileVerified) 'main contact',
+      if (!session.primaryMobileVerified) 'phone number',
       if (!session.contactEmailVerified) 'email',
       if (session.alternateMobile.isNotEmpty && !session.alternateVerified)
         'alternate contact',

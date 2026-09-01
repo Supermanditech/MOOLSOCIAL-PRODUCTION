@@ -478,7 +478,7 @@ class WorkSession extends ChangeNotifier {
   Future<bool> sendPrimaryMobileOtp(String mobile) async {
     final normalized = mobile.replaceAll(RegExp(r'\D'), '');
     if (normalized.length != 10) {
-      errorMessage = 'Enter a valid 10-digit main contact number.';
+      errorMessage = 'Enter a valid 10-digit phone number.';
       notifyListeners();
       return false;
     }
@@ -550,7 +550,7 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     if (normalized == primaryMobile) {
-      errorMessage = 'This is already your main contact number.';
+      errorMessage = 'This is already the number customers can reach you on.';
       notifyListeners();
       return false;
     }
@@ -628,7 +628,8 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     if (!primaryMobileVerified) {
-      errorMessage = 'Confirm your main contact number before continuing.';
+      errorMessage =
+          'Confirm the phone number customers can reach you on before continuing.';
       notifyListeners();
       return false;
     }
@@ -757,7 +758,7 @@ class WorkSession extends ChangeNotifier {
     if (!validateDetails()) return false;
     if (!workspaceContactsReady) {
       errorMessage =
-          'Confirm the main contact and email before submitting this Workspace.';
+          'Confirm your phone number and email before submitting this Workspace.';
       notifyListeners();
       return false;
     }

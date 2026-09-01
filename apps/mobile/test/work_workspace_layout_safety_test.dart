@@ -123,6 +123,26 @@ void main() {
     },
   );
 
+  testWidgets('contact OTP action stays on one line on a narrow device', (
+    tester,
+  ) async {
+    final work = selectedRetailer()
+      ..primaryMobile = '9829012321'
+      ..primaryMobileVerified = false
+      ..primaryMobileOtpSent = true;
+    await mount(tester, route: '/app/work/workspace/contact', work: work);
+
+    final confirm = find.descendant(
+      of: find.byKey(const Key('work-primary-contact-confirm-otp')),
+      matching: find.text('Confirm'),
+    );
+    await reveal(tester, confirm);
+    final label = tester.widget<Text>(confirm);
+    expect(label.maxLines, 1);
+    expect(label.softWrap, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Workspace request sheet clears Android and keyboard insets without losing input',
     (tester) async {

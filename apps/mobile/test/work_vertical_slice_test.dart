@@ -307,7 +307,7 @@ void main() {
       );
       await tapVisible(tester, const Key('work-alternate-contact-send-otp'));
       expect(
-        find.text('This is already your main contact number.'),
+        find.text('This is already the number customers can reach you on.'),
         findsOneWidget,
       );
 
@@ -339,7 +339,7 @@ void main() {
   );
 
   testWidgets(
-    'Google email is shown alone and missing main contact is confirmed in place',
+    'Google email is shown alone and missing phone is confirmed in place',
     (tester) async {
       final journey = JourneySession(
         store: MemoryJourneyStore(
