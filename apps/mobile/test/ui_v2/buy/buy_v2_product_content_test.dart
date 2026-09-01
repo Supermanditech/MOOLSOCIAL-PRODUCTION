@@ -6,6 +6,7 @@ import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -65,6 +66,20 @@ void main() {
           find.byKey(ValueKey('buy-product-hero-price-$productId')),
           findsOneWidget,
         );
+        final compliance = find.byKey(
+          ValueKey('buy-product-compliance-$productId'),
+        );
+        await tester.scrollUntilVisible(
+          compliance,
+          220,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$productId')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        expect(compliance, findsOneWidget);
         expect(find.text('Buy now'), findsNothing);
         expect(tester.takeException(), isNull);
 
@@ -75,6 +90,88 @@ void main() {
       }
     },
   );
+
+  testWidgets('product compliance shows supplied facts and hides no data', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 700);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final product = BuyV2Catalogue.products.first.copyWith(
+      compliance: const BuyV2ProductCompliance(
+        genericName: 'Refined sunflower oil',
+        netQuantity: '5 L',
+        manufacturerName: 'Surya Oils India',
+        packerName: 'Surya Oils India',
+        importerName: 'Mool Imports India',
+        countryOfOrigin: 'India',
+        manufacturedOrPackedOnLabel: 'Packed August 2026',
+        bestBeforeOrUseByLabel: 'Best before 12 months from packing',
+        fssaiLicenseNumber: '10000000000000',
+        consumerCare: 'Surya Oils Consumer Care',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: BuyV2ProductCompliancePanel(product: product),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (final value in const [
+      'Product compliance',
+      'Refined sunflower oil',
+      '5 L',
+      'Surya Oils India',
+      'Mool Imports India',
+      'India',
+      'Packed August 2026',
+      'Best before 12 months from packing',
+      '10000000000000',
+      'Surya Oils Consumer Care',
+    ]) {
+      expect(find.text(value), findsWidgets, reason: value);
+    }
+    expect(find.textContaining('Not provided'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('missing optional compliance facts stay hidden', (tester) async {
+    final product = BuyV2Catalogue.products.first;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(body: BuyV2ProductCompliancePanel(product: product)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(product.title), findsOneWidget);
+    expect(find.text(product.pack), findsOneWidget);
+    expect(find.text(product.unitPrice), findsOneWidget);
+    for (final label in const [
+      'Manufacturer',
+      'Packer',
+      'Importer',
+      'Country of origin',
+      'Manufactured or packed',
+      'Best before / use by',
+      'FSSAI licence',
+      'Consumer care',
+    ]) {
+      expect(find.text(label), findsNothing, reason: label);
+    }
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'product gallery and details use one authoritative content owner',

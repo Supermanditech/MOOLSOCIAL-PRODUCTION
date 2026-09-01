@@ -937,6 +937,10 @@ class BuyV2ProductView extends StatelessWidget {
                   ],
                 ],
               ),
+              if (automaticFulfilment) ...[
+                const SizedBox(height: 10),
+                BuyV2ProductCompliancePanel(product: product),
+              ],
               const SizedBox(height: 10),
               _ProductContentSections(
                 session: session,
@@ -1001,6 +1005,113 @@ class BuyV2ProductView extends StatelessWidget {
       ],
     );
   }
+}
+
+class BuyV2ProductCompliancePanel extends StatelessWidget {
+  const BuyV2ProductCompliancePanel({required this.product, super.key});
+
+  final BuyV2Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    final compliance = product.compliance;
+    final genericName = _nonBlankComplianceValue(compliance?.genericName);
+    final netQuantity = _nonBlankComplianceValue(compliance?.netQuantity);
+    final manufacturer = _nonBlankComplianceValue(compliance?.manufacturerName);
+    final packer = _nonBlankComplianceValue(compliance?.packerName);
+    final importer = _nonBlankComplianceValue(compliance?.importerName);
+    final countryOfOrigin = _nonBlankComplianceValue(
+      compliance?.countryOfOrigin,
+    );
+    final manufacturedOrPackedOn = _nonBlankComplianceValue(
+      compliance?.manufacturedOrPackedOnLabel,
+    );
+    final bestBeforeOrUseBy = _nonBlankComplianceValue(
+      compliance?.bestBeforeOrUseByLabel,
+    );
+    final fssai = _nonBlankComplianceValue(compliance?.fssaiLicenseNumber);
+    final consumerCare = _nonBlankComplianceValue(compliance?.consumerCare);
+    return _DecisionPanel(
+      key: ValueKey('buy-product-compliance-${product.id}'),
+      title: 'Product compliance',
+      children: [
+        _DecisionRow(
+          icon: Icons.category_outlined,
+          label: 'Generic name',
+          value: genericName ?? product.title,
+        ),
+        _DecisionRow(
+          icon: Icons.scale_outlined,
+          label: 'Net quantity',
+          value: netQuantity ?? product.pack,
+        ),
+        if (product.mrp case final mrp?)
+          _DecisionRow(
+            icon: Icons.currency_rupee_rounded,
+            label: 'MRP (incl. taxes)',
+            value: buyV2Money(mrp),
+          ),
+        _DecisionRow(
+          icon: Icons.price_check_outlined,
+          label: 'Unit price',
+          value: product.unitPrice,
+        ),
+        if (manufacturer case final value?)
+          _DecisionRow(
+            icon: Icons.factory_outlined,
+            label: 'Manufacturer',
+            value: value,
+          ),
+        if (packer case final value?)
+          _DecisionRow(
+            icon: Icons.inventory_2_outlined,
+            label: 'Packer',
+            value: value,
+          ),
+        if (importer case final value?)
+          _DecisionRow(
+            icon: Icons.public_outlined,
+            label: 'Importer',
+            value: value,
+          ),
+        if (countryOfOrigin case final value?)
+          _DecisionRow(
+            icon: Icons.flag_outlined,
+            label: 'Country of origin',
+            value: value,
+          ),
+        if (manufacturedOrPackedOn case final value?)
+          _DecisionRow(
+            icon: Icons.event_outlined,
+            label: 'Manufactured or packed',
+            value: value,
+          ),
+        if (bestBeforeOrUseBy case final value?)
+          _DecisionRow(
+            icon: Icons.event_available_outlined,
+            label: 'Best before / use by',
+            value: value,
+          ),
+        if (fssai case final value?)
+          _DecisionRow(
+            icon: Icons.verified_outlined,
+            label: 'FSSAI licence',
+            value: value,
+          ),
+        if (consumerCare case final value?)
+          _DecisionRow(
+            icon: Icons.support_agent_outlined,
+            label: 'Consumer care',
+            value: value,
+          ),
+      ],
+    );
+  }
+}
+
+String? _nonBlankComplianceValue(String? value) {
+  final normalized = value?.trim();
+  return normalized == null || normalized.isEmpty ? null : normalized;
 }
 
 class _ProductHeroFact extends StatelessWidget {

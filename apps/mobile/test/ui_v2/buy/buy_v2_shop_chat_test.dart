@@ -396,6 +396,35 @@ void main() {
     expect(uri.queryParameters['policyVersion'], 'POLICY-7');
   });
 
+  test('supplier Chat snapshot carries product compliance facts', () {
+    final product = BuyV2Catalogue.products.first.copyWith(
+      compliance: const BuyV2ProductCompliance(
+        genericName: 'Refined sunflower oil',
+        netQuantity: '5 L',
+        manufacturerName: 'Surya Oils India',
+        countryOfOrigin: 'India',
+        fssaiLicenseNumber: '10000000000000',
+        consumerCare: 'Surya Oils Consumer Care',
+      ),
+    );
+    final uri = Uri.parse(
+      const BuyV2ChatRouteAdapter().productQuestionLocationFor(
+        product: product,
+      ),
+    );
+    final snapshot =
+        jsonDecode(uri.queryParameters['productSnapshot']!)
+            as Map<String, dynamic>;
+    final compliance = snapshot['compliance'] as Map<String, dynamic>;
+
+    expect(compliance['genericName'], 'Refined sunflower oil');
+    expect(compliance['netQuantity'], '5 L');
+    expect(compliance['manufacturer'], 'Surya Oils India');
+    expect(compliance['countryOfOrigin'], 'India');
+    expect(compliance['fssaiLicenseNumber'], '10000000000000');
+    expect(compliance['consumerCare'], 'Surya Oils Consumer Care');
+  });
+
   testWidgets('Buy Chat action opens only the shared Chat module', (
     tester,
   ) async {

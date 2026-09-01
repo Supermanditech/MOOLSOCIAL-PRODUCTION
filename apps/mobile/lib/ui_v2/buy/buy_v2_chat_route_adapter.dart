@@ -195,6 +195,7 @@ class BuyV2ChatRouteAdapter {
 
   Map<String, Object?> _productSnapshot(BuyV2Product product) {
     final protection = product.purchaseProtection;
+    final compliance = product.compliance;
     return <String, Object?>{
       'productId': product.canonicalId,
       'skuId': product.id,
@@ -213,6 +214,18 @@ class BuyV2ChatRouteAdapter {
       'origin': product.origin,
       'minimumOrder': product.minimumOrder,
       'returnPolicy': product.returnPolicy,
+      'compliance': <String, Object?>{
+        'genericName': compliance?.genericName ?? product.title,
+        'netQuantity': compliance?.netQuantity ?? product.pack,
+        'manufacturer': compliance?.manufacturerName,
+        'packer': compliance?.packerName,
+        'importer': compliance?.importerName,
+        'countryOfOrigin': compliance?.countryOfOrigin,
+        'manufacturedOrPackedOn': compliance?.manufacturedOrPackedOnLabel,
+        'bestBeforeOrUseBy': compliance?.bestBeforeOrUseByLabel,
+        'fssaiLicenseNumber': compliance?.fssaiLicenseNumber,
+        'consumerCare': compliance?.consumerCare,
+      },
       if (protection != null)
         'purchaseProtection': <String, Object?>{
           'summary': protection.summary,

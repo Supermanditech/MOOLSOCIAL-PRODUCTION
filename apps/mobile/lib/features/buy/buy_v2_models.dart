@@ -101,6 +101,32 @@ class BuyV2PurchaseProtection {
   final String? effectiveFromLabel;
 }
 
+class BuyV2ProductCompliance {
+  const BuyV2ProductCompliance({
+    this.genericName,
+    this.netQuantity,
+    this.manufacturerName,
+    this.packerName,
+    this.importerName,
+    this.countryOfOrigin,
+    this.manufacturedOrPackedOnLabel,
+    this.bestBeforeOrUseByLabel,
+    this.fssaiLicenseNumber,
+    this.consumerCare,
+  });
+
+  final String? genericName;
+  final String? netQuantity;
+  final String? manufacturerName;
+  final String? packerName;
+  final String? importerName;
+  final String? countryOfOrigin;
+  final String? manufacturedOrPackedOnLabel;
+  final String? bestBeforeOrUseByLabel;
+  final String? fssaiLicenseNumber;
+  final String? consumerCare;
+}
+
 class BuyV2Product {
   const BuyV2Product({
     required this.id,
@@ -128,6 +154,7 @@ class BuyV2Product {
     this.minimumOrder = 1,
     this.returnPolicy,
     this.purchaseProtection,
+    this.compliance,
     this.freightIncluded = false,
     this.manufacturerVerified = false,
     this.catalogueListing = true,
@@ -158,6 +185,7 @@ class BuyV2Product {
   final int minimumOrder;
   final String? returnPolicy;
   final BuyV2PurchaseProtection? purchaseProtection;
+  final BuyV2ProductCompliance? compliance;
   final bool freightIncluded;
   final bool manufacturerVerified;
   final bool catalogueListing;
@@ -177,6 +205,7 @@ class BuyV2Product {
     int? minimumOrder,
     bool? catalogueListing,
     BuyV2PurchaseProtection? purchaseProtection,
+    BuyV2ProductCompliance? compliance,
   }) => BuyV2Product(
     id: id ?? this.id,
     canonicalId: canonicalId ?? this.canonicalId,
@@ -203,6 +232,7 @@ class BuyV2Product {
     minimumOrder: minimumOrder ?? this.minimumOrder,
     returnPolicy: returnPolicy,
     purchaseProtection: purchaseProtection ?? this.purchaseProtection,
+    compliance: compliance ?? this.compliance,
     freightIncluded: freightIncluded,
     manufacturerVerified: manufacturerVerified,
     catalogueListing: catalogueListing ?? this.catalogueListing,
