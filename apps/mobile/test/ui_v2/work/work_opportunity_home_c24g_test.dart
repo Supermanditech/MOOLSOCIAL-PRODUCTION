@@ -163,19 +163,28 @@ void main() {
       find.byKey(const Key('workspace-actor-chooser-hero')),
       findsOneWidget,
     );
+    expect(find.text('Grow your business with MoolSocial'), findsOneWidget);
+    expect(find.text('Signed in'), findsOneWidget);
+    expect(find.text('Build your Workspace'), findsNothing);
+    expect(find.text('Verified account'), findsNothing);
+    expect(find.textContaining('GST category'), findsNothing);
+    expect(find.byKey(const Key('work-global-chat')), findsNothing);
+    expect(find.byKey(const Key('work-help')), findsNothing);
     expect(find.text('18 orders'), findsNothing);
     expect(find.text('₹12,840'), findsNothing);
     expect(find.text('7 items'), findsNothing);
-    final family = find.byKey(const Key('work-family-products-trade'));
-    await _scrollTo(tester, family, const Key('work-choose-screen'));
-    expect(tester.getSize(family).height, greaterThanOrEqualTo(44));
-    final semantics = tester.getSemantics(family).getSemanticsData();
+    final actor = find.byKey(const Key('work-profile-retailer-grocery'));
+    await _scrollTo(tester, actor, const Key('work-choose-screen'));
+    expect(tester.getSize(actor).height, greaterThanOrEqualTo(44));
+    final semantics = tester.getSemantics(actor).getSemanticsData();
     expect(semantics.hasAction(SemanticsAction.tap), isTrue);
+    expect(find.text('Growth opportunity'), findsWidgets);
+    expect(find.text('Workspace advantage'), findsWidgets);
 
-    await tester.tap(family);
+    await tester.tap(actor);
     await tester.pumpAndSettle();
     expect(
-      find.byKey(const Key('work-profile-retailer-grocery')),
+      find.byKey(const Key('workspace-business-identity-notice')),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);

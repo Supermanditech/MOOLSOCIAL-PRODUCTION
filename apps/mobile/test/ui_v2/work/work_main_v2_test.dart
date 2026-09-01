@@ -234,20 +234,28 @@ void main() {
           matching: find.byType(Scrollable),
         )
         .first;
-    for (final family in const [
-      'products-trade',
-      'food-business',
-      'health',
-      'services',
-      'ride',
-      'create-work',
+    for (final profile in const [
+      'retailer-grocery',
+      'retailer-speciality',
+      'wholesaler',
+      'manufacturer',
+      'restaurant',
+      'cloud-kitchen',
+      'clinic',
+      'pharmacy',
+      'salon',
+      'service-provider',
+      'captain',
+      'fleet',
+      'creator',
+      'freelancer',
     ]) {
       await tester.scrollUntilVisible(
-        find.byKey(Key('work-family-$family')),
+        find.byKey(Key('work-profile-$profile')),
         220,
         scrollable: chooserScroll,
       );
-      expect(find.byKey(Key('work-family-$family')), findsOneWidget);
+      expect(find.byKey(Key('work-profile-$profile')), findsOneWidget);
     }
   });
 

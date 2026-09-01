@@ -2,466 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
-import '../../../core/design/mool_service_home.dart';
 import '../../../core/design/mool_theme.dart';
 import '../widgets/work_widgets.dart';
 import '../work_models.dart';
 import '../work_services.dart';
 import '../work_session.dart';
 
-const _workAccent = Color(0xFF4D46A8);
-
 double _workViewBottomInset(BuildContext context) {
   final view = View.of(context);
   return view.viewPadding.bottom / view.devicePixelRatio;
-}
-
-class MyWorkScreen extends StatefulWidget {
-  const MyWorkScreen({required this.session, super.key});
-
-  final WorkSession session;
-
-  @override
-  State<MyWorkScreen> createState() => _MyWorkScreenState();
-}
-
-class _MyWorkScreenState extends State<MyWorkScreen> {
-  WorkSession get session => widget.session;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) session.loadInitialWorkspaceState();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: session,
-      builder: (context, _) {
-        final workspace = session.activeWorkspace;
-        return WorkPageScaffold(
-          session: session,
-          title: 'Workspace',
-          subtitle: workspace == null
-              ? 'Start and operate verified work'
-              : workspace.name,
-          fallbackBackRoute: '/app/work',
-          showBack: false,
-          activeLocalAction: 'workspace',
-          body: ListView(
-            key: const Key('my-work-screen'),
-            padding: const EdgeInsets.fromLTRB(
-              MoolServiceHomeTokens.pagePadding,
-              MoolSpacing.xs,
-              MoolServiceHomeTokens.pagePadding,
-              MoolSpacing.xxl,
-            ),
-            children: [
-              if (session.savedOpportunity case final opportunity?) ...[
-                WorkCard(
-                  color: const Color(0xFFFFF4E5),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const WorkPill(
-                        label: 'Opportunity saved',
-                        color: MoolColors.orange,
-                        icon: Icons.bookmark_added_outlined,
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      Text(
-                        opportunity.title,
-                        style: const TextStyle(
-                          color: MoolColors.ink,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        workspace == null
-                            ? 'Start My Work, then return to apply.'
-                            : 'Your verified workspace can apply directly.',
-                        style: const TextStyle(color: MoolColors.muted),
-                      ),
-                      const SizedBox(height: MoolSpacing.sm),
-                      if (workspace != null)
-                        WorkPrimaryButton(
-                          keyName: 'my-work-return-opportunity',
-                          label: 'Return to opportunity',
-                          onPressed: () {
-                            session.openOpportunity(opportunity.id);
-                            context.go(
-                              '/app/work/opportunity/${opportunity.id}',
-                            );
-                          },
-                          icon: Icons.arrow_back_rounded,
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.md),
-              ],
-              if (workspace == null)
-                session.reviewStage == WorkReviewStage.gstPending &&
-                        session.reviewCaseId != null
-                    ? _PendingWorkState(session: session)
-                    : _NewWorkState(session: session)
-              else ...[
-                _ActiveWorkspaceCard(workspace: workspace),
-                const SizedBox(height: MoolSpacing.md),
-                const WorkSectionTitle(
-                  title: 'Needs attention',
-                  detail:
-                      'Manage setup, stock and settlements for this Workspace',
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                _AttentionCard(
-                  icon: Icons.inventory_2_outlined,
-                  title: session.reviewStage == WorkReviewStage.live
-                      ? 'Review available stock'
-                      : 'Finish shop readiness',
-                  detail: session.reviewStage == WorkReviewStage.live
-                      ? 'Price, quantity and fulfilment must stay accurate.'
-                      : 'Add stock, price and fulfilment before customers see products.',
-                  actionLabel: session.reviewStage == WorkReviewStage.live
-                      ? 'Open shop'
-                      : 'Continue setup',
-                  keyName: 'my-work-open-active',
-                  onPressed: () => context.go(
-                    session.reviewStage == WorkReviewStage.approved
-                        ? '/app/work/ready'
-                        : session.reviewStage == WorkReviewStage.live
-                        ? '/app/retailer/home'
-                        : '/app/work/retailer/setup',
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                _AttentionCard(
-                  icon: Icons.payments_outlined,
-                  title: 'Settlement summary',
-                  detail:
-                      'Review completed sales and any amount due in your operating workspace.',
-                  actionLabel: 'View summary',
-                  keyName: 'my-work-settlement',
-                  onPressed: () =>
-                      _showSettlementSummary(context, workspace.name),
-                ),
-                if (session.otherWorkspaces.isNotEmpty) ...[
-                  const SizedBox(height: MoolSpacing.md),
-                  const WorkSectionTitle(
-                    title: 'Other workspaces',
-                    detail: 'Your current workspace stays selected',
-                  ),
-                  const SizedBox(height: MoolSpacing.sm),
-                  Column(
-                    key: const Key('my-work-other-list'),
-                    children: [
-                      for (final other in session.otherWorkspaces)
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            bottom: MoolServiceHomeTokens.cardGap,
-                          ),
-                          child: MoolServiceCard(
-                            key: Key('my-work-other-${other.id}'),
-                            title: other.name,
-                            subtitle: '${other.profileLabel} · ${other.area}',
-                            icon: Icons.verified_user_outlined,
-                            accent: _workAccent,
-                            metadata: const [
-                              MoolServiceMeta(
-                                icon: Icons.verified_rounded,
-                                label: 'Verified workspace',
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: MoolSpacing.md),
-                OutlinedButton.icon(
-                  key: const Key('my-work-add-another'),
-                  onPressed: () {
-                    session.startAnotherWork();
-                    context.go('/app/work/workspace/choose');
-                  },
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add Another Work'),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _PendingWorkState extends StatelessWidget {
-  const _PendingWorkState({required this.session});
-
-  final WorkSession session;
-
-  @override
-  Widget build(BuildContext context) {
-    return WorkCard(
-      color: const Color(0xFFFFF4E5),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const WorkPill(
-            label: 'Review in progress',
-            color: MoolColors.orange,
-            icon: Icons.schedule_rounded,
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          Text(
-            session.workName.isEmpty ? 'Work profile' : session.workName,
-            style: const TextStyle(
-              color: MoolColors.ink,
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            'Free plan · ${session.reviewCaseId}',
-            style: const TextStyle(color: MoolColors.muted),
-          ),
-          const SizedBox(height: MoolSpacing.md),
-          WorkPrimaryButton(
-            keyName: 'my-work-open-pending-review',
-            label: 'Check review',
-            onPressed: () => context.go('/app/work/status'),
-            icon: Icons.arrow_forward_rounded,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NewWorkState extends StatelessWidget {
-  const _NewWorkState({required this.session});
-
-  final WorkSession session;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        WorkCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const MoolServiceSectionHeader(
-                title: 'Set up your Workspace',
-                subtitle:
-                    'Use one verified profile for opportunities or an existing business.',
-              ),
-              const SizedBox(height: MoolSpacing.md),
-              WorkPrimaryButton(
-                keyName: 'my-work-start',
-                label: 'Start Workspace setup',
-                onPressed: () {
-                  session.startMyWork();
-                  context.go('/app/work/workspace/choose');
-                },
-                icon: Icons.arrow_forward_rounded,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: MoolSpacing.md),
-        const MoolServiceCard(
-          key: Key('my-work-account-context'),
-          title: 'Personal account',
-          subtitle:
-              'Your personal account stays active during application and approval.',
-          icon: Icons.verified_user_outlined,
-          accent: MoolColors.success,
-          metadata: [
-            MoolServiceMeta(
-              icon: Icons.visibility_off_outlined,
-              label: 'Private until approved',
-            ),
-            MoolServiceMeta(
-              icon: Icons.lock_outline_rounded,
-              label: 'No account change',
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ActiveWorkspaceCard extends StatelessWidget {
-  const _ActiveWorkspaceCard({required this.workspace});
-
-  final WorkWorkspace workspace;
-
-  @override
-  Widget build(BuildContext context) {
-    return MoolServiceCard(
-      key: const Key('my-work-active-workspace'),
-      title: workspace.name,
-      subtitle: '${workspace.profileLabel} · ${workspace.area}',
-      icon: Icons.storefront_outlined,
-      accent: _workAccent,
-      emphasized: true,
-      metadata: [
-        const MoolServiceMeta(
-          icon: Icons.verified_rounded,
-          label: 'Verified workspace',
-        ),
-        if (workspace.gstReminder)
-          const MoolServiceMeta(
-            icon: Icons.schedule_rounded,
-            label: 'GST reminder active',
-          ),
-      ],
-    );
-  }
-}
-
-class _AttentionCard extends StatelessWidget {
-  const _AttentionCard({
-    required this.icon,
-    required this.title,
-    required this.detail,
-    required this.actionLabel,
-    required this.keyName,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String title;
-  final String detail;
-  final String actionLabel;
-  final String keyName;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return WorkCard(
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: const Color(0xFFEDEEFF),
-            foregroundColor: MoolColors.navy,
-            child: Icon(icon),
-          ),
-          const SizedBox(width: MoolSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  detail,
-                  style: const TextStyle(color: MoolColors.muted, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: MoolSpacing.xs),
-          TextButton(
-            key: Key(keyName),
-            onPressed: onPressed,
-            child: Text(actionLabel),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-Future<void> _showSettlementSummary(
-  BuildContext context,
-  String workspaceName,
-) {
-  return showModalBottomSheet<void>(
-    context: context,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        0,
-        MoolSpacing.lg,
-        MoolSpacing.lg,
-      ),
-      child: Column(
-        key: const Key('my-work-settlement-sheet'),
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Settlement summary',
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          WorkCard(
-            color: const Color(0xFFF0FAF3),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  workspaceName,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-                const Text(
-                  'No payout is due now',
-                  style: TextStyle(
-                    color: MoolColors.success,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-                const Text(
-                  'Completed orders, refunds and fees will appear here after '
-                  'their payment records are verified.',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.md),
-          FilledButton(
-            key: const Key('my-work-settlement-open-workspace'),
-            onPressed: () {
-              Navigator.of(sheetContext).pop();
-              context.go('/app/retailer/home');
-            },
-            child: const Text('Open operating workspace'),
-          ),
-          TextButton(
-            key: const Key('my-work-settlement-close'),
-            onPressed: () => Navigator.of(sheetContext).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    ),
-  );
 }
 
 class WorkChooseActivityScreen extends StatefulWidget {
@@ -504,13 +53,15 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
         final profile = widget.session.selectedProfile;
         return WorkPageScaffold(
           session: widget.session,
-          title: 'Choose your work',
+          title: 'Grow with MoolSocial',
           subtitle: family == null
-              ? 'Create the Workspace that matches how you earn'
+              ? 'Choose your business or professional path'
               : widget.session.familyLabel(family),
           fallbackBackRoute: '/app/work/earn',
           showBack: Navigator.of(context).canPop(),
           activeLocalAction: 'workspace',
+          showHeaderChat: false,
+          showTrailingAction: false,
           bottomAction: profile == null
               ? null
               : WorkPrimaryButton(
@@ -551,28 +102,39 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
               const SizedBox(height: MoolSpacing.lg),
               if (family == null) ...[
                 const WorkSectionTitle(
-                  title: 'How do you work?',
+                  title: 'Choose your path to growth',
                   detail:
-                      'Choose a category to see Workspace profiles designed for your role.',
+                      'Select the user type that best represents your business, profession or service.',
                 ),
-                const SizedBox(height: MoolSpacing.sm),
-                for (final familyId in widget.session.familyIds) ...[
-                  _FamilyCard(
-                    familyId: familyId,
-                    label: widget.session.familyLabel(familyId),
-                    profileCount: widget.session
-                        .profilesForFamily(familyId)
-                        .length,
-                    onTap: () => widget.session.selectFamily(familyId),
-                  ),
-                  const SizedBox(height: MoolSpacing.sm),
-                ],
+                const SizedBox(height: MoolSpacing.md),
                 OutlinedButton.icon(
                   key: const Key('work-profile-not-shown'),
                   onPressed: () => _showUnsupportedRequest(context),
                   icon: const Icon(Icons.add_comment_outlined),
-                  label: const Text('Request another type of Workspace'),
+                  label: const Text('Request another user type'),
                 ),
+                const SizedBox(height: MoolSpacing.md),
+                for (final familyId in widget.session.familyIds) ...[
+                  WorkSectionTitle(
+                    title: widget.session.familyLabel(familyId),
+                    detail: _workspaceActorGroupPresentation(familyId).examples,
+                  ),
+                  const SizedBox(height: MoolSpacing.sm),
+                  for (final option in widget.session.profilesForFamily(
+                    familyId,
+                  )) ...[
+                    _ProfileCard(
+                      option: option,
+                      selected: false,
+                      onTap: () {
+                        widget.session.selectFamily(option.familyId);
+                        widget.session.selectProfile(option.id);
+                      },
+                    ),
+                    const SizedBox(height: MoolSpacing.sm),
+                  ],
+                  const SizedBox(height: MoolSpacing.xs),
+                ],
               ] else ...[
                 Row(
                   children: [
@@ -799,28 +361,80 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
   }
 }
 
-class _WorkspaceEntryHero extends StatelessWidget {
+class _WorkspaceEntryHero extends StatefulWidget {
   const _WorkspaceEntryHero();
 
   @override
+  State<_WorkspaceEntryHero> createState() => _WorkspaceEntryHeroState();
+}
+
+class _WorkspaceEntryHeroState extends State<_WorkspaceEntryHero>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 620),
+  );
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = 1;
+    } else {
+      _controller.repeat(reverse: true, count: 4).whenComplete(() {
+        if (mounted) _controller.value = 1;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      key: const Key('workspace-actor-chooser-hero'),
-      padding: const EdgeInsets.all(MoolSpacing.md),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF000080), Color(0xFF3535B8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(MoolRadii.floating),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x26000080),
-            blurRadius: 20,
-            offset: Offset(0, 8),
+    final pulse = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutCubic,
+    );
+    return AnimatedBuilder(
+      animation: pulse,
+      builder: (context, child) => Transform.scale(
+        scale: .99 + (.01 * pulse.value),
+        child: Container(
+          key: const Key('workspace-actor-chooser-hero'),
+          padding: const EdgeInsets.all(MoolSpacing.md),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFF000080),
+                Color.lerp(
+                  const Color(0xFF3535B8),
+                  const Color(0xFF5B21B6),
+                  pulse.value,
+                )!,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(MoolRadii.floating),
+            boxShadow: [
+              BoxShadow(
+                color: MoolColors.orange.withValues(
+                  alpha: .14 + (.10 * pulse.value),
+                ),
+                blurRadius: 18 + (8 * pulse.value),
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-        ],
+          child: child,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -828,40 +442,48 @@ class _WorkspaceEntryHero extends StatelessWidget {
           const Row(
             children: [
               CircleAvatar(
-                backgroundColor: Colors.white,
+                backgroundColor: MoolColors.orange,
                 foregroundColor: MoolColors.navy,
-                child: Icon(Icons.dashboard_customize_outlined),
+                child: Icon(Icons.rocket_launch_rounded),
               ),
               SizedBox(width: MoolSpacing.sm),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Build your Workspace',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      'Your personal MoolSocial account stays active.',
-                      style: TextStyle(
-                        color: Color(0xFFE5E5FF),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'MOOLSOCIAL PARTNER JOURNEY',
+                  style: TextStyle(
+                    color: Color(0xFFFFD6AD),
+                    fontSize: 10,
+                    letterSpacing: .6,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
               WorkPill(
-                label: 'Verified account',
+                label: 'Signed in',
                 color: Colors.white,
-                icon: Icons.verified_rounded,
+                icon: Icons.login_rounded,
               ),
             ],
+          ),
+          const SizedBox(height: MoolSpacing.md),
+          const Text(
+            'Grow your business with MoolSocial',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              height: 1.08,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          const Text(
+            'Join MoolSocial, reach more customers and become a partner in shared success.',
+            style: TextStyle(
+              color: Color(0xFFE8E8FF),
+              fontSize: 12,
+              height: 1.35,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: MoolSpacing.md),
           Container(
@@ -872,22 +494,54 @@ class _WorkspaceEntryHero extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: .12),
               borderRadius: BorderRadius.circular(MoolRadii.control),
+              border: Border.all(color: Colors.white.withValues(alpha: .18)),
             ),
             child: const Row(
               children: [
                 Expanded(
-                  child: _WorkspaceStep(number: '1', label: 'Choose'),
+                  child: _WorkspaceStep(
+                    icon: Icons.explore_rounded,
+                    label: 'CHOOSE YOUR PATH',
+                  ),
                 ),
-                Icon(Icons.chevron_right_rounded, color: Color(0xFFCCCCF4)),
+                Icon(Icons.arrow_forward_rounded, color: MoolColors.orange),
                 Expanded(
-                  child: _WorkspaceStep(number: '2', label: 'Verify'),
+                  child: _WorkspaceStep(
+                    icon: Icons.workspace_premium_outlined,
+                    label: 'BUILD TRUST',
+                  ),
                 ),
-                Icon(Icons.chevron_right_rounded, color: Color(0xFFCCCCF4)),
+                Icon(Icons.arrow_forward_rounded, color: MoolColors.orange),
                 Expanded(
-                  child: _WorkspaceStep(number: '3', label: 'Operate'),
+                  child: _WorkspaceStep(
+                    icon: Icons.trending_up_rounded,
+                    label: 'GROW WITH US',
+                  ),
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          const Row(
+            children: [
+              Icon(
+                Icons.lock_outline_rounded,
+                color: Color(0xFFFFD6AD),
+                size: 16,
+              ),
+              SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  'Business verification begins after you choose a user type and provide its documents.',
+                  style: TextStyle(
+                    color: Color(0xFFE8E8FF),
+                    fontSize: 10,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -896,36 +550,29 @@ class _WorkspaceEntryHero extends StatelessWidget {
 }
 
 class _WorkspaceStep extends StatelessWidget {
-  const _WorkspaceStep({required this.number, required this.label});
+  const _WorkspaceStep({required this.icon, required this.label});
 
-  final String number;
+  final IconData icon;
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        CircleAvatar(
-          radius: 9,
-          backgroundColor: MoolColors.orange,
-          foregroundColor: MoolColors.navy,
-          child: Text(
-            number,
-            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Flexible(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-            ),
+        Icon(icon, color: MoolColors.orange, size: 19),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 8.5,
+            height: 1.12,
+            letterSpacing: .2,
+            fontWeight: FontWeight.w900,
           ),
         ),
       ],
@@ -1143,126 +790,97 @@ class _WorkspaceApplicationSummary extends StatelessWidget {
   }
 }
 
-class _FamilyCard extends StatelessWidget {
-  const _FamilyCard({
-    required this.familyId,
-    required this.label,
-    required this.profileCount,
-    required this.onTap,
-  });
-
-  final String familyId;
-  final String label;
-  final int profileCount;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final presentation = _workspaceActorGroupPresentation(familyId);
-    return Material(
-      key: Key('work-family-$familyId'),
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(MoolRadii.floating),
-      elevation: 1,
-      shadowColor: const Color(0x16000050),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ColoredBox(
-                color: presentation.accent,
-                child: const SizedBox(width: 6),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(MoolSpacing.sm),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: presentation.tint,
-                            foregroundColor: presentation.accent,
-                            child: Icon(presentation.icon),
-                          ),
-                          const SizedBox(width: MoolSpacing.sm),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  label,
-                                  style: const TextStyle(
-                                    color: MoolColors.navy,
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                Text(
-                                  '$profileCount Workspace profiles',
-                                  style: TextStyle(
-                                    color: presentation.accent,
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            Icons.arrow_forward_rounded,
-                            color: presentation.accent,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      Text(
-                        presentation.description,
-                        style: const TextStyle(
-                          color: MoolColors.muted,
-                          fontSize: 11,
-                          height: 1.3,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        presentation.examples,
-                        style: TextStyle(
-                          color: presentation.accent,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
+Future<void> _showSettlementSummary(
+  BuildContext context,
+  String workspaceName,
+) {
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.lg,
+        0,
+        MoolSpacing.lg,
+        MoolSpacing.lg,
+      ),
+      child: Column(
+        key: const Key('my-work-settlement-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Settlement overview',
+            style: TextStyle(
+              color: MoolColors.navy,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: MoolSpacing.sm),
+          WorkCard(
+            color: const Color(0xFFF0FAF3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  workspaceName,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: MoolSpacing.xs),
+                const Text(
+                  'No payout is due now',
+                  style: TextStyle(
+                    color: MoolColors.success,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+                const Text(
+                  'Completed orders, refunds and service fees will appear after their payment records are verified.',
+                  style: TextStyle(
+                    color: MoolColors.muted,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: MoolSpacing.md),
+          FilledButton(
+            key: const Key('my-work-settlement-open-workspace'),
+            onPressed: () {
+              Navigator.of(sheetContext).pop();
+              context.push('/app/retailer/home');
+            },
+            child: const Text('Open Workspace'),
+          ),
+          TextButton(
+            key: const Key('my-work-settlement-close'),
+            onPressed: () => Navigator.of(sheetContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _WorkspaceActorGroupPresentation {
   const _WorkspaceActorGroupPresentation({
-    required this.icon,
     required this.accent,
     required this.tint,
-    required this.description,
     required this.examples,
   });
 
-  final IconData icon;
   final Color accent;
   final Color tint;
-  final String description;
   final String examples;
 }
 
@@ -1270,49 +888,33 @@ _WorkspaceActorGroupPresentation _workspaceActorGroupPresentation(
   String familyId,
 ) => switch (familyId) {
   'products-trade' => const _WorkspaceActorGroupPresentation(
-    icon: Icons.inventory_2_outlined,
     accent: Color(0xFF0047AB),
     tint: Color(0xFFEAF2FF),
-    description:
-        'Sell, supply and manage products, stock, orders and fulfilment.',
     examples: 'Retailer · Wholesaler · Manufacturer',
   ),
   'food-business' => const _WorkspaceActorGroupPresentation(
-    icon: Icons.restaurant_outlined,
     accent: Color(0xFFA65A00),
     tint: Color(0xFFFFF4E5),
-    description:
-        'Serve customers through menus, kitchens, orders and table operations.',
     examples: 'Restaurant · Café · Cloud kitchen',
   ),
   'health' => const _WorkspaceActorGroupPresentation(
-    icon: Icons.medical_services_outlined,
     accent: Color(0xFF007A4D),
     tint: Color(0xFFE8F7F0),
-    description: 'Operate verified care, appointment and medicine services.',
     examples: 'Doctor · Clinic · Pharmacy',
   ),
   'services' => const _WorkspaceActorGroupPresentation(
-    icon: Icons.content_cut_rounded,
     accent: Color(0xFF9C1C6B),
     tint: Color(0xFFFFEDF7),
-    description: 'Offer appointments, packages and trusted local services.',
     examples: 'Salon · Wellness · Local services',
   ),
   'ride' => const _WorkspaceActorGroupPresentation(
-    icon: Icons.local_shipping_outlined,
     accent: Color(0xFF006D77),
     tint: Color(0xFFE8F7F8),
-    description:
-        'Manage trips, deliveries, vehicles, drivers and service areas.',
     examples: 'Rider · Delivery captain · Fleet',
   ),
   _ => const _WorkspaceActorGroupPresentation(
-    icon: Icons.work_outline_rounded,
     accent: Color(0xFF5B21B6),
     tint: Color(0xFFF2EDFF),
-    description:
-        'Build a professional profile for campaigns, assignments and paid work.',
     examples: 'Creator · Freelancer · Job seeker',
   ),
 };
@@ -1330,10 +932,11 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final presentation = _workspaceActorGroupPresentation(option.familyId);
     return WorkCard(
       keyName: 'work-profile-${option.id}',
       onTap: onTap,
-      color: selected ? const Color(0xFFEDEEFF) : Colors.white,
+      color: selected ? presentation.tint : Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1341,9 +944,9 @@ class _ProfileCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 backgroundColor: selected
-                    ? MoolColors.navy
-                    : const Color(0xFFEDEEFF),
-                foregroundColor: selected ? Colors.white : MoolColors.navy,
+                    ? presentation.accent
+                    : presentation.tint,
+                foregroundColor: selected ? Colors.white : presentation.accent,
                 child: Icon(option.icon),
               ),
               const SizedBox(width: MoolSpacing.sm),
@@ -1360,32 +963,16 @@ class _ProfileCard extends StatelessWidget {
                       ),
                     ),
                     if (!selected)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            option.tools,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: MoolColors.muted,
-                              fontSize: 10.5,
-                              height: 1.25,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            'GST category · ${option.gstMatchCategory.label}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: MoolColors.success,
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        option.sellSide,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: MoolColors.muted,
+                          fontSize: 10.5,
+                          height: 1.25,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                   ],
                 ),
@@ -1396,19 +983,53 @@ class _ProfileCard extends StatelessWidget {
                   color: MoolColors.success,
                 )
               else
-                const Icon(Icons.chevron_right_rounded),
+                Icon(Icons.chevron_right_rounded, color: presentation.accent),
             ],
           ),
-          if (selected) ...[
+          if (!selected) ...[
             const Divider(height: MoolSpacing.lg),
-            _PreviewRow(label: 'Sell / Serve', value: option.sellSide),
-            _PreviewRow(label: 'Buy / Procure', value: option.buySide),
-            _PreviewRow(label: 'Operate', value: option.tools),
+            _ActorPreviewLine(
+              icon: Icons.trending_up_rounded,
+              label: 'Growth opportunity',
+              value: option.sellSide,
+              accent: presentation.accent,
+            ),
+            _ActorPreviewLine(
+              icon: Icons.dashboard_customize_outlined,
+              label: 'Workspace advantage',
+              value: option.tools,
+              accent: presentation.accent,
+            ),
             const SizedBox(height: MoolSpacing.xs),
-            _GstMatchNotice(category: option.gstMatchCategory),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  'Explore this path',
+                  style: TextStyle(
+                    color: presentation.accent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  color: presentation.accent,
+                  size: 18,
+                ),
+              ],
+            ),
+          ] else ...[
+            const Divider(height: MoolSpacing.lg),
+            _PreviewRow(label: 'Reach customers', value: option.sellSide),
+            _PreviewRow(label: 'Source smarter', value: option.buySide),
+            _PreviewRow(label: 'Run your Workspace', value: option.tools),
+            const SizedBox(height: MoolSpacing.xs),
+            const _BusinessIdentityNotice(),
             const SizedBox(height: MoolSpacing.xs),
             const Text(
-              'Documents are requested after you confirm this Workspace profile.',
+              'Next, add the documents for this Workspace. Verification begins after you submit them.',
               style: TextStyle(
                 color: MoolColors.success,
                 fontSize: 11,
@@ -1422,15 +1043,65 @@ class _ProfileCard extends StatelessWidget {
   }
 }
 
-class _GstMatchNotice extends StatelessWidget {
-  const _GstMatchNotice({required this.category});
+class _ActorPreviewLine extends StatelessWidget {
+  const _ActorPreviewLine({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
 
-  final WorkGstMatchCategory category;
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: accent, size: 17),
+          const SizedBox(width: MoolSpacing.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 10.5,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BusinessIdentityNotice extends StatelessWidget {
+  const _BusinessIdentityNotice();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      key: const Key('workspace-gst-match-notice'),
+      key: const Key('workspace-business-identity-notice'),
       padding: const EdgeInsets.all(MoolSpacing.xs),
       decoration: BoxDecoration(
         color: const Color(0xFFEAF7E8),
@@ -1451,16 +1122,16 @@ class _GstMatchNotice extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Optional GST verification',
+                  'Optional business identity check',
                   style: TextStyle(
                     color: MoolColors.navy,
                     fontSize: 11.5,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                Text(
-                  'If you add a GST certificate, we’ll match this Workspace as a ${category.label.toLowerCase()} using its GSTIN, legal or trade name, business constitution and principal business address.',
-                  style: const TextStyle(
+                const Text(
+                  'Have a GST certificate? Add it to help confirm your registered business details and protect this Workspace from impersonation.',
+                  style: TextStyle(
                     color: MoolColors.muted,
                     fontSize: 10,
                     height: 1.32,
@@ -1602,14 +1273,14 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
       animation: widget.session,
       builder: (context, _) => WorkPageScaffold(
         session: widget.session,
-        title: 'Verify Your Work',
+        title: 'Complete your Workspace profile',
         subtitle: widget.session.selectedProfile?.label ?? 'Work profile',
         fallbackBackRoute: '/app/work/workspace/choose',
         activeLocalAction: 'workspace',
         bottomAction: switch (_step) {
           0 => WorkPrimaryButton(
             keyName: 'work-details-continue',
-            label: 'Continue to proof',
+            label: 'Continue to documents',
             onPressed: () {
               _saveFields();
               if (widget.session.validateDetails()) {
@@ -1619,11 +1290,11 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
           ),
           1 => WorkPrimaryButton(
             keyName: 'work-proof-review',
-            label: 'Review',
+            label: 'Review your information',
             onPressed: () {
               if (!widget.session.requiredProofsAdded) {
                 widget.session.showError(
-                  'Add every required proof before review.',
+                  'Add each required document before continuing.',
                 );
                 return;
               }
@@ -1697,7 +1368,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                 children: [
                   Expanded(
                     child: const WorkSectionTitle(
-                      title: 'Proof',
+                      title: 'Documents',
                       detail: 'India / Rajasthan · profile-specific',
                     ),
                   ),
@@ -1726,7 +1397,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                   const Expanded(
                     child: WorkSectionTitle(
                       title: 'Review and submit',
-                      detail: 'Check profile, contacts and proof',
+                      detail: 'Check your profile, contacts and documents',
                     ),
                   ),
                   TextButton(
@@ -1753,7 +1424,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                       value: widget.session.primaryActivity,
                     ),
                     _ReviewRow(
-                      label: 'Proof',
+                      label: 'Documents',
                       value: '${widget.session.addedProofs.length} items added',
                     ),
                   ],
@@ -1880,7 +1551,7 @@ class _ProgressHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['Details', 'Proof', 'Review'];
+    const labels = ['Details', 'Documents', 'Review'];
     return Row(
       children: [
         for (var index = 0; index < labels.length; index += 1) ...[

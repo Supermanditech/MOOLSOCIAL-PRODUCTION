@@ -85,7 +85,7 @@ class NativeWorkProofPicker implements WorkProofPicker {
       );
     } on FileSystemException {
       throw const WorkGatewayException(
-        'That proof document could not be read. Choose it again.',
+        'That document could not be read. Choose it again.',
       );
     } on Object {
       throw const WorkGatewayException(
@@ -131,7 +131,7 @@ class IoWorkProofUploadTransport implements WorkProofUploadTransport {
   }) async {
     if (url.scheme != 'https' || !url.host.endsWith('googleapis.com')) {
       throw const WorkGatewayException(
-        'Proof upload could not be prepared. Choose the document again.',
+        'Document upload could not be prepared. Choose the document again.',
       );
     }
     try {
@@ -155,8 +155,8 @@ class IoWorkProofUploadTransport implements WorkProofUploadTransport {
       throw WorkGatewayException(
         response.statusCode == HttpStatus.unauthorized ||
                 response.statusCode == HttpStatus.forbidden
-            ? 'Proof upload expired. Choose the document again.'
-            : 'Proof could not upload. Check your connection and try again.',
+            ? 'Document upload expired. Choose the document again.'
+            : 'Document could not upload. Check your connection and try again.',
         retryable:
             response.statusCode == HttpStatus.requestTimeout ||
             response.statusCode == HttpStatus.tooManyRequests ||
@@ -166,17 +166,17 @@ class IoWorkProofUploadTransport implements WorkProofUploadTransport {
       rethrow;
     } on TimeoutException {
       throw const WorkGatewayException(
-        'Proof upload timed out. Check your connection and try again.',
+        'Document upload timed out. Check your connection and try again.',
         retryable: true,
       );
     } on SocketException {
       throw const WorkGatewayException(
-        'Proof could not upload. Check your connection and try again.',
+        'Document could not upload. Check your connection and try again.',
         retryable: true,
       );
     } on Object {
       throw const WorkGatewayException(
-        'Proof could not upload. Choose the document again.',
+        'Document could not upload. Choose the document again.',
       );
     }
   }
@@ -367,7 +367,7 @@ class AuthenticatedWorkGateway implements WorkGateway {
         expiresAt == null ||
         !expiresAt.isAfter(DateTime.now())) {
       throw const WorkGatewayException(
-        'Proof upload could not be prepared. Choose the document again.',
+        'Document upload could not be prepared. Choose the document again.',
         retryable: true,
       );
     }
@@ -573,7 +573,7 @@ class ReviewWorkGateway implements WorkGateway {
     if (failSubmission) {
       failSubmission = false;
       throw const WorkGatewayException(
-        'Work profile was not submitted. Your details and proof remain saved.',
+        'Workspace profile was not submitted. Your details and documents remain saved.',
       );
     }
     return WorkReviewResult(
@@ -612,7 +612,7 @@ class ReviewWorkGateway implements WorkGateway {
     if (failGst) {
       failGst = false;
       throw const WorkGatewayException(
-        'GST proof was not submitted. Your review remains active.',
+        'GST certificate was not submitted. Your Workspace review is still active.',
       );
     }
     return 'GST-$gstCalls';
@@ -646,11 +646,11 @@ WorkPickedProof _validateProof(String fileName, Uint8List bytes) {
     'png' => 'image/png',
     'webp' => 'image/webp',
     _ => throw const WorkGatewayException(
-      'Choose a PDF, JPG, PNG or WebP proof document.',
+      'Choose a PDF, JPG, PNG or WebP document.',
     ),
   };
   if (bytes.isEmpty || bytes.length > 10 * 1024 * 1024) {
-    throw const WorkGatewayException('Choose a proof document up to 10 MB.');
+    throw const WorkGatewayException('Choose a document up to 10 MB.');
   }
   return WorkPickedProof(
     fileName: fileName,

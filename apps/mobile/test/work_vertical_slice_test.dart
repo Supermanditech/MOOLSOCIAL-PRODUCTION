@@ -111,7 +111,6 @@ void main() {
   }
 
   Future<void> chooseRetailer(WidgetTester tester) async {
-    await tapVisible(tester, const Key('work-family-products-trade'));
     await tapVisible(tester, const Key('work-profile-retailer-grocery'));
     await tapVisible(tester, const Key('work-continue-proof'));
     expect(find.byKey(const Key('work-proof-screen')), findsOneWidget);
@@ -254,7 +253,6 @@ void main() {
         workSession: work,
       );
 
-      await tapVisible(tester, const Key('work-family-products-trade'));
       await tapVisible(tester, const Key('work-profile-retailer-grocery'));
       await enter(tester, const Key('work-alternate-mobile'), '123');
       await tapVisible(tester, const Key('work-send-alternate-otp'));
@@ -329,7 +327,6 @@ void main() {
     (tester) async {
       await mount(tester, route: '/app/work/workspace/choose');
 
-      await tapVisible(tester, const Key('work-family-products-trade'));
       await tapVisible(tester, const Key('work-profile-retailer-grocery'));
 
       final selectedCard = find.byKey(
@@ -345,10 +342,10 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('workspace-gst-match-notice')),
+        find.byKey(const Key('workspace-business-identity-notice')),
         findsOneWidget,
       );
-      expect(find.textContaining('retail goods supplier'), findsOneWidget);
+      expect(find.text('Optional business identity check'), findsOneWidget);
     },
   );
 
@@ -394,7 +391,7 @@ void main() {
       await tapVisible(tester, const Key('work-submit-profile'));
       expect(
         find.text(
-          'Work profile was not submitted. Your details and proof remain saved.',
+          'Workspace profile was not submitted. Your details and documents remain saved.',
         ),
         findsOneWidget,
       );
@@ -441,7 +438,9 @@ void main() {
       await tapVisible(tester, const Key('work-gst-source-upload'));
       await tapVisible(tester, const Key('work-submit-gst'));
       expect(
-        find.text('GST proof was not submitted. Your review remains active.'),
+        find.text(
+          'GST certificate was not submitted. Your Workspace review is still active.',
+        ),
         findsOneWidget,
       );
       await tapVisible(tester, const Key('work-submit-gst'));

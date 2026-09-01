@@ -1025,9 +1025,10 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Products & Trade',
     label: 'Grocery / Kirana Shop',
     gstMatchCategory: WorkGstMatchCategory.retailGoodsSupplier,
-    sellSide: 'Sell products to local customers',
-    buySide: 'Buy verified wholesale packs',
-    tools: 'Orders, stock, delivery and business book',
+    sellSide:
+        'Grow a trusted neighbourhood store and serve more local customers.',
+    buySide: 'Source verified wholesale packs from eligible suppliers.',
+    tools: 'Run catalogue, stock, orders, delivery and business records.',
     icon: Icons.storefront_rounded,
   ),
   WorkProfileOption(
@@ -1036,9 +1037,11 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Products & Trade',
     label: 'Speciality Retail Shop',
     gstMatchCategory: WorkGstMatchCategory.retailGoodsSupplier,
-    sellSide: 'Sell category products',
-    buySide: 'Procure from eligible suppliers',
-    tools: 'Catalogue, stock, orders and invoices',
+    sellSide:
+        'Showcase specialist products to customers searching by category.',
+    buySide:
+        'Build reliable supplier relationships and source with confidence.',
+    tools: 'Manage catalogue, inventory, orders, invoices and fulfilment.',
     icon: Icons.shopping_bag_outlined,
   ),
   WorkProfileOption(
@@ -1047,9 +1050,10 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Products & Trade',
     label: 'Wholesaler / Distributor',
     gstMatchCategory: WorkGstMatchCategory.wholesaleDistributor,
-    sellSide: 'List case packs and trade terms',
-    buySide: 'Source from manufacturers',
-    tools: 'Business orders, credit and dispatch',
+    sellSide:
+        'Reach verified retailers with clear case packs, pricing and trade terms.',
+    buySide: 'Connect with manufacturers and strengthen your sourcing network.',
+    tools: 'Manage business orders, buyer terms, credit and dispatch.',
     icon: Icons.warehouse_outlined,
   ),
   WorkProfileOption(
@@ -1058,9 +1062,10 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Products & Trade',
     label: 'Manufacturer / Supplier',
     gstMatchCategory: WorkGstMatchCategory.manufacturerSupplier,
-    sellSide: 'Reach eligible trade buyers',
-    buySide: 'Source materials and services',
-    tools: 'Sales targets, distribution and fulfilment',
+    sellSide:
+        'Expand distribution by reaching eligible retailers and wholesalers.',
+    buySide: 'Source business materials and specialist services.',
+    tools: 'Track sales opportunities, distribution partners and fulfilment.',
     icon: Icons.factory_outlined,
   ),
   WorkProfileOption(
@@ -1069,9 +1074,10 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Food Business',
     label: 'Restaurant / Café',
     gstMatchCategory: WorkGstMatchCategory.foodServiceProvider,
-    sellSide: 'Serve delivery, pickup and tables',
-    buySide: 'Procure food and supplies',
-    tools: 'Menu, kitchen, orders and tables',
+    sellSide:
+        'Welcome more diners through delivery, pickup and table bookings.',
+    buySide: 'Source ingredients, packaging and operating supplies.',
+    tools: 'Run menus, kitchen flow, orders, tables and customer service.',
     icon: Icons.restaurant_rounded,
   ),
   WorkProfileOption(
@@ -1080,9 +1086,9 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Food Business',
     label: 'Cloud Kitchen / Tiffin',
     gstMatchCategory: WorkGstMatchCategory.foodServiceProvider,
-    sellSide: 'Sell meals and subscriptions',
-    buySide: 'Procure ingredients and packaging',
-    tools: 'Menu, plans, delivery and kitchen',
+    sellSide: 'Grow meal orders, tiffin plans and recurring subscriptions.',
+    buySide: 'Source ingredients and packaging from suitable suppliers.',
+    tools: 'Manage menus, meal plans, kitchen flow and delivery.',
     icon: Icons.soup_kitchen_outlined,
   ),
   WorkProfileOption(
@@ -1091,9 +1097,10 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Health & Medicine',
     label: 'Clinic / Doctor',
     gstMatchCategory: WorkGstMatchCategory.healthcareProvider,
-    sellSide: 'Offer verified appointments',
-    buySide: 'Manage approved supplies',
-    tools: 'Appointments, consent and follow-up',
+    sellSide:
+        'Build a trusted patient presence and offer verified appointments.',
+    buySide: 'Organise eligible clinic and professional supplies.',
+    tools: 'Manage availability, consent, appointments and follow-up.',
     icon: Icons.medical_services_outlined,
   ),
   WorkProfileOption(
@@ -1102,9 +1109,9 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Health & Medicine',
     label: 'Pharmacy',
     gstMatchCategory: WorkGstMatchCategory.pharmacySupplier,
-    sellSide: 'Fulfil eligible medicine orders',
-    buySide: 'Procure from licensed suppliers',
-    tools: 'Prescription checks, stock and orders',
+    sellSide: 'Serve eligible medicine orders with licensed fulfilment.',
+    buySide: 'Source medicines and products from licensed suppliers.',
+    tools: 'Manage prescription review, compliant stock and orders.',
     icon: Icons.local_pharmacy_outlined,
   ),
   WorkProfileOption(
@@ -1113,9 +1120,10 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Services & Salon',
     label: 'Salon / Wellness',
     gstMatchCategory: WorkGstMatchCategory.personalCareProvider,
-    sellSide: 'Offer appointments and packages',
-    buySide: 'Procure professional products',
-    tools: 'Slots, staff, bills and repeat visits',
+    sellSide:
+        'Attract repeat customers with appointments, services and packages.',
+    buySide: 'Source professional products for your team and customers.',
+    tools: 'Manage schedules, staff, billing and repeat visits.',
     icon: Icons.content_cut_rounded,
   ),
   WorkProfileOption(
@@ -1124,9 +1132,11 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Services & Salon',
     label: 'Local Service Provider',
     gstMatchCategory: WorkGstMatchCategory.localServiceProvider,
-    sellSide: 'Accept defined service tasks',
-    buySide: 'Source tools and supplies',
-    tools: 'Availability, proof, payout and support',
+    sellSide:
+        'Win clearly defined local service requests from nearby customers.',
+    buySide: 'Source the tools and supplies needed for quality service.',
+    tools:
+        'Manage availability, service records, customer support and earnings.',
     icon: Icons.handyman_outlined,
   ),
   WorkProfileOption(
@@ -1135,9 +1145,9 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Ride & Transport',
     label: 'Ride / Delivery Captain',
     gstMatchCategory: WorkGstMatchCategory.individualTransportProvider,
-    sellSide: 'Accept eligible trips and routes',
-    buySide: 'Access vehicle services',
-    tools: 'Trips, safety, earnings and documents',
+    sellSide: 'Access eligible ride, delivery and route opportunities.',
+    buySide: 'Find vehicle care and operating services.',
+    tools: 'Track trips, safety, documents and earnings.',
     icon: Icons.two_wheeler_rounded,
   ),
   WorkProfileOption(
@@ -1146,9 +1156,9 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Ride & Transport',
     label: 'Fleet / Transport Business',
     gstMatchCategory: WorkGstMatchCategory.fleetTransportOperator,
-    sellSide: 'Offer verified capacity',
-    buySide: 'Source routes and services',
-    tools: 'Vehicles, drivers, routes and settlement',
+    sellSide: 'Grow your transport business with verified service capacity.',
+    buySide: 'Discover suitable routes and operating services.',
+    tools: 'Manage vehicles, drivers, routes and settlements.',
     icon: Icons.local_shipping_outlined,
   ),
   WorkProfileOption(
@@ -1157,9 +1167,9 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Create & Work',
     label: 'Creator',
     gstMatchCategory: WorkGstMatchCategory.digitalContentProvider,
-    sellSide: 'Complete funded creator campaigns',
-    buySide: 'Hire creator support services',
-    tools: 'YouTube Connect, campaigns and earnings',
+    sellSide: 'Turn your audience and skills into paid brand opportunities.',
+    buySide: 'Find professional tools and creator support.',
+    tools: 'Manage channels, campaigns, deliverables and earnings.',
     icon: Icons.video_camera_front_outlined,
   ),
   WorkProfileOption(
@@ -1168,9 +1178,9 @@ const workProfiles = <WorkProfileOption>[
     familyLabel: 'Create & Work',
     label: 'Freelancer / Job Seeker',
     gstMatchCategory: WorkGstMatchCategory.independentProfessional,
-    sellSide: 'Apply for funded work and roles',
-    buySide: 'Access professional services',
-    tools: 'Applications, proof, payout and profile',
+    sellSide: 'Showcase your skills and pursue paid assignments and roles.',
+    buySide: 'Access professional services that support your work.',
+    tools: 'Manage applications, portfolio documents, payouts and profile.',
     icon: Icons.work_outline_rounded,
   ),
 ];
@@ -1179,7 +1189,7 @@ const workProofs = <WorkProofRequirement>[
   WorkProofRequirement(
     id: 'personal-kyc',
     label: 'Personal identity',
-    detail: 'Verified account owner · already received',
+    detail: 'Signed-in account identity · included with this application',
     required: true,
   ),
   WorkProofRequirement(

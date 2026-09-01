@@ -538,7 +538,7 @@ class WorkSession extends ChangeNotifier {
       final proof = await proofPicker.pick(source);
       if (proof == null) return false;
       addedProofs[proofId] = await gateway.saveProof(proofId, proof);
-      noticeMessage = 'Proof received. You can review it before submission.';
+      noticeMessage = 'Document received. You can review it before submission.';
       return true;
     } on WorkGatewayException catch (error) {
       if (!error.cancelled) errorMessage = error.message;
@@ -552,7 +552,7 @@ class WorkSession extends ChangeNotifier {
   void removeProof(String proofId) {
     if (proofId == 'personal-kyc') return;
     addedProofs.remove(proofId);
-    showNotice('Proof removed. Add a replacement before review if required.');
+    showNotice('Document removed. Add a replacement if it is required.');
   }
 
   void setDeclaration(bool value) {
@@ -564,7 +564,7 @@ class WorkSession extends ChangeNotifier {
   Future<bool> submitProfile() async {
     if (!validateDetails()) return false;
     if (!requiredProofsAdded) {
-      errorMessage = 'Add every required proof before submission.';
+      errorMessage = 'Add each required document before submission.';
       notifyListeners();
       return false;
     }
@@ -655,7 +655,7 @@ class WorkSession extends ChangeNotifier {
       final caseId = reviewCaseId;
       if (caseId == null) {
         throw const WorkGatewayException(
-          'Submit the work profile before adding GST proof.',
+          'Submit the Workspace profile before adding a GST certificate.',
         );
       }
       final proofReference = gstProofReference;
@@ -667,7 +667,7 @@ class WorkSession extends ChangeNotifier {
       await gateway.submitGst(caseId, normalized, proofReference);
       gstin = normalized;
       gstReminder = false;
-    }, success: 'GST proof added to the active review.');
+    }, success: 'GST certificate added to your Workspace review.');
   }
 
   Future<bool> checkReview() async {

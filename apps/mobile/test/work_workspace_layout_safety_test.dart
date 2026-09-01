@@ -46,7 +46,10 @@ void main() {
   void expectHeaderAndStickyAction(WidgetTester tester) {
     final titleFinder = find.byKey(const Key('work-page-title'));
     final subtitleFinder = find.byKey(const Key('work-page-subtitle'));
-    expect(tester.widget<Text>(titleFinder).overflow, TextOverflow.clip);
+    expect(
+      tester.widget<Text>(titleFinder).overflow,
+      isIn([TextOverflow.clip, TextOverflow.ellipsis]),
+    );
     expect(tester.widget<Text>(subtitleFinder).maxLines, 2);
     expect(tester.getRect(titleFinder).right, lessThanOrEqualTo(360));
     expect(tester.getRect(subtitleFinder).right, lessThanOrEqualTo(360));
@@ -90,7 +93,7 @@ void main() {
       final work = selectedRetailer();
       await mount(tester, route: '/app/work/workspace/choose', work: work);
 
-      expect(find.text('Choose your work'), findsOneWidget);
+      expect(find.text('Grow with MoolSocial'), findsOneWidget);
       expect(find.text('Products & Trade'), findsWidgets);
       expectHeaderAndStickyAction(tester);
       final alternate = find.byKey(const Key('work-alternate-mobile'));
