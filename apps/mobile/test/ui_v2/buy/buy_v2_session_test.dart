@@ -2177,5 +2177,65 @@ void main() {
       expect(fixture.session.selectedAddress.id, addressId);
       expect(fixture.session.cartLines, isNotEmpty);
     });
+
+    test('Shop sale type separates Quick delivery and Courier products', () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
+      expect(session.catalogueSaleTypeProducts, isNotEmpty);
+      expect(
+        session.catalogueSaleTypeProducts.every(
+          (product) =>
+              session.fulfilmentModeFor(product) ==
+              BuyV2FulfilmentMode.quickLocal,
+        ),
+        isTrue,
+      );
+
+      session.chooseShopSaleType(BuyV2ShopSaleType.courier);
+      expect(session.shopSaleType, BuyV2ShopSaleType.courier);
+      expect(session.catalogueSaleTypeProducts, isNotEmpty);
+      expect(
+        session.catalogueSaleTypeProducts.every(
+          (product) =>
+              session.fulfilmentModeFor(product) ==
+              BuyV2FulfilmentMode.standardCourier,
+        ),
+        isTrue,
+      );
+    });
+
+    test('Wholesale sale type separates regular and higher-volume MOQ', () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      session.openDestination(BuyV2Destination.wholesale);
+
+      expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.wholesale);
+      expect(session.catalogueSaleTypeProducts, isNotEmpty);
+      expect(
+        session.catalogueSaleTypeProducts.every(
+          (product) => product.minimumOrder <= 2,
+        ),
+        isTrue,
+      );
+
+      session.addProduct(session.catalogueSaleTypeProducts.first.id);
+      final itemCount = session.itemCount;
+      session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.bulk);
+      expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.bulk);
+      expect(session.catalogueSaleTypeProducts, isNotEmpty);
+      expect(
+        session.catalogueSaleTypeProducts.every(
+          (product) => product.minimumOrder > 2,
+        ),
+        isTrue,
+      );
+      expect(session.itemCount, itemCount);
+    });
   });
 }

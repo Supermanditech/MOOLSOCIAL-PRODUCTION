@@ -40,6 +40,10 @@ enum BuyV2ProductSort {
 
 enum BuyV2PackFilter { standard, multipack, bulk }
 
+enum BuyV2ShopSaleType { quickDelivery, courier }
+
+enum BuyV2WholesaleSaleType { wholesale, bulk }
+
 enum BuyV2AddressKind { home, work, thirdParty, other }
 
 enum BuyV2OrderStatus { preparing, confirmed, dispatched, arriving, delivered }

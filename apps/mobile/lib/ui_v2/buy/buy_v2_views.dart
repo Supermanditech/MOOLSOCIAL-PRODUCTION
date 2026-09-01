@@ -404,6 +404,7 @@ class BuyV2ProductView extends StatelessWidget {
     super.key,
     required this.session,
     this.returnLabel,
+    this.onReturn,
     this.onAskSeller,
     this.onOpenPartnerCatalogue,
     this.wholesaleTradeDecisionAdapter =
@@ -412,6 +413,7 @@ class BuyV2ProductView extends StatelessWidget {
 
   final BuyV2Session session;
   final String? returnLabel;
+  final VoidCallback? onReturn;
   final ValueChanged<BuyV2Product>? onAskSeller;
   final BuyV2PartnerCatalogueHandler? onOpenPartnerCatalogue;
   final BuyV2WholesaleTradeDecisionAdapter wholesaleTradeDecisionAdapter;
@@ -475,7 +477,7 @@ class BuyV2ProductView extends StatelessWidget {
             children: [
               _ReturnAffordance(
                 label: returnLabel ?? product.destination.label,
-                onTap: session.closeProduct,
+                onTap: onReturn ?? session.closeProduct,
               ),
               const SizedBox(height: 7),
               BuyV2FiniteDepthReveal(
@@ -4889,10 +4891,14 @@ class BuyV2CartView extends StatefulWidget {
     super.key,
     required this.session,
     required this.onBrowseMore,
+    this.onBrowseStore,
+    this.storeLabel,
   });
 
   final BuyV2Session session;
   final VoidCallback onBrowseMore;
+  final VoidCallback? onBrowseStore;
+  final String? storeLabel;
 
   @override
   State<BuyV2CartView> createState() => _BuyV2CartViewState();
@@ -5029,6 +5035,24 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                   key: PageStorageKey('buy-cart-${session.cartScope.name}'),
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                   children: [
+                    if (widget.onBrowseStore != null &&
+                        widget.storeLabel?.trim().isNotEmpty == true) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: FilledButton.tonalIcon(
+                          key: const ValueKey('buy-cart-continue-store'),
+                          onPressed: widget.onBrowseStore,
+                          icon: const Icon(Icons.storefront_outlined),
+                          label: Text(
+                            'Continue browsing ${widget.storeLabel}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     SizedBox(
                       width: double.infinity,
                       height: 44,

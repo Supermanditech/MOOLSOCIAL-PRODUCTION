@@ -109,7 +109,7 @@ void main() {
         expect(
           find.descendant(
             of: firstCard,
-            matching: find.textContaining('12 min'),
+            matching: find.textContaining('Quick 10m delivery'),
           ),
           findsOneWidget,
         );
@@ -264,7 +264,10 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: card, matching: find.textContaining('12 min')),
+        find.descendant(
+          of: card,
+          matching: find.textContaining('Quick 10m delivery'),
+        ),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);

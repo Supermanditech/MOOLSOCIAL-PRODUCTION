@@ -81,6 +81,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   bool _scannerBusy = false;
   bool _searchOpen = false;
   bool _offersActive = false;
+  BuyV2Product? _storeBrowseAnchor;
   BuyV2NavigationMotionDirection _surfaceMotionDirection =
       BuyV2NavigationMotionDirection.replace;
   late BuyV2GstInvoiceController _gstInvoiceController;
@@ -780,14 +781,70 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   void _openPartnerCatalogue(BuyV2Product product, {bool brandOnly = false}) {
     HapticFeedback.selectionClick();
     FocusScope.of(context).unfocus();
+    if (!brandOnly) {
+      setState(() => _storeBrowseAnchor = product);
+    }
     unawaited(
       showBuyV2PartnerCatalogue(
         context,
         widget.session,
         product,
         brandOnly: brandOnly,
+        onOpenProduct: _openStoreProduct,
       ),
     );
+  }
+
+  Future<bool> _openStoreProduct(BuyV2Product product) async {
+    final session = widget.session;
+    final previousView = session.view;
+    final previousDestination = session.destination;
+    final previousProductId = session.selectedProductId;
+    final previousCartScope = session.cartScope;
+    if (!session.openProduct(product.id) || !mounted) return false;
+
+    final openCart = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        settings: const RouteSettings(name: 'buy-store-product'),
+        builder: (routeContext) => Scaffold(
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: AnimatedBuilder(
+              animation: session,
+              builder: (context, _) => Column(
+                children: [
+                  Expanded(
+                    child: BuyV2ProductView(
+                      session: session,
+                      returnLabel:
+                          'Back to ${_storeBrowseAnchor?.seller ?? product.seller}',
+                      onReturn: () => Navigator.of(routeContext).pop(false),
+                      onAskSeller: _openProductQuestion,
+                      wholesaleTradeDecisionAdapter:
+                          widget.wholesaleTradeDecisionAdapter,
+                    ),
+                  ),
+                  if (session.itemCount > 0)
+                    BuyV2StoreCartBar(
+                      session: session,
+                      onOpenCart: () => Navigator.of(routeContext).pop(true),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return openCart ?? false;
+
+    if (previousView == BuyV2View.cart) {
+      session.destination = previousDestination;
+      session.openCart(scope: previousCartScope);
+    } else if (previousView == BuyV2View.product && previousProductId != null) {
+      session.openProduct(previousProductId);
+    }
+    return openCart ?? false;
   }
 
   void _openShopChat() {
@@ -844,6 +901,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       ),
       BuyV2View.cart => BuyV2CartView(
         session: session,
+        storeLabel: _storeBrowseAnchor?.seller,
+        onBrowseStore: _storeBrowseAnchor == null
+            ? null
+            : () => _openPartnerCatalogue(_storeBrowseAnchor!),
         onBrowseMore: () {
           if (_offersActive) {
             _openOffers();

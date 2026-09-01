@@ -490,6 +490,8 @@ class BuyV2Session extends ChangeNotifier {
   int? maximumProductPrice;
   BuyV2PackFilter? selectedPackFilter;
   BuyV2FulfilmentMode? selectedFulfilmentMode;
+  BuyV2ShopSaleType _shopSaleType = BuyV2ShopSaleType.quickDelivery;
+  BuyV2WholesaleSaleType _wholesaleSaleType = BuyV2WholesaleSaleType.wholesale;
   BuyV2ProductSort productSort = BuyV2ProductSort.relevance;
   bool availableProductsOnly = false;
   BuyV2ShoppingIntent? activeShoppingIntent;
@@ -1472,8 +1474,12 @@ class BuyV2Session extends ChangeNotifier {
 
   BuyV2PackFilter packFilterFor(BuyV2Product product) {
     final pack = product.pack.toLowerCase();
-    if (product.destination == BuyV2Destination.wholesale ||
-        product.minimumOrder > 1 ||
+    if (product.destination == BuyV2Destination.wholesale) {
+      return product.minimumOrder > 2
+          ? BuyV2PackFilter.bulk
+          : BuyV2PackFilter.standard;
+    }
+    if (product.minimumOrder > 1 ||
         RegExp(r'case|carton|crate|sack|pallet|lot|trade').hasMatch(pack)) {
       return BuyV2PackFilter.bulk;
     }
@@ -1481,6 +1487,30 @@ class BuyV2Session extends ChangeNotifier {
       return BuyV2PackFilter.multipack;
     }
     return BuyV2PackFilter.standard;
+  }
+
+  BuyV2ShopSaleType get shopSaleType => _shopSaleType;
+
+  BuyV2WholesaleSaleType get wholesaleSaleType => _wholesaleSaleType;
+
+  String get saleTypeSignature => switch (destination) {
+    BuyV2Destination.shop => 'shop-${shopSaleType.name}',
+    BuyV2Destination.wholesale => 'wholesale-${wholesaleSaleType.name}',
+    BuyV2Destination.medicine || BuyV2Destination.orders => destination.name,
+  };
+
+  void chooseShopSaleType(BuyV2ShopSaleType value) {
+    if (_shopSaleType == value) return;
+    _shopSaleType = value;
+    selectedFilter = null;
+    notifyListeners();
+  }
+
+  void chooseWholesaleSaleType(BuyV2WholesaleSaleType value) {
+    if (_wholesaleSaleType == value) return;
+    _wholesaleSaleType = value;
+    selectedFilter = null;
+    notifyListeners();
   }
 
   bool _availableForDiscovery(BuyV2Product product) {
@@ -1495,7 +1525,10 @@ class BuyV2Session extends ChangeNotifier {
         !orderability.contains('loading');
   }
 
-  List<BuyV2Product> get visibleProducts {
+  List<BuyV2Product> get visibleProducts =>
+      _resolveVisibleProducts(limit: true);
+
+  List<BuyV2Product> _resolveVisibleProducts({required bool limit}) {
     final normalized = query.trim().toLowerCase();
     final filterDestination = destination == BuyV2Destination.orders
         ? BuyV2Destination.shop
@@ -1613,10 +1646,44 @@ class BuyV2Session extends ChangeNotifier {
           ).price.compareTo(productFactsFor(right).price);
         });
     }
-    if (category == 'all' && normalized.isEmpty && products.length > 18) {
+    if (limit &&
+        category == 'all' &&
+        normalized.isEmpty &&
+        products.length > 18) {
       return products.take(18).toList();
     }
     return products;
+  }
+
+  List<BuyV2Product> get catalogueSaleTypeProducts {
+    final products = _resolveVisibleProducts(limit: false);
+    if (query.trim().isNotEmpty ||
+        selectedFilter != null ||
+        activeShoppingIntent != null) {
+      return products;
+    }
+    final partitioned = products
+        .where((product) {
+          return switch (destination) {
+            BuyV2Destination.shop => switch (shopSaleType) {
+              BuyV2ShopSaleType.quickDelivery =>
+                fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal,
+              BuyV2ShopSaleType.courier =>
+                fulfilmentModeFor(product) ==
+                    BuyV2FulfilmentMode.standardCourier,
+            },
+            BuyV2Destination.wholesale => switch (wholesaleSaleType) {
+              BuyV2WholesaleSaleType.wholesale => product.minimumOrder <= 2,
+              BuyV2WholesaleSaleType.bulk => product.minimumOrder > 2,
+            },
+            BuyV2Destination.medicine || BuyV2Destination.orders => true,
+          };
+        })
+        .toList(growable: false);
+    if (selectedCategoryId == 'all' && partitioned.length > 18) {
+      return partitioned.take(18).toList(growable: false);
+    }
+    return partitioned;
   }
 
   bool get hasNarrowedProductSearchScope =>

@@ -355,7 +355,7 @@ void main() {
         find.byKey(const ValueKey('buy-featured-product-list')),
         findsOneWidget,
       );
-      final products = session.visibleProducts.take(2).toList();
+      final products = session.catalogueSaleTypeProducts.take(2).toList();
       final rects = [
         for (final product in products)
           tester.getRect(find.byKey(ValueKey('buy-product-${product.id}'))),
@@ -900,7 +900,7 @@ void main() {
   });
 
   testWidgets(
-    'category action is compact and its first-party feature reuses filters',
+    'category action is compact and Shop sale types reuse its toolbar space',
     (tester) async {
       final session = BuyV2Session(core: BuySession());
       await tester.pumpWidget(app(session));
@@ -909,14 +909,19 @@ void main() {
       final categoryAction = find.byKey(const ValueKey('buy-category-picker'));
       expect(tester.getSize(categoryAction), const Size(44, 44));
       expect(find.byIcon(Icons.menu_rounded), findsOneWidget);
-      expect(find.byKey(const ValueKey('buy-owned-feature')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-shop-sale-type-selector')),
+        findsOneWidget,
+      );
 
-      await tester.tap(find.byKey(const ValueKey('buy-owned-feature')));
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-sale-type-courier')),
+      );
       await tester.pumpAndSettle();
-      expect(session.selectedFilter, 'lowest');
-      await tester.tap(find.byKey(const ValueKey('buy-owned-feature')));
+      expect(session.shopSaleType, BuyV2ShopSaleType.courier);
+      await tester.tap(find.byKey(const ValueKey('buy-shop-sale-type-quick')));
       await tester.pumpAndSettle();
-      expect(session.selectedFilter, isNull);
+      expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
     },
   );
 
@@ -1254,7 +1259,8 @@ void main() {
         scrollable: scrollableWithin(
           PageStorageKey(
             'buy-${session.destination.name}-'
-            '${session.selectedCategoryId}-all',
+            '${session.selectedCategoryId}-'
+            '${session.saleTypeSignature}-all',
           ),
         ),
       );
@@ -2985,14 +2991,9 @@ void main() {
       final product = session.visibleProducts.first;
       final card = find.byKey(ValueKey('buy-product-${product.id}'));
       final add = find.byKey(ValueKey('buy-add-${product.id}'));
-      final fullPromise = buyV2BuyerDeliveryPromise(
-        session.productFactsFor(product),
-      );
-      final promisedMinutes = RegExp(r'(\d+)\s*min').firstMatch(fullPromise);
-      expect(promisedMinutes, isNotNull);
       final promise = find.descendant(
         of: card,
-        matching: find.textContaining('${promisedMinutes!.group(1)} min'),
+        matching: find.textContaining('Quick 10m delivery'),
       );
 
       expect(add, findsOneWidget);
@@ -4012,6 +4013,137 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'store Add feedback Cart access and product return keep one browse path',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      expect(session.openProduct('s-eggs'), isTrue);
+      await tester.pumpAndSettle();
+      final storeAction = find.byKey(
+        const ValueKey('buy-shop-seller-action-s-eggs'),
+      );
+      await tester.scrollUntilVisible(
+        storeAction,
+        220,
+        scrollable: scrollableWithin(
+          const PageStorageKey('buy-product-s-eggs'),
+        ),
+      );
+      await tester.tap(storeAction);
+      await tester.pumpAndSettle();
+
+      final storeSheet = find.byKey(
+        const ValueKey('buy-shop-seller-sheet-s-eggs'),
+      );
+      expect(storeSheet, findsOneWidget);
+      final storeScroll = find
+          .descendant(of: storeSheet, matching: find.byType(Scrollable))
+          .first;
+      final addChicken = find.byKey(const ValueKey('buy-add-s-chicken'));
+      await tester.scrollUntilVisible(addChicken, 180, scrollable: storeScroll);
+      await tester.tap(addChicken);
+      await tester.pumpAndSettle();
+
+      expect(session.quantityFor('s-chicken'), 1);
+      expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('buy-store-cart-feedback')))
+            .data,
+        contains('added'),
+      );
+
+      final chicken = find.byKey(const ValueKey('buy-product-s-chicken'));
+      await tester.ensureVisible(chicken);
+      await tester.tap(chicken);
+      await tester.pumpAndSettle();
+      expect(session.selectedProductId, 's-chicken');
+      expect(find.text('Back to Safe Protein Store'), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsOneWidget);
+
+      await tester.tap(find.text('Back to Safe Protein Store'));
+      await tester.pumpAndSettle();
+      expect(storeSheet, findsOneWidget);
+      expect(session.selectedProductId, 's-eggs');
+
+      await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.cart);
+      expect(
+        find.byKey(const ValueKey('buy-cart-continue-store')),
+        findsOneWidget,
+      );
+      expect(find.text('Continue browsing Safe Protein Store'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('buy-cart-continue-store')));
+      await tester.pumpAndSettle();
+      expect(storeSheet, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Shop Quick Courier and Wholesale Bulk selectors wire exact catalogues',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-sale-type-selector')),
+        findsOneWidget,
+      );
+      expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
+      expect(
+        find.byKey(const ValueKey('buy-product-s-tomato')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('buy-product-s-atta')), findsNothing);
+      expect(find.textContaining('Quick 10m delivery'), findsWidgets);
+
+      await tester.tap(
+        find.byKey(const ValueKey('buy-shop-sale-type-courier')),
+      );
+      await tester.pumpAndSettle();
+      expect(session.shopSaleType, BuyV2ShopSaleType.courier);
+      expect(find.byKey(const ValueKey('buy-product-s-tomato')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-product-s-atta')), findsOneWidget);
+      expect(find.textContaining('Delivery today'), findsWidgets);
+
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-wholesale-sale-type-selector')),
+        findsOneWidget,
+      );
+      expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.wholesale);
+      expect(
+        find.byKey(const ValueKey('buy-product-w-tomato')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('buy-product-w-rice')), findsNothing);
+
+      await tester.tap(
+        find.byKey(const ValueKey('buy-wholesale-sale-type-bulk')),
+      );
+      await tester.pumpAndSettle();
+      expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.bulk);
+      expect(find.byKey(const ValueKey('buy-product-w-tomato')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-product-w-rice')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 void _expectCustomerFacingBuyCopy(WidgetTester tester) {
