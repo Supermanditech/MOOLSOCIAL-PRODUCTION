@@ -41,6 +41,7 @@ class BuyV2Screen extends StatefulWidget {
     this.onDestinationChanged,
     this.invoiceDownloader = saveBuyV2InvoiceToDevice,
     this.paymentHandoff,
+    this.liveDeliveryMapBuilder,
     this.offersSource = const BuyV2CataloguePublishedOffersSource(),
     this.wholesaleTradeDecisionAdapter =
         const BuyV2UnavailableWholesaleTradeDecisionAdapter(),
@@ -64,6 +65,7 @@ class BuyV2Screen extends StatefulWidget {
   final ValueChanged<BuyV2Destination>? onDestinationChanged;
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final BuyV2PaymentHandoff? paymentHandoff;
+  final BuyV2LiveDeliveryMapBuilder? liveDeliveryMapBuilder;
   final BuyV2PublishedOffersSource offersSource;
   final BuyV2WholesaleTradeDecisionAdapter wholesaleTradeDecisionAdapter;
 
@@ -848,6 +850,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
         paymentHandoff: widget.paymentHandoff,
+        liveDeliveryMapBuilder: widget.liveDeliveryMapBuilder,
       ),
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
       BuyV2View.assist => BuyV2TrackingView(
@@ -855,6 +858,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
         paymentHandoff: widget.paymentHandoff,
+        liveDeliveryMapBuilder: widget.liveDeliveryMapBuilder,
       ),
       BuyV2View.account => BuyV2AccountView(
         session: session,

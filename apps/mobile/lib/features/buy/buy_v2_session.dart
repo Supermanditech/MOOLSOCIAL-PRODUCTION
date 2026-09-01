@@ -329,6 +329,7 @@ class BuyV2Session extends ChangeNotifier {
     this.checkoutQuoteAdapter,
     this.balancePaymentAdapter,
     this.deliveryExceptionAdapter,
+    this.liveDeliveryAdapter,
     BuyV2OrderResolutionAdapter? orderResolutionAdapter,
     BuyV2ShoppingAlertsAdapter? shoppingAlertsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
@@ -403,6 +404,7 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2CheckoutQuoteAdapter? checkoutQuoteAdapter;
   final BuyV2BalancePaymentAdapter? balancePaymentAdapter;
   final BuyV2DeliveryExceptionAdapter? deliveryExceptionAdapter;
+  final BuyV2LiveDeliveryAdapter? liveDeliveryAdapter;
   final BuyV2OrderResolutionAdapter orderResolutionAdapter;
   final BuyV2ShoppingAlertsAdapter shoppingAlertsAdapter;
   final BuyV2CommerceAdapter commerceAdapter;
@@ -659,6 +661,9 @@ class BuyV2Session extends ChangeNotifier {
   _deliveryExceptionSnapshots = {};
   final Set<String> _deliveryExceptionBusyOrderIds = {};
   final Map<String, String> _selectedDeliveryRescheduleSlots = {};
+  final Map<String, BuyV2LiveDeliverySnapshot> _liveDeliverySnapshots = {};
+  final Set<String> _liveDeliveryBusyOrderIds = {};
+  final Map<String, String> _liveDeliveryRefreshMessages = {};
   final Map<BuyV2CartScope, double> _cartScrollOffsets = {};
   final Map<BuyV2Destination, String> _deliveryInstructionIds = {};
   final Map<String, _BuyV2CartBenefitSelectionRef> _selectedCartBenefitRefs =
@@ -1250,6 +1255,109 @@ class BuyV2Session extends ChangeNotifier {
       _deliveryExceptionBusyOrderIds.remove(orderId);
       notifyListeners();
     }
+  }
+
+  bool get liveDeliveryAvailable => liveDeliveryAdapter != null;
+
+  bool liveDeliveryBusy(String orderId) =>
+      _liveDeliveryBusyOrderIds.contains(orderId);
+
+  BuyV2LiveDeliverySnapshot? liveDeliveryFor(String orderId) =>
+      _liveDeliverySnapshots[orderId];
+
+  String? liveDeliveryRefreshMessage(String orderId) =>
+      _liveDeliveryRefreshMessages[orderId];
+
+  Future<bool> refreshLiveDelivery(String orderId) async {
+    final orderExists = _orders.any((order) => order.id == orderId);
+    if (!orderExists || !_liveDeliveryBusyOrderIds.add(orderId)) return false;
+    final adapter = liveDeliveryAdapter;
+    if (adapter == null) {
+      _liveDeliveryBusyOrderIds.remove(orderId);
+      _liveDeliverySnapshots[orderId] = BuyV2LiveDeliverySnapshot(
+        orderId: orderId,
+        state: BuyV2LiveDeliveryState.unavailable,
+        customerMessage:
+            'Live delivery updates are not available for this order yet.',
+        sourceId: 'not-connected',
+      );
+      _liveDeliveryRefreshMessages.remove(orderId);
+      notifyListeners();
+      return false;
+    }
+    notifyListeners();
+    try {
+      final snapshot = await adapter.load(orderId: orderId);
+      if (!_validLiveDeliverySnapshot(snapshot, orderId)) {
+        const message =
+            'Live delivery details are temporarily unavailable. Try again.';
+        if (_liveDeliverySnapshots[orderId]?.state ==
+            BuyV2LiveDeliveryState.ready) {
+          _liveDeliveryRefreshMessages[orderId] = message;
+        } else {
+          _liveDeliverySnapshots[orderId] = BuyV2LiveDeliverySnapshot(
+            orderId: orderId,
+            state: BuyV2LiveDeliveryState.unavailable,
+            customerMessage: message,
+            sourceId: 'invalid-details',
+          );
+        }
+        return false;
+      }
+      if ((snapshot.state == BuyV2LiveDeliveryState.offline ||
+              snapshot.state == BuyV2LiveDeliveryState.unavailable) &&
+          _liveDeliverySnapshots[orderId]?.state ==
+              BuyV2LiveDeliveryState.ready) {
+        _liveDeliveryRefreshMessages[orderId] = snapshot.customerMessage;
+        return false;
+      }
+      _liveDeliverySnapshots[orderId] = snapshot;
+      _liveDeliveryRefreshMessages.remove(orderId);
+      return snapshot.state == BuyV2LiveDeliveryState.ready ||
+          snapshot.state == BuyV2LiveDeliveryState.delivered;
+    } on Object {
+      const message =
+          'Live delivery could not refresh. Check your connection and try again.';
+      if (_liveDeliverySnapshots[orderId]?.state ==
+          BuyV2LiveDeliveryState.ready) {
+        _liveDeliveryRefreshMessages[orderId] = message;
+      } else {
+        _liveDeliverySnapshots[orderId] = BuyV2LiveDeliverySnapshot(
+          orderId: orderId,
+          state: BuyV2LiveDeliveryState.offline,
+          customerMessage: message,
+          sourceId: 'connection-unavailable',
+        );
+      }
+      return false;
+    } finally {
+      _liveDeliveryBusyOrderIds.remove(orderId);
+      notifyListeners();
+    }
+  }
+
+  bool _validLiveDeliverySnapshot(
+    BuyV2LiveDeliverySnapshot snapshot,
+    String orderId,
+  ) {
+    if (snapshot.orderId != orderId ||
+        snapshot.customerMessage.trim().isEmpty ||
+        snapshot.sourceId.trim().isEmpty) {
+      return false;
+    }
+    if (snapshot.state != BuyV2LiveDeliveryState.ready) return true;
+    final progress = snapshot.routeProgress;
+    final updatedAt = snapshot.lastUpdatedAt;
+    return snapshot.courierPosition?.isValid == true &&
+        snapshot.destinationPosition?.isValid == true &&
+        snapshot.driverName?.trim().isNotEmpty == true &&
+        snapshot.etaLabel?.trim().isNotEmpty == true &&
+        updatedAt != null &&
+        !updatedAt.isAfter(DateTime.now().add(const Duration(minutes: 5))) &&
+        progress != null &&
+        progress.isFinite &&
+        progress >= 0 &&
+        progress <= 1;
   }
 
   bool _validDeliveryExceptionSnapshot(

@@ -71,9 +71,9 @@ String buyV2DeliveryPromiseSummary({
 String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
     switch (destination) {
       BuyV2Destination.shop ||
-      BuyV2Destination.wholesale => 'Automatically assigned Mool Partner',
+      BuyV2Destination.wholesale => 'Mool delivery partner',
       BuyV2Destination.medicine => 'Mool Pharmacy Partner',
-      BuyV2Destination.orders => 'Mool Fulfilment Partner',
+      BuyV2Destination.orders => 'Mool delivery partner',
     };
 
 String buyV2FulfilmentModeLabel(BuyV2FulfilmentMode mode) => switch (mode) {
@@ -219,8 +219,8 @@ BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
       state: BuyV2ProductOfferDecisionState.unavailable,
       statusLabel: 'Store closed',
       detail: nextOpening == null || nextOpening.isEmpty
-          ? 'This fulfilment partner is closed. Check again before adding to Cart.'
-          : 'This fulfilment partner is closed. $nextOpening.',
+          ? 'This store is closed. Check again before adding to Cart.'
+          : 'This store is closed. $nextOpening.',
     );
   }
   if (facts.stale) {

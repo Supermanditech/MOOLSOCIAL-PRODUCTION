@@ -253,7 +253,7 @@ String buyV2PartnerRoleFor(BuyV2Destination destination, String sourceRole) {
     BuyV2Destination.shop => 'Mool Retail Partner',
     BuyV2Destination.wholesale => 'Mool Trade Partner',
     BuyV2Destination.medicine => 'Mool Pharmacy Partner',
-    BuyV2Destination.orders => 'Mool Fulfilment Partner',
+    BuyV2Destination.orders => 'Mool delivery partner',
   };
 }
 

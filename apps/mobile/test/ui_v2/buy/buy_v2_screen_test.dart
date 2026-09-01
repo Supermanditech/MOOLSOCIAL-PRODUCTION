@@ -19,7 +19,8 @@ final _forbiddenBuyCopy = RegExp(
   r'mock|placeholder|working note|internal plan|implementation|workflow|'
   r'state machine|endpoint|payload|backend|provider callback|next screen|'
   r'for (?:review|testing)|source route|product compliance|'
-  r'fulfiller assigned|route owner|internal identifier|debug build|ui review)\b',
+  r'fulfiller assigned|fulfilment|route owner|internal identifier|'
+  r'debug build|ui review)\b',
   caseSensitive: false,
 );
 

@@ -23,6 +23,9 @@ import 'buy_v2_prescription_sheet_motion.dart';
 import 'buy_v2_product_feedback_sheet_motion.dart';
 import 'buy_v2_product_video.dart';
 
+typedef BuyV2LiveDeliveryMapBuilder =
+    Widget Function(BuildContext context, BuyV2LiveDeliverySnapshot snapshot);
+
 String _productCountLabel(int count) =>
     '$count ${count == 1 ? 'product' : 'products'}';
 
@@ -3828,7 +3831,7 @@ class _MarketplaceTrustPanel extends StatelessWidget {
         if (trust.serviceReliabilityLabel case final reliability?)
           _DecisionRow(
             icon: Icons.local_shipping_outlined,
-            label: 'Fulfilment record',
+            label: 'Delivery record',
             value: reliability,
           ),
         if (trust.returnSummary case final returnSummary?)
@@ -6285,7 +6288,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                           'Delivery ${index + 1} · '
                           '${_checkoutFulfilmentCountLabel(deliveryGroups[index])}',
                       detail: [
-                        '${deliveryGroups[index].destination.label} fulfilment · '
+                        '${deliveryGroups[index].destination.label} delivery · '
                             '${_fulfilmentPromiseSummary(deliveryGroups[index])}',
                         '${deliveryGroups[index].destination.label} · ${buyV2Money(deliveryGroups[index].total)}',
                         for (final line in deliveryGroups[index].lines)
@@ -8538,6 +8541,246 @@ class _BalancePaymentCard extends StatelessWidget {
   }
 }
 
+class BuyV2LiveDeliveryPanel extends StatefulWidget {
+  const BuyV2LiveDeliveryPanel({
+    required this.session,
+    required this.order,
+    this.mapBuilder,
+    this.pollInterval = const Duration(seconds: 15),
+    super.key,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Order order;
+  final BuyV2LiveDeliveryMapBuilder? mapBuilder;
+  final Duration pollInterval;
+
+  @override
+  State<BuyV2LiveDeliveryPanel> createState() => _BuyV2LiveDeliveryPanelState();
+}
+
+class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  @override
+  void didUpdateWidget(covariant BuyV2LiveDeliveryPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, widget.session) ||
+        oldWidget.order.id != widget.order.id ||
+        oldWidget.order.status != widget.order.status ||
+        oldWidget.pollInterval != widget.pollInterval) {
+      _timer?.cancel();
+      _start();
+    }
+  }
+
+  void _start() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(widget.session.refreshLiveDelivery(widget.order.id));
+      }
+    });
+    if (!widget.session.liveDeliveryAvailable ||
+        widget.order.status == BuyV2OrderStatus.delivered ||
+        widget.pollInterval <= Duration.zero) {
+      return;
+    }
+    _timer = Timer.periodic(widget.pollInterval, (_) {
+      if (mounted && !widget.session.liveDeliveryBusy(widget.order.id)) {
+        unawaited(widget.session.refreshLiveDelivery(widget.order.id));
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final snapshot = widget.session.liveDeliveryFor(widget.order.id);
+    final busy = widget.session.liveDeliveryBusy(widget.order.id);
+    final refreshMessage = widget.session.liveDeliveryRefreshMessage(
+      widget.order.id,
+    );
+    final ready = snapshot?.state == BuyV2LiveDeliveryState.ready;
+    final delivered = snapshot?.state == BuyV2LiveDeliveryState.delivered;
+    final updatedAt = snapshot?.lastUpdatedAt;
+    final stale =
+        ready &&
+        updatedAt != null &&
+        DateTime.now().difference(updatedAt) > const Duration(minutes: 2);
+    return Container(
+      key: ValueKey('buy-live-delivery-${widget.order.id}'),
+      padding: const EdgeInsets.all(10),
+      decoration: buyV2CardDecoration(color: BuyV2Colors.softBlue, radius: 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                color: BuyV2Colors.navy,
+                size: 21,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  delivered ? 'Delivery completed' : 'Live delivery',
+                  style: context.buyTitle.copyWith(fontSize: 14),
+                ),
+              ),
+              if (busy)
+                const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (snapshot == null)
+            Text('Checking the latest delivery update…', style: context.buyBody)
+          else if (!ready) ...[
+            Text(snapshot.customerMessage, style: context.buyBody),
+            if (widget.session.liveDeliveryAvailable && !delivered) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                height: BuyV2Metrics.minimumTap,
+                child: OutlinedButton.icon(
+                  key: ValueKey('buy-live-delivery-retry-${widget.order.id}'),
+                  onPressed: busy
+                      ? null
+                      : () =>
+                            widget.session.refreshLiveDelivery(widget.order.id),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Try again'),
+                ),
+              ),
+            ],
+          ] else ...[
+            Semantics(
+              label: 'Courier location map. ${snapshot.etaLabel}.',
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(13),
+                child: SizedBox(
+                  key: ValueKey('buy-live-delivery-map-${widget.order.id}'),
+                  height: 158,
+                  child:
+                      widget.mapBuilder?.call(context, snapshot) ??
+                      ColoredBox(
+                        color: const Color(0xFFE7EAF4),
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.map_outlined,
+                                  color: BuyV2Colors.navy,
+                                  size: 30,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Map view is not available right now.',
+                                  textAlign: TextAlign.center,
+                                  style: context.buyBody,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'The latest delivery details are shown below.',
+                                  textAlign: TextAlign.center,
+                                  style: context.buyMeta,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _DecisionRow(
+              icon: Icons.schedule_outlined,
+              label: 'Arriving',
+              value: snapshot.etaLabel!,
+            ),
+            _DecisionRow(
+              icon: Icons.delivery_dining_outlined,
+              label: 'Delivery partner',
+              value: switch (_nonBlankComplianceValue(snapshot.vehicleLabel)) {
+                final vehicle? => '${snapshot.driverName!} · $vehicle',
+                null => snapshot.driverName!,
+              },
+            ),
+            if (_nonBlankComplianceValue(snapshot.trackingReference)
+                case final tracking?)
+              _DecisionRow(
+                icon: Icons.pin_outlined,
+                label: 'Tracking reference',
+                value: tracking,
+              ),
+            _DecisionRow(
+              icon: Icons.update_rounded,
+              label: 'Last updated',
+              value: _liveDeliveryUpdatedLabel(updatedAt!),
+            ),
+            if (stale || refreshMessage != null) ...[
+              const SizedBox(height: 6),
+              Container(
+                key: ValueKey('buy-live-delivery-update-${widget.order.id}'),
+                padding: const EdgeInsets.all(9),
+                decoration: buyV2CardDecoration(
+                  color: BuyV2Colors.softOrange,
+                  radius: 12,
+                ),
+                child: Text(
+                  refreshMessage ??
+                      'The courier location has not updated recently. Try again for the latest position.',
+                  style: context.buyMeta,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: BuyV2Metrics.minimumTap,
+                child: OutlinedButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () =>
+                            widget.session.refreshLiveDelivery(widget.order.id),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Refresh location'),
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+String _liveDeliveryUpdatedLabel(DateTime updatedAt) {
+  final elapsed = DateTime.now().difference(updatedAt);
+  if (elapsed <= const Duration(seconds: 45)) return 'Just now';
+  if (elapsed < const Duration(hours: 1)) {
+    final minutes = elapsed.inMinutes.clamp(1, 59);
+    return '$minutes min ago';
+  }
+  final hours = elapsed.inHours;
+  return '$hours ${hours == 1 ? 'hour' : 'hours'} ago';
+}
+
 class BuyV2TrackingView extends StatelessWidget {
   const BuyV2TrackingView({
     super.key,
@@ -8545,12 +8788,14 @@ class BuyV2TrackingView extends StatelessWidget {
     required this.onOpenOrderHelp,
     this.invoiceDownloader,
     this.paymentHandoff,
+    this.liveDeliveryMapBuilder,
   });
 
   final BuyV2Session session;
   final ValueChanged<BuyV2Order> onOpenOrderHelp;
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final BuyV2PaymentHandoff? paymentHandoff;
+  final BuyV2LiveDeliveryMapBuilder? liveDeliveryMapBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -8779,12 +9024,20 @@ class BuyV2TrackingView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
+        if (order.status != BuyV2OrderStatus.delivered) ...[
+          BuyV2LiveDeliveryPanel(
+            session: session,
+            order: order,
+            mapBuilder: liveDeliveryMapBuilder,
+          ),
+          const SizedBox(height: 6),
+        ],
         if (session.deliveryExceptionAdapter != null) ...[
           _DeliveryExceptionCard(session: session, order: order),
           const SizedBox(height: 6),
         ],
         _DecisionPanel(
-          title: 'Fulfilment',
+          title: 'Delivery details',
           children: [
             _DecisionRow(
               icon: Icons.storefront_outlined,
@@ -10146,12 +10399,12 @@ Future<void> showBuyV2FilterSheet(
   final options = switch (destination) {
     BuyV2Destination.shop => const [
       ('any', 'Any delivery time', 'Show every available product'),
-      ('fast', 'Fast delivery', 'Nearby fulfilment first'),
+      ('fast', 'Fast delivery', 'Nearby delivery first'),
       ('today', 'Delivered today', 'Confirmed same-day listings'),
       (
         'quick-local',
         'Quick local delivery',
-        'Nearby rider fulfilment with a confirmed short delivery window',
+        'Nearby delivery with a confirmed short delivery window',
       ),
       (
         'standard-courier',
@@ -10159,7 +10412,7 @@ Future<void> showBuyV2FilterSheet(
         'Scheduled local or remote delivery with a confirmed date or window',
       ),
       ('lowest', 'Lowest delivered price', 'Price including delivery'),
-      ('nearby', 'Nearby sellers', 'Local Mool fulfilment partners'),
+      ('nearby', 'Nearby sellers', 'Nearby Mool partners'),
       ('returns', 'Easy returns', 'Listings with a clear return option'),
     ],
     BuyV2Destination.wholesale => const [
@@ -10182,7 +10435,7 @@ Future<void> showBuyV2FilterSheet(
       ('today', 'Delivered today', 'Confirmed same-day medicine supply'),
       ('lowest', 'Lowest delivered price', 'Price including delivery'),
       ('otc', 'No prescription required', 'Listed non-prescription products'),
-      ('nearby', 'Nearby pharmacy', 'Licensed local fulfilment partners'),
+      ('nearby', 'Nearby pharmacy', 'Licensed local pharmacies'),
       (
         'manufacturer',
         'Manufacturer sealed packs',
