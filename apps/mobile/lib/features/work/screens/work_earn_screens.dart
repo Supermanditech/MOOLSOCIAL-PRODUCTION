@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -60,9 +62,11 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
   );
   final FocusNode _searchFocus = FocusNode(debugLabel: 'work-earn-search');
   bool _searchOpen = false;
+  Timer? _refreshNoticeTimer;
 
   @override
   void dispose() {
+    _refreshNoticeTimer?.cancel();
     _search.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -101,6 +105,21 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
     widget.session.search('');
     widget.session.setFilter(WorkFeedFilter.forYou);
     widget.session.clearOpportunityFilters();
+  }
+
+  Future<void> _refreshFeed() async {
+    _refreshNoticeTimer?.cancel();
+    await widget.session.refreshFeed();
+    if (!mounted ||
+        widget.session.noticeMessage != 'Work opportunities refreshed.') {
+      return;
+    }
+    _refreshNoticeTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted &&
+          widget.session.noticeMessage == 'Work opportunities refreshed.') {
+        widget.session.dismissMessages();
+      }
+    });
   }
 
   void _openProfile(BuildContext context) {
@@ -165,7 +184,7 @@ class _WorkEarnScreenState extends State<WorkEarnScreen> {
                 ),
                 Expanded(
                   child: RefreshIndicator(
-                    onRefresh: widget.session.refreshFeed,
+                    onRefresh: _refreshFeed,
                     child: CustomScrollView(
                       key: const Key('work-earn-screen'),
                       slivers: [
@@ -1203,11 +1222,52 @@ class _OpportunityCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      _AttentionApplyButton(
-                        keyName: 'work-opportunity-apply-${opportunity.id}',
-                        onPressed: onApply,
-                        accent: color,
-                        compact: true,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                key: Key(
+                                  'work-opportunity-details-${opportunity.id}',
+                                ),
+                                onPressed: onOpen,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: MoolColors.navy,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  side: const BorderSide(
+                                    color: MoolColors.navy,
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  Icons.description_outlined,
+                                  size: 17,
+                                ),
+                                label: const Text(
+                                  'View details',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: _AttentionApplyButton(
+                              keyName:
+                                  'work-opportunity-apply-${opportunity.id}',
+                              onPressed: onApply,
+                              accent: color,
+                              compact: true,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1555,29 +1615,33 @@ class _AttentionApplyButtonState extends State<_AttentionApplyButton>
           style: FilledButton.styleFrom(
             backgroundColor: MoolColors.navy,
             foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             disabledBackgroundColor: MoolColors.muted.withValues(alpha: .28),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(MoolRadii.control),
               side: BorderSide(color: widget.accent, width: 2),
             ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: MoolColors.orange,
-                  shape: BoxShape.circle,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: MoolColors.orange,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              const SizedBox(width: MoolSpacing.xs),
-              const Text(
-                'Apply Now',
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ],
+                const SizedBox(width: MoolSpacing.xs),
+                const Text(
+                  'Apply Now',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ],
+            ),
           ),
         ),
       ),

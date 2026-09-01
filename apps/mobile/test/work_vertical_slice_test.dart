@@ -231,9 +231,16 @@ void main() {
       ),
       findsOneWidget,
     );
-    await tester.drag(list, const Offset(0, 320));
-    await tester.pumpAndSettle();
+    final refresh = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    final refreshFuture = refresh.onRefresh();
+    await tester.pump(const Duration(milliseconds: 30));
+    await refreshFuture;
+    await tester.pump();
     expect(find.text('Work opportunities refreshed.'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(find.text('Work opportunities refreshed.'), findsNothing);
   });
 
   testWidgets(

@@ -185,6 +185,11 @@ void main() {
       find.descendant(of: card, matching: find.byType(FadeTransition)),
       findsWidgets,
     );
+    expect(
+      find.byKey(const Key('work-opportunity-details-quick-delivery-biker')),
+      findsOneWidget,
+    );
+    expect(find.text('View details'), findsWidgets);
 
     await tester.tap(find.byKey(const Key('work-earn-global-profile')));
     await tester.pumpAndSettle();
@@ -211,6 +216,28 @@ void main() {
       find.byKey(const Key('work-opportunity-quick-delivery-biker')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('Earn assistance opens the shared Workspace profile chooser', (
+    tester,
+  ) async {
+    await mountWork(tester);
+    await tester.tap(
+      find.byKey(const Key('work-persistent-workspace-assistance')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    for (final family in const [
+      'products-trade',
+      'food-business',
+      'health',
+      'services',
+      'ride',
+      'create-work',
+    ]) {
+      expect(find.byKey(Key('work-family-$family')), findsOneWidget);
+    }
   });
 
   testWidgets('compact Profile opens from the inline header without overflow', (
@@ -351,7 +378,9 @@ void main() {
     final (_, work) = await mountWork(tester);
     await openSearch(tester, 'doctor');
     await tester.tap(
-      find.byKey(const Key('work-opportunity-doctor-onboarding-specialist')),
+      find.byKey(
+        const Key('work-opportunity-details-doctor-onboarding-specialist'),
+      ),
     );
     await tester.pumpAndSettle();
 
