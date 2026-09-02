@@ -4327,13 +4327,36 @@ void main() {
       expect(find.text('Quick 10m'), findsWidgets);
       final askStore = find.byKey(const ValueKey('buy-public-store-ask'));
       expect(askStore, findsOneWidget);
+      expect(tester.getSize(askStore), const Size(124, 44));
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('buy-public-store-ask-visible')))
+            .height,
+        34,
+      );
       await tester.tap(askStore);
       await tester.pumpAndSettle();
       expect(storeChatOpens, 1);
+      expect(storeSheet, findsNothing);
+      await tester.tap(storeAction);
+      await tester.pumpAndSettle();
       expect(storeSheet, findsOneWidget);
       final storeScroll = find
           .descendant(of: storeSheet, matching: find.byType(Scrollable))
           .first;
+      final emptyCartSku = find.byKey(const ValueKey('buy-product-s-chicken'));
+      await tester.scrollUntilVisible(
+        emptyCartSku,
+        160,
+        scrollable: storeScroll,
+      );
+      await tester.tap(emptyCartSku);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsOneWidget);
+      expect(find.text('Cart is empty'), findsOneWidget);
+      await tester.tap(find.text('Back to Safe Protein Store'));
+      await tester.pumpAndSettle();
+      expect(storeSheet, findsOneWidget);
       final addChicken = find.byKey(const ValueKey('buy-add-s-chicken'));
       await tester.scrollUntilVisible(addChicken, 180, scrollable: storeScroll);
       await tester.tap(addChicken);
@@ -4522,7 +4545,7 @@ void main() {
     expect(askCount, 1);
     expect(
       find.byKey(const ValueKey('buy-public-store-no-products')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(tester.takeException(), isNull);
   });
@@ -4582,6 +4605,65 @@ void main() {
     expect(find.textContaining('Address confirmed'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'Wholesale and Bulk provider storefront keeps Cart on SKU depth',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      session.openDestination(BuyV2Destination.wholesale);
+      expect(session.openProduct('w-rice'), isTrue);
+      await tester.pumpAndSettle();
+
+      final supplierAction = find.byKey(
+        const ValueKey('buy-wholesale-store-action-w-rice'),
+      );
+      final wholesaleProductScroll = scrollableWithin(
+        const PageStorageKey('buy-product-w-rice'),
+      );
+      await tester.scrollUntilVisible(
+        supplierAction,
+        220,
+        scrollable: wholesaleProductScroll,
+      );
+      await tester.drag(wholesaleProductScroll, const Offset(0, -140));
+      await tester.pumpAndSettle();
+      expect(tester.getCenter(supplierAction).dy, lessThan(700));
+      await tester.tap(supplierAction);
+      await tester.pumpAndSettle();
+
+      final supplierSheet = find.byKey(
+        const ValueKey('buy-wholesale-supplier-sheet-w-rice'),
+      );
+      expect(supplierSheet, findsOneWidget);
+      expect(find.text('MoolSocial Fulfilment Partner'), findsOneWidget);
+      expect(find.textContaining('Wholesaler'), findsWidgets);
+      expect(find.text('Open'), findsOneWidget);
+      expect(find.text('Bulk delivery'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-public-store-ask-visible')),
+          matching: find.text('Ask supplier'),
+        ),
+        findsOneWidget,
+      );
+
+      final supplierSku = find.byKey(const ValueKey('buy-product-w-rice'));
+      expect(supplierSku, findsOneWidget);
+      await tester.tap(supplierSku);
+      await tester.pumpAndSettle();
+      expect(supplierSheet, findsNothing);
+      expect(session.selectedProductId, 'w-rice');
+      expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsOneWidget);
+      expect(find.text('Cart is empty'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'Shop Quick Scheduled and Wholesale Bulk swipe selectors wire catalogues',

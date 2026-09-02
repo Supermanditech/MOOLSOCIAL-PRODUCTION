@@ -853,11 +853,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                           widget.wholesaleTradeDecisionAdapter,
                     ),
                   ),
-                  if (session.itemCount > 0)
-                    BuyV2StoreCartBar(
-                      session: session,
-                      onOpenCart: () => Navigator.of(routeContext).pop(true),
-                    ),
+                  BuyV2StoreCartBar(
+                    session: session,
+                    onOpenCart: () => Navigator.of(routeContext).pop(true),
+                  ),
                 ],
               ),
             ),

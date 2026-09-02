@@ -3403,13 +3403,15 @@ Future<void> showBuyV2PartnerCatalogue(
       ? const <BuyV2Product>[]
       : session.brandCatalogueFor(current);
   final products = brandOnly ? brandProducts : sellerProducts;
-  final publicStore =
-      !brandOnly && current.destination == BuyV2Destination.shop;
-  if (!supportedDestination || (products.isEmpty && !publicStore)) return;
+  final publicPartner =
+      !brandOnly &&
+      (current.destination == BuyV2Destination.shop ||
+          current.destination == BuyV2Destination.wholesale);
+  if (!supportedDestination || (products.isEmpty && !publicPartner)) return;
   final previewProducts = products.take(6).toList(growable: false);
   final storeFacts = session.productFactsFor(current);
   final storeTrust = session.marketplaceTrustFor(current);
-  final storeFulfilment = publicStore
+  final storeFulfilment = publicPartner
       ? _publicStoreFulfilmentLabels(
           session,
           products.isEmpty ? [current] : products,
@@ -3574,7 +3576,7 @@ Future<void> showBuyV2PartnerCatalogue(
                           ],
                         ),
                         const SizedBox(height: 12),
-                        if (publicStore) ...[
+                        if (publicPartner) ...[
                           _PublicStoreTruthPanel(
                             product: current,
                             facts: storeFacts,
@@ -3582,7 +3584,9 @@ Future<void> showBuyV2PartnerCatalogue(
                             fulfilmentLabels: storeFulfilment,
                             onAskStore: onAskStore == null
                                 ? null
-                                : () => onAskStore(current),
+                                : () => Navigator.of(
+                                    sheetContext,
+                                  ).pop('ask-store:'),
                           ),
                           const SizedBox(height: 12),
                         ],
@@ -3698,6 +3702,10 @@ Future<void> showBuyV2PartnerCatalogue(
         session.openCart();
         return;
       }
+      if (selectedProductId == 'ask-store:') {
+        onAskStore?.call(current);
+        return;
+      }
       const storePrefix = 'store:';
       if (selectedProductId.startsWith(storePrefix)) {
         await showBuyV2PartnerCatalogue(
@@ -3737,7 +3745,7 @@ List<String> _publicStoreFulfilmentLabels(
       case BuyV2FulfilmentMode.standardCourier:
         labels.add('Scheduled delivery');
       case BuyV2FulfilmentMode.bulkFreight:
-        break;
+        labels.add('Bulk delivery');
     }
     final service = facts.deliveryServiceLevel?.toLowerCase() ?? '';
     if (service.contains('pickup')) labels.add('Store pickup');
@@ -3753,6 +3761,19 @@ String _publicStoreLocality(String source) {
       .toList(growable: false);
   if (parts.length >= 2) return '${parts.last}, ${parts.first}';
   return source.trim();
+}
+
+String _publicProviderType(String source) {
+  final value = source.trim().toLowerCase();
+  if (value.contains('manufacturer')) return 'Manufacturer';
+  if (value.contains('distributor')) return 'Distributor';
+  if (value.contains('wholesaler')) return 'Wholesaler';
+  if (value.contains('special')) return 'Speciality Store';
+  if (value.contains('bulk')) return 'Bulk Seller';
+  if (value.contains('retailer')) return 'Retailer';
+  return source
+      .replaceFirst(RegExp(r'^Verified\s+', caseSensitive: false), '')
+      .trim();
 }
 
 class _PublicStoreTruthPanel extends StatelessWidget {
@@ -3776,6 +3797,15 @@ class _PublicStoreTruthPanel extends StatelessWidget {
         ? trust.partnerLocation!.trim()
         : product.origin.trim();
     final locality = _publicStoreLocality(sourceLocation);
+    final providerType = _publicProviderType(product.sellerType);
+    final fulfilmentIdentity = product.destination == BuyV2Destination.shop
+        ? 'MoolSocial Fulfilment Store'
+        : 'MoolSocial Fulfilment Partner';
+    final askLabel = product.destination == BuyV2Destination.shop
+        ? 'Ask store'
+        : providerType == 'Manufacturer'
+        ? 'Ask manufacturer'
+        : 'Ask supplier';
     final addressConfirmed =
         trust.state == BuyV2MarketplaceTrustState.ready && locality.isNotEmpty;
     final (
@@ -3805,7 +3835,7 @@ class _PublicStoreTruthPanel extends StatelessWidget {
       key: ValueKey('buy-public-store-truth-${product.id}'),
       container: true,
       label:
-          'MoolSocial Fulfilment Store. ${product.seller}. '
+          '$fulfilmentIdentity. ${product.seller}. $providerType. '
           '${addressConfirmed ? 'Address confirmed. ' : ''}'
           '$locality. $statusLabel. ${fulfilmentLabels.join(', ')}',
       child: Container(
@@ -3839,7 +3869,7 @@ class _PublicStoreTruthPanel extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'MoolSocial Fulfilment Store',
+                        fulfilmentIdentity,
                         key: const ValueKey('buy-public-store-badge'),
                         style: context.buyBody.copyWith(
                           color: BuyV2Colors.navy,
@@ -3849,8 +3879,8 @@ class _PublicStoreTruthPanel extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         addressConfirmed
-                            ? 'Address confirmed · $locality'
-                            : locality,
+                            ? '$providerType · Address confirmed · $locality'
+                            : '$providerType · $locality',
                         key: const ValueKey('buy-public-store-location'),
                         style: context.buyMeta,
                       ),
@@ -3917,13 +3947,51 @@ class _PublicStoreTruthPanel extends StatelessWidget {
             ],
             if (onAskStore != null) ...[
               const SizedBox(height: 10),
-              SizedBox(
-                height: BuyV2Metrics.minimumTap,
-                child: OutlinedButton.icon(
+              Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
                   key: const ValueKey('buy-public-store-ask'),
-                  onPressed: onAskStore,
-                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-                  label: const Text('Ask store'),
+                  width: 124,
+                  height: BuyV2Metrics.minimumTap,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onAskStore,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          key: const ValueKey('buy-public-store-ask-visible'),
+                          height: 34,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(color: const Color(0x33000080)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                color: BuyV2Colors.navy,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                askLabel,
+                                style: const TextStyle(
+                                  color: BuyV2Colors.navy,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -3980,8 +4048,9 @@ class BuyV2StoreCartBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final itemCount = session.itemCount;
     final itemLabel = itemCount == 1 ? 'item' : 'items';
-    final message =
-        session.cartAcknowledgement ?? '$itemCount $itemLabel in Cart';
+    final message = itemCount == 0
+        ? 'Cart is empty'
+        : session.cartAcknowledgement ?? '$itemCount $itemLabel in Cart';
     void activate() {
       HapticFeedback.selectionClick();
       onOpenCart();

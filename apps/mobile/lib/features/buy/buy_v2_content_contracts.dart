@@ -775,7 +775,9 @@ final class BuyV2CatalogueProductFactsAdapter
           : 'Available to add',
       sourceId: 'approved-buy-catalogue',
       fulfilmentMode: buyV2CatalogueFulfilmentModeFor(product),
-      storeOperatingState: product.destination == BuyV2Destination.shop
+      storeOperatingState:
+          product.destination == BuyV2Destination.shop ||
+              product.destination == BuyV2Destination.wholesale
           ? BuyV2StoreOperatingState.open
           : BuyV2StoreOperatingState.unknown,
     );
