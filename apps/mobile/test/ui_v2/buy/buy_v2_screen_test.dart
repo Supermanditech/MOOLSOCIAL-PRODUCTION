@@ -933,6 +933,31 @@ void main() {
         find.byKey(const ValueKey('buy-shop-sale-type-selector')),
         findsOneWidget,
       );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-shop-sale-type-quick')),
+          matching: find.byIcon(Icons.timer_rounded),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-shop-sale-type-courier')),
+          matching: find.byIcon(Icons.event_available_rounded),
+        ),
+        findsOneWidget,
+      );
+      for (final title in const ['Quick 10m', 'Scheduled']) {
+        final iconSurface = tester.widget<AnimatedContainer>(
+          find.byKey(ValueKey('buy-sale-type-icon-surface-$title')),
+        );
+        final iconDecoration = iconSurface.decoration! as BoxDecoration;
+        expect(iconDecoration.color, Colors.white);
+        expect(
+          (iconDecoration.border! as Border).top.color,
+          isNot(BuyV2Colors.orange),
+        );
+      }
       final track = tester.getRect(
         find.byKey(const ValueKey('buy-shop-sale-type-track')),
       );
@@ -945,12 +970,45 @@ void main() {
         find.byKey(const ValueKey('buy-shop-sale-type-thumb')),
       );
       expect(thumbMotion.duration, BuyV2Motion.contentChange);
-      expect(thumbMotion.curve, Curves.easeOutBack);
+      expect(thumbMotion.curve, Curves.easeOutQuart);
+      final thumbSurface = tester.widget<DecoratedBox>(
+        find.byKey(const ValueKey('buy-shop-sale-type-thumb-surface')),
+      );
+      final thumbDecoration = thumbSurface.decoration as BoxDecoration;
+      expect(
+        (thumbDecoration.border! as Border).top.color,
+        const Color(0xFF3030D4),
+      );
+      expect(
+        thumbDecoration.boxShadow!.every(
+          (shadow) => shadow.color != BuyV2Colors.orange,
+        ),
+        isTrue,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-shop-sale-type-active-indicator')),
+        findsOneWidget,
+      );
+      final indicatorMotion = tester.widget<TweenAnimationBuilder<double>>(
+        find.byKey(const ValueKey('buy-shop-sale-type-active-indicator-0')),
+      );
+      expect(indicatorMotion.duration, BuyV2Motion.contentChange);
+      final segmentTransition = tester.widget<AnimatedSwitcher>(
+        find.byKey(
+          const ValueKey('buy-sale-type-segment-transition-Quick 10m'),
+        ),
+      );
+      expect(segmentTransition.duration, BuyV2Motion.stateChange);
       final quickTypography = tester.widget<AnimatedDefaultTextStyle>(
         find.byKey(const ValueKey('buy-shop-sale-type-quick-label-style')),
       );
       expect(quickTypography.style.fontSize, 11.25);
       expect(quickTypography.duration, BuyV2Motion.selection);
+      final catalogueMotion = tester.widget<TweenAnimationBuilder<double>>(
+        find.byKey(const ValueKey('buy-catalogue-motion-tween-shop')),
+      );
+      expect(catalogueMotion.duration, BuyV2Motion.contentChange);
+      expect(catalogueMotion.curve, Curves.easeOutQuart);
 
       await tester.tap(
         find.byKey(const ValueKey('buy-shop-sale-type-courier')),
@@ -960,6 +1018,32 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('buy-shop-sale-type-quick')));
       await tester.pumpAndSettle();
       expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
+
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
+      await tester.pumpAndSettle();
+      final wholesaleSelector = find.byKey(
+        const ValueKey('buy-wholesale-sale-type-selector'),
+      );
+      expect(
+        find.descendant(
+          of: wholesaleSelector,
+          matching: find.byIcon(Icons.storefront_rounded),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: wholesaleSelector,
+          matching: find.byIcon(Icons.view_module_rounded),
+        ),
+        findsOneWidget,
+      );
+      for (final title in const ['Wholesale', 'Bulk']) {
+        final iconSurface = tester.widget<AnimatedContainer>(
+          find.byKey(ValueKey('buy-sale-type-icon-surface-$title')),
+        );
+        expect((iconSurface.decoration! as BoxDecoration).color, Colors.white);
+      }
     },
   );
 
@@ -1037,6 +1121,15 @@ void main() {
     final quickTypography = tester.widget<AnimatedDefaultTextStyle>(
       find.byKey(const ValueKey('buy-shop-sale-type-quick-label-style')),
     );
+    final indicatorMotion = tester.widget<TweenAnimationBuilder<double>>(
+      find.byKey(const ValueKey('buy-shop-sale-type-active-indicator-0')),
+    );
+    final segmentTransition = tester.widget<AnimatedSwitcher>(
+      find.byKey(const ValueKey('buy-sale-type-segment-transition-Quick 10m')),
+    );
+    final catalogueMotion = tester.widget<TweenAnimationBuilder<double>>(
+      find.byKey(const ValueKey('buy-catalogue-motion-tween-shop')),
+    );
     final category = find.byKey(const ValueKey('buy-category-picker'));
     final categoryPress = find.descendant(
       of: category,
@@ -1049,6 +1142,10 @@ void main() {
 
     expect(thumbMotion.duration, Duration.zero);
     expect(quickTypography.duration, Duration.zero);
+    expect(indicatorMotion.duration, Duration.zero);
+    expect(segmentTransition.duration, Duration.zero);
+    expect(segmentTransition.reverseDuration, Duration.zero);
+    expect(catalogueMotion.duration, Duration.zero);
     expect(categoryPress, findsOneWidget);
     expect(categoryLift, findsOneWidget);
     expect(tester.widget<AnimatedScale>(categoryPress).duration, Duration.zero);

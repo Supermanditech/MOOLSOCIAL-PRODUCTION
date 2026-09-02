@@ -678,20 +678,20 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
     final shop = session.destination == BuyV2Destination.shop;
     final options = shop
         ? const [
-            (id: 'quick', title: 'Quick 10m', icon: Icons.bolt_rounded),
+            (id: 'quick', title: 'Quick 10m', icon: Icons.timer_rounded),
             (
               id: 'courier',
               title: 'Scheduled',
-              icon: Icons.calendar_today_outlined,
+              icon: Icons.event_available_rounded,
             ),
           ]
         : const [
             (
               id: 'wholesale',
               title: 'Wholesale',
-              icon: Icons.inventory_2_outlined,
+              icon: Icons.storefront_rounded,
             ),
-            (id: 'bulk', title: 'Bulk', icon: Icons.warehouse_outlined),
+            (id: 'bulk', title: 'Bulk', icon: Icons.view_module_rounded),
           ];
     final selectedIndex = shop
         ? session.shopSaleType == BuyV2ShopSaleType.quickDelivery
@@ -758,15 +758,15 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFF8F7FF), Color(0xFFFFF8F0)],
+                          colors: [Color(0xFFF9FAFF), Color(0xFFEFF1FF)],
                         ),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: BuyV2Colors.line),
+                        border: Border.all(color: const Color(0xFFCFD3F8)),
                         boxShadow: const [
                           BoxShadow(
-                            color: Color(0x0F000080),
-                            blurRadius: 5,
-                            offset: Offset(0, 1),
+                            color: Color(0x16000080),
+                            blurRadius: 7,
+                            offset: Offset(0, 2),
                           ),
                         ],
                       ),
@@ -780,12 +780,16 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                       context,
                       BuyV2Motion.contentChange,
                     ),
-                    curve: Curves.easeOutBack,
+                    curve: Curves.easeOutQuart,
                     left: selectedIndex == 0 ? 0 : segmentWidth,
                     top: 0,
                     bottom: 0,
                     width: segmentWidth,
                     child: DecoratedBox(
+                      key: ValueKey(
+                        'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
+                        'thumb-surface',
+                      ),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           begin: Alignment.topLeft,
@@ -794,21 +798,69 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                         ),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: BuyV2Colors.orange,
-                          width: 1.1,
+                          color: const Color(0xFF3030D4),
+                          width: 1.2,
                         ),
                         boxShadow: const [
                           BoxShadow(
-                            color: Color(0x36000080),
-                            blurRadius: 13,
-                            offset: Offset(0, 5),
+                            color: Color(0x44000080),
+                            blurRadius: 14,
+                            offset: Offset(0, 6),
                           ),
                           BoxShadow(
-                            color: Color(0x28FF9933),
-                            blurRadius: 8,
-                            spreadRadius: 1,
+                            color: Color(0x302F4BFF),
+                            blurRadius: 10,
+                            spreadRadius: .5,
                           ),
                         ],
+                      ),
+                      child: TweenAnimationBuilder<double>(
+                        key: ValueKey(
+                          'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
+                          'active-indicator-$selectedIndex',
+                        ),
+                        duration: BuyV2Motion.resolved(
+                          context,
+                          BuyV2Motion.contentChange,
+                        ),
+                        curve: Curves.easeOutCubic,
+                        tween: Tween<double>(begin: 0, end: 1),
+                        builder: (context, value, child) => Align(
+                          alignment: Alignment.topCenter,
+                          child: Opacity(
+                            opacity: value,
+                            child: Transform.scale(
+                              alignment: Alignment.topCenter,
+                              scaleX: .7 + (.3 * value),
+                              child: child,
+                            ),
+                          ),
+                        ),
+                        child: Container(
+                          key: ValueKey(
+                            'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
+                            'active-indicator',
+                          ),
+                          width: 48,
+                          height: 2,
+                          margin: const EdgeInsets.only(top: 2),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0x005C73FF),
+                                Color(0xFF7287FF),
+                                Color(0x005C73FF),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(99),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x805C73FF),
+                                blurRadius: 5,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -876,64 +928,106 @@ class _CatalogueSaleSegment extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (showIcon) ...[
-                  AnimatedScale(
-                    duration: BuyV2Motion.resolved(
-                      context,
-                      BuyV2Motion.selection,
-                    ),
-                    curve: Curves.easeOutBack,
-                    scale: selected ? 1.08 : .94,
-                    child: AnimatedContainer(
+            child: AnimatedSwitcher(
+              key: ValueKey('buy-sale-type-segment-transition-$title'),
+              duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
+              reverseDuration: BuyV2Motion.resolved(
+                context,
+                BuyV2Motion.selection,
+              ),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                final eased = CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                );
+                return FadeTransition(
+                  opacity: eased,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, .12),
+                      end: Offset.zero,
+                    ).animate(eased),
+                    child: child,
+                  ),
+                );
+              },
+              child: Row(
+                key: ValueKey('$title-$selected'),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (showIcon) ...[
+                    AnimatedScale(
                       duration: BuyV2Motion.resolved(
                         context,
                         BuyV2Motion.selection,
                       ),
-                      width: 23,
-                      height: 23,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? BuyV2Colors.orange.withValues(alpha: .18)
-                            : BuyV2Colors.softBlue.withValues(alpha: .65),
-                        shape: BoxShape.circle,
+                      curve: Curves.easeOutBack,
+                      scale: selected ? 1.08 : .94,
+                      child: AnimatedContainer(
+                        key: ValueKey('buy-sale-type-icon-surface-$title'),
+                        duration: BuyV2Motion.resolved(
+                          context,
+                          BuyV2Motion.selection,
+                        ),
+                        width: 23,
+                        height: 23,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: selected
+                                ? const Color(0xFFBBC3FF)
+                                : const Color(0xFFD8DCFA),
+                          ),
+                          boxShadow: selected
+                              ? const [
+                                  BoxShadow(
+                                    color: Color(0x30000080),
+                                    blurRadius: 5,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ]
+                              : const [],
+                        ),
+                        child: Icon(
+                          icon,
+                          size: 16.5,
+                          color: selected
+                              ? const Color(0xFF1818B8)
+                              : BuyV2Colors.navy,
+                        ),
                       ),
-                      child: Icon(
-                        icon,
-                        size: 16.5,
-                        color: selected ? BuyV2Colors.orange : BuyV2Colors.navy,
+                    ),
+                    const SizedBox(width: 5),
+                  ],
+                  Flexible(
+                    child: AnimatedDefaultTextStyle(
+                      key: labelStyleKey,
+                      duration: BuyV2Motion.resolved(
+                        context,
+                        BuyV2Motion.selection,
+                      ),
+                      curve: Curves.easeOutCubic,
+                      style: TextStyle(
+                        color: selected ? Colors.white : BuyV2Colors.navy,
+                        fontSize: 11.25,
+                        fontWeight: FontWeight.w900,
+                        height: 1,
+                        letterSpacing: selected ? .15 : .05,
+                      ),
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.fade,
+                        softWrap: false,
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 5),
                 ],
-                Flexible(
-                  child: AnimatedDefaultTextStyle(
-                    key: labelStyleKey,
-                    duration: BuyV2Motion.resolved(
-                      context,
-                      BuyV2Motion.selection,
-                    ),
-                    curve: Curves.easeOutCubic,
-                    style: TextStyle(
-                      color: selected ? Colors.white : BuyV2Colors.navy,
-                      fontSize: 11.25,
-                      fontWeight: FontWeight.w900,
-                      height: 1,
-                      letterSpacing: selected ? .15 : .05,
-                    ),
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.fade,
-                      softWrap: false,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -1050,7 +1144,7 @@ class _CatalogueMotionOwner extends StatelessWidget {
     return TweenAnimationBuilder<double>(
       key: ValueKey('buy-catalogue-motion-tween-${destination.name}'),
       duration: duration,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeOutQuart,
       tween: Tween<double>(begin: duration == Duration.zero ? 1 : 0, end: 1),
       builder: (context, value, child) {
         final offset = Offset(
