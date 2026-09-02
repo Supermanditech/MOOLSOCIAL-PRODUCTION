@@ -373,4 +373,132 @@ void main() {
     expect(find.byKey(const Key('work-dashboard-earn')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('retail dashboard exposes the four connected control surfaces', (
+    tester,
+  ) async {
+    final work = WorkSession()..seedVerifiedWorkspace();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    expect(find.byKey(const Key('work-dashboard-hero')), findsOneWidget);
+    for (final keyName in const [
+      'work-dashboard-search',
+      'work-dashboard-alerts',
+      'work-dashboard-profile',
+      'work-dashboard-availability',
+      'work-dashboard-orders',
+      'work-dashboard-create-order',
+      'work-dashboard-products',
+      'work-dashboard-delivery',
+    ]) {
+      await reveal(tester, find.byKey(Key(keyName)));
+      expect(find.byKey(Key(keyName)), findsOneWidget);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('retail dashboard Profile opens globally and returns in place', (
+    tester,
+  ) async {
+    final work = WorkSession()..seedVerifiedWorkspace();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('store search keeps text stable with keyboard and native Back', (
+    tester,
+  ) async {
+    final work = WorkSession()..seedVerifiedWorkspace();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    await tester.tap(find.byKey(const Key('work-dashboard-search')));
+    await tester.pumpAndSettle();
+    final field = find.byKey(const Key('work-dashboard-search-field'));
+    expect(field, findsOneWidget);
+    await tester.enterText(field, 'stock');
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.pumpAndSettle();
+
+    expect(work.workspaceSearchQuery, 'stock');
+    expect(find.byKey(const Key('work-search-products')), findsOneWidget);
+    expect(find.byKey(const Key('work-search-orders')), findsNothing);
+    expect(
+      tester.getBottomRight(field).dy,
+      lessThanOrEqualTo(
+        tester.getTopRight(find.byKey(const Key('work-local-navigation'))).dy,
+      ),
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+    expect(work.workspaceSearchQuery, 'stock');
+  });
+
+  testWidgets(
+    'availability saves customer-facing state and Back discards draft',
+    (tester) async {
+      final work = WorkSession()..seedVerifiedWorkspace();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+      await tester.tap(find.byKey(const Key('work-dashboard-availability')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-dashboard-status-screen')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('work-status-accepting-orders')));
+      await tester.pumpAndSettle();
+      await reveal(tester, find.text('Tomorrow at 8:00 AM'));
+      expect(find.text('Tomorrow at 8:00 AM'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-status-save')));
+      await tester.pumpAndSettle();
+
+      expect(work.workspaceAcceptingOrders, isFalse);
+      expect(work.workspaceReopensAt, 'Tomorrow at 8:00 AM');
+      expect(find.text('Store paused'), findsWidgets);
+
+      await tester.tap(find.byKey(const Key('work-dashboard-availability')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-status-accepting-orders')));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(work.workspaceAcceptingOrders, isFalse);
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('attention queue is truthful and returns to dashboard', (
+    tester,
+  ) async {
+    final work = WorkSession()..seedVerifiedWorkspace();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    await tester.tap(find.byKey(const Key('work-dashboard-alerts')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-dashboard-alerts-screen')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('work-alert-store-setup')), findsOneWidget);
+    expect(find.byKey(const Key('work-alert-contact-details')), findsOneWidget);
+    expect(find.text('No urgent store action'), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

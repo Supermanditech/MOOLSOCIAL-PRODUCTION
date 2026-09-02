@@ -83,6 +83,12 @@ class WorkSession extends ChangeNotifier {
   bool retailerStoreCollection = false;
   bool retailerSetupSaved = false;
   bool initialWorkspaceStateLoaded = false;
+  String workspaceSearchQuery = '';
+  bool workspaceAcceptingOrders = true;
+  String workspaceFulfilmentMode = 'Delivery and pickup';
+  int workspaceBusyMinutes = 0;
+  String workspaceReopensAt = '';
+  final Set<String> dismissedWorkspaceAlerts = <String>{};
 
   List<WorkOpportunity> get filteredOpportunities {
     final normalized = searchQuery.trim().toLowerCase();
@@ -254,6 +260,33 @@ class WorkSession extends ChangeNotifier {
   void search(String value) {
     searchQuery = value;
     clearMessages();
+    notifyListeners();
+  }
+
+  void updateWorkspaceSearch(String value) {
+    workspaceSearchQuery = value;
+    notifyListeners();
+  }
+
+  void saveWorkspaceAvailability({
+    required bool acceptingOrders,
+    required String fulfilmentMode,
+    required int busyMinutes,
+    required String reopensAt,
+  }) {
+    workspaceAcceptingOrders = acceptingOrders;
+    workspaceFulfilmentMode = fulfilmentMode;
+    workspaceBusyMinutes = busyMinutes;
+    workspaceReopensAt = acceptingOrders ? '' : reopensAt;
+    showNotice(
+      acceptingOrders
+          ? 'Store availability updated for customers.'
+          : 'Store paused. Customers can see when ordering resumes.',
+    );
+  }
+
+  void dismissWorkspaceAlert(String alertId) {
+    dismissedWorkspaceAlerts.add(alertId);
     notifyListeners();
   }
 
