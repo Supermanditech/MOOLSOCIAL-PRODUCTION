@@ -778,6 +778,32 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     }
   }
 
+  void _openStoreQuestion(BuyV2Product product) {
+    HapticFeedback.selectionClick();
+    FocusScope.of(context).unfocus();
+    final router = GoRouter.maybeOf(context);
+    if (router == null) {
+      final onOpenChat = widget.onOpenChat;
+      if (onOpenChat != null) {
+        onOpenChat();
+      } else {
+        widget.session.showNotice(
+          'Store Chat is unavailable right now. Your products are unchanged.',
+        );
+      }
+      return;
+    }
+    try {
+      context.push(
+        const BuyV2ChatRouteAdapter().storeQuestionLocationFor(anchor: product),
+      );
+    } on ArgumentError {
+      widget.session.showNotice(
+        'Store Chat is unavailable right now. Your products are unchanged.',
+      );
+    }
+  }
+
   void _openPartnerCatalogue(BuyV2Product product, {bool brandOnly = false}) {
     HapticFeedback.selectionClick();
     FocusScope.of(context).unfocus();
@@ -790,6 +816,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         widget.session,
         product,
         brandOnly: brandOnly,
+        onAskStore: _openStoreQuestion,
         onOpenProduct: _openStoreProduct,
       ),
     );

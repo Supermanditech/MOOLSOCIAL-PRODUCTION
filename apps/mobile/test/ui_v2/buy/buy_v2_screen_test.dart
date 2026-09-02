@@ -9,6 +9,7 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_chat_route_adapter.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_scanner.dart';
@@ -63,6 +64,25 @@ final class _FixedDeliveryPromiseFactsAdapter
           orderabilityLabel: 'Available to add',
           sourceId: 'b01-t02-server-assignment',
           stale: false,
+        );
+  }
+}
+
+final class _StoreStatusFactsAdapter implements BuyV2ProductFactsAdapter {
+  const _StoreStatusFactsAdapter({required this.state, this.nextOpeningLabel});
+
+  final BuyV2StoreOperatingState state;
+  final String? nextOpeningLabel;
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          storeOperatingState: product.destination == BuyV2Destination.shop
+              ? state
+              : BuyV2StoreOperatingState.unknown,
+          nextOpeningLabel: nextOpeningLabel,
         );
   }
 }
@@ -1880,9 +1900,13 @@ void main() {
         240,
         scrollable: productScrollable,
       );
-      await tester.tap(
-        find.byKey(ValueKey('buy-review-product-${product.id}')),
+      await tester.drag(productScrollable, const Offset(0, -140));
+      await tester.pumpAndSettle();
+      final reviewProduct = find.byKey(
+        ValueKey('buy-review-product-${product.id}'),
       );
+      expect(tester.getCenter(reviewProduct).dy, lessThan(480));
+      await tester.tap(reviewProduct);
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('buy-review-rating-${product.id}-4')),
@@ -4273,7 +4297,10 @@ void main() {
       addTearDown(tester.view.reset);
       final session = BuyV2Session(core: BuySession());
       addTearDown(session.dispose);
-      await tester.pumpWidget(app(session));
+      var storeChatOpens = 0;
+      await tester.pumpWidget(
+        app(session, onOpenChat: () => storeChatOpens += 1),
+      );
       await tester.pumpAndSettle();
       expect(session.openProduct('s-eggs'), isTrue);
       await tester.pumpAndSettle();
@@ -4293,6 +4320,16 @@ void main() {
       final storeSheet = find.byKey(
         const ValueKey('buy-shop-seller-sheet-s-eggs'),
       );
+      expect(storeSheet, findsOneWidget);
+      expect(find.text('MoolSocial Fulfilment Store'), findsOneWidget);
+      expect(find.textContaining('Address confirmed'), findsOneWidget);
+      expect(find.text('Open'), findsOneWidget);
+      expect(find.text('Quick 10m'), findsWidgets);
+      final askStore = find.byKey(const ValueKey('buy-public-store-ask'));
+      expect(askStore, findsOneWidget);
+      await tester.tap(askStore);
+      await tester.pumpAndSettle();
+      expect(storeChatOpens, 1);
       expect(storeSheet, findsOneWidget);
       final storeScroll = find
           .descendant(of: storeSheet, matching: find.byType(Scrollable))
@@ -4353,6 +4390,198 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  test(
+    'store Chat keeps supplier context, Admin visibility and Buy return',
+    () {
+      final storeProduct = BuyV2Catalogue.products.firstWhere(
+        (product) => product.id == 's-eggs',
+      );
+      final location = const BuyV2ChatRouteAdapter().storeQuestionLocationFor(
+        anchor: storeProduct,
+      );
+      final uri = Uri.parse(location);
+
+      expect(uri.path, contains('/app/chat/thread/'));
+      expect(uri.queryParameters['context'], 'supplier-store');
+      expect(uri.queryParameters['supplier'], 'Safe Protein Store');
+      expect(uri.queryParameters['storeAnchorSku'], 's-eggs');
+      expect(uri.queryParameters['adminVisible'], 'true');
+      expect(uri.queryParameters['escalationReason'], 'supplier-non-response');
+      expect(uri.queryParameters['callAuthority'], 'moolsocial-admin-only');
+      final returnUri = Uri.parse(uri.queryParameters['return']!);
+      expect(returnUri.path, '/app/buy');
+      expect(returnUri.queryParameters['sub'], 'shop');
+    },
+  );
+
+  testWidgets('closed store preserves truth and blocks unavailable Add', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(
+      core: BuySession(),
+      productFactsAdapter: const _StoreStatusFactsAdapter(
+        state: BuyV2StoreOperatingState.closed,
+        nextOpeningLabel: 'tomorrow at 8:00 am',
+      ),
+    );
+    addTearDown(session.dispose);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    expect(session.openProduct('s-eggs'), isTrue);
+    await tester.pumpAndSettle();
+    final storeAction = find.byKey(
+      const ValueKey('buy-shop-seller-action-s-eggs'),
+    );
+    final productScroll = scrollableWithin(
+      const PageStorageKey('buy-product-s-eggs'),
+    );
+    await tester.scrollUntilVisible(
+      storeAction,
+      220,
+      scrollable: productScroll,
+    );
+    await tester.drag(productScroll, const Offset(0, -140));
+    await tester.pumpAndSettle();
+    expect(tester.getCenter(storeAction).dy, lessThan(740));
+    await tester.tap(storeAction);
+    await tester.pumpAndSettle();
+
+    expect(find.text('MoolSocial Fulfilment Store'), findsOneWidget);
+    expect(find.text('Closed · Opens tomorrow at 8:00 am'), findsOneWidget);
+    final storeSheet = find.byKey(
+      const ValueKey('buy-shop-seller-sheet-s-eggs'),
+    );
+    final storeScroll = find
+        .descendant(of: storeSheet, matching: find.byType(Scrollable))
+        .first;
+    final reviewChicken = find.byKey(
+      const ValueKey('buy-review-offer-s-chicken'),
+    );
+    await tester.scrollUntilVisible(
+      reviewChicken,
+      160,
+      scrollable: storeScroll,
+    );
+    expect(reviewChicken, findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-add-s-chicken')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('no-products store preserves identity, status and Ask store', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession(), reviewDataEnabled: false);
+    addTearDown(session.dispose);
+    final storeProduct = BuyV2Catalogue.products.firstWhere(
+      (product) => product.id == 's-eggs',
+    );
+    var askCount = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              key: const ValueKey('open-empty-public-store'),
+              onPressed: () => unawaited(
+                showBuyV2PartnerCatalogue(
+                  context,
+                  session,
+                  storeProduct,
+                  onAskStore: (_) => askCount += 1,
+                ),
+              ),
+              child: const Text('Open store'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('open-empty-public-store')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Safe Protein Store'), findsWidgets);
+    expect(find.text('MoolSocial Fulfilment Store'), findsOneWidget);
+    expect(find.text('Open'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-public-store-no-products')),
+      findsOneWidget,
+    );
+    expect(find.text('No products available right now.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-add-s-eggs')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('buy-public-store-ask')));
+    await tester.pumpAndSettle();
+    expect(askCount, 1);
+    expect(
+      find.byKey(const ValueKey('buy-public-store-no-products')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('public store truth fits 320px at 140 percent text', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 700);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final storeProduct = BuyV2Catalogue.products.firstWhere(
+      (product) => product.id == 's-eggs',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        builder: (context, child) {
+          final media = MediaQuery.of(context);
+          return MediaQuery(
+            data: media.copyWith(textScaler: const TextScaler.linear(1.4)),
+            child: child!,
+          );
+        },
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              key: const ValueKey('open-compact-public-store'),
+              onPressed: () => unawaited(
+                showBuyV2PartnerCatalogue(
+                  context,
+                  session,
+                  storeProduct,
+                  onAskStore: (_) {},
+                ),
+              ),
+              child: const Text('Open store'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('open-compact-public-store')));
+    await tester.pumpAndSettle();
+
+    final truth = find.byKey(const ValueKey('buy-public-store-truth-s-eggs'));
+    expect(truth, findsOneWidget);
+    final sheet = find.byKey(const ValueKey('buy-shop-seller-sheet-s-eggs'));
+    final sheetScroll = find
+        .descendant(of: sheet, matching: find.byType(Scrollable))
+        .first;
+    final ask = find.byKey(const ValueKey('buy-public-store-ask'));
+    await tester.scrollUntilVisible(ask, 160, scrollable: sheetScroll);
+    expect(tester.getSize(ask).height, greaterThanOrEqualTo(44));
+    expect(find.text('MoolSocial Fulfilment Store'), findsOneWidget);
+    expect(find.textContaining('Address confirmed'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'Shop Quick Scheduled and Wholesale Bulk swipe selectors wire catalogues',

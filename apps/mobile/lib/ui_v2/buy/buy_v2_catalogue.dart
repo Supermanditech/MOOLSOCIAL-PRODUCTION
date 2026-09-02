@@ -3389,6 +3389,7 @@ Future<void> showBuyV2PartnerCatalogue(
   BuyV2Session session,
   BuyV2Product current, {
   bool brandOnly = false,
+  ValueChanged<BuyV2Product>? onAskStore,
   Future<bool> Function(BuyV2Product product)? onOpenProduct,
 }) async {
   final supportedDestination =
@@ -3402,7 +3403,18 @@ Future<void> showBuyV2PartnerCatalogue(
       ? const <BuyV2Product>[]
       : session.brandCatalogueFor(current);
   final products = brandOnly ? brandProducts : sellerProducts;
+  final publicStore =
+      !brandOnly && current.destination == BuyV2Destination.shop;
+  if (!supportedDestination || (products.isEmpty && !publicStore)) return;
   final previewProducts = products.take(6).toList(growable: false);
+  final storeFacts = session.productFactsFor(current);
+  final storeTrust = session.marketplaceTrustFor(current);
+  final storeFulfilment = publicStore
+      ? _publicStoreFulfilmentLabels(
+          session,
+          products.isEmpty ? [current] : products,
+        )
+      : const <String>[];
   final otherStores = brandOnly
       ? const <BuyV2Product>[]
       : BuyV2Catalogue.products
@@ -3420,8 +3432,6 @@ Future<void> showBuyV2PartnerCatalogue(
             })
             .take(4)
             .toList(growable: false);
-  if (!supportedDestination || products.isEmpty) return;
-
   final ownerPrefix = brandOnly
       ? 'buy-${current.destination.name}-brand'
       : switch (current.destination) {
@@ -3440,14 +3450,14 @@ Future<void> showBuyV2PartnerCatalogue(
             'Compare available packs, minimum orders, prices and delivery',
           BuyV2Destination.medicine =>
             'Review available packs and prices · Not medical advice',
-          _ => 'Browse this store’s available products and delivery times',
+          _ => 'Browse available products and delivery times',
         };
   final closeTooltip = brandOnly
       ? 'Close brand products'
       : switch (current.destination) {
           BuyV2Destination.wholesale => 'Close supplier products',
           BuyV2Destination.medicine => 'Close pharmacy products',
-          _ => 'Close seller products',
+          _ => 'Close store',
         };
   final motion = BuyV2SupplierSheetMotion.resolve(context);
   Future<void> openStoreProduct(
@@ -3564,19 +3574,34 @@ Future<void> showBuyV2PartnerCatalogue(
                           ],
                         ),
                         const SizedBox(height: 12),
-                        BuyV2ProgressiveProductGrid(
-                          session: session,
-                          products: previewProducts,
-                          storageKey:
-                              '$ownerPrefix-catalogue-${brandOnly ? current.brand : current.seller}',
-                          semanticLabel:
-                              '${brandOnly ? current.brand : current.seller} product catalogue',
-                          laneCount: previewProducts.length >= 6 ? 2 : 1,
-                          storeContext: !brandOnly,
-                          onOpenProduct: (product) => unawaited(
-                            openStoreProduct(sheetContext, product),
+                        if (publicStore) ...[
+                          _PublicStoreTruthPanel(
+                            product: current,
+                            facts: storeFacts,
+                            trust: storeTrust,
+                            fulfilmentLabels: storeFulfilment,
+                            onAskStore: onAskStore == null
+                                ? null
+                                : () => onAskStore(current),
                           ),
-                        ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (previewProducts.isEmpty)
+                          const _PublicStoreNoProductsState()
+                        else
+                          BuyV2ProgressiveProductGrid(
+                            session: session,
+                            products: previewProducts,
+                            storageKey:
+                                '$ownerPrefix-catalogue-${brandOnly ? current.brand : current.seller}',
+                            semanticLabel:
+                                '${brandOnly ? current.brand : current.seller} product catalogue',
+                            laneCount: previewProducts.length >= 6 ? 2 : 1,
+                            storeContext: !brandOnly,
+                            onOpenProduct: (product) => unawaited(
+                              openStoreProduct(sheetContext, product),
+                            ),
+                          ),
                         if (!brandOnly && products.length > 1) ...[
                           const SizedBox(height: 4),
                           SizedBox(
@@ -3679,6 +3704,7 @@ Future<void> showBuyV2PartnerCatalogue(
           context,
           session,
           session.product(selectedProductId.substring(storePrefix.length)),
+          onAskStore: onAskStore,
           onOpenProduct: onOpenProduct,
         );
       } else {
@@ -3693,6 +3719,250 @@ Future<void> showBuyV2PartnerCatalogue(
     }
   } finally {
     transitionController.dispose();
+  }
+}
+
+List<String> _publicStoreFulfilmentLabels(
+  BuyV2Session session,
+  List<BuyV2Product> products,
+) {
+  final labels = <String>{};
+  for (final product in products) {
+    final facts = session.productFactsFor(product);
+    final mode =
+        facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
+    switch (mode) {
+      case BuyV2FulfilmentMode.quickLocal:
+        labels.add('Quick 10m');
+      case BuyV2FulfilmentMode.standardCourier:
+        labels.add('Scheduled delivery');
+      case BuyV2FulfilmentMode.bulkFreight:
+        break;
+    }
+    final service = facts.deliveryServiceLevel?.toLowerCase() ?? '';
+    if (service.contains('pickup')) labels.add('Store pickup');
+  }
+  return List.unmodifiable(labels);
+}
+
+String _publicStoreLocality(String source) {
+  final parts = source
+      .split(RegExp(r'\s*(?:→|·)\s*'))
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList(growable: false);
+  if (parts.length >= 2) return '${parts.last}, ${parts.first}';
+  return source.trim();
+}
+
+class _PublicStoreTruthPanel extends StatelessWidget {
+  const _PublicStoreTruthPanel({
+    required this.product,
+    required this.facts,
+    required this.trust,
+    required this.fulfilmentLabels,
+    required this.onAskStore,
+  });
+
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2MarketplaceTrustSnapshot trust;
+  final List<String> fulfilmentLabels;
+  final VoidCallback? onAskStore;
+
+  @override
+  Widget build(BuildContext context) {
+    final sourceLocation = trust.partnerLocation?.trim().isNotEmpty == true
+        ? trust.partnerLocation!.trim()
+        : product.origin.trim();
+    final locality = _publicStoreLocality(sourceLocation);
+    final addressConfirmed =
+        trust.state == BuyV2MarketplaceTrustState.ready && locality.isNotEmpty;
+    final (
+      statusLabel,
+      statusColor,
+      statusSurface,
+    ) = switch (facts.storeOperatingState) {
+      BuyV2StoreOperatingState.open => (
+        'Open',
+        BuyV2Colors.green,
+        BuyV2Colors.softGreen,
+      ),
+      BuyV2StoreOperatingState.closed => (
+        facts.nextOpeningLabel?.trim().isNotEmpty == true
+            ? 'Closed · Opens ${facts.nextOpeningLabel!.trim()}'
+            : 'Closed',
+        const Color(0xFFB64025),
+        BuyV2Colors.softOrange,
+      ),
+      BuyV2StoreOperatingState.unknown => (
+        'Store hours unavailable right now',
+        BuyV2Colors.muted,
+        BuyV2Colors.softBlue,
+      ),
+    };
+    return Semantics(
+      key: ValueKey('buy-public-store-truth-${product.id}'),
+      container: true,
+      label:
+          'MoolSocial Fulfilment Store. ${product.seller}. '
+          '${addressConfirmed ? 'Address confirmed. ' : ''}'
+          '$locality. $statusLabel. ${fulfilmentLabels.join(', ')}',
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softBlue.withValues(alpha: .38),
+          radius: 16,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0x33000080)),
+                  ),
+                  child: const Icon(
+                    Icons.local_shipping_outlined,
+                    color: BuyV2Colors.navy,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'MoolSocial Fulfilment Store',
+                        key: const ValueKey('buy-public-store-badge'),
+                        style: context.buyBody.copyWith(
+                          color: BuyV2Colors.navy,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        addressConfirmed
+                            ? 'Address confirmed · $locality'
+                            : locality,
+                        key: const ValueKey('buy-public-store-location'),
+                        style: context.buyMeta,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              key: const ValueKey('buy-public-store-status'),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+              decoration: BoxDecoration(
+                color: statusSurface,
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.schedule_rounded, color: statusColor, size: 17),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      statusLabel,
+                      style: context.buyBody.copyWith(
+                        color: statusColor,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (fulfilmentLabels.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final label in fulfilmentLabels)
+                    Container(
+                      key: ValueKey(
+                        'buy-public-store-fulfilment-'
+                        '${label.toLowerCase().replaceAll(' ', '-')}',
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0x33000080)),
+                      ),
+                      child: Text(
+                        label,
+                        style: context.buyMeta.copyWith(
+                          color: BuyV2Colors.navy,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+            if (onAskStore != null) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: BuyV2Metrics.minimumTap,
+                child: OutlinedButton.icon(
+                  key: const ValueKey('buy-public-store-ask'),
+                  onPressed: onAskStore,
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                  label: const Text('Ask store'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PublicStoreNoProductsState extends StatelessWidget {
+  const _PublicStoreNoProductsState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: const ValueKey('buy-public-store-no-products'),
+      container: true,
+      label: 'No products available right now.',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        decoration: buyV2CardDecoration(color: Colors.white, radius: 16),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.inventory_2_outlined,
+              color: BuyV2Colors.navy,
+              size: 28,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No products available right now.',
+              textAlign: TextAlign.center,
+              style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

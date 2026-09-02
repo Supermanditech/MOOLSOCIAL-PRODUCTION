@@ -116,6 +116,34 @@ class BuyV2ChatRouteAdapter {
     ).toString();
   }
 
+  String storeQuestionLocationFor({required BuyV2Product anchor}) {
+    final returnRoute = Uri(
+      path: '/app/buy',
+      queryParameters: {'sub': anchor.destination.name},
+    ).toString();
+    return Uri(
+      path: _supplierThreadPathFor(
+        destination: anchor.destination,
+        supplier: anchor.seller,
+      ),
+      queryParameters: {
+        'draft': 'I have a question for ${anchor.seller}.',
+        'return': returnRoute,
+        'directReturn': 'true',
+        'context': 'supplier-store',
+        'conversationKey': _supplierConversationKey(anchor),
+        'supplier': anchor.seller,
+        'supplierType': anchor.sellerType,
+        'supplierRole': anchor.partnerRole,
+        'storeAnchorSku': anchor.id,
+        'origin': anchor.origin,
+        'adminVisible': 'true',
+        'escalationReason': 'supplier-non-response',
+        'callAuthority': 'moolsocial-admin-only',
+      },
+    ).toString();
+  }
+
   String productQuestionLocationFor({
     required BuyV2Product product,
     int quantity = 0,
