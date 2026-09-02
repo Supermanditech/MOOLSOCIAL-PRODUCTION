@@ -936,14 +936,14 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('buy-shop-sale-type-quick')),
-          matching: find.byIcon(Icons.timer_rounded),
+          matching: find.byIcon(Icons.speed_rounded),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('buy-shop-sale-type-courier')),
-          matching: find.byIcon(Icons.event_available_rounded),
+          matching: find.byIcon(Icons.schedule_rounded),
         ),
         findsOneWidget,
       );
@@ -952,7 +952,15 @@ void main() {
           find.byKey(ValueKey('buy-sale-type-icon-surface-$title')),
         );
         final iconDecoration = iconSurface.decoration! as BoxDecoration;
+        expect(
+          tester.getSize(
+            find.byKey(ValueKey('buy-sale-type-icon-surface-$title')),
+          ),
+          const Size(20, 20),
+        );
         expect(iconDecoration.color, Colors.white);
+        expect(iconDecoration.shape, BoxShape.rectangle);
+        expect(iconDecoration.borderRadius, isNull);
         expect(
           (iconDecoration.border! as Border).top.color,
           isNot(BuyV2Colors.orange),
@@ -966,6 +974,15 @@ void main() {
       );
       expect(thumb.top, lessThan(track.top));
       expect(thumb.bottom, greaterThan(track.bottom));
+      expect(thumb.height, 40);
+      expect(track.height, 34);
+      final trackSurface = tester.widget<DecoratedBox>(
+        find.byKey(const ValueKey('buy-shop-sale-type-track-surface')),
+      );
+      final trackDecoration = trackSurface.decoration as BoxDecoration;
+      expect(trackDecoration.gradient, isNull);
+      expect(trackDecoration.color, const Color(0xFFF2F3FF));
+      expect(trackDecoration.borderRadius, isNull);
       final thumbMotion = tester.widget<AnimatedPositioned>(
         find.byKey(const ValueKey('buy-shop-sale-type-thumb')),
       );
@@ -975,9 +992,12 @@ void main() {
         find.byKey(const ValueKey('buy-shop-sale-type-thumb-surface')),
       );
       final thumbDecoration = thumbSurface.decoration as BoxDecoration;
+      expect(thumbDecoration.gradient, isNull);
+      expect(thumbDecoration.color, const Color(0xFF1010A8));
+      expect(thumbDecoration.borderRadius, isNull);
       expect(
         (thumbDecoration.border! as Border).top.color,
-        const Color(0xFF3030D4),
+        const Color(0xFF1010A8),
       );
       expect(
         thumbDecoration.boxShadow!.every(
@@ -1027,14 +1047,14 @@ void main() {
       expect(
         find.descendant(
           of: wholesaleSelector,
-          matching: find.byIcon(Icons.storefront_rounded),
+          matching: find.byIcon(Icons.business_center_rounded),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
           of: wholesaleSelector,
-          matching: find.byIcon(Icons.view_module_rounded),
+          matching: find.byIcon(Icons.layers_rounded),
         ),
         findsOneWidget,
       );
@@ -1042,7 +1062,10 @@ void main() {
         final iconSurface = tester.widget<AnimatedContainer>(
           find.byKey(ValueKey('buy-sale-type-icon-surface-$title')),
         );
-        expect((iconSurface.decoration! as BoxDecoration).color, Colors.white);
+        final iconDecoration = iconSurface.decoration! as BoxDecoration;
+        expect(iconDecoration.color, Colors.white);
+        expect(iconDecoration.shape, BoxShape.rectangle);
+        expect(iconDecoration.borderRadius, isNull);
       }
     },
   );

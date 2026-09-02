@@ -678,20 +678,16 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
     final shop = session.destination == BuyV2Destination.shop;
     final options = shop
         ? const [
-            (id: 'quick', title: 'Quick 10m', icon: Icons.timer_rounded),
-            (
-              id: 'courier',
-              title: 'Scheduled',
-              icon: Icons.event_available_rounded,
-            ),
+            (id: 'quick', title: 'Quick 10m', icon: Icons.speed_rounded),
+            (id: 'courier', title: 'Scheduled', icon: Icons.schedule_rounded),
           ]
         : const [
             (
               id: 'wholesale',
               title: 'Wholesale',
-              icon: Icons.storefront_rounded,
+              icon: Icons.business_center_rounded,
             ),
-            (id: 'bulk', title: 'Bulk', icon: Icons.view_module_rounded),
+            (id: 'bulk', title: 'Bulk', icon: Icons.layers_rounded),
           ];
     final selectedIndex = shop
         ? session.shopSaleType == BuyV2ShopSaleType.quickDelivery
@@ -753,14 +749,15 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                     ),
                     left: 0,
                     right: 0,
-                    top: 4,
-                    bottom: 4,
+                    top: 7,
+                    bottom: 7,
                     child: DecoratedBox(
+                      key: ValueKey(
+                        'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
+                        'track-surface',
+                      ),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFF9FAFF), Color(0xFFEFF1FF)],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
+                        color: const Color(0xFFF2F3FF),
                         border: Border.all(color: const Color(0xFFCFD3F8)),
                         boxShadow: const [
                           BoxShadow(
@@ -781,36 +778,23 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                       BuyV2Motion.contentChange,
                     ),
                     curve: Curves.easeOutQuart,
-                    left: selectedIndex == 0 ? 0 : segmentWidth,
-                    top: 0,
-                    bottom: 0,
-                    width: segmentWidth,
+                    left: selectedIndex == 0 ? 4 : segmentWidth + 4,
+                    top: 4,
+                    bottom: 4,
+                    width: segmentWidth - 8,
                     child: DecoratedBox(
                       key: ValueKey(
                         'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
                         'thumb-surface',
                       ),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [BuyV2Colors.royal, BuyV2Colors.navy],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: const Color(0xFF3030D4),
-                          width: 1.2,
-                        ),
+                        color: const Color(0xFF1010A8),
+                        border: Border.all(color: const Color(0xFF1010A8)),
                         boxShadow: const [
                           BoxShadow(
-                            color: Color(0x44000080),
-                            blurRadius: 14,
-                            offset: Offset(0, 6),
-                          ),
-                          BoxShadow(
-                            color: Color(0x302F4BFF),
-                            blurRadius: 10,
-                            spreadRadius: .5,
+                            color: Color(0x3D1010A8),
+                            blurRadius: 11,
+                            offset: Offset(0, 5),
                           ),
                         ],
                       ),
@@ -845,18 +829,11 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                           height: 2,
                           margin: const EdgeInsets.only(top: 2),
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color(0x005C73FF),
-                                Color(0xFF7287FF),
-                                Color(0x005C73FF),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(99),
+                            color: Colors.white,
                             boxShadow: const [
                               BoxShadow(
-                                color: Color(0x805C73FF),
-                                blurRadius: 5,
+                                color: Color(0x5CFFFFFF),
+                                blurRadius: 4,
                               ),
                             ],
                           ),
@@ -926,7 +903,6 @@ class _CatalogueSaleSegment extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
           child: Center(
             child: AnimatedSwitcher(
               key: ValueKey('buy-sale-type-segment-transition-$title'),
@@ -971,32 +947,29 @@ class _CatalogueSaleSegment extends StatelessWidget {
                           context,
                           BuyV2Motion.selection,
                         ),
-                        width: 23,
-                        height: 23,
+                        width: 20,
+                        height: 20,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          shape: BoxShape.circle,
                           border: Border.all(
                             color: selected
-                                ? const Color(0xFFBBC3FF)
-                                : const Color(0xFFD8DCFA),
+                                ? const Color(0xFF1010A8)
+                                : const Color(0xFFCFD3F8),
                           ),
                           boxShadow: selected
                               ? const [
                                   BoxShadow(
                                     color: Color(0x30000080),
-                                    blurRadius: 5,
-                                    offset: Offset(0, 2),
+                                    blurRadius: 3,
+                                    offset: Offset(0, 1),
                                   ),
                                 ]
                               : const [],
                         ),
                         child: Icon(
                           icon,
-                          size: 16.5,
-                          color: selected
-                              ? const Color(0xFF1818B8)
-                              : BuyV2Colors.navy,
+                          size: 14,
+                          color: const Color(0xFF1010A8),
                         ),
                       ),
                     ),
