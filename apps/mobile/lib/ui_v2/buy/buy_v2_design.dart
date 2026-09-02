@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -602,6 +604,157 @@ class BuyV2FiniteDepthReveal extends StatelessWidget {
             transformHitTests: false,
             child: child,
           ),
+        );
+      },
+    );
+  }
+}
+
+/// One finite cinematic card reveal with a single blue-white light sweep.
+/// It never loops, owns no semantics or hit testing, and resolves immediately
+/// when reduced motion is requested.
+class BuyV2CinematicCardReveal extends StatefulWidget {
+  const BuyV2CinematicCardReveal({
+    super.key,
+    required this.stateKey,
+    required this.child,
+    this.delay = Duration.zero,
+    this.duration = const Duration(milliseconds: 780),
+    this.borderRadius = const BorderRadius.all(Radius.circular(16)),
+  });
+
+  final Object stateKey;
+  final Widget child;
+  final Duration delay;
+  final Duration duration;
+  final BorderRadius borderRadius;
+
+  @override
+  State<BuyV2CinematicCardReveal> createState() =>
+      _BuyV2CinematicCardRevealState();
+}
+
+class _BuyV2CinematicCardRevealState extends State<BuyV2CinematicCardReveal>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: widget.duration,
+  );
+  Timer? _delayTimer;
+  bool _scheduled = false;
+
+  void _schedule() {
+    if (_scheduled || MediaQuery.disableAnimationsOf(context)) return;
+    _scheduled = true;
+    if (widget.delay == Duration.zero) {
+      _controller.forward();
+      return;
+    }
+    _delayTimer = Timer(widget.delay, () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _delayTimer?.cancel();
+      _controller.value = 1;
+      _scheduled = true;
+      return;
+    }
+    _schedule();
+  }
+
+  @override
+  void didUpdateWidget(covariant BuyV2CinematicCardReveal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _controller.duration = widget.duration;
+    if (oldWidget.stateKey == widget.stateKey) return;
+    _delayTimer?.cancel();
+    _scheduled = false;
+    _controller.value = MediaQuery.disableAnimationsOf(context) ? 1 : 0;
+    _schedule();
+  }
+
+  @override
+  void dispose() {
+    _delayTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      key: ValueKey<Object>(widget.stateKey),
+      animation: _controller,
+      child: widget.child,
+      builder: (context, child) {
+        final progress = Curves.easeOutCubic.transform(_controller.value);
+        final shineProgress = ((_controller.value - .2) / .68).clamp(0.0, 1.0);
+        final shineOpacity =
+            (1 - ((shineProgress * 2) - 1).abs()).clamp(0.0, 1.0) * .52;
+        final transform =
+            Matrix4.translationValues((1 - progress) * 7, (1 - progress) * 9, 0)
+              ..setEntry(3, 2, .0012)
+              ..rotateY((1 - progress) * .045)
+              ..scaleByDouble(
+                .97 + (.03 * progress),
+                .97 + (.03 * progress),
+                1,
+                1,
+              );
+        return Stack(
+          fit: StackFit.passthrough,
+          children: [
+            Opacity(
+              key: ValueKey('buy-cinematic-card-content-${widget.stateKey}'),
+              opacity: .58 + (.42 * progress),
+              child: Transform(
+                alignment: Alignment.center,
+                transform: transform,
+                transformHitTests: false,
+                child: child,
+              ),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: ClipRRect(
+                  borderRadius: widget.borderRadius,
+                  child: Opacity(
+                    key: ValueKey(
+                      'buy-cinematic-card-sheen-${widget.stateKey}',
+                    ),
+                    opacity: shineOpacity,
+                    child: Align(
+                      alignment: Alignment(-1.7 + (3.4 * shineProgress), 0),
+                      child: FractionallySizedBox(
+                        widthFactor: .34,
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()..setEntry(0, 1, -.16),
+                          child: const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Color(0x00FFFFFF),
+                                  Color(0xB8FFFFFF),
+                                  Color(0x5C63A4FF),
+                                  Color(0x00FFFFFF),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
       },
     );

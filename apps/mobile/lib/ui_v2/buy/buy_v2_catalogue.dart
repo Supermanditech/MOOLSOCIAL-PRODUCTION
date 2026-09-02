@@ -759,13 +759,6 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: const Color(0xFFF2F3FF),
                         border: Border.all(color: const Color(0xFFCFD3F8)),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x16000080),
-                            blurRadius: 7,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
                       ),
                     ),
                   ),
@@ -778,67 +771,16 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                       BuyV2Motion.contentChange,
                     ),
                     curve: Curves.easeOutQuart,
-                    left: selectedIndex == 0 ? 4 : segmentWidth + 4,
-                    top: 4,
-                    bottom: 4,
-                    width: segmentWidth - 8,
+                    left: selectedIndex == 0 ? 0 : segmentWidth,
+                    top: 7,
+                    bottom: 7,
+                    width: segmentWidth,
                     child: DecoratedBox(
                       key: ValueKey(
                         'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
                         'thumb-surface',
                       ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1010A8),
-                        border: Border.all(color: const Color(0xFF1010A8)),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x3D1010A8),
-                            blurRadius: 11,
-                            offset: Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: TweenAnimationBuilder<double>(
-                        key: ValueKey(
-                          'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
-                          'active-indicator-$selectedIndex',
-                        ),
-                        duration: BuyV2Motion.resolved(
-                          context,
-                          BuyV2Motion.contentChange,
-                        ),
-                        curve: Curves.easeOutCubic,
-                        tween: Tween<double>(begin: 0, end: 1),
-                        builder: (context, value, child) => Align(
-                          alignment: Alignment.topCenter,
-                          child: Opacity(
-                            opacity: value,
-                            child: Transform.scale(
-                              alignment: Alignment.topCenter,
-                              scaleX: .7 + (.3 * value),
-                              child: child,
-                            ),
-                          ),
-                        ),
-                        child: Container(
-                          key: ValueKey(
-                            'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
-                            'active-indicator',
-                          ),
-                          width: 48,
-                          height: 2,
-                          margin: const EdgeInsets.only(top: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x5CFFFFFF),
-                                blurRadius: 4,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                      decoration: const BoxDecoration(color: Color(0xFF1010A8)),
                     ),
                   ),
                   Row(
@@ -3659,45 +3601,51 @@ Future<void> showBuyV2PartnerCatalogue(
                             style: sheetContext.buyMeta,
                           ),
                           const SizedBox(height: 8),
-                          SizedBox(
-                            height: 170,
-                            child: ListView.separated(
-                              key: ValueKey('$ownerPrefix-other-stores'),
-                              scrollDirection: Axis.horizontal,
-                              itemCount: otherStores.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(width: 8),
-                              itemBuilder: (_, index) {
-                                final store = otherStores[index];
-                                return BuyV2FiniteDepthReveal(
-                                  stateKey:
-                                      '$ownerPrefix-other-store-${store.id}-motion',
-                                  duration: Duration(
-                                    milliseconds: 260 + (index * 70),
-                                  ),
-                                  child: _RelatedStoreCard(
-                                    key: ValueKey(
-                                      '$ownerPrefix-other-store-${store.id}',
+                          SingleChildScrollView(
+                            key: ValueKey('$ownerPrefix-other-stores'),
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (
+                                  var index = 0;
+                                  index < otherStores.length;
+                                  index++
+                                )
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      right: index == otherStores.length - 1
+                                          ? 0
+                                          : 8,
                                     ),
-                                    product: store,
-                                    onTap: () => unawaited(
-                                      showBuyV2PartnerCatalogue(
-                                        sheetContext,
-                                        session,
-                                        store,
-                                        onAskStore: (storeProduct) =>
-                                            Navigator.of(sheetContext).pop(
-                                              'ask-store:${storeProduct.id}',
-                                            ),
-                                        onOpenProduct: onOpenProduct,
-                                        onOpenCart: () => Navigator.of(
-                                          sheetContext,
-                                        ).pop('cart:'),
+                                    child: BuyV2CinematicCardReveal(
+                                      stateKey:
+                                          '$ownerPrefix-other-store-${otherStores[index].id}-motion',
+                                      delay: Duration(milliseconds: index * 90),
+                                      child: _RelatedStoreCard(
+                                        key: ValueKey(
+                                          '$ownerPrefix-other-store-${otherStores[index].id}',
+                                        ),
+                                        product: otherStores[index],
+                                        onTap: () => unawaited(
+                                          showBuyV2PartnerCatalogue(
+                                            sheetContext,
+                                            session,
+                                            otherStores[index],
+                                            onAskStore: (storeProduct) =>
+                                                Navigator.of(sheetContext).pop(
+                                                  'ask-store:${storeProduct.id}',
+                                                ),
+                                            onOpenProduct: onOpenProduct,
+                                            onOpenCart: () => Navigator.of(
+                                              sheetContext,
+                                            ).pop('cart:'),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                );
-                              },
+                              ],
                             ),
                           ),
                         ],
@@ -4359,7 +4307,7 @@ class _RelatedStoreCard extends StatelessWidget {
         width: 224,
         child: Material(
           key: ValueKey('buy-related-store-surface-${product.id}'),
-          color: BuyV2Colors.softBlue.withValues(alpha: .62),
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(16),
           child: InkWell(
             onTap: onTap,
@@ -4367,66 +4315,84 @@ class _RelatedStoreCard extends StatelessWidget {
             splashColor: BuyV2Colors.navy.withValues(alpha: .1),
             highlightColor: BuyV2Colors.navy.withValues(alpha: .05),
             child: Container(
+              key: ValueKey('buy-related-store-card-${product.id}'),
               padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFFFFFFF),
+                    Color(0xFFEAF0FF),
+                    Color(0xFFD8E5FF),
+                  ],
+                ),
                 border: Border.all(
-                  color: BuyV2Colors.navy.withValues(alpha: .32),
+                  color: const Color(0xFF315BFF).withValues(alpha: .5),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: BuyV2Colors.navy.withValues(alpha: .13),
-                    blurRadius: 12,
-                    offset: const Offset(0, 5),
+                    color: const Color(0xFF315BFF).withValues(alpha: .16),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: BuyV2Colors.navy.withValues(alpha: .22),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(7, 5, 5, 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF172CCB),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: .72),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.storefront_outlined,
+                            color: Color(0xFF172CCB),
+                            size: 13,
                           ),
                         ),
-                        child: const Icon(
-                          Icons.storefront_outlined,
-                          color: BuyV2Colors.navy,
-                          size: 13,
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Expanded(
-                        child: Text(
-                          product.seller,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.buyBody.copyWith(
-                            fontWeight: FontWeight.w900,
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            product.seller,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.buyBody.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
-                      ),
-                      Container(
-                        width: 22,
-                        height: 22,
-                        decoration: BoxDecoration(
-                          color: BuyV2Colors.navy,
-                          borderRadius: BorderRadius.circular(7),
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4F7CFF),
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Colors.white,
+                            size: 15,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.arrow_forward_rounded,
-                          color: Colors.white,
-                          size: 15,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(

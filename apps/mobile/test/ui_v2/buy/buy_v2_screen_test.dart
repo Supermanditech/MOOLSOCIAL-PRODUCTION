@@ -992,9 +992,11 @@ void main() {
       final thumb = tester.getRect(
         find.byKey(const ValueKey('buy-shop-sale-type-thumb')),
       );
-      expect(thumb.top, lessThan(track.top));
-      expect(thumb.bottom, greaterThan(track.bottom));
-      expect(thumb.height, 40);
+      expect(thumb.top, track.top);
+      expect(thumb.bottom, track.bottom);
+      expect(thumb.left, track.left);
+      expect(thumb.width, track.width / 2);
+      expect(thumb.height, 34);
       expect(track.height, 34);
       final trackSurface = tester.widget<DecoratedBox>(
         find.byKey(const ValueKey('buy-shop-sale-type-track-surface')),
@@ -1003,6 +1005,7 @@ void main() {
       expect(trackDecoration.gradient, isNull);
       expect(trackDecoration.color, const Color(0xFFF2F3FF));
       expect(trackDecoration.borderRadius, isNull);
+      expect(trackDecoration.boxShadow, isNull);
       final thumbMotion = tester.widget<AnimatedPositioned>(
         find.byKey(const ValueKey('buy-shop-sale-type-thumb')),
       );
@@ -1015,24 +1018,16 @@ void main() {
       expect(thumbDecoration.gradient, isNull);
       expect(thumbDecoration.color, const Color(0xFF1010A8));
       expect(thumbDecoration.borderRadius, isNull);
-      expect(
-        (thumbDecoration.border! as Border).top.color,
-        const Color(0xFF1010A8),
-      );
-      expect(
-        thumbDecoration.boxShadow!.every(
-          (shadow) => shadow.color != BuyV2Colors.orange,
-        ),
-        isTrue,
-      );
+      expect(thumbDecoration.border, isNull);
+      expect(thumbDecoration.boxShadow, isNull);
       expect(
         find.byKey(const ValueKey('buy-shop-sale-type-active-indicator')),
-        findsOneWidget,
+        findsNothing,
       );
-      final indicatorMotion = tester.widget<TweenAnimationBuilder<double>>(
+      expect(
         find.byKey(const ValueKey('buy-shop-sale-type-active-indicator-0')),
+        findsNothing,
       );
-      expect(indicatorMotion.duration, BuyV2Motion.contentChange);
       final segmentTransition = tester.widget<AnimatedSwitcher>(
         find.byKey(
           const ValueKey('buy-sale-type-segment-transition-Quick 10m'),
@@ -1164,9 +1159,6 @@ void main() {
     final quickTypography = tester.widget<AnimatedDefaultTextStyle>(
       find.byKey(const ValueKey('buy-shop-sale-type-quick-label-style')),
     );
-    final indicatorMotion = tester.widget<TweenAnimationBuilder<double>>(
-      find.byKey(const ValueKey('buy-shop-sale-type-active-indicator-0')),
-    );
     final segmentTransition = tester.widget<AnimatedSwitcher>(
       find.byKey(const ValueKey('buy-sale-type-segment-transition-Quick 10m')),
     );
@@ -1185,7 +1177,6 @@ void main() {
 
     expect(thumbMotion.duration, Duration.zero);
     expect(quickTypography.duration, Duration.zero);
-    expect(indicatorMotion.duration, Duration.zero);
     expect(segmentTransition.duration, Duration.zero);
     expect(segmentTransition.reverseDuration, Duration.zero);
     expect(catalogueMotion.duration, Duration.zero);
@@ -4681,14 +4672,18 @@ void main() {
         of: originalStore,
         matching: find.byWidgetPredicate(
           (widget) =>
-              widget is BuyV2FiniteDepthReveal &&
+              widget is BuyV2CinematicCardReveal &&
               widget.stateKey == 'buy-shop-seller-other-store-s-tomato-motion',
         ),
       );
       expect(relatedStoreMotion, findsOneWidget);
       expect(
-        tester.widget<BuyV2FiniteDepthReveal>(relatedStoreMotion).duration,
-        const Duration(milliseconds: 260),
+        tester.widget<BuyV2CinematicCardReveal>(relatedStoreMotion).duration,
+        const Duration(milliseconds: 780),
+      );
+      expect(
+        tester.widget<BuyV2CinematicCardReveal>(relatedStoreMotion).delay,
+        Duration.zero,
       );
       expect(
         tester
@@ -4707,8 +4702,20 @@ void main() {
               find.byKey(const ValueKey('buy-related-store-surface-s-tomato')),
             )
             .color,
-        BuyV2Colors.softBlue.withValues(alpha: .62),
+        Colors.transparent,
       );
+      final relatedCard = tester.widget<Container>(
+        find.byKey(const ValueKey('buy-related-store-card-s-tomato')),
+      );
+      final relatedDecoration = relatedCard.decoration! as BoxDecoration;
+      expect(relatedDecoration.gradient, isA<LinearGradient>());
+      expect((relatedDecoration.gradient! as LinearGradient).colors, const [
+        Color(0xFFFFFFFF),
+        Color(0xFFEAF0FF),
+        Color(0xFFD8E5FF),
+      ]);
+      expect(relatedDecoration.boxShadow, isNotEmpty);
+      expect(tester.getSize(relatedStore).height, lessThan(170));
       expect(
         find.descendant(
           of: relatedStore,
@@ -4870,8 +4877,93 @@ void main() {
     );
     await tester.scrollUntilVisible(relatedStore, 150, scrollable: storeScroll);
 
-    expect(tester.getSize(relatedStore).height, 170);
+    expect(
+      find.byKey(const ValueKey('buy-shop-seller-other-stores')),
+      findsOneWidget,
+    );
+    expect(
+      tester.widget(find.byKey(const ValueKey('buy-shop-seller-other-stores'))),
+      isA<SingleChildScrollView>(),
+    );
+    expect(tester.getSize(relatedStore).height, inInclusiveRange(140, 210));
     expect(tester.getSize(relatedStore).width, 224);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Other stores cinematic reveal respects reduced motion', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final storeProduct = session.product('s-eggs');
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        builder: (context, child) {
+          final media = MediaQuery.of(context);
+          return MediaQuery(
+            data: media.copyWith(disableAnimations: true),
+            child: child!,
+          );
+        },
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              key: const ValueKey('open-related-store-reduced-motion'),
+              onPressed: () => unawaited(
+                showBuyV2PartnerCatalogue(context, session, storeProduct),
+              ),
+              child: const Text('Open store'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('open-related-store-reduced-motion')),
+    );
+    await tester.pumpAndSettle();
+
+    final storeSheet = find.byKey(
+      const ValueKey('buy-shop-seller-sheet-s-eggs'),
+    );
+    final storeScroll = find
+        .descendant(of: storeSheet, matching: find.byType(Scrollable))
+        .first;
+    final relatedStore = find.byKey(
+      const ValueKey('buy-shop-seller-other-store-s-tomato'),
+    );
+    await tester.scrollUntilVisible(relatedStore, 150, scrollable: storeScroll);
+
+    expect(
+      tester
+          .widget<Opacity>(
+            find.byKey(
+              const ValueKey(
+                'buy-cinematic-card-content-'
+                'buy-shop-seller-other-store-s-tomato-motion',
+              ),
+            ),
+          )
+          .opacity,
+      1,
+    );
+    expect(
+      tester
+          .widget<Opacity>(
+            find.byKey(
+              const ValueKey(
+                'buy-cinematic-card-sheen-'
+                'buy-shop-seller-other-store-s-tomato-motion',
+              ),
+            ),
+          )
+          .opacity,
+      0,
+    );
     expect(tester.takeException(), isNull);
   });
 
