@@ -13,7 +13,7 @@ param(
   [Parameter(Mandatory)]
   [ValidatePattern('^[0-9A-F]{64}$')]
   [string]$ExpectedRegistrySha256,
-  [ValidateSet('baseline','cursor_ui','codex_auth','codex_backend','integration_repair','integration')]
+  [ValidateSet('baseline','cursor_ui','codex_ui','codex_auth','codex_backend','integration_repair','integration')]
   [string]$ProductionLane = 'baseline',
   [ValidateSet(
     'baseline','governance_preflight','coordination_bootstrap','task_start','implementation','pre_commit','handoff',
@@ -163,7 +163,7 @@ function Test-ProductionWorktreeClean {
 
 function Get-ProductionRemoteBranchHead([string]$BranchName) {
   Assert-Coordination (
-    $BranchName -cmatch '^(?:work/(?:cursor-ui|codex-auth|codex-backend|integration-repair)/|integration/moolsocial/)[a-z0-9][a-z0-9-]{2,48}$'
+    $BranchName -cmatch '^(?:work/(?:cursor-ui|codex-ui|codex-auth|codex-backend|integration-repair)/|integration/moolsocial/)[a-z0-9][a-z0-9-]{2,48}$'
   ) 'production remote branch name is invalid.'
   $remoteRef = 'refs/heads/' + $BranchName
   $remoteOutput = @(& git -C $root ls-remote --exit-code --heads origin `
@@ -562,7 +562,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 57) `
+Assert-Coordination ($continuationBindings.Count -eq 58) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -573,6 +573,7 @@ foreach ($continuationBinding in $continuationBindings) {
   ) 'founder-authorized continuation binding'
   $continuationBranchPrefix = switch ([string]$continuationBinding.lane) {
     'cursor_ui' { 'work/cursor-ui/' }
+    'codex_ui' { 'work/codex-ui/' }
     'codex_auth' { 'work/codex-auth/' }
     'integration_repair' { 'work/integration-repair/' }
     default { '' }
@@ -583,11 +584,12 @@ foreach ($continuationBinding in $continuationBindings) {
       'founder_authorized_2026_08_25',
       'founder_authorized_2026_08_26',
       'founder_authorized_2026_08_28',
-      'founder_authorized_2026_08_29'
+      'founder_authorized_2026_08_29',
+      'founder_authorized_2026_09_02'
     ) -and
-    [string]$continuationBinding.lane -cin @('cursor_ui','codex_auth','integration_repair') -and
+    [string]$continuationBinding.lane -cin @('cursor_ui','codex_ui','codex_auth','integration_repair') -and
     [string]$continuationBinding.role -cin @('primary','subagent') -and
-    [string]$continuationBinding.task -cmatch '^/root/[a-z0-9_]+$' -and
+    [string]$continuationBinding.task -cmatch '^/root(?:/[a-z0-9_]+)?$' -and
     [string]$continuationBinding.workId -cmatch '^[a-z0-9][a-z0-9-]{2,48}$' -and
     [string]$continuationBinding.ticketId -cmatch '^[A-Z0-9][A-Z0-9-]{4,159}$' -and
     [string]$continuationBinding.branch -ceq
@@ -674,7 +676,7 @@ Assert-Coordination (
   -not [bool]$gitDiscipline.ticketClosure.worktreeRemovalBeforeIntegrationVerificationAllowed
 ) 'ticket closure discipline weakened.'
 Assert-ExactNames $gitDiscipline.agentTicketQueues @(
-  'cursorUiMaximumOpenTickets','codexAuthMaximumOpenTickets',
+  'cursorUiMaximumOpenTickets','codexUiMaximumOpenTickets','codexAuthMaximumOpenTickets',
   'codexBackendMaximumOpenTickets','integrationRepairMaximumOpenTickets',
   'priorTicketClosureRequired',
   'founderSelectsExactNextTicket','crossLaneImplementationAllowed',
@@ -686,6 +688,7 @@ $plannedCodexAuthenticationProviders = @(
 )
 Assert-Coordination (
   [int]$gitDiscipline.agentTicketQueues.cursorUiMaximumOpenTickets -eq 1 -and
+  [int]$gitDiscipline.agentTicketQueues.codexUiMaximumOpenTickets -eq 1 -and
   [int]$gitDiscipline.agentTicketQueues.codexAuthMaximumOpenTickets -eq 1 -and
   [int]$gitDiscipline.agentTicketQueues.codexBackendMaximumOpenTickets -eq 1 -and
   [int]$gitDiscipline.agentTicketQueues.integrationRepairMaximumOpenTickets -eq 1 -and
@@ -753,7 +756,7 @@ Assert-Coordination (
 ) 'Facebook prebuild qualification changed.'
 
 $productionLanes = @($gitDiscipline.lanes)
-$expectedLaneIds = @('cursor_ui','codex_auth','codex_backend','integration_repair','integration')
+$expectedLaneIds = @('cursor_ui','codex_ui','codex_auth','codex_backend','integration_repair','integration')
 Assert-Coordination (
   $productionLanes.Count -eq $expectedLaneIds.Count -and
   (@($productionLanes.id | Sort-Object) -join '|') -ceq
@@ -764,6 +767,11 @@ $expectedLaneContracts = @{
     role = 'subagent'; task = '/root/cursor_'; branch = 'work/cursor-ui/'
     worktree = 'MOOLSOCIAL-WORKTREE-CURSOR-'; commit = 'ui'
     base = 'governance_tag'
+  }
+  codex_ui = @{
+    role = 'primary'; task = '/root'; branch = 'work/codex-ui/'
+    worktree = 'MOOLSOCIAL-WORKTREE-CODEX-'; commit = 'ui'
+    base = 'approved_codex_ui_checkpoint'
   }
   codex_auth = @{
     role = 'primary'; task = '/root/codex_auth_'; branch = 'work/codex-auth/'
@@ -1098,6 +1106,9 @@ Assert-Coordination (
 $cursorUiOpenTasks = @($taskNames | Where-Object {
   $_.StartsWith('/root/cursor_', [StringComparison]::Ordinal)
 })
+$codexUiOpenTasks = @($taskNames | Where-Object {
+  $_ -ceq '/root'
+})
 $codexAuthOpenTasks = @($taskNames | Where-Object {
   $_.StartsWith('/root/codex_auth_', [StringComparison]::Ordinal)
 })
@@ -1110,6 +1121,8 @@ $integrationRepairOpenTasks = @($taskNames | Where-Object {
 Assert-Coordination (
   $cursorUiOpenTasks.Count -le
     [int]$gitDiscipline.agentTicketQueues.cursorUiMaximumOpenTickets -and
+  $codexUiOpenTasks.Count -le
+    [int]$gitDiscipline.agentTicketQueues.codexUiMaximumOpenTickets -and
   $codexAuthOpenTasks.Count -le
     [int]$gitDiscipline.agentTicketQueues.codexAuthMaximumOpenTickets -and
   $codexBackendOpenTasks.Count -le
@@ -1472,6 +1485,12 @@ if ($ProductionLane -ceq 'baseline') {
         'founder_acceptance','ticket_acceptance','ticket_close'
       )
     }
+    'codex_ui' {
+      @(
+        'coordination_bootstrap','task_start','implementation','pre_commit','handoff',
+        'founder_acceptance','ticket_acceptance','ticket_close'
+      )
+    }
     'codex_auth' {
       @('coordination_bootstrap','task_start','implementation','pre_commit','handoff','ticket_acceptance','ticket_close')
     }
@@ -1499,10 +1518,12 @@ if ($ProductionLane -ceq 'baseline') {
           Get-CanonicalOwner ([string]$_)
         }
       )
-      foreach ($bootstrapOwner in $expectedBootstrapOwners) {
-        Assert-Coordination (
-          $ownerToTask.ContainsKey($bootstrapOwner.ToLowerInvariant())
-        ) "continuation bootstrap owner is unclaimed: $bootstrapOwner"
+      if ($ProductionLane -cne 'codex_ui') {
+        foreach ($bootstrapOwner in $expectedBootstrapOwners) {
+          Assert-Coordination (
+            $ownerToTask.ContainsKey($bootstrapOwner.ToLowerInvariant())
+          ) "continuation bootstrap owner is unclaimed: $bootstrapOwner"
+        }
       }
       Assert-Coordination (
         (@($changedOwners | Sort-Object) -join '|') -ceq
@@ -1897,8 +1918,8 @@ if ($ProductionLane -ceq 'baseline') {
   }
 
   if ($ProductionPhase -ceq 'founder_acceptance') {
-    Assert-Coordination ($ProductionLane -ceq 'cursor_ui') `
-      'founder UI acceptance phase is valid only for Cursor UI.'
+    Assert-Coordination ($ProductionLane -cin @('cursor_ui','codex_ui')) `
+      'founder UI acceptance phase is valid only for a UI lane.'
     Assert-Coordination (
       $AcceptedUiCommit -ceq $head -and
       $FounderAcceptanceEvidenceSha256 -cmatch '^[0-9A-F]{64}$' -and

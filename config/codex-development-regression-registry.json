@@ -44633,6 +44633,56 @@
       "prevention": "Select the qualified binding by lane plus exact current task /root/repair_shop_chat_shared_v1_20260829, require one match, and rerun the full handoff gate.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260902-3945-COMPOUND-WORKTREE-PRECHECK-POWERSHELL-PARSER",
+      "status": "registered_independent_scalar_prechecks_required",
+      "appliesTo": ["primary", "coordination", "git", "worktree", "tooling"],
+      "mistake": "A compound PowerShell expression intended to report new-worktree path and branch existence failed at parse time before Git ran.",
+      "rootCause": "A native git invocation and LASTEXITCODE evaluation were embedded inside one casted object-property expression instead of being executed as independent scalar checks.",
+      "prevention": "Run path existence and branch-ref existence as separate commands, capture each exit code independently, then compose only already-resolved scalar values into the summary object.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260902-3946-CODEX-UI-ROOT-TASK-BINDING-REJECTED",
+      "status": "registered_exact_root_task_binding_support_required",
+      "appliesTo": ["primary", "coordination", "implementation", "ui"],
+      "mistake": "The first Codex UI coordination bootstrap was rejected because the continuation-binding validator required a child task path even though the active desktop task and active claim are canonically /root.",
+      "rootCause": "The new lane contract was added without extending the legacy continuation task-name predicate to accept the canonical primary /root identity.",
+      "prevention": "Allow /root or an existing child task path in the continuation validator, retain exact active-claim equality, and rerun the same bootstrap with unchanged branch, worktree, ticket and owners.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260902-3947-NEW-WORKTREE-CHECKOUT-INCOMPLETE",
+      "status": "registered_complete_checkout_verification_required",
+      "appliesTo": ["primary", "coordination", "git", "worktree", "implementation"],
+      "mistake": "The Codex UI bootstrap gate was attempted after the worktree creation output ended mid-checkout, and a claimed Work source file was not present.",
+      "rootCause": "Branch and HEAD existence were verified, but complete file materialization was not independently verified after the long worktree-add operation produced truncated progress output.",
+      "prevention": "Before a new-worktree gate, verify the exact required owner files exist and the index/worktree checkout is complete; if incomplete, restore only missing tracked files from the worktree HEAD and revalidate branch, HEAD and owner presence.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260902-3948-DELETED-WORK-ENTRY-CLAIMED-AS-LIVE-OWNER",
+      "status": "registered_head-tree-owner-existence-check_required",
+      "appliesTo": ["primary", "coordination", "implementation", "ui"],
+      "mistake": "The initial Codex UI owner claim included the historical work_main_v2.dart path even though the approved checkpoint had deleted that file and replaced its presentation with the Workspace dashboard screen.",
+      "rootCause": "The owner list was taken from historical changed-owner output without distinguishing added/modified owners from a deleted legacy path at the current HEAD.",
+      "prevention": "Before binding owners, use the current HEAD tree plus name-status to exclude deleted legacy files and claim only live exact owners.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260902-3949-BOOTSTRAP-PRIMARY-OWNER-DUPLICATED-IN-FEATURE-CLAIM",
+      "status": "registered_primary_bootstrap_owner_exception_required",
+      "appliesTo": ["primary", "coordination", "implementation", "ui"],
+      "mistake": "The Codex UI bootstrap gate rejected the current claim because primary-only bootstrap files were duplicated by preserved historical task claims.",
+      "rootCause": "Bootstrap evidence owners were added to the feature owner claim instead of remaining primary-only coordination owners handled by the bootstrap phase.",
+      "prevention": "Keep the Codex UI feature claim limited to Work source/tests and allow the exact continuation bootstrap owner manifest only for the primary coordination bootstrap phase.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
     }
   ]
 }

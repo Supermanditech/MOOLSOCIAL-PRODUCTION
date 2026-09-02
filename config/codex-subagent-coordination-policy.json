@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3907,
-    "sha256": "4A5A254414028E04A8FBAD2C51565664676DB985F3F3EDF19572B6FE38033F4A"
+    "entryCount": 3912,
+    "sha256": "CB66BEE5DF9F8234FC08C632327D4AE090EA60F57304D503343B1D5BB9B08D79"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,22 +34,15 @@
       "task": "/root",
       "role": "primary",
       "owners": [
-        ".gitattributes",
-        "AGENTS.md",
-        "config/cross-agent-incremental-ticket-gate.json",
-        "docs/quality/ACTIVE-CODEX-HANDOFF.md",
-        "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md",
-        "docs/quality/MOOLSOCIAL-PARALLEL-PRODUCTION-BASELINE-AND-WORKTREE-HANDOFF-20260823.md",
-        "docs/quality/UAW-PRIMARY-SOCIAL-PROTECTED-V74-GATE-FIX-20260828.md",
-        "docs/quality/UAW-PRIMARY-SHOP-V2-PROTECTED-CANDIDATE-GATE-20260828.md",
-        "docs/quality/UAW-PRIMARY-V74-BUY-PROTECTION-BRAND-GATE-FIX-20260828.md",
-        "scripts/check-brand-integrity.ps1",
-        "scripts/check-buy-protected-baseline.ps1",
-        "scripts/check-codex-development-regression-memory.ps1",
-        "scripts/check-cross-agent-incremental-ticket-gate.ps1",
-        "scripts/check-mvp-delivery-discipline-lock.ps1",
-        "scripts/check-social-protected-baseline.ps1",
-        "scripts/test-codex-integration-repair-coordination-policy.ps1"
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/widgets/work_widgets.dart",
+        "apps/mobile/test/ui_v2/work/work_main_v2_test.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "apps/mobile/test/work_vertical_slice_test.dart",
+        "apps/mobile/test/work_production_gateway_test.dart"
       ]
     },
     {
@@ -1427,6 +1420,26 @@
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "codex_work_core_controls_v1_20260902",
+        "state": "founder_authorized_2026_09_02",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "work-core-controls-v1-20260902",
+        "ticketId": "UAW-CODEX-WORK-CORE-CONTROLS-V1-20260902",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-work-core-controls-v1-20260902",
+        "branch": "work/codex-ui/work-core-controls-v1-20260902",
+        "baselineHead": "38e6841b8d67232229509c9267aafb5daf74ad58",
+        "bootstrapCommitSubject": "coordination(work-core-controls-v1-20260902): bind authorized Codex UI lane",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
       }
     ],
     "workspaceIsolation": {
@@ -1470,6 +1483,7 @@
     },
     "agentTicketQueues": {
       "cursorUiMaximumOpenTickets": 1,
+      "codexUiMaximumOpenTickets": 1,
       "codexAuthMaximumOpenTickets": 1,
       "codexBackendMaximumOpenTickets": 1,
       "integrationRepairMaximumOpenTickets": 1,
@@ -1546,6 +1560,37 @@
           "backend/",
           "config/",
           "scripts/"
+        ]
+      },
+      {
+        "id": "codex_ui",
+        "agentRole": "primary",
+        "taskPrefix": "/root",
+        "branchPrefix": "work/codex-ui/",
+        "worktreePrefix": "MOOLSOCIAL-WORKTREE-CODEX-",
+        "commitPrefix": "ui",
+        "baseRule": "approved_codex_ui_checkpoint",
+        "allowedOwnerRoots": [
+          "apps/mobile/lib/ui_v2/work/",
+          "apps/mobile/lib/features/work/",
+          "apps/mobile/test/ui_v2/work/",
+          "apps/mobile/test/work_workspace_layout_safety_test.dart",
+          "apps/mobile/test/work_vertical_slice_test.dart",
+          "apps/mobile/test/work_production_gateway_test.dart"
+        ],
+        "forbiddenOwnerRoots": [
+          "apps/mobile/lib/core/auth/",
+          "apps/mobile/lib/features/journey01/",
+          "apps/mobile/lib/ui_v2/buy/",
+          "apps/mobile/lib/ui_v2/chat/",
+          "apps/mobile/lib/ui_v2/profile/",
+          "apps/mobile/lib/ui_v2/social/",
+          "apps/mobile/lib/ui_v2/universal/",
+          "apps/mobile/android/",
+          "apps/mobile/ios/",
+          "apps/mobile/pubspec.yaml",
+          "apps/mobile/pubspec.lock",
+          "backend/"
         ]
       },
       {
