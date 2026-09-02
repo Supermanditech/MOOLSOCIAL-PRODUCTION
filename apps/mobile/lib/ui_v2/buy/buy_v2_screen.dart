@@ -936,6 +936,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     );
   }
 
+  Future<bool> _openPaymentCollection(Uri uri) =>
+      showBuyV2PaymentCollectionSheet(context, widget.session, uri);
+
   Widget _currentView(BuyV2Session session) {
     if (_offersActive && session.view == BuyV2View.catalogue) {
       return BuyV2OffersView(session: session, source: widget.offersSource);
@@ -988,7 +991,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         session: session,
         gstInvoiceController: _gstInvoiceController,
         onOpenSupport: _openShopChat,
-        paymentHandoff: widget.paymentHandoff,
+        paymentHandoff: widget.paymentHandoff ?? _openPaymentCollection,
       ),
       BuyV2View.confirmation => BuyV2ConfirmationView(
         session: session,
@@ -998,7 +1001,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         session: session,
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
-        paymentHandoff: widget.paymentHandoff,
+        paymentHandoff: widget.paymentHandoff ?? _openPaymentCollection,
         liveDeliveryMapBuilder: widget.liveDeliveryMapBuilder,
       ),
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
@@ -1006,7 +1009,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         session: session,
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
-        paymentHandoff: widget.paymentHandoff,
+        paymentHandoff: widget.paymentHandoff ?? _openPaymentCollection,
         liveDeliveryMapBuilder: widget.liveDeliveryMapBuilder,
       ),
       BuyV2View.account => BuyV2AccountView(

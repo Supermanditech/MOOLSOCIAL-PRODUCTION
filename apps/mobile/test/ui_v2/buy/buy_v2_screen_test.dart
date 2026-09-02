@@ -183,6 +183,24 @@ void main() {
     );
   }
 
+  Future<void> completeReviewPayment(
+    WidgetTester tester,
+    BuyV2Session session,
+  ) async {
+    expect(
+      session.checkoutSubmissionState,
+      BuyV2CheckoutSubmissionState.paymentActionRequired,
+    );
+    expect(await session.continuePayment((_) async => true), isTrue);
+    await tester.pumpAndSettle();
+    expect(
+      session.checkoutSubmissionState,
+      BuyV2CheckoutSubmissionState.paymentPending,
+    );
+    expect(await session.reconcilePayment(), isTrue);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('persistent Buy navigation preserves one destination surface', (
     tester,
   ) async {
@@ -2830,7 +2848,7 @@ void main() {
     );
     expect(find.text('Delivering to Home'), findsOneWidget);
     expect(find.text('Edit'), findsOneWidget);
-    expect(find.text('Payment · UPI'), findsOneWidget);
+    expect(find.text('Payment · PhonePe'), findsOneWidget);
     expect(find.textContaining('Delivery & payment'), findsNothing);
     expect(find.textContaining('delivery and payment'), findsNothing);
   });
@@ -3390,6 +3408,7 @@ void main() {
 
       await tester.tap(find.text('Place order'));
       await tester.pumpAndSettle();
+      await completeReviewPayment(tester, session);
 
       expect(find.text('Order placed'), findsOneWidget);
       expect(find.textContaining('2 products ·'), findsOneWidget);
@@ -3409,9 +3428,10 @@ void main() {
       );
       expect(find.textContaining(shop.seller), findsWidgets);
       expect(find.textContaining(wholesale.seller), findsWidgets);
-      expect(session.confirmedPurchaseId, 'BUY-NEW-01');
+      final purchaseId = session.confirmedPurchaseId;
+      expect(purchaseId, isNotNull);
       expect(session.confirmedOrders.map((order) => order.purchaseId).toSet(), {
-        'BUY-NEW-01',
+        purchaseId,
       });
     },
   );
@@ -3468,6 +3488,7 @@ void main() {
     );
     await tester.tap(find.text('Place order'));
     await tester.pumpAndSettle();
+    await completeReviewPayment(tester, session);
     expect(find.text('Order placed'), findsOneWidget);
     expect(
       find.text('Promised at Checkout · Delivered in 10 min · by 6:40 PM'),
@@ -3501,6 +3522,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Place order'));
       await tester.pumpAndSettle();
+      await completeReviewPayment(tester, session);
+      final purchaseId = session.confirmedPurchaseId!;
 
       expect(find.byKey(const ValueKey('buy-confirmation')), findsOneWidget);
       expect(find.text('Your deliveries'), findsOneWidget);
@@ -3508,7 +3531,7 @@ void main() {
       expect(find.text('Delivery 2 of 2'), findsOneWidget);
       expect(find.text('Delivery 3 of 3'), findsNothing);
       expect(find.textContaining('Promised at Checkout'), findsNWidgets(2));
-      expect(find.textContaining('Purchase BUY-NEW-01'), findsOneWidget);
+      expect(find.textContaining('Purchase $purchaseId'), findsOneWidget);
       expect(
         find.textContaining(session.confirmedOrders.first.partner),
         findsWidgets,
@@ -3551,7 +3574,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('PURCHASES'), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('buy-purchase-group-BUY-NEW-01')),
+        find.byKey(ValueKey('buy-purchase-group-$purchaseId')),
         findsOneWidget,
       );
       expect(

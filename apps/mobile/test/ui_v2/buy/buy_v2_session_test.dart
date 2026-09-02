@@ -899,7 +899,7 @@ void main() {
           );
           expect(order.total, group.total);
           expect(order.partnerType, group.partnerType);
-          expect(order.paymentMethod, 'UPI');
+          expect(order.paymentMethod, 'PhonePe');
           expect(order.recipient, session.selectedAddress.recipient);
           expect(order.addressLine, contains(session.selectedAddress.pinCode));
         }
@@ -1380,7 +1380,7 @@ void main() {
     test('saved address and payment selections change independently', () {
       session.chooseAddress('work');
       expect(session.selectedAddressId, 'work');
-      expect(session.selectedPayment, 'UPI');
+      expect(session.selectedPayment, 'PhonePe');
 
       expect(session.choosePayment('Bank transfer'), isTrue);
       expect(session.selectedAddressId, 'work');
@@ -1461,6 +1461,9 @@ void main() {
       expect(session.notice, 'This payment method is not available.');
       expect(BuyV2Session.paymentMethods, {
         'UPI',
+        'PhonePe',
+        'Paytm',
+        'Pine Labs',
         'Bank transfer',
         'Purchase order',
       });

@@ -221,6 +221,27 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
         ),
       );
     }
+    if (const {
+      'PhonePe',
+      'Paytm',
+      'Pine Labs',
+      'UPI',
+    }.contains(request.paymentMethod)) {
+      final provider = request.paymentMethod == 'UPI'
+          ? 'upi'
+          : request.paymentMethod.toLowerCase().replaceAll(' ', '-');
+      final paymentReference = reference.replaceFirst('BT-', 'PAY-');
+      return BuyV2OrderPlacementResult(
+        outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
+        customerMessage:
+            'Continue securely with ${request.paymentMethod == 'UPI' ? 'UPI' : request.paymentMethod}. MoolSocial will collect this payment.',
+        paymentReference: paymentReference,
+        paymentActionUri: Uri.https('payments.moolsocial.app', '/checkout', {
+          'provider': provider,
+          'reference': paymentReference,
+        }),
+      );
+    }
     return BuyV2OrderPlacementResult(
       outcome: BuyV2OrderPlacementOutcome.confirmed,
       customerMessage: 'Your order is confirmed.',
@@ -233,12 +254,19 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
   Future<BuyV2OrderPlacementResult> reconcileOrder({
     required String idempotencyKey,
     required String paymentReference,
-  }) async => BuyV2OrderPlacementResult(
-    outcome: BuyV2OrderPlacementOutcome.paymentPending,
-    customerMessage:
-        'Your transfer is still being checked. Do not transfer again.',
-    paymentReference: paymentReference,
-  );
+  }) async => paymentReference.startsWith('BT-')
+      ? BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.paymentPending,
+          customerMessage:
+              'Your transfer is still being checked. Do not transfer again.',
+          paymentReference: paymentReference,
+        )
+      : BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          customerMessage: 'Payment confirmed. Your order is placed.',
+          purchaseReference: paymentReference.replaceFirst('PAY-', 'MS-'),
+          paymentReference: paymentReference,
+        );
 
   @override
   Future<BuyV2OrderRefreshResult> refreshOrder({
@@ -420,6 +448,9 @@ class BuyV2Session extends ChangeNotifier {
 
   static const Set<String> paymentMethods = {
     'UPI',
+    'PhonePe',
+    'Paytm',
+    'Pine Labs',
     'Bank transfer',
     'Purchase order',
   };
@@ -510,7 +541,7 @@ class BuyV2Session extends ChangeNotifier {
   bool trackingAlertsEnabled = true;
   bool trackingAlertsAvailable = true;
   bool trackingAlertsBusy = false;
-  String selectedPayment = 'UPI';
+  String selectedPayment = 'PhonePe';
 
   bool get purchaseOrderEligibleForCheckout {
     final lines = checkoutLines;
@@ -5422,7 +5453,14 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return Future<bool>.value(false);
     }
-    if (reviewDataEnabled && selectedPayment == 'Bank transfer') {
+    if (reviewDataEnabled &&
+        const {
+          'PhonePe',
+          'Paytm',
+          'Pine Labs',
+          'UPI',
+          'Bank transfer',
+        }.contains(selectedPayment)) {
       return _submitOrderAsync();
     }
     if (reviewDataEnabled) {
@@ -5831,7 +5869,7 @@ class BuyV2Session extends ChangeNotifier {
     if (!opened) {
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
       notice =
-          'The payment app did not open. Your Cart has not changed. Try again.';
+          'Secure payment could not start. Your Cart has not changed. Try again.';
       _persistCustomerState();
       notifyListeners();
       return false;

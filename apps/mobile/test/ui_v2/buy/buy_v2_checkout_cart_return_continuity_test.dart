@@ -337,6 +337,16 @@ class _DeliveryExceptionAdapter implements BuyV2DeliveryExceptionAdapter {
   }
 }
 
+Future<bool> _submitAndCompleteReviewPayment(BuyV2Session session) async {
+  if (await session.submitOrder()) return true;
+  if (session.checkoutSubmissionState !=
+      BuyV2CheckoutSubmissionState.paymentActionRequired) {
+    return false;
+  }
+  if (!await session.continuePayment((_) async => true)) return false;
+  return session.reconcilePayment();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -590,7 +600,7 @@ void main() {
         findsOneWidget,
       );
 
-      expect(await session.submitOrder(), isTrue);
+      expect(await _submitAndCompleteReviewPayment(session), isTrue);
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.confirmation);
       expect(
@@ -687,7 +697,7 @@ void main() {
     final quotedTotal = session.checkoutQuote!.total;
     expect(quotedTotal, greaterThan(session.checkoutTotal));
 
-    expect(await session.submitOrder(), isTrue);
+    expect(await _submitAndCompleteReviewPayment(session), isTrue);
     await tester.pumpAndSettle();
     expect(session.confirmedTotal, quotedTotal);
     expect(
@@ -777,7 +787,7 @@ void main() {
       );
       expect(tester.takeException(), isNull);
 
-      expect(await session.submitOrder(), isTrue);
+      expect(await _submitAndCompleteReviewPayment(session), isTrue);
       final order = session.confirmedOrders.single;
       expect(order.deliveryPartnerName, 'Rajasthan Freight Network');
       expect(order.dispatchPromise, 'Dispatch within one business day');
@@ -816,7 +826,7 @@ void main() {
                 BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
           );
       expect(session.chooseCommercialPaymentTerm(booking), isTrue);
-      expect(await session.submitOrder(), isTrue);
+      expect(await _submitAndCompleteReviewPayment(session), isTrue);
       final order = session.confirmedOrders.single;
       balanceAdapter.amountDue = order.balanceDue;
       expect(session.openTracking(order.id), isTrue);

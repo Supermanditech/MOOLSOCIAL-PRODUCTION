@@ -5151,7 +5151,11 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                       onPressed: () {
                         if (!session.openCheckout() &&
                             session.selectedAddressOrNull == null) {
-                          showBuyV2AddressSheet(context, session);
+                          showBuyV2AddressSheet(
+                            context,
+                            session,
+                            continueToCheckoutAfterSelection: true,
+                          );
                         }
                       },
                       child: const Text('Review order'),
@@ -6440,8 +6444,8 @@ class BuyV2CheckoutView extends StatelessWidget {
                     icon: Icons.account_balance_wallet_outlined,
                     title: 'Payment · ${session.selectedPayment}',
                     detail: destinations.contains(BuyV2Destination.wholesale)
-                        ? 'One payment selection for this purchase. Supplier invoices remain attached to their deliveries.'
-                        : 'Selected payment method for this purchase.',
+                        ? 'MoolSocial collects this payment. Supplier settlement follows confirmed delivery, while each supplier invoice stays with its delivery.'
+                        : 'MoolSocial collects this payment securely for your purchase.',
                     action: 'Change',
                     onTap: () => showBuyV2PaymentSheet(context, session),
                   ),
@@ -6553,7 +6557,7 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
       BuyV2CheckoutSubmissionState.paymentActionRequired =>
         bankTransfer
             ? 'Transfer to place your order'
-            : 'Continue securely to payment',
+            : 'Continue to secure payment',
       BuyV2CheckoutSubmissionState.paymentPending =>
         'Payment confirmation is pending',
       BuyV2CheckoutSubmissionState.paymentUnknown =>
@@ -6571,7 +6575,7 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
       BuyV2CheckoutSubmissionState.paymentActionRequired =>
         bankTransfer
             ? 'Use the exact amount and reference below. Your Cart stays reserved for this single attempt.'
-            : 'Your Cart is reserved for this attempt. Complete payment once, then return here.',
+            : 'MoolSocial will collect this payment. Your Cart stays reserved until the payment is confirmed.',
       BuyV2CheckoutSubmissionState.paymentPending ||
       BuyV2CheckoutSubmissionState.paymentUnknown =>
         'Do not pay again. Check this payment before trying another method.',
@@ -6670,7 +6674,7 @@ class _CheckoutSubmissionStatus extends StatelessWidget {
                                 ? 'I’ve made the transfer'
                                 : paymentHandoff == null
                                 ? 'Choose another method'
-                                : 'Open payment app',
+                                : 'Continue payment',
                           ),
                         ),
                       )
@@ -11144,6 +11148,168 @@ class _BuyV2FilterOption extends StatelessWidget {
   }
 }
 
+Future<bool> showBuyV2PaymentCollectionSheet(
+  BuildContext context,
+  BuyV2Session session,
+  Uri paymentUri,
+) async {
+  final provider = session.selectedPayment;
+  if (!const {'PhonePe', 'Paytm', 'Pine Labs', 'UPI'}.contains(provider) ||
+      !paymentUri.hasScheme ||
+      paymentUri.host.isEmpty) {
+    return false;
+  }
+  final providerLabel = provider == 'UPI' ? 'UPI' : provider;
+  final providerIcon = switch (provider) {
+    'PhonePe' => Icons.phone_android_rounded,
+    'Paytm' => Icons.account_balance_wallet_rounded,
+    'Pine Labs' => Icons.credit_card_rounded,
+    _ => Icons.qr_code_rounded,
+  };
+  return await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        useSafeArea: true,
+        backgroundColor: Colors.white,
+        constraints: const BoxConstraints(
+          maxWidth: BuyV2PaymentSheetMotion.maxWidth,
+        ),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        sheetAnimationStyle: BuyV2PaymentSheetMotion.resolve(context),
+        builder: (sheetContext) => Semantics(
+          key: ValueKey('buy-payment-collection-$provider'),
+          container: true,
+          scopesRoute: true,
+          namesRoute: true,
+          explicitChildNodes: true,
+          label: 'Pay MoolSocial with $providerLabel',
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: BuyV2Colors.navy,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(providerIcon, color: Colors.white, size: 23),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Pay with $providerLabel',
+                            style: sheetContext.buyTitle,
+                          ),
+                          Text(
+                            'Payment is collected by MoolSocial',
+                            style: sheetContext.buyMeta,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      key: const ValueKey('buy-payment-collection-close'),
+                      tooltip: 'Close payment',
+                      onPressed: () => Navigator.of(sheetContext).pop(false),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  key: const ValueKey('buy-payment-collection-summary'),
+                  padding: const EdgeInsets.all(14),
+                  decoration: buyV2CardDecoration(
+                    color: BuyV2Colors.softBlue,
+                    border: BuyV2Colors.navy,
+                    radius: 16,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Amount to MoolSocial', style: sheetContext.buyMeta),
+                      const SizedBox(height: 2),
+                      Text(
+                        buyV2Money(session.checkoutAmountDueNow),
+                        key: const ValueKey('buy-payment-collection-amount'),
+                        style: sheetContext.buyTitle.copyWith(fontSize: 24),
+                      ),
+                      const SizedBox(height: 10),
+                      const _PaymentCollectionFact(
+                        icon: Icons.verified_user_outlined,
+                        text:
+                            'Your payment is confirmed before the order is placed.',
+                      ),
+                      const SizedBox(height: 7),
+                      const _PaymentCollectionFact(
+                        icon: Icons.inventory_2_outlined,
+                        text: 'Supplier settlement follows confirmed delivery.',
+                      ),
+                      const SizedBox(height: 7),
+                      const _PaymentCollectionFact(
+                        icon: Icons.shopping_cart_outlined,
+                        text:
+                            'Your Cart stays unchanged until payment is confirmed.',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  height: BuyV2Metrics.minimumTap,
+                  child: FilledButton.icon(
+                    key: const ValueKey('buy-payment-collection-continue'),
+                    onPressed: () => Navigator.of(sheetContext).pop(true),
+                    icon: const Icon(Icons.lock_outline_rounded, size: 18),
+                    label: Text('Continue with $providerLabel'),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextButton(
+                  key: const ValueKey('buy-payment-collection-not-now'),
+                  onPressed: () => Navigator.of(sheetContext).pop(false),
+                  child: const Text('Not now'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ) ??
+      false;
+}
+
+class _PaymentCollectionFact extends StatelessWidget {
+  const _PaymentCollectionFact({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: BuyV2Colors.navy, size: 17),
+        const SizedBox(width: 7),
+        Expanded(child: Text(text, style: context.buyMeta)),
+      ],
+    );
+  }
+}
+
 Future<void> showBuyV2PaymentSheet(
   BuildContext context,
   BuyV2Session session,
@@ -11151,24 +11317,40 @@ Future<void> showBuyV2PaymentSheet(
   final destination = session.destination;
   final view = session.view;
   final selectedPayment = session.selectedPayment;
+  final brandedChoices = [
+    (
+      'PhonePe',
+      Icons.phone_android_rounded,
+      'Pay MoolSocial securely with PhonePe',
+    ),
+    (
+      'Paytm',
+      Icons.account_balance_wallet_rounded,
+      'Pay MoolSocial securely with Paytm',
+    ),
+    (
+      'Pine Labs',
+      Icons.credit_card_rounded,
+      'Pay MoolSocial through Pine Labs',
+    ),
+  ];
+  final brandedAvailable = brandedChoices.any(
+    (choice) => session.availablePaymentMethods.contains(choice.$1),
+  );
   final choices = [
-    (
-      'UPI',
-      Icons.qr_code_rounded,
-      'Use your preferred UPI app when you are ready to pay',
-    ),
-    (
-      'Bank transfer',
-      Icons.account_balance_outlined,
-      'View transfer details during payment',
-    ),
-    (
-      'Purchase order',
-      Icons.receipt_long_outlined,
-      session.purchaseOrderEligibleForCheckout
-          ? 'Use your verified business Workspace for this wholesale basket'
-          : 'Requires a verified business Workspace and a wholesale-only basket',
-    ),
+    ...brandedChoices,
+    if (!brandedAvailable)
+      (
+        'UPI',
+        Icons.qr_code_rounded,
+        'Pay MoolSocial using an available UPI option',
+      ),
+    if (session.purchaseOrderEligibleForCheckout)
+      (
+        'Purchase order',
+        Icons.receipt_long_outlined,
+        'For this verified Wholesale or Bulk Workspace purchase',
+      ),
   ].where((choice) => session.availablePaymentMethods.contains(choice.$1));
   await showModalBottomSheet<void>(
     context: context,
@@ -11226,7 +11408,7 @@ Future<void> showBuyV2PaymentSheet(
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          'Choose how you want to pay. No payment is started here.',
+                          'Choose how you want to pay MoolSocial for this purchase.',
                           style: sheetContext.buyMeta,
                         ),
                       ],
@@ -11519,8 +11701,9 @@ Future<void> showBuyV2PrescriptionSheet(
 
 Future<void> showBuyV2AddressSheet(
   BuildContext context,
-  BuyV2Session session,
-) async {
+  BuyV2Session session, {
+  bool continueToCheckoutAfterSelection = false,
+}) async {
   final destination = session.destination;
   final view = session.view;
   final selectedAddressId = session.selectedAddressId;
@@ -11543,7 +11726,25 @@ Future<void> showBuyV2AddressSheet(
         !session.addresses.any((address) => address.id == addressId)) {
       return;
     }
-    session.chooseAddress(addressId);
+    if (session.chooseAddress(addressId) && continueToCheckoutAfterSelection) {
+      session.openCheckout();
+    }
+  }
+
+  Future<void> addAndContinue(BuildContext sheetContext) async {
+    final previousAddressId = session.selectedAddressId;
+    await _showAddAddressSheet(sheetContext, session);
+    if (!continueToCheckoutAfterSelection ||
+        session.selectedAddressId == previousAddressId ||
+        !sheetContext.mounted) {
+      return;
+    }
+    final routeCompleted = ModalRoute.of(sheetContext)?.completed;
+    Navigator.of(sheetContext).pop();
+    if (routeCompleted != null) await routeCompleted;
+    if (session.destination == destination && session.view == view) {
+      session.openCheckout();
+    }
   }
 
   await showModalBottomSheet<void>(
@@ -11712,7 +11913,7 @@ Future<void> showBuyV2AddressSheet(
                 height: BuyV2Metrics.minimumTap,
                 child: FilledButton.icon(
                   key: const ValueKey('buy-address-add'),
-                  onPressed: () => _showAddAddressSheet(sheetContext, session),
+                  onPressed: () => addAndContinue(sheetContext),
                   icon: const Icon(Icons.add_location_alt_outlined, size: 18),
                   label: const Text('Add new address'),
                 ),
