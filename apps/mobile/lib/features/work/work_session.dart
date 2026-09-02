@@ -81,6 +81,7 @@ class WorkSession extends ChangeNotifier {
   int retailerSellPrice = 0;
   bool retailerHomeDelivery = false;
   bool retailerStoreCollection = false;
+  bool retailerPublishAfterSetup = false;
   bool retailerSetupSaved = false;
   bool initialWorkspaceStateLoaded = false;
   String workspaceSearchQuery = '';
@@ -105,6 +106,7 @@ class WorkSession extends ChangeNotifier {
   final List<WorkspaceCatalogueItem> workspaceCatalogueItems = [];
   final Map<String, int> workspaceOrderQuantities = {};
   final List<WorkspaceActivityEntry> workspaceActivity = [];
+  WorkspaceGroupBuy? activeGroupBuy;
   final Set<String> dismissedWorkspaceAlerts = <String>{};
 
   int get workspaceOrderItemCount => workspaceOrderQuantities.values.fold(
@@ -1301,6 +1303,64 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setRetailerPublishAfterSetup(bool value) {
+    retailerPublishAfterSetup = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void prepareWorkspaceOrder({
+    required String source,
+    required String fulfilment,
+  }) {
+    startNewWorkspaceOrder();
+    workspaceOrderSource = source;
+    workspaceOrderFulfilment = fulfilment;
+    workspaceOrderNeedsDelivery = fulfilment != 'At the shop';
+    notifyListeners();
+  }
+
+  void startWorkspaceGroupBuy({
+    required String productName,
+    required String specification,
+    required int targetQuantity,
+    required int securedQuantity,
+    required String unitLabel,
+    required int regularUnitPrice,
+    required int groupUnitPrice,
+    required int facilitationFee,
+    required int deliveryFee,
+    required int confirmationAmount,
+    required String closingLabel,
+    required String storeDeliveryLabel,
+  }) {
+    final storeName = activeWorkspace?.name ?? workName;
+    activeGroupBuy = WorkspaceGroupBuy(
+      id: 'GB-${DateTime.now().millisecondsSinceEpoch}',
+      productName: productName.trim(),
+      specification: specification.trim(),
+      leadRetailer: storeName,
+      confirmedRetailers: [storeName],
+      targetQuantity: targetQuantity,
+      securedQuantity: securedQuantity,
+      unitLabel: unitLabel.trim(),
+      regularUnitPrice: regularUnitPrice,
+      groupUnitPrice: groupUnitPrice,
+      facilitationFee: facilitationFee,
+      deliveryFee: deliveryFee,
+      confirmationAmount: confirmationAmount,
+      closingLabel: closingLabel.trim(),
+      storeDeliveryLabel: storeDeliveryLabel.trim(),
+      paymentConfirmed: true,
+    );
+    _recordWorkspaceActivity(
+      '$storeName confirmed $securedQuantity $unitLabel of $productName for Group Buying.',
+    );
+    showNotice(
+      'Group Buying request confirmed and visible to eligible retailers.',
+    );
+  }
+
   Future<bool> finishRetailerSetup() async {
     if (!retailerProductAdded) {
       errorMessage = 'Add at least one product from the verified catalogue.';
@@ -1353,11 +1413,17 @@ class WorkSession extends ChangeNotifier {
         );
         retailerSetupSaved = true;
         reviewStage = WorkReviewStage.live;
-        workspaceVisibleToCustomers = true;
-        _recordWorkspaceActivity('Store setup completed and published.');
+        workspaceVisibleToCustomers = retailerPublishAfterSetup;
+        workspaceAcceptingOrders = retailerPublishAfterSetup;
+        _recordWorkspaceActivity(
+          retailerPublishAfterSetup
+              ? 'Store setup completed and opened for customers.'
+              : 'Store setup completed and kept off.',
+        );
       },
-      success:
-          'Shop setup complete. Your available product and fulfilment choices are live.',
+      success: retailerPublishAfterSetup
+          ? 'Shop setup complete. Your available products are open for customers.'
+          : 'Shop setup complete. Your store remains off until you choose Open.',
     );
   }
 

@@ -303,7 +303,7 @@ void main() {
       await mount(tester, route: '/app/work/retailer/setup', work: work);
       expectHeaderAndStickyAction(tester);
       final visibilityCopy = find.text(
-        'Nothing is public until setup passes and you choose Finish setup and go live.',
+        'Nothing will be public after setup until you choose Open.',
       );
       await reveal(tester, visibilityCopy);
       expect(
@@ -315,6 +315,14 @@ void main() {
         ),
       );
       expect(find.byKey(const Key('retailer-finish-setup')), findsOneWidget);
+      expect(
+        find.byKey(const Key('retailer-publish-after-setup')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('retailer-publish-after-setup')));
+      await tester.pumpAndSettle();
+      expect(work.retailerPublishAfterSetup, isTrue);
+      expect(find.text('Finish setup and open store'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -645,11 +653,11 @@ void main() {
 
     await tester.tap(find.byKey(const Key('work-dashboard-store-state')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Busy · add 20 minutes'));
+    await tester.tap(find.text('Pause for 1 hour'));
     await tester.pumpAndSettle();
-    expect(work.workspaceAcceptingOrders, isTrue);
-    expect(work.workspaceBusyMinutes, 20);
-    expect(find.text('BUSY'), findsOneWidget);
+    expect(work.workspaceAcceptingOrders, isFalse);
+    expect(work.workspaceReopensAt, 'In 1 hour');
+    expect(find.text('PAUSED'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('work-dashboard-public-preview')));
     await tester.pumpAndSettle();
@@ -666,6 +674,85 @@ void main() {
     await tester.pumpAndSettle();
     expect(work.workspaceVisibleToCustomers, isFalse);
     expect(find.text('PRIVATE PREVIEW'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('first-tap store actions open exact operational destinations', (
+    tester,
+  ) async {
+    final work = WorkSession()..seedVerifiedWorkspace();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    for (final keyName in const [
+      'work-quick-new-sale',
+      'work-quick-delivery',
+      'work-quick-buy',
+      'work-quick-group-buy',
+    ]) {
+      expect(find.byKey(Key(keyName)), findsOneWidget);
+    }
+
+    await tester.tap(find.byKey(const Key('work-quick-delivery')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-dashboard-counter-order-screen')),
+      findsOneWidget,
+    );
+    expect(work.workspaceOrderFulfilment, 'Mool delivery');
+    expect(find.byKey(const Key('work-order-address')), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-store-today-canvas')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('work-quick-buy')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    if (find.byKey(const ValueKey('buy-v2-screen')).evaluate().isNotEmpty) {
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+    }
+    expect(find.byKey(const Key('work-store-today-canvas')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('paid Group Buy pins to Today with complete decision facts', (
+    tester,
+  ) async {
+    final work = WorkSession()
+      ..seedVerifiedWorkspace()
+      ..startWorkspaceGroupBuy(
+        productName: 'Premium onion',
+        specification: 'Fresh red onion · Grade A · 45 mm+',
+        targetQuantity: 1000,
+        securedQuantity: 100,
+        unitLabel: 'kg',
+        regularUnitPrice: 18,
+        groupUnitPrice: 14,
+        facilitationFee: 200,
+        deliveryFee: 0,
+        confirmationAmount: 1400,
+        closingLabel: '5 Sep · 8:00 PM',
+        storeDeliveryLabel: '7 Sep · Door delivery',
+      );
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    expect(
+      find.byKey(const Key('work-dashboard-active-group-buy')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('work-dashboard-active-group-buy')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-group-buy-active-screen')),
+      findsOneWidget,
+    );
+    expect(find.text('₹14/kg'), findsWidgets);
+    expect(find.text('₹400'), findsOneWidget);
+    await reveal(tester, find.text('Confirmed · payment received'));
+    expect(find.text('Confirmed · payment received'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

@@ -256,6 +256,8 @@ class _WorkWorkspaceDashboardScreenState
         'sell',
       (_WorkspaceControlView.operation, _WorkspaceOperation.catalogue) =>
         'stock',
+      (_WorkspaceControlView.operation, _WorkspaceOperation.groupBuying) =>
+        'stock',
       _ => 'store',
     };
     final storeActions = [
@@ -326,6 +328,15 @@ class _WorkWorkspaceDashboardScreenState
           onStatus: _showStatus,
           onQuickState: (state) => _applyQuickStoreState(context, state),
           onOpenOperation: _showOperation,
+          onBuyStock: () => context.push(
+            Uri(
+              path: '/app/buy',
+              queryParameters: const {
+                'sub': 'wholesale',
+                'return': '/app/work/workspace/dashboard',
+              },
+            ).toString(),
+          ),
         ),
         _WorkspaceControlView.search => _WorkspaceSearchSurface(
           controller: _searchController,
@@ -415,7 +426,7 @@ class _WorkWorkspaceDashboardScreenState
     final ready =
         session.retailerSetupSaved ||
         session.reviewStage == WorkReviewStage.live;
-    if (!ready && state != _QuickStoreState.closed) {
+    if (!ready && state != _QuickStoreState.off) {
       session.beginRetailerSetup();
       context.push('/app/work/retailer/setup');
       return;
@@ -429,14 +440,6 @@ class _WorkWorkspaceDashboardScreenState
           busyMinutes: 0,
           reopensAt: '',
         );
-      case _QuickStoreState.busy:
-        session.setWorkspaceVisibility(true);
-        session.saveWorkspaceAvailability(
-          acceptingOrders: true,
-          fulfilmentMode: session.workspaceFulfilmentMode,
-          busyMinutes: 20,
-          reopensAt: '',
-        );
       case _QuickStoreState.paused:
         session.setWorkspaceVisibility(true);
         session.saveWorkspaceAvailability(
@@ -445,7 +448,7 @@ class _WorkWorkspaceDashboardScreenState
           busyMinutes: 0,
           reopensAt: 'In 1 hour',
         );
-      case _QuickStoreState.closed:
+      case _QuickStoreState.off:
         session.setWorkspaceVisibility(false);
         session.saveWorkspaceAvailability(
           acceptingOrders: false,
@@ -500,6 +503,7 @@ enum _WorkspaceOperation {
   services,
   settings,
   preview,
+  groupBuying,
 }
 
 extension on _WorkspaceOperation {
@@ -515,6 +519,7 @@ extension on _WorkspaceOperation {
     _WorkspaceOperation.services => 'Business services',
     _WorkspaceOperation.settings => 'Workspace settings',
     _WorkspaceOperation.preview => 'Customer store preview',
+    _WorkspaceOperation.groupBuying => 'Group Buying',
   };
 
   String get subtitle => switch (this) {
@@ -538,10 +543,12 @@ extension on _WorkspaceOperation {
       'Store details, documents and additional Workspaces',
     _WorkspaceOperation.preview =>
       'See exactly what customers can discover and order',
+    _WorkspaceOperation.groupBuying =>
+      'Buy together with verified retailers at a confirmed group price',
   };
 }
 
-enum _QuickStoreState { open, busy, paused, closed }
+enum _QuickStoreState { open, paused, off }
 
 class _WorkspaceDashboardHeader extends StatelessWidget {
   const _WorkspaceDashboardHeader({
@@ -569,7 +576,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
             onTap: onSearch,
             excludeSemantics: true,
             child: MoolServiceSearchField(
-              hintText: 'Search orders, products or customers',
+              hintText: 'Search store',
               readOnly: true,
               onTap: onSearch,
             ),
@@ -596,12 +603,14 @@ class _StoreControlDashboard extends StatelessWidget {
     required this.onStatus,
     required this.onQuickState,
     required this.onOpenOperation,
+    required this.onBuyStock,
   });
 
   final WorkSession session;
   final VoidCallback onStatus;
   final ValueChanged<_QuickStoreState> onQuickState;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
+  final VoidCallback onBuyStock;
 
   @override
   Widget build(BuildContext context) {
@@ -625,6 +634,24 @@ class _StoreControlDashboard extends StatelessWidget {
           onStatus: onStatus,
           onPreview: () => onOpenOperation(_WorkspaceOperation.preview),
         ),
+        _StoreQuickActionBar(
+          onNewSale: () {
+            session.prepareWorkspaceOrder(
+              source: 'Counter',
+              fulfilment: 'At the shop',
+            );
+            onOpenOperation(_WorkspaceOperation.counterOrder);
+          },
+          onDelivery: () {
+            session.prepareWorkspaceOrder(
+              source: 'Counter',
+              fulfilment: 'Mool delivery',
+            );
+            onOpenOperation(_WorkspaceOperation.counterOrder);
+          },
+          onBuy: onBuyStock,
+          onGroupBuy: () => onOpenOperation(_WorkspaceOperation.groupBuying),
+        ),
         Expanded(
           child: ListView(
             key: const Key('work-store-today-canvas'),
@@ -636,6 +663,14 @@ class _StoreControlDashboard extends StatelessWidget {
               MoolSpacing.xl,
             ),
             children: [
+              if (session.activeGroupBuy != null) ...[
+                _GroupBuyTodayRow(
+                  groupBuy: session.activeGroupBuy!,
+                  onPressed: () =>
+                      onOpenOperation(_WorkspaceOperation.groupBuying),
+                ),
+                const Divider(height: 1),
+              ],
               if (!storeReady) ...[
                 _StoreActionRow(
                   keyName: 'work-dashboard-priority-action',
@@ -644,7 +679,7 @@ class _StoreControlDashboard extends StatelessWidget {
                   eyebrow: 'ACTION REQUIRED',
                   title: 'Finish store setup',
                   detail: 'Add products and customer fulfilment choices.',
-                  actionLabel: 'Continue',
+                  actionLabel: 'Set up',
                   onPressed: () {
                     session.beginRetailerSetup();
                     context.push('/app/work/retailer/setup');
@@ -678,7 +713,9 @@ class _StoreControlDashboard extends StatelessWidget {
                     : 'No low-stock action right now.',
                 actionLabel: session.workspaceLowStockCount > 0
                     ? 'Update'
-                    : 'Open',
+                    : session.workspaceCatalogueItems.isEmpty
+                    ? 'Add'
+                    : 'View',
                 onPressed: () => onOpenOperation(_WorkspaceOperation.catalogue),
               ),
               if (session.workspaceSettlementBalance > 0) ...[
@@ -708,8 +745,18 @@ class _StoreControlDashboard extends StatelessWidget {
                     : 'Phone and counter orders can request delivery here.',
                 actionLabel: session.workspaceOrderNeedsDelivery
                     ? 'Continue'
-                    : 'Open',
-                onPressed: () => onOpenOperation(_WorkspaceOperation.delivery),
+                    : 'Request',
+                onPressed: () {
+                  if (session.workspaceOrderNeedsDelivery) {
+                    onOpenOperation(_WorkspaceOperation.delivery);
+                    return;
+                  }
+                  session.prepareWorkspaceOrder(
+                    source: 'Counter',
+                    fulfilment: 'Mool delivery',
+                  );
+                  onOpenOperation(_WorkspaceOperation.counterOrder);
+                },
               ),
               if (session.workspaceActivity.isNotEmpty) ...[
                 const SizedBox(height: MoolSpacing.md),
@@ -722,7 +769,7 @@ class _StoreControlDashboard extends StatelessWidget {
                       onOpenOperation(_WorkspaceOperation.settings),
                   icon: const Icon(Icons.notifications_active_outlined),
                   label: Text(
-                    '$alertCount ${alertCount == 1 ? 'store action' : 'store actions'} need attention',
+                    '$alertCount ${alertCount == 1 ? 'store action needs' : 'store actions need'} attention',
                   ),
                 ),
               ],
@@ -874,16 +921,14 @@ class _StoreSignalStrip extends StatelessWidget {
     final state = !ready
         ? 'SETUP'
         : !session.workspaceVisibleToCustomers
-        ? 'CLOSED'
+        ? 'OFF'
         : !session.workspaceAcceptingOrders
         ? 'PAUSED'
-        : session.workspaceBusyMinutes > 0
-        ? 'BUSY'
         : 'OPEN';
     final stateColor = switch (state) {
       'OPEN' => const Color(0xFF08765D),
-      'BUSY' || 'PAUSED' => const Color(0xFF9A4A00),
-      'CLOSED' => const Color(0xFFB42318),
+      'PAUSED' => const Color(0xFF9A4A00),
+      'OFF' => const Color(0xFFB42318),
       _ => MoolColors.orange,
     };
     return Container(
@@ -908,16 +953,12 @@ class _StoreSignalStrip extends StatelessWidget {
                   child: Text('Open for orders'),
                 ),
                 PopupMenuItem(
-                  value: _QuickStoreState.busy,
-                  child: Text('Busy · add 20 minutes'),
-                ),
-                PopupMenuItem(
                   value: _QuickStoreState.paused,
                   child: Text('Pause for 1 hour'),
                 ),
                 PopupMenuItem(
-                  value: _QuickStoreState.closed,
-                  child: Text('Close store'),
+                  value: _QuickStoreState.off,
+                  child: Text('Turn store off'),
                 ),
               ],
               child: _StoreSignal(
@@ -1000,6 +1041,122 @@ class _StoreSignal extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _StoreQuickActionBar extends StatelessWidget {
+  const _StoreQuickActionBar({
+    required this.onNewSale,
+    required this.onDelivery,
+    required this.onBuy,
+    required this.onGroupBuy,
+  });
+
+  final VoidCallback onNewSale;
+  final VoidCallback onDelivery;
+  final VoidCallback onBuy;
+  final VoidCallback onGroupBuy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('work-store-quick-actions'),
+      height: 58,
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          _StoreQuickAction(
+            keyName: 'work-quick-new-sale',
+            icon: Icons.point_of_sale_outlined,
+            label: 'New Sale',
+            onPressed: onNewSale,
+          ),
+          _StoreQuickAction(
+            keyName: 'work-quick-delivery',
+            icon: Icons.delivery_dining_outlined,
+            label: 'Deliver',
+            onPressed: onDelivery,
+          ),
+          _StoreQuickAction(
+            keyName: 'work-quick-buy',
+            icon: Icons.shopping_bag_outlined,
+            label: 'Buy',
+            onPressed: onBuy,
+          ),
+          _StoreQuickAction(
+            keyName: 'work-quick-group-buy',
+            icon: Icons.groups_2_outlined,
+            label: 'Group Buy',
+            onPressed: onGroupBuy,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoreQuickAction extends StatelessWidget {
+  const _StoreQuickAction({
+    required this.keyName,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String keyName;
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        key: Key(keyName),
+        borderRadius: BorderRadius.circular(10),
+        onTap: onPressed,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: MoolColors.navy, size: 19),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GroupBuyTodayRow extends StatelessWidget {
+  const _GroupBuyTodayRow({required this.groupBuy, required this.onPressed});
+
+  final WorkspaceGroupBuy groupBuy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return _StoreActionRow(
+      keyName: 'work-dashboard-active-group-buy',
+      urgency: _StoreActionUrgency.attention,
+      icon: Icons.groups_2_outlined,
+      eyebrow: 'GROUP BUY · ${groupBuy.closingLabel.toUpperCase()}',
+      title:
+          '${groupBuy.productName} · ₹${groupBuy.groupUnitPrice}/${groupBuy.unitLabel}',
+      detail:
+          '${groupBuy.confirmedRetailers.length} retailer confirmed · Save ₹${groupBuy.savingPerUnit}/${groupBuy.unitLabel}',
+      actionLabel: 'Review',
+      onPressed: onPressed,
     );
   }
 }
@@ -1440,6 +1597,22 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       return _WorkspaceCatalogueSurface(
         session: session,
         onOpenPurchases: () => onOpenOperation(_WorkspaceOperation.sourcing),
+        onOpenGroupBuy: () => onOpenOperation(_WorkspaceOperation.groupBuying),
+      );
+    }
+    if (operation == _WorkspaceOperation.groupBuying) {
+      return Column(
+        children: [
+          _StockContextRail(
+            lowStockOnly: false,
+            groupBuySelected: true,
+            onProducts: () => onOpenOperation(_WorkspaceOperation.catalogue),
+            onLowStock: () => onOpenOperation(_WorkspaceOperation.catalogue),
+            onPurchases: () => onOpenOperation(_WorkspaceOperation.sourcing),
+            onGroupBuy: () {},
+          ),
+          Expanded(child: _WorkspaceGroupBuyingSurface(session: session)),
+        ],
       );
     }
     if (operation == _WorkspaceOperation.preview) {
@@ -1613,6 +1786,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     ],
     _WorkspaceOperation.counterOrder => const [],
     _WorkspaceOperation.preview => const [],
+    _WorkspaceOperation.groupBuying => const [],
   };
 }
 
@@ -1687,10 +1861,12 @@ class _WorkspaceCatalogueSurface extends StatefulWidget {
   const _WorkspaceCatalogueSurface({
     required this.session,
     required this.onOpenPurchases,
+    required this.onOpenGroupBuy,
   });
 
   final WorkSession session;
   final VoidCallback onOpenPurchases;
+  final VoidCallback onOpenGroupBuy;
 
   @override
   State<_WorkspaceCatalogueSurface> createState() =>
@@ -1750,6 +1926,7 @@ class _WorkspaceCatalogueSurfaceState
           onProducts: () => setState(() => _lowStockOnly = false),
           onLowStock: () => setState(() => _lowStockOnly = true),
           onPurchases: widget.onOpenPurchases,
+          onGroupBuy: widget.onOpenGroupBuy,
         ),
         Expanded(
           child: ListView(
@@ -1836,15 +2013,19 @@ class _WorkspaceCatalogueSurfaceState
 class _StockContextRail extends StatelessWidget {
   const _StockContextRail({
     required this.lowStockOnly,
+    this.groupBuySelected = false,
     required this.onProducts,
     required this.onLowStock,
     required this.onPurchases,
+    required this.onGroupBuy,
   });
 
   final bool lowStockOnly;
+  final bool groupBuySelected;
   final VoidCallback onProducts;
   final VoidCallback onLowStock;
   final VoidCallback onPurchases;
+  final VoidCallback onGroupBuy;
 
   @override
   Widget build(BuildContext context) {
@@ -1859,18 +2040,23 @@ class _StockContextRail extends StatelessWidget {
         children: [
           _StoreContextButton(
             label: 'Products',
-            selected: !lowStockOnly,
-            onPressed: lowStockOnly ? onProducts : null,
+            selected: !lowStockOnly && !groupBuySelected,
+            onPressed: !lowStockOnly && !groupBuySelected ? null : onProducts,
           ),
           _StoreContextButton(
             label: 'Low stock',
-            selected: lowStockOnly,
-            onPressed: lowStockOnly ? null : onLowStock,
+            selected: lowStockOnly && !groupBuySelected,
+            onPressed: lowStockOnly && !groupBuySelected ? null : onLowStock,
           ),
           _StoreContextButton(
             label: 'Purchases',
             selected: false,
             onPressed: onPurchases,
+          ),
+          _StoreContextButton(
+            label: 'Group Buy',
+            selected: groupBuySelected,
+            onPressed: groupBuySelected ? null : onGroupBuy,
           ),
         ],
       ),
@@ -2381,6 +2567,447 @@ class _CustomerStorePreviewSurface extends StatelessWidget {
             const SizedBox(height: MoolSpacing.xs),
           ],
       ],
+    );
+  }
+}
+
+class _WorkspaceGroupBuyingSurface extends StatefulWidget {
+  const _WorkspaceGroupBuyingSurface({required this.session});
+
+  final WorkSession session;
+
+  @override
+  State<_WorkspaceGroupBuyingSurface> createState() =>
+      _WorkspaceGroupBuyingSurfaceState();
+}
+
+class _WorkspaceGroupBuyingSurfaceState
+    extends State<_WorkspaceGroupBuyingSurface> {
+  String? _productId;
+  final TextEditingController _specification = TextEditingController();
+  final TextEditingController _target = TextEditingController();
+  final TextEditingController _secured = TextEditingController();
+  final TextEditingController _unit = TextEditingController(text: 'kg');
+  final TextEditingController _regularPrice = TextEditingController();
+  final TextEditingController _groupPrice = TextEditingController();
+  final TextEditingController _facilitationFee = TextEditingController(
+    text: '0',
+  );
+  final TextEditingController _deliveryFee = TextEditingController(text: '0');
+  final TextEditingController _confirmationAmount = TextEditingController();
+  final TextEditingController _closing = TextEditingController();
+  final TextEditingController _deliveryDate = TextEditingController();
+  bool _paymentConfirmed = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _specification.dispose();
+    _target.dispose();
+    _secured.dispose();
+    _unit.dispose();
+    _regularPrice.dispose();
+    _groupPrice.dispose();
+    _facilitationFee.dispose();
+    _deliveryFee.dispose();
+    _confirmationAmount.dispose();
+    _closing.dispose();
+    _deliveryDate.dispose();
+    super.dispose();
+  }
+
+  void _start() {
+    final products = widget.session.workspaceCatalogueItems.isEmpty
+        ? workspaceMasterCatalogue
+        : widget.session.workspaceCatalogueItems;
+    final selected = products
+        .where((product) => product.id == _productId)
+        .firstOrNull;
+    final target = int.tryParse(_target.text.trim());
+    final secured = int.tryParse(_secured.text.trim());
+    final regular = int.tryParse(_regularPrice.text.trim());
+    final group = int.tryParse(_groupPrice.text.trim());
+    final facilitation = int.tryParse(_facilitationFee.text.trim());
+    final delivery = int.tryParse(_deliveryFee.text.trim());
+    final confirmation = int.tryParse(_confirmationAmount.text.trim());
+    final error = selected == null
+        ? 'Choose the exact product or commodity.'
+        : _specification.text.trim().isEmpty
+        ? 'Add the complete product specification.'
+        : target == null || target <= 0
+        ? 'Enter the total Group Buying quantity.'
+        : secured == null || secured <= 0 || secured > target
+        ? 'Enter the quantity already confirmed by your store.'
+        : _unit.text.trim().isEmpty
+        ? 'Enter the trading unit.'
+        : regular == null || regular <= 0
+        ? 'Enter the regular market price.'
+        : group == null || group <= 0 || group >= regular
+        ? 'Enter a Group Buying price below the regular price.'
+        : facilitation == null || facilitation < 0
+        ? 'Enter the MoolSocial facilitation fee.'
+        : delivery == null || delivery < 0
+        ? 'Enter the store delivery fee or zero for free delivery.'
+        : confirmation == null || confirmation <= 0
+        ? 'Enter the confirmation amount.'
+        : _closing.text.trim().isEmpty
+        ? 'Add the closing date and time.'
+        : _deliveryDate.text.trim().isEmpty
+        ? 'Add the expected door-delivery date.'
+        : !_paymentConfirmed
+        ? 'Confirm the payment before publishing this Group Buy.'
+        : null;
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
+    widget.session.startWorkspaceGroupBuy(
+      productName: selected!.title,
+      specification: _specification.text,
+      targetQuantity: target!,
+      securedQuantity: secured!,
+      unitLabel: _unit.text,
+      regularUnitPrice: regular!,
+      groupUnitPrice: group!,
+      facilitationFee: facilitation!,
+      deliveryFee: delivery!,
+      confirmationAmount: confirmation!,
+      closingLabel: _closing.text,
+      storeDeliveryLabel: _deliveryDate.text,
+    );
+    setState(() => _error = null);
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final groupBuy = widget.session.activeGroupBuy;
+    if (groupBuy != null) {
+      return _ActiveGroupBuyView(groupBuy: groupBuy);
+    }
+    final products = widget.session.workspaceCatalogueItems.isEmpty
+        ? workspaceMasterCatalogue
+        : widget.session.workspaceCatalogueItems;
+    return ListView(
+      key: const Key('work-group-buy-create-screen'),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.md,
+        MoolSpacing.xs,
+        MoolSpacing.md,
+        MoolSpacing.xl,
+      ),
+      children: [
+        const Text(
+          'Start a Group Buy',
+          style: TextStyle(
+            color: MoolColors.navy,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const Text(
+          'Publish only after your store confirms the quantity and payment.',
+          style: TextStyle(color: MoolColors.muted),
+        ),
+        const SizedBox(height: MoolSpacing.sm),
+        DropdownButtonFormField<String>(
+          key: const Key('work-group-buy-product'),
+          initialValue: _productId,
+          decoration: const InputDecoration(labelText: 'Product or commodity'),
+          items: [
+            for (final product in products)
+              DropdownMenuItem(value: product.id, child: Text(product.title)),
+          ],
+          onChanged: (value) {
+            final product = products
+                .where((item) => item.id == value)
+                .firstOrNull;
+            setState(() {
+              _productId = value;
+              if (product != null && _specification.text.isEmpty) {
+                _specification.text = '${product.variant} · ${product.pack}';
+              }
+            });
+          },
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        TextField(
+          key: const Key('work-group-buy-specification'),
+          controller: _specification,
+          decoration: const InputDecoration(
+            labelText: 'Exact specification and grade',
+          ),
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        Row(
+          children: [
+            Expanded(
+              child: _NumberField(
+                keyName: 'work-group-buy-target',
+                controller: _target,
+                label: 'Target quantity',
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _NumberField(
+                keyName: 'work-group-buy-secured',
+                controller: _secured,
+                label: 'Your confirmed quantity',
+              ),
+            ),
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 74,
+              child: TextField(
+                key: const Key('work-group-buy-unit'),
+                controller: _unit,
+                decoration: const InputDecoration(labelText: 'Unit'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        Row(
+          children: [
+            Expanded(
+              child: _MoneyField(
+                keyName: 'work-group-buy-regular-price',
+                controller: _regularPrice,
+                label: 'Regular / unit',
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _MoneyField(
+                keyName: 'work-group-buy-price',
+                controller: _groupPrice,
+                label: 'Group / unit',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        Row(
+          children: [
+            Expanded(
+              child: _MoneyField(
+                keyName: 'work-group-buy-facilitation-fee',
+                controller: _facilitationFee,
+                label: 'MoolSocial fee',
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _MoneyField(
+                keyName: 'work-group-buy-delivery-fee',
+                controller: _deliveryFee,
+                label: 'Delivery fee',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        _MoneyField(
+          keyName: 'work-group-buy-confirmation-amount',
+          controller: _confirmationAmount,
+          label: 'Confirmation amount paid',
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        TextField(
+          key: const Key('work-group-buy-closing'),
+          controller: _closing,
+          decoration: const InputDecoration(
+            labelText: 'Closing date and time',
+            hintText: 'For example: 5 Sep · 8:00 PM',
+          ),
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        TextField(
+          key: const Key('work-group-buy-delivery-date'),
+          controller: _deliveryDate,
+          decoration: const InputDecoration(
+            labelText: 'Door-delivery date',
+            hintText: 'Confirmed expected date for each store',
+          ),
+        ),
+        SwitchListTile.adaptive(
+          key: const Key('work-group-buy-payment-confirmed'),
+          contentPadding: EdgeInsets.zero,
+          value: _paymentConfirmed,
+          title: const Text('Confirmation amount paid'),
+          subtitle: const Text(
+            'The Group Buy becomes visible to eligible retailers only after payment confirmation.',
+          ),
+          onChanged: (value) => setState(() => _paymentConfirmed = value),
+        ),
+        if (_error != null)
+          Text(
+            _error!,
+            key: const Key('work-group-buy-error'),
+            style: const TextStyle(
+              color: Color(0xFFB42318),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        const SizedBox(height: MoolSpacing.sm),
+        FilledButton.icon(
+          key: const Key('work-group-buy-confirm'),
+          onPressed: _start,
+          icon: const Icon(Icons.verified_outlined),
+          label: const Text('Confirm and publish Group Buy'),
+        ),
+      ],
+    );
+  }
+}
+
+class _NumberField extends StatelessWidget {
+  const _NumberField({
+    required this.keyName,
+    required this.controller,
+    required this.label,
+  });
+
+  final String keyName;
+  final TextEditingController controller;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      key: Key(keyName),
+      controller: controller,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(labelText: label),
+    );
+  }
+}
+
+class _ActiveGroupBuyView extends StatelessWidget {
+  const _ActiveGroupBuyView({required this.groupBuy});
+
+  final WorkspaceGroupBuy groupBuy;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      key: const Key('work-group-buy-active-screen'),
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.md,
+        MoolSpacing.xs,
+        MoolSpacing.md,
+        MoolSpacing.xl,
+      ),
+      children: [
+        Text(
+          groupBuy.productName,
+          style: const TextStyle(
+            color: MoolColors.navy,
+            fontSize: 21,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        Text(groupBuy.specification),
+        const SizedBox(height: MoolSpacing.sm),
+        WorkCard(
+          keyName: 'work-group-buy-live-status',
+          color: const Color(0xFFFFF7EA),
+          child: Column(
+            children: [
+              _GroupBuyFact(label: 'Closes', value: groupBuy.closingLabel),
+              _GroupBuyFact(
+                label: 'Confirmed',
+                value:
+                    '${groupBuy.securedQuantity}/${groupBuy.targetQuantity} ${groupBuy.unitLabel}',
+              ),
+              _GroupBuyFact(
+                label: 'Remaining',
+                value: '${groupBuy.remainingQuantity} ${groupBuy.unitLabel}',
+              ),
+              _GroupBuyFact(
+                label: 'Regular price',
+                value: '₹${groupBuy.regularUnitPrice}/${groupBuy.unitLabel}',
+              ),
+              _GroupBuyFact(
+                label: 'Group price',
+                value: '₹${groupBuy.groupUnitPrice}/${groupBuy.unitLabel}',
+              ),
+              _GroupBuyFact(
+                label: 'Your saving',
+                value: '₹${groupBuy.totalSaving}',
+              ),
+              _GroupBuyFact(
+                label: 'MoolSocial fee',
+                value: '₹${groupBuy.facilitationFee}',
+              ),
+              _GroupBuyFact(
+                label: 'Store delivery',
+                value: groupBuy.deliveryFee == 0
+                    ? 'Free · ${groupBuy.storeDeliveryLabel}'
+                    : '₹${groupBuy.deliveryFee} · ${groupBuy.storeDeliveryLabel}',
+              ),
+              _GroupBuyFact(
+                label: 'Confirmation paid',
+                value: '₹${groupBuy.confirmationAmount}',
+              ),
+              _GroupBuyFact(
+                label: 'Delivery partner',
+                value:
+                    groupBuy.deliveryPartnerName ??
+                    'Assigned after stock is secured',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: MoolSpacing.md),
+        const _WorkspaceSectionLabel(
+          title: 'Confirmed retailers',
+          detail: 'Payment-backed participation',
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        for (final retailer in groupBuy.confirmedRetailers)
+          ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: Color(0xFFEAF7E8),
+              child: Icon(Icons.verified_rounded, color: MoolColors.success),
+            ),
+            title: Text(retailer),
+            subtitle: const Text('Confirmed · payment received'),
+          ),
+      ],
+    );
+  }
+}
+
+class _GroupBuyFact extends StatelessWidget {
+  const _GroupBuyFact({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label, style: const TextStyle(color: MoolColors.muted)),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                color: MoolColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

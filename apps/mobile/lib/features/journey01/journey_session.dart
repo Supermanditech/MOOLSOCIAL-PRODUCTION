@@ -1654,8 +1654,11 @@ class JourneySession extends ChangeNotifier {
     }
   }
 
-  String buyExitRoute({String? requestedRoute}) =>
-      requestedRoute == '/app/mool' ? '/app/mool' : '/app/mool?from=buy';
+  String buyExitRoute({String? requestedRoute}) => switch (requestedRoute) {
+    '/app/mool' => '/app/mool',
+    '/app/work/workspace/dashboard' => '/app/work/workspace/dashboard',
+    _ => '/app/mool?from=buy',
+  };
 
   void openMoolFrom(String section) {
     if (section != 'mool') previousPrimarySection = section;

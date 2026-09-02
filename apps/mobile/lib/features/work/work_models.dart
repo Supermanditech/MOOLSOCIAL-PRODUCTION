@@ -224,6 +224,51 @@ class WorkspaceActivityEntry {
   final DateTime time;
 }
 
+class WorkspaceGroupBuy {
+  const WorkspaceGroupBuy({
+    required this.id,
+    required this.productName,
+    required this.specification,
+    required this.leadRetailer,
+    required this.confirmedRetailers,
+    required this.targetQuantity,
+    required this.securedQuantity,
+    required this.unitLabel,
+    required this.regularUnitPrice,
+    required this.groupUnitPrice,
+    required this.facilitationFee,
+    required this.deliveryFee,
+    required this.confirmationAmount,
+    required this.closingLabel,
+    required this.storeDeliveryLabel,
+    required this.paymentConfirmed,
+    this.deliveryPartnerName,
+  });
+
+  final String id;
+  final String productName;
+  final String specification;
+  final String leadRetailer;
+  final List<String> confirmedRetailers;
+  final int targetQuantity;
+  final int securedQuantity;
+  final String unitLabel;
+  final int regularUnitPrice;
+  final int groupUnitPrice;
+  final int facilitationFee;
+  final int deliveryFee;
+  final int confirmationAmount;
+  final String closingLabel;
+  final String storeDeliveryLabel;
+  final bool paymentConfirmed;
+  final String? deliveryPartnerName;
+
+  int get remainingQuantity =>
+      (targetQuantity - securedQuantity).clamp(0, targetQuantity);
+  int get savingPerUnit => regularUnitPrice - groupUnitPrice;
+  int get totalSaving => savingPerUnit * securedQuantity;
+}
+
 enum WorkOpportunityPosterType {
   moolSocial,
   retailer,

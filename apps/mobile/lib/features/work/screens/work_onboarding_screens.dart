@@ -3830,7 +3830,7 @@ class WorkspaceReadyScreen extends StatelessWidget {
                       ),
                     ),
                     const Text(
-                      '3 steps · stock, price and fulfilment',
+                      '4 steps · product, price, fulfilment and publishing',
                       style: TextStyle(
                         color: Color(0xFFD9DAFF),
                         fontWeight: FontWeight.w700,
@@ -3838,7 +3838,7 @@ class WorkspaceReadyScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: MoolSpacing.sm),
                     const Text(
-                      'Customers see products only after every readiness step is complete and you approve going live.',
+                      'Customers see products only after every readiness step is complete and you choose to open the store.',
                       style: TextStyle(color: Color(0xFFD9DAFF), height: 1.4),
                     ),
                   ],
@@ -3987,8 +3987,10 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
           session: widget.session,
           title: complete ? 'Shop ready' : 'Set up your shop',
           subtitle: complete
-              ? 'Available products are now visible'
-              : 'Stock, price and fulfilment',
+              ? widget.session.workspaceVisibleToCustomers
+                    ? 'Available products are open for customers'
+                    : 'Setup complete · store is off'
+              : 'Stock, price, fulfilment and publishing',
           fallbackBackRoute: complete
               ? '/app/work/workspace/choose'
               : '/app/work/ready',
@@ -3999,7 +4001,9 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
                 : 'retailer-finish-setup',
             label: complete
                 ? 'Open shop operations'
-                : 'Finish setup and go live',
+                : widget.session.retailerPublishAfterSetup
+                ? 'Finish setup and open store'
+                : 'Finish setup with store off',
             busy: widget.session.busy,
             onPressed: () async {
               if (complete) {
@@ -4028,7 +4032,9 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      complete ? 'Mahadev Fresh Mart is ready' : '3 steps',
+                      complete
+                          ? '${widget.session.activeWorkspace?.name ?? widget.session.workName} is ready'
+                          : '4 steps',
                       style: TextStyle(
                         color: complete ? MoolColors.ink : Colors.white,
                         fontSize: 21,
@@ -4038,7 +4044,7 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
                     Text(
                       complete
                           ? 'Customers see only available stock with the fulfilment you approved.'
-                          : 'Products remain private until all three checks pass and you approve going live.',
+                          : 'Products remain private until setup passes and you choose whether to open the store.',
                       style: TextStyle(
                         color: complete
                             ? MoolColors.muted
@@ -4214,22 +4220,55 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
                 ),
               ),
               const SizedBox(height: MoolSpacing.md),
+              const WorkSectionTitle(
+                title: '4. Choose store publishing',
+                detail: 'You can open the store now or keep it off after setup',
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              WorkCard(
+                child: SwitchListTile.adaptive(
+                  key: const Key('retailer-publish-after-setup'),
+                  contentPadding: EdgeInsets.zero,
+                  value: widget.session.retailerPublishAfterSetup,
+                  title: const Text(
+                    'Open store after setup',
+                    style: TextStyle(
+                      color: MoolColors.ink,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  subtitle: Text(
+                    widget.session.retailerPublishAfterSetup
+                        ? 'Available products will be public and ready for customer orders.'
+                        : 'The store remains off and private until you choose Open.',
+                  ),
+                  onChanged: widget.session.setRetailerPublishAfterSetup,
+                ),
+              ),
+              const SizedBox(height: MoolSpacing.md),
               WorkCard(
                 color: const Color(0xFFFFF4E5),
                 child: Row(
                   children: [
                     Icon(
-                      complete
+                      complete && widget.session.workspaceVisibleToCustomers
                           ? Icons.visibility_rounded
                           : Icons.visibility_off_outlined,
-                      color: complete ? MoolColors.success : MoolColors.orange,
+                      color:
+                          complete && widget.session.workspaceVisibleToCustomers
+                          ? MoolColors.success
+                          : MoolColors.orange,
                     ),
                     const SizedBox(width: MoolSpacing.sm),
                     Expanded(
                       child: Text(
                         complete
-                            ? 'This product is visible with current stock and fulfilment.'
-                            : 'Nothing is public until setup passes and you choose Finish setup and go live.',
+                            ? widget.session.workspaceVisibleToCustomers
+                                  ? 'Available products are public with the fulfilment you approved.'
+                                  : 'Setup is complete. The store remains off until you choose Open.'
+                            : widget.session.retailerPublishAfterSetup
+                            ? 'The store will open after all four setup steps pass.'
+                            : 'Nothing will be public after setup until you choose Open.',
                         style: const TextStyle(
                           color: MoolColors.ink,
                           fontWeight: FontWeight.w700,
