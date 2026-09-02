@@ -29,6 +29,7 @@ class _WorkWorkspaceDashboardScreenState
   String _draftFulfilmentMode = 'Delivery and pickup';
   int _draftBusyMinutes = 0;
   String _draftReopensAt = '';
+  _WorkspaceOperation _operation = _WorkspaceOperation.orders;
 
   @override
   void initState() {
@@ -227,6 +228,7 @@ class _WorkWorkspaceDashboardScreenState
       _WorkspaceControlView.search => 'Search your store',
       _WorkspaceControlView.status => 'Store availability',
       _WorkspaceControlView.alerts => 'Needs your attention',
+      _WorkspaceControlView.operation => _operation.title,
     };
     final subtitle = switch (_view) {
       _WorkspaceControlView.dashboard => '${profile.label} · ${workspace.area}',
@@ -236,14 +238,9 @@ class _WorkWorkspaceDashboardScreenState
         'Choose when customers can order and how you fulfil',
       _WorkspaceControlView.alerts =>
         'Resolve the most important store actions first',
+      _WorkspaceControlView.operation => _operation.subtitle,
     };
     final bottomAction = switch (_view) {
-      _WorkspaceControlView.dashboard => WorkPrimaryButton(
-        keyName: 'work-dashboard-earn',
-        label: 'Find business opportunities',
-        icon: Icons.bolt_rounded,
-        onPressed: () => context.push('/app/work/earn'),
-      ),
       _WorkspaceControlView.status => WorkPrimaryButton(
         keyName: 'work-status-save',
         label: 'Save store availability',
@@ -257,8 +254,17 @@ class _WorkWorkspaceDashboardScreenState
       session: session,
       title: title,
       subtitle: subtitle,
+      headerTitle: _view == _WorkspaceControlView.dashboard
+          ? _WorkspaceDashboardHeader(
+              session: session,
+              onSearch: _showSearch,
+              onAlerts: _showAlerts,
+              onProfile: () => _openProfile(context, workspace),
+            )
+          : null,
       fallbackBackRoute: '/app/work/earn',
       activeLocalAction: 'workspace',
+      showBack: _view != _WorkspaceControlView.dashboard,
       showHeaderChat: false,
       showTrailingAction: false,
       onBack: _view == _WorkspaceControlView.dashboard ? null : _showDashboard,
@@ -268,10 +274,9 @@ class _WorkWorkspaceDashboardScreenState
           session: session,
           workspace: workspace,
           profile: profile,
-          onSearch: _showSearch,
           onStatus: _showStatus,
-          onAlerts: _showAlerts,
-          onProfile: () => _openProfile(context, workspace),
+          onVisibility: () => _toggleVisibility(context),
+          onOpenOperation: _showOperation,
         ),
         _WorkspaceControlView.search => _WorkspaceSearchSurface(
           controller: _searchController,
@@ -279,7 +284,7 @@ class _WorkWorkspaceDashboardScreenState
           query: session.workspaceSearchQuery,
           onChanged: session.updateWorkspaceSearch,
           onClear: _clearSearch,
-          onOpen: (route) => context.push(route),
+          onOpen: _showOperation,
         ),
         _WorkspaceControlView.status => _WorkspaceStatusSurface(
           acceptingOrders: _draftAcceptingOrders,
@@ -305,8 +310,15 @@ class _WorkWorkspaceDashboardScreenState
         _WorkspaceControlView.alerts => _WorkspaceAlertsSurface(
           session: session,
           onOpen: (route) => context.push(route),
+          onOpenOrders: () => _showOperation(_WorkspaceOperation.orders),
           onOpenStatus: _showStatus,
           onDismiss: session.dismissWorkspaceAlert,
+        ),
+        _WorkspaceControlView.operation => _WorkspaceOperationSurface(
+          operation: _operation,
+          session: session,
+          onOpenOperation: _showOperation,
+          onOpenRoute: (route) => context.push(route),
         ),
       },
     );
@@ -340,6 +352,26 @@ class _WorkWorkspaceDashboardScreenState
     setState(() => _view = _WorkspaceControlView.alerts);
   }
 
+  void _showOperation(_WorkspaceOperation operation) {
+    _searchFocus.unfocus();
+    setState(() {
+      _operation = operation;
+      _view = _WorkspaceControlView.operation;
+    });
+  }
+
+  void _toggleVisibility(BuildContext context) {
+    final ready =
+        session.retailerSetupSaved ||
+        session.reviewStage == WorkReviewStage.live;
+    if (!ready && !session.workspaceVisibleToCustomers) {
+      session.beginRetailerSetup();
+      context.push('/app/work/retailer/setup');
+      return;
+    }
+    session.setWorkspaceVisibility(!session.workspaceVisibleToCustomers);
+  }
+
   void _openProfile(BuildContext context, WorkWorkspace workspace) {
     showGlobalProfilePanelV2(
       context,
@@ -370,31 +402,122 @@ class _WorkWorkspaceDashboardScreenState
   }
 }
 
-enum _WorkspaceControlView { dashboard, search, status, alerts }
+enum _WorkspaceControlView { dashboard, search, status, alerts, operation }
+
+enum _WorkspaceOperation {
+  orders,
+  counterOrder,
+  catalogue,
+  delivery,
+  customers,
+  payments,
+  books,
+  sourcing,
+  services,
+  settings,
+}
+
+extension on _WorkspaceOperation {
+  String get title => switch (this) {
+    _WorkspaceOperation.orders => 'Customer orders',
+    _WorkspaceOperation.counterOrder => 'Create customer order',
+    _WorkspaceOperation.catalogue => 'Catalogue and stock',
+    _WorkspaceOperation.delivery => 'Delivery desk',
+    _WorkspaceOperation.customers => 'Customer records',
+    _WorkspaceOperation.payments => 'Sales and settlements',
+    _WorkspaceOperation.books => 'Business books',
+    _WorkspaceOperation.sourcing => 'Wholesale sourcing',
+    _WorkspaceOperation.services => 'Business services',
+    _WorkspaceOperation.settings => 'Workspace settings',
+  };
+
+  String get subtitle => switch (this) {
+    _WorkspaceOperation.orders => 'Accept, prepare and complete every order',
+    _WorkspaceOperation.counterOrder =>
+      'Record counter or phone orders and arrange delivery',
+    _WorkspaceOperation.catalogue =>
+      'Products, selling prices and available stock',
+    _WorkspaceOperation.delivery =>
+      'Assign delivery and follow every customer handoff',
+    _WorkspaceOperation.customers =>
+      'Purchases, dues and repeat-business history',
+    _WorkspaceOperation.payments =>
+      'Completed sales, available balance and settlement',
+    _WorkspaceOperation.books => 'Sales, purchases, stock and money records',
+    _WorkspaceOperation.sourcing =>
+      'Compare wholesale supply and replenish stock',
+    _WorkspaceOperation.services =>
+      'GST, tax, bookkeeping and audit assistance',
+    _WorkspaceOperation.settings =>
+      'Store details, documents and additional Workspaces',
+  };
+}
+
+class _WorkspaceDashboardHeader extends StatelessWidget {
+  const _WorkspaceDashboardHeader({
+    required this.session,
+    required this.onSearch,
+    required this.onAlerts,
+    required this.onProfile,
+  });
+
+  final WorkSession session;
+  final VoidCallback onSearch;
+  final VoidCallback onAlerts;
+  final VoidCallback onProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      key: const Key('work-dashboard-inline-header'),
+      children: [
+        Expanded(
+          child: MoolServiceSearchField(
+            fieldKey: const Key('work-dashboard-search'),
+            hintText: 'Search your store',
+            semanticLabel: 'Search orders, products and customers',
+            readOnly: true,
+            onTap: onSearch,
+          ),
+        ),
+        const SizedBox(width: 6),
+        _DashboardAlertButton(
+          count: _workspaceAlerts(session).length,
+          onPressed: onAlerts,
+        ),
+        const SizedBox(width: 4),
+        MoolGlobalProfileShortcutV2(
+          keyName: 'work-dashboard-profile',
+          onPressed: onProfile,
+        ),
+      ],
+    );
+  }
+}
 
 class _StoreControlDashboard extends StatelessWidget {
   const _StoreControlDashboard({
     required this.session,
     required this.workspace,
     required this.profile,
-    required this.onSearch,
     required this.onStatus,
-    required this.onAlerts,
-    required this.onProfile,
+    required this.onVisibility,
+    required this.onOpenOperation,
   });
 
   final WorkSession session;
   final WorkWorkspace workspace;
   final WorkProfileOption profile;
-  final VoidCallback onSearch;
   final VoidCallback onStatus;
-  final VoidCallback onAlerts;
-  final VoidCallback onProfile;
+  final VoidCallback onVisibility;
+  final ValueChanged<_WorkspaceOperation> onOpenOperation;
 
   @override
   Widget build(BuildContext context) {
-    final presentation = _presentationFor(profile);
     final alertCount = _workspaceAlerts(session).length;
+    final storeReady =
+        session.retailerSetupSaved ||
+        session.reviewStage == WorkReviewStage.live;
     return ListView(
       key: const Key('work-workspace-dashboard'),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -405,41 +528,30 @@ class _StoreControlDashboard extends StatelessWidget {
         MoolSpacing.xl,
       ),
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: MoolServiceSearchField(
-                fieldKey: const Key('work-dashboard-search'),
-                hintText: 'Search orders, products, customers or invoices',
-                semanticLabel: 'Search your store',
-                readOnly: true,
-                onTap: onSearch,
-              ),
-            ),
-            const SizedBox(width: MoolSpacing.xs),
-            _DashboardAlertButton(count: alertCount, onPressed: onAlerts),
-            const SizedBox(width: 4),
-            MoolGlobalProfileShortcutV2(
-              keyName: 'work-dashboard-profile',
-              onPressed: onProfile,
-            ),
-          ],
-        ),
-        const SizedBox(height: MoolSpacing.sm),
         _DashboardReveal(
           child: _WorkspaceDashboardHero(
             session: session,
             workspace: workspace,
             profile: profile,
-            onStatus: onStatus,
+            onVisibility: onVisibility,
           ),
         ),
-        const SizedBox(height: MoolSpacing.sm),
+        const SizedBox(height: MoolSpacing.xs),
         _StoreAvailabilityStrip(session: session, onPressed: onStatus),
+        const SizedBox(height: MoolSpacing.sm),
+        _StoreReadinessCard(
+          session: session,
+          onPressed: storeReady
+              ? () => onOpenOperation(_WorkspaceOperation.catalogue)
+              : () {
+                  session.beginRetailerSetup();
+                  context.push('/app/work/retailer/setup');
+                },
+        ),
         const SizedBox(height: MoolSpacing.md),
-        const WorkSectionTitle(
-          title: 'Today in your store',
-          detail: 'Open the exact task you want to complete.',
+        const _WorkspaceSectionLabel(
+          title: 'Run your store',
+          detail: 'Your most-used actions, ready in one place.',
         ),
         const SizedBox(height: MoolSpacing.sm),
         LayoutBuilder(
@@ -452,99 +564,78 @@ class _StoreControlDashboard extends StatelessWidget {
               children: [
                 SizedBox(
                   width: tileWidth,
-                  height: 104,
+                  height: 98,
                   child: _WorkspaceActionTile(
                     keyName: 'work-dashboard-orders',
                     icon: Icons.receipt_long_outlined,
                     title: 'Customer orders',
-                    detail: 'Review and fulfil',
-                    onTap: () => context.push('/app/retailer/orders'),
+                    detail: 'Accept and fulfil',
+                    onTap: () => onOpenOperation(_WorkspaceOperation.orders),
                   ),
                 ),
                 SizedBox(
                   width: tileWidth,
-                  height: 104,
+                  height: 98,
                   child: _WorkspaceActionTile(
                     keyName: 'work-dashboard-create-order',
                     icon: Icons.add_shopping_cart_rounded,
-                    title: 'Create counter order',
-                    detail: 'Record a store sale',
-                    onTap: () => context.push('/app/retailer/orders/new'),
+                    title: 'Counter or phone order',
+                    detail: 'Record and deliver',
+                    onTap: () =>
+                        onOpenOperation(_WorkspaceOperation.counterOrder),
                   ),
                 ),
                 SizedBox(
                   width: tileWidth,
-                  height: 104,
+                  height: 98,
                   child: _WorkspaceActionTile(
                     keyName: 'work-dashboard-products',
                     icon: Icons.inventory_2_outlined,
                     title: 'Catalogue',
-                    detail: 'Products, prices and stock',
-                    onTap: () => context.push('/app/retailer/home?view=stock'),
+                    detail: 'Price and stock',
+                    onTap: () => onOpenOperation(_WorkspaceOperation.catalogue),
                   ),
                 ),
                 SizedBox(
                   width: tileWidth,
-                  height: 104,
+                  height: 98,
                   child: _WorkspaceActionTile(
                     keyName: 'work-dashboard-delivery',
                     icon: Icons.delivery_dining_outlined,
-                    title: 'Deliver a phone order',
-                    detail: 'Create and arrange delivery',
-                    onTap: () =>
-                        context.push('/app/retailer/orders/new?source=phone'),
+                    title: 'Deliver an order',
+                    detail: 'Assign and follow',
+                    onTap: () => onOpenOperation(_WorkspaceOperation.delivery),
                   ),
                 ),
               ],
             );
           },
         ),
-        const SizedBox(height: MoolSpacing.md),
-        _DashboardReveal(
-          delay: const Duration(milliseconds: 90),
-          child: _DashboardPriorityCard(
-            session: session,
-            profile: profile,
-            presentation: presentation,
+        const SizedBox(height: MoolSpacing.sm),
+        _WorkspaceQuickSignals(
+          onCustomers: () => onOpenOperation(_WorkspaceOperation.customers),
+          onPayments: () => onOpenOperation(_WorkspaceOperation.payments),
+          onBooks: () => onOpenOperation(_WorkspaceOperation.books),
+        ),
+        if (alertCount > 0) ...[
+          const SizedBox(height: MoolSpacing.sm),
+          _CompactAttentionCard(
+            count: alertCount,
+            onPressed: () => onOpenOperation(_WorkspaceOperation.settings),
           ),
-        ),
+        ],
         const SizedBox(height: MoolSpacing.md),
-        WorkSectionTitle(
-          title: 'Needs your attention',
-          detail: alertCount == 0
-              ? 'Your store has no urgent action right now.'
-              : '$alertCount store ${alertCount == 1 ? 'action' : 'actions'} to review.',
+        const _WorkspaceSectionLabel(
+          title: 'Grow your business',
+          detail: 'Source better and keep essential support close.',
         ),
         const SizedBox(height: MoolSpacing.sm),
-        _AttentionPreview(session: session, onOpenAlerts: onAlerts),
-        const SizedBox(height: MoolSpacing.md),
-        const WorkSectionTitle(
-          title: 'Run your business',
-          detail: 'Your existing store tools stay connected to this Workspace.',
-        ),
-        const SizedBox(height: MoolSpacing.sm),
-        _WorkspaceNavigationRow(
-          keyName: 'work-dashboard-customers',
-          icon: Icons.groups_outlined,
-          title: 'Customers',
-          detail: 'Purchase history, dues and repeat business',
-          onTap: () => context.push('/app/retailer/customers'),
-        ),
-        const SizedBox(height: MoolSpacing.xs),
-        _WorkspaceNavigationRow(
-          keyName: 'work-dashboard-books',
-          icon: Icons.menu_book_outlined,
-          title: 'Business books',
-          detail: 'Sales, purchases, stock and money',
-          onTap: () => context.push('/app/retailer/books'),
-        ),
-        const SizedBox(height: MoolSpacing.xs),
         _WorkspaceNavigationRow(
           keyName: 'work-dashboard-sourcing',
           icon: Icons.handshake_outlined,
           title: 'Wholesale sourcing',
-          detail: 'Restock through the existing Wholesale flow',
-          onTap: () => context.push('/app/retailer/wholesale'),
+          detail: 'Compare packs, terms and delivery before restocking',
+          onTap: () => onOpenOperation(_WorkspaceOperation.sourcing),
         ),
         const SizedBox(height: MoolSpacing.xs),
         _WorkspaceNavigationRow(
@@ -552,34 +643,15 @@ class _StoreControlDashboard extends StatelessWidget {
           icon: Icons.business_center_outlined,
           title: 'Business services',
           detail: 'GST, tax, bookkeeping and audit support',
-          onTap: () => context.push('/app/retailer/services'),
+          onTap: () => onOpenOperation(_WorkspaceOperation.services),
         ),
-        const SizedBox(height: MoolSpacing.md),
-        _WorkspaceAccountState(session: session, workspace: workspace),
-        const SizedBox(height: MoolSpacing.md),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                key: const Key('work-dashboard-manage-record'),
-                onPressed: () => context.push('/app/work/workspace/proof'),
-                icon: const Icon(Icons.fact_check_outlined),
-                label: const Text('Workspace record'),
-              ),
-            ),
-            const SizedBox(width: MoolSpacing.xs),
-            Expanded(
-              child: OutlinedButton.icon(
-                key: const Key('work-dashboard-add-workspace'),
-                onPressed: () {
-                  session.startAnotherWork();
-                  context.push('/app/work/workspace/choose');
-                },
-                icon: const Icon(Icons.add_business_outlined),
-                label: const Text('Add Workspace'),
-              ),
-            ),
-          ],
+        const SizedBox(height: MoolSpacing.xs),
+        _WorkspaceNavigationRow(
+          keyName: 'work-dashboard-settings',
+          icon: Icons.settings_outlined,
+          title: 'Workspace settings',
+          detail: 'Store details, documents and additional Workspaces',
+          onTap: () => onOpenOperation(_WorkspaceOperation.settings),
         ),
       ],
     );
@@ -602,6 +674,230 @@ class _DashboardAlertButton extends StatelessWidget {
         tooltip: 'Store alerts',
         onPressed: onPressed,
         icon: const Icon(Icons.notifications_none_rounded),
+      ),
+    );
+  }
+}
+
+class _WorkspaceSectionLabel extends StatelessWidget {
+  const _WorkspaceSectionLabel({required this.title, required this.detail});
+
+  final String title;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: MoolColors.navy,
+              fontSize: 18,
+              height: 1,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        Flexible(
+          child: Text(
+            detail,
+            textAlign: TextAlign.end,
+            maxLines: 2,
+            style: const TextStyle(
+              color: MoolColors.muted,
+              fontSize: 9.5,
+              height: 1.15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StoreReadinessCard extends StatelessWidget {
+  const _StoreReadinessCard({required this.session, required this.onPressed});
+
+  final WorkSession session;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final ready =
+        session.retailerSetupSaved ||
+        session.reviewStage == WorkReviewStage.live;
+    return Material(
+      key: const Key('work-dashboard-priority'),
+      color: ready ? const Color(0xFFE8F7F1) : const Color(0xFFFFF2DE),
+      borderRadius: BorderRadius.circular(MoolRadii.control),
+      child: InkWell(
+        key: const Key('work-dashboard-priority-action'),
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: MoolSpacing.sm,
+            vertical: 10,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                ready ? Icons.verified_outlined : Icons.rocket_launch_outlined,
+                color: ready ? const Color(0xFF00745D) : MoolColors.orange,
+              ),
+              const SizedBox(width: MoolSpacing.xs),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ready
+                          ? 'Store ready for customers'
+                          : 'Complete store setup',
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      ready
+                          ? 'Review products, prices and available stock.'
+                          : 'Add your first products and delivery choices.',
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 10.5,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_rounded, color: MoolColors.navy),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkspaceQuickSignals extends StatelessWidget {
+  const _WorkspaceQuickSignals({
+    required this.onCustomers,
+    required this.onPayments,
+    required this.onBooks,
+  });
+
+  final VoidCallback onCustomers;
+  final VoidCallback onPayments;
+  final VoidCallback onBooks;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      key: const Key('work-dashboard-quick-signals'),
+      children: [
+        Expanded(
+          child: _QuickSignal(
+            keyName: 'work-dashboard-customers',
+            icon: Icons.groups_outlined,
+            label: 'Customers',
+            onTap: onCustomers,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _QuickSignal(
+            keyName: 'work-dashboard-payments',
+            icon: Icons.account_balance_wallet_outlined,
+            label: 'Payments',
+            onTap: onPayments,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _QuickSignal(
+            keyName: 'work-dashboard-books',
+            icon: Icons.menu_book_outlined,
+            label: 'Books',
+            onTap: onBooks,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickSignal extends StatelessWidget {
+  const _QuickSignal({
+    required this.keyName,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final String keyName;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(MoolRadii.control),
+      child: InkWell(
+        key: Key(keyName),
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 4),
+          child: Column(
+            children: [
+              Icon(icon, color: MoolColors.navy, size: 21),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactAttentionCard extends StatelessWidget {
+  const _CompactAttentionCard({required this.count, required this.onPressed});
+
+  final int count;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFFFF5E8),
+      borderRadius: BorderRadius.circular(MoolRadii.control),
+      child: ListTile(
+        key: const Key('work-dashboard-attention-preview'),
+        dense: true,
+        onTap: onPressed,
+        leading: const Icon(Icons.notifications_active_outlined),
+        title: Text(
+          '$count ${count == 1 ? 'store action needs' : 'store actions need'} attention',
+          style: const TextStyle(fontWeight: FontWeight.w900),
+        ),
+        trailing: const Icon(Icons.arrow_forward_rounded),
       ),
     );
   }
@@ -821,76 +1117,6 @@ class _WorkspaceNavigationRow extends StatelessWidget {
   }
 }
 
-class _AttentionPreview extends StatelessWidget {
-  const _AttentionPreview({required this.session, required this.onOpenAlerts});
-
-  final WorkSession session;
-  final VoidCallback onOpenAlerts;
-
-  @override
-  Widget build(BuildContext context) {
-    final alerts = _workspaceAlerts(session);
-    if (alerts.isEmpty) {
-      return WorkCard(
-        keyName: 'work-dashboard-no-alerts',
-        padding: const EdgeInsets.all(MoolSpacing.sm),
-        child: const Row(
-          children: [
-            Icon(Icons.check_circle_outline_rounded, color: MoolColors.success),
-            SizedBox(width: MoolSpacing.xs),
-            Expanded(
-              child: Text(
-                'No urgent store action right now.',
-                style: TextStyle(
-                  color: MoolColors.ink,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    final first = alerts.first;
-    return WorkCard(
-      keyName: 'work-dashboard-attention-preview',
-      onTap: onOpenAlerts,
-      color: const Color(0xFFFFF7EA),
-      padding: const EdgeInsets.all(MoolSpacing.sm),
-      child: Row(
-        children: [
-          Icon(first.icon, color: const Color(0xFF9A4A00)),
-          const SizedBox(width: MoolSpacing.xs),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  first.title,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  first.detail,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MoolColors.muted,
-                    fontSize: 10.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded),
-        ],
-      ),
-    );
-  }
-}
-
 class _WorkspaceSearchSurface extends StatelessWidget {
   const _WorkspaceSearchSurface({
     required this.controller,
@@ -906,7 +1132,7 @@ class _WorkspaceSearchSurface extends StatelessWidget {
   final String query;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
-  final ValueChanged<String> onOpen;
+  final ValueChanged<_WorkspaceOperation> onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -935,7 +1161,7 @@ class _WorkspaceSearchSurface extends StatelessWidget {
             semanticLabel: 'Search your store records',
             onChanged: onChanged,
             onSubmitted: (_) {
-              if (results.isNotEmpty) onOpen(results.first.route);
+              if (results.isNotEmpty) onOpen(results.first.operation);
             },
             trailing: query.isEmpty
                 ? null
@@ -977,10 +1203,558 @@ class _WorkspaceSearchSurface extends StatelessWidget {
                       icon: destination.icon,
                       title: destination.title,
                       detail: destination.detail,
-                      onTap: () => onOpen(destination.route),
+                      onTap: () => onOpen(destination.operation),
                     );
                   },
                 ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WorkspaceOperationSurface extends StatelessWidget {
+  const _WorkspaceOperationSurface({
+    required this.operation,
+    required this.session,
+    required this.onOpenOperation,
+    required this.onOpenRoute,
+  });
+
+  final _WorkspaceOperation operation;
+  final WorkSession session;
+  final ValueChanged<_WorkspaceOperation> onOpenOperation;
+  final ValueChanged<String> onOpenRoute;
+
+  @override
+  Widget build(BuildContext context) {
+    if (operation == _WorkspaceOperation.counterOrder) {
+      return _CounterOrderSurface(
+        session: session,
+        onArrangeDelivery: () => onOpenOperation(_WorkspaceOperation.delivery),
+      );
+    }
+    return ListView(
+      key: Key('work-dashboard-${operation.name}-screen'),
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.md,
+        MoolSpacing.xs,
+        MoolSpacing.md,
+        MoolSpacing.xl,
+      ),
+      children: [
+        _OperationLead(operation: operation),
+        const SizedBox(height: MoolSpacing.sm),
+        ..._operationContent(),
+      ],
+    );
+  }
+
+  List<Widget> _operationContent() => switch (operation) {
+    _WorkspaceOperation.orders => [
+      _OperationActionCard(
+        icon: Icons.notifications_active_outlined,
+        title: 'New customer orders',
+        detail:
+            'New app orders will appear here with payment and fulfilment details.',
+        actionLabel: 'Create a customer order',
+        onPressed: () => onOpenOperation(_WorkspaceOperation.counterOrder),
+      ),
+      const SizedBox(height: MoolSpacing.xs),
+      const _OperationActionCard(
+        icon: Icons.inventory_outlined,
+        title: 'Preparing and ready',
+        detail:
+            'Accepted orders remain visible through packing, pickup and delivery.',
+      ),
+      const SizedBox(height: MoolSpacing.xs),
+      const _OperationActionCard(
+        icon: Icons.task_alt_rounded,
+        title: 'Completed orders and issues',
+        detail:
+            'Completed, cancelled and support-required orders stay separated.',
+      ),
+    ],
+    _WorkspaceOperation.catalogue => [
+      _OperationActionCard(
+        icon: Icons.inventory_2_outlined,
+        title: session.retailerProductAdded
+            ? 'Your first product is ready'
+            : 'Add your first products',
+        detail: session.retailerProductAdded
+            ? '${session.retailerQuantity} available · Purchase ₹${session.retailerBuyPrice} · Selling ₹${session.retailerSellPrice}'
+            : 'Choose products from the verified catalogue, then set your price and available stock.',
+        actionLabel: session.retailerProductAdded
+            ? 'Update catalogue and stock'
+            : 'Start catalogue setup',
+        onPressed: () {
+          session.beginRetailerSetup();
+          onOpenRoute('/app/work/retailer/setup');
+        },
+      ),
+      const SizedBox(height: MoolSpacing.xs),
+      const _OperationActionCard(
+        icon: Icons.qr_code_scanner_rounded,
+        title: 'Fast product matching',
+        detail:
+            'Search or scan an existing product, then add only your price and stock.',
+      ),
+      const SizedBox(height: MoolSpacing.xs),
+      const _OperationActionCard(
+        icon: Icons.low_priority_rounded,
+        title: 'Restocking attention',
+        detail:
+            'Low-stock recommendations will appear when real sales and stock records are available.',
+      ),
+    ],
+    _WorkspaceOperation.delivery => [
+      _OperationActionCard(
+        icon: Icons.delivery_dining_rounded,
+        title: session.workspaceOrderNeedsDelivery
+            ? 'Order ready for delivery details'
+            : 'Deliver a phone or counter order',
+        detail: session.workspaceOrderNeedsDelivery
+            ? 'Add the confirmed customer address before requesting a delivery partner.'
+            : 'Record the customer order first, then arrange delivery without keeping a full-time rider.',
+        actionLabel: 'Create delivery order',
+        onPressed: () => onOpenOperation(_WorkspaceOperation.counterOrder),
+      ),
+      const SizedBox(height: MoolSpacing.xs),
+      const _OperationActionCard(
+        icon: Icons.route_outlined,
+        title: 'Active delivery journey',
+        detail:
+            'Accepted delivery assignments will show rider, pickup, route and handoff status here.',
+      ),
+    ],
+    _WorkspaceOperation.customers => const [
+      _OperationActionCard(
+        icon: Icons.people_alt_outlined,
+        title: 'Customer purchase records',
+        detail:
+            'Customer name, purchase date, order value and payment state will appear after a recorded sale.',
+      ),
+      SizedBox(height: MoolSpacing.xs),
+      _OperationActionCard(
+        icon: Icons.repeat_rounded,
+        title: 'Bring customers back',
+        detail:
+            'Repeat-order and permitted offer actions will use real customer purchase history.',
+      ),
+    ],
+    _WorkspaceOperation.payments => const [
+      _OperationMetricBoard(),
+      SizedBox(height: MoolSpacing.xs),
+      _OperationActionCard(
+        icon: Icons.account_balance_outlined,
+        title: 'Request settlement',
+        detail:
+            'Settlement becomes available when completed sales create a payable balance.',
+      ),
+    ],
+    _WorkspaceOperation.books => const [
+      _OperationActionCard(
+        icon: Icons.point_of_sale_outlined,
+        title: 'Sales record',
+        detail: 'App, counter and phone-order sales stay together by date.',
+      ),
+      SizedBox(height: MoolSpacing.xs),
+      _OperationActionCard(
+        icon: Icons.shopping_bag_outlined,
+        title: 'Purchase and stock record',
+        detail:
+            'Wholesale purchases, received stock and supplier payments stay connected.',
+      ),
+      SizedBox(height: MoolSpacing.xs),
+      _OperationActionCard(
+        icon: Icons.account_balance_wallet_outlined,
+        title: 'Customer dues',
+        detail:
+            'Recorded customer balances remain visible without mixing them with paid sales.',
+      ),
+    ],
+    _WorkspaceOperation.sourcing => [
+      _OperationActionCard(
+        icon: Icons.inventory_2_outlined,
+        title: 'Buy stock at wholesale',
+        detail:
+            'Compare pack size, minimum order, delivery date and payment terms before buying.',
+        actionLabel: 'Open Wholesale',
+        onPressed: () => onOpenRoute('/app/buy?sub=wholesale'),
+      ),
+      const SizedBox(height: MoolSpacing.xs),
+      const _OperationActionCard(
+        icon: Icons.groups_2_outlined,
+        title: 'Retailer group buying',
+        detail:
+            'Confirmed retailer-led group buys will show specifications, closing time, savings, fees and store delivery.',
+      ),
+    ],
+    _WorkspaceOperation.services => const [
+      _OperationActionCard(
+        icon: Icons.receipt_long_outlined,
+        title: 'GST and tax assistance',
+        detail:
+            'Keep business records ready and request professional filing assistance when needed.',
+      ),
+      SizedBox(height: MoolSpacing.xs),
+      _OperationActionCard(
+        icon: Icons.menu_book_outlined,
+        title: 'Bookkeeping and accounts',
+        detail:
+            'Organise sales, purchases, stock and settlement records for your accountant.',
+      ),
+      SizedBox(height: MoolSpacing.xs),
+      _OperationActionCard(
+        icon: Icons.verified_user_outlined,
+        title: 'Audit support',
+        detail:
+            'Request document and record assistance without changing your store operations.',
+      ),
+    ],
+    _WorkspaceOperation.settings => [
+      _OperationActionCard(
+        keyName: 'work-dashboard-manage-record',
+        icon: Icons.fact_check_outlined,
+        title: 'Store details and documents',
+        detail:
+            'Review submitted business details, documents and any clarification request.',
+        actionLabel: 'Open Workspace record',
+        onPressed: () => onOpenRoute('/app/work/workspace/proof'),
+      ),
+      const SizedBox(height: MoolSpacing.xs),
+      _OperationActionCard(
+        keyName: 'work-dashboard-add-workspace',
+        icon: Icons.add_business_outlined,
+        title: 'Add another Workspace',
+        detail:
+            'Create a separate Workspace for another business, profession or service.',
+        actionLabel: 'Choose another Workspace',
+        onPressed: () {
+          session.startAnotherWork();
+          onOpenRoute('/app/work/workspace/choose');
+        },
+      ),
+    ],
+    _WorkspaceOperation.counterOrder => const [],
+  };
+}
+
+class _OperationLead extends StatelessWidget {
+  const _OperationLead({required this.operation});
+
+  final _WorkspaceOperation operation;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(MoolSpacing.sm),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF080887), Color(0xFF2727C4)],
+        ),
+        borderRadius: BorderRadius.circular(MoolRadii.card),
+      ),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            backgroundColor: MoolColors.orange,
+            foregroundColor: MoolColors.navy,
+            child: Icon(Icons.storefront_rounded),
+          ),
+          const SizedBox(width: MoolSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  operation.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  operation.subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFFE1E2FF),
+                    fontSize: 10.5,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OperationActionCard extends StatelessWidget {
+  const _OperationActionCard({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    this.keyName,
+    this.actionLabel,
+    this.onPressed,
+  });
+
+  final String? keyName;
+  final IconData icon;
+  final String title;
+  final String detail;
+  final String? actionLabel;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkCard(
+      keyName: keyName,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            backgroundColor: const Color(0xFFEAF2FF),
+            foregroundColor: MoolColors.navy,
+            child: Icon(icon),
+          ),
+          const SizedBox(width: MoolSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  detail,
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 10.5,
+                    height: 1.3,
+                  ),
+                ),
+                if (actionLabel != null && onPressed != null) ...[
+                  const SizedBox(height: MoolSpacing.xs),
+                  FilledButton.tonalIcon(
+                    onPressed: onPressed,
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 17),
+                    label: Text(actionLabel!),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OperationMetricBoard extends StatelessWidget {
+  const _OperationMetricBoard();
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkCard(
+      keyName: 'work-payments-summary',
+      color: const Color(0xFFEAF7F3),
+      child: Column(
+        children: const [
+          _PaymentMetric(label: 'Completed sales today', value: 'No sales yet'),
+          Divider(height: MoolSpacing.md),
+          _PaymentMetric(
+            label: 'Available for settlement',
+            value: 'No balance yet',
+          ),
+          Divider(height: MoolSpacing.md),
+          _PaymentMetric(label: 'Settlement requested', value: 'None'),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentMetric extends StatelessWidget {
+  const _PaymentMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Text(label)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+      ],
+    );
+  }
+}
+
+class _CounterOrderSurface extends StatefulWidget {
+  const _CounterOrderSurface({
+    required this.session,
+    required this.onArrangeDelivery,
+  });
+
+  final WorkSession session;
+  final VoidCallback onArrangeDelivery;
+
+  @override
+  State<_CounterOrderSurface> createState() => _CounterOrderSurfaceState();
+}
+
+class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
+  late final TextEditingController _customer = TextEditingController(
+    text: widget.session.workspaceOrderCustomer,
+  );
+  late final TextEditingController _items = TextEditingController(
+    text: widget.session.workspaceOrderItems,
+  );
+  late final TextEditingController _amount = TextEditingController(
+    text: widget.session.workspaceOrderAmount,
+  );
+  late bool _delivery = widget.session.workspaceOrderNeedsDelivery;
+  String? _error;
+
+  @override
+  void dispose() {
+    _customer.dispose();
+    _items.dispose();
+    _amount.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final phone = _customer.text.replaceAll(RegExp(r'\D'), '');
+    final amount = num.tryParse(_amount.text.trim());
+    final error = phone.length < 10
+        ? 'Enter the customer’s 10-digit mobile number.'
+        : _items.text.trim().isEmpty
+        ? 'Add the products or service requested by the customer.'
+        : amount == null || amount <= 0
+        ? 'Enter the confirmed bill amount.'
+        : null;
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
+    widget.session.saveWorkspaceOrderDraft(
+      customer: _customer.text,
+      items: _items.text,
+      amount: _amount.text,
+      needsDelivery: _delivery,
+    );
+    setState(() => _error = null);
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (_delivery) widget.onArrangeDelivery();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      key: const Key('work-dashboard-counter-order-screen'),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.md,
+        MoolSpacing.xs,
+        MoolSpacing.md,
+        MoolSpacing.xl,
+      ),
+      children: [
+        const _OperationLead(operation: _WorkspaceOperation.counterOrder),
+        const SizedBox(height: MoolSpacing.sm),
+        WorkCard(
+          child: Column(
+            children: [
+              TextField(
+                key: const Key('work-order-customer'),
+                controller: _customer,
+                keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Customer mobile number',
+                  hintText: 'Number used for order updates',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              TextField(
+                key: const Key('work-order-items'),
+                controller: _items,
+                maxLines: 3,
+                minLines: 2,
+                textInputAction: TextInputAction.newline,
+                decoration: const InputDecoration(
+                  labelText: 'Products or service requested',
+                  hintText: 'Add item, quantity and any customer instruction',
+                  alignLabelWithHint: true,
+                  prefixIcon: Icon(Icons.shopping_bag_outlined),
+                ),
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              TextField(
+                key: const Key('work-order-amount'),
+                controller: _amount,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  labelText: 'Confirmed bill amount',
+                  prefixText: '₹ ',
+                  prefixIcon: Icon(Icons.currency_rupee_rounded),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        WorkCard(
+          child: SwitchListTile.adaptive(
+            key: const Key('work-order-delivery'),
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Customer needs delivery',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            subtitle: const Text(
+              'The confirmed address and delivery partner are added next.',
+            ),
+            value: _delivery,
+            onChanged: (value) => setState(() => _delivery = value),
+          ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: MoolSpacing.xs),
+          Text(
+            _error!,
+            key: const Key('work-order-error'),
+            style: const TextStyle(
+              color: Color(0xFFB42318),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+        const SizedBox(height: MoolSpacing.sm),
+        FilledButton.icon(
+          key: const Key('work-order-save'),
+          onPressed: _save,
+          icon: Icon(
+            _delivery ? Icons.delivery_dining_rounded : Icons.save_outlined,
+          ),
+          label: Text(
+            _delivery ? 'Save and arrange delivery' : 'Save customer order',
+          ),
         ),
       ],
     );
@@ -1157,12 +1931,14 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
   const _WorkspaceAlertsSurface({
     required this.session,
     required this.onOpen,
+    required this.onOpenOrders,
     required this.onOpenStatus,
     required this.onDismiss,
   });
 
   final WorkSession session;
   final ValueChanged<String> onOpen;
+  final VoidCallback onOpenOrders;
   final VoidCallback onOpenStatus;
   final ValueChanged<String> onDismiss;
 
@@ -1176,7 +1952,7 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
         detail:
             'Order, delivery, money and stock alerts will appear here when they need your attention.',
         actionLabel: 'Review customer orders',
-        onAction: () => onOpen('/app/retailer/orders'),
+        onAction: onOpenOrders,
       );
     }
     return ListView.separated(
@@ -1263,7 +2039,7 @@ typedef _WorkspaceSearchDestination = ({
   String title,
   String detail,
   String keywords,
-  String route,
+  _WorkspaceOperation operation,
   IconData icon,
 });
 
@@ -1273,7 +2049,7 @@ const List<_WorkspaceSearchDestination> _workspaceSearchDestinations = [
     title: 'Customer orders',
     detail: 'Need action, preparing, ready and completed orders',
     keywords: 'order invoice fulfilment packing pickup delivery',
-    route: '/app/retailer/orders',
+    operation: _WorkspaceOperation.orders,
     icon: Icons.receipt_long_outlined,
   ),
   (
@@ -1281,7 +2057,7 @@ const List<_WorkspaceSearchDestination> _workspaceSearchDestinations = [
     title: 'Products and stock',
     detail: 'Catalogue, price, availability and stock',
     keywords: 'product sku barcode inventory catalogue price',
-    route: '/app/retailer/home?view=stock',
+    operation: _WorkspaceOperation.catalogue,
     icon: Icons.inventory_2_outlined,
   ),
   (
@@ -1289,7 +2065,7 @@ const List<_WorkspaceSearchDestination> _workspaceSearchDestinations = [
     title: 'Customers',
     detail: 'Purchase history, repeat orders and payment records',
     keywords: 'customer mobile due statement repeat',
-    route: '/app/retailer/customers',
+    operation: _WorkspaceOperation.customers,
     icon: Icons.groups_outlined,
   ),
   (
@@ -1297,7 +2073,7 @@ const List<_WorkspaceSearchDestination> _workspaceSearchDestinations = [
     title: 'Business books',
     detail: 'Sales, purchases, stock and money',
     keywords: 'invoice ledger sales purchase stock money expense settlement',
-    route: '/app/retailer/books',
+    operation: _WorkspaceOperation.books,
     icon: Icons.menu_book_outlined,
   ),
   (
@@ -1305,7 +2081,7 @@ const List<_WorkspaceSearchDestination> _workspaceSearchDestinations = [
     title: 'Wholesale sourcing',
     detail: 'Restock products and track purchase orders',
     keywords: 'wholesale supplier restock sourcing purchase order',
-    route: '/app/retailer/wholesale',
+    operation: _WorkspaceOperation.sourcing,
     icon: Icons.handshake_outlined,
   ),
   (
@@ -1313,7 +2089,7 @@ const List<_WorkspaceSearchDestination> _workspaceSearchDestinations = [
     title: 'Business services',
     detail: 'GST, tax, bookkeeping and audit support',
     keywords: 'gst itr income tax books audit compliance',
-    route: '/app/retailer/services',
+    operation: _WorkspaceOperation.services,
     icon: Icons.business_center_outlined,
   ),
   (
@@ -1321,7 +2097,7 @@ const List<_WorkspaceSearchDestination> _workspaceSearchDestinations = [
     title: 'Workspace record',
     detail: 'Business details, documents and review status',
     keywords: 'workspace kyc document review profile approval',
-    route: '/app/work/workspace/proof',
+    operation: _WorkspaceOperation.settings,
     icon: Icons.fact_check_outlined,
   ),
 ];
@@ -1384,166 +2160,139 @@ class _WorkspaceDashboardHero extends StatelessWidget {
     required this.session,
     required this.workspace,
     required this.profile,
-    this.onStatus,
+    this.onVisibility,
   });
 
   final WorkSession session;
   final WorkWorkspace workspace;
   final WorkProfileOption profile;
-  final VoidCallback? onStatus;
+  final VoidCallback? onVisibility;
 
   @override
   Widget build(BuildContext context) {
-    final live = session.reviewStage == WorkReviewStage.live;
     return Container(
       key: const Key('work-dashboard-hero'),
-      padding: const EdgeInsets.all(MoolSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: MoolSpacing.sm,
+        vertical: 12,
+      ),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF080887), Color(0xFF006B62)],
+          colors: [Color(0xFF080887), Color(0xFF1616AF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(MoolRadii.sheet),
+        borderRadius: BorderRadius.circular(MoolRadii.card),
         boxShadow: const [
           BoxShadow(
             color: Color(0x22080887),
-            blurRadius: 20,
-            offset: Offset(0, 8),
+            blurRadius: 14,
+            offset: Offset(0, 5),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 25,
-                backgroundColor: MoolColors.orange,
-                foregroundColor: MoolColors.navy,
-                child: Icon(profile.icon, size: 27),
-              ),
-              const SizedBox(width: MoolSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      live ? 'WORKSPACE ACTIVE' : 'WORKSPACE APPROVED',
-                      style: const TextStyle(
-                        color: Color(0xFFFFD39A),
-                        fontSize: 10,
-                        letterSpacing: .55,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      workspace.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 21,
-                        height: 1.05,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (onStatus != null)
-                IconButton(
-                  key: const Key('work-dashboard-status'),
-                  tooltip: 'Change store availability',
-                  onPressed: onStatus,
-                  style: IconButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: Colors.white.withValues(alpha: .12),
-                    side: BorderSide(
-                      color: Colors.white.withValues(alpha: .24),
-                    ),
-                  ),
-                  icon: const Icon(Icons.tune_rounded),
-                ),
-            ],
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: MoolColors.orange,
+            foregroundColor: MoolColors.navy,
+            child: Icon(profile.icon, size: 24),
           ),
-          const SizedBox(height: MoolSpacing.sm),
-          Text(
-            '${profile.label} · ${workspace.area}',
-            style: const TextStyle(
-              color: Color(0xFFE7E7FF),
-              fontWeight: FontWeight.w700,
+          const SizedBox(width: MoolSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  workspace.name,
+                  maxLines: 2,
+                  softWrap: true,
+                  overflow: TextOverflow.visible,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    height: 1.05,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${profile.label} · ${workspace.area}',
+                  maxLines: 2,
+                  overflow: TextOverflow.fade,
+                  style: const TextStyle(
+                    color: Color(0xFFD8D9FF),
+                    fontSize: 10.5,
+                    height: 1.15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: MoolSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: _HeroState(
-                  label: 'ACCOUNT',
-                  value: session.connectedProviderLabel.isEmpty
-                      ? 'Linked'
-                      : session.connectedProviderLabel,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Expanded(
-                child: _HeroState(label: 'REVIEW', value: 'Approved'),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _HeroState(
-                  label: 'VISIBILITY',
-                  value: live ? 'Live' : 'Private',
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(width: MoolSpacing.xs),
+          if (onVisibility != null)
+            _StoreVisibilityButton(
+              visible: session.workspaceVisibleToCustomers,
+              onPressed: onVisibility!,
+            ),
         ],
       ),
     );
   }
 }
 
-class _HeroState extends StatelessWidget {
-  const _HeroState({required this.label, required this.value});
+class _StoreVisibilityButton extends StatelessWidget {
+  const _StoreVisibilityButton({
+    required this.visible,
+    required this.onPressed,
+  });
 
-  final String label;
-  final String value;
+  final bool visible;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(MoolRadii.control),
-        border: Border.all(color: Colors.white.withValues(alpha: .25)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFFD9DAFF),
-              fontSize: 8,
-              fontWeight: FontWeight.w800,
-            ),
+    return Semantics(
+      button: true,
+      label: visible
+          ? 'Store visible to customers. Tap to hide.'
+          : 'Store hidden from customers. Tap to make visible.',
+      child: InkWell(
+        key: const Key('work-dashboard-visibility'),
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: visible
+                ? const Color(0xFF16A36F)
+                : Colors.white.withValues(alpha: .14),
+            border: Border.all(color: Colors.white.withValues(alpha: .5)),
           ),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w900,
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                visible ? Icons.visibility_rounded : Icons.visibility_off,
+                color: Colors.white,
+                size: 19,
+              ),
+              Text(
+                visible ? 'VISIBLE' : 'HIDDEN',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 6.8,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

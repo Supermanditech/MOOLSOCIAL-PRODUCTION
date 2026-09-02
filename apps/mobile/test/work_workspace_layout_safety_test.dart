@@ -360,17 +360,14 @@ void main() {
       of: find.byKey(const Key('work-dashboard-hero')),
       matching: find.text('Mahadev Fresh Mart'),
     );
-    expect(tester.widget<Text>(heroName).maxLines, 1);
-    expectHeaderAndStickyAction(tester);
-    final account = find.byKey(const Key('work-dashboard-account-state'));
-    await reveal(tester, account);
-    expect(
-      tester.getBottomRight(account).dy,
-      lessThanOrEqualTo(
-        tester.getTopRight(find.byKey(const Key('work-sticky-action-bar'))).dy,
-      ),
-    );
-    expect(find.byKey(const Key('work-dashboard-earn')), findsOneWidget);
+    expect(heroName, findsOneWidget);
+    expect(tester.widget<Text>(heroName).maxLines, 2);
+    expect(find.byKey(const Key('work-dashboard-inline-header')), findsOne);
+    expect(find.byKey(const Key('work-page-title')), findsNothing);
+    expect(find.byKey(const Key('work-dashboard-account-state')), findsNothing);
+    expect(find.byKey(const Key('work-dashboard-visibility')), findsOneWidget);
+    expect(find.byKey(const Key('work-sticky-action-bar')), findsNothing);
+    expect(find.byKey(const Key('work-local-navigation')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -501,4 +498,48 @@ void main() {
     expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'retail operations stay inside Work and counter order survives keyboard',
+    (tester) async {
+      final work = WorkSession()..seedVerifiedWorkspace();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+      await reveal(tester, find.byKey(const Key('work-dashboard-orders')));
+      await tester.tap(find.byKey(const Key('work-dashboard-orders')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-dashboard-orders-screen')), findsOne);
+      expect(find.text('What would you like to do?'), findsNothing);
+
+      await tester.tap(find.text('Create a customer order'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-dashboard-counter-order-screen')),
+        findsOne,
+      );
+      await tester.enterText(
+        find.byKey(const Key('work-order-customer')),
+        '9829012345',
+      );
+      await tester.enterText(
+        find.byKey(const Key('work-order-items')),
+        'Rice 5 kg',
+      );
+      await tester.enterText(find.byKey(const Key('work-order-amount')), '420');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      await reveal(tester, find.byKey(const Key('work-order-delivery')));
+      await tester.tap(find.byKey(const Key('work-order-delivery')));
+      await reveal(tester, find.byKey(const Key('work-order-save')));
+      await tester.tap(find.byKey(const Key('work-order-save')));
+      await tester.pumpAndSettle();
+
+      expect(work.workspaceOrderCustomer, '9829012345');
+      expect(work.workspaceOrderItems, 'Rice 5 kg');
+      expect(work.workspaceOrderAmount, '420');
+      expect(work.workspaceOrderNeedsDelivery, isTrue);
+      expect(find.byKey(const Key('work-dashboard-delivery-screen')), findsOne);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

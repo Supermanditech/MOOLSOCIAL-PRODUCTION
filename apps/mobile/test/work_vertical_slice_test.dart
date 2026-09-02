@@ -1045,9 +1045,13 @@ void main() {
         workSession: work,
       );
 
-      expect(find.text('Open operations'), findsOneWidget);
+      expect(find.text('Store ready for customers'), findsOneWidget);
       await tapVisible(tester, const Key('work-dashboard-priority-action'));
-      expect(find.byKey(const Key('retailer-home-screen')), findsOneWidget);
+      expect(
+        find.byKey(const Key('work-dashboard-catalogue-screen')),
+        findsOneWidget,
+      );
+      expect(find.text('What would you like to do?'), findsNothing);
       expect(work.reviewStage, WorkReviewStage.live);
     },
   );
@@ -1102,20 +1106,33 @@ void main() {
         findsOneWidget,
         reason: profile.id,
       );
+      final retailer = const {
+        'retailer-grocery',
+        'retailer-speciality',
+      }.contains(profile.id);
       final accountState = find.byKey(
         const Key('work-dashboard-account-state'),
       );
-      await tester.scrollUntilVisible(
-        accountState,
-        260,
-        scrollable: find
-            .descendant(
-              of: find.byKey(const Key('work-workspace-dashboard')),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      expect(accountState, findsOneWidget, reason: profile.id);
+      if (retailer) {
+        expect(accountState, findsNothing, reason: profile.id);
+        expect(
+          find.byKey(const Key('work-dashboard-visibility')),
+          findsOneWidget,
+          reason: profile.id,
+        );
+      } else {
+        await tester.scrollUntilVisible(
+          accountState,
+          260,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const Key('work-workspace-dashboard')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        expect(accountState, findsOneWidget, reason: profile.id);
+      }
       expect(find.textContaining('Set up my shop'), findsNothing);
     }
   });

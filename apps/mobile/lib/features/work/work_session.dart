@@ -88,6 +88,11 @@ class WorkSession extends ChangeNotifier {
   String workspaceFulfilmentMode = 'Delivery and pickup';
   int workspaceBusyMinutes = 0;
   String workspaceReopensAt = '';
+  bool workspaceVisibleToCustomers = false;
+  String workspaceOrderCustomer = '';
+  String workspaceOrderItems = '';
+  String workspaceOrderAmount = '';
+  bool workspaceOrderNeedsDelivery = false;
   final Set<String> dismissedWorkspaceAlerts = <String>{};
 
   List<WorkOpportunity> get filteredOpportunities {
@@ -288,6 +293,32 @@ class WorkSession extends ChangeNotifier {
   void dismissWorkspaceAlert(String alertId) {
     dismissedWorkspaceAlerts.add(alertId);
     notifyListeners();
+  }
+
+  void setWorkspaceVisibility(bool visible) {
+    workspaceVisibleToCustomers = visible;
+    showNotice(
+      visible
+          ? 'Your store is now visible to customers.'
+          : 'Your store is hidden from customer discovery.',
+    );
+  }
+
+  void saveWorkspaceOrderDraft({
+    required String customer,
+    required String items,
+    required String amount,
+    required bool needsDelivery,
+  }) {
+    workspaceOrderCustomer = customer.trim();
+    workspaceOrderItems = items.trim();
+    workspaceOrderAmount = amount.trim();
+    workspaceOrderNeedsDelivery = needsDelivery;
+    showNotice(
+      needsDelivery
+          ? 'Order saved. Add the delivery address when the customer confirms.'
+          : 'Counter order saved for customer confirmation.',
+    );
   }
 
   void setOpportunityLocationFilters({
@@ -1134,6 +1165,7 @@ class WorkSession extends ChangeNotifier {
         );
         retailerSetupSaved = true;
         reviewStage = WorkReviewStage.live;
+        workspaceVisibleToCustomers = true;
       },
       success:
           'Shop setup complete. Your available product and fulfilment choices are live.',
