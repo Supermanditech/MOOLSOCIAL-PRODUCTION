@@ -907,12 +907,50 @@ void main() {
       await tester.pumpAndSettle();
 
       final categoryAction = find.byKey(const ValueKey('buy-category-picker'));
-      expect(tester.getSize(categoryAction), const Size(44, 44));
-      expect(find.byIcon(Icons.menu_rounded), findsOneWidget);
+      expect(tester.getSize(categoryAction), const Size(48, 48));
+      expect(
+        find.descendant(
+          of: categoryAction,
+          matching: find.byIcon(Icons.grid_view_rounded),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-saved-products-button')),
+          matching: find.byIcon(Icons.bookmark_border_rounded),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-filter-button')),
+          matching: find.byIcon(Icons.tune_rounded),
+        ),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const ValueKey('buy-shop-sale-type-selector')),
         findsOneWidget,
       );
+      final track = tester.getRect(
+        find.byKey(const ValueKey('buy-shop-sale-type-track')),
+      );
+      final thumb = tester.getRect(
+        find.byKey(const ValueKey('buy-shop-sale-type-thumb')),
+      );
+      expect(thumb.top, lessThan(track.top));
+      expect(thumb.bottom, greaterThan(track.bottom));
+      final thumbMotion = tester.widget<AnimatedPositioned>(
+        find.byKey(const ValueKey('buy-shop-sale-type-thumb')),
+      );
+      expect(thumbMotion.duration, BuyV2Motion.contentChange);
+      expect(thumbMotion.curve, Curves.easeOutBack);
+      final quickTypography = tester.widget<AnimatedDefaultTextStyle>(
+        find.byKey(const ValueKey('buy-shop-sale-type-quick-label-style')),
+      );
+      expect(quickTypography.style.fontSize, 11.25);
+      expect(quickTypography.duration, BuyV2Motion.selection);
 
       await tester.tap(
         find.byKey(const ValueKey('buy-shop-sale-type-courier')),
@@ -924,6 +962,99 @@ void main() {
       expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
     },
   );
+
+  testWidgets(
+    'commerce toolbar stays spacious at compact width and larger text',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+
+      await tester.pumpWidget(app(session, textScale: 1.4));
+      await tester.pumpAndSettle();
+
+      final toolbar = tester.getRect(
+        find.byKey(const ValueKey('buy-catalogue-toolbar')),
+      );
+      final category = tester.getRect(
+        find.byKey(const ValueKey('buy-category-picker')),
+      );
+      final selector = tester.getRect(
+        find.byKey(const ValueKey('buy-shop-sale-type-selector')),
+      );
+      final saved = tester.getRect(
+        find.byKey(const ValueKey('buy-saved-products-button')),
+      );
+      final filters = tester.getRect(
+        find.byKey(const ValueKey('buy-filter-button')),
+      );
+
+      expect(toolbar.height, 60);
+      expect(category.size, const Size(48, 48));
+      expect(saved.size, const Size(48, 48));
+      expect(filters.size, const Size(48, 48));
+      expect(category.right, lessThan(selector.left));
+      expect(selector.right, lessThan(saved.left));
+      expect(saved.right, lessThan(filters.left));
+      expect(find.text('Quick 10m'), findsOneWidget);
+      expect(find.text('Scheduled'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
+      await tester.pumpAndSettle();
+      final wholesaleSelector = find.byKey(
+        const ValueKey('buy-wholesale-sale-type-selector'),
+      );
+      expect(
+        find.descendant(
+          of: wholesaleSelector,
+          matching: find.text('Wholesale'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: wholesaleSelector, matching: find.text('Bulk')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('commerce toolbar motion respects reduced-motion preference', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+
+    await tester.pumpWidget(app(session, disableAnimations: true));
+    await tester.pumpAndSettle();
+
+    final thumbMotion = tester.widget<AnimatedPositioned>(
+      find.byKey(const ValueKey('buy-shop-sale-type-thumb')),
+    );
+    final quickTypography = tester.widget<AnimatedDefaultTextStyle>(
+      find.byKey(const ValueKey('buy-shop-sale-type-quick-label-style')),
+    );
+    final category = find.byKey(const ValueKey('buy-category-picker'));
+    final categoryPress = find.descendant(
+      of: category,
+      matching: find.byType(AnimatedScale),
+    );
+    final categoryLift = find.descendant(
+      of: category,
+      matching: find.byType(AnimatedSlide),
+    );
+
+    expect(thumbMotion.duration, Duration.zero);
+    expect(quickTypography.duration, Duration.zero);
+    expect(categoryPress, findsOneWidget);
+    expect(categoryLift, findsOneWidget);
+    expect(tester.widget<AnimatedScale>(categoryPress).duration, Duration.zero);
+    expect(tester.widget<AnimatedSlide>(categoryLift).duration, Duration.zero);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'every Buy destination keeps one global profile and exact Back return',
@@ -4119,7 +4250,7 @@ void main() {
       );
       final shopThumb = find.byKey(const ValueKey('buy-shop-sale-type-thumb'));
       expect(shopSelector, findsOneWidget);
-      expect(tester.getSize(shopSelector).height, 44);
+      expect(tester.getSize(shopSelector).height, 48);
       final quickThumbLeft = tester.getTopLeft(shopThumb).dx;
       expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
       expect(
@@ -4144,7 +4275,7 @@ void main() {
         const ValueKey('buy-wholesale-sale-type-selector'),
       );
       expect(wholesaleSelector, findsOneWidget);
-      expect(tester.getSize(wholesaleSelector).height, 44);
+      expect(tester.getSize(wholesaleSelector).height, 48);
       expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.wholesale);
       expect(
         find.byKey(const ValueKey('buy-product-w-tomato')),

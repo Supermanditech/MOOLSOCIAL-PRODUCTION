@@ -729,9 +729,9 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final showIcons =
-              constraints.maxWidth >= 190 &&
-              MediaQuery.textScalerOf(context).scale(1) <= 1.2;
-          final segmentWidth = (constraints.maxWidth - 4) / 2;
+              constraints.maxWidth >= 184 &&
+              MediaQuery.textScalerOf(context).scale(1) <= 1.25;
+          final segmentWidth = constraints.maxWidth / 2;
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onHorizontalDragEnd: (details) {
@@ -739,41 +739,74 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
               if (velocity.abs() < 80) return;
               select(velocity < 0 ? 1 : 0);
             },
-            child: Container(
+            child: SizedBox(
               key: ValueKey(
                 'buy-${shop ? 'shop' : 'wholesale'}-sale-type-swipe',
               ),
-              height: 44,
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: BuyV2Colors.softBlue,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: BuyV2Colors.line),
-              ),
+              height: 48,
               child: Stack(
+                clipBehavior: Clip.none,
                 children: [
+                  Positioned(
+                    key: ValueKey(
+                      'buy-${shop ? 'shop' : 'wholesale'}-sale-type-track',
+                    ),
+                    left: 0,
+                    right: 0,
+                    top: 4,
+                    bottom: 4,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFF8F7FF), Color(0xFFFFF8F0)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: BuyV2Colors.line),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x0F000080),
+                            blurRadius: 5,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   AnimatedPositioned(
                     key: ValueKey(
                       'buy-${shop ? 'shop' : 'wholesale'}-sale-type-thumb',
                     ),
                     duration: BuyV2Motion.resolved(
                       context,
-                      BuyV2Motion.selection,
+                      BuyV2Motion.contentChange,
                     ),
-                    curve: Curves.easeOutCubic,
+                    curve: Curves.easeOutBack,
                     left: selectedIndex == 0 ? 0 : segmentWidth,
                     top: 0,
                     bottom: 0,
                     width: segmentWidth,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: BuyV2Colors.navy,
-                        borderRadius: BorderRadius.circular(12),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [BuyV2Colors.royal, BuyV2Colors.navy],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: BuyV2Colors.orange,
+                          width: 1.1,
+                        ),
                         boxShadow: const [
                           BoxShadow(
-                            color: Color(0x22000050),
-                            blurRadius: 7,
-                            offset: Offset(0, 2),
+                            color: Color(0x36000080),
+                            blurRadius: 13,
+                            offset: Offset(0, 5),
+                          ),
+                          BoxShadow(
+                            color: Color(0x28FF9933),
+                            blurRadius: 8,
+                            spreadRadius: 1,
                           ),
                         ],
                       ),
@@ -792,6 +825,10 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                             icon: options[index].icon,
                             selected: selectedIndex == index,
                             showIcon: showIcons,
+                            labelStyleKey: ValueKey(
+                              'buy-${shop ? 'shop' : 'wholesale'}-sale-type-'
+                              '${options[index].id}-label-style',
+                            ),
                             onTap: () => select(index),
                           ),
                         ),
@@ -814,6 +851,7 @@ class _CatalogueSaleSegment extends StatelessWidget {
     required this.icon,
     required this.selected,
     required this.showIcon,
+    required this.labelStyleKey,
     required this.onTap,
   });
 
@@ -821,6 +859,7 @@ class _CatalogueSaleSegment extends StatelessWidget {
   final IconData icon;
   final bool selected;
   final bool showIcon;
+  final Key labelStyleKey;
   final VoidCallback onTap;
 
   @override
@@ -841,23 +880,56 @@ class _CatalogueSaleSegment extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (showIcon) ...[
-                  Icon(
-                    icon,
-                    size: 15,
-                    color: selected ? BuyV2Colors.orange : BuyV2Colors.navy,
+                  AnimatedScale(
+                    duration: BuyV2Motion.resolved(
+                      context,
+                      BuyV2Motion.selection,
+                    ),
+                    curve: Curves.easeOutBack,
+                    scale: selected ? 1.08 : .94,
+                    child: AnimatedContainer(
+                      duration: BuyV2Motion.resolved(
+                        context,
+                        BuyV2Motion.selection,
+                      ),
+                      width: 23,
+                      height: 23,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? BuyV2Colors.orange.withValues(alpha: .18)
+                            : BuyV2Colors.softBlue.withValues(alpha: .65),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        size: 16.5,
+                        color: selected ? BuyV2Colors.orange : BuyV2Colors.navy,
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 5),
                 ],
                 Flexible(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
+                  child: AnimatedDefaultTextStyle(
+                    key: labelStyleKey,
+                    duration: BuyV2Motion.resolved(
+                      context,
+                      BuyV2Motion.selection,
+                    ),
+                    curve: Curves.easeOutCubic,
                     style: TextStyle(
                       color: selected ? Colors.white : BuyV2Colors.navy,
-                      fontSize: showIcon ? 8.5 : 8,
+                      fontSize: 11.25,
                       fontWeight: FontWeight.w900,
+                      height: 1,
+                      letterSpacing: selected ? .15 : .05,
+                    ),
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.fade,
+                      softWrap: false,
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),
@@ -1387,17 +1459,28 @@ class _CatalogueToolbar extends StatelessWidget {
     return Container(
       key: const ValueKey('buy-catalogue-toolbar'),
       height: 60,
-      padding: const EdgeInsets.fromLTRB(6, 5, 6, 5),
+      padding: const EdgeInsets.fromLTRB(6, 6, 6, 5),
       decoration: const BoxDecoration(
-        color: BuyV2Colors.canvas,
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [Color(0xFFFFF9F2), Color(0xFFF8F8FF), Color(0xFFF5F8FF)],
+        ),
         border: Border(bottom: BorderSide(color: BuyV2Colors.line)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x10000080),
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          ),
+        ],
       ),
       child: Row(
         children: [
           _CatalogueCategoryPickerButton(session: session),
-          const SizedBox(width: 4),
+          const SizedBox(width: 5),
           Expanded(child: _CatalogueOwnedFeature(session: session)),
-          const SizedBox(width: 4),
+          const SizedBox(width: 5),
           _CompactCatalogueAction(
             key: const ValueKey('buy-saved-products-button'),
             icon: savedOnly
@@ -1408,7 +1491,7 @@ class _CatalogueToolbar extends StatelessWidget {
             active: savedOnly,
             onTap: onSaved,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 5),
           _CatalogueToolsMenu(session: session, order: order),
         ],
       ),
@@ -1427,31 +1510,15 @@ class _CatalogueCategoryPickerButton extends StatelessWidget {
       (category) => category.id == session.selectedCategoryId,
       orElse: () => session.categories.first,
     );
-    return Semantics(
+    return _CatalogueChromeAction(
+      key: const ValueKey('buy-category-picker'),
       label:
           'Choose ${session.destination.label} category. '
           'Current category ${selected.label}',
-      button: true,
-      child: IconButton(
-        key: const ValueKey('buy-category-picker'),
-        tooltip: '${session.destination.label} categories · ${selected.label}',
-        onPressed: () {
-          HapticFeedback.selectionClick();
-          showBuyV2CategoryPicker(context, session);
-        },
-        style: IconButton.styleFrom(
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          minimumSize: const Size(44, 44),
-          maximumSize: const Size(44, 44),
-          backgroundColor: BuyV2Colors.softOrange,
-          foregroundColor: BuyV2Colors.navy,
-          side: const BorderSide(color: BuyV2Colors.orange),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(13),
-          ),
-        ),
-        icon: const Icon(Icons.menu_rounded, size: 21),
-      ),
+      tooltip: '${session.destination.label} categories · ${selected.label}',
+      icon: Icons.grid_view_rounded,
+      emphasized: true,
+      onTap: () => showBuyV2CategoryPicker(context, session),
     );
   }
 }
@@ -2269,41 +2336,146 @@ class _CompactCatalogueAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    void activate() {
-      HapticFeedback.selectionClick();
-      onTap();
-    }
-
-    return Semantics(
+    return _CatalogueChromeAction(
       label: badge == null ? label : '$label, $badge saved',
+      tooltip: label,
+      icon: icon,
+      badge: badge,
+      active: active,
+      iconMotionKey: const ValueKey('buy-saved-filter-icon-motion'),
+      onTap: onTap,
+    );
+  }
+}
+
+class _CatalogueChromeAction extends StatefulWidget {
+  const _CatalogueChromeAction({
+    super.key,
+    required this.label,
+    required this.tooltip,
+    required this.icon,
+    required this.onTap,
+    this.badge,
+    this.active = false,
+    this.emphasized = false,
+    this.iconMotionKey,
+  });
+
+  final String label;
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? badge;
+  final bool active;
+  final bool emphasized;
+  final Key? iconMotionKey;
+
+  @override
+  State<_CatalogueChromeAction> createState() => _CatalogueChromeActionState();
+}
+
+class _CatalogueChromeActionState extends State<_CatalogueChromeAction> {
+  bool _pressed = false;
+
+  void _activate() {
+    HapticFeedback.selectionClick();
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final highlighted = widget.active || widget.emphasized;
+    return Semantics(
+      label: widget.label,
       button: true,
       excludeSemantics: true,
-      onTap: activate,
-      child: IconButton(
-        onPressed: activate,
-        tooltip: label,
-        style: IconButton.styleFrom(
-          minimumSize: const Size(44, 44),
-          maximumSize: const Size(44, 44),
-          backgroundColor: active ? BuyV2Colors.softOrange : Colors.white,
-          foregroundColor: BuyV2Colors.navy,
-          side: const BorderSide(color: BuyV2Colors.line),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(13),
-          ),
-        ),
-        icon: Badge(
-          isLabelVisible: badge != null,
-          label: badge == null
-              ? null
-              : Text(badge!, style: const TextStyle(fontSize: 8)),
-          backgroundColor: BuyV2Colors.orange,
-          textColor: BuyV2Colors.navy,
-          child: BuyV2FiniteVisualTransition(
-            key: const ValueKey('buy-saved-filter-icon-motion'),
-            stateKey: icon,
-            ownerSize: const Size.square(19),
-            child: Icon(icon, size: 19),
+      onTap: _activate,
+      child: Tooltip(
+        message: widget.tooltip,
+        child: AnimatedScale(
+          duration: BuyV2Motion.resolved(context, BuyV2Motion.press),
+          curve: Curves.easeOutCubic,
+          scale: _pressed ? .93 : 1,
+          child: AnimatedSlide(
+            duration: BuyV2Motion.resolved(context, BuyV2Motion.press),
+            curve: Curves.easeOutCubic,
+            offset: _pressed ? const Offset(0, .035) : Offset.zero,
+            child: AnimatedContainer(
+              duration: BuyV2Motion.resolved(context, BuyV2Motion.selection),
+              curve: Curves.easeOutCubic,
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: highlighted
+                      ? const [Color(0xFFFFE8CE), Colors.white]
+                      : const [Colors.white, Color(0xFFF4F3FF)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: highlighted ? BuyV2Colors.orange : BuyV2Colors.line,
+                  width: highlighted ? 1.15 : 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: highlighted
+                        ? const Color(0x30FF9933)
+                        : const Color(0x1A000080),
+                    blurRadius: highlighted ? 12 : 9,
+                    offset: const Offset(0, 4),
+                  ),
+                  const BoxShadow(
+                    color: Color(0xB8FFFFFF),
+                    blurRadius: 2,
+                    offset: Offset(0, -1),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  onTap: _activate,
+                  onHighlightChanged: (value) {
+                    if (_pressed == value) return;
+                    setState(() => _pressed = value);
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  splashColor: BuyV2Colors.orange.withValues(alpha: .18),
+                  highlightColor: BuyV2Colors.softOrange.withValues(alpha: .3),
+                  child: Center(
+                    child: Badge(
+                      isLabelVisible: widget.badge != null,
+                      label: widget.badge == null
+                          ? null
+                          : Text(
+                              widget.badge!,
+                              style: const TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                      backgroundColor: BuyV2Colors.orange,
+                      textColor: BuyV2Colors.navy,
+                      child: BuyV2FiniteVisualTransition(
+                        key: widget.iconMotionKey,
+                        stateKey: widget.icon,
+                        ownerSize: const Size.square(22),
+                        child: Icon(
+                          widget.icon,
+                          size: 22,
+                          color: highlighted
+                              ? BuyV2Colors.royal
+                              : BuyV2Colors.navy,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -2380,41 +2552,19 @@ class _CatalogueToolsMenu extends StatelessWidget {
       );
     }
 
-    return Semantics(
+    return _CatalogueChromeAction(
+      key: const ValueKey('buy-filter-button'),
       label:
           'Open ${session.destination.label} tools and filters. '
           'Current ${_filterLabel(filterOptions, session.selectedFilter)}. '
           '$refinementCount additional ${refinementCount == 1 ? 'filter' : 'filters'} selected',
-      button: true,
-      excludeSemantics: true,
+      tooltip: 'Orders, tools and filters',
+      icon: Icons.tune_rounded,
+      badge: session.selectedFilter != null || refinementCount > 0
+          ? '${refinementCount + (session.selectedFilter == null ? 0 : 1)}'
+          : null,
+      active: session.selectedFilter != null || refinementCount > 0,
       onTap: openSheet,
-      child: IconButton(
-        key: const ValueKey('buy-filter-button'),
-        onPressed: openSheet,
-        tooltip: 'Orders, tools and filters',
-        style: IconButton.styleFrom(
-          minimumSize: const Size(44, 44),
-          maximumSize: const Size(44, 44),
-          backgroundColor:
-              session.selectedFilter == null && refinementCount == 0
-              ? Colors.white
-              : BuyV2Colors.softOrange,
-          foregroundColor: BuyV2Colors.navy,
-          side: const BorderSide(color: BuyV2Colors.line),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(13),
-          ),
-        ),
-        icon: Badge(
-          isLabelVisible: session.selectedFilter != null || refinementCount > 0,
-          backgroundColor: BuyV2Colors.orange,
-          child: const Icon(
-            Icons.more_horiz_rounded,
-            color: BuyV2Colors.navy,
-            size: 20,
-          ),
-        ),
-      ),
     );
   }
 }
