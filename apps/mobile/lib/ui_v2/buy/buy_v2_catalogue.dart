@@ -3669,9 +3669,12 @@ Future<void> showBuyV2PartnerCatalogue(
                                   const SizedBox(width: 8),
                               itemBuilder: (_, index) {
                                 final store = otherStores[index];
-                                return BuyV2FiniteIncomingTransition(
+                                return BuyV2FiniteDepthReveal(
                                   stateKey:
                                       '$ownerPrefix-other-store-${store.id}-motion',
+                                  duration: Duration(
+                                    milliseconds: 260 + (index * 70),
+                                  ),
                                   child: _RelatedStoreCard(
                                     key: ValueKey(
                                       '$ownerPrefix-other-store-${store.id}',
@@ -4351,30 +4354,53 @@ class _RelatedStoreCard extends StatelessWidget {
         'Bulk delivery · ${_compactDeliveryPromise(product.deliveryPromise)}',
     };
     return BuyV2IntentDepth(
-      spatial: true,
+      spatial: false,
       child: SizedBox(
         width: 224,
         child: Material(
-          color: Colors.white,
+          key: ValueKey('buy-related-store-surface-${product.id}'),
+          color: BuyV2Colors.softBlue.withValues(alpha: .62),
           borderRadius: BorderRadius.circular(16),
           child: InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(16),
+            splashColor: BuyV2Colors.navy.withValues(alpha: .1),
+            highlightColor: BuyV2Colors.navy.withValues(alpha: .05),
             child: Container(
-              padding: const EdgeInsets.all(11),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0x33000080)),
+                border: Border.all(
+                  color: BuyV2Colors.navy.withValues(alpha: .32),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: BuyV2Colors.navy.withValues(alpha: .13),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(
-                        Icons.storefront_outlined,
-                        color: BuyV2Colors.navy,
-                        size: 19,
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: BuyV2Colors.navy.withValues(alpha: .22),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.storefront_outlined,
+                          color: BuyV2Colors.navy,
+                          size: 13,
+                        ),
                       ),
                       const SizedBox(width: 7),
                       Expanded(
@@ -4387,14 +4413,22 @@ class _RelatedStoreCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: BuyV2Colors.navy,
-                        size: 18,
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: BuyV2Colors.navy,
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_forward_rounded,
+                          color: Colors.white,
+                          size: 15,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     '$identity · $providerType',
                     maxLines: 2,
@@ -4404,14 +4438,14 @@ class _RelatedStoreCard extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     '${product.title} · ${product.pack}',
                     maxLines: 2,
                     overflow: TextOverflow.clip,
                     style: context.buyMeta.copyWith(color: BuyV2Colors.ink),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Row(
                     children: [
                       Text(
@@ -4432,15 +4466,27 @@ class _RelatedStoreCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    delivery,
-                    maxLines: 2,
-                    overflow: TextOverflow.clip,
-                    style: context.buyMeta.copyWith(
-                      color: BuyV2Colors.green,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.local_shipping_outlined,
+                        color: BuyV2Colors.navy,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          delivery,
+                          maxLines: 2,
+                          overflow: TextOverflow.clip,
+                          style: context.buyMeta.copyWith(
+                            color: BuyV2Colors.navy,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

@@ -4677,17 +4677,37 @@ void main() {
         180,
         scrollable: storeScroll,
       );
-      expect(
-        find.descendant(
-          of: originalStore,
-          matching: find.byWidgetPredicate(
-            (widget) =>
-                widget is BuyV2FiniteIncomingTransition &&
-                widget.stateKey ==
-                    'buy-shop-seller-other-store-s-tomato-motion',
-          ),
+      final relatedStoreMotion = find.descendant(
+        of: originalStore,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is BuyV2FiniteDepthReveal &&
+              widget.stateKey == 'buy-shop-seller-other-store-s-tomato-motion',
         ),
-        findsOneWidget,
+      );
+      expect(relatedStoreMotion, findsOneWidget);
+      expect(
+        tester.widget<BuyV2FiniteDepthReveal>(relatedStoreMotion).duration,
+        const Duration(milliseconds: 260),
+      );
+      expect(
+        tester
+            .widget<BuyV2IntentDepth>(
+              find.descendant(
+                of: relatedStore,
+                matching: find.byType(BuyV2IntentDepth),
+              ),
+            )
+            .spatial,
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<Material>(
+              find.byKey(const ValueKey('buy-related-store-surface-s-tomato')),
+            )
+            .color,
+        BuyV2Colors.softBlue.withValues(alpha: .62),
       );
       expect(
         find.descendant(
