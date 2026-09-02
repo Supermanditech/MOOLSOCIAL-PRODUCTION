@@ -395,6 +395,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('approved store rail is contextual and opens actions directly', (
+    tester,
+  ) async {
+    final work = WorkSession()..seedVerifiedWorkspace();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    expect(find.byKey(const Key('work-local-earn')), findsNothing);
+    expect(find.byKey(const Key('work-local-workspace')), findsNothing);
+    final storeKeys = const [
+      Key('work-store-home'),
+      Key('work-store-orders'),
+      Key('work-store-sell'),
+      Key('work-store-stock'),
+    ];
+    for (final key in storeKeys) {
+      expect(find.byKey(key), findsOneWidget);
+    }
+    final centers = storeKeys
+        .map((key) => tester.getCenter(find.byKey(key)).dx)
+        .toList();
+    expect(centers[1] - centers[0], closeTo(60, 1));
+    expect(centers[2] - centers[1], closeTo(60, 1));
+    expect(centers[3] - centers[2], closeTo(60, 1));
+
+    await tester.tap(find.byKey(const Key('work-dashboard-create-order')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-dashboard-counter-order-screen')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('work-sell-context-rail')), findsOneWidget);
+    expect(find.text('What would you like to do?'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('work-store-home')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-store-today-canvas')), findsOneWidget);
+    expect(find.byKey(const Key('work-store-context-rail')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('retail dashboard Profile opens globally and returns in place', (
     tester,
   ) async {
@@ -506,8 +546,7 @@ void main() {
       final work = WorkSession()..seedVerifiedWorkspace();
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
-      await reveal(tester, find.byKey(const Key('work-dashboard-orders')));
-      await tester.tap(find.byKey(const Key('work-dashboard-orders')));
+      await tester.tap(find.byKey(const Key('work-store-orders')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-dashboard-orders-screen')), findsOne);
       expect(find.text('What would you like to do?'), findsNothing);
@@ -570,8 +609,7 @@ void main() {
       final work = WorkSession()..seedVerifiedWorkspace();
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
-      await reveal(tester, find.byKey(const Key('work-dashboard-products')));
-      await tester.tap(find.byKey(const Key('work-dashboard-products')));
+      await tester.tap(find.byKey(const Key('work-store-stock')));
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('work-dashboard-catalogue-screen')),

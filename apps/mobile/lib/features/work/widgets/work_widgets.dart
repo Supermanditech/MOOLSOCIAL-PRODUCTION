@@ -22,6 +22,9 @@ class WorkPageScaffold extends StatelessWidget {
     this.onBack,
     this.trailing,
     this.bottomAction,
+    this.contextualLocalActions,
+    this.contextualActiveId,
+    this.contextualDestinationLabel,
     super.key,
   });
 
@@ -38,6 +41,9 @@ class WorkPageScaffold extends StatelessWidget {
   final VoidCallback? onBack;
   final Widget? trailing;
   final Widget? bottomAction;
+  final List<MoolLocalNavigationAction>? contextualLocalActions;
+  final String? contextualActiveId;
+  final String? contextualDestinationLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +84,39 @@ class WorkPageScaffold extends StatelessWidget {
     void switchGlobalDestination(String route) {
       session.clearMessages();
       openMoolConnectedRoute(context, activeFamilyId: 'work', route: route);
+    }
+
+    final localActions =
+        contextualLocalActions ??
+        [
+          MoolLocalNavigationAction(
+            keyName: 'work-local-earn',
+            id: 'earn',
+            label: 'Earn Today',
+            icon: Icons.bolt_rounded,
+            onPressed: activeLocalAction == 'earn'
+                ? null
+                : () => openLocal('/app/work/earn'),
+          ),
+          MoolLocalNavigationAction(
+            keyName: 'work-local-workspace',
+            id: 'workspace',
+            label: 'Workspace',
+            icon: Icons.dashboard_customize_outlined,
+            onPressed: activeLocalAction == 'workspace'
+                ? null
+                : () => openLocal('/app/work/my-work'),
+          ),
+        ];
+    final resolvedActiveId = contextualActiveId ?? activeLocalAction;
+    var selectedLocalIndex = localActions.indexWhere(
+      (action) => action.id == resolvedActiveId,
+    );
+    if (selectedLocalIndex < 0) selectedLocalIndex = 0;
+
+    void moveLocal(int delta) {
+      final target = (selectedLocalIndex + delta) % localActions.length;
+      localActions[target].onPressed?.call();
     }
 
     return PopScope<Object?>(
@@ -182,49 +221,24 @@ class WorkPageScaffold extends StatelessWidget {
         ),
         bottomNavigationBar: MoolDestinationNavigationV2(
           activeId: 'work',
-          destinationLabel: 'Work',
+          destinationLabel: contextualDestinationLabel ?? 'Work',
           showFamilyRootAction: false,
-          selectedLocalIndex: activeLocalAction == 'workspace' ? 1 : 0,
-          localActionCount: 2,
+          selectedLocalIndex: selectedLocalIndex,
+          localActionCount: localActions.length,
           localNavigation: MoolLocalNavigationRail(
             key: const Key('work-local-navigation'),
             familyId: 'work',
             surfaceTone: MoolLocalNavigationSurfaceTone.light,
-            semanticLabel: 'Work choices: Earn Today and Workspace.',
-            activeId: activeLocalAction,
-            actions: [
-              MoolLocalNavigationAction(
-                keyName: 'work-local-earn',
-                id: 'earn',
-                label: 'Earn Today',
-                icon: Icons.bolt_rounded,
-                onPressed: activeLocalAction == 'earn'
-                    ? null
-                    : () => openLocal('/app/work/earn'),
-              ),
-              MoolLocalNavigationAction(
-                keyName: 'work-local-workspace',
-                id: 'workspace',
-                label: 'Workspace',
-                icon: Icons.dashboard_customize_outlined,
-                onPressed: activeLocalAction == 'workspace'
-                    ? null
-                    : () => openLocal('/app/work/my-work'),
-              ),
-            ],
+            semanticLabel: contextualLocalActions == null
+                ? 'Work choices: Earn Today and Workspace.'
+                : 'Store choices: Store, Orders, Sell and Stock.',
+            activeId: resolvedActiveId,
+            actions: localActions,
           ),
           onOpenMool: () => openGlobal('/app/mool?from=work'),
           onOpenAction: (action) => switchGlobalDestination(action.route),
-          onPreviousLocalAction: () => openLocal(
-            activeLocalAction == 'workspace'
-                ? '/app/work/earn'
-                : '/app/work/my-work',
-          ),
-          onNextLocalAction: () => openLocal(
-            activeLocalAction == 'workspace'
-                ? '/app/work/earn'
-                : '/app/work/my-work',
-          ),
+          onPreviousLocalAction: () => moveLocal(-1),
+          onNextLocalAction: () => moveLocal(1),
           onOpenChat: openChat,
         ),
       ),

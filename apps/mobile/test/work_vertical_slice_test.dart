@@ -1049,7 +1049,7 @@ void main() {
         find.byKey(const Key('work-dashboard-command-centre')),
         findsOneWidget,
       );
-      await tapVisible(tester, const Key('work-dashboard-products'));
+      await tapVisible(tester, const Key('work-store-stock'));
       expect(
         find.byKey(const Key('work-dashboard-catalogue-screen')),
         findsOneWidget,
@@ -1111,7 +1111,7 @@ void main() {
         );
       }
       expect(
-        find.text(familySignal[profile.familyId]!),
+        find.text(retailer ? 'Stock' : familySignal[profile.familyId]!),
         findsOneWidget,
         reason: profile.id,
       );
