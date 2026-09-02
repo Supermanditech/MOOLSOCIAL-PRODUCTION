@@ -112,7 +112,6 @@ class _WorkWorkspaceDashboardScreenState
             children: [
               _DashboardReveal(
                 child: _WorkspaceDashboardHero(
-                  session: session,
                   workspace: workspace,
                   profile: profile,
                 ),
@@ -272,10 +271,8 @@ class _WorkWorkspaceDashboardScreenState
       body: switch (_view) {
         _WorkspaceControlView.dashboard => _StoreControlDashboard(
           session: session,
-          workspace: workspace,
-          profile: profile,
           onStatus: _showStatus,
-          onVisibility: () => _toggleVisibility(context),
+          onQuickState: (state) => _applyQuickStoreState(context, state),
           onOpenOperation: _showOperation,
         ),
         _WorkspaceControlView.search => _WorkspaceSearchSurface(
@@ -310,6 +307,7 @@ class _WorkWorkspaceDashboardScreenState
         _WorkspaceControlView.alerts => _WorkspaceAlertsSurface(
           session: session,
           onOpen: (route) => context.push(route),
+          onOpenOperation: _showOperation,
           onOpenOrders: () => _showOperation(_WorkspaceOperation.orders),
           onOpenStatus: _showStatus,
           onDismiss: session.dismissWorkspaceAlert,
@@ -360,16 +358,49 @@ class _WorkWorkspaceDashboardScreenState
     });
   }
 
-  void _toggleVisibility(BuildContext context) {
+  void _applyQuickStoreState(BuildContext context, _QuickStoreState state) {
     final ready =
         session.retailerSetupSaved ||
         session.reviewStage == WorkReviewStage.live;
-    if (!ready && !session.workspaceVisibleToCustomers) {
+    if (!ready && state != _QuickStoreState.closed) {
       session.beginRetailerSetup();
       context.push('/app/work/retailer/setup');
       return;
     }
-    session.setWorkspaceVisibility(!session.workspaceVisibleToCustomers);
+    switch (state) {
+      case _QuickStoreState.open:
+        session.setWorkspaceVisibility(true);
+        session.saveWorkspaceAvailability(
+          acceptingOrders: true,
+          fulfilmentMode: session.workspaceFulfilmentMode,
+          busyMinutes: 0,
+          reopensAt: '',
+        );
+      case _QuickStoreState.busy:
+        session.setWorkspaceVisibility(true);
+        session.saveWorkspaceAvailability(
+          acceptingOrders: true,
+          fulfilmentMode: session.workspaceFulfilmentMode,
+          busyMinutes: 20,
+          reopensAt: '',
+        );
+      case _QuickStoreState.paused:
+        session.setWorkspaceVisibility(true);
+        session.saveWorkspaceAvailability(
+          acceptingOrders: false,
+          fulfilmentMode: session.workspaceFulfilmentMode,
+          busyMinutes: 0,
+          reopensAt: 'In 1 hour',
+        );
+      case _QuickStoreState.closed:
+        session.setWorkspaceVisibility(false);
+        session.saveWorkspaceAvailability(
+          acceptingOrders: false,
+          fulfilmentMode: session.workspaceFulfilmentMode,
+          busyMinutes: 0,
+          reopensAt: '',
+        );
+    }
   }
 
   void _openProfile(BuildContext context, WorkWorkspace workspace) {
@@ -415,6 +446,7 @@ enum _WorkspaceOperation {
   sourcing,
   services,
   settings,
+  preview,
 }
 
 extension on _WorkspaceOperation {
@@ -429,6 +461,7 @@ extension on _WorkspaceOperation {
     _WorkspaceOperation.sourcing => 'Wholesale sourcing',
     _WorkspaceOperation.services => 'Business services',
     _WorkspaceOperation.settings => 'Workspace settings',
+    _WorkspaceOperation.preview => 'Customer store preview',
   };
 
   String get subtitle => switch (this) {
@@ -450,8 +483,12 @@ extension on _WorkspaceOperation {
       'GST, tax, bookkeeping and audit assistance',
     _WorkspaceOperation.settings =>
       'Store details, documents and additional Workspaces',
+    _WorkspaceOperation.preview =>
+      'See exactly what customers can discover and order',
   };
 }
+
+enum _QuickStoreState { open, busy, paused, closed }
 
 class _WorkspaceDashboardHeader extends StatelessWidget {
   const _WorkspaceDashboardHeader({
@@ -474,7 +511,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
         Expanded(
           child: MoolServiceSearchField(
             fieldKey: const Key('work-dashboard-search'),
-            hintText: 'Search your store',
+            hintText: 'Search orders, products or customers',
             semanticLabel: 'Search orders, products and customers',
             readOnly: true,
             onTap: onSearch,
@@ -498,18 +535,14 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
 class _StoreControlDashboard extends StatelessWidget {
   const _StoreControlDashboard({
     required this.session,
-    required this.workspace,
-    required this.profile,
     required this.onStatus,
-    required this.onVisibility,
+    required this.onQuickState,
     required this.onOpenOperation,
   });
 
   final WorkSession session;
-  final WorkWorkspace workspace;
-  final WorkProfileOption profile;
   final VoidCallback onStatus;
-  final VoidCallback onVisibility;
+  final ValueChanged<_QuickStoreState> onQuickState;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
 
   @override
@@ -528,43 +561,45 @@ class _StoreControlDashboard extends StatelessWidget {
         MoolSpacing.xl,
       ),
       children: [
-        _DashboardReveal(
-          child: _WorkspaceDashboardHero(
-            session: session,
-            workspace: workspace,
-            profile: profile,
-            onVisibility: onVisibility,
-          ),
-        ),
-        const SizedBox(height: MoolSpacing.xs),
-        _StoreAvailabilityStrip(session: session, onPressed: onStatus),
-        const SizedBox(height: MoolSpacing.sm),
-        _StoreReadinessCard(
+        _StoreCommandCentre(
           session: session,
-          onPressed: storeReady
-              ? () => onOpenOperation(_WorkspaceOperation.catalogue)
-              : () {
-                  session.beginRetailerSetup();
-                  context.push('/app/work/retailer/setup');
-                },
+          onStateSelected: onQuickState,
+          onOrders: () => onOpenOperation(_WorkspaceOperation.orders),
+          onPayments: () => onOpenOperation(_WorkspaceOperation.payments),
+          onCatalogue: () => onOpenOperation(_WorkspaceOperation.catalogue),
+          onPreview: () => onOpenOperation(_WorkspaceOperation.preview),
+          onAvailability: onStatus,
         ),
-        const SizedBox(height: MoolSpacing.md),
+        if (!storeReady) ...[
+          const SizedBox(height: MoolSpacing.xs),
+          _StoreReadinessCard(
+            session: session,
+            onPressed: () {
+              session.beginRetailerSetup();
+              context.push('/app/work/retailer/setup');
+            },
+          ),
+        ],
+        const SizedBox(height: MoolSpacing.sm),
         const _WorkspaceSectionLabel(
-          title: 'Run your store',
-          detail: 'Your most-used actions, ready in one place.',
+          title: 'Now',
+          detail: 'Daily store actions',
         ),
         const SizedBox(height: MoolSpacing.sm),
         LayoutBuilder(
           key: const Key('work-dashboard-daily-actions'),
           builder: (context, constraints) {
             final tileWidth = (constraints.maxWidth - MoolSpacing.xs) / 2;
+            final tileHeight = MediaQuery.textScalerOf(context).scale(1) > 1.15
+                ? 104.0
+                : 84.0;
             return Wrap(
               spacing: MoolSpacing.xs,
               runSpacing: MoolSpacing.xs,
               children: [
                 SizedBox(
                   width: tileWidth,
-                  height: 98,
+                  height: tileHeight,
                   child: _WorkspaceActionTile(
                     keyName: 'work-dashboard-orders',
                     icon: Icons.receipt_long_outlined,
@@ -575,7 +610,7 @@ class _StoreControlDashboard extends StatelessWidget {
                 ),
                 SizedBox(
                   width: tileWidth,
-                  height: 98,
+                  height: tileHeight,
                   child: _WorkspaceActionTile(
                     keyName: 'work-dashboard-create-order',
                     icon: Icons.add_shopping_cart_rounded,
@@ -587,7 +622,7 @@ class _StoreControlDashboard extends StatelessWidget {
                 ),
                 SizedBox(
                   width: tileWidth,
-                  height: 98,
+                  height: tileHeight,
                   child: _WorkspaceActionTile(
                     keyName: 'work-dashboard-products',
                     icon: Icons.inventory_2_outlined,
@@ -598,7 +633,7 @@ class _StoreControlDashboard extends StatelessWidget {
                 ),
                 SizedBox(
                   width: tileWidth,
-                  height: 98,
+                  height: tileHeight,
                   child: _WorkspaceActionTile(
                     keyName: 'work-dashboard-delivery',
                     icon: Icons.delivery_dining_outlined,
@@ -617,6 +652,8 @@ class _StoreControlDashboard extends StatelessWidget {
           onPayments: () => onOpenOperation(_WorkspaceOperation.payments),
           onBooks: () => onOpenOperation(_WorkspaceOperation.books),
         ),
+        const SizedBox(height: MoolSpacing.sm),
+        _WorkspaceActivityCard(session: session),
         if (alertCount > 0) ...[
           const SizedBox(height: MoolSpacing.sm),
           _CompactAttentionCard(
@@ -630,6 +667,16 @@ class _StoreControlDashboard extends StatelessWidget {
           detail: 'Source better and keep essential support close.',
         ),
         const SizedBox(height: MoolSpacing.sm),
+        _WorkspaceNavigationRow(
+          keyName: 'work-dashboard-preview',
+          icon: Icons.storefront_outlined,
+          title: 'View customer store',
+          detail: session.workspaceVisibleToCustomers
+              ? 'See the public store customers can open now'
+              : 'Preview your store before making it public',
+          onTap: () => onOpenOperation(_WorkspaceOperation.preview),
+        ),
+        const SizedBox(height: MoolSpacing.xs),
         _WorkspaceNavigationRow(
           keyName: 'work-dashboard-sourcing',
           icon: Icons.handshake_outlined,
@@ -674,6 +721,305 @@ class _DashboardAlertButton extends StatelessWidget {
         tooltip: 'Store alerts',
         onPressed: onPressed,
         icon: const Icon(Icons.notifications_none_rounded),
+      ),
+    );
+  }
+}
+
+class _StoreCommandCentre extends StatelessWidget {
+  const _StoreCommandCentre({
+    required this.session,
+    required this.onStateSelected,
+    required this.onOrders,
+    required this.onPayments,
+    required this.onCatalogue,
+    required this.onPreview,
+    required this.onAvailability,
+  });
+
+  final WorkSession session;
+  final ValueChanged<_QuickStoreState> onStateSelected;
+  final VoidCallback onOrders;
+  final VoidCallback onPayments;
+  final VoidCallback onCatalogue;
+  final VoidCallback onPreview;
+  final VoidCallback onAvailability;
+
+  @override
+  Widget build(BuildContext context) {
+    final ready =
+        session.retailerSetupSaved ||
+        session.reviewStage == WorkReviewStage.live;
+    final stateLabel = !ready
+        ? 'SETUP'
+        : !session.workspaceVisibleToCustomers
+        ? 'CLOSED'
+        : !session.workspaceAcceptingOrders
+        ? 'PAUSED'
+        : session.workspaceBusyMinutes > 0
+        ? 'BUSY'
+        : 'OPEN';
+    final stateColor = switch (stateLabel) {
+      'OPEN' => const Color(0xFF32D39A),
+      'BUSY' => const Color(0xFFFFBF57),
+      'PAUSED' => const Color(0xFFFFBF57),
+      'CLOSED' => const Color(0xFFFF8D8D),
+      _ => const Color(0xFFFFC073),
+    };
+    final orderCount = session.hasActiveWorkspaceOrder ? 1 : 0;
+    return Container(
+      key: const Key('work-dashboard-command-centre'),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+      decoration: BoxDecoration(
+        color: MoolColors.navy,
+        borderRadius: BorderRadius.circular(MoolRadii.card),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22080887),
+            blurRadius: 12,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Text(
+                'STORE CONTROL',
+                style: TextStyle(
+                  color: Color(0xFFD9DAFF),
+                  fontSize: 9,
+                  letterSpacing: .7,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                key: const Key('work-dashboard-public-preview'),
+                tooltip: 'Customer store preview',
+                onPressed: onPreview,
+                visualDensity: VisualDensity.compact,
+                color: Colors.white,
+                icon: const Icon(Icons.visibility_outlined, size: 19),
+              ),
+              IconButton(
+                key: const Key('work-dashboard-status'),
+                tooltip: 'Delivery and opening settings',
+                onPressed: onAvailability,
+                visualDensity: VisualDensity.compact,
+                color: Colors.white,
+                icon: const Icon(Icons.tune_rounded, size: 19),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: PopupMenuButton<_QuickStoreState>(
+                  key: const Key('work-dashboard-store-state'),
+                  tooltip: 'Change store state',
+                  onSelected: onStateSelected,
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _QuickStoreState.open,
+                      child: Text('Open for orders'),
+                    ),
+                    PopupMenuItem(
+                      value: _QuickStoreState.busy,
+                      child: Text('Busy · add 20 minutes'),
+                    ),
+                    PopupMenuItem(
+                      value: _QuickStoreState.paused,
+                      child: Text('Pause for 1 hour'),
+                    ),
+                    PopupMenuItem(
+                      value: _QuickStoreState.closed,
+                      child: Text('Close store'),
+                    ),
+                  ],
+                  child: _CommandMetric(
+                    label: 'Store',
+                    value: stateLabel,
+                    valueColor: stateColor,
+                    icon: Icons.storefront_rounded,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: _CommandMetric(
+                  label: 'Orders',
+                  value: '$orderCount',
+                  icon: Icons.receipt_long_outlined,
+                  onTap: onOrders,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: _CommandMetric(
+                  label: 'Sales',
+                  value: '₹${session.workspaceSalesToday}',
+                  icon: Icons.currency_rupee_rounded,
+                  onTap: onPayments,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: _CommandMetric(
+                  label: 'Low stock',
+                  value: '${session.workspaceLowStockCount}',
+                  icon: Icons.inventory_2_outlined,
+                  onTap: onCatalogue,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommandMetric extends StatelessWidget {
+  const _CommandMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.valueColor = Colors.white,
+    this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color valueColor;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Container(
+      constraints: const BoxConstraints(minHeight: 58),
+      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: .13)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: const Color(0xFFD9DAFF), size: 16),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 1,
+            style: TextStyle(
+              color: valueColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.fade,
+            softWrap: false,
+            style: const TextStyle(
+              color: Color(0xFFD9DAFF),
+              fontSize: 7.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (onTap == null) return child;
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: child,
+    );
+  }
+}
+
+class _WorkspaceActivityCard extends StatelessWidget {
+  const _WorkspaceActivityCard({required this.session});
+
+  final WorkSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final activity = session.workspaceActivity.take(2).toList();
+    return WorkCard(
+      keyName: 'work-dashboard-live-activity',
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              SizedBox(
+                width: 8,
+                height: 8,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Color(0xFF0B9E72),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              SizedBox(width: 6),
+              Text(
+                'LIVE ACTIVITY',
+                style: TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 9,
+                  letterSpacing: .55,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (activity.isEmpty)
+            const Text(
+              'Orders, catalogue changes and store updates will appear here as they happen.',
+              style: TextStyle(
+                color: MoolColors.muted,
+                fontSize: 10.5,
+                height: 1.25,
+              ),
+            )
+          else
+            for (final entry in activity)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        entry.message,
+                        style: const TextStyle(
+                          color: MoolColors.ink,
+                          fontSize: 10.5,
+                          height: 1.2,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${entry.time.hour.toString().padLeft(2, '0')}:${entry.time.minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        ],
       ),
     );
   }
@@ -898,86 +1244,6 @@ class _CompactAttentionCard extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         trailing: const Icon(Icons.arrow_forward_rounded),
-      ),
-    );
-  }
-}
-
-class _StoreAvailabilityStrip extends StatelessWidget {
-  const _StoreAvailabilityStrip({
-    required this.session,
-    required this.onPressed,
-  });
-
-  final WorkSession session;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final accepting = session.workspaceAcceptingOrders;
-    return Material(
-      key: const Key('work-dashboard-availability'),
-      color: accepting ? const Color(0xFFEAF7F3) : const Color(0xFFFFF3E8),
-      borderRadius: BorderRadius.circular(MoolRadii.card),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(MoolRadii.card),
-        onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: MoolSpacing.sm,
-            vertical: MoolSpacing.xs,
-          ),
-          child: Row(
-            children: [
-              Icon(
-                accepting
-                    ? Icons.storefront_rounded
-                    : Icons.pause_circle_outline,
-                color: accepting
-                    ? const Color(0xFF08765D)
-                    : const Color(0xFF9A4A00),
-              ),
-              const SizedBox(width: MoolSpacing.xs),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      accepting ? 'Accepting app orders' : 'Store paused',
-                      style: const TextStyle(
-                        color: MoolColors.ink,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      accepting
-                          ? session.workspaceBusyMinutes == 0
-                                ? session.workspaceFulfilmentMode
-                                : '${session.workspaceFulfilmentMode} · ${session.workspaceBusyMinutes} min extra preparation'
-                          : session.workspaceReopensAt.isEmpty
-                          ? 'Choose when customers can order again'
-                          : 'Ordering resumes ${session.workspaceReopensAt}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: MoolColors.muted,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Text(
-                'Change',
-                style: TextStyle(
-                  color: MoolColors.navy,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1228,10 +1494,30 @@ class _WorkspaceOperationSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (operation == _WorkspaceOperation.orders) {
+      return _WorkspaceOrdersSurface(
+        session: session,
+        onCreateOrder: () => onOpenOperation(_WorkspaceOperation.counterOrder),
+        onOpenDelivery: () => onOpenOperation(_WorkspaceOperation.delivery),
+      );
+    }
     if (operation == _WorkspaceOperation.counterOrder) {
       return _CounterOrderSurface(
         session: session,
         onArrangeDelivery: () => onOpenOperation(_WorkspaceOperation.delivery),
+        onOpenCatalogue: () => onOpenOperation(_WorkspaceOperation.catalogue),
+      );
+    }
+    if (operation == _WorkspaceOperation.catalogue) {
+      return _WorkspaceCatalogueSurface(session: session);
+    }
+    if (operation == _WorkspaceOperation.preview) {
+      return _CustomerStorePreviewSurface(session: session);
+    }
+    if (operation == _WorkspaceOperation.delivery) {
+      return _WorkspaceDeliverySurface(
+        session: session,
+        onCreateOrder: () => onOpenOperation(_WorkspaceOperation.counterOrder),
       );
     }
     return ListView(
@@ -1251,82 +1537,9 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   }
 
   List<Widget> _operationContent() => switch (operation) {
-    _WorkspaceOperation.orders => [
-      _OperationActionCard(
-        icon: Icons.notifications_active_outlined,
-        title: 'New customer orders',
-        detail:
-            'New app orders will appear here with payment and fulfilment details.',
-        actionLabel: 'Create a customer order',
-        onPressed: () => onOpenOperation(_WorkspaceOperation.counterOrder),
-      ),
-      const SizedBox(height: MoolSpacing.xs),
-      const _OperationActionCard(
-        icon: Icons.inventory_outlined,
-        title: 'Preparing and ready',
-        detail:
-            'Accepted orders remain visible through packing, pickup and delivery.',
-      ),
-      const SizedBox(height: MoolSpacing.xs),
-      const _OperationActionCard(
-        icon: Icons.task_alt_rounded,
-        title: 'Completed orders and issues',
-        detail:
-            'Completed, cancelled and support-required orders stay separated.',
-      ),
-    ],
-    _WorkspaceOperation.catalogue => [
-      _OperationActionCard(
-        icon: Icons.inventory_2_outlined,
-        title: session.retailerProductAdded
-            ? 'Your first product is ready'
-            : 'Add your first products',
-        detail: session.retailerProductAdded
-            ? '${session.retailerQuantity} available · Purchase ₹${session.retailerBuyPrice} · Selling ₹${session.retailerSellPrice}'
-            : 'Choose products from the verified catalogue, then set your price and available stock.',
-        actionLabel: session.retailerProductAdded
-            ? 'Update catalogue and stock'
-            : 'Start catalogue setup',
-        onPressed: () {
-          session.beginRetailerSetup();
-          onOpenRoute('/app/work/retailer/setup');
-        },
-      ),
-      const SizedBox(height: MoolSpacing.xs),
-      const _OperationActionCard(
-        icon: Icons.qr_code_scanner_rounded,
-        title: 'Fast product matching',
-        detail:
-            'Search or scan an existing product, then add only your price and stock.',
-      ),
-      const SizedBox(height: MoolSpacing.xs),
-      const _OperationActionCard(
-        icon: Icons.low_priority_rounded,
-        title: 'Restocking attention',
-        detail:
-            'Low-stock recommendations will appear when real sales and stock records are available.',
-      ),
-    ],
-    _WorkspaceOperation.delivery => [
-      _OperationActionCard(
-        icon: Icons.delivery_dining_rounded,
-        title: session.workspaceOrderNeedsDelivery
-            ? 'Order ready for delivery details'
-            : 'Deliver a phone or counter order',
-        detail: session.workspaceOrderNeedsDelivery
-            ? 'Add the confirmed customer address before requesting a delivery partner.'
-            : 'Record the customer order first, then arrange delivery without keeping a full-time rider.',
-        actionLabel: 'Create delivery order',
-        onPressed: () => onOpenOperation(_WorkspaceOperation.counterOrder),
-      ),
-      const SizedBox(height: MoolSpacing.xs),
-      const _OperationActionCard(
-        icon: Icons.route_outlined,
-        title: 'Active delivery journey',
-        detail:
-            'Accepted delivery assignments will show rider, pickup, route and handoff status here.',
-      ),
-    ],
+    _WorkspaceOperation.orders => const [],
+    _WorkspaceOperation.catalogue => const [],
+    _WorkspaceOperation.delivery => const [],
     _WorkspaceOperation.customers => const [
       _OperationActionCard(
         icon: Icons.people_alt_outlined,
@@ -1342,14 +1555,21 @@ class _WorkspaceOperationSurface extends StatelessWidget {
             'Repeat-order and permitted offer actions will use real customer purchase history.',
       ),
     ],
-    _WorkspaceOperation.payments => const [
-      _OperationMetricBoard(),
-      SizedBox(height: MoolSpacing.xs),
+    _WorkspaceOperation.payments => [
+      _OperationMetricBoard(session: session),
+      const SizedBox(height: MoolSpacing.xs),
       _OperationActionCard(
         icon: Icons.account_balance_outlined,
         title: 'Request settlement',
-        detail:
-            'Settlement becomes available when completed sales create a payable balance.',
+        detail: session.workspaceSettlementBalance > 0
+            ? '₹${session.workspaceSettlementBalance} from completed sales is available.'
+            : 'Settlement becomes available when completed sales create a payable balance.',
+        actionLabel: session.workspaceSettlementBalance > 0
+            ? 'Request ₹${session.workspaceSettlementBalance}'
+            : null,
+        onPressed: session.workspaceSettlementBalance > 0
+            ? session.requestWorkspaceSettlement
+            : null,
       ),
     ],
     _WorkspaceOperation.books => const [
@@ -1437,6 +1657,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       ),
     ],
     _WorkspaceOperation.counterOrder => const [],
+    _WorkspaceOperation.preview => const [],
   };
 }
 
@@ -1559,8 +1780,648 @@ class _OperationActionCard extends StatelessWidget {
   }
 }
 
+class _WorkspaceCatalogueSurface extends StatefulWidget {
+  const _WorkspaceCatalogueSurface({required this.session});
+
+  final WorkSession session;
+
+  @override
+  State<_WorkspaceCatalogueSurface> createState() =>
+      _WorkspaceCatalogueSurfaceState();
+}
+
+class _WorkspaceCatalogueSurfaceState
+    extends State<_WorkspaceCatalogueSurface> {
+  final TextEditingController _search = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _edit(WorkspaceCatalogueItem product) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) =>
+          _CatalogueProductEditor(session: widget.session, product: product),
+    );
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = _query.trim().toLowerCase();
+    bool matches(WorkspaceCatalogueItem product) =>
+        normalized.isEmpty ||
+        '${product.title} ${product.brand} ${product.pack} ${product.sku} ${product.barcode} ${product.categoryId}'
+            .toLowerCase()
+            .contains(normalized);
+    final own = widget.session.workspaceCatalogueItems.where(matches).toList();
+    final available = workspaceMasterCatalogue
+        .where(matches)
+        .where(
+          (product) => widget.session.workspaceCatalogueItems.every(
+            (owned) => owned.id != product.id,
+          ),
+        )
+        .toList();
+    return ListView(
+      key: const Key('work-dashboard-catalogue-screen'),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.md,
+        MoolSpacing.xs,
+        MoolSpacing.md,
+        MoolSpacing.xl,
+      ),
+      children: [
+        const _OperationLead(operation: _WorkspaceOperation.catalogue),
+        const SizedBox(height: MoolSpacing.sm),
+        MoolServiceSearchField(
+          fieldKey: const Key('work-catalogue-search'),
+          controller: _search,
+          hintText: 'Search product, pack, SKU or barcode',
+          semanticLabel: 'Search your catalogue and verified products',
+          onChanged: (value) => setState(() => _query = value),
+          trailing: _query.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Clear product search',
+                  onPressed: () {
+                    _search.clear();
+                    setState(() => _query = '');
+                  },
+                  icon: const Icon(Icons.close_rounded),
+                ),
+        ),
+        const SizedBox(height: MoolSpacing.sm),
+        _CatalogueSummary(session: widget.session),
+        const SizedBox(height: MoolSpacing.md),
+        const _WorkspaceSectionLabel(
+          title: 'Your catalogue',
+          detail: 'Price · stock · public status',
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        if (own.isEmpty)
+          const WorkCard(
+            keyName: 'work-catalogue-empty',
+            child: Text(
+              'No matching product in your store. Add one from the verified catalogue below.',
+              style: TextStyle(color: MoolColors.muted, height: 1.3),
+            ),
+          )
+        else
+          for (final product in own) ...[
+            _WorkspaceProductRow(
+              product: product,
+              owned: true,
+              onPressed: () => _edit(product),
+            ),
+            const SizedBox(height: MoolSpacing.xs),
+          ],
+        const SizedBox(height: MoolSpacing.md),
+        const _WorkspaceSectionLabel(
+          title: 'Add products',
+          detail: 'Match once; enter only store values',
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        if (available.isEmpty)
+          const WorkCard(
+            child: Text(
+              'All matching verified products are already in your catalogue.',
+              style: TextStyle(color: MoolColors.muted),
+            ),
+          )
+        else
+          for (final product in available) ...[
+            _WorkspaceProductRow(
+              product: product,
+              owned: false,
+              onPressed: () => _edit(product),
+            ),
+            const SizedBox(height: MoolSpacing.xs),
+          ],
+      ],
+    );
+  }
+}
+
+class _CatalogueSummary extends StatelessWidget {
+  const _CatalogueSummary({required this.session});
+
+  final WorkSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _CatalogueMetric(
+            value: '${session.workspaceCatalogueItems.length}',
+            label: 'Products',
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _CatalogueMetric(
+            value: '${session.workspacePublishedProductCount}',
+            label: 'Public',
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _CatalogueMetric(
+            value: '${session.workspaceLowStockCount}',
+            label: 'Low stock',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CatalogueMetric extends StatelessWidget {
+  const _CatalogueMetric({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF2FF),
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              color: MoolColors.navy,
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              color: MoolColors.muted,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkspaceProductRow extends StatelessWidget {
+  const _WorkspaceProductRow({
+    required this.product,
+    required this.owned,
+    required this.onPressed,
+  });
+
+  final WorkspaceCatalogueItem product;
+  final bool owned;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkCard(
+      keyName: 'work-catalogue-${owned ? 'owned' : 'master'}-${product.id}',
+      padding: const EdgeInsets.all(10),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: const Color(0xFFEAF2FF),
+            foregroundColor: MoolColors.navy,
+            child: Text(
+              product.brand.substring(0, 1),
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+          const SizedBox(width: MoolSpacing.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.title,
+                  maxLines: 2,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  '${product.pack} · ${product.sku}',
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 9.5,
+                  ),
+                ),
+                Text(
+                  owned
+                      ? '₹${product.sellingPrice} · ${product.stock} available · ${product.publicListing ? 'Public' : 'Store only'}'
+                      : 'MRP ₹${product.mrp ?? product.sellingPrice} · verified match',
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 76,
+            child: FilledButton.tonal(
+              key: Key(
+                'work-catalogue-${owned ? 'edit' : 'add'}-${product.id}',
+              ),
+              onPressed: onPressed,
+              child: Text(owned ? 'Edit' : 'Add'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatalogueProductEditor extends StatefulWidget {
+  const _CatalogueProductEditor({required this.session, required this.product});
+
+  final WorkSession session;
+  final WorkspaceCatalogueItem product;
+
+  @override
+  State<_CatalogueProductEditor> createState() =>
+      _CatalogueProductEditorState();
+}
+
+class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
+  late final TextEditingController _purchase = TextEditingController(
+    text: widget.product.purchasePrice == 0
+        ? ''
+        : '${widget.product.purchasePrice}',
+  );
+  late final TextEditingController _selling = TextEditingController(
+    text: '${widget.product.sellingPrice}',
+  );
+  late final TextEditingController _mrp = TextEditingController(
+    text: widget.product.mrp == null ? '' : '${widget.product.mrp}',
+  );
+  late final TextEditingController _stock = TextEditingController(
+    text: '${widget.product.stock}',
+  );
+  late final TextEditingController _delivery = TextEditingController(
+    text: widget.product.deliveryPromise,
+  );
+  late bool _public = widget.product.publicListing;
+  String? _error;
+
+  @override
+  void dispose() {
+    _purchase.dispose();
+    _selling.dispose();
+    _mrp.dispose();
+    _stock.dispose();
+    _delivery.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final purchase = int.tryParse(_purchase.text.trim());
+    final selling = int.tryParse(_selling.text.trim());
+    final mrp = int.tryParse(_mrp.text.trim());
+    final stock = int.tryParse(_stock.text.trim());
+    final error = purchase == null || purchase <= 0
+        ? 'Enter the current purchase cost for your internal margin view.'
+        : selling == null || selling <= purchase
+        ? 'Enter a customer price above the purchase cost.'
+        : stock == null || stock < 0
+        ? 'Enter the available stock.'
+        : mrp != null && mrp < selling
+        ? 'MRP cannot be lower than the customer price.'
+        : _delivery.text.trim().isEmpty
+        ? 'Add the customer delivery promise.'
+        : null;
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
+    widget.session.addOrUpdateWorkspaceProduct(
+      widget.product.copyWith(
+        purchasePrice: purchase,
+        sellingPrice: selling,
+        mrp: mrp,
+        stock: stock,
+        unitPrice: '₹$selling/${widget.product.pack}',
+        deliveryPromise: _delivery.text.trim(),
+        available: stock! > 0,
+        publicListing: _public,
+      ),
+    );
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          MoolSpacing.md,
+          MoolSpacing.md,
+          MoolSpacing.md,
+          MediaQuery.viewInsetsOf(context).bottom + MoolSpacing.md,
+        ),
+        child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.product.title,
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                '${widget.product.brand} · ${widget.product.pack} · ${widget.product.sku}',
+                style: const TextStyle(color: MoolColors.muted),
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MoneyField(
+                      keyName: 'work-product-purchase-price',
+                      controller: _purchase,
+                      label: 'Purchase cost',
+                    ),
+                  ),
+                  const SizedBox(width: MoolSpacing.xs),
+                  Expanded(
+                    child: _MoneyField(
+                      keyName: 'work-product-selling-price',
+                      controller: _selling,
+                      label: 'Customer price',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: MoolSpacing.xs),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MoneyField(
+                      keyName: 'work-product-mrp',
+                      controller: _mrp,
+                      label: 'MRP',
+                    ),
+                  ),
+                  const SizedBox(width: MoolSpacing.xs),
+                  Expanded(
+                    child: TextField(
+                      key: const Key('work-product-stock'),
+                      controller: _stock,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Available stock',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: MoolSpacing.xs),
+              TextField(
+                key: const Key('work-product-delivery'),
+                controller: _delivery,
+                decoration: const InputDecoration(
+                  labelText: 'Customer delivery promise',
+                ),
+              ),
+              SwitchListTile.adaptive(
+                key: const Key('work-product-public'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Show this product to customers'),
+                subtitle: const Text(
+                  'Purchase cost remains private. Customer price, stock and product information are published.',
+                ),
+                value: _public,
+                onChanged: (value) => setState(() => _public = value),
+              ),
+              if (_error != null)
+                Text(
+                  _error!,
+                  key: const Key('work-product-error'),
+                  style: const TextStyle(
+                    color: Color(0xFFB42318),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              const SizedBox(height: MoolSpacing.sm),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const Key('work-product-save'),
+                  onPressed: _save,
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Save product'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MoneyField extends StatelessWidget {
+  const _MoneyField({
+    required this.keyName,
+    required this.controller,
+    required this.label,
+  });
+
+  final String keyName;
+  final TextEditingController controller;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      key: Key(keyName),
+      controller: controller,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(labelText: label, prefixText: '₹ '),
+    );
+  }
+}
+
+class _CustomerStorePreviewSurface extends StatelessWidget {
+  const _CustomerStorePreviewSurface({required this.session});
+
+  final WorkSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final products = session.workspaceCatalogueItems
+        .where((product) => product.published)
+        .toList();
+    final ready =
+        session.retailerSetupSaved ||
+        session.reviewStage == WorkReviewStage.live;
+    return ListView(
+      key: const Key('work-dashboard-preview-screen'),
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.md,
+        MoolSpacing.xs,
+        MoolSpacing.md,
+        MoolSpacing.xl,
+      ),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(MoolSpacing.sm),
+          decoration: BoxDecoration(
+            color: MoolColors.navy,
+            borderRadius: BorderRadius.circular(MoolRadii.card),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                session.workspaceVisibleToCustomers
+                    ? 'VISIBLE TO CUSTOMERS'
+                    : 'PRIVATE PREVIEW',
+                style: const TextStyle(
+                  color: Color(0xFFFFC073),
+                  fontSize: 9,
+                  letterSpacing: .6,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                session.activeWorkspace?.name ?? 'Your store',
+                maxLines: 2,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                '${session.activeWorkspace?.area ?? ''} · Mool Retail Partner',
+                style: const TextStyle(color: Color(0xFFD9DAFF)),
+              ),
+              const SizedBox(height: MoolSpacing.xs),
+              FilledButton.tonalIcon(
+                key: const Key('work-preview-visibility'),
+                onPressed: ready
+                    ? () => session.setWorkspaceVisibility(
+                        !session.workspaceVisibleToCustomers,
+                      )
+                    : null,
+                icon: Icon(
+                  session.workspaceVisibleToCustomers
+                      ? Icons.visibility_off_outlined
+                      : Icons.public_rounded,
+                ),
+                label: Text(
+                  session.workspaceVisibleToCustomers
+                      ? 'Make store private'
+                      : 'Publish store',
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: MoolSpacing.md),
+        const _WorkspaceSectionLabel(
+          title: 'Available products',
+          detail: 'Customer price and delivery',
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        if (products.isEmpty)
+          const WorkCard(
+            keyName: 'work-preview-empty',
+            child: Text(
+              'No public product is available yet. Add stock and enable customer visibility from Catalogue.',
+              style: TextStyle(color: MoolColors.muted, height: 1.3),
+            ),
+          )
+        else
+          for (final product in products) ...[
+            WorkCard(
+              keyName: 'work-preview-product-${product.id}',
+              child: Row(
+                children: [
+                  const CircleAvatar(
+                    backgroundColor: Color(0xFFEAF2FF),
+                    child: Icon(
+                      Icons.shopping_bag_outlined,
+                      color: MoolColors.navy,
+                    ),
+                  ),
+                  const SizedBox(width: MoolSpacing.xs),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.title,
+                          style: const TextStyle(
+                            color: MoolColors.ink,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          '${product.pack} · ${product.deliveryPromise}',
+                          style: const TextStyle(
+                            color: MoolColors.muted,
+                            fontSize: 9.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '₹${product.sellingPrice}',
+                    style: const TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: MoolSpacing.xs),
+          ],
+      ],
+    );
+  }
+}
+
 class _OperationMetricBoard extends StatelessWidget {
-  const _OperationMetricBoard();
+  const _OperationMetricBoard({required this.session});
+
+  final WorkSession session;
 
   @override
   Widget build(BuildContext context) {
@@ -1568,15 +2429,21 @@ class _OperationMetricBoard extends StatelessWidget {
       keyName: 'work-payments-summary',
       color: const Color(0xFFEAF7F3),
       child: Column(
-        children: const [
-          _PaymentMetric(label: 'Completed sales today', value: 'No sales yet'),
-          Divider(height: MoolSpacing.md),
+        children: [
+          _PaymentMetric(
+            label: 'Completed sales today',
+            value: '₹${session.workspaceSalesToday}',
+          ),
+          const Divider(height: MoolSpacing.md),
           _PaymentMetric(
             label: 'Available for settlement',
-            value: 'No balance yet',
+            value: '₹${session.workspaceSettlementBalance}',
           ),
-          Divider(height: MoolSpacing.md),
-          _PaymentMetric(label: 'Settlement requested', value: 'None'),
+          const Divider(height: MoolSpacing.md),
+          _PaymentMetric(
+            label: 'Settlement requested',
+            value: '₹${session.workspaceSettlementRequested}',
+          ),
         ],
       ),
     );
@@ -1600,14 +2467,304 @@ class _PaymentMetric extends StatelessWidget {
   }
 }
 
+class _WorkspaceOrdersSurface extends StatelessWidget {
+  const _WorkspaceOrdersSurface({
+    required this.session,
+    required this.onCreateOrder,
+    required this.onOpenDelivery,
+  });
+
+  final WorkSession session;
+  final VoidCallback onCreateOrder;
+  final VoidCallback onOpenDelivery;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      key: const Key('work-dashboard-orders-screen'),
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.md,
+        MoolSpacing.xs,
+        MoolSpacing.md,
+        MoolSpacing.xl,
+      ),
+      children: [
+        const _OperationLead(operation: _WorkspaceOperation.orders),
+        const SizedBox(height: MoolSpacing.sm),
+        if (session.workspaceOrderCustomer.isEmpty)
+          _OperationActionCard(
+            icon: Icons.receipt_long_outlined,
+            title: 'No order needs action',
+            detail:
+                'New app orders will appear here. You can also record a counter, phone or Chat order now.',
+            actionLabel: 'Create customer order',
+            onPressed: onCreateOrder,
+          )
+        else
+          _LiveWorkspaceOrderCard(
+            session: session,
+            onCreateOrder: () {
+              session.startNewWorkspaceOrder();
+              onCreateOrder();
+            },
+            onOpenDelivery: onOpenDelivery,
+          ),
+        const SizedBox(height: MoolSpacing.sm),
+        const _WorkspaceSectionLabel(
+          title: 'Order flow',
+          detail: 'Confirmed · Preparing · Ready · Completed',
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        const _OperationActionCard(
+          icon: Icons.verified_user_outlined,
+          title: 'Every action stays attached to the order',
+          detail:
+              'Customer, payment, stock, preparation and delivery updates remain together.',
+        ),
+      ],
+    );
+  }
+}
+
+class _LiveWorkspaceOrderCard extends StatelessWidget {
+  const _LiveWorkspaceOrderCard({
+    required this.session,
+    required this.onCreateOrder,
+    required this.onOpenDelivery,
+  });
+
+  final WorkSession session;
+  final VoidCallback onCreateOrder;
+  final VoidCallback onOpenDelivery;
+
+  @override
+  Widget build(BuildContext context) {
+    final stage = session.workspaceOrderStage;
+    final primaryLabel = switch (stage) {
+      'Confirmed' => 'Start preparing',
+      'Preparing' => 'Mark order ready',
+      'Ready' when session.workspaceOrderNeedsDelivery => 'Arrange delivery',
+      'Ready' => 'Complete order',
+      'Delivery requested' => 'Mark delivered',
+      _ => null,
+    };
+    return WorkCard(
+      keyName: 'work-live-order',
+      color: const Color(0xFFF7F8FF),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE7E8FF),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  stage.toUpperCase(),
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '₹${session.workspaceOrderAmount}',
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: MoolSpacing.xs),
+          Text(
+            '${session.workspaceOrderSource} · ${session.workspaceOrderCustomer}',
+            style: const TextStyle(
+              color: MoolColors.ink,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            session.workspaceOrderItems,
+            style: const TextStyle(color: MoolColors.muted, height: 1.3),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${session.workspaceOrderPayment} · ${session.workspaceOrderFulfilment}${session.workspaceOrderExtraMinutes == 0 ? '' : ' · +${session.workspaceOrderExtraMinutes} min'}',
+            style: const TextStyle(
+              color: MoolColors.navy,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          if (session.workspaceOrderAddress.isNotEmpty)
+            Text(
+              session.workspaceOrderAddress,
+              style: const TextStyle(color: MoolColors.muted, fontSize: 10),
+            ),
+          const SizedBox(height: MoolSpacing.sm),
+          if (primaryLabel != null)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const Key('work-order-primary-action'),
+                onPressed:
+                    stage == 'Ready' && session.workspaceOrderNeedsDelivery
+                    ? onOpenDelivery
+                    : session.advanceWorkspaceOrder,
+                icon: const Icon(Icons.arrow_forward_rounded),
+                label: Text(primaryLabel),
+              ),
+            ),
+          Row(
+            children: [
+              TextButton(
+                key: const Key('work-order-new'),
+                onPressed: onCreateOrder,
+                child: const Text('New order'),
+              ),
+              const Spacer(),
+              if (session.hasActiveWorkspaceOrder)
+                PopupMenuButton<String>(
+                  key: const Key('work-order-more'),
+                  tooltip: 'More order actions',
+                  onSelected: (value) {
+                    if (value == 'cancel') {
+                      session.cancelWorkspaceOrder();
+                    } else {
+                      session.extendWorkspaceOrder(int.parse(value));
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(value: '10', child: Text('Add 10 minutes')),
+                    PopupMenuItem(value: '20', child: Text('Add 20 minutes')),
+                    PopupMenuItem(value: 'cancel', child: Text('Cancel order')),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkspaceDeliverySurface extends StatelessWidget {
+  const _WorkspaceDeliverySurface({
+    required this.session,
+    required this.onCreateOrder,
+  });
+
+  final WorkSession session;
+  final VoidCallback onCreateOrder;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasDelivery =
+        session.workspaceOrderCustomer.isNotEmpty &&
+        session.workspaceOrderNeedsDelivery;
+    return ListView(
+      key: const Key('work-dashboard-delivery-screen'),
+      padding: const EdgeInsets.fromLTRB(
+        MoolSpacing.md,
+        MoolSpacing.xs,
+        MoolSpacing.md,
+        MoolSpacing.xl,
+      ),
+      children: [
+        const _OperationLead(operation: _WorkspaceOperation.delivery),
+        const SizedBox(height: MoolSpacing.sm),
+        if (!hasDelivery)
+          _OperationActionCard(
+            icon: Icons.delivery_dining_outlined,
+            title: 'No order is waiting for delivery',
+            detail:
+                'Record a phone, counter or Chat order and choose a delivery option.',
+            actionLabel: 'Create delivery order',
+            onPressed: onCreateOrder,
+          )
+        else
+          WorkCard(
+            keyName: 'work-live-delivery',
+            color: const Color(0xFFEAF7F3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  session.workspaceOrderStage.toUpperCase(),
+                  style: const TextStyle(
+                    color: Color(0xFF08765D),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  '${session.workspaceOrderCustomer} · ₹${session.workspaceOrderAmount}',
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  session.workspaceOrderAddress,
+                  style: const TextStyle(color: MoolColors.muted),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+                if (session.workspaceOrderStage != 'Delivery requested' &&
+                    session.workspaceOrderStage != 'Completed')
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      key: const Key('work-delivery-request'),
+                      onPressed: session.advanceWorkspaceOrder,
+                      icon: const Icon(Icons.delivery_dining_rounded),
+                      label: Text(
+                        session.workspaceOrderStage == 'Ready'
+                            ? 'Request delivery partner'
+                            : 'Mark order ready',
+                      ),
+                    ),
+                  )
+                else if (session.workspaceOrderStage == 'Delivery requested')
+                  const Text(
+                    'Finding an available delivery partner. Rider identity and route will appear only after confirmation.',
+                    style: TextStyle(
+                      color: MoolColors.ink,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        const SizedBox(height: MoolSpacing.xs),
+        const _OperationActionCard(
+          icon: Icons.route_outlined,
+          title: 'Live delivery journey',
+          detail:
+              'Confirmed rider, pickup, route and customer handoff updates appear here without invented status.',
+        ),
+      ],
+    );
+  }
+}
+
 class _CounterOrderSurface extends StatefulWidget {
   const _CounterOrderSurface({
     required this.session,
     required this.onArrangeDelivery,
+    required this.onOpenCatalogue,
   });
 
   final WorkSession session;
   final VoidCallback onArrangeDelivery;
+  final VoidCallback onOpenCatalogue;
 
   @override
   State<_CounterOrderSurface> createState() => _CounterOrderSurfaceState();
@@ -1617,32 +2774,29 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   late final TextEditingController _customer = TextEditingController(
     text: widget.session.workspaceOrderCustomer,
   );
-  late final TextEditingController _items = TextEditingController(
-    text: widget.session.workspaceOrderItems,
+  late final TextEditingController _address = TextEditingController(
+    text: widget.session.workspaceOrderAddress,
   );
-  late final TextEditingController _amount = TextEditingController(
-    text: widget.session.workspaceOrderAmount,
-  );
-  late bool _delivery = widget.session.workspaceOrderNeedsDelivery;
+  late String _source = widget.session.workspaceOrderSource;
+  late String _fulfilment = widget.session.workspaceOrderFulfilment;
+  late String _payment = widget.session.workspaceOrderPayment;
   String? _error;
 
   @override
   void dispose() {
     _customer.dispose();
-    _items.dispose();
-    _amount.dispose();
+    _address.dispose();
     super.dispose();
   }
 
   void _save() {
     final phone = _customer.text.replaceAll(RegExp(r'\D'), '');
-    final amount = num.tryParse(_amount.text.trim());
     final error = phone.length < 10
         ? 'Enter the customer’s 10-digit mobile number.'
-        : _items.text.trim().isEmpty
-        ? 'Add the products or service requested by the customer.'
-        : amount == null || amount <= 0
-        ? 'Enter the confirmed bill amount.'
+        : widget.session.workspaceOrderItemCount == 0
+        ? 'Add at least one product from your store catalogue.'
+        : _fulfilment != 'At the shop' && _address.text.trim().isEmpty
+        ? 'Add the confirmed customer delivery address.'
         : null;
     if (error != null) {
       setState(() => _error = error);
@@ -1650,13 +2804,14 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     }
     widget.session.saveWorkspaceOrderDraft(
       customer: _customer.text,
-      items: _items.text,
-      amount: _amount.text,
-      needsDelivery: _delivery,
+      source: _source,
+      fulfilment: _fulfilment,
+      payment: _payment,
+      address: _address.text,
     );
     setState(() => _error = null);
     FocusManager.instance.primaryFocus?.unfocus();
-    if (_delivery) widget.onArrangeDelivery();
+    if (_fulfilment != 'At the shop') widget.onArrangeDelivery();
   }
 
   @override
@@ -1675,6 +2830,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         const SizedBox(height: MoolSpacing.sm),
         WorkCard(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextField(
                 key: const Key('work-order-customer'),
@@ -1688,31 +2844,79 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                 ),
               ),
               const SizedBox(height: MoolSpacing.sm),
-              TextField(
-                key: const Key('work-order-items'),
-                controller: _items,
-                maxLines: 3,
-                minLines: 2,
-                textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
-                  labelText: 'Products or service requested',
-                  hintText: 'Add item, quantity and any customer instruction',
-                  alignLabelWithHint: true,
-                  prefixIcon: Icon(Icons.shopping_bag_outlined),
+              const Text(
+                'Order received through',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                children: [
+                  for (final source in const ['Counter', 'Phone', 'Chat'])
+                    ChoiceChip(
+                      key: Key('work-order-source-${source.toLowerCase()}'),
+                      label: Text(source),
+                      selected: _source == source,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _source = source);
+                      },
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        const _WorkspaceSectionLabel(
+          title: 'Products',
+          detail: 'From your catalogue',
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        if (widget.session.workspaceCatalogueItems.isEmpty)
+          WorkCard(
+            keyName: 'work-order-catalogue-empty',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Your catalogue has no product yet.',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const Text(
+                  'Add products once, then use them for counter, phone and Chat orders.',
+                  style: TextStyle(color: MoolColors.muted),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+                FilledButton.tonalIcon(
+                  onPressed: widget.onOpenCatalogue,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add products'),
+                ),
+              ],
+            ),
+          )
+        else
+          for (final product in widget.session.workspaceCatalogueItems) ...[
+            _OrderCatalogueRow(product: product, session: widget.session),
+            const SizedBox(height: MoolSpacing.xs),
+          ],
+        WorkCard(
+          keyName: 'work-order-total',
+          color: const Color(0xFFEAF7F3),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${widget.session.workspaceOrderItemCount} products',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
-              const SizedBox(height: MoolSpacing.sm),
-              TextField(
-                key: const Key('work-order-amount'),
-                controller: _amount,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  labelText: 'Confirmed bill amount',
-                  prefixText: '₹ ',
-                  prefixIcon: Icon(Icons.currency_rupee_rounded),
+              Text(
+                '₹${widget.session.workspaceOrderTotal}',
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ],
@@ -1720,18 +2924,80 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         ),
         const SizedBox(height: MoolSpacing.xs),
         WorkCard(
-          child: SwitchListTile.adaptive(
-            key: const Key('work-order-delivery'),
-            contentPadding: EdgeInsets.zero,
-            title: const Text(
-              'Customer needs delivery',
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
-            subtitle: const Text(
-              'The confirmed address and delivery partner are added next.',
-            ),
-            value: _delivery,
-            onChanged: (value) => setState(() => _delivery = value),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Customer receives the order',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final mode in const [
+                    'At the shop',
+                    'Own delivery',
+                    'Mool delivery',
+                  ])
+                    ChoiceChip(
+                      key: Key(
+                        'work-order-fulfilment-${mode.toLowerCase().replaceAll(' ', '-')}',
+                      ),
+                      label: Text(mode),
+                      selected: _fulfilment == mode,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _fulfilment = mode);
+                      },
+                    ),
+                ],
+              ),
+              if (_fulfilment != 'At the shop') ...[
+                const SizedBox(height: MoolSpacing.xs),
+                TextField(
+                  key: const Key('work-order-address'),
+                  controller: _address,
+                  minLines: 2,
+                  maxLines: 3,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
+                    labelText: 'Customer delivery address',
+                    hintText: 'House, street, area and landmark',
+                    prefixIcon: Icon(Icons.location_on_outlined),
+                  ),
+                ),
+              ],
+              const SizedBox(height: MoolSpacing.xs),
+              const Text(
+                'Payment',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final payment in const [
+                    'Cash',
+                    'UPI',
+                    'Pay request',
+                    'On delivery',
+                    'Customer due',
+                  ])
+                    ChoiceChip(
+                      key: Key(
+                        'work-order-payment-${payment.toLowerCase().replaceAll(' ', '-')}',
+                      ),
+                      label: Text(payment),
+                      selected: _payment == payment,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _payment = payment);
+                      },
+                    ),
+                ],
+              ),
+            ],
           ),
         ),
         if (_error != null) ...[
@@ -1750,13 +3016,92 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
           key: const Key('work-order-save'),
           onPressed: _save,
           icon: Icon(
-            _delivery ? Icons.delivery_dining_rounded : Icons.save_outlined,
+            _fulfilment == 'At the shop'
+                ? Icons.check_circle_outline_rounded
+                : Icons.delivery_dining_rounded,
           ),
           label: Text(
-            _delivery ? 'Save and arrange delivery' : 'Save customer order',
+            _fulfilment == 'At the shop'
+                ? 'Confirm customer order'
+                : 'Confirm and arrange delivery',
           ),
         ),
       ],
+    );
+  }
+}
+
+class _OrderCatalogueRow extends StatelessWidget {
+  const _OrderCatalogueRow({required this.product, required this.session});
+
+  final WorkspaceCatalogueItem product;
+  final WorkSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final quantity = session.workspaceOrderQuantities[product.id] ?? 0;
+    return WorkCard(
+      keyName: 'work-order-product-${product.id}',
+      padding: const EdgeInsets.all(10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.title,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                Text(
+                  '${product.pack} · ₹${product.sellingPrice} · ${product.stock} available',
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 9.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (quantity == 0)
+            SizedBox(
+              width: 76,
+              child: FilledButton.tonal(
+                key: Key('work-order-add-${product.id}'),
+                onPressed: product.stock == 0
+                    ? null
+                    : () => session.adjustWorkspaceOrderQuantity(product.id, 1),
+                child: const Text('Add'),
+              ),
+            )
+          else
+            Row(
+              children: [
+                IconButton(
+                  key: Key('work-order-reduce-${product.id}'),
+                  tooltip: 'Reduce ${product.title}',
+                  onPressed: () =>
+                      session.adjustWorkspaceOrderQuantity(product.id, -1),
+                  icon: const Icon(Icons.remove_circle_outline),
+                ),
+                Text(
+                  '$quantity',
+                  key: Key('work-order-quantity-${product.id}'),
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                IconButton(
+                  key: Key('work-order-increase-${product.id}'),
+                  tooltip: 'Add ${product.title}',
+                  onPressed: quantity >= product.stock
+                      ? null
+                      : () =>
+                            session.adjustWorkspaceOrderQuantity(product.id, 1),
+                  icon: const Icon(Icons.add_circle_rounded),
+                ),
+              ],
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1931,6 +3276,7 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
   const _WorkspaceAlertsSurface({
     required this.session,
     required this.onOpen,
+    required this.onOpenOperation,
     required this.onOpenOrders,
     required this.onOpenStatus,
     required this.onDismiss,
@@ -1938,6 +3284,7 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
 
   final WorkSession session;
   final ValueChanged<String> onOpen;
+  final ValueChanged<_WorkspaceOperation> onOpenOperation;
   final VoidCallback onOpenOrders;
   final VoidCallback onOpenStatus;
   final ValueChanged<String> onDismiss;
@@ -2009,8 +3356,10 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
                       onPressed: () {
                         if (alert.id == 'store-paused') {
                           onOpenStatus();
+                        } else if (alert.operation != null) {
+                          onOpenOperation(alert.operation!);
                         } else {
-                          onOpen(alert.route);
+                          onOpen(alert.route!);
                         }
                       },
                       icon: const Icon(Icons.arrow_forward_rounded, size: 17),
@@ -2107,7 +3456,8 @@ typedef _WorkspaceAlertItem = ({
   String title,
   String detail,
   String actionLabel,
-  String route,
+  String? route,
+  _WorkspaceOperation? operation,
   IconData icon,
   bool requiredAction,
 });
@@ -2122,6 +3472,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
           'Add the products and fulfilment choices needed before customers can order.',
       actionLabel: 'Continue store setup',
       route: '/app/work/retailer/setup',
+      operation: null,
       icon: Icons.storefront_outlined,
       requiredAction: true,
     ));
@@ -2134,6 +3485,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
           'Keep a confirmed contact number and email available for store support.',
       actionLabel: 'Review contact details',
       route: '/app/work/workspace/contact',
+      operation: null,
       icon: Icons.contact_phone_outlined,
       requiredAction: true,
     ));
@@ -2148,8 +3500,43 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
           : 'Customers can see that ordering resumes ${session.workspaceReopensAt}.',
       actionLabel: 'Review availability',
       route: '/app/work/workspace/dashboard',
+      operation: null,
       icon: Icons.pause_circle_outline_rounded,
       requiredAction: false,
+    ));
+  }
+  if (session.workspaceLowStockCount > 0) {
+    alerts.add((
+      id: 'low-stock',
+      title: '${session.workspaceLowStockCount} products need stock attention',
+      detail:
+          'Review available quantities before accepting the next customer order.',
+      actionLabel: 'Review catalogue',
+      route: null,
+      operation: _WorkspaceOperation.catalogue,
+      icon: Icons.inventory_2_outlined,
+      requiredAction: true,
+    ));
+  }
+  if (session.workspaceOrderCustomer.isNotEmpty) {
+    alerts.add((
+      id: 'customer-order',
+      title: session.workspaceOrderNeedsDelivery
+          ? 'Customer order needs delivery details'
+          : 'Customer order is ready to review',
+      detail:
+          '${session.workspaceOrderItems} · ₹${session.workspaceOrderAmount}',
+      actionLabel: session.workspaceOrderNeedsDelivery
+          ? 'Continue delivery'
+          : 'Review order',
+      route: null,
+      operation: session.workspaceOrderNeedsDelivery
+          ? _WorkspaceOperation.delivery
+          : _WorkspaceOperation.orders,
+      icon: session.workspaceOrderNeedsDelivery
+          ? Icons.delivery_dining_outlined
+          : Icons.receipt_long_outlined,
+      requiredAction: true,
     ));
   }
   return alerts;
@@ -2157,16 +3544,12 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
 
 class _WorkspaceDashboardHero extends StatelessWidget {
   const _WorkspaceDashboardHero({
-    required this.session,
     required this.workspace,
     required this.profile,
-    this.onVisibility,
   });
 
-  final WorkSession session;
   final WorkWorkspace workspace;
   final WorkProfileOption profile;
-  final VoidCallback? onVisibility;
 
   @override
   Widget build(BuildContext context) {
@@ -2232,67 +3615,7 @@ class _WorkspaceDashboardHero extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: MoolSpacing.xs),
-          if (onVisibility != null)
-            _StoreVisibilityButton(
-              visible: session.workspaceVisibleToCustomers,
-              onPressed: onVisibility!,
-            ),
         ],
-      ),
-    );
-  }
-}
-
-class _StoreVisibilityButton extends StatelessWidget {
-  const _StoreVisibilityButton({
-    required this.visible,
-    required this.onPressed,
-  });
-
-  final bool visible;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: visible
-          ? 'Store visible to customers. Tap to hide.'
-          : 'Store hidden from customers. Tap to make visible.',
-      child: InkWell(
-        key: const Key('work-dashboard-visibility'),
-        customBorder: const CircleBorder(),
-        onTap: onPressed,
-        child: Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: visible
-                ? const Color(0xFF16A36F)
-                : Colors.white.withValues(alpha: .14),
-            border: Border.all(color: Colors.white.withValues(alpha: .5)),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                visible ? Icons.visibility_rounded : Icons.visibility_off,
-                color: Colors.white,
-                size: 19,
-              ),
-              Text(
-                visible ? 'VISIBLE' : 'HIDDEN',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 6.8,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

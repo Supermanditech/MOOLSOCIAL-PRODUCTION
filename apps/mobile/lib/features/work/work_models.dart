@@ -14,6 +14,216 @@ extension WorkFeedFilterLabel on WorkFeedFilter {
 
 enum WorkReviewStage { none, drafting, gstPending, approved, setup, live }
 
+class WorkspaceProductCompliance {
+  const WorkspaceProductCompliance({
+    this.genericName,
+    this.netQuantity,
+    this.manufacturerName,
+    this.packerName,
+    this.importerName,
+    this.countryOfOrigin,
+    this.manufacturedOrPackedOn,
+    this.bestBeforeOrUseBy,
+    this.fssaiLicenseNumber,
+    this.consumerCare,
+  });
+
+  final String? genericName;
+  final String? netQuantity;
+  final String? manufacturerName;
+  final String? packerName;
+  final String? importerName;
+  final String? countryOfOrigin;
+  final String? manufacturedOrPackedOn;
+  final String? bestBeforeOrUseBy;
+  final String? fssaiLicenseNumber;
+  final String? consumerCare;
+}
+
+class WorkspaceCatalogueItem {
+  const WorkspaceCatalogueItem({
+    required this.id,
+    required this.canonicalId,
+    required this.categoryId,
+    required this.brand,
+    required this.title,
+    required this.variant,
+    required this.pack,
+    required this.sku,
+    required this.barcode,
+    required this.purchasePrice,
+    required this.sellingPrice,
+    required this.unitPrice,
+    required this.stock,
+    required this.deliveryPromise,
+    required this.origin,
+    required this.visualLabel,
+    required this.visualKind,
+    this.mrp,
+    this.minimumOrder = 1,
+    this.returnPolicy,
+    this.requiresPrescription = false,
+    this.composition,
+    this.regulatoryNote,
+    this.compliance,
+    this.available = true,
+    this.publicListing = true,
+  });
+
+  final String id;
+  final String canonicalId;
+  final String categoryId;
+  final String brand;
+  final String title;
+  final String variant;
+  final String pack;
+  final String sku;
+  final String barcode;
+  final int purchasePrice;
+  final int sellingPrice;
+  final String unitPrice;
+  final int stock;
+  final String deliveryPromise;
+  final String origin;
+  final String visualLabel;
+  final String visualKind;
+  final int? mrp;
+  final int minimumOrder;
+  final String? returnPolicy;
+  final bool requiresPrescription;
+  final String? composition;
+  final String? regulatoryNote;
+  final WorkspaceProductCompliance? compliance;
+  final bool available;
+  final bool publicListing;
+
+  bool get published => publicListing && available && stock > 0;
+
+  WorkspaceCatalogueItem copyWith({
+    int? purchasePrice,
+    int? sellingPrice,
+    String? unitPrice,
+    int? stock,
+    String? deliveryPromise,
+    int? mrp,
+    bool? available,
+    bool? publicListing,
+  }) => WorkspaceCatalogueItem(
+    id: id,
+    canonicalId: canonicalId,
+    categoryId: categoryId,
+    brand: brand,
+    title: title,
+    variant: variant,
+    pack: pack,
+    sku: sku,
+    barcode: barcode,
+    purchasePrice: purchasePrice ?? this.purchasePrice,
+    sellingPrice: sellingPrice ?? this.sellingPrice,
+    unitPrice: unitPrice ?? this.unitPrice,
+    stock: stock ?? this.stock,
+    deliveryPromise: deliveryPromise ?? this.deliveryPromise,
+    origin: origin,
+    visualLabel: visualLabel,
+    visualKind: visualKind,
+    mrp: mrp ?? this.mrp,
+    minimumOrder: minimumOrder,
+    returnPolicy: returnPolicy,
+    requiresPrescription: requiresPrescription,
+    composition: composition,
+    regulatoryNote: regulatoryNote,
+    compliance: compliance,
+    available: available ?? this.available,
+    publicListing: publicListing ?? this.publicListing,
+  );
+}
+
+const workspaceMasterCatalogue = <WorkspaceCatalogueItem>[
+  WorkspaceCatalogueItem(
+    id: 'oil-fortune-1l',
+    canonicalId: 'oil-fortune-sunflower',
+    categoryId: 'cooking-oil',
+    brand: 'Fortune',
+    title: 'Fortune Sunflower Oil',
+    variant: 'Refined sunflower oil',
+    pack: '1 L pouch',
+    sku: 'FRT-1L',
+    barcode: '8906007281015',
+    purchasePrice: 248,
+    sellingPrice: 264,
+    unitPrice: '₹264/L',
+    stock: 0,
+    deliveryPromise: 'Store pickup or local delivery',
+    origin: 'India',
+    visualLabel: 'Fortune Sunflower Oil 1 L pouch',
+    visualKind: 'catalogue-packshot',
+    mrp: 270,
+    returnPolicy: 'Return accepted for a sealed damaged pack at delivery.',
+    compliance: WorkspaceProductCompliance(
+      genericName: 'Refined sunflower oil',
+      netQuantity: '1 L',
+      countryOfOrigin: 'India',
+    ),
+  ),
+  WorkspaceCatalogueItem(
+    id: 'atta-aashirvaad-1kg',
+    canonicalId: 'atta-aashirvaad-whole-wheat',
+    categoryId: 'flour-grains',
+    brand: 'Aashirvaad',
+    title: 'Aashirvaad Whole Wheat Atta',
+    variant: 'Whole wheat flour',
+    pack: '1 kg pack',
+    sku: 'AAT-1K',
+    barcode: '8901725001228',
+    purchasePrice: 98,
+    sellingPrice: 108,
+    unitPrice: '₹108/kg',
+    stock: 0,
+    deliveryPromise: 'Store pickup or local delivery',
+    origin: 'India',
+    visualLabel: 'Aashirvaad Whole Wheat Atta 1 kg',
+    visualKind: 'catalogue-packshot',
+    mrp: 112,
+    compliance: WorkspaceProductCompliance(
+      genericName: 'Whole wheat flour',
+      netQuantity: '1 kg',
+      countryOfOrigin: 'India',
+    ),
+  ),
+  WorkspaceCatalogueItem(
+    id: 'salt-tata-1kg',
+    canonicalId: 'salt-tata-iodised',
+    categoryId: 'salt-spices',
+    brand: 'Tata',
+    title: 'Tata Salt',
+    variant: 'Iodised salt',
+    pack: '1 kg pack',
+    sku: 'TSL-1K',
+    barcode: '8904043901017',
+    purchasePrice: 50,
+    sellingPrice: 56,
+    unitPrice: '₹56/kg',
+    stock: 0,
+    deliveryPromise: 'Store pickup or local delivery',
+    origin: 'India',
+    visualLabel: 'Tata Salt 1 kg pack',
+    visualKind: 'catalogue-packshot',
+    mrp: 58,
+    compliance: WorkspaceProductCompliance(
+      genericName: 'Iodised salt',
+      netQuantity: '1 kg',
+      countryOfOrigin: 'India',
+    ),
+  ),
+];
+
+class WorkspaceActivityEntry {
+  const WorkspaceActivityEntry({required this.message, required this.time});
+
+  final String message;
+  final DateTime time;
+}
+
 enum WorkOpportunityPosterType {
   moolSocial,
   retailer,

@@ -354,18 +354,17 @@ void main() {
       );
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
-    expect(find.byKey(const Key('work-dashboard-hero')), findsOneWidget);
+    expect(find.byKey(const Key('work-dashboard-hero')), findsNothing);
     expect(find.textContaining('Work profile approved'), findsNothing);
-    final heroName = find.descendant(
-      of: find.byKey(const Key('work-dashboard-hero')),
-      matching: find.text('Mahadev Fresh Mart'),
-    );
-    expect(heroName, findsOneWidget);
-    expect(tester.widget<Text>(heroName).maxLines, 2);
+    expect(find.text('Mahadev Fresh Mart'), findsNothing);
     expect(find.byKey(const Key('work-dashboard-inline-header')), findsOne);
     expect(find.byKey(const Key('work-page-title')), findsNothing);
     expect(find.byKey(const Key('work-dashboard-account-state')), findsNothing);
-    expect(find.byKey(const Key('work-dashboard-visibility')), findsOneWidget);
+    expect(
+      find.byKey(const Key('work-dashboard-command-centre')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('work-dashboard-store-state')), findsOneWidget);
     expect(find.byKey(const Key('work-sticky-action-bar')), findsNothing);
     expect(find.byKey(const Key('work-local-navigation')), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -377,12 +376,14 @@ void main() {
     final work = WorkSession()..seedVerifiedWorkspace();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
-    expect(find.byKey(const Key('work-dashboard-hero')), findsOneWidget);
+    expect(find.byKey(const Key('work-dashboard-hero')), findsNothing);
     for (final keyName in const [
       'work-dashboard-search',
       'work-dashboard-alerts',
       'work-dashboard-profile',
-      'work-dashboard-availability',
+      'work-dashboard-command-centre',
+      'work-dashboard-store-state',
+      'work-dashboard-public-preview',
       'work-dashboard-orders',
       'work-dashboard-create-order',
       'work-dashboard-products',
@@ -448,7 +449,7 @@ void main() {
       final work = WorkSession()..seedVerifiedWorkspace();
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
-      await tester.tap(find.byKey(const Key('work-dashboard-availability')));
+      await tester.tap(find.byKey(const Key('work-dashboard-status')));
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('work-dashboard-status-screen')),
@@ -463,9 +464,9 @@ void main() {
 
       expect(work.workspaceAcceptingOrders, isFalse);
       expect(work.workspaceReopensAt, 'Tomorrow at 8:00 AM');
-      expect(find.text('Store paused'), findsWidgets);
+      expect(work.workspaceActivity.first.message, contains('paused'));
 
-      await tester.tap(find.byKey(const Key('work-dashboard-availability')));
+      await tester.tap(find.byKey(const Key('work-dashboard-status')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-status-accepting-orders')));
       await tester.pumpAndSettle();
@@ -511,7 +512,7 @@ void main() {
       expect(find.byKey(const Key('work-dashboard-orders-screen')), findsOne);
       expect(find.text('What would you like to do?'), findsNothing);
 
-      await tester.tap(find.text('Create a customer order'));
+      await tester.tap(find.text('Create customer order'));
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('work-dashboard-counter-order-screen')),
@@ -521,25 +522,112 @@ void main() {
         find.byKey(const Key('work-order-customer')),
         '9829012345',
       );
-      await tester.enterText(
-        find.byKey(const Key('work-order-items')),
-        'Rice 5 kg',
-      );
-      await tester.enterText(find.byKey(const Key('work-order-amount')), '420');
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);
       await tester.pumpAndSettle();
-      await reveal(tester, find.byKey(const Key('work-order-delivery')));
-      await tester.tap(find.byKey(const Key('work-order-delivery')));
+      await reveal(
+        tester,
+        find.byKey(const Key('work-order-add-oil-fortune-1l')),
+      );
+      await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
+      await reveal(
+        tester,
+        find.byKey(const Key('work-order-fulfilment-mool-delivery')),
+      );
+      await tester.tap(
+        find.byKey(const Key('work-order-fulfilment-mool-delivery')),
+      );
+      await reveal(tester, find.byKey(const Key('work-order-address')));
+      await tester.enterText(
+        find.byKey(const Key('work-order-address')),
+        '12 Market Road, Sardarpura',
+      );
       await reveal(tester, find.byKey(const Key('work-order-save')));
       await tester.tap(find.byKey(const Key('work-order-save')));
       await tester.pumpAndSettle();
 
       expect(work.workspaceOrderCustomer, '9829012345');
-      expect(work.workspaceOrderItems, 'Rice 5 kg');
-      expect(work.workspaceOrderAmount, '420');
+      expect(work.workspaceOrderItems, contains('Fortune Sunflower Oil'));
+      expect(work.workspaceOrderAmount, '264');
       expect(work.workspaceOrderNeedsDelivery, isTrue);
+      expect(work.workspaceOrderAddress, '12 Market Road, Sardarpura');
       expect(find.byKey(const Key('work-dashboard-delivery-screen')), findsOne);
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.pumpAndSettle();
+      for (var step = 0; step < 3; step++) {
+        await reveal(tester, find.byKey(const Key('work-delivery-request')));
+        await tester.tap(find.byKey(const Key('work-delivery-request')));
+        await tester.pumpAndSettle();
+      }
+      expect(work.workspaceOrderStage, 'Delivery requested');
+      expect(work.workspaceActivity, isNotEmpty);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'catalogue keeps internal cost private and publishes customer fields',
+    (tester) async {
+      final work = WorkSession()..seedVerifiedWorkspace();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+      await reveal(tester, find.byKey(const Key('work-dashboard-products')));
+      await tester.tap(find.byKey(const Key('work-dashboard-products')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-dashboard-catalogue-screen')),
+        findsOneWidget,
+      );
+      expect(find.text('Price · stock · public status'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('work-catalogue-edit-oil-fortune-1l')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-product-purchase-price')),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Purchase cost remains private'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-product-public')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('store state and customer preview complete within two taps', (
+    tester,
+  ) async {
+    final work = WorkSession()
+      ..seedVerifiedWorkspace()
+      ..reviewStage = WorkReviewStage.live
+      ..retailerSetupSaved = true
+      ..workspaceVisibleToCustomers = true;
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    await tester.tap(find.byKey(const Key('work-dashboard-store-state')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Busy · add 20 minutes'));
+    await tester.pumpAndSettle();
+    expect(work.workspaceAcceptingOrders, isTrue);
+    expect(work.workspaceBusyMinutes, 20);
+    expect(find.text('BUSY'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('work-dashboard-public-preview')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-dashboard-preview-screen')),
+      findsOneWidget,
+    );
+    expect(find.text('Mahadev Fresh Mart'), findsOneWidget);
+    expect(
+      find.byKey(const Key('work-preview-product-oil-fortune-1l')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('work-preview-visibility')));
+    await tester.pumpAndSettle();
+    expect(work.workspaceVisibleToCustomers, isFalse);
+    expect(find.text('PRIVATE PREVIEW'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

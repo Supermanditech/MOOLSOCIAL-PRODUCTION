@@ -1045,8 +1045,11 @@ void main() {
         workSession: work,
       );
 
-      expect(find.text('Store ready for customers'), findsOneWidget);
-      await tapVisible(tester, const Key('work-dashboard-priority-action'));
+      expect(
+        find.byKey(const Key('work-dashboard-command-centre')),
+        findsOneWidget,
+      );
+      await tapVisible(tester, const Key('work-dashboard-products'));
       expect(
         find.byKey(const Key('work-dashboard-catalogue-screen')),
         findsOneWidget,
@@ -1096,27 +1099,29 @@ void main() {
         findsOneWidget,
         reason: profile.id,
       );
-      expect(
-        find.textContaining(profile.label),
-        findsWidgets,
-        reason: profile.id,
-      );
+      final retailer = const {
+        'retailer-grocery',
+        'retailer-speciality',
+      }.contains(profile.id);
+      if (!retailer) {
+        expect(
+          find.textContaining(profile.label),
+          findsWidgets,
+          reason: profile.id,
+        );
+      }
       expect(
         find.text(familySignal[profile.familyId]!),
         findsOneWidget,
         reason: profile.id,
       );
-      final retailer = const {
-        'retailer-grocery',
-        'retailer-speciality',
-      }.contains(profile.id);
       final accountState = find.byKey(
         const Key('work-dashboard-account-state'),
       );
       if (retailer) {
         expect(accountState, findsNothing, reason: profile.id);
         expect(
-          find.byKey(const Key('work-dashboard-visibility')),
+          find.byKey(const Key('work-dashboard-store-state')),
           findsOneWidget,
           reason: profile.id,
         );

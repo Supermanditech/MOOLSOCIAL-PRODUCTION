@@ -93,7 +93,42 @@ class WorkSession extends ChangeNotifier {
   String workspaceOrderItems = '';
   String workspaceOrderAmount = '';
   bool workspaceOrderNeedsDelivery = false;
+  String workspaceOrderSource = 'Counter';
+  String workspaceOrderFulfilment = 'At the shop';
+  String workspaceOrderPayment = 'Cash';
+  String workspaceOrderAddress = '';
+  String workspaceOrderStage = 'No order';
+  int workspaceOrderExtraMinutes = 0;
+  int workspaceSalesToday = 0;
+  int workspaceSettlementBalance = 0;
+  int workspaceSettlementRequested = 0;
+  final List<WorkspaceCatalogueItem> workspaceCatalogueItems = [];
+  final Map<String, int> workspaceOrderQuantities = {};
+  final List<WorkspaceActivityEntry> workspaceActivity = [];
   final Set<String> dismissedWorkspaceAlerts = <String>{};
+
+  int get workspaceOrderItemCount => workspaceOrderQuantities.values.fold(
+    0,
+    (total, quantity) => total + quantity,
+  );
+
+  int get workspaceOrderTotal =>
+      workspaceCatalogueItems.fold(0, (total, product) {
+        return total +
+            product.sellingPrice * (workspaceOrderQuantities[product.id] ?? 0);
+      });
+
+  int get workspaceLowStockCount => workspaceCatalogueItems
+      .where((product) => product.available && product.stock <= 5)
+      .length;
+
+  int get workspacePublishedProductCount =>
+      workspaceCatalogueItems.where((product) => product.published).length;
+
+  bool get hasActiveWorkspaceOrder =>
+      workspaceOrderCustomer.isNotEmpty &&
+      workspaceOrderStage != 'Completed' &&
+      workspaceOrderStage != 'Cancelled';
 
   List<WorkOpportunity> get filteredOpportunities {
     final normalized = searchQuery.trim().toLowerCase();
@@ -283,6 +318,13 @@ class WorkSession extends ChangeNotifier {
     workspaceFulfilmentMode = fulfilmentMode;
     workspaceBusyMinutes = busyMinutes;
     workspaceReopensAt = acceptingOrders ? '' : reopensAt;
+    _recordWorkspaceActivity(
+      acceptingOrders
+          ? busyMinutes > 0
+                ? 'Store marked busy with $busyMinutes minutes extra preparation.'
+                : 'Store opened for customer orders.'
+          : 'New customer orders paused${reopensAt.isEmpty ? '.' : ' until $reopensAt.'}',
+    );
     showNotice(
       acceptingOrders
           ? 'Store availability updated for customers.'
@@ -297,6 +339,11 @@ class WorkSession extends ChangeNotifier {
 
   void setWorkspaceVisibility(bool visible) {
     workspaceVisibleToCustomers = visible;
+    _recordWorkspaceActivity(
+      visible
+          ? 'Store published for customer discovery.'
+          : 'Store removed from customer discovery.',
+    );
     showNotice(
       visible
           ? 'Your store is now visible to customers.'
@@ -306,19 +353,146 @@ class WorkSession extends ChangeNotifier {
 
   void saveWorkspaceOrderDraft({
     required String customer,
-    required String items,
-    required String amount,
-    required bool needsDelivery,
+    required String source,
+    required String fulfilment,
+    required String payment,
+    required String address,
   }) {
     workspaceOrderCustomer = customer.trim();
-    workspaceOrderItems = items.trim();
-    workspaceOrderAmount = amount.trim();
-    workspaceOrderNeedsDelivery = needsDelivery;
+    workspaceOrderSource = source;
+    workspaceOrderFulfilment = fulfilment;
+    workspaceOrderPayment = payment;
+    workspaceOrderAddress = address.trim();
+    workspaceOrderNeedsDelivery = fulfilment != 'At the shop';
+    workspaceOrderItems = workspaceCatalogueItems
+        .where((product) => (workspaceOrderQuantities[product.id] ?? 0) > 0)
+        .map(
+          (product) =>
+              '${product.title} × ${workspaceOrderQuantities[product.id]}',
+        )
+        .join(', ');
+    workspaceOrderAmount = '$workspaceOrderTotal';
+    workspaceOrderStage = 'Confirmed';
+    workspaceOrderExtraMinutes = 0;
+    _recordWorkspaceActivity(
+      '$source order saved · $workspaceOrderItemCount products · ₹$workspaceOrderTotal.',
+    );
     showNotice(
-      needsDelivery
+      workspaceOrderNeedsDelivery
           ? 'Order saved. Add the delivery address when the customer confirms.'
           : 'Counter order saved for customer confirmation.',
     );
+  }
+
+  void advanceWorkspaceOrder() {
+    final previous = workspaceOrderStage;
+    workspaceOrderStage = switch (previous) {
+      'Confirmed' => 'Preparing',
+      'Preparing' => 'Ready',
+      'Ready' when workspaceOrderNeedsDelivery => 'Delivery requested',
+      'Ready' => 'Completed',
+      'Delivery requested' => 'Completed',
+      _ => workspaceOrderStage,
+    };
+    if (workspaceOrderStage == 'Completed' && previous != 'Completed') {
+      final amount = int.tryParse(workspaceOrderAmount) ?? 0;
+      workspaceSalesToday += amount;
+      workspaceSettlementBalance += amount;
+    }
+    _recordWorkspaceActivity('Order moved to $workspaceOrderStage.');
+    showNotice('Order is now ${workspaceOrderStage.toLowerCase()}.');
+  }
+
+  void requestWorkspaceSettlement() {
+    if (workspaceSettlementBalance <= 0) {
+      showError('No completed-sale balance is available for settlement yet.');
+      return;
+    }
+    workspaceSettlementRequested += workspaceSettlementBalance;
+    _recordWorkspaceActivity(
+      'Settlement requested for ₹$workspaceSettlementBalance.',
+    );
+    workspaceSettlementBalance = 0;
+    showNotice('Settlement request received for processing.');
+  }
+
+  void extendWorkspaceOrder(int minutes) {
+    workspaceOrderExtraMinutes += minutes;
+    _recordWorkspaceActivity(
+      'Customer preparation estimate extended by $minutes minutes.',
+    );
+    showNotice('Customer preparation estimate updated.');
+  }
+
+  void cancelWorkspaceOrder() {
+    workspaceOrderStage = 'Cancelled';
+    _recordWorkspaceActivity('Customer order cancelled.');
+    showNotice('Order cancelled. Stock remains available.');
+  }
+
+  void startNewWorkspaceOrder() {
+    workspaceOrderCustomer = '';
+    workspaceOrderItems = '';
+    workspaceOrderAmount = '';
+    workspaceOrderNeedsDelivery = false;
+    workspaceOrderSource = 'Counter';
+    workspaceOrderFulfilment = 'At the shop';
+    workspaceOrderPayment = 'Cash';
+    workspaceOrderAddress = '';
+    workspaceOrderStage = 'No order';
+    workspaceOrderExtraMinutes = 0;
+    workspaceOrderQuantities.clear();
+    clearMessages();
+    notifyListeners();
+  }
+
+  void addOrUpdateWorkspaceProduct(WorkspaceCatalogueItem product) {
+    final index = workspaceCatalogueItems.indexWhere(
+      (item) => item.id == product.id,
+    );
+    if (index == -1) {
+      workspaceCatalogueItems.add(product);
+      _recordWorkspaceActivity('${product.title} added to your catalogue.');
+    } else {
+      workspaceCatalogueItems[index] = product;
+      _recordWorkspaceActivity('${product.title} price and stock updated.');
+    }
+    retailerProductAdded = workspaceCatalogueItems.isNotEmpty;
+    if (workspaceCatalogueItems.isNotEmpty) {
+      final first = workspaceCatalogueItems.first;
+      retailerQuantity = first.stock;
+      retailerBuyPrice = first.purchasePrice;
+      retailerSellPrice = first.sellingPrice;
+    }
+    showNotice(
+      product.publicListing
+          ? '${product.title} is ready for store publishing.'
+          : '${product.title} saved for store use only.',
+    );
+  }
+
+  void adjustWorkspaceOrderQuantity(String productId, int change) {
+    final product = workspaceCatalogueItems
+        .where((item) => item.id == productId)
+        .firstOrNull;
+    if (product == null) return;
+    final current = workspaceOrderQuantities[productId] ?? 0;
+    final next = (current + change).clamp(0, product.stock);
+    if (next == 0) {
+      workspaceOrderQuantities.remove(productId);
+    } else {
+      workspaceOrderQuantities[productId] = next;
+    }
+    clearMessages();
+    notifyListeners();
+  }
+
+  void _recordWorkspaceActivity(String message) {
+    workspaceActivity.insert(
+      0,
+      WorkspaceActivityEntry(message: message, time: DateTime.now()),
+    );
+    if (workspaceActivity.length > 8) workspaceActivity.removeLast();
   }
 
   void setOpportunityLocationFilters({
@@ -1087,6 +1261,9 @@ class WorkSession extends ChangeNotifier {
 
   void addRetailerProduct() {
     retailerProductAdded = true;
+    if (workspaceCatalogueItems.isEmpty) {
+      workspaceCatalogueItems.add(workspaceMasterCatalogue.first);
+    }
     clearMessages();
     notifyListeners();
   }
@@ -1099,6 +1276,17 @@ class WorkSession extends ChangeNotifier {
     retailerQuantity = quantity;
     retailerBuyPrice = buyPrice;
     retailerSellPrice = sellPrice;
+    if (workspaceCatalogueItems.isEmpty) {
+      workspaceCatalogueItems.add(workspaceMasterCatalogue.first);
+    }
+    workspaceCatalogueItems[0] = workspaceCatalogueItems.first.copyWith(
+      stock: quantity,
+      purchasePrice: buyPrice,
+      sellingPrice: sellPrice,
+      unitPrice: '₹$sellPrice/${workspaceCatalogueItems.first.pack}',
+      available: quantity > 0,
+      publicListing: true,
+    );
     clearMessages();
     notifyListeners();
   }
@@ -1166,6 +1354,7 @@ class WorkSession extends ChangeNotifier {
         retailerSetupSaved = true;
         reviewStage = WorkReviewStage.live;
         workspaceVisibleToCustomers = true;
+        _recordWorkspaceActivity('Store setup completed and published.');
       },
       success:
           'Shop setup complete. Your available product and fulfilment choices are live.',
@@ -1188,6 +1377,15 @@ class WorkSession extends ChangeNotifier {
       area: 'Sardarpura, Jodhpur',
       verified: true,
     );
+    workspaceCatalogueItems
+      ..clear()
+      ..add(
+        workspaceMasterCatalogue.first.copyWith(
+          stock: 8,
+          available: true,
+          publicListing: true,
+        ),
+      );
     notifyListeners();
   }
 
