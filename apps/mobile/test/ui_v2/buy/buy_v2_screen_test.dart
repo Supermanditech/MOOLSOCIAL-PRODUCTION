@@ -4435,8 +4435,425 @@ void main() {
       final returnUri = Uri.parse(uri.queryParameters['return']!);
       expect(returnUri.path, '/app/buy');
       expect(returnUri.queryParameters['sub'], 'shop');
+      expect(returnUri.queryParameters['view'], 'product');
+      expect(returnUri.queryParameters['product'], 's-eggs');
     },
   );
+
+  testWidgets('Chat return restores the exact store instead of product depth', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    expect(session.rememberStoreReturnAnchor('s-tomato'), isTrue);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(
+          session: session,
+          initialDestination: BuyV2Destination.shop,
+          initialView: BuyV2View.product,
+          productId: 's-tomato',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(session.view, BuyV2View.catalogue);
+    expect(session.selectedProductId, isNull);
+    expect(
+      find.byKey(const ValueKey('buy-shop-seller-sheet-s-tomato')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Shree Balaji Fresh'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('single-SKU Shop products expose owner and Visit store wiring', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    final tomato = session.product('s-tomato');
+    expect(session.partnerCatalogueFor(tomato), hasLength(1));
+    expect(session.openProduct(tomato.id), isTrue);
+    await tester.pumpAndSettle();
+    final storeAction = find.byKey(
+      const ValueKey('buy-shop-seller-action-s-tomato'),
+    );
+    await tester.scrollUntilVisible(
+      storeAction,
+      220,
+      scrollable: scrollableWithin(
+        const PageStorageKey('buy-product-s-tomato'),
+      ),
+    );
+
+    expect(storeAction, findsOneWidget);
+    expect(find.text('1 available product from this store'), findsOneWidget);
+    await tester.tap(storeAction);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-shop-seller-sheet-s-tomato')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-public-store-truth-s-tomato')),
+        matching: find.textContaining('Retailer'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Verified retailer'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('master Shop and Wholesale cards show real provider owners', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    final shopCard = find.byKey(const ValueKey('buy-product-s-tomato'));
+    expect(shopCard, findsOneWidget);
+    expect(
+      find.descendant(of: shopCard, matching: find.text('Shree Balaji Fresh')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: shopCard, matching: find.text('Retailer')),
+      findsOneWidget,
+    );
+
+    session.openDestination(BuyV2Destination.wholesale);
+    await tester.pumpAndSettle();
+    final wholesaleCard = find.byKey(const ValueKey('buy-product-w-tomato'));
+    expect(wholesaleCard, findsOneWidget);
+    expect(
+      find.descendant(
+        of: wholesaleCard,
+        matching: find.text('Jodhpur Fresh Supply'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: wholesaleCard, matching: find.text('Wholesaler')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Verified retailer'), findsNothing);
+    expect(find.textContaining('Verified wholesaler'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('View all keeps browsing depth and surfaces live Cart feedback', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(session.openProduct('s-eggs'), isTrue);
+    await tester.pumpAndSettle();
+
+    final storeAction = find.byKey(
+      const ValueKey('buy-shop-seller-action-s-eggs'),
+    );
+    await tester.scrollUntilVisible(
+      storeAction,
+      220,
+      scrollable: scrollableWithin(const PageStorageKey('buy-product-s-eggs')),
+    );
+    await tester.tap(storeAction);
+    await tester.pumpAndSettle();
+
+    final storeSheet = find.byKey(
+      const ValueKey('buy-shop-seller-sheet-s-eggs'),
+    );
+    final storeScroll = find
+        .descendant(of: storeSheet, matching: find.byType(Scrollable))
+        .first;
+    final viewAll = find.byKey(
+      const ValueKey('buy-shop-seller-view-more-s-eggs'),
+    );
+    await tester.scrollUntilVisible(viewAll, 180, scrollable: storeScroll);
+    await tester.tap(viewAll);
+    await tester.pumpAndSettle();
+
+    final fullCatalogue = find.byKey(
+      const ValueKey('buy-shop-seller-full-catalogue-list'),
+    );
+    final fullCatalogueSheet = find.byKey(
+      const ValueKey('buy-shop-seller-full-catalogue-sheet'),
+    );
+    expect(fullCatalogue, findsOneWidget);
+    expect(fullCatalogueSheet, findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: fullCatalogueSheet,
+        matching: find.byKey(const ValueKey('buy-add-s-eggs')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(session.quantityFor('s-eggs'), 1);
+    final fullCatalogueCart = find.descendant(
+      of: fullCatalogueSheet,
+      matching: find.byKey(const ValueKey('buy-store-cart-bar')),
+    );
+    expect(fullCatalogueCart, findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: fullCatalogueSheet,
+        matching: find.byKey(const ValueKey('buy-product-s-eggs')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Back to Safe Protein Store'), findsOneWidget);
+    await tester.tap(find.text('Back to Safe Protein Store'));
+    await tester.pumpAndSettle();
+    expect(fullCatalogue, findsOneWidget);
+
+    await tester.tap(fullCatalogueCart);
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.cart);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Other stores cards carry decisions, motion and Back continuity',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      var storeChatOpens = 0;
+      await tester.pumpWidget(
+        app(session, onOpenChat: () => storeChatOpens += 1),
+      );
+      await tester.pumpAndSettle();
+      expect(session.openProduct('s-eggs'), isTrue);
+      await tester.pumpAndSettle();
+
+      final storeAction = find.byKey(
+        const ValueKey('buy-shop-seller-action-s-eggs'),
+      );
+      await tester.scrollUntilVisible(
+        storeAction,
+        220,
+        scrollable: scrollableWithin(
+          const PageStorageKey('buy-product-s-eggs'),
+        ),
+      );
+      await tester.tap(storeAction);
+      await tester.pumpAndSettle();
+
+      final originalStore = find.byKey(
+        const ValueKey('buy-shop-seller-sheet-s-eggs'),
+      );
+      final storeScroll = find
+          .descendant(of: originalStore, matching: find.byType(Scrollable))
+          .first;
+      final relatedStore = find.byKey(
+        const ValueKey('buy-shop-seller-other-store-s-tomato'),
+      );
+      await tester.scrollUntilVisible(
+        relatedStore,
+        180,
+        scrollable: storeScroll,
+      );
+      expect(
+        find.descendant(
+          of: originalStore,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is BuyV2FiniteIncomingTransition &&
+                widget.stateKey ==
+                    'buy-shop-seller-other-store-s-tomato-motion',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: relatedStore,
+          matching: find.text('MoolSocial Fulfilment Store · Retailer'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: relatedStore, matching: find.text('₹37')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: relatedStore, matching: find.text('Quick 10m')),
+        findsOneWidget,
+      );
+
+      await tester.tap(relatedStore);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shop-seller-sheet-s-tomato')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(originalStore, findsOneWidget);
+
+      await tester.tap(relatedStore);
+      await tester.pumpAndSettle();
+      final nestedStore = find.byKey(
+        const ValueKey('buy-shop-seller-sheet-s-tomato'),
+      );
+      expect(nestedStore, findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: nestedStore,
+          matching: find.byKey(const ValueKey('buy-public-store-ask')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(storeChatOpens, 1);
+      expect(nestedStore, findsNothing);
+      expect(originalStore, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Other store Cart closes both storefronts and opens Cart', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final storeProduct = session.product('s-eggs');
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              key: const ValueKey('open-other-store-cart'),
+              onPressed: () => unawaited(
+                showBuyV2PartnerCatalogue(context, session, storeProduct),
+              ),
+              child: const Text('Open store'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('open-other-store-cart')));
+    await tester.pumpAndSettle();
+
+    final originalStore = find.byKey(
+      const ValueKey('buy-shop-seller-sheet-s-eggs'),
+    );
+    final storeScroll = find
+        .descendant(of: originalStore, matching: find.byType(Scrollable))
+        .first;
+    final relatedStore = find.byKey(
+      const ValueKey('buy-shop-seller-other-store-s-tomato'),
+    );
+    await tester.scrollUntilVisible(relatedStore, 180, scrollable: storeScroll);
+    await tester.tap(relatedStore);
+    await tester.pumpAndSettle();
+
+    final nestedStore = find.byKey(
+      const ValueKey('buy-shop-seller-sheet-s-tomato'),
+    );
+    final nestedRoute = find.byKey(
+      const ValueKey('buy-shop-seller-route-s-tomato'),
+    );
+    await tester.tap(
+      find.descendant(
+        of: nestedStore,
+        matching: find.byKey(const ValueKey('buy-add-s-tomato')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(session.quantityFor('s-tomato'), 1);
+    final nestedCart = find.descendant(
+      of: nestedRoute,
+      matching: find.byKey(const ValueKey('buy-store-cart-bar')),
+    );
+    expect(nestedCart, findsOneWidget);
+    await tester.tap(nestedCart);
+    await tester.pumpAndSettle();
+
+    expect(session.view, BuyV2View.cart);
+    expect(nestedStore, findsNothing);
+    expect(originalStore, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Other stores decisions fit 320px at 140 percent text', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 700);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final storeProduct = session.product('s-eggs');
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        builder: (context, child) {
+          final media = MediaQuery.of(context);
+          return MediaQuery(
+            data: media.copyWith(textScaler: const TextScaler.linear(1.4)),
+            child: child!,
+          );
+        },
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              key: const ValueKey('open-related-store-fitment'),
+              onPressed: () => unawaited(
+                showBuyV2PartnerCatalogue(context, session, storeProduct),
+              ),
+              child: const Text('Open store'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('open-related-store-fitment')));
+    await tester.pumpAndSettle();
+
+    final storeSheet = find.byKey(
+      const ValueKey('buy-shop-seller-sheet-s-eggs'),
+    );
+    final storeScroll = find
+        .descendant(of: storeSheet, matching: find.byType(Scrollable))
+        .first;
+    final relatedStore = find.byKey(
+      const ValueKey('buy-shop-seller-other-store-s-tomato'),
+    );
+    await tester.scrollUntilVisible(relatedStore, 150, scrollable: storeScroll);
+
+    expect(tester.getSize(relatedStore).height, 170);
+    expect(tester.getSize(relatedStore).width, 224);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('closed store preserves truth and blocks unavailable Add', (
     tester,

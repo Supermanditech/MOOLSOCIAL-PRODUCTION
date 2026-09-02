@@ -119,7 +119,11 @@ class BuyV2ChatRouteAdapter {
   String storeQuestionLocationFor({required BuyV2Product anchor}) {
     final returnRoute = Uri(
       path: '/app/buy',
-      queryParameters: {'sub': anchor.destination.name},
+      queryParameters: {
+        'sub': anchor.destination.name,
+        'view': 'product',
+        'product': anchor.id,
+      },
     ).toString();
     return Uri(
       path: _supplierThreadPathFor(

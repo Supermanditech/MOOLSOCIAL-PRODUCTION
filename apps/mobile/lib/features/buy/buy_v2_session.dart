@@ -479,6 +479,7 @@ class BuyV2Session extends ChangeNotifier {
   String medicineCategoryId = 'all';
   String query = '';
   String? selectedProductId;
+  String? _pendingStoreReturnAnchorId;
   String? pendingPrescriptionProductId;
   BuyV2RecoveryKind? recoveryKind;
   _BuyV2RecoveryOrigin? _recoveryOrigin;
@@ -3902,6 +3903,28 @@ class BuyV2Session extends ChangeNotifier {
       unawaited(refreshProductBenefits(item.id));
     }
     return true;
+  }
+
+  bool rememberStoreReturnAnchor(String id) {
+    final product = findProduct(id);
+    if (product == null ||
+        (product.destination != BuyV2Destination.shop &&
+            product.destination != BuyV2Destination.wholesale)) {
+      return false;
+    }
+    _pendingStoreReturnAnchorId = product.id;
+    return true;
+  }
+
+  String? takeStoreReturnAnchor({required String? routeProductId}) {
+    final pendingId = _pendingStoreReturnAnchorId;
+    if (pendingId == null || pendingId != routeProductId) return null;
+    _pendingStoreReturnAnchorId = null;
+    return pendingId;
+  }
+
+  void clearStoreReturnAnchor() {
+    _pendingStoreReturnAnchorId = null;
   }
 
   bool selectProductVariant(String id) {

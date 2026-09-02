@@ -453,8 +453,8 @@ class BuyV2ProductView extends StatelessWidget {
         : null;
     final partnerProducts = switch (product.destination) {
       BuyV2Destination.shop ||
-      BuyV2Destination.medicine => session.sellerContinuationsFor(product),
       BuyV2Destination.wholesale => session.partnerCatalogueFor(product),
+      BuyV2Destination.medicine => session.sellerContinuationsFor(product),
       BuyV2Destination.orders => const <BuyV2Product>[],
     };
     final rxBlocked =
@@ -992,7 +992,6 @@ class BuyV2ProductView extends StatelessWidget {
                     (product.destination == BuyV2Destination.shop ||
                             product.destination ==
                                 BuyV2Destination.wholesale) &&
-                        partnerProducts.isNotEmpty &&
                         onOpenPartnerCatalogue != null
                     ? () => onOpenPartnerCatalogue!(product)
                     : null,
@@ -3840,12 +3839,14 @@ class _MarketplaceTrustPanel extends StatelessWidget {
               '${product.destination == BuyV2Destination.wholesale ? 'buy-wholesale-store-action' : 'buy-shop-seller-action'}-${product.id}',
             ),
             icon: Icons.storefront_outlined,
-            label: 'Visit store',
+            label: product.destination == BuyV2Destination.wholesale
+                ? 'Visit supplier'
+                : 'Visit store',
             value: trust.partnerName,
             detail:
-                '$sellerProductCount more ${sellerProductCount == 1 ? 'product' : 'products'} from this store',
+                '$sellerProductCount available ${sellerProductCount == 1 ? 'product' : 'products'} from this ${product.destination == BuyV2Destination.wholesale ? 'supplier' : 'store'}',
             semanticLabel:
-                'Visit ${trust.partnerName} for $sellerProductCount more ${sellerProductCount == 1 ? 'product' : 'products'}',
+                'Visit ${trust.partnerName} for $sellerProductCount available ${sellerProductCount == 1 ? 'product' : 'products'}',
             emphasized: true,
             onTap: onViewSeller!,
           ),

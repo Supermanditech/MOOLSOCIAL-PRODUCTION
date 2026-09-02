@@ -151,7 +151,19 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     final productId = widget.productId;
     final orderId = widget.orderId;
     final recoveryKind = widget.recoveryKind;
-    if (recoveryKind != null) {
+    final storeReturnId = widget.session.takeStoreReturnAnchor(
+      routeProductId: productId,
+    );
+    if (storeReturnId != null) {
+      widget.session.destination = widget.initialDestination;
+      widget.session.view = BuyV2View.catalogue;
+      widget.session.selectedProductId = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final anchor = widget.session.findProduct(storeReturnId);
+        if (anchor != null) _openPartnerCatalogue(anchor);
+      });
+    } else if (recoveryKind != null) {
       widget.session.destination = widget.initialDestination;
       widget.session.openRecovery(recoveryKind);
     } else if (productId != null) {
@@ -794,10 +806,17 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       return;
     }
     try {
+      if (!widget.session.rememberStoreReturnAnchor(product.id)) {
+        widget.session.showNotice(
+          'This store is unavailable right now. Your products are unchanged.',
+        );
+        return;
+      }
       context.push(
         const BuyV2ChatRouteAdapter().storeQuestionLocationFor(anchor: product),
       );
     } on ArgumentError {
+      widget.session.clearStoreReturnAnchor();
       widget.session.showNotice(
         'Store Chat is unavailable right now. Your products are unchanged.',
       );
