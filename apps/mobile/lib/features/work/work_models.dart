@@ -199,6 +199,37 @@ class WorkspaceStoreOffer {
   final bool active;
 }
 
+enum WorkspaceStockMode { availabilityOnly, exactQuantity }
+
+enum WorkspaceStockMovementKind {
+  sale,
+  returned,
+  goodsReceived,
+  adjustment,
+  damageOrExpiry,
+  openingStock,
+}
+
+class WorkspaceStockMovement {
+  const WorkspaceStockMovement({
+    required this.id,
+    required this.productId,
+    required this.productLabel,
+    required this.kind,
+    required this.quantityDelta,
+    required this.reason,
+    required this.occurredAt,
+  });
+
+  final String id;
+  final String productId;
+  final String productLabel;
+  final WorkspaceStockMovementKind kind;
+  final int quantityDelta;
+  final String reason;
+  final DateTime occurredAt;
+}
+
 class WorkspaceCatalogueItem {
   const WorkspaceCatalogueItem({
     required this.id,
@@ -227,6 +258,8 @@ class WorkspaceCatalogueItem {
     this.compliance,
     this.available = true,
     this.publicListing = true,
+    this.stockMode = WorkspaceStockMode.exactQuantity,
+    this.lowStockThreshold = 5,
   });
 
   final String id;
@@ -255,8 +288,13 @@ class WorkspaceCatalogueItem {
   final WorkspaceProductCompliance? compliance;
   final bool available;
   final bool publicListing;
+  final WorkspaceStockMode stockMode;
+  final int lowStockThreshold;
 
-  bool get published => publicListing && available && stock > 0;
+  bool get published =>
+      publicListing &&
+      available &&
+      (stockMode == WorkspaceStockMode.availabilityOnly || stock > 0);
 
   BuyV2Product toBuyPublicProduct({
     required String storeName,
@@ -305,7 +343,7 @@ class WorkspaceCatalogueItem {
         storeVisible &&
         publicListing &&
         available &&
-        stock > 0 &&
+        (stockMode == WorkspaceStockMode.availabilityOnly || stock > 0) &&
         acceptingOrders;
     return BuyV2ProductFactsSnapshot(
       productId: id,
@@ -316,7 +354,8 @@ class WorkspaceCatalogueItem {
           ? 'Available to order'
           : !storeVisible || !publicListing
           ? 'Not listed for customers'
-          : !available || stock <= 0
+          : !available ||
+                (stockMode == WorkspaceStockMode.exactQuantity && stock <= 0)
           ? 'Out of stock'
           : 'Store is not accepting orders',
       sourceId: sourceId,
@@ -357,6 +396,8 @@ class WorkspaceCatalogueItem {
     WorkspaceProductCompliance? compliance,
     bool? available,
     bool? publicListing,
+    WorkspaceStockMode? stockMode,
+    int? lowStockThreshold,
   }) => WorkspaceCatalogueItem(
     id: id,
     canonicalId: canonicalId ?? this.canonicalId,
@@ -384,6 +425,8 @@ class WorkspaceCatalogueItem {
     compliance: compliance ?? this.compliance,
     available: available ?? this.available,
     publicListing: publicListing ?? this.publicListing,
+    stockMode: stockMode ?? this.stockMode,
+    lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
   );
 }
 

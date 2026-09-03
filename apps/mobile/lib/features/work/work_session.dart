@@ -122,6 +122,7 @@ class WorkSession extends ChangeNotifier {
   int workspaceSettlementRequested = 0;
   String? workspaceSettlementReference;
   final List<WorkspaceCatalogueItem> workspaceCatalogueItems = [];
+  final List<WorkspaceStockMovement> workspaceStockMovements = [];
   final Map<String, int> workspaceOrderQuantities = {};
   final List<WorkspaceOrderRecord> workspaceOrders = [];
   final Set<String> workspacePackedProductIds = <String>{};
@@ -166,11 +167,90 @@ class WorkSession extends ChangeNotifier {
       });
 
   int get workspaceLowStockCount => workspaceCatalogueItems
-      .where((product) => product.available && product.stock <= 5)
+      .where(
+        (product) =>
+            product.stockMode == WorkspaceStockMode.exactQuantity &&
+            product.available &&
+            product.stock <= product.lowStockThreshold,
+      )
       .length;
+
+  int get workspaceOutOfStockCount => workspaceCatalogueItems
+      .where(
+        (product) =>
+            !product.available ||
+            (product.stockMode == WorkspaceStockMode.exactQuantity &&
+                product.stock <= 0),
+      )
+      .length;
+
+  int get workspaceAvailableUnitCount => workspaceCatalogueItems
+      .where(
+        (product) =>
+            product.stockMode == WorkspaceStockMode.exactQuantity &&
+            product.available,
+      )
+      .fold<int>(0, (total, product) => total + product.stock);
+
+  int get workspaceReservedUnitCount => workspaceOrders
+      .where(
+        (order) =>
+            order.stockReserved &&
+            order.stage != 'Completed' &&
+            order.stage != 'Cancelled',
+      )
+      .expand((order) => order.quantities.entries)
+      .fold<int>(0, (total, entry) => total + entry.value);
 
   int get workspacePublishedProductCount =>
       workspaceCatalogueItems.where((product) => product.published).length;
+
+  int reservedWorkspaceUnitsFor(String productId) => workspaceOrders
+      .where(
+        (order) =>
+            order.stockReserved &&
+            order.stage != 'Completed' &&
+            order.stage != 'Cancelled',
+      )
+      .fold<int>(
+        0,
+        (total, order) => total + (order.quantities[productId] ?? 0),
+      );
+
+  int? workspaceDaysOfStockFor(WorkspaceCatalogueItem product) {
+    if (product.stockMode != WorkspaceStockMode.exactQuantity) return null;
+    final cutoff = DateTime.now().subtract(const Duration(days: 30));
+    final sold = workspaceOrders
+        .where(
+          (order) =>
+              order.stage == 'Completed' && !order.createdAt.isBefore(cutoff),
+        )
+        .fold<int>(
+          0,
+          (total, order) => total + (order.quantities[product.id] ?? 0),
+        );
+    if (sold <= 0) return null;
+    final daily = sold / 30;
+    return (product.stock / daily).floor();
+  }
+
+  int suggestedWorkspaceRestockFor(WorkspaceCatalogueItem product) {
+    if (product.stockMode != WorkspaceStockMode.exactQuantity) return 0;
+    final cutoff = DateTime.now().subtract(const Duration(days: 30));
+    final sold = workspaceOrders
+        .where(
+          (order) =>
+              order.stage == 'Completed' && !order.createdAt.isBefore(cutoff),
+        )
+        .fold<int>(
+          0,
+          (total, order) => total + (order.quantities[product.id] ?? 0),
+        );
+    final target = sold > 0
+        ? ((sold / 30) * 14).ceil()
+        : product.lowStockThreshold * 2;
+    return (target - product.stock).clamp(0, 1 << 31).toInt();
+  }
 
   bool get hasActiveWorkspaceOrder =>
       workspaceOrderCustomer.isNotEmpty &&
@@ -630,6 +710,20 @@ class WorkSession extends ChangeNotifier {
           'returnPolicy': product.returnPolicy,
           'available': product.available,
           'publicListing': product.publicListing,
+          'stockMode': product.stockMode.name,
+          'lowStockThreshold': product.lowStockThreshold,
+        },
+    ],
+    'stockMovements': [
+      for (final movement in workspaceStockMovements)
+        {
+          'id': movement.id,
+          'productId': movement.productId,
+          'productLabel': movement.productLabel,
+          'kind': movement.kind.name,
+          'quantityDelta': movement.quantityDelta,
+          'reason': movement.reason,
+          'occurredAt': movement.occurredAt.toUtc().toIso8601String(),
         },
     ],
     'orders': [
@@ -969,10 +1063,15 @@ class WorkSession extends ChangeNotifier {
       final product = workspaceCatalogueItems
           .where((item) => item.id == entry.key)
           .firstOrNull;
-      if (product == null || product.stock < entry.value) {
+      if (product == null ||
+          !product.available ||
+          (product.stockMode == WorkspaceStockMode.exactQuantity &&
+              product.stock < entry.value)) {
         showError(
           product == null
               ? 'A product in this order is no longer in the catalogue.'
+              : product.stockMode == WorkspaceStockMode.availabilityOnly
+              ? '${product.title} is currently unavailable.'
               : '${product.title} has only ${product.stock} available.',
         );
         return false;
@@ -984,9 +1083,16 @@ class WorkSession extends ChangeNotifier {
       );
       if (index < 0) continue;
       final product = workspaceCatalogueItems[index];
+      if (product.stockMode == WorkspaceStockMode.availabilityOnly) continue;
       workspaceCatalogueItems[index] = product.copyWith(
         stock: product.stock - entry.value,
         available: product.stock - entry.value > 0,
+      );
+      _recordWorkspaceStockMovement(
+        product: product,
+        kind: WorkspaceStockMovementKind.sale,
+        quantityDelta: -entry.value,
+        reason: 'Reserved for ${order.id}',
       );
     }
     return true;
@@ -999,9 +1105,16 @@ class WorkSession extends ChangeNotifier {
       );
       if (index < 0) continue;
       final product = workspaceCatalogueItems[index];
+      if (product.stockMode == WorkspaceStockMode.availabilityOnly) continue;
       workspaceCatalogueItems[index] = product.copyWith(
         stock: product.stock + entry.value,
         available: true,
+      );
+      _recordWorkspaceStockMovement(
+        product: product,
+        kind: WorkspaceStockMovementKind.returned,
+        quantityDelta: entry.value,
+        reason: 'Released after ${order.id} was cancelled',
       );
     }
   }
@@ -1373,16 +1486,56 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addOrUpdateWorkspaceProduct(WorkspaceCatalogueItem product) {
+  void _recordWorkspaceStockMovement({
+    required WorkspaceCatalogueItem product,
+    required WorkspaceStockMovementKind kind,
+    required int quantityDelta,
+    required String reason,
+  }) {
+    if (quantityDelta == 0) return;
+    workspaceStockMovements.insert(
+      0,
+      WorkspaceStockMovement(
+        id: 'STK-${DateTime.now().microsecondsSinceEpoch}',
+        productId: product.id,
+        productLabel: '${product.title} · ${product.pack}',
+        kind: kind,
+        quantityDelta: quantityDelta,
+        reason: reason,
+        occurredAt: DateTime.now(),
+      ),
+    );
+    if (workspaceStockMovements.length > 100) {
+      workspaceStockMovements.removeRange(100, workspaceStockMovements.length);
+    }
+  }
+
+  void addOrUpdateWorkspaceProduct(
+    WorkspaceCatalogueItem product, {
+    String stockReason = 'Product quantity updated',
+  }) {
     final index = workspaceCatalogueItems.indexWhere(
       (item) => item.id == product.id,
     );
     if (index == -1) {
       workspaceCatalogueItems.add(product);
       _recordWorkspaceActivity('${product.title} added to your catalogue.');
+      _recordWorkspaceStockMovement(
+        product: product,
+        kind: WorkspaceStockMovementKind.openingStock,
+        quantityDelta: product.stock,
+        reason: 'Opening quantity',
+      );
     } else {
+      final previous = workspaceCatalogueItems[index];
       workspaceCatalogueItems[index] = product;
       _recordWorkspaceActivity('${product.title} price and stock updated.');
+      _recordWorkspaceStockMovement(
+        product: product,
+        kind: WorkspaceStockMovementKind.adjustment,
+        quantityDelta: product.stock - previous.stock,
+        reason: stockReason,
+      );
     }
     retailerProductAdded = workspaceCatalogueItems.isNotEmpty;
     if (workspaceCatalogueItems.isNotEmpty) {
@@ -1406,8 +1559,21 @@ class WorkSession extends ChangeNotifier {
       );
       if (index < 0) {
         workspaceCatalogueItems.add(product);
+        _recordWorkspaceStockMovement(
+          product: product,
+          kind: WorkspaceStockMovementKind.goodsReceived,
+          quantityDelta: product.stock,
+          reason: 'Imported product quantity',
+        );
       } else {
+        final previous = workspaceCatalogueItems[index];
         workspaceCatalogueItems[index] = product;
+        _recordWorkspaceStockMovement(
+          product: product,
+          kind: WorkspaceStockMovementKind.goodsReceived,
+          quantityDelta: product.stock - previous.stock,
+          reason: 'Imported product quantity',
+        );
       }
     }
     retailerProductAdded = workspaceCatalogueItems.isNotEmpty;
@@ -1427,9 +1593,54 @@ class WorkSession extends ChangeNotifier {
       publicListing: false,
       stock: 0,
     );
+    _recordWorkspaceStockMovement(
+      product: product,
+      kind: WorkspaceStockMovementKind.adjustment,
+      quantityDelta: -product.stock,
+      reason: 'Removed from active catalogue',
+    );
     _recordWorkspaceActivity('${product.title} removed from active catalogue.');
     showNotice('${product.title} is no longer shown to customers.');
     _persistOperationalState('catalogue-retired');
+  }
+
+  bool updateWorkspaceStock({
+    required String productId,
+    required int quantity,
+    required String reason,
+    WorkspaceStockMovementKind kind = WorkspaceStockMovementKind.adjustment,
+  }) {
+    final cleanReason = reason.trim();
+    if (cleanReason.isEmpty) {
+      showError('Choose why the quantity changed.');
+      return false;
+    }
+    final index = workspaceCatalogueItems.indexWhere(
+      (product) => product.id == productId,
+    );
+    if (index < 0) {
+      showError('This product is no longer in your catalogue.');
+      return false;
+    }
+    final product = workspaceCatalogueItems[index];
+    final nextQuantity = quantity.clamp(0, 1 << 31).toInt();
+    workspaceCatalogueItems[index] = product.copyWith(
+      stock: nextQuantity,
+      available: product.stockMode == WorkspaceStockMode.availabilityOnly
+          ? product.available
+          : nextQuantity > 0,
+    );
+    _recordWorkspaceStockMovement(
+      product: product,
+      kind: kind,
+      quantityDelta: nextQuantity - product.stock,
+      reason: cleanReason,
+    );
+    _recordWorkspaceActivity('${product.title} quantity updated.');
+    showNotice('${product.title} quantity is now $nextQuantity.');
+    _persistOperationalState('stock-adjusted');
+    notifyListeners();
+    return true;
   }
 
   void adjustWorkspaceOrderQuantity(String productId, int change) {
@@ -1438,7 +1649,10 @@ class WorkSession extends ChangeNotifier {
         .firstOrNull;
     if (product == null) return;
     final current = workspaceOrderQuantities[productId] ?? 0;
-    final next = (current + change).clamp(0, product.stock);
+    final maximum = product.stockMode == WorkspaceStockMode.availabilityOnly
+        ? 99
+        : product.stock;
+    final next = (current + change).clamp(0, maximum);
     if (next == 0) {
       workspaceOrderQuantities.remove(productId);
     } else {
@@ -2498,6 +2712,7 @@ class WorkSession extends ChangeNotifier {
           publicListing: true,
         ),
       );
+    workspaceStockMovements.clear();
     workspaceStoreState = WorkspaceStoreState.off;
     workspaceAcceptingOrders = false;
     workspaceVisibleToCustomers = false;

@@ -130,6 +130,28 @@ void main() {
         ..workspaceVisibleToCustomers = true
         ..workspaceLastUpdatedAt = DateTime(2026, 9, 3, 8, 30);
 
+  WorkspaceCatalogueItem catalogueProduct(int index, {int stock = 12}) =>
+      WorkspaceCatalogueItem(
+        id: 'store-product-$index',
+        canonicalId: 'store-canonical-$index',
+        categoryId: 'grocery-staples',
+        brand: 'Store Brand',
+        title: 'Daily grocery product $index',
+        variant: 'Regular',
+        pack: '${index + 1} kg pack',
+        sku: 'STORE-SKU-$index',
+        barcode: '89000000000$index',
+        purchasePrice: 80 + index,
+        sellingPrice: 95 + index,
+        unitPrice: '₹${95 + index}/pack',
+        stock: stock,
+        deliveryPromise: 'Store pickup or local delivery',
+        origin: 'India',
+        visualLabel: 'Daily grocery product $index',
+        visualKind: 'catalogue-packshot',
+        mrp: 100 + index,
+      );
+
   void seedIncomingOrder(
     WorkSession work, {
     String stage = 'Confirmed',
@@ -1930,6 +1952,13 @@ void main() {
       find.byKey(const Key('work-product-cancel')).hitTestable(),
       findsOne,
     );
+    await tester.ensureVisible(
+      find.byKey(const Key('work-product-details-section')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-product-details-section')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('work-product-title')));
     await tester.tap(find.byKey(const Key('work-product-title')));
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
     await tester.pumpAndSettle();
@@ -1939,6 +1968,201 @@ void main() {
       lessThanOrEqualTo(500),
     );
     tester.view.viewInsets = FakeViewPadding.zero;
+  });
+
+  testWidgets('catalogue keeps daily product actions direct and compact', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+    );
+    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Products customers can buy'), findsOneWidget);
+    expect(find.byKey(const Key('work-catalogue-scan')), findsOneWidget);
+    expect(find.byKey(const Key('work-catalogue-add')), findsOneWidget);
+    expect(find.byKey(const Key('work-catalogue-more')), findsOneWidget);
+    expect(
+      find.byKey(const Key('work-catalogue-price-oil-fortune-1l')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('work-catalogue-stock-oil-fortune-1l')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('work-catalogue-price-oil-fortune-1l')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-quick-price')), '265');
+    await tester.tap(find.byKey(const Key('work-quick-price-save')));
+    await tester.pumpAndSettle();
+    expect(work.workspaceCatalogueItems.first.sellingPrice, 265);
+
+    await tester.tap(
+      find.byKey(const Key('work-catalogue-stock-oil-fortune-1l')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-quick-stock')), '4');
+    await tester.tap(find.byKey(const Key('work-quick-stock-save')));
+    await tester.pumpAndSettle();
+    expect(work.workspaceCatalogueItems.first.stock, 4);
+    expect(work.workspaceStockMovements.first.reason, 'Counted in store');
+
+    await tester.tap(
+      find.byKey(const Key('work-catalogue-visibility-oil-fortune-1l')),
+    );
+    await tester.pumpAndSettle();
+    expect(work.workspaceCatalogueItems.first.publicListing, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('stock statement returns from exact Wholesale recommendation', (
+    tester,
+  ) async {
+    final work = liveStore();
+    work.updateWorkspaceStock(
+      productId: 'oil-fortune-1l',
+      quantity: 3,
+      reason: 'Counted in store',
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+    );
+    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-catalogue-stock-statement')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('work-stock-statement-screen')),
+      findsOneWidget,
+    );
+    expect(find.text('3'), findsWidgets);
+    expect(
+      find.byKey(const Key('work-stock-position-oil-fortune-1l')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const Key('work-stock-restock-oil-fortune-1l')),
+    );
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-store-procurement-screen')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-stock-statement-screen')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'five catalogue rows remain visible in the normal Store viewport',
+    (tester) async {
+      final work = liveStore();
+      for (var index = 1; index <= 4; index++) {
+        work.workspaceCatalogueItems.add(catalogueProduct(index));
+      }
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+      );
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      final fifth = find.byKey(
+        const Key('work-catalogue-owned-store-product-4'),
+      );
+      expect(fifth, findsOneWidget);
+      expect(fifth.hitTestable(), findsOneWidget);
+      expect(
+        tester.getBottomRight(fifth).dy,
+        lessThanOrEqualTo(
+          tester.getTopLeft(find.byKey(const Key('work-local-navigation'))).dy,
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test('Store stock changes require a reason and balance reservations', () {
+    final work = liveStore();
+    addTearDown(work.dispose);
+    expect(
+      work.updateWorkspaceStock(
+        productId: 'oil-fortune-1l',
+        quantity: 10,
+        reason: '',
+      ),
+      isFalse,
+    );
+    expect(work.workspaceCatalogueItems.first.stock, 8);
+    expect(
+      work.updateWorkspaceStock(
+        productId: 'oil-fortune-1l',
+        quantity: 10,
+        reason: 'Goods received',
+        kind: WorkspaceStockMovementKind.goodsReceived,
+      ),
+      isTrue,
+    );
+    expect(work.workspaceStockMovements.first.quantityDelta, 2);
+
+    work
+      ..workspaceOrderCustomer = '9829012345'
+      ..workspaceOrderItems = 'Fortune Sunflower Oil × 2'
+      ..workspaceOrderAmount = '528'
+      ..workspaceOrderStage = 'Confirmed'
+      ..workspaceOrderQuantities['oil-fortune-1l'] = 2;
+    work.advanceWorkspaceOrder();
+    expect(work.workspaceCatalogueItems.first.stock, 8);
+    expect(work.workspaceReservedUnitCount, 2);
+    expect(
+      work.workspaceStockMovements.first.kind,
+      WorkspaceStockMovementKind.sale,
+    );
+    work.cancelWorkspaceOrder();
+    expect(work.workspaceCatalogueItems.first.stock, 10);
+    expect(work.workspaceReservedUnitCount, 0);
+    expect(
+      work.workspaceStockMovements.first.kind,
+      WorkspaceStockMovementKind.returned,
+    );
+
+    final availabilityOnly = catalogueProduct(90, stock: 0).copyWith(
+      stockMode: WorkspaceStockMode.availabilityOnly,
+      available: true,
+      publicListing: true,
+    );
+    expect(availabilityOnly.published, isTrue);
+    expect(
+      availabilityOnly
+          .toBuyPublicFacts(
+            storeName: 'Mahadev Fresh Mart',
+            sourceId: 'WK-510001',
+            storeVisible: true,
+            acceptingOrders: true,
+            observedAt: DateTime(2026, 9, 4),
+          )
+          .orderabilityLabel,
+      'Available to order',
+    );
   });
 
   testWidgets('Work inputs expose merged accessibility names', (tester) async {
@@ -2380,6 +2604,75 @@ void main() {
           );
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-order-review')));
+        },
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - premium product catalogue',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore();
+      for (var index = 1; index <= 4; index++) {
+        work.workspaceCatalogueItems.add(
+          catalogueProduct(index, stock: index == 1 ? 3 : 12 + index),
+        );
+      }
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-products-stock-v1-local-review-20260904',
+        fileName: '01-products-customers-can-buy-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-store-stock')));
+        },
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - fast product editor',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      await captureActivityDeck(
+        tester,
+        work: liveStore(),
+        directory: 'work-store-live-products-stock-v1-local-review-20260904',
+        fileName: '02-fast-product-editor-412x915.png',
+        target: find.byType(MaterialApp),
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-store-stock')));
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const Key('work-catalogue-edit-oil-fortune-1l')),
+          );
+        },
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - stock statement',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore();
+      work.updateWorkspaceStock(
+        productId: 'oil-fortune-1l',
+        quantity: 3,
+        reason: 'Counted in store',
+      );
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-products-stock-v1-local-review-20260904',
+        fileName: '03-stock-statement-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-store-stock')));
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const Key('work-catalogue-stock-statement')),
+          );
         },
       );
     },
