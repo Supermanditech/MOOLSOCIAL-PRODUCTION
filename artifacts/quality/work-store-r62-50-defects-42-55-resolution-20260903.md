@@ -4,7 +4,7 @@ Source baseline: `38b584758ecff66c7a82293242d1748f88975e31`
 
 ## Equivalent fixes
 
-- **42 — review launch:** the r62.50 OPPO entry point renders an immediate branded preparation frame before the review session finishes starting. This is review-build composition; locked production Splash source is unchanged.
+- **42 — review launch:** the debug-review Android source set displays the Mool app mark while Flutter extracts and starts. This is isolated from the locked production Splash resources.
 - **43 — Store search:** the native inline Store search scales its complete label instead of ellipsizing it at the OPPO text size.
 - **44 — packing:** every product uses a compact 42-pixel packing row and remains visible above `Mark ready`.
 - **45 — Settings/Store child Back:** Store operations carry their exact parent. Delivery, Staff and Business record return to Store Settings; Offers and paid work return to Grow. A visible compact Back action is present in the persistent Store header.
