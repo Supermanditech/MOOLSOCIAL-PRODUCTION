@@ -29,6 +29,8 @@ enum BuyV2View {
   recovery,
 }
 
+enum BuyV2CheckoutStep { address, payment, confirm }
+
 enum BuyV2CartScope { all, shop, wholesale, medicine }
 
 enum BuyV2ProductSort {

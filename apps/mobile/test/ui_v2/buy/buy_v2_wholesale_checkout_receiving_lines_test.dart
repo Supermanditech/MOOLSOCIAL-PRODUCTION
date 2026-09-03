@@ -47,6 +47,8 @@ void main() {
       session.openCart(scope: scope);
     }
     expect(session.openCheckout(), isTrue);
+    expect(session.continueCheckoutFromAddress(), isTrue);
+    expect(session.continueCheckoutFromPayment(), isTrue);
     return session;
   }
 
@@ -165,7 +167,7 @@ void main() {
       160,
       scrollable: find
           .descendant(
-            of: find.byKey(const PageStorageKey('buy-checkout')),
+            of: find.byKey(const PageStorageKey('buy-checkout-confirm')),
             matching: find.byType(Scrollable),
           )
           .first,

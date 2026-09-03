@@ -201,6 +201,38 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> advanceCheckoutToPayment(
+    WidgetTester tester,
+    BuyV2Session session,
+  ) async {
+    expect(session.checkoutStep, BuyV2CheckoutStep.address);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-address')),
+    );
+    await tester.pumpAndSettle();
+    expect(session.checkoutStep, BuyV2CheckoutStep.payment);
+    expect(
+      find.byKey(const ValueKey('buy-checkout-payment-stage')),
+      findsOneWidget,
+    );
+  }
+
+  Future<void> advanceCheckoutToConfirm(
+    WidgetTester tester,
+    BuyV2Session session,
+  ) async {
+    await advanceCheckoutToPayment(tester, session);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-payment')),
+    );
+    await tester.pumpAndSettle();
+    expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+    expect(
+      find.byKey(const ValueKey('buy-checkout-confirm-stage')),
+      findsOneWidget,
+    );
+  }
+
   testWidgets('persistent Buy navigation preserves one destination surface', (
     tester,
   ) async {
@@ -2843,12 +2875,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const ValueKey('buy-saved-address-reminder')),
+      find.byKey(const ValueKey('buy-checkout-address-home')),
       findsOneWidget,
     );
-    expect(find.text('Delivering to Home'), findsOneWidget);
-    expect(find.text('Edit'), findsOneWidget);
-    expect(find.text('Payment · PhonePe'), findsOneWidget);
+    expect(find.text('Delivery address'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-checkout-address-edit-home')),
+      findsOneWidget,
+    );
+    expect(find.text('Payment · PhonePe'), findsNothing);
+    await advanceCheckoutToPayment(tester, session);
+    expect(find.byKey(const ValueKey('buy-payment-PhonePe')), findsOneWidget);
+    expect(find.text('Amount to MoolSocial'), findsOneWidget);
     expect(find.textContaining('Delivery & payment'), findsNothing);
     expect(find.textContaining('delivery and payment'), findsNothing);
   });
@@ -3291,6 +3329,288 @@ void main() {
     },
   );
 
+  testWidgets('PAY-07 success settles once with customer actions only', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(session.addProduct('s-tomato'), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(session.confirmOrder(), isTrue);
+    await tester.pump();
+
+    expect(
+      find.byKey(ValueKey('buy-order-success-${session.confirmedPurchaseId}')),
+      findsOneWidget,
+    );
+    expect(find.text('Order placed'), findsOneWidget);
+    expect(find.text('Track delivery'), findsNothing);
+    expect(find.text('View purchase in Orders'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('buy-confirmation-order-details')),
+      findsOneWidget,
+    );
+    final continueShopping = find.byKey(
+      const ValueKey('buy-confirmation-continue-shopping'),
+    );
+    await tester.scrollUntilVisible(
+      continueShopping,
+      180,
+      scrollable: scrollableWithin(const ValueKey('buy-confirmation')),
+    );
+    expect(continueShopping, findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 900));
+    await tester.pumpAndSettle();
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('PAY-08 Quick status appears at top and can be minimized', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(session.addProduct('s-tomato'), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(session.confirmOrder(), isTrue);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('buy-quick-delivery-status-expanded')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('buy-quick-delivery-minimize')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-quick-delivery-status-minimized')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('buy-quick-delivery-expand')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-quick-delivery-status-expanded')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('PAY-08 scheduled and courier delivery uses quiet status', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final product = BuyV2Catalogue.products.firstWhere(
+      (candidate) =>
+          candidate.destination == BuyV2Destination.shop &&
+          session.fulfilmentModeFor(candidate) ==
+              BuyV2FulfilmentMode.standardCourier,
+    );
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(session.addProduct(product.id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(session.confirmOrder(), isTrue);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('buy-quiet-delivery-status')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-quick-delivery-status-expanded')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('PAY-09 Cart summary clears the fixed action bar', (
+    tester,
+  ) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 568);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final product = BuyV2Catalogue.products.firstWhere(
+      (candidate) => candidate.destination == BuyV2Destination.wholesale,
+    );
+    await tester.pumpWidget(app(session, textScale: 1.4));
+    await tester.pumpAndSettle();
+    expect(session.addProduct(product.id), isTrue);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    await tester.pumpAndSettle();
+
+    final summary = find.byKey(const ValueKey('buy-cart-bill-summary'));
+    final cartList = scrollableWithin(
+      const PageStorageKey('buy-cart-wholesale'),
+    );
+    await tester.scrollUntilVisible(summary, 220, scrollable: cartList);
+    await tester.pumpAndSettle();
+    final actionBar = find.byKey(const ValueKey('buy-cart-action-bar'));
+    final dockTotal = find.descendant(
+      of: actionBar,
+      matching: find.text(buyV2Money(session.scopedPayableTotal)),
+    );
+    final reviewAction = find.descendant(
+      of: actionBar,
+      matching: find.text('Review order'),
+    );
+    expect(
+      tester.getRect(summary).bottom,
+      lessThanOrEqualTo(tester.getRect(actionBar).top),
+    );
+    expect(dockTotal, findsOneWidget);
+    expect(reviewAction, findsOneWidget);
+    expect(
+      tester.getRect(actionBar).contains(tester.getRect(dockTotal).bottomRight),
+      isTrue,
+    );
+    expect(
+      tester
+          .getRect(actionBar)
+          .contains(tester.getRect(reviewAction).bottomRight),
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('PAY-01 through PAY-09 fit Android and iOS viewport matrix', (
+    tester,
+  ) async {
+    addTearDown(tester.view.reset);
+    tester.view.devicePixelRatio = 1;
+    const viewports =
+        <({String label, Size size, EdgeInsets safe, double scale})>[
+          (
+            label: 'compact Android',
+            size: Size(320, 568),
+            safe: EdgeInsets.symmetric(vertical: 24),
+            scale: 1.4,
+          ),
+          (
+            label: 'Redmi Android',
+            size: Size(360, 800),
+            safe: EdgeInsets.only(top: 34, bottom: 81),
+            scale: 1,
+          ),
+          (
+            label: 'large Android',
+            size: Size(412, 915),
+            safe: EdgeInsets.only(top: 32, bottom: 24),
+            scale: 1.15,
+          ),
+          (
+            label: 'iPhone SE',
+            size: Size(375, 667),
+            safe: EdgeInsets.only(top: 20),
+            scale: 1,
+          ),
+          (
+            label: 'iPhone',
+            size: Size(390, 844),
+            safe: EdgeInsets.only(top: 47, bottom: 34),
+            scale: 1,
+          ),
+          (
+            label: 'large iPhone',
+            size: Size(430, 932),
+            safe: EdgeInsets.only(top: 59, bottom: 34),
+            scale: 1.2,
+          ),
+          (
+            label: 'Android tablet',
+            size: Size(600, 960),
+            safe: EdgeInsets.only(top: 24, bottom: 24),
+            scale: 1,
+          ),
+        ];
+
+    for (final viewport in viewports) {
+      tester.view.physicalSize = viewport.size;
+      final session = BuyV2Session(core: BuySession());
+
+      await tester.pumpWidget(
+        app(
+          session,
+          textScale: viewport.scale,
+          safePadding: viewport.safe,
+          disableAnimations: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(session.addProduct('s-tomato'), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('buy-checkout-address-stage')),
+        findsOneWidget,
+        reason: viewport.label,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-checkout-primary-address')),
+        findsOneWidget,
+        reason: viewport.label,
+      );
+      expect(tester.takeException(), isNull, reason: viewport.label);
+
+      expect(session.continueCheckoutFromAddress(), isTrue);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-checkout-payment-stage')),
+        findsOneWidget,
+        reason: viewport.label,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-checkout-primary-payment')),
+        findsOneWidget,
+        reason: viewport.label,
+      );
+      expect(find.text('Amount to MoolSocial'), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: viewport.label);
+
+      expect(session.continueCheckoutFromPayment(), isTrue);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-checkout-confirm-stage')),
+        findsOneWidget,
+        reason: viewport.label,
+      );
+      final confirmAction = find.byKey(
+        const ValueKey('buy-checkout-primary-confirm'),
+      );
+      expect(confirmAction, findsOneWidget, reason: viewport.label);
+      expect(
+        tester.getRect(confirmAction).bottom,
+        lessThanOrEqualTo(viewport.size.height - viewport.safe.bottom),
+        reason: viewport.label,
+      );
+      expect(tester.takeException(), isNull, reason: viewport.label);
+
+      expect(session.showCheckoutStep(BuyV2CheckoutStep.payment), isTrue);
+      session.checkoutSubmissionState = BuyV2CheckoutSubmissionState.cancelled;
+      session.notifyListeners();
+      await tester.pumpAndSettle();
+      expect(find.text('Choose again'), findsOneWidget, reason: viewport.label);
+      expect(find.textContaining('…'), findsNothing, reason: viewport.label);
+      expect(tester.takeException(), isNull, reason: viewport.label);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      session.dispose();
+    }
+  });
+
   testWidgets(
     'checkout payment recovery states stay actionable at compact size',
     (tester) async {
@@ -3308,6 +3628,7 @@ void main() {
       session.openCart(scope: BuyV2CartScope.shop);
       session.openCheckout();
       await tester.pumpAndSettle();
+      await advanceCheckoutToPayment(tester, session);
 
       for (final state in const [
         BuyV2CheckoutSubmissionState.submitting,
@@ -3323,26 +3644,20 @@ void main() {
         await tester.pump(const Duration(milliseconds: 120));
 
         expect(
-          find.byKey(ValueKey('buy-checkout-submission-${state.name}')),
+          find.byKey(ValueKey('buy-checkout-payment-state-${state.name}')),
           findsOneWidget,
         );
         expect(tester.takeException(), isNull, reason: state.name);
-        if (state == BuyV2CheckoutSubmissionState.submitting) continue;
-        final actionKey = switch (state) {
-          BuyV2CheckoutSubmissionState.paymentActionRequired => const ValueKey(
-            'buy-checkout-continue-payment',
-          ),
-          BuyV2CheckoutSubmissionState.paymentPending ||
-          BuyV2CheckoutSubmissionState.paymentUnknown => const ValueKey(
-            'buy-checkout-check-payment',
-          ),
-          _ => const ValueKey('buy-checkout-retry-order'),
-        };
+        const actionKey = ValueKey('buy-checkout-primary-payment');
         expect(find.byKey(actionKey), findsOneWidget);
         expect(
           tester.getSize(find.byKey(actionKey)).height,
           greaterThanOrEqualTo(44),
         );
+        if (state == BuyV2CheckoutSubmissionState.cancelled) {
+          expect(find.text('Choose again'), findsOneWidget);
+          expect(find.textContaining('…'), findsNothing);
+        }
       }
     },
   );
@@ -3360,15 +3675,16 @@ void main() {
     session.openCart(scope: BuyV2CartScope.shop);
     session.openCheckout();
     await tester.pumpAndSettle();
+    await advanceCheckoutToConfirm(tester, session);
 
-    expect(find.text('Delivery plan'), findsOneWidget);
+    expect(find.text('Deliveries'), findsOneWidget);
     expect(find.textContaining('Delivery 1 ·'), findsOneWidget);
     expect(session.checkoutDestinations, {BuyV2Destination.shop});
     expect(session.checkoutFulfilmentGroups, hasLength(1));
     expect(
       find.byKey(
         ValueKey(
-          'buy-checkout-delivery-plan-${session.checkoutFulfilmentGroups.single.key}',
+          'buy-checkout-confirm-delivery-${session.checkoutFulfilmentGroups.single.key}',
         ),
       ),
       findsOneWidget,
@@ -3392,8 +3708,9 @@ void main() {
       session.openCart();
       expect(session.openCheckout(), isTrue);
       await tester.pumpAndSettle();
+      await advanceCheckoutToConfirm(tester, session);
 
-      expect(find.text('Delivery plan'), findsOneWidget);
+      expect(find.text('Deliveries'), findsOneWidget);
       expect(
         find.textContaining('Delivered in 5 min · by 6:35 PM'),
         findsOneWidget,
@@ -3404,9 +3721,14 @@ void main() {
       );
       expect(find.text(shop.seller), findsNothing);
       expect(find.text(wholesale.seller), findsNothing);
-      expect(find.text('Place order'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-checkout-primary-confirm')),
+        findsOneWidget,
+      );
 
-      await tester.tap(find.text('Place order'));
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-confirm')),
+      );
       await tester.pumpAndSettle();
       await completeReviewPayment(tester, session);
 
@@ -3417,13 +3739,11 @@ void main() {
       expect(find.text('Delivery 1 of 2'), findsOneWidget);
       expect(find.text('Delivery 2 of 2'), findsOneWidget);
       expect(
-        find.text('Promised at Checkout · Delivered in 5 min · by 6:35 PM'),
+        find.text('Delivery · Delivered in 5 min · by 6:35 PM'),
         findsOneWidget,
       );
       expect(
-        find.text(
-          'Promised at Checkout · Delivered in 1 day · by tomorrow 4:00 PM',
-        ),
+        find.text('Delivery · Delivered in 1 day · by tomorrow 4:00 PM'),
         findsOneWidget,
       );
       expect(find.textContaining(shop.seller), findsWidgets);
@@ -3451,9 +3771,12 @@ void main() {
     session.openCart();
     expect(session.openCheckout(), isTrue);
     await tester.pumpAndSettle();
+    await advanceCheckoutToConfirm(tester, session);
 
     adapter.updateShop(promise: 'within 10 min', promisedBy: 'by 6:40 PM');
-    await tester.tap(find.text('Place order'));
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-confirm')),
+    );
     await tester.pumpAndSettle();
 
     expect(
@@ -3486,12 +3809,14 @@ void main() {
       find.byKey(const ValueKey('buy-checkout-promise-change-review')),
       findsNothing,
     );
-    await tester.tap(find.text('Place order'));
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-confirm')),
+    );
     await tester.pumpAndSettle();
     await completeReviewPayment(tester, session);
     expect(find.text('Order placed'), findsOneWidget);
     expect(
-      find.text('Promised at Checkout · Delivered in 10 min · by 6:40 PM'),
+      find.text('Delivery · Delivered in 10 min · by 6:40 PM'),
       findsOneWidget,
     );
   });
@@ -3517,10 +3842,13 @@ void main() {
       session.openCart();
       session.openCheckout();
       await tester.pumpAndSettle();
+      await advanceCheckoutToConfirm(tester, session);
 
       await tester.drag(find.byType(ListView).first, const Offset(0, -900));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Place order'));
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-confirm')),
+      );
       await tester.pumpAndSettle();
       await completeReviewPayment(tester, session);
       final purchaseId = session.confirmedPurchaseId!;
@@ -3530,8 +3858,13 @@ void main() {
       expect(find.text('Delivery 1 of 2'), findsOneWidget);
       expect(find.text('Delivery 2 of 2'), findsOneWidget);
       expect(find.text('Delivery 3 of 3'), findsNothing);
-      expect(find.textContaining('Promised at Checkout'), findsNWidgets(2));
-      expect(find.textContaining('Purchase $purchaseId'), findsOneWidget);
+      for (final order in session.confirmedOrders) {
+        expect(find.textContaining(order.promise), findsWidgets);
+      }
+      expect(
+        find.textContaining('Order reference · $purchaseId'),
+        findsOneWidget,
+      );
       expect(
         find.textContaining(session.confirmedOrders.first.partner),
         findsWidgets,
@@ -3567,7 +3900,7 @@ void main() {
       expect(find.byKey(const ValueKey('buy-confirmation')), findsOneWidget);
 
       final ordersAction = find.byKey(
-        const ValueKey('buy-confirmation-orders'),
+        const ValueKey('buy-confirmation-order-details'),
       );
       await tester.ensureVisible(ordersAction);
       await tester.tap(ordersAction);
@@ -4341,12 +4674,12 @@ void main() {
       expect(find.text('Quick 10m'), findsWidgets);
       final askStore = find.byKey(const ValueKey('buy-public-store-ask'));
       expect(askStore, findsOneWidget);
-      expect(tester.getSize(askStore), const Size(124, 44));
+      expect(tester.getSize(askStore), const Size(112, 44));
       expect(
         tester
             .getSize(find.byKey(const ValueKey('buy-public-store-ask-visible')))
             .height,
-        34,
+        30,
       );
       await tester.tap(askStore);
       await tester.pumpAndSettle();
@@ -5155,6 +5488,71 @@ void main() {
     expect(tester.getSize(ask).height, greaterThanOrEqualTo(44));
     expect(find.text('MoolSocial Fulfilment Store'), findsOneWidget);
     expect(find.textContaining('Address confirmed'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Masala Ghar storefront is compact and product-led', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final storeProduct = session.product('s-turmeric');
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              key: const ValueKey('open-compact-masala-store'),
+              onPressed: () => unawaited(
+                showBuyV2PartnerCatalogue(
+                  context,
+                  session,
+                  storeProduct,
+                  onAskStore: (_) {},
+                ),
+              ),
+              child: const Text('Open store'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('open-compact-masala-store')));
+    await tester.pumpAndSettle();
+
+    final title = find.text('More from Masala Ghar').first;
+    expect(tester.widget<Text>(title).style?.fontSize, 16);
+    final header = find.byKey(const ValueKey('buy-shop-seller-sheet-header'));
+    expect(tester.getSize(header).height, lessThanOrEqualTo(58));
+    final truth = find.byKey(
+      const ValueKey('buy-public-store-truth-s-turmeric'),
+    );
+    expect(tester.getSize(truth).height, lessThanOrEqualTo(150));
+    final grid = find.byKey(const ValueKey('buy-horizontal-product-grid'));
+    expect(grid, findsOneWidget);
+    for (final product in session.partnerCatalogueFor(storeProduct).take(3)) {
+      final card = find
+          .descendant(
+            of: grid,
+            matching: find.byKey(ValueKey('buy-product-${product.id}')),
+          )
+          .first;
+      expect(card, findsOneWidget);
+      expect(tester.getSize(card).height, lessThanOrEqualTo(232));
+    }
+    final viewAll = find.byKey(
+      const ValueKey('buy-shop-seller-view-more-s-turmeric'),
+    );
+    expect(tester.getSize(viewAll).height, inInclusiveRange(44, 48));
+    final visibleViewAll = find.byKey(
+      const ValueKey('buy-shop-seller-view-more-visible-s-turmeric'),
+    );
+    expect(tester.getSize(visibleViewAll).height, 32);
+    expect(tester.getSize(visibleViewAll).width, lessThan(190));
     expect(tester.takeException(), isNull);
   });
 

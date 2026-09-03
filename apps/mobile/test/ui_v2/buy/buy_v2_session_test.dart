@@ -1382,13 +1382,38 @@ void main() {
       expect(session.selectedAddressId, 'work');
       expect(session.selectedPayment, 'PhonePe');
 
-      expect(session.choosePayment('Bank transfer'), isTrue);
+      expect(session.choosePayment('Paytm'), isTrue);
       expect(session.selectedAddressId, 'work');
-      expect(session.selectedPayment, 'Bank transfer');
+      expect(session.selectedPayment, 'Paytm');
 
       session.chooseAddress('home');
       expect(session.selectedAddressId, 'home');
-      expect(session.selectedPayment, 'Bank transfer');
+      expect(session.selectedPayment, 'Paytm');
+    });
+
+    test('staged Checkout Back returns Confirm Payment Address then Cart', () {
+      final product = BuyV2Catalogue.products.firstWhere(
+        (item) => item.destination == BuyV2Destination.shop,
+      );
+      expect(session.addProduct(product.id), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.checkoutStep, BuyV2CheckoutStep.address);
+
+      expect(session.continueCheckoutFromAddress(), isTrue);
+      expect(session.checkoutStep, BuyV2CheckoutStep.payment);
+      expect(session.continueCheckoutFromPayment(), isTrue);
+      expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+
+      session.goBack();
+      expect(session.view, BuyV2View.checkout);
+      expect(session.checkoutStep, BuyV2CheckoutStep.payment);
+      session.goBack();
+      expect(session.view, BuyV2View.checkout);
+      expect(session.checkoutStep, BuyV2CheckoutStep.address);
+      session.goBack();
+      expect(session.view, BuyV2View.cart);
+      expect(session.cartScope, BuyV2CartScope.shop);
     });
 
     test('saved address update preserves identity count and selection', () {
@@ -1455,16 +1480,16 @@ void main() {
       expect(session.choosePayment('Purchase order'), isTrue);
 
       expect(session.choosePayment('Card<script>'), isFalse);
+      expect(session.choosePayment('UPI'), isFalse);
+      expect(session.choosePayment('Bank transfer'), isFalse);
 
       expect(session.selectedAddressId, 'work');
       expect(session.selectedPayment, 'Purchase order');
       expect(session.notice, 'This payment method is not available.');
       expect(BuyV2Session.paymentMethods, {
-        'UPI',
         'PhonePe',
         'Paytm',
         'Pine Labs',
-        'Bank transfer',
         'Purchase order',
       });
     });
@@ -1654,7 +1679,7 @@ void main() {
             landmark: 'Near the park',
           ),
         );
-        first.choosePayment('Bank transfer');
+        first.choosePayment('Paytm');
         final brand = first.discoveryBrands.first;
         first.toggleDiscoveryBrand(brand);
         first.chooseMaximumProductPrice(500);
@@ -1673,7 +1698,7 @@ void main() {
         expect(restored.quantityFor(product.id), product.minimumOrder);
         expect(restored.isSaved(product.id), isTrue);
         expect(restored.selectedAddressId, 'family');
-        expect(restored.selectedPayment, 'Bank transfer');
+        expect(restored.selectedPayment, 'Paytm');
         expect(restored.selectedBrands, {brand});
         expect(restored.maximumProductPrice, 500);
         expect(restored.selectedPackFilter, BuyV2PackFilter.standard);

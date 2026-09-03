@@ -3392,10 +3392,10 @@ Future<void> showBuyV2PartnerCatalogue(
       ? 'Browse ${products.length} available ${current.brand} products'
       : switch (current.destination) {
           BuyV2Destination.wholesale =>
-            'Compare available packs, minimum orders, prices and delivery',
+            '${products.length} packs · Minimums, prices and delivery',
           BuyV2Destination.medicine =>
-            'Review available packs and prices · Not medical advice',
-          _ => 'Browse available products and delivery times',
+            '${products.length} products · Packs and prices · Not medical advice',
+          _ => '${products.length} products · Delivery options',
         };
   final closeTooltip = brandOnly
       ? 'Close brand products'
@@ -3462,23 +3462,25 @@ Future<void> showBuyV2PartnerCatalogue(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
                       children: [
                         Row(
+                          key: ValueKey('$ownerPrefix-sheet-header'),
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              width: 44,
-                              height: 44,
+                              width: 38,
+                              height: 38,
                               decoration: BoxDecoration(
                                 color: BuyV2Colors.softOrange,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
                                 brandOnly
                                     ? Icons.sell_outlined
                                     : Icons.storefront_outlined,
                                 color: BuyV2Colors.navy,
+                                size: 21,
                               ),
                             ),
-                            const SizedBox(width: 11),
+                            const SizedBox(width: 9),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -3488,17 +3490,17 @@ Future<void> showBuyV2PartnerCatalogue(
                                     maxLines: 2,
                                     overflow: TextOverflow.clip,
                                     style: sheetContext.buyTitle.copyWith(
-                                      fontSize: 18,
+                                      fontSize: 16,
+                                      height: 1.08,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
-                                  Text(detail, style: sheetContext.buyMeta),
-                                  const SizedBox(height: 3),
                                   Text(
-                                    '${products.length} ${products.length == 1 ? 'product' : 'products'}',
+                                    detail,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.clip,
                                     style: sheetContext.buyMeta.copyWith(
-                                      color: BuyV2Colors.green,
-                                      fontWeight: FontWeight.w900,
+                                      height: 1.08,
                                     ),
                                   ),
                                 ],
@@ -3519,7 +3521,7 @@ Future<void> showBuyV2PartnerCatalogue(
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         if (publicPartner) ...[
                           _PublicStoreTruthPanel(
                             product: current,
@@ -3532,7 +3534,7 @@ Future<void> showBuyV2PartnerCatalogue(
                                     sheetContext,
                                   ).pop('ask-store:${current.id}'),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                         ],
                         if (previewProducts.isEmpty)
                           const _PublicStoreNoProductsState()
@@ -3551,40 +3553,81 @@ Future<void> showBuyV2PartnerCatalogue(
                             ),
                           ),
                         if (!brandOnly && products.length > 1) ...[
-                          const SizedBox(height: 4),
-                          SizedBox(
-                            height: BuyV2Metrics.minimumTap,
-                            child: OutlinedButton.icon(
+                          const SizedBox(height: 2),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: SizedBox(
                               key: ValueKey(
                                 '$ownerPrefix-view-more-${current.id}',
                               ),
-                              onPressed: () async {
-                                final productId =
-                                    await _showBuyV2FullStoreCatalogue(
-                                      sheetContext,
-                                      session,
-                                      current,
-                                      products,
-                                      ownerPrefix,
-                                      onOpenProduct: onOpenProduct,
-                                    );
-                                if (productId != null && sheetContext.mounted) {
-                                  if (productId == 'cart:') {
-                                    Navigator.of(sheetContext).pop('cart:');
-                                    return;
-                                  }
-                                  await openStoreProduct(
-                                    sheetContext,
-                                    session.product(productId),
-                                  );
-                                }
-                              },
-                              icon: const Icon(
-                                Icons.grid_view_rounded,
-                                size: 18,
-                              ),
-                              label: Text(
-                                'View all ${products.length} products',
+                              height: BuyV2Metrics.minimumTap,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () async {
+                                    final productId =
+                                        await _showBuyV2FullStoreCatalogue(
+                                          sheetContext,
+                                          session,
+                                          current,
+                                          products,
+                                          ownerPrefix,
+                                          onOpenProduct: onOpenProduct,
+                                        );
+                                    if (productId != null &&
+                                        sheetContext.mounted) {
+                                      if (productId == 'cart:') {
+                                        Navigator.of(sheetContext).pop('cart:');
+                                        return;
+                                      }
+                                      await openStoreProduct(
+                                        sheetContext,
+                                        session.product(productId),
+                                      );
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Container(
+                                      key: ValueKey(
+                                        '$ownerPrefix-view-more-visible-${current.id}',
+                                      ),
+                                      height: 32,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: BuyV2Colors.softBlue.withValues(
+                                          alpha: .46,
+                                        ),
+                                        borderRadius: BorderRadius.circular(9),
+                                        border: Border.all(
+                                          color: const Color(0x33000080),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.grid_view_rounded,
+                                            size: 15,
+                                            color: BuyV2Colors.navy,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            'View all ${products.length} products',
+                                            style: const TextStyle(
+                                              color: BuyV2Colors.navy,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -3824,31 +3867,32 @@ class _PublicStoreTruthPanel extends StatelessWidget {
           '${addressConfirmed ? 'Address confirmed. ' : ''}'
           '$locality. $statusLabel. ${fulfilmentLabels.join(', ')}',
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: buyV2CardDecoration(
           color: BuyV2Colors.softBlue.withValues(alpha: .38),
-          radius: 16,
+          radius: 14,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0x33000080)),
                   ),
                   child: const Icon(
                     Icons.local_shipping_outlined,
                     color: BuyV2Colors.navy,
-                    size: 20,
+                    size: 18,
                   ),
                 ),
-                const SizedBox(width: 9),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -3858,128 +3902,132 @@ class _PublicStoreTruthPanel extends StatelessWidget {
                         key: const ValueKey('buy-public-store-badge'),
                         style: context.buyBody.copyWith(
                           color: BuyV2Colors.navy,
+                          fontSize: 12,
+                          height: 1.08,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
                         addressConfirmed
                             ? '$providerType · Address confirmed · $locality'
                             : '$providerType · $locality',
                         key: const ValueKey('buy-public-store-location'),
-                        style: context.buyMeta,
+                        maxLines: 2,
+                        overflow: TextOverflow.clip,
+                        style: context.buyMeta.copyWith(height: 1.08),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Container(
-              key: const ValueKey('buy-public-store-status'),
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-              decoration: BoxDecoration(
-                color: statusSurface,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.schedule_rounded, color: statusColor, size: 17),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      statusLabel,
-                      style: context.buyBody.copyWith(
-                        color: statusColor,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+            const SizedBox(height: 5),
+            Wrap(
+              spacing: 6,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Container(
+                  key: const ValueKey('buy-public-store-status'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
                   ),
-                ],
-              ),
-            ),
-            if (fulfilmentLabels.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final label in fulfilmentLabels)
-                    Container(
-                      key: ValueKey(
-                        'buy-public-store-fulfilment-'
-                        '${label.toLowerCase().replaceAll(' ', '-')}',
+                  decoration: BoxDecoration(
+                    color: statusSurface,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.schedule_rounded,
+                        color: statusColor,
+                        size: 15,
                       ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0x33000080)),
-                      ),
-                      child: Text(
-                        label,
+                      const SizedBox(width: 4),
+                      Text(
+                        statusLabel,
                         style: context.buyMeta.copyWith(
-                          color: BuyV2Colors.navy,
-                          fontWeight: FontWeight.w800,
+                          color: statusColor,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                    ),
-                ],
-              ),
-            ],
-            if (onAskStore != null) ...[
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  key: const ValueKey('buy-public-store-ask'),
-                  width: 124,
-                  height: BuyV2Metrics.minimumTap,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: onAskStore,
-                      borderRadius: BorderRadius.circular(10),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          key: const ValueKey('buy-public-store-ask-visible'),
-                          height: 34,
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(9),
-                            border: Border.all(color: const Color(0x33000080)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.chat_bubble_outline_rounded,
-                                color: BuyV2Colors.navy,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                askLabel,
-                                style: const TextStyle(
-                                  color: BuyV2Colors.navy,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                for (final label in fulfilmentLabels)
+                  Container(
+                    key: ValueKey(
+                      'buy-public-store-fulfilment-'
+                      '${label.toLowerCase().replaceAll(' ', '-')}',
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: const Color(0x33000080)),
+                    ),
+                    child: Text(
+                      label,
+                      style: context.buyMeta.copyWith(
+                        color: BuyV2Colors.navy,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                if (onAskStore != null)
+                  SizedBox(
+                    key: const ValueKey('buy-public-store-ask'),
+                    width: 112,
+                    height: BuyV2Metrics.minimumTap,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: onAskStore,
+                        borderRadius: BorderRadius.circular(9),
+                        child: Center(
+                          child: Container(
+                            key: const ValueKey('buy-public-store-ask-visible'),
+                            height: 30,
+                            padding: const EdgeInsets.symmetric(horizontal: 9),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0x33000080),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  color: BuyV2Colors.navy,
+                                  size: 15,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  askLabel,
+                                  style: const TextStyle(
+                                    color: BuyV2Colors.navy,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -5846,6 +5894,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
         final layout = _resolveCompactProductGridLayout(
           constraints: constraints,
           accessibleText: accessibleText,
+          denseStore: storeContext,
         );
         return _HorizontalProductGrid(
           session: session,
@@ -5870,6 +5919,7 @@ _resolveCompactProductGridLayout({
   required BoxConstraints constraints,
   required bool accessibleText,
   bool savedOnly = false,
+  bool denseStore = false,
 }) {
   // The founder-approved Shop and Wholesale rhythm keeps three products
   // visible at normal text scale. Enlarged accessibility text uses two cards
@@ -5894,6 +5944,14 @@ _resolveCompactProductGridLayout({
                   ? 290.0
                   : 284.0
             : 260.0
+      : denseStore
+      ? accessibleText
+            ? constraints.maxWidth < 360
+                  ? 294.0
+                  : 284.0
+            : columns == 3
+            ? 228.0
+            : 232.0
       : accessibleText
       ? constraints.maxWidth < 360
             ? 322.0

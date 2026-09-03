@@ -206,35 +206,17 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
   ) async {
     final reference =
         'BT-${DateTime.now().microsecondsSinceEpoch.toString().substring(8)}';
-    if (request.paymentMethod == 'Bank transfer') {
-      return BuyV2OrderPlacementResult(
-        outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
-        customerMessage:
-            'Transfer the exact amount once, then return here to check it.',
-        paymentReference: reference,
-        bankTransferInstructions: BuyV2BankTransferInstructions(
-          beneficiaryName: 'MoolSocial Shop Payments',
-          bankName: 'MoolSocial Payments Bank',
-          accountNumber: '000000004821',
-          ifsc: 'MOOL0000482',
-          transferReference: reference,
-        ),
-      );
-    }
     if (const {
       'PhonePe',
       'Paytm',
       'Pine Labs',
-      'UPI',
     }.contains(request.paymentMethod)) {
-      final provider = request.paymentMethod == 'UPI'
-          ? 'upi'
-          : request.paymentMethod.toLowerCase().replaceAll(' ', '-');
+      final provider = request.paymentMethod.toLowerCase().replaceAll(' ', '-');
       final paymentReference = reference.replaceFirst('BT-', 'PAY-');
       return BuyV2OrderPlacementResult(
         outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
         customerMessage:
-            'Continue securely with ${request.paymentMethod == 'UPI' ? 'UPI' : request.paymentMethod}. MoolSocial will collect this payment.',
+            'Continue securely with ${request.paymentMethod}. MoolSocial will collect this payment.',
         paymentReference: paymentReference,
         paymentActionUri: Uri.https('payments.moolsocial.app', '/checkout', {
           'provider': provider,
@@ -447,11 +429,9 @@ class BuyV2Session extends ChangeNotifier {
       BuyV2CatalogueMarketplaceTrustAdapter();
 
   static const Set<String> paymentMethods = {
-    'UPI',
     'PhonePe',
     'Paytm',
     'Pine Labs',
-    'Bank transfer',
     'Purchase order',
   };
 
@@ -502,6 +482,7 @@ class BuyV2Session extends ChangeNotifier {
 
   BuyV2Destination destination = BuyV2Destination.shop;
   BuyV2View view = BuyV2View.catalogue;
+  BuyV2CheckoutStep checkoutStep = BuyV2CheckoutStep.address;
   BuyV2CartScope cartScope = BuyV2CartScope.all;
   BuyV2CartScope checkoutScope = BuyV2CartScope.all;
   BuyV2OrdersTab ordersTab = BuyV2OrdersTab.active;
@@ -1929,6 +1910,7 @@ class BuyV2Session extends ChangeNotifier {
         ..addAll(snapshot.deliveryInstructionIds);
       final storedPayment = snapshot.selectedPayment;
       if (storedPayment != null &&
+          paymentMethods.contains(storedPayment) &&
           availablePaymentMethods.contains(storedPayment)) {
         selectedPayment = storedPayment;
       }
@@ -2007,6 +1989,9 @@ class BuyV2Session extends ChangeNotifier {
         final state? => state,
         null => BuyV2CheckoutSubmissionState.idle,
       };
+      if (checkoutRequiresResolution) {
+        checkoutStep = BuyV2CheckoutStep.payment;
+      }
       _pruneCartSelections();
       notifyListeners();
     } on Object {
@@ -3590,6 +3575,30 @@ class BuyV2Session extends ChangeNotifier {
       .where((order) => order.status != BuyV2OrderStatus.delivered)
       .length;
 
+  BuyV2Order? get activeQuickDeliveryOrder => _orders
+      .where((order) => order.destination != BuyV2Destination.medicine)
+      .where((order) => order.status != BuyV2OrderStatus.delivered)
+      .where((order) => order.lines.isNotEmpty)
+      .where(
+        (order) => order.lines.any(
+          (line) =>
+              fulfilmentModeFor(line.product) == BuyV2FulfilmentMode.quickLocal,
+        ),
+      )
+      .firstOrNull;
+
+  BuyV2Order? get activeQuietDeliveryOrder => _orders
+      .where((order) => order.destination != BuyV2Destination.medicine)
+      .where((order) => order.status != BuyV2OrderStatus.delivered)
+      .where((order) => order.lines.isNotEmpty)
+      .where(
+        (order) => order.lines.every(
+          (line) =>
+              fulfilmentModeFor(line.product) != BuyV2FulfilmentMode.quickLocal,
+        ),
+      )
+      .firstOrNull;
+
   int get deliveredOrderCount => _orders
       .where((order) => order.destination != BuyV2Destination.medicine)
       .where((order) => order.status == BuyV2OrderStatus.delivered)
@@ -3869,7 +3878,9 @@ class BuyV2Session extends ChangeNotifier {
   bool restoreSelectedAddressId(String? id) {
     if (id == null || !_addresses.any((address) => address.id == id)) {
       _selectedAddressId = null;
-      if (view == BuyV2View.checkout || view == BuyV2View.confirmation) {
+      if (view == BuyV2View.checkout) {
+        checkoutStep = BuyV2CheckoutStep.address;
+      } else if (view == BuyV2View.confirmation) {
         view = BuyV2View.cart;
       }
       notice = 'Choose a delivery address to continue.';
@@ -4053,6 +4064,8 @@ class BuyV2Session extends ChangeNotifier {
 
   bool openCheckout() {
     final previous = _navigationSurfaceIdentity;
+    final retainingCheckout = view == BuyV2View.checkout;
+    final retainedStep = checkoutStep;
     if (cartLines.isEmpty) {
       _clearCheckoutPromiseSnapshot();
       view = BuyV2View.catalogue;
@@ -4063,29 +4076,88 @@ class BuyV2Session extends ChangeNotifier {
       );
       return false;
     }
-    if (selectedAddressOrNull == null) {
-      _clearCheckoutPromiseSnapshot();
-      view = BuyV2View.cart;
-      notice = 'Choose a delivery address to continue.';
-      _notifyNavigationIfChanged(
-        previous,
-        BuyV2NavigationMotionDirection.replace,
-      );
-      return false;
-    } else {
-      checkoutScope = cartScope;
-      view = BuyV2View.checkout;
-      if (!checkoutRequiresResolution) {
-        checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
-      }
-      notice = null;
-      _captureCheckoutPromiseSnapshot();
-      _invalidateAndRefreshCheckoutPricingContracts();
+    checkoutScope = cartScope;
+    view = BuyV2View.checkout;
+    checkoutStep = checkoutRequiresResolution
+        ? BuyV2CheckoutStep.payment
+        : retainingCheckout
+        ? retainedStep
+        : BuyV2CheckoutStep.address;
+    if (!checkoutRequiresResolution) {
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
     }
+    notice = null;
+    _captureCheckoutPromiseSnapshot();
+    _invalidateAndRefreshCheckoutPricingContracts();
     _notifyNavigationIfChanged(
       previous,
       BuyV2NavigationMotionDirection.forward,
     );
+    return true;
+  }
+
+  bool continueCheckoutFromAddress() {
+    if (view != BuyV2View.checkout || checkoutBusy) return false;
+    if (selectedAddressOrNull == null) {
+      notice = 'Choose a delivery address to continue.';
+      notifyListeners();
+      return false;
+    }
+    checkoutStep = BuyV2CheckoutStep.payment;
+    notice = null;
+    _invalidateAndRefreshCheckoutPricingContracts();
+    notifyListeners();
+    return true;
+  }
+
+  bool continueCheckoutFromPayment() {
+    if (view != BuyV2View.checkout || checkoutBusy) return false;
+    if (!availablePaymentMethods.contains(selectedPayment)) {
+      notice = 'Choose an available payment method to continue.';
+      notifyListeners();
+      return false;
+    }
+    if (selectedPayment == 'Purchase order' &&
+        !purchaseOrderEligibleForCheckout) {
+      notice = purchaseOrderEligibilityMessage;
+      notifyListeners();
+      return false;
+    }
+    if (checkoutSubmissionState != BuyV2CheckoutSubmissionState.idle) {
+      notice = 'Complete the current payment step before continuing.';
+      notifyListeners();
+      return false;
+    }
+    checkoutStep = BuyV2CheckoutStep.confirm;
+    notice = null;
+    notifyListeners();
+    return true;
+  }
+
+  bool showCheckoutStep(BuyV2CheckoutStep step) {
+    if (view != BuyV2View.checkout || checkoutBusy) return false;
+    if (step == BuyV2CheckoutStep.confirm &&
+        (selectedAddressOrNull == null || checkoutRequiresResolution)) {
+      return false;
+    }
+    checkoutStep = step;
+    notice = null;
+    notifyListeners();
+    return true;
+  }
+
+  bool retryCheckoutPayment() {
+    if (view != BuyV2View.checkout || checkoutBusy) return false;
+    if (checkoutSubmissionState != BuyV2CheckoutSubmissionState.cancelled &&
+        checkoutSubmissionState != BuyV2CheckoutSubmissionState.failed &&
+        checkoutSubmissionState != BuyV2CheckoutSubmissionState.unavailable) {
+      return false;
+    }
+    _clearCheckoutPaymentAttempt();
+    checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+    checkoutStep = BuyV2CheckoutStep.payment;
+    notice = null;
+    notifyListeners();
     return true;
   }
 
@@ -4602,7 +4674,18 @@ class BuyV2Session extends ChangeNotifier {
             returnToCatalogue();
           }
         case BuyV2View.checkout:
-          openCart(scope: checkoutScope);
+          switch (checkoutStep) {
+            case BuyV2CheckoutStep.confirm:
+              checkoutStep = BuyV2CheckoutStep.payment;
+              notice = null;
+              notifyListeners();
+            case BuyV2CheckoutStep.payment:
+              checkoutStep = BuyV2CheckoutStep.address;
+              notice = null;
+              notifyListeners();
+            case BuyV2CheckoutStep.address:
+              openCart(scope: checkoutScope);
+          }
         case BuyV2View.confirmation:
           _openOrdersRoot();
         case BuyV2View.tracking:
@@ -5329,7 +5412,8 @@ class BuyV2Session extends ChangeNotifier {
 
   bool choosePayment(String value) {
     if (_holdCartForPaymentResolution()) return false;
-    if (!availablePaymentMethods.contains(value)) {
+    if (!paymentMethods.contains(value) ||
+        !availablePaymentMethods.contains(value)) {
       notice = 'This payment method is not available.';
       notifyListeners();
       return false;
@@ -5377,7 +5461,8 @@ class BuyV2Session extends ChangeNotifier {
     }
     final address = selectedAddressOrNull;
     if (address == null) {
-      view = BuyV2View.cart;
+      view = BuyV2View.checkout;
+      checkoutStep = BuyV2CheckoutStep.address;
       notice = 'Choose a delivery address to continue.';
       _notifyNavigationIfChanged(
         previous,
@@ -5454,13 +5539,7 @@ class BuyV2Session extends ChangeNotifier {
       return Future<bool>.value(false);
     }
     if (reviewDataEnabled &&
-        const {
-          'PhonePe',
-          'Paytm',
-          'Pine Labs',
-          'UPI',
-          'Bank transfer',
-        }.contains(selectedPayment)) {
+        const {'PhonePe', 'Paytm', 'Pine Labs'}.contains(selectedPayment)) {
       return _submitOrderAsync();
     }
     if (reviewDataEnabled) {
@@ -5581,7 +5660,8 @@ class BuyV2Session extends ChangeNotifier {
     }
     final address = selectedAddressOrNull;
     if (address == null) {
-      view = BuyV2View.cart;
+      view = BuyV2View.checkout;
+      checkoutStep = BuyV2CheckoutStep.address;
       notice = 'Choose a delivery address to continue.';
       _notifyNavigationIfChanged(
         previous,
@@ -5709,6 +5789,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (placement.outcome != BuyV2OrderPlacementOutcome.confirmed) {
+      checkoutStep = BuyV2CheckoutStep.payment;
       checkoutSubmissionState = switch (placement.outcome) {
         BuyV2OrderPlacementOutcome.paymentActionRequired
             when _validPaymentAction(placement) ||
@@ -5737,7 +5818,7 @@ class BuyV2Session extends ChangeNotifier {
         _paymentActionUri = null;
         _bankTransferInstructions = null;
       }
-      notice = placement.customerMessage;
+      notice = null;
       _persistCustomerState();
       notifyListeners();
       return false;
@@ -5868,14 +5949,13 @@ class BuyV2Session extends ChangeNotifier {
     }
     if (!opened) {
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
-      notice =
-          'Secure payment could not start. Your Cart has not changed. Try again.';
+      notice = null;
       _persistCustomerState();
       notifyListeners();
       return false;
     }
     checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentPending;
-    notice = 'Return here after payment to check your order.';
+    notice = null;
     _persistCustomerState();
     notifyListeners();
     return true;
@@ -5928,7 +6008,7 @@ class BuyV2Session extends ChangeNotifier {
     _paymentReference = null;
     _paymentActionUri = null;
     _bankTransferInstructions = null;
-    notice = 'Payment cancelled. Your Cart has not changed.';
+    notice = null;
     _persistCustomerState();
     notifyListeners();
     return true;
@@ -5953,6 +6033,7 @@ class BuyV2Session extends ChangeNotifier {
     _pruneCartSelections();
     cartScope = BuyV2CartScope.all;
     checkoutScope = BuyV2CartScope.all;
+    checkoutStep = BuyV2CheckoutStep.address;
     destination = BuyV2Destination.orders;
     view = BuyV2View.confirmation;
     checkoutSubmissionState = BuyV2CheckoutSubmissionState.confirmed;
@@ -6418,8 +6499,9 @@ class BuyV2Session extends ChangeNotifier {
           }
           exact = false;
         } else if (selectedAddressOrNull == null) {
-          cartScope = origin.checkoutScope;
-          view = BuyV2View.cart;
+          checkoutScope = origin.checkoutScope;
+          view = BuyV2View.checkout;
+          checkoutStep = BuyV2CheckoutStep.address;
           notice = 'Choose a delivery address to continue.';
           exact = false;
         }

@@ -46,6 +46,8 @@ void main() {
     }
     session.openCart(scope: scope);
     expect(session.openCheckout(), isTrue);
+    expect(session.continueCheckoutFromAddress(), isTrue);
+    expect(session.continueCheckoutFromPayment(), isTrue);
     return session;
   }
 
@@ -153,6 +155,9 @@ void main() {
 
     await tester.tap(find.text('Review order'));
     await tester.pumpAndSettle();
+    expect(session.continueCheckoutFromAddress(), isTrue);
+    expect(session.continueCheckoutFromPayment(), isTrue);
+    await tester.pumpAndSettle();
     expect(session.checkoutScope, BuyV2CartScope.all);
     expect(find.text('Delivery 1 · 1 product · 2 packs'), findsOneWidget);
     expect(find.text('1 product · 2 packs'), findsOneWidget);
@@ -220,6 +225,12 @@ void main() {
       );
       expect(tester.takeException(), isNull);
 
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.checkoutStep, BuyV2CheckoutStep.payment);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.checkoutStep, BuyV2CheckoutStep.address);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.cart);

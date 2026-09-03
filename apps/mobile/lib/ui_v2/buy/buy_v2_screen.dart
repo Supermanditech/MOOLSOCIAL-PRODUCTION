@@ -81,6 +81,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   bool _scannerBusy = false;
   bool _searchOpen = false;
   bool _offersActive = false;
+  bool _quickTrackerMinimized = false;
+  String? _presentedQuickOrderId;
   BuyV2Product? _storeBrowseAnchor;
   BuyV2NavigationMotionDirection _surfaceMotionDirection =
       BuyV2NavigationMotionDirection.replace;
@@ -189,6 +191,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   void _sessionChanged() {
     if (!mounted) return;
     _surfaceMotionDirection = widget.session.navigationMotionDirection;
+    final quickOrderId = widget.session.activeQuickDeliveryOrder?.id;
+    if (quickOrderId != _presentedQuickOrderId) {
+      _presentedQuickOrderId = quickOrderId;
+      _quickTrackerMinimized = false;
+    }
     if (_offersActive &&
         widget.session.view == BuyV2View.catalogue &&
         widget.session.destination != BuyV2Destination.shop) {
@@ -415,10 +422,17 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     final session = widget.session;
     final careNavigation =
         session.activeDockDestination == BuyV2Destination.medicine;
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     final surfaceTheme = BuyV2ThemeSpec.resolve(
       session.destination,
       session.view,
     );
+    final quickOrder = session.view == BuyV2View.tracking
+        ? null
+        : session.activeQuickDeliveryOrder;
+    final quietOrder = quickOrder == null && session.view != BuyV2View.tracking
+        ? session.activeQuietDeliveryOrder
+        : null;
     return BuyV2ThemeScope(
       spec: surfaceTheme,
       child: PopScope<Object?>(
@@ -485,6 +499,20 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               session.destination != BuyV2Destination.orders &&
                               session.destination != BuyV2Destination.medicine)
                             BuyV2ShoppingIntentBar(session: session),
+                          if (quickOrder != null)
+                            _BuyQuickDeliveryStatusBar(
+                              order: quickOrder,
+                              minimized: _quickTrackerMinimized,
+                              onMinimizedChanged: (value) => setState(
+                                () => _quickTrackerMinimized = value,
+                              ),
+                              onOpen: () => session.openTracking(quickOrder.id),
+                            )
+                          else if (quietOrder != null)
+                            _BuyQuietDeliveryStatusBar(
+                              order: quietOrder,
+                              onOpen: () => session.openTracking(quietOrder.id),
+                            ),
                           Expanded(
                             child: Stack(
                               children: [
@@ -532,32 +560,34 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
               ),
             ),
           ),
-          bottomNavigationBar: MoolDestinationNavigationV2(
-            activeId: careNavigation ? 'book' : 'buy',
-            destinationLabel: careNavigation ? 'Care' : 'Shop',
-            familyRootSelected:
-                !careNavigation &&
-                !_offersActive &&
-                session.activeDockDestination == BuyV2Destination.shop,
-            selectedLocalIndex: careNavigation
-                ? 1
-                : _offersActive
-                ? 2
-                : switch (session.activeDockDestination) {
-                    BuyV2Destination.orders => 1,
-                    _ => 0,
-                  },
-            localActionCount: 3,
-            localNavigation: careNavigation
-                ? _buildCareLocalNavigation()
-                : _buildBuyLocalNavigation(session),
-            onOpenMool: _openGlobalMool,
-            onOpenAction: _openGlobalAction,
-            onOpenChat: _openShopChat,
-            moolNavigationController: _moolNavigationController,
-            onPreviousLocalAction: () => _moveBuyLocal(session, -1),
-            onNextLocalAction: () => _moveBuyLocal(session, 1),
-          ),
+          bottomNavigationBar: keyboardVisible
+              ? null
+              : MoolDestinationNavigationV2(
+                  activeId: careNavigation ? 'book' : 'buy',
+                  destinationLabel: careNavigation ? 'Care' : 'Shop',
+                  familyRootSelected:
+                      !careNavigation &&
+                      !_offersActive &&
+                      session.activeDockDestination == BuyV2Destination.shop,
+                  selectedLocalIndex: careNavigation
+                      ? 1
+                      : _offersActive
+                      ? 2
+                      : switch (session.activeDockDestination) {
+                          BuyV2Destination.orders => 1,
+                          _ => 0,
+                        },
+                  localActionCount: 3,
+                  localNavigation: careNavigation
+                      ? _buildCareLocalNavigation()
+                      : _buildBuyLocalNavigation(session),
+                  onOpenMool: _openGlobalMool,
+                  onOpenAction: _openGlobalAction,
+                  onOpenChat: _openShopChat,
+                  moolNavigationController: _moolNavigationController,
+                  onPreviousLocalAction: () => _moveBuyLocal(session, -1),
+                  onNextLocalAction: () => _moveBuyLocal(session, 1),
+                ),
         ),
       ),
     );
@@ -936,8 +966,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     );
   }
 
-  Future<bool> _openPaymentCollection(Uri uri) =>
-      showBuyV2PaymentCollectionSheet(context, widget.session, uri);
+  Future<bool> _openPaymentCollection(Uri uri) async {
+    if (!uri.hasScheme || uri.host.isEmpty) return false;
+    HapticFeedback.mediumImpact();
+    return true;
+  }
 
   Widget _currentView(BuyV2Session session) {
     if (_offersActive && session.view == BuyV2View.catalogue) {
@@ -990,7 +1023,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       BuyV2View.checkout => BuyV2CheckoutView(
         session: session,
         gstInvoiceController: _gstInvoiceController,
-        onOpenSupport: _openShopChat,
+        keyboardVisible: MediaQuery.viewInsetsOf(context).bottom > 0,
         paymentHandoff: widget.paymentHandoff ?? _openPaymentCollection,
       ),
       BuyV2View.confirmation => BuyV2ConfirmationView(
@@ -1022,6 +1055,225 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         onOpenOrderHelp: _openOrderHelpChat,
       ),
     };
+  }
+}
+
+String _buyOrderStatusLabel(BuyV2OrderStatus status) => switch (status) {
+  BuyV2OrderStatus.preparing => 'Preparing your order',
+  BuyV2OrderStatus.confirmed => 'Order confirmed',
+  BuyV2OrderStatus.dispatched => 'On the way',
+  BuyV2OrderStatus.arriving => 'Arriving soon',
+  BuyV2OrderStatus.delivered => 'Delivered',
+};
+
+class _BuyQuickDeliveryStatusBar extends StatelessWidget {
+  const _BuyQuickDeliveryStatusBar({
+    required this.order,
+    required this.minimized,
+    required this.onMinimizedChanged,
+    required this.onOpen,
+  });
+
+  final BuyV2Order order;
+  final bool minimized;
+  final ValueChanged<bool> onMinimizedChanged;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusBar = Container(
+      key: ValueKey(
+        minimized
+            ? 'buy-quick-delivery-status-minimized'
+            : 'buy-quick-delivery-status-expanded',
+      ),
+      margin: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: BuyV2Colors.navy, width: 1.2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000080),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: minimized
+          ? Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    key: const ValueKey('buy-quick-delivery-open-minimized'),
+                    borderRadius: BorderRadius.circular(15),
+                    onTap: onOpen,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.bolt_rounded,
+                            color: BuyV2Colors.navy,
+                            size: 19,
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text(
+                              'Quick delivery · ${_buyOrderStatusLabel(order.status)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.buyBody.copyWith(fontSize: 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  key: const ValueKey('buy-quick-delivery-expand'),
+                  tooltip: 'Show delivery status',
+                  onPressed: () => onMinimizedChanged(false),
+                  icon: const Icon(Icons.expand_more_rounded),
+                  style: IconButton.styleFrom(minimumSize: const Size(44, 44)),
+                ),
+              ],
+            )
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(11, 8, 4, 9),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: BuyV2Colors.softBlue,
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: const Icon(
+                          Icons.bolt_rounded,
+                          color: BuyV2Colors.navy,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: InkWell(
+                          key: const ValueKey('buy-quick-delivery-open'),
+                          onTap: onOpen,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Quick delivery',
+                                style: context.buyBody.copyWith(fontSize: 11),
+                              ),
+                              Text(
+                                '${_buyOrderStatusLabel(order.status)} · ${order.promise}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: context.buyMeta,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        key: const ValueKey('buy-quick-delivery-minimize'),
+                        tooltip: 'Minimize delivery status',
+                        onPressed: () => onMinimizedChanged(true),
+                        icon: const Icon(Icons.remove_rounded),
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 7),
+                    child: BuyV2HonestProgressIndicator(
+                      ownerId: order.id,
+                      progress: order.progress,
+                      statusLabel: _buyOrderStatusLabel(order.status),
+                      backgroundColor: BuyV2Colors.softBlue,
+                      valueColor: BuyV2Colors.navy,
+                      minHeight: 5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+    if (MediaQuery.disableAnimationsOf(context)) return statusBar;
+    return AnimatedSize(
+      duration: BuyV2Motion.expandCollapse,
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: statusBar,
+    );
+  }
+}
+
+class _BuyQuietDeliveryStatusBar extends StatelessWidget {
+  const _BuyQuietDeliveryStatusBar({required this.order, required this.onOpen});
+
+  final BuyV2Order order;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 5, 8, 3),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(13),
+          side: const BorderSide(color: BuyV2Colors.line),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: const ValueKey('buy-quiet-delivery-status'),
+          onTap: onOpen,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.local_shipping_outlined,
+                    color: BuyV2Colors.navy,
+                    size: 19,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${_buyOrderStatusLabel(order.status)} · ${order.promise}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyMeta.copyWith(
+                        color: BuyV2Colors.navy,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: BuyV2Colors.muted,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

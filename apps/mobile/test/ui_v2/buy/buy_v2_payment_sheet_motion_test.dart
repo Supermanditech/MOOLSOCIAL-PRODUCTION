@@ -104,7 +104,7 @@ void main() {
     expect(reduced.reverseCurve, Curves.linear);
   });
 
-  testWidgets('real Checkout and Account callers reach the R56.7 sheet', (
+  testWidgets('Checkout embeds payment choices and Account retains its sheet', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
@@ -113,6 +113,8 @@ void main() {
       (item) => item.destination == BuyV2Destination.shop,
     );
     session.addProduct(product.id);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
 
     await tester.pumpWidget(
       app(
@@ -126,11 +128,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Change'));
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-address')),
+    );
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('buy-payment-sheet-route')), findsOne);
-    await tester.tap(find.byKey(const ValueKey('buy-payment-close')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-checkout-payment-stage')), findsOne);
+    expect(find.byKey(const ValueKey('buy-payment-PhonePe')), findsOne);
+    expect(find.byKey(const ValueKey('buy-payment-sheet-route')), findsNothing);
 
     await tester.pumpWidget(
       app(
@@ -417,38 +421,43 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Place order'));
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-address')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-payment')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-confirm')),
+      );
       await tester.pumpAndSettle();
 
       expect(
         session.checkoutSubmissionState,
         BuyV2CheckoutSubmissionState.paymentActionRequired,
       );
-      expect(find.text('Continue to secure payment'), findsOneWidget);
-      await tester.tap(find.text('Continue payment'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
       expect(
-        find.byKey(const ValueKey('buy-payment-collection-PhonePe')),
+        find.byKey(
+          const ValueKey('buy-checkout-payment-state-paymentActionRequired'),
+        ),
         findsOneWidget,
       );
-      expect(find.text('Payment is collected by MoolSocial'), findsOneWidget);
-      expect(
-        find.text('Supplier settlement follows confirmed delivery.'),
-        findsOneWidget,
-      );
+      expect(find.text('Ready for secure payment'), findsOneWidget);
       await tester.tap(
-        find.byKey(const ValueKey('buy-payment-collection-continue')),
+        find.byKey(const ValueKey('buy-checkout-primary-payment')),
       );
       await tester.pumpAndSettle();
       expect(
         session.checkoutSubmissionState,
         BuyV2CheckoutSubmissionState.paymentPending,
       );
-      expect(find.text('Check payment'), findsOneWidget);
+      expect(find.text('Payment confirmation pending'), findsOneWidget);
 
-      await tester.tap(find.text('Check payment'));
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-payment')),
+      );
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.confirmation);
       expect(find.text('Order placed'), findsOneWidget);
