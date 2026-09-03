@@ -18,6 +18,21 @@ import '../widgets/work_widgets.dart';
 import '../work_models.dart';
 import '../work_session.dart';
 
+String _formatStoreAmount(int value) {
+  final negative = value < 0;
+  final digits = value.abs().toString();
+  if (digits.length <= 3) return '${negative ? '-' : ''}$digits';
+  final tail = digits.substring(digits.length - 3);
+  var lead = digits.substring(0, digits.length - 3);
+  final groups = <String>[];
+  while (lead.length > 2) {
+    groups.insert(0, lead.substring(lead.length - 2));
+    lead = lead.substring(0, lead.length - 2);
+  }
+  if (lead.isNotEmpty) groups.insert(0, lead);
+  return '${negative ? '-' : ''}${groups.join(',')},$tail';
+}
+
 class WorkWorkspaceDashboardScreen extends StatefulWidget {
   const WorkWorkspaceDashboardScreen({
     required this.session,
@@ -1217,7 +1232,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                               fit: BoxFit.scaleDown,
                               alignment: Alignment.centerLeft,
                               child: Text(
-                                '${workspace.name} · ${workspace.area}',
+                                workspace.name,
                                 maxLines: 1,
                                 style: const TextStyle(
                                   color: MoolColors.navy,
@@ -1228,25 +1243,59 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            '${session.workspaceStoreState == WorkspaceStoreState.open
-                                ? 'Open'
-                                : session.workspaceStoreState == WorkspaceStoreState.paused
-                                ? 'Paused'
-                                : 'Off'} · ${session.workspaceVisibleToCustomers ? 'Public' : 'Private'}',
-                            style: const TextStyle(
-                              color: MoolColors.muted,
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(width: 2),
                           const Icon(
                             Icons.keyboard_arrow_down_rounded,
                             size: 17,
                             color: MoolColors.muted,
                           ),
                         ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Semantics(
+                button: true,
+                label:
+                    '${session.workspaceStoreState == WorkspaceStoreState.open
+                        ? 'Open'
+                        : session.workspaceStoreState == WorkspaceStoreState.paused
+                        ? 'Paused'
+                        : 'Off'}, ${session.workspaceVisibleToCustomers ? 'public storefront' : 'private storefront'}. Change store controls',
+                child: Material(
+                  key: const Key('work-dashboard-settings'),
+                  color: const Color(0xFFF0F3FF),
+                  borderRadius: BorderRadius.circular(999),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: onSettings,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minHeight: 30,
+                        maxWidth: 112,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 6,
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '${session.workspaceStoreState == WorkspaceStoreState.open
+                                ? 'Open'
+                                : session.workspaceStoreState == WorkspaceStoreState.paused
+                                ? 'Paused'
+                                : 'Off'} · ${session.workspaceVisibleToCustomers ? 'Public' : 'Private'}',
+                            maxLines: 1,
+                            style: const TextStyle(
+                              color: MoolColors.navy,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -1398,13 +1447,6 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                 ),
               ),
               if (!searchOpen) ...[
-                const SizedBox(width: 4),
-                IconButton.outlined(
-                  key: const Key('work-dashboard-settings'),
-                  tooltip: 'Store settings',
-                  onPressed: onSettings,
-                  icon: const Icon(Icons.tune_rounded),
-                ),
                 const SizedBox(width: 6),
                 _DashboardAlertButton(
                   count: _workspaceAlerts(session).length,
@@ -1495,67 +1537,53 @@ class _StoreControlDashboard extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 320),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              child: storeReady
-                  ? _StoreActivityDeck(
-                      key: ValueKey(session.workspaceOrderStage),
-                      session: session,
-                      onReviewOrder: onOrders,
-                      onStock: onStock,
-                      onMoney: onMoney,
-                      onGroupBulk: () =>
-                          onOpenOperation(_WorkspaceOperation.groupBuying),
-                    )
-                  : _StoreSetupDeck(
-                      session: session,
-                      workspace: workspace,
-                      onSetup: onSetup,
-                    ),
+            child: Column(
+              children: [
+                if (storeReady)
+                  _StoreLiveBusinessPulse(
+                    session: session,
+                    onOrders: onOrders,
+                    onSales: onMoney,
+                    onStock: onStock,
+                    onSettlement: onMoney,
+                  ),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 320),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: storeReady
+                        ? _StoreActivityDeck(
+                            key: ValueKey(session.workspaceOrderStage),
+                            session: session,
+                            onReviewOrder: onOrders,
+                            onStock: onStock,
+                            onMoney: onMoney,
+                            onGroupBulk: () => onOpenOperation(
+                              _WorkspaceOperation.groupBuying,
+                            ),
+                          )
+                        : _StoreSetupDeck(
+                            session: session,
+                            workspace: workspace,
+                            onSetup: onSetup,
+                          ),
+                  ),
+                ),
+              ],
             ),
           ),
           if (storeReady)
             Positioned(
-              right: 10,
-              top: 14,
-              child: _LiveStatusBubbleRail(
-                session: session,
-                onOrders: () {
-                  session.setWorkspaceOrderFilter('Live');
-                  onOrders();
-                },
-                onPacking: () {
-                  session.setWorkspaceOrderFilter('Packing');
-                  onOrders();
-                },
-                onDelivery: () {
-                  session.setWorkspaceOrderFilter('Ready');
-                  onOrders();
-                },
-                onStock: onStock,
-                onMoney: onMoney,
-              ),
-            ),
-          if (storeReady)
-            Positioned(
               left: 12,
-              right: 70,
-              bottom: 14,
+              right: 12,
+              bottom: 10,
               child: _FloatingStoreCommandDock(
                 onNewSale: onNewSale,
                 onDeliver: onDeliverOrder,
                 onBuyStock: onBuyStock,
                 onGroupBulk: () =>
                     onOpenOperation(_WorkspaceOperation.groupBuying),
-              ),
-            ),
-          if (storeReady)
-            Positioned(
-              right: 12,
-              bottom: 18,
-              child: _BusinessDrawerButton(
                 onCustomers: onCustomers,
                 onMoney: onMoney,
                 onGrow: onGrow,
@@ -1565,11 +1593,190 @@ class _StoreControlDashboard extends StatelessWidget {
           if (session.workspaceDashboardState != WorkspaceDashboardState.ready)
             Positioned(
               left: 12,
-              right: 68,
-              top: 10,
+              right: 12,
+              top: storeReady ? 72 : 10,
               child: _DashboardSyncBanner(session: session),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _StoreLiveBusinessPulse extends StatelessWidget {
+  const _StoreLiveBusinessPulse({
+    required this.session,
+    required this.onOrders,
+    required this.onSales,
+    required this.onStock,
+    required this.onSettlement,
+  });
+
+  final WorkSession session;
+  final VoidCallback onOrders;
+  final VoidCallback onSales;
+  final VoidCallback onStock;
+  final VoidCallback onSettlement;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: 'Live business summary',
+      child: Container(
+        key: const Key('work-live-status-bubbles'),
+        margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFDDE3F4)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x12001B4D),
+              blurRadius: 16,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: SizedBox(
+          key: const Key('work-store-live-business-pulse'),
+          height: 60,
+          child: Row(
+            children: [
+              _StorePulseMetric(
+                keyName: 'work-pulse-orders',
+                label: 'Orders',
+                value: session.hasActiveWorkspaceOrder ? '1' : '0',
+                icon: Icons.receipt_long_outlined,
+                attention: session.hasActiveWorkspaceOrder,
+                onTap: onOrders,
+              ),
+              _StorePulseDivider(),
+              _StorePulseMetric(
+                keyName: 'work-pulse-sales',
+                label: 'Sales',
+                value: '₹${_formatStoreAmount(session.workspaceSalesToday)}',
+                icon: Icons.point_of_sale_outlined,
+                onTap: onSales,
+              ),
+              _StorePulseDivider(),
+              _StorePulseMetric(
+                keyName: 'work-pulse-stock',
+                label: 'Low stock',
+                value: '${session.workspaceLowStockCount}',
+                icon: Icons.inventory_2_outlined,
+                attention: session.workspaceLowStockCount > 0,
+                onTap: onStock,
+              ),
+              _StorePulseDivider(),
+              _StorePulseMetric(
+                keyName: 'work-pulse-settlement',
+                label: 'To receive',
+                value:
+                    '₹${_formatStoreAmount(session.workspaceSettlementEligible)}',
+                icon: Icons.account_balance_wallet_outlined,
+                positive: session.workspaceSettlementEligible > 0,
+                onTap: onSettlement,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StorePulseDivider extends StatelessWidget {
+  const _StorePulseDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 28,
+      child: VerticalDivider(width: 1, thickness: 1, color: Color(0xFFE2E7F4)),
+    );
+  }
+}
+
+class _StorePulseMetric extends StatelessWidget {
+  const _StorePulseMetric({
+    required this.keyName,
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onTap,
+    this.attention = false,
+    this.positive = false,
+  });
+
+  final String keyName;
+  final String label;
+  final String value;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool attention;
+  final bool positive;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = attention
+        ? const Color(0xFF9A4A00)
+        : positive
+        ? const Color(0xFF08765D)
+        : MoolColors.navy;
+    return Expanded(
+      child: Semantics(
+        button: true,
+        label: '$label, $value',
+        excludeSemantics: true,
+        child: InkWell(
+          key: Key(keyName),
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 13, color: accent),
+                    const SizedBox(width: 3),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          value,
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: const TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1623,10 +1830,25 @@ class _StoreActivityDeck extends StatelessWidget {
     } else {
       content = const _StoreReadyActivity();
     }
+    final compact = content is _StoreReadyActivity;
     return Padding(
       key: const Key('work-store-activity-deck'),
-      padding: const EdgeInsets.fromLTRB(14, 18, 70, 104),
-      child: Center(child: _ActivityDeckShell(child: content)),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 86),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final desiredHeight = compact ? 190.0 : 430.0;
+          final availableHeight = constraints.maxHeight < desiredHeight
+              ? constraints.maxHeight
+              : desiredHeight;
+          return Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              height: availableHeight,
+              child: _ActivityDeckShell(child: content),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -1639,7 +1861,7 @@ class _ActivityDeckShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 430, maxHeight: 510),
+      constraints: const BoxConstraints(maxWidth: 430),
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -2814,15 +3036,16 @@ class _StoreReadyActivity extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       key: const Key('work-activity-ready'),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(18),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Row(
             children: [
               _LiveDot(color: Color(0xFF08765D)),
               SizedBox(width: 8),
               Text(
-                'STORE LIVE',
+                'STORE READY',
                 style: TextStyle(
                   color: Color(0xFF08765D),
                   fontSize: 11,
@@ -2832,54 +3055,39 @@ class _StoreReadyActivity extends StatelessWidget {
               ),
             ],
           ),
-          const Spacer(),
-          Container(
-            width: 118,
-            height: 118,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFF000080), Color(0xFF3949C6)],
+          const SizedBox(height: 14),
+          const Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: Color(0xFFE8F7F1),
+                child: Icon(Icons.storefront_rounded, color: Color(0xFF08765D)),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: MoolColors.navy.withValues(alpha: .22),
-                  blurRadius: 28,
-                  spreadRadius: 4,
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Your store is ready',
+                      style: TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      'New orders and urgent tasks will appear here.',
+                      style: TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 10.5,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: const Icon(
-              Icons.storefront_rounded,
-              color: Colors.white,
-              size: 52,
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Ready for customer activity',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'New orders and time-sensitive store work will rise here automatically.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: MoolColors.muted,
-              fontSize: 12,
-              height: 1.35,
-            ),
-          ),
-          const Spacer(),
-          const Text(
-            'Swipe through live work · Completed activity moves to history',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: MoolColors.muted, fontSize: 9.5),
+              ),
+            ],
           ),
         ],
       ),
@@ -2976,227 +3184,84 @@ class _StoreSetupDeck extends StatelessWidget {
   }
 }
 
-class _LiveStatusBubbleRail extends StatelessWidget {
-  const _LiveStatusBubbleRail({
-    required this.session,
-    required this.onOrders,
-    required this.onPacking,
-    required this.onDelivery,
-    required this.onStock,
-    required this.onMoney,
-  });
-
-  final WorkSession session;
-  final VoidCallback onOrders;
-  final VoidCallback onPacking;
-  final VoidCallback onDelivery;
-  final VoidCallback onStock;
-  final VoidCallback onMoney;
-
-  @override
-  Widget build(BuildContext context) {
-    final packing = session.workspaceOrderStage == 'Preparing';
-    final delivery =
-        const {
-          'Ready',
-          'Delivery requested',
-        }.contains(session.workspaceOrderStage) &&
-        session.workspaceOrderNeedsDelivery;
-    return Column(
-      key: const Key('work-live-status-bubbles'),
-      children: [
-        _ActivityBubble(
-          icon: Icons.receipt_long_outlined,
-          label: 'Orders',
-          count: session.hasActiveWorkspaceOrder ? 1 : 0,
-          active: session.hasActiveWorkspaceOrder && !packing && !delivery,
-          onTap: onOrders,
-        ),
-        const SizedBox(height: 10),
-        _ActivityBubble(
-          icon: Icons.inventory_rounded,
-          label: 'Packing',
-          count: packing ? 1 : 0,
-          active: packing,
-          onTap: onPacking,
-        ),
-        const SizedBox(height: 10),
-        _ActivityBubble(
-          icon: Icons.delivery_dining_outlined,
-          label: 'Delivery',
-          count: delivery ? 1 : 0,
-          active: delivery,
-          onTap: onDelivery,
-        ),
-        const SizedBox(height: 10),
-        _ActivityBubble(
-          icon: Icons.inventory_2_outlined,
-          label: 'Stock',
-          count: session.workspaceLowStockCount,
-          active: session.workspaceLowStockCount > 0,
-          onTap: onStock,
-        ),
-        const SizedBox(height: 10),
-        _ActivityBubble(
-          icon: Icons.account_balance_wallet_outlined,
-          label: 'Money',
-          count: session.workspaceSettlementBalance > 0 ? 1 : 0,
-          active: session.workspaceSettlementBalance > 0,
-          onTap: onMoney,
-        ),
-      ],
-    );
-  }
-}
-
-class _ActivityBubble extends StatelessWidget {
-  const _ActivityBubble({
-    required this.icon,
-    required this.label,
-    required this.count,
-    required this.active,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final int count;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: '$label${count > 0 ? ': $count' : ''}',
-      child: InkResponse(
-        onTap: onTap,
-        radius: 28,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 260),
-          width: active ? 50 : 44,
-          height: active ? 50 : 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: active ? MoolColors.navy : Colors.white,
-            border: Border.all(
-              color: active ? MoolColors.navy : const Color(0xFFDCE2F2),
-            ),
-            boxShadow: active
-                ? const [
-                    BoxShadow(
-                      color: Color(0x22000080),
-                      blurRadius: 14,
-                      offset: Offset(0, 5),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      icon,
-                      color: active ? Colors.white : MoolColors.muted,
-                      size: 16,
-                    ),
-                    const SizedBox(height: 1),
-                    SizedBox(
-                      width: 36,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          label,
-                          maxLines: 1,
-                          style: TextStyle(
-                            color: active ? Colors.white : MoolColors.muted,
-                            fontSize: 7,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (count > 0)
-                Positioned(
-                  right: 1,
-                  top: 1,
-                  child: Container(
-                    width: 17,
-                    height: 17,
-                    alignment: Alignment.center,
-                    decoration: const BoxDecoration(
-                      color: MoolColors.orange,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '$count',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _FloatingStoreCommandDock extends StatelessWidget {
   const _FloatingStoreCommandDock({
     required this.onNewSale,
     required this.onDeliver,
     required this.onBuyStock,
     required this.onGroupBulk,
+    required this.onCustomers,
+    required this.onMoney,
+    required this.onGrow,
+    required this.onPreview,
   });
 
   final VoidCallback onNewSale;
   final VoidCallback onDeliver;
   final VoidCallback onBuyStock;
   final VoidCallback onGroupBulk;
+  final VoidCallback onCustomers;
+  final VoidCallback onMoney;
+  final VoidCallback onGrow;
+  final VoidCallback onPreview;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Material(
       key: const Key('work-floating-command-dock'),
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: [
-        _FloatingCommand(
-          keyName: 'work-quick-new-sale',
-          icon: Icons.point_of_sale_rounded,
-          label: 'New sale',
-          onTap: onNewSale,
+      elevation: 12,
+      shadowColor: const Color(0x22001B4D),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(22),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        height: 68,
+        child: Row(
+          children: [
+            Expanded(
+              child: _FloatingCommand(
+                keyName: 'work-quick-new-sale',
+                icon: Icons.point_of_sale_rounded,
+                label: 'Bill',
+                semanticLabel: 'Bill and send invoice',
+                onTap: onNewSale,
+              ),
+            ),
+            Expanded(
+              child: _FloatingCommand(
+                keyName: 'work-quick-delivery',
+                icon: Icons.delivery_dining_rounded,
+                label: 'Deliver',
+                onTap: onDeliver,
+              ),
+            ),
+            Expanded(
+              child: _FloatingCommand(
+                keyName: 'work-quick-buy',
+                icon: Icons.shopping_bag_rounded,
+                label: 'Buy stock',
+                onTap: onBuyStock,
+              ),
+            ),
+            Expanded(
+              child: _FloatingCommand(
+                keyName: 'work-quick-group-buy',
+                icon: Icons.groups_2_rounded,
+                label: 'Group buy',
+                onTap: onGroupBulk,
+              ),
+            ),
+            Expanded(
+              child: _BusinessDrawerButton(
+                onCustomers: onCustomers,
+                onMoney: onMoney,
+                onGrow: onGrow,
+                onPreview: onPreview,
+              ),
+            ),
+          ],
         ),
-        _FloatingCommand(
-          keyName: 'work-quick-delivery',
-          icon: Icons.delivery_dining_rounded,
-          label: 'Deliver',
-          onTap: onDeliver,
-        ),
-        _FloatingCommand(
-          keyName: 'work-quick-buy',
-          icon: Icons.shopping_bag_rounded,
-          label: 'Buy stock',
-          onTap: onBuyStock,
-        ),
-        _FloatingCommand(
-          keyName: 'work-quick-group-buy',
-          icon: Icons.groups_2_rounded,
-          label: 'Group bulk',
-          onTap: onGroupBulk,
-        ),
-      ],
+      ),
     );
   }
 }
@@ -3207,54 +3272,46 @@ class _FloatingCommand extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.semanticLabel,
   });
 
   final String keyName;
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: label,
+      label: semanticLabel ?? label,
       onTap: onTap,
       excludeSemantics: true,
-      child: SizedBox(
-        width: 58,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Material(
-              key: Key(keyName),
-              elevation: 9,
-              shadowColor: const Color(0x22000080),
-              color: MoolColors.navy,
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: onTap,
-                child: SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: Icon(icon, color: Colors.white, size: 21),
+      child: InkWell(
+        key: Key(keyName),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 7),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: MoolColors.navy, size: 21),
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.fade,
-              softWrap: false,
-              style: const TextStyle(
-                color: MoolColors.navy,
-                fontSize: 8.5,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -3276,31 +3333,19 @@ class _BusinessDrawerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      key: const Key('work-business-drawer'),
-      color: MoolColors.navy,
-      elevation: 9,
-      shadowColor: const Color(0x22000080),
-      shape: const CircleBorder(),
-      child: Tooltip(
-        message: 'Customers, Money and Grow',
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: () => showModalBottomSheet<void>(
-            context: context,
-            showDragHandle: true,
-            builder: (context) => _BusinessDrawerSheet(
-              onCustomers: onCustomers,
-              onMoney: onMoney,
-              onGrow: onGrow,
-              onPreview: onPreview,
-            ),
-          ),
-          child: const SizedBox(
-            width: 48,
-            height: 48,
-            child: Icon(Icons.apps_rounded, color: Colors.white),
-          ),
+    return _FloatingCommand(
+      keyName: 'work-business-drawer',
+      icon: Icons.apps_rounded,
+      label: 'More',
+      semanticLabel: 'Customers, Money, Grow and Storefront',
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (context) => _BusinessDrawerSheet(
+          onCustomers: onCustomers,
+          onMoney: onMoney,
+          onGrow: onGrow,
+          onPreview: onPreview,
         ),
       ),
     );

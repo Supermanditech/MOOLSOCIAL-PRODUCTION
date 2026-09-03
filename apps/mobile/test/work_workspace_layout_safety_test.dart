@@ -11,6 +11,9 @@ void main() {
   const captureFounderEvidence = bool.fromEnvironment(
     'MOOL_CAPTURE_WORK_STORE_1_40',
   );
+  const captureStoreLiveEvidence = bool.fromEnvironment(
+    'MOOL_CAPTURE_WORK_STORE_LIVE_V1',
+  );
   Future<void> mount(
     WidgetTester tester, {
     required String route,
@@ -1225,6 +1228,78 @@ void main() {
   });
 
   testWidgets(
+    'Store Live first view keeps pulse commands and status operable at large text',
+    (tester) async {
+      final work = liveStore()..workspaceSalesToday = 28450;
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(320, 780),
+        textScale: 1.4,
+      );
+
+      expect(
+        find.byKey(const Key('work-store-live-business-pulse')),
+        findsOneWidget,
+      );
+      for (final key in const [
+        'work-pulse-orders',
+        'work-pulse-sales',
+        'work-pulse-stock',
+        'work-pulse-settlement',
+        'work-quick-new-sale',
+        'work-quick-delivery',
+        'work-quick-buy',
+        'work-quick-group-buy',
+        'work-business-drawer',
+      ]) {
+        final action = find.byKey(Key(key));
+        expect(action, findsOneWidget);
+        expect(action.hitTestable(), findsOneWidget);
+        expect(tester.getRect(action).left, greaterThanOrEqualTo(0));
+        expect(tester.getRect(action).right, lessThanOrEqualTo(320));
+      }
+      expect(find.text('Ready for customer activity'), findsNothing);
+      expect(find.text('Your store is ready'), findsOneWidget);
+      expect(find.text('Mahadev Fresh Mart'), findsOneWidget);
+      expect(find.text('₹28,450'), findsOneWidget);
+      expect(find.text('Bill'), findsOneWidget);
+      expect(find.text('Buy stock'), findsOneWidget);
+      expect(find.text('Group buy'), findsOneWidget);
+
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Store Live pulse opens exact operational destinations', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    await tester.tap(find.byKey(const Key('work-pulse-orders')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-operation-back')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('work-pulse-stock')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-dashboard-catalogue-screen')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('work-operation-back')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('work-pulse-settlement')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-money-destination')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
     'Store hosts Wholesale and Bulk with one Store navigation owner',
     (tester) async {
       final semantics = tester.ensureSemantics();
@@ -1859,6 +1934,7 @@ void main() {
     WidgetTester tester, {
     required WorkSession work,
     required String fileName,
+    String directory = 'work-store-atomic-r62-50-local-review-20260903',
     Future<void> Function()? afterMount,
     Finder? target,
   }) async {
@@ -1874,11 +1950,73 @@ void main() {
     await tester.pumpAndSettle();
     await expectLater(
       target ?? find.byType(Scaffold).first,
-      matchesGoldenFile(
-        '../../../artifacts/quality/work-store-atomic-r62-50-local-review-20260903/$fileName',
-      ),
+      matchesGoldenFile('../../../artifacts/quality/$directory/$fileName'),
     );
   }
+
+  testWidgets(
+    'Store Live v1 capture - quiet store',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      await captureActivityDeck(
+        tester,
+        work: liveStore()..workspaceSalesToday = 28450,
+        directory: 'work-store-live-v1-local-review-20260903',
+        fileName: '01-store-live-quiet-412x915.png',
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - incoming order',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore()
+        ..workspaceSalesToday = 28450
+        ..workspaceSettlementBalance = 17820;
+      seedIncomingOrder(work);
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-v1-local-review-20260903',
+        fileName: '02-store-live-order-412x915.png',
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - packing',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore()
+        ..workspaceSalesToday = 28450
+        ..workspaceSettlementBalance = 17820;
+      seedIncomingOrder(work, stage: 'Preparing', delivery: true);
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-v1-local-review-20260903',
+        fileName: '03-store-live-packing-412x915.png',
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - delivery',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore()
+        ..workspaceSalesToday = 28450
+        ..workspaceSettlementBalance = 17820;
+      seedIncomingOrder(work, stage: 'Ready', delivery: true);
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-v1-local-review-20260903',
+        fileName: '04-store-live-delivery-412x915.png',
+      );
+    },
+  );
 
   testWidgets(
     'founder Activity Deck capture - idle live store',
