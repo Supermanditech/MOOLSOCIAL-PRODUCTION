@@ -1452,6 +1452,15 @@ if ($ProductionLane -ceq 'baseline') {
         $effectiveOwner -cmatch
           '^artifacts/quality/buy-v2-r65-[123]-cursor-75-defect-review-20260903/[^/]+$'
       )
+      $retainedBuyGeneratedPackageOwner = (
+        $hasContinuationBinding -and
+        [string]$selectedContinuationBinding.id -ceq
+          'cursor_buy_mvp_ticket14_v1_20260902' -and
+        $effectiveOwner -cin @(
+          'apps/mobile/.dart_tool/package_config.json',
+          'apps/mobile/.dart_tool/package_graph.json'
+        )
+      )
       $allowedOwner = $false
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
@@ -1460,7 +1469,8 @@ if ($ProductionLane -ceq 'baseline') {
         }
       }
       if ($shopCursorReviewAndroidOwner -or
-          $retainedBuyCandidateEvidenceOwner) {
+          $retainedBuyCandidateEvidenceOwner -or
+          $retainedBuyGeneratedPackageOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -1469,6 +1479,7 @@ if ($ProductionLane -ceq 'baseline') {
         Assert-Coordination (
           $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
+          $retainedBuyGeneratedPackageOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }
@@ -1584,7 +1595,44 @@ if ($ProductionLane -ceq 'baseline') {
             [string]$admissionOwners[0] -ceq
               'scripts/check-codex-subagent-coordination-policy.ps1'
           ) 'retained-evidence admission changed an unexpected owner.'
-          & git -C $root diff --quiet $admissionCommit -- `
+          $sealedCoordinationCommit = $admissionCommit
+          $metadataSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): preserve generated package metadata'
+          $matchingMetadataCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'generated-metadata coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $metadataSubject) {
+              $matchingMetadataCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingMetadataCommits.Count -le 1) `
+            'generated-metadata coordination commit is duplicated.'
+          if ($matchingMetadataCommits.Count -eq 1) {
+            $metadataCommit = [string]$matchingMetadataCommits[0]
+            $metadataParent = @(& git -C $root show -s --format=%P `
+                $metadataCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $metadataParent.Count -eq 1 -and
+              [string]$metadataParent[0] -ceq $admissionCommit
+            ) 'generated-metadata coordination parent changed.'
+            $metadataOwners = @(& git -C $root diff-tree --no-commit-id `
+                --name-only -r $metadataCommit)
+            $expectedMetadataOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($metadataOwners | Sort-Object) -join '|') -ceq
+              (@($expectedMetadataOwners | Sort-Object) -join '|')
+            ) 'generated-metadata coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $metadataCommit
+          }
+          & git -C $root diff --quiet $sealedCoordinationCommit -- `
             'config/codex-subagent-coordination-policy.json' `
             'scripts/check-codex-subagent-coordination-policy.ps1'
           Assert-Coordination ($LASTEXITCODE -eq 0) `
