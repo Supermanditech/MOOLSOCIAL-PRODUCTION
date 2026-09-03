@@ -4769,7 +4769,12 @@ void main() {
         find.byKey(const ValueKey('buy-cart-continue-store')),
         findsOneWidget,
       );
-      expect(find.text('Continue browsing Safe Protein Store'), findsOneWidget);
+      expect(find.text('Continue browsing'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('buy-cart-continue-store-name')),
+        findsOneWidget,
+      );
+      expect(find.text('Safe Protein Store'), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('buy-cart-continue-store')));
       await tester.pumpAndSettle();
@@ -5803,6 +5808,18 @@ void main() {
         find.byKey(const ValueKey('buy-cart-continue-store')),
         findsOneWidget,
       );
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('buy-cart-continue-store')))
+            .height,
+        56,
+      );
+      final returnName = tester.widget<Text>(
+        find.byKey(const ValueKey('buy-cart-continue-store-name')),
+      );
+      expect(returnName.data, 'Thar Grains Wholesale');
+      expect(returnName.maxLines, 2);
+      expect(returnName.overflow, TextOverflow.clip);
       await tester.tap(find.byKey(const ValueKey('buy-cart-continue-store')));
       await tester.pumpAndSettle();
       expect(supplierSheet, findsOneWidget);

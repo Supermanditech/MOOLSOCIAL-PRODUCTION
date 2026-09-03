@@ -5041,15 +5041,47 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                         widget.storeLabel?.trim().isNotEmpty == true) ...[
                       SizedBox(
                         width: double.infinity,
-                        height: 48,
-                        child: FilledButton.tonalIcon(
+                        height: 56,
+                        child: FilledButton.tonal(
                           key: const ValueKey('buy-cart-continue-store'),
                           onPressed: widget.onBrowseStore,
-                          icon: const Icon(Icons.storefront_outlined),
-                          label: Text(
-                            'Continue browsing ${widget.storeLabel}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.storefront_outlined, size: 20),
+                              const SizedBox(width: 10),
+                              Flexible(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Continue browsing',
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        height: 1,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      widget.storeLabel!,
+                                      key: const ValueKey(
+                                        'buy-cart-continue-store-name',
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.clip,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        height: 1.05,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
