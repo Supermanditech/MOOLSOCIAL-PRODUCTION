@@ -2911,6 +2911,10 @@ class _DeliveryActivityCard extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     key: const Key('work-delivery-call-customer'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      visualDensity: VisualDensity.compact,
+                    ),
                     onPressed: () {
                       final digits = session.workspaceOrderCustomer.replaceAll(
                         RegExp(r'[^0-9]'),
@@ -2920,14 +2924,21 @@ class _DeliveryActivityCard extends StatelessWidget {
                         unawaited(launchUrl(Uri(scheme: 'tel', path: digits)));
                       }
                     },
-                    icon: const Icon(Icons.call_outlined, size: 18),
-                    label: const Text('Call'),
+                    icon: const Icon(Icons.call_outlined, size: 17),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Call'),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: OutlinedButton.icon(
                     key: const Key('work-delivery-chat-customer'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      visualDensity: VisualDensity.compact,
+                    ),
                     onPressed: () => context.push(
                       Uri(
                         path: '/app/chat/inbox',
@@ -2940,15 +2951,22 @@ class _DeliveryActivityCard extends StatelessWidget {
                     ),
                     icon: const Icon(
                       Icons.chat_bubble_outline_rounded,
-                      size: 18,
+                      size: 17,
                     ),
-                    label: const Text('Chat'),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Chat'),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: OutlinedButton.icon(
                     key: const Key('work-delivery-open-map'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      visualDensity: VisualDensity.compact,
+                    ),
                     onPressed: session.workspaceOrderAddress.isEmpty
                         ? null
                         : () => unawaited(
@@ -2960,8 +2978,11 @@ class _DeliveryActivityCard extends StatelessWidget {
                               mode: LaunchMode.externalApplication,
                             ),
                           ),
-                    icon: const Icon(Icons.map_outlined, size: 18),
-                    label: const Text('Map'),
+                    icon: const Icon(Icons.map_outlined, size: 17),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Map'),
+                    ),
                   ),
                 ),
               ],
@@ -10459,7 +10480,10 @@ class _LiveOrderTicket extends StatelessWidget {
                       stage == 'Preparing' && !session.workspacePackingComplete
                       ? null
                       : stage == 'Ready' && order.needsDelivery
-                      ? onOpenDelivery
+                      ? () {
+                          session.advanceWorkspaceOrder();
+                          onOpenDelivery();
+                        }
                       : session.advanceWorkspaceOrder,
                   icon: const Icon(Icons.arrow_forward_rounded, size: 17),
                   label: Text(nextAction),

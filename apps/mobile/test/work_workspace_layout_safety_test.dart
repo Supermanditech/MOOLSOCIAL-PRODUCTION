@@ -1739,6 +1739,24 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Orders requests a rider before opening the delivery desk', (
+    tester,
+  ) async {
+    final work = liveStore();
+    seedIncomingOrder(work, stage: 'Ready', delivery: true);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    await tester.tap(find.byKey(const Key('work-store-orders')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Arrange delivery'));
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderStage, 'Delivery requested');
+    expect(work.workspaceDeliveryAssignment, isNotNull);
+    expect(find.byKey(const Key('work-delivery-destination')), findsOneWidget);
+    expect(find.text('Review delivery partner'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Delivery keeps call Chat map and handover actions visible', (
     tester,
   ) async {
@@ -1770,6 +1788,17 @@ void main() {
       'work-activity-confirm-handover',
     ]) {
       expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
+    }
+    for (final entry in const {
+      'Call': 'work-delivery-call-customer',
+      'Chat': 'work-delivery-chat-customer',
+      'Map': 'work-delivery-open-map',
+    }.entries) {
+      final label = find.descendant(
+        of: find.byKey(Key(entry.value)),
+        matching: find.text(entry.key),
+      );
+      expect(tester.getSize(label).height, lessThan(32));
     }
     expect(tester.takeException(), isNull);
   });
@@ -2486,9 +2515,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-grow-destination')), findsOne);
-    await tester.ensureVisible(
-      find.byKey(const Key('work-growth-paid-work')),
-    );
+    await tester.ensureVisible(find.byKey(const Key('work-growth-paid-work')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-growth-paid-work')));
     await tester.pumpAndSettle();
