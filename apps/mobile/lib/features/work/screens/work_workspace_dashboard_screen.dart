@@ -1734,7 +1734,7 @@ class _StorePulseMetric extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -1760,7 +1760,7 @@ class _StorePulseMetric extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
@@ -5261,7 +5261,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     if (operation == _WorkspaceOperation.counterOrder) {
       return _CounterOrderSurface(
         session: session,
-        onArrangeDelivery: () => onOpenOperation(_WorkspaceOperation.delivery),
+        onArrangeDelivery: () => onOpenOperation(_WorkspaceOperation.orders),
         onOpenCatalogue: () => onOpenOperation(_WorkspaceOperation.catalogue),
       );
     }
@@ -10580,6 +10580,36 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     super.dispose();
   }
 
+  List<String> get _recentCustomers {
+    final seen = <String>{};
+    return widget.session.visibleWorkspaceOrders
+        .map((order) => order.customer.trim())
+        .where((customer) => customer.isNotEmpty && seen.add(customer))
+        .take(4)
+        .toList(growable: false);
+  }
+
+  int get _selectedUnits => widget.session.workspaceOrderQuantities.values
+      .fold<int>(0, (total, quantity) => total + quantity);
+
+  String get _draftItems => widget.session.workspaceCatalogueItems
+      .where(
+        (product) =>
+            (widget.session.workspaceOrderQuantities[product.id] ?? 0) > 0,
+      )
+      .map(
+        (product) =>
+            '${product.title} × ${widget.session.workspaceOrderQuantities[product.id]}',
+      )
+      .join(' · ');
+
+  String _fulfilmentLabel(String value) => switch (value) {
+    'At the shop' => 'Take now',
+    'Own delivery' => 'My delivery',
+    'Mool delivery' => 'Mool delivery',
+    _ => value,
+  };
+
   void _save() {
     final phone = _customer.text.replaceAll(RegExp(r'\D'), '');
     final error = phone.length < 10
@@ -10614,6 +10644,11 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         );
       }
     } else {
+      widget.session.showNotice(
+        _source == 'Phone'
+            ? 'Delivery order saved. Confirm the order with the customer before dispatch.'
+            : 'Delivery order saved. Pack the items before requesting a rider.',
+      );
       widget.onArrangeDelivery();
     }
   }
@@ -10633,65 +10668,87 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               duration: const Duration(milliseconds: 180),
               padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
               child: SizedBox(
-                height: media.size.height * .56,
-                child: SingleChildScrollView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: EdgeInsets.fromLTRB(
-                    18,
-                    0,
-                    18,
-                    media.viewPadding.bottom + 24,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Complete this order',
-                        style: TextStyle(
-                          color: MoolColors.ink,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w900,
+                height: media.size.height * .72,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Review customer order',
+                              style: TextStyle(
+                                color: MoolColors.ink,
+                                fontSize: 21,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _OrderReviewSummary(
+                              customer: _customer.text.trim(),
+                              source: _source,
+                              items: _draftItems,
+                              units: _selectedUnits,
+                              amount: widget.session.workspaceOrderTotal,
+                            ),
+                            const SizedBox(height: 14),
+                            _OrderCompletionChoices(
+                              fulfilment: _fulfilment,
+                              payment: _payment,
+                              addressController: _address,
+                              onFulfilmentChanged: (value) {
+                                setState(() => _fulfilment = value);
+                                setSheetState(() {});
+                              },
+                              onPaymentChanged: (value) {
+                                setState(() => _payment = value);
+                                setSheetState(() {});
+                              },
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      _OrderCompletionChoices(
-                        fulfilment: _fulfilment,
-                        payment: _payment,
-                        addressController: _address,
-                        onFulfilmentChanged: (value) {
-                          setState(() => _fulfilment = value);
-                          setSheetState(() {});
-                        },
-                        onPaymentChanged: (value) {
-                          setState(() => _payment = value);
-                          setSheetState(() {});
-                        },
+                    ),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.fromLTRB(
+                        18,
+                        8,
+                        18,
+                        media.viewPadding.bottom + 12,
                       ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          key: const Key('work-order-save'),
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            _save();
-                          },
-                          icon: Icon(
-                            _fulfilment == 'At the shop'
-                                ? Icons.check_circle_outline_rounded
-                                : Icons.delivery_dining_rounded,
-                          ),
-                          label: Text(
-                            _fulfilment == 'At the shop'
-                                ? 'Confirm customer order'
-                                : 'Confirm and arrange delivery',
-                          ),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        border: Border(
+                          top: BorderSide(color: Color(0xFFE2E7F4)),
                         ),
                       ),
-                    ],
-                  ),
+                      child: FilledButton.icon(
+                        key: const Key('work-order-save'),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _save();
+                        },
+                        icon: Icon(
+                          _fulfilment == 'At the shop'
+                              ? Icons.check_circle_outline_rounded
+                              : Icons.delivery_dining_rounded,
+                        ),
+                        label: Text(
+                          _fulfilment == 'At the shop'
+                              ? 'Complete sale & create invoice'
+                              : _fulfilment == 'Mool delivery'
+                              ? 'Create order for Mool delivery'
+                              : 'Create order for my delivery',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -10744,31 +10801,30 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               children: [
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    _fulfilment == 'At the shop' ? 'New sale' : 'Deliver order',
-                    style: const TextStyle(
+                  child: const Text(
+                    'Create customer order',
+                    style: TextStyle(
                       color: MoolColors.ink,
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-                Align(
+                const SizedBox(height: 7),
+                const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    _fulfilment == 'At the shop'
-                        ? 'Counter, Phone or Chat sale from your live catalogue'
-                        : 'Record the customer order before requesting delivery',
-                    style: const TextStyle(
+                    'How did the customer order?',
+                    style: TextStyle(
                       color: MoolColors.muted,
-                      fontSize: 10.5,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
                 Wrap(
                   spacing: 7,
-                  runSpacing: 7,
+                  runSpacing: 4,
                   children: [
                     for (final source in const ['Counter', 'Phone', 'Chat'])
                       ChoiceChip(
@@ -10779,7 +10835,38 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                       ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 7),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'How will the customer receive it?',
+                    style: TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 4,
+                  children: [
+                    for (final mode in const [
+                      'At the shop',
+                      'Own delivery',
+                      'Mool delivery',
+                    ])
+                      ChoiceChip(
+                        key: Key(
+                          'work-order-receive-${mode.toLowerCase().replaceAll(' ', '-')}',
+                        ),
+                        label: Text(_fulfilmentLabel(mode)),
+                        selected: _fulfilment == mode,
+                        onSelected: (_) => setState(() => _fulfilment = mode),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 9),
                 _AccessibleWorkTextField(
                   keyName: 'work-order-customer',
                   controller: _customer,
@@ -10790,19 +10877,58 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                   onChanged: (_) => setState(() {}),
                   prefixIcon: const Icon(Icons.phone_outlined),
                 ),
+                if (_recentCustomers.isNotEmpty) ...[
+                  const SizedBox(height: 7),
+                  SizedBox(
+                    height: 34,
+                    child: ListView.separated(
+                      key: const Key('work-order-recent-customers'),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _recentCustomers.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 6),
+                      itemBuilder: (context, index) {
+                        final customer = _recentCustomers[index];
+                        return ActionChip(
+                          avatar: const Icon(Icons.history_rounded, size: 16),
+                          label: Text(customer),
+                          onPressed: () {
+                            _customer.text = customer;
+                            _customer.selection = TextSelection.collapsed(
+                              offset: customer.length,
+                            );
+                            setState(() {});
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                if (_fulfilment != 'At the shop') ...[
+                  const SizedBox(height: 9),
+                  _AccessibleWorkTextField(
+                    keyName: 'work-order-address',
+                    controller: _address,
+                    label: 'Customer delivery address',
+                    hint: 'House, street, area and landmark',
+                    textInputAction: TextInputAction.done,
+                    maxLines: 2,
+                    onChanged: (_) => setState(() {}),
+                    prefixIcon: const Icon(Icons.location_on_outlined),
+                  ),
+                ],
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             child: Row(
               children: [
                 const Expanded(
                   child: Text(
-                    'Add products',
+                    'Quick add products',
                     style: TextStyle(
                       color: MoolColors.ink,
-                      fontSize: 19,
+                      fontSize: 17,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -10829,16 +10955,12 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                       label: const Text('Add products to your catalogue'),
                     ),
                   )
-                : GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          mainAxisExtent: 160,
-                        ),
+                : ListView.separated(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                     itemCount: widget.session.workspaceCatalogueItems.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 7),
                     itemBuilder: (context, index) {
                       final product =
                           widget.session.workspaceCatalogueItems[index];
@@ -10876,7 +10998,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${widget.session.workspaceOrderItemCount} products',
+                            '$_selectedUnits units',
                             style: const TextStyle(color: MoolColors.muted),
                           ),
                           Text(
@@ -10897,9 +11019,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                         onPressed: canReview ? _review : null,
                         icon: const Icon(Icons.arrow_forward_rounded),
                         label: Text(
-                          _fulfilment == 'At the shop'
-                              ? 'Review sale'
-                              : 'Review delivery',
+                          'Review ₹${_formatStoreAmount(widget.session.workspaceOrderTotal)}',
                         ),
                       ),
                     ),
@@ -10925,80 +11045,95 @@ class _SaleProductTile extends StatelessWidget {
     final quantity = session.workspaceOrderQuantities[product.id] ?? 0;
     return Material(
       color: Colors.white,
-      elevation: quantity > 0 ? 8 : 2,
+      elevation: quantity > 0 ? 5 : 1,
       shadowColor: const Color(0x1A001B4D),
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        key: Key('work-order-add-${product.id}'),
-        borderRadius: BorderRadius.circular(22),
-        onTap: () => session.adjustWorkspaceOrderQuantity(product.id, 1),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: const Color(0xFFE5EAFF),
-                child: Text(
-                  product.brand.substring(0, 1),
-                  style: const TextStyle(
-                    color: MoolColors.navy,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                product.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: const Color(0xFFE5EAFF),
+              child: Text(
+                product.brand.substring(0, 1),
                 style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 12,
+                  color: MoolColors.navy,
+                  fontSize: 16,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              Text(
-                product.pack,
-                style: const TextStyle(color: MoolColors.muted, fontSize: 9.5),
-              ),
-              const Spacer(),
-              Row(
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Text(
-                      '₹${product.sellingPrice}',
-                      style: const TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                      ),
+                  Text(
+                    product.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: MoolColors.ink,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  if (quantity > 0)
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: MoolColors.navy,
-                      child: Text(
-                        '$quantity',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    )
-                  else
-                    const Icon(
-                      Icons.add_circle_rounded,
-                      color: MoolColors.navy,
+                  Text(
+                    '${product.pack} · ${product.stock} available',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 9.5,
                     ),
+                  ),
                 ],
               ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '₹${product.sellingPrice}',
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(width: 7),
+            if (quantity > 0) ...[
+              IconButton(
+                key: Key('work-order-reduce-${product.id}'),
+                tooltip: 'Reduce ${product.title}',
+                visualDensity: VisualDensity.compact,
+                onPressed: () =>
+                    session.adjustWorkspaceOrderQuantity(product.id, -1),
+                icon: const Icon(Icons.remove_circle_outline_rounded),
+              ),
+              Text(
+                '$quantity',
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ],
-          ),
+            IconButton(
+              key: Key('work-order-add-${product.id}'),
+              tooltip: 'Add ${product.title}',
+              visualDensity: VisualDensity.compact,
+              onPressed: product.stock > quantity
+                  ? () => session.adjustWorkspaceOrderQuantity(product.id, 1)
+                  : null,
+              icon: Icon(
+                quantity > 0
+                    ? Icons.add_circle_outline_rounded
+                    : Icons.add_circle_rounded,
+                color: product.stock > quantity ? MoolColors.navy : null,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -11039,6 +11174,78 @@ class _OrderTotalBar extends StatelessWidget {
   }
 }
 
+class _OrderReviewSummary extends StatelessWidget {
+  const _OrderReviewSummary({
+    required this.customer,
+    required this.source,
+    required this.items,
+    required this.units,
+    required this.amount,
+  });
+
+  final String customer;
+  final String source;
+  final String items;
+  final int units;
+  final int amount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('work-order-review-summary'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F6FF),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  customer,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                '₹${_formatStoreAmount(amount)}',
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            '$source order · $units units',
+            style: const TextStyle(color: MoolColors.muted, fontSize: 10.5),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            items,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: MoolColors.ink,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _OrderCompletionChoices extends StatelessWidget {
   const _OrderCompletionChoices({
     required this.fulfilment,
@@ -11060,7 +11267,7 @@ class _OrderCompletionChoices extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Customer receives the order',
+          'How will the customer receive it?',
           style: TextStyle(fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 4),
@@ -11077,7 +11284,11 @@ class _OrderCompletionChoices extends StatelessWidget {
                 key: Key(
                   'work-order-fulfilment-${mode.toLowerCase().replaceAll(' ', '-')}',
                 ),
-                label: Text(mode),
+                label: Text(switch (mode) {
+                  'At the shop' => 'Take now',
+                  'Own delivery' => 'My delivery',
+                  _ => 'Mool delivery',
+                }),
                 selected: fulfilment == mode,
                 onSelected: (selected) {
                   if (selected) onFulfilmentChanged(mode);
@@ -11087,16 +11298,65 @@ class _OrderCompletionChoices extends StatelessWidget {
         ),
         if (fulfilment != 'At the shop') ...[
           const SizedBox(height: MoolSpacing.xs),
-          TextField(
-            key: const Key('work-order-address'),
-            controller: addressController,
-            minLines: 2,
-            maxLines: 3,
-            textInputAction: TextInputAction.done,
-            decoration: const InputDecoration(
-              labelText: 'Customer delivery address',
-              hintText: 'House, street, area and landmark',
-              prefixIcon: Icon(Icons.location_on_outlined),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4F6FF),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on_outlined, size: 19),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    addressController.text.trim().isEmpty
+                        ? 'Add the delivery address before confirming.'
+                        : addressController.text.trim(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: addressController.text.trim().isEmpty
+                          ? const Color(0xFFB42318)
+                          : MoolColors.ink,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (fulfilment == 'Mool delivery') ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF7F3),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.verified_user_outlined,
+                  color: Color(0xFF08765D),
+                  size: 19,
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Confirm the products, total and address with the customer before dispatch. The first delivery does not require app installation.',
+                    style: TextStyle(
+                      color: Color(0xFF075E4B),
+                      fontSize: 10.5,
+                      height: 1.3,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

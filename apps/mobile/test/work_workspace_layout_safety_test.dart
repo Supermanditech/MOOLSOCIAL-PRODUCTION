@@ -798,7 +798,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('work-quick-delivery')));
       await tester.pumpAndSettle();
-      expect(find.text('Create order'), findsOneWidget);
+      expect(find.text('Create customer order'), findsOneWidget);
       expect(find.text('Phone'), findsWidgets);
 
       await tester.binding.handlePopRoute();
@@ -1200,6 +1200,123 @@ void main() {
       },
     );
   });
+
+  testWidgets(
+    'phone order keeps customer product payment and Mool delivery truth in one flow',
+    (tester) async {
+      final work = WorkSession()
+        ..seedVerifiedWorkspace()
+        ..retailerSetupSaved = true
+        ..reviewStage = WorkReviewStage.live
+        ..workspaceStoreState = WorkspaceStoreState.open
+        ..workspaceAcceptingOrders = true
+        ..workspaceVisibleToCustomers = true
+        ..workspaceOrders.add(
+          WorkspaceOrderRecord(
+            id: 'ORD-RECENT-1',
+            customer: 'Rakesh · 98290 12345',
+            items: 'Fortune Sunflower Oil × 1',
+            quantities: const {'oil-fortune-1l': 1},
+            amount: 264,
+            source: 'Counter',
+            fulfilment: 'At the shop',
+            payment: 'Cash',
+            address: '',
+            stage: 'Completed',
+            needsDelivery: false,
+            createdAt: DateTime(2026, 9, 3, 9),
+          ),
+        );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+      );
+
+      await tester.tap(find.byKey(const Key('work-quick-delivery')));
+      await tester.pumpAndSettle();
+      expect(find.text('How did the customer order?'), findsOneWidget);
+      expect(find.text('How will the customer receive it?'), findsOneWidget);
+      expect(
+        find.byKey(const Key('work-order-recent-customers')),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Rakesh · 98290 12345'));
+      await tester.enterText(
+        find.byKey(const Key('work-order-address')),
+        '12 Market Road, Sardarpura',
+      );
+      await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
+      await tester.pumpAndSettle();
+      expect(find.text('1 units'), findsOneWidget);
+      expect(find.text('₹264'), findsWidgets);
+
+      await tester.tap(find.byKey(const Key('work-order-review')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-order-review-summary')),
+        findsOneWidget,
+      );
+      expect(find.text('Phone order · 1 units'), findsOneWidget);
+      expect(find.text('Fortune Sunflower Oil × 1'), findsOneWidget);
+      expect(find.text('Create order for Mool delivery'), findsOneWidget);
+      expect(
+        find.textContaining('first delivery does not require app'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('work-order-save')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+      expect(work.workspaceOrderStage, 'Confirmed');
+      expect(work.workspaceOrderFulfilment, 'Mool delivery');
+      expect(work.workspaceOrderNeedsDelivery, isTrue);
+      expect(work.workspaceOrderAddress, '12 Market Road, Sardarpura');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'counter order changes source and quantity without losing the draft',
+    (tester) async {
+      final work = liveStore();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1.6,
+      );
+
+      await tester.tap(find.byKey(const Key('work-quick-new-sale')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('work-order-customer')),
+        '9829012345',
+      );
+      await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
+      await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-sell-source-chat')));
+      await tester.tap(
+        find.byKey(const Key('work-order-reduce-oil-fortune-1l')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('work-order-customer')))
+            .controller
+            ?.text,
+        '9829012345',
+      );
+      expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+      expect(find.byKey(const Key('work-order-address')), findsNothing);
+      expect(find.text('Review ₹264'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('Store Activity Deck replaces rejected dashboard bands', (
     tester,
@@ -2217,6 +2334,53 @@ void main() {
         work: work,
         directory: 'work-store-live-v1-local-review-20260903',
         fileName: '08-store-live-delivery-assigned-412x915.png',
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - customer delivery composer',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      await captureActivityDeck(
+        tester,
+        work: liveStore(),
+        directory: 'work-store-live-sell-deliver-v1-local-review-20260904',
+        fileName: '01-customer-delivery-composer-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-quick-delivery')));
+        },
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - customer delivery review',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      await captureActivityDeck(
+        tester,
+        work: liveStore(),
+        directory: 'work-store-live-sell-deliver-v1-local-review-20260904',
+        fileName: '02-customer-delivery-review-412x915.png',
+        target: find.byType(MaterialApp),
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-quick-delivery')));
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byKey(const Key('work-order-customer')),
+            '98290 12345',
+          );
+          await tester.enterText(
+            find.byKey(const Key('work-order-address')),
+            '12 Market Road, Sardarpura',
+          );
+          await tester.tap(
+            find.byKey(const Key('work-order-add-oil-fortune-1l')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-order-review')));
+        },
       );
     },
   );
