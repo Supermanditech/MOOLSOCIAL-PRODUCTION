@@ -1445,6 +1445,13 @@ if ($ProductionLane -ceq 'baseline') {
           'integration_repair_shop_v2_r61_5_cursor_review_build_20260828' -and
         $effectiveOwner -ceq 'apps/mobile/android/app/build.gradle.kts'
       )
+      $retainedBuyCandidateEvidenceOwner = (
+        $hasContinuationBinding -and
+        [string]$selectedContinuationBinding.id -ceq
+          'cursor_buy_mvp_ticket14_v1_20260902' -and
+        $effectiveOwner -cmatch
+          '^artifacts/quality/buy-v2-r65-[123]-cursor-75-defect-review-20260903/[^/]+$'
+      )
       $allowedOwner = $false
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
@@ -1452,7 +1459,8 @@ if ($ProductionLane -ceq 'baseline') {
           break
         }
       }
-      if ($shopCursorReviewAndroidOwner) {
+      if ($shopCursorReviewAndroidOwner -or
+          $retainedBuyCandidateEvidenceOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -1460,6 +1468,7 @@ if ($ProductionLane -ceq 'baseline') {
       foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
         Assert-Coordination (
           $shopCursorReviewAndroidOwner -or
+          $retainedBuyCandidateEvidenceOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }
@@ -1545,6 +1554,42 @@ if ($ProductionLane -ceq 'baseline') {
             $_.ToLowerInvariant()
           }
         )
+        $admissionSubject =
+          'ui(buy-mvp-ticket14-v1-20260902): admit retained evidence owners'
+        $matchingAdmissionCommits = @()
+        foreach ($candidateCommit in $continuationFeatureCommits) {
+          $candidateSubject = @(& git -C $root show -s --format=%s `
+              $candidateCommit)
+          Assert-Coordination (
+            $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+          ) 'retained-evidence admission subject read failed.'
+          if ([string]$candidateSubject[0] -ceq $admissionSubject) {
+            $matchingAdmissionCommits += [string]$candidateCommit
+          }
+        }
+        Assert-Coordination ($matchingAdmissionCommits.Count -le 1) `
+          'retained-evidence admission commit is duplicated.'
+        if ($matchingAdmissionCommits.Count -eq 1) {
+          $admissionCommit = [string]$matchingAdmissionCommits[0]
+          $admissionParent = @(& git -C $root show -s --format=%P `
+              $admissionCommit)
+          Assert-Coordination (
+            $LASTEXITCODE -eq 0 -and $admissionParent.Count -eq 1 -and
+            [string]$admissionParent[0] -ceq $coordinationCommit
+          ) 'retained-evidence admission parent changed.'
+          $admissionOwners = @(& git -C $root diff-tree --no-commit-id `
+              --name-only -r $admissionCommit)
+          Assert-Coordination (
+            $LASTEXITCODE -eq 0 -and $admissionOwners.Count -eq 1 -and
+            [string]$admissionOwners[0] -ceq
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+          ) 'retained-evidence admission changed an unexpected owner.'
+          & git -C $root diff --quiet $admissionCommit -- `
+            'config/codex-subagent-coordination-policy.json' `
+            'scripts/check-codex-subagent-coordination-policy.ps1'
+          Assert-Coordination ($LASTEXITCODE -eq 0) `
+            'retained-evidence coordination owners changed after admission.'
+        }
       }
     }
     if ($isCoordinationBootstrap) {
