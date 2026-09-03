@@ -3625,7 +3625,7 @@ Future<void> showBuyV2PartnerCatalogue(
                           Text(
                             'Other stores you may like',
                             style: sheetContext.buyTitle.copyWith(
-                              fontSize: 14,
+                              fontSize: 12.5,
                               height: 1.08,
                             ),
                           ),
@@ -3633,7 +3633,7 @@ Future<void> showBuyV2PartnerCatalogue(
                           Text(
                             'More stores with relevant products and delivery options',
                             style: sheetContext.buyMeta.copyWith(
-                              fontSize: 9.5,
+                              fontSize: 9,
                               height: 1.08,
                             ),
                           ),

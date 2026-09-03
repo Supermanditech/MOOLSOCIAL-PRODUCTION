@@ -835,14 +835,18 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       }
       return;
     }
+    if (!widget.session.rememberStoreReturnAnchor(product.id)) {
+      widget.session.showNotice(
+        'This store is unavailable right now. Your products are unchanged.',
+      );
+      return;
+    }
+    unawaited(_openStoreQuestionRoute(product));
+  }
+
+  Future<void> _openStoreQuestionRoute(BuyV2Product product) async {
     try {
-      if (!widget.session.rememberStoreReturnAnchor(product.id)) {
-        widget.session.showNotice(
-          'This store is unavailable right now. Your products are unchanged.',
-        );
-        return;
-      }
-      context.push(
+      await context.push(
         const BuyV2ChatRouteAdapter().storeQuestionLocationFor(anchor: product),
       );
     } on ArgumentError {
@@ -850,7 +854,15 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       widget.session.showNotice(
         'Store Chat is unavailable right now. Your products are unchanged.',
       );
+      return;
     }
+    if (!mounted) return;
+    final anchorId = widget.session.takeStoreReturnAnchor(
+      routeProductId: product.id,
+    );
+    if (anchorId == null) return;
+    final anchor = widget.session.findProduct(anchorId);
+    if (anchor != null) _openPartnerCatalogue(anchor);
   }
 
   void _openPartnerCatalogue(BuyV2Product product, {bool brandOnly = false}) {

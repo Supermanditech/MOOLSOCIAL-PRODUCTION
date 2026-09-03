@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
@@ -4833,6 +4834,81 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Android Back from store Chat restores the Cart-origin store', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final router = GoRouter(
+      initialLocation: '/buy',
+      routes: [
+        GoRoute(
+          path: '/buy',
+          builder: (context, state) => BuyV2Screen(session: session),
+        ),
+        GoRoute(
+          path: '/app/chat/thread/:threadId',
+          builder: (context, state) => const Scaffold(
+            key: ValueKey('store-chat-route'),
+            body: Text('Conversation'),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      MaterialApp.router(theme: MoolTheme.light(), routerConfig: router),
+    );
+    await tester.pumpAndSettle();
+
+    expect(session.openProduct('s-eggs'), isTrue);
+    await tester.pumpAndSettle();
+    final storeAction = find.byKey(
+      const ValueKey('buy-shop-seller-action-s-eggs'),
+    );
+    await tester.scrollUntilVisible(
+      storeAction,
+      220,
+      scrollable: scrollableWithin(const PageStorageKey('buy-product-s-eggs')),
+    );
+    await tester.tap(storeAction);
+    await tester.pumpAndSettle();
+
+    final storeSheet = find.byKey(
+      const ValueKey('buy-shop-seller-sheet-s-eggs'),
+    );
+    final storeScroll = find
+        .descendant(of: storeSheet, matching: find.byType(Scrollable))
+        .first;
+    final addChicken = find.byKey(const ValueKey('buy-add-s-chicken'));
+    await tester.scrollUntilVisible(addChicken, 180, scrollable: storeScroll);
+    await tester.tap(addChicken);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.cart);
+    expect(session.cartScope, BuyV2CartScope.shop);
+
+    await tester.tap(find.byKey(const ValueKey('buy-cart-continue-store')));
+    await tester.pumpAndSettle();
+    expect(storeSheet, findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('buy-public-store-ask')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('store-chat-route')), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('store-chat-route')), findsNothing);
+    expect(storeSheet, findsOneWidget);
+    expect(session.view, BuyV2View.cart);
+    expect(session.cartScope, BuyV2CartScope.shop);
+    expect(session.quantityFor('s-chicken'), 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('single-SKU Shop products expose owner and Visit store wiring', (
     tester,
   ) async {
@@ -5612,7 +5688,7 @@ void main() {
     final relatedTitle = tester.widget<Text>(
       find.text('Other stores you may like'),
     );
-    expect(relatedTitle.style?.fontSize, 14);
+    expect(relatedTitle.style?.fontSize, 12.5);
     expect(
       tester.getTopLeft(find.text('Other stores you may like')).dy -
           tester.getBottomLeft(grid).dy,
