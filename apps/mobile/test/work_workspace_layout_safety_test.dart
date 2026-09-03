@@ -1334,6 +1334,33 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Store Live order decision keeps one clear action row', (
+    tester,
+  ) async {
+    final work = liveStore();
+    seedIncomingOrder(work);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    for (final key in const [
+      'work-activity-order-call',
+      'work-activity-order-chat',
+      'work-activity-order-reject',
+      'work-activity-order-review',
+      'work-activity-order-accept',
+    ]) {
+      expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
+    }
+    expect(find.text('Act now'), findsOneWidget);
+    expect(
+      find.text('Swipe left to reject · Tap to review · Swipe right to accept'),
+      findsNothing,
+    );
+    await tester.tap(find.byKey(const Key('work-activity-order-review')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Store hosts Wholesale and Bulk with one Store navigation owner',
     (tester) async {

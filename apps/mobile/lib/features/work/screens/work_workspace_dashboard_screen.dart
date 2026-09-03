@@ -1962,7 +1962,7 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                   ),
                   child: _LiveCountdownText(
                     deadline: session.workspaceOrderActionDeadline,
-                    fallback: 'Review now',
+                    fallback: 'Act now',
                     style: const TextStyle(
                       color: Color(0xFF9A4A00),
                       fontWeight: FontWeight.w900,
@@ -1992,13 +1992,54 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-            Text(
-              '${session.workspaceOrderSource} · ${session.workspaceOrderPayment} · ${session.workspaceOrderFulfilment}',
-              style: const TextStyle(
-                color: MoolColors.muted,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${session.workspaceOrderSource} · ${session.workspaceOrderPayment} · ${session.workspaceOrderFulfilment}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  key: const Key('work-activity-order-call'),
+                  tooltip: 'Call customer',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    final digits = session.workspaceOrderCustomer.replaceAll(
+                      RegExp(r'[^0-9]'),
+                      '',
+                    );
+                    if (digits.length >= 10) {
+                      unawaited(launchUrl(Uri(scheme: 'tel', path: digits)));
+                    }
+                  },
+                  icon: const Icon(Icons.call_outlined, size: 20),
+                ),
+                IconButton(
+                  key: const Key('work-activity-order-chat'),
+                  tooltip: 'Chat about this order',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => context.push(
+                    Uri(
+                      path: '/app/chat/inbox',
+                      queryParameters: {
+                        'return': GoRouterState.of(context).uri.toString(),
+                        'type': 'business',
+                        'recipient': session.workspaceOrderCustomer,
+                        'draft':
+                            'Question about your ₹${session.workspaceOrderAmount} order',
+                      },
+                    ).toString(),
+                  ),
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
+                ),
+              ],
             ),
             const SizedBox(height: 18),
             Expanded(
@@ -2033,6 +2074,14 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
+                  child: TextButton(
+                    key: const Key('work-activity-order-review'),
+                    onPressed: onReview,
+                    child: const FittedBox(child: Text('View order')),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
                   child: FilledButton.icon(
                     key: const Key('work-activity-order-accept'),
                     onPressed: session.advanceWorkspaceOrder,
@@ -2041,14 +2090,6 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 8),
-            const Center(
-              child: Text(
-                'Swipe left to reject · Tap to review · Swipe right to accept',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: MoolColors.muted, fontSize: 9.5),
-              ),
             ),
           ],
         ),
