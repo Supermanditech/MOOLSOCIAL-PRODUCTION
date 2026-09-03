@@ -2101,6 +2101,7 @@ Future<void> _showWorkspaceInvoiceSheet(
   WorkspaceCustomerInvoice invoice,
 ) async {
   final returnRoute = GoRouterState.of(context).uri.toString();
+  final router = GoRouter.of(context);
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -2179,8 +2180,7 @@ Future<void> _showWorkspaceInvoiceSheet(
                     'MoolSocial Chat',
                   );
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!context.mounted) return;
-                    context.push(
+                    router.push(
                       Uri(
                         path: '/app/chat/inbox',
                         queryParameters: {
@@ -2603,7 +2603,7 @@ class _MoneyActivityCard extends StatelessWidget {
       key: const Key('work-activity-money'),
       onTap: onOpen,
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2620,14 +2620,14 @@ class _MoneyActivityCard extends StatelessWidget {
             const Icon(
               Icons.account_balance_wallet_rounded,
               color: Color(0xFF08765D),
-              size: 64,
+              size: 52,
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
             Text(
               '₹${session.workspaceSettlementBalance}',
               style: const TextStyle(
                 color: MoolColors.navy,
-                fontSize: 42,
+                fontSize: 36,
                 height: 1,
                 fontWeight: FontWeight.w900,
               ),
@@ -8589,7 +8589,7 @@ class _CustomerFact extends StatelessWidget {
             value,
             style: const TextStyle(
               color: MoolColors.navy,
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.w900,
             ),
           ),

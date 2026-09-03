@@ -1538,6 +1538,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(work.workspaceOrderStage, 'Completed');
     expect(find.byKey(const Key('work-invoice-share-chat')), findsOne);
+    await tester.tap(find.byKey(const Key('work-invoice-share-chat')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-pending-draft-card')), findsOne);
+    expect(find.textContaining('INV-'), findsWidgets);
   });
 
   testWidgets('live App order appears in customer statement', (tester) async {
