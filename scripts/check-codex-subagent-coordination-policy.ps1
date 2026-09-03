@@ -562,7 +562,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 58) `
+Assert-Coordination ($continuationBindings.Count -eq 59) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -585,7 +585,8 @@ foreach ($continuationBinding in $continuationBindings) {
       'founder_authorized_2026_08_26',
       'founder_authorized_2026_08_28',
       'founder_authorized_2026_08_29',
-      'founder_authorized_2026_09_02'
+      'founder_authorized_2026_09_02',
+      'founder_authorized_2026_09_03'
     ) -and
     [string]$continuationBinding.lane -cin @('cursor_ui','codex_ui','codex_auth','integration_repair') -and
     [string]$continuationBinding.role -cin @('primary','subagent') -and
