@@ -1494,6 +1494,59 @@ if ($ProductionLane -ceq 'baseline') {
 
   if ($ProductionLane -cne 'integration') {
     $changedOwners = @(Get-ProductionChangedOwners $baseCommit $head)
+    $primaryEvidenceCoordinationOwnerKeys = @()
+    if (
+      $ProductionLane -ceq 'cursor_ui' -and
+      $ProductionWorkId -ceq 'buy-mvp-ticket14-v1-20260902' -and
+      $ProductionTicketId -ceq 'UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902'
+    ) {
+      $coordinationSubject =
+        'ui(buy-mvp-ticket14-v1-20260902): register retained candidate evidence'
+      $matchingCoordinationCommits = @()
+      $continuationFeatureCommits = @(& git -C $root rev-list --reverse `
+          "$baseCommit..$head")
+      Assert-Coordination ($LASTEXITCODE -eq 0) `
+        'retained-evidence coordination commit inventory failed.'
+      foreach ($candidateCommit in $continuationFeatureCommits) {
+        $candidateSubject = @(& git -C $root show -s --format=%s `
+            $candidateCommit)
+        Assert-Coordination (
+          $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+        ) 'retained-evidence coordination subject read failed.'
+        if ([string]$candidateSubject[0] -ceq $coordinationSubject) {
+          $matchingCoordinationCommits += [string]$candidateCommit
+        }
+      }
+      Assert-Coordination ($matchingCoordinationCommits.Count -le 1) `
+        'retained-evidence coordination commit is duplicated.'
+      if ($matchingCoordinationCommits.Count -eq 1) {
+        $coordinationCommit = [string]$matchingCoordinationCommits[0]
+        $coordinationParent = @(& git -C $root show -s --format=%P `
+            $coordinationCommit)
+        Assert-Coordination (
+          $LASTEXITCODE -eq 0 -and $coordinationParent.Count -eq 1 -and
+          [string]$coordinationParent[0] -ceq
+            'fbc39fb4d6bc5ce3fb3ffd33063c273084634dc5'
+        ) 'retained-evidence coordination parent changed.'
+        $coordinationOwners = @(& git -C $root diff-tree --no-commit-id `
+            --name-only -r $coordinationCommit)
+        Assert-Coordination ($LASTEXITCODE -eq 0) `
+          'retained-evidence coordination owner inventory failed.'
+        $expectedCoordinationOwners = @(
+          'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1'
+        )
+        Assert-Coordination (
+          (@($coordinationOwners | Sort-Object) -join '|') -ceq
+          (@($expectedCoordinationOwners | Sort-Object) -join '|')
+        ) 'retained-evidence coordination changed an unexpected owner.'
+        $primaryEvidenceCoordinationOwnerKeys = @(
+          $expectedCoordinationOwners | ForEach-Object {
+            $_.ToLowerInvariant()
+          }
+        )
+      }
+    }
     if ($isCoordinationBootstrap) {
       $expectedBootstrapOwners = @(
         $selectedContinuationBinding.bootstrapOwners | ForEach-Object {
@@ -1521,9 +1574,12 @@ if ($ProductionLane -ceq 'baseline') {
             $_.ToLowerInvariant()
           }).Contains($changedOwnerKey)
         )
+        $primaryEvidenceCoordinationOwner =
+          $primaryEvidenceCoordinationOwnerKeys.Contains($changedOwnerKey)
         Assert-Coordination (
           $effectiveOwnerKeys.Contains($changedOwnerKey) -or
-          $repairAutomaticOwner
+          $repairAutomaticOwner -or
+          $primaryEvidenceCoordinationOwner
         ) "production feature changed an owner outside its claim: $changedOwner"
       }
     }
