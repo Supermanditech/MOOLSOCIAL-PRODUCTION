@@ -1355,6 +1355,32 @@ void main() {
     expect(tester.getBottomRight(field).dy, lessThanOrEqualTo(safeBottom));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('Store invoice handoff keeps recipient and draft visible', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route:
+          '/app/chat/inbox?type=business&recipient=Rakesh%20%C2%B7%209829012345&draft=INV-100%20%C2%B7%20%E2%82%B9264&return=/app/work/workspace/dashboard',
+      journey: journey,
+      chat: chat,
+    );
+
+    expect(find.byKey(const Key('chat-pending-draft-card')), findsOneWidget);
+    expect(find.text('For Rakesh · 9829012345'), findsOneWidget);
+    expect(find.textContaining('INV-100'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat-pending-draft-find-customer')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-people-search')), findsOneWidget);
+  });
 }
 
 class _PeopleSocialGateway

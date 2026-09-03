@@ -525,11 +525,49 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool prepareRepeatWorkspaceOrder() {
-    final source = workspaceOrders
-        .where((order) => order.quantities.isNotEmpty)
-        .firstOrNull;
+    final source =
+        visibleWorkspaceOrders
+            .where((order) => order.stage == 'Completed')
+            .firstOrNull ??
+        visibleWorkspaceOrders.firstOrNull;
     if (source == null) {
       showError('No previous basket is available for this customer yet.');
+      return false;
+    }
+    final repeatQuantities = Map<String, int>.from(source.quantities);
+    var unavailableLines = 0;
+    if (repeatQuantities.isEmpty) {
+      final lines = source.items
+          .split(RegExp(r'\s+[·,]\s+'))
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty);
+      for (final line in lines) {
+        final quantity =
+            int.tryParse(
+              RegExp(r'×\s*(\d+)').firstMatch(line)?.group(1) ?? '',
+            ) ??
+            1;
+        final words = line
+            .replaceAll(RegExp(r'×\s*\d+'), '')
+            .toLowerCase()
+            .split(RegExp(r'[^a-z0-9]+'))
+            .where((word) => word.length > 2)
+            .toSet();
+        final product = workspaceCatalogueItems.where((item) {
+          final candidate = '${item.brand} ${item.title}'.toLowerCase();
+          return words.isNotEmpty && words.every(candidate.contains);
+        }).firstOrNull;
+        if (product == null || product.stock <= 0 || !product.available) {
+          unavailableLines++;
+          continue;
+        }
+        repeatQuantities[product.id] = quantity.clamp(1, product.stock);
+      }
+    }
+    if (repeatQuantities.isEmpty) {
+      showError(
+        'The previous basket is saved, but its products are not available in your current catalogue.',
+      );
       return false;
     }
     startNewWorkspaceOrder();
@@ -538,7 +576,10 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderNeedsDelivery = source.needsDelivery;
     workspaceOrderCustomer = source.customer;
     workspaceOrderAddress = source.address;
-    workspaceOrderQuantities.addAll(source.quantities);
+    workspaceOrderQuantities.addAll(repeatQuantities);
+    noticeMessage = unavailableLines == 0
+        ? 'Previous basket added. Confirm quantities before completing the sale.'
+        : 'Available products were added. Review the basket before completing the sale.';
     notifyListeners();
     return true;
   }

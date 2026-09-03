@@ -30,6 +30,7 @@ class WorkPageScaffold extends StatelessWidget {
     this.manageSystemBack = true,
     this.hideNavigationWhenKeyboardVisible = false,
     this.navigationOverBody = false,
+    this.resizeToAvoidBottomInset = true,
     super.key,
   });
 
@@ -52,6 +53,7 @@ class WorkPageScaffold extends StatelessWidget {
   final bool manageSystemBack;
   final bool hideNavigationWhenKeyboardVisible;
   final bool navigationOverBody;
+  final bool resizeToAvoidBottomInset;
 
   @override
   Widget build(BuildContext context) {
@@ -212,6 +214,7 @@ class WorkPageScaffold extends StatelessWidget {
         }
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: resizeToAvoidBottomInset,
         extendBody: false,
         appBar: AppBar(
           backgroundColor: MoolColors.canvas,

@@ -1152,7 +1152,9 @@ void main() {
           textScale: 1,
           bottomInset: 34,
         );
-        await tester.tap(find.text('Grow'));
+        await tester.tap(find.byKey(const Key('work-business-drawer')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-business-grow')));
         await tester.pumpAndSettle();
         await expectLater(
           find.byType(Scaffold).first,
@@ -1182,9 +1184,9 @@ void main() {
           textScale: 1,
           bottomInset: 34,
         );
-        await tester.tap(
-          find.byKey(const Key('work-dashboard-public-preview')),
-        );
+        await tester.tap(find.byKey(const Key('work-business-drawer')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-business-storefront')));
         await tester.pumpAndSettle();
         await expectLater(
           find.byType(Scaffold).first,
@@ -1286,6 +1288,13 @@ void main() {
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+      final buyRail = find.byKey(const ValueKey('buy-local-destination-tabs'));
+      expect(buyRail, findsOneWidget);
+      expect(
+        tester.getTopLeft(buyRail).dy,
+        greaterThanOrEqualTo(500),
+        reason: 'The embedded Buy rail stays behind the 300px keyboard.',
+      );
       expect(tester.takeException(), isNull);
 
       tester.view.viewInsets = FakeViewPadding.zero;
@@ -1504,8 +1513,7 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-dashboard-settings')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-dashboard-status-screen')), findsOne);
     await reveal(tester, find.text('Staff and counters'));
     await tester.tap(find.text('Staff and counters'));
     await tester.pumpAndSettle();
@@ -1641,10 +1649,7 @@ void main() {
     expect(find.byKey(const Key('work-local-navigation')), findsOne);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-business-grow')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-grow-destination')), findsOne);
     await tester.tap(find.text('Publish paid work'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-paid-requirement-screen')), findsOne);
@@ -1665,6 +1670,140 @@ void main() {
     expect(find.textContaining('Decision Pending'), findsNothing);
   });
 
+  testWidgets('packing keeps every product above its ready action on OPPO', (
+    tester,
+  ) async {
+    final work = liveStore();
+    seedIncomingOrder(work, stage: 'Preparing');
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    final first = find.byKey(const Key('work-pack-summary-0'));
+    final second = find.byKey(const Key('work-pack-summary-1'));
+    final ready = find.byKey(const Key('work-activity-mark-ready'));
+    expect(first.hitTestable(), findsOneWidget);
+    expect(second.hitTestable(), findsOneWidget);
+    expect(
+      tester.getBottomRight(second).dy,
+      lessThanOrEqualTo(tester.getTopRight(ready).dy),
+    );
+  });
+
+  testWidgets('nested Store operations return to their exact parent', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+    await tester.pumpAndSettle();
+    await reveal(tester, find.text('Delivery area and charges'));
+    await tester.tap(find.text('Delivery area and charges'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-operation-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-dashboard-status-screen')), findsOne);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-business-grow')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Offers'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-operation-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-grow-destination')), findsOne);
+  });
+
+  testWidgets('drafted sale has explicit keep or discard recovery', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-quick-new-sale')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('work-order-customer')),
+      '9829012345',
+    );
+    await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-operation-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-order-discard-dialog')), findsOne);
+    await tester.tap(find.byKey(const Key('work-order-keep-editing')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-order-customer')), findsOne);
+    await tester.tap(find.byKey(const Key('work-operation-back')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-order-discard')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-store-activity-deck')), findsOne);
+    expect(work.workspaceOrderQuantities, isEmpty);
+  });
+
+  testWidgets('Store header and contextual tabs keep full customer labels', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    final searchLabel = tester.widget<Text>(find.text('Search your store'));
+    expect(searchLabel.maxLines, 1);
+    expect(searchLabel.overflow, isNull);
+    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-business-storefront')));
+    await tester.pumpAndSettle();
+    for (final label in const [
+      'Today',
+      'Customers',
+      'Money',
+      'Grow',
+      'Storefront',
+    ]) {
+      expect(find.text(label), findsWidgets, reason: label);
+    }
+    expect(
+      find
+          .byKey(const Key('work-preview-product-oil-fortune-1l'))
+          .hitTestable(),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Workspace product opens exact public Buy product details', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(
+      tester,
+      route:
+          '/app/buy?view=product&product=oil-fortune-1l&workspaceProduct=oil-fortune-1l&return=/app/work/workspace/dashboard',
+      work: work,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Fortune Sunflower Oil'), findsWidgets);
+    expect(find.textContaining('1 L pouch'), findsWidgets);
+    expect(find.text('This product could not be found.'), findsNothing);
+  });
+
+  testWidgets('funded work uses compact named customer fields', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-business-grow')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Publish paid work'));
+    await tester.pumpAndSettle();
+    expect(find.text('Experience or qualification'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Experience or qualification'),
+      findsOneWidget,
+    );
+    semantics.dispose();
+  });
+
   Future<void> captureActivityDeck(
     WidgetTester tester, {
     required WorkSession work,
@@ -1677,7 +1816,7 @@ void main() {
       route: '/app/work/workspace/dashboard',
       work: work,
       viewport: const Size(412, 915),
-      textScale: 1,
+      textScale: 1.4,
       bottomInset: 34,
     );
     if (afterMount != null) await afterMount();
@@ -1685,7 +1824,7 @@ void main() {
     await expectLater(
       target ?? find.byType(Scaffold).first,
       matchesGoldenFile(
-        '../../../artifacts/quality/work-store-atomic-r62-49-local-review-20260903/$fileName',
+        '../../../artifacts/quality/work-store-atomic-r62-50-local-review-20260903/$fileName',
       ),
     );
   }
@@ -1841,6 +1980,30 @@ void main() {
           }).first;
           await tester.tap(edit);
         },
+      );
+    },
+  );
+
+  testWidgets(
+    'founder correction capture - exact Workspace product in Buy',
+    skip: !captureFounderEvidence,
+    (tester) async {
+      final work = liveStore();
+      await mount(
+        tester,
+        route:
+            '/app/buy?view=product&product=oil-fortune-1l&workspaceProduct=oil-fortune-1l&return=/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1.4,
+        bottomInset: 34,
+      );
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(Scaffold).first,
+        matchesGoldenFile(
+          '../../../artifacts/quality/work-store-atomic-r62-50-local-review-20260903/destination-workspace-public-buy-product-412x915.png',
+        ),
       );
     },
   );

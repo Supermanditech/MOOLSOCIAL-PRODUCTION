@@ -49,6 +49,10 @@ class _WorkWorkspaceDashboardScreenState
   int _draftBusyMinutes = 0;
   String _draftReopensAt = '';
   _WorkspaceOperation _operation = _WorkspaceOperation.orders;
+  _WorkspaceControlView _operationReturnView = _WorkspaceControlView.dashboard;
+  _WorkspaceOperation? _operationReturnOperation;
+  Timer? _procurementRevealTimer;
+  bool _procurementReady = false;
 
   @override
   void initState() {
@@ -61,6 +65,7 @@ class _WorkWorkspaceDashboardScreenState
 
   @override
   void dispose() {
+    _procurementRevealTimer?.cancel();
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -383,7 +388,7 @@ class _WorkWorkspaceDashboardScreenState
             ? null
             : _view == _WorkspaceControlView.status
             ? () => unawaited(_leaveSettings())
-            : _showDashboard,
+            : () => unawaited(_navigateFromCounterDraft(_showDashboard)),
       ),
       MoolLocalNavigationAction(
         keyName: 'work-store-orders',
@@ -392,7 +397,11 @@ class _WorkWorkspaceDashboardScreenState
         icon: Icons.receipt_long_outlined,
         onPressed: storeActiveId == 'orders'
             ? null
-            : () => _showOperation(_WorkspaceOperation.orders),
+            : () => unawaited(
+                _navigateFromCounterDraft(
+                  () => _showOperation(_WorkspaceOperation.orders),
+                ),
+              ),
       ),
       MoolLocalNavigationAction(
         keyName: 'work-store-sell',
@@ -416,7 +425,11 @@ class _WorkWorkspaceDashboardScreenState
         icon: Icons.inventory_2_outlined,
         onPressed: storeActiveId == 'stock'
             ? null
-            : () => _showOperation(_WorkspaceOperation.catalogue),
+            : () => unawaited(
+                _navigateFromCounterDraft(
+                  () => _showOperation(_WorkspaceOperation.catalogue),
+                ),
+              ),
       ),
     ];
     final storeRootSurface =
@@ -437,6 +450,9 @@ class _WorkWorkspaceDashboardScreenState
               searchController: _searchController,
               searchFocusNode: _searchFocus,
               onSwitchWorkspace: () => _showWorkspaceSwitcher(context),
+              onBack: _view == _WorkspaceControlView.operation
+                  ? () => unawaited(_leaveOperation())
+                  : null,
               onSearch: _showSearch,
               onSearchChanged: session.updateWorkspaceSearch,
               onCloseSearch: _showDashboard,
@@ -458,12 +474,14 @@ class _WorkWorkspaceDashboardScreenState
         _WorkspaceControlView.dashboard => null,
         _WorkspaceControlView.procurement => _showDashboard,
         _WorkspaceControlView.status => () => unawaited(_leaveSettings()),
+        _WorkspaceControlView.operation => () => unawaited(_leaveOperation()),
         _ => _showDashboard,
       },
       manageSystemBack: _view != _WorkspaceControlView.procurement,
       hideNavigationWhenKeyboardVisible:
           _view == _WorkspaceControlView.procurement,
       navigationOverBody: _view == _WorkspaceControlView.procurement,
+      resizeToAvoidBottomInset: _view != _WorkspaceControlView.procurement,
       bottomAction: bottomAction,
       body: switch (_view) {
         _WorkspaceControlView.dashboard => _StoreControlDashboard(
@@ -546,6 +564,7 @@ class _WorkWorkspaceDashboardScreenState
           session: widget.procurementSession,
           accountIdentity: widget.accountIdentity,
           accountAuthenticated: widget.accountAuthenticated,
+          ready: _procurementReady,
           onExit: _showDashboard,
           onDestinationChanged: _handleProcurementDestinationChanged,
         ),
@@ -592,6 +611,17 @@ class _WorkWorkspaceDashboardScreenState
   void _showOperation(_WorkspaceOperation operation) {
     _searchFocus.unfocus();
     setState(() {
+      if (_view == _WorkspaceControlView.status) {
+        _operationReturnView = _WorkspaceControlView.status;
+        _operationReturnOperation = null;
+      } else if (_view == _WorkspaceControlView.operation &&
+          _isNestedWorkspaceOperation(operation)) {
+        _operationReturnView = _WorkspaceControlView.operation;
+        _operationReturnOperation = _operation;
+      } else {
+        _operationReturnView = _WorkspaceControlView.dashboard;
+        _operationReturnOperation = null;
+      }
       _operation = operation;
       _view = _WorkspaceControlView.operation;
     });
@@ -601,6 +631,81 @@ class _WorkWorkspaceDashboardScreenState
     _searchFocus.unfocus();
     session.clearMessages();
     setState(() => _view = _WorkspaceControlView.procurement);
+    if (_procurementReady || _procurementRevealTimer != null) return;
+    _procurementRevealTimer = Timer(const Duration(milliseconds: 650), () {
+      if (!mounted) return;
+      setState(() => _procurementReady = true);
+      _procurementRevealTimer = null;
+    });
+  }
+
+  bool _isNestedWorkspaceOperation(_WorkspaceOperation operation) => const {
+    _WorkspaceOperation.deliverySettings,
+    _WorkspaceOperation.staff,
+    _WorkspaceOperation.businessRecord,
+    _WorkspaceOperation.offers,
+    _WorkspaceOperation.paidWork,
+  }.contains(operation);
+
+  bool get _hasCounterOrderDraft =>
+      _view == _WorkspaceControlView.operation &&
+      _operation == _WorkspaceOperation.counterOrder &&
+      (session.workspaceOrderCustomer.trim().isNotEmpty ||
+          session.workspaceOrderQuantities.isNotEmpty);
+
+  Future<bool> _confirmDiscardCounterOrder() async {
+    if (!_hasCounterOrderDraft) return true;
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('work-order-discard-dialog'),
+        title: const Text('Leave this sale?'),
+        content: const Text(
+          'The customer and selected products have not been completed.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('work-order-keep-editing'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep editing'),
+          ),
+          FilledButton(
+            key: const Key('work-order-discard'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFB42318),
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Discard sale'),
+          ),
+        ],
+      ),
+    );
+    if (discard == true) session.startNewWorkspaceOrder();
+    return discard == true;
+  }
+
+  Future<void> _leaveOperation() async {
+    if (!await _confirmDiscardCounterOrder() || !mounted) return;
+    if (_operationReturnView == _WorkspaceControlView.status) {
+      _showStatus();
+      return;
+    }
+    final parent = _operationReturnOperation;
+    if (_operationReturnView == _WorkspaceControlView.operation &&
+        parent != null) {
+      setState(() {
+        _operation = parent;
+        _operationReturnView = _WorkspaceControlView.dashboard;
+        _operationReturnOperation = null;
+      });
+      return;
+    }
+    _showDashboard();
+  }
+
+  Future<void> _navigateFromCounterDraft(VoidCallback destination) async {
+    if (!await _confirmDiscardCounterOrder() || !mounted) return;
+    destination();
   }
 
   void _handleProcurementDestinationChanged(BuyV2Destination destination) {
@@ -833,11 +938,12 @@ enum _WorkspaceControlView {
   operation,
 }
 
-class _StoreProcurementSurface extends StatefulWidget {
+class _StoreProcurementSurface extends StatelessWidget {
   const _StoreProcurementSurface({
     required this.session,
     required this.accountIdentity,
     required this.accountAuthenticated,
+    required this.ready,
     required this.onExit,
     required this.onDestinationChanged,
   });
@@ -845,31 +951,9 @@ class _StoreProcurementSurface extends StatefulWidget {
   final BuyV2Session session;
   final AuthenticatedAccountIdentity? accountIdentity;
   final bool accountAuthenticated;
+  final bool ready;
   final VoidCallback onExit;
   final ValueChanged<BuyV2Destination> onDestinationChanged;
-
-  @override
-  State<_StoreProcurementSurface> createState() =>
-      _StoreProcurementSurfaceState();
-}
-
-class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
-  Timer? _revealTimer;
-  bool _ready = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _revealTimer = Timer(const Duration(milliseconds: 1800), () {
-      if (mounted) setState(() => _ready = true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _revealTimer?.cancel();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -877,9 +961,17 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
     final keyboardVisible = media.viewInsets.bottom > 0;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crop = keyboardVisible ? 104.0 : 0.0;
+        final crop = keyboardVisible ? 116.0 : 0.0;
         final buy = MediaQuery(
           data: media.copyWith(
+            size: Size(media.size.width, media.size.height + crop),
+            viewInsets: keyboardVisible ? EdgeInsets.zero : media.viewInsets,
+            viewPadding: keyboardVisible
+                ? media.viewPadding.copyWith(bottom: 0)
+                : media.viewPadding,
+            padding: keyboardVisible
+                ? media.padding.copyWith(bottom: 0)
+                : media.padding,
             textScaler: media.textScaler.clamp(
               minScaleFactor: 1,
               maxScaleFactor: 1,
@@ -887,13 +979,13 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
           ),
           child: BuyV2Screen(
             key: const ValueKey('work-store-procurement-buy-host'),
-            session: widget.session,
-            accountIdentity: widget.accountIdentity,
-            accountAuthenticated: widget.accountAuthenticated,
+            session: session,
+            accountIdentity: accountIdentity,
+            accountAuthenticated: accountAuthenticated,
             initialDestination: BuyV2Destination.wholesale,
             initialCartScope: BuyV2CartScope.wholesale,
-            onExit: widget.onExit,
-            onDestinationChanged: widget.onDestinationChanged,
+            onExit: onExit,
+            onDestinationChanged: onDestinationChanged,
           ),
         );
         return Stack(
@@ -914,7 +1006,7 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
                       ),
                     ),
             ),
-            if (!_ready)
+            if (!ready)
               const Positioned.fill(
                 child: ColoredBox(
                   color: Color(0xFFF8FAFF),
@@ -1038,6 +1130,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
     required this.searchController,
     required this.searchFocusNode,
     required this.onSwitchWorkspace,
+    this.onBack,
     required this.onSearch,
     required this.onSearchChanged,
     required this.onCloseSearch,
@@ -1054,6 +1147,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
   final TextEditingController searchController;
   final FocusNode searchFocusNode;
   final VoidCallback onSwitchWorkspace;
+  final VoidCallback? onBack;
   final VoidCallback onSearch;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onCloseSearch;
@@ -1071,63 +1165,87 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
         key: const Key('work-dashboard-inline-header'),
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Semantics(
-            container: true,
-            button: true,
-            label:
-                '${workspace.name}, ${profile.label}, ${workspace.area}. Change Workspace',
-            child: InkWell(
-              key: const Key('work-dashboard-workspace-switcher'),
-              borderRadius: BorderRadius.circular(8),
-              onTap: onSwitchWorkspace,
-              child: SizedBox(
-                height: 22,
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.storefront_outlined,
-                      size: 15,
+          Row(
+            children: [
+              if (onBack != null) ...[
+                SizedBox(
+                  width: 34,
+                  height: 28,
+                  child: IconButton(
+                    key: const Key('work-operation-back'),
+                    tooltip: 'Back',
+                    onPressed: onBack,
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      size: 20,
                       color: MoolColors.navy,
                     ),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          '${workspace.name} · ${workspace.area}',
-                          maxLines: 1,
-                          style: const TextStyle(
+                  ),
+                ),
+                const SizedBox(width: 3),
+              ],
+              Expanded(
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  label:
+                      '${workspace.name}, ${profile.label}, ${workspace.area}. Change Workspace',
+                  child: InkWell(
+                    key: const Key('work-dashboard-workspace-switcher'),
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: onSwitchWorkspace,
+                    child: SizedBox(
+                      height: 22,
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.storefront_outlined,
+                            size: 15,
                             color: MoolColors.navy,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
                           ),
-                        ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                '${workspace.name} · ${workspace.area}',
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  color: MoolColors.navy,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${session.workspaceStoreState == WorkspaceStoreState.open
+                                ? 'Open'
+                                : session.workspaceStoreState == WorkspaceStoreState.paused
+                                ? 'Paused'
+                                : 'Off'} · ${session.workspaceVisibleToCustomers ? 'Public' : 'Private'}',
+                            style: const TextStyle(
+                              color: MoolColors.muted,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 17,
+                            color: MoolColors.muted,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${session.workspaceStoreState == WorkspaceStoreState.open
-                          ? 'Open'
-                          : session.workspaceStoreState == WorkspaceStoreState.paused
-                          ? 'Paused'
-                          : 'Off'} · ${session.workspaceVisibleToCustomers ? 'Public' : 'Private'}',
-                      style: const TextStyle(
-                        color: MoolColors.muted,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(width: 2),
-                    const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 17,
-                      color: MoolColors.muted,
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
           const SizedBox(height: 3),
           Row(
@@ -1203,21 +1321,27 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                                         ),
                                         const SizedBox(width: 9),
                                         Expanded(
-                                          child: Text(
-                                            searchController.text.trim().isEmpty
-                                                ? 'Search your store'
-                                                : searchController.text.trim(),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color:
-                                                  searchController.text
+                                          child: FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerLeft,
+                                            child: Text(
+                                              searchController.text
                                                       .trim()
                                                       .isEmpty
-                                                  ? MoolColors.muted
-                                                  : MoolColors.navy,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
+                                                  ? 'Search your store'
+                                                  : searchController.text
+                                                        .trim(),
+                                              maxLines: 1,
+                                              style: TextStyle(
+                                                color:
+                                                    searchController.text
+                                                        .trim()
+                                                        .isEmpty
+                                                    ? MoolColors.muted
+                                                    : MoolColors.navy,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -1713,7 +1837,7 @@ class _PackingActivityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       key: const Key('work-activity-packing'),
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1750,12 +1874,12 @@ class _PackingActivityCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
           Text(
             session.workspaceOrderCustomer,
             style: const TextStyle(
               color: MoolColors.ink,
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -1763,7 +1887,7 @@ class _PackingActivityCard extends StatelessWidget {
             'Order ₹${session.workspaceOrderAmount}',
             style: const TextStyle(color: MoolColors.muted),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1772,7 +1896,7 @@ class _PackingActivityCard extends StatelessWidget {
                 minHeight: 8,
                 borderRadius: BorderRadius.circular(999),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 5),
               Text(
                 '${session.workspaceOrderDisplayItemCount} products reserved for packing',
                 style: const TextStyle(
@@ -1782,38 +1906,45 @@ class _PackingActivityCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Expanded(
             child: Material(
               color: const Color(0xFFF6F8FF),
               borderRadius: BorderRadius.circular(18),
               child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 children: [
                   for (final line in session.workspacePackingLines)
-                    CheckboxListTile(
-                      key: Key('work-pack-${line.id}'),
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      value: line.packed,
-                      onChanged: (value) => session.setWorkspacePackingLine(
-                        line.id,
-                        value == true,
-                      ),
-                      title: Text(
-                        line.label,
-                        style: const TextStyle(
-                          color: MoolColors.ink,
-                          fontWeight: FontWeight.w800,
+                    SizedBox(
+                      height: 42,
+                      child: CheckboxListTile(
+                        key: Key('work-pack-${line.id}'),
+                        dense: true,
+                        visualDensity: VisualDensity.compact,
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.trailing,
+                        value: line.packed,
+                        onChanged: (value) => session.setWorkspacePackingLine(
+                          line.id,
+                          value == true,
+                        ),
+                        title: Text(
+                          '${line.label} · ${line.quantity}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: MoolColors.ink,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
-                      subtitle: Text('Quantity ${line.quantity}'),
                     ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
@@ -2047,16 +2178,21 @@ Future<void> _showWorkspaceInvoiceSheet(
                     invoice.id,
                     'MoolSocial Chat',
                   );
-                  context.push(
-                    Uri(
-                      path: '/app/chat/inbox',
-                      queryParameters: {
-                        'return': returnRoute,
-                        'draft':
-                            '${invoice.id} · ₹${invoice.amount} · ${invoice.items}',
-                      },
-                    ).toString(),
-                  );
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!context.mounted) return;
+                    context.push(
+                      Uri(
+                        path: '/app/chat/inbox',
+                        queryParameters: {
+                          'type': 'business',
+                          'return': returnRoute,
+                          'recipient': invoice.customer,
+                          'draft':
+                              '${invoice.id} · ₹${invoice.amount} · ${invoice.items}',
+                        },
+                      ).toString(),
+                    );
+                  });
                 },
                 icon: const Icon(Icons.chat_bubble_outline_rounded),
                 label: const Text('Send in MoolSocial Chat'),
@@ -3959,7 +4095,7 @@ class _StoreContextRail extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       key: const Key('work-store-context-rail'),
-      height: 44,
+      height: 48,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFDCE2F2))),
@@ -4021,14 +4157,18 @@ class _StoreContextButton extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.fade,
-              softWrap: false,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.bottomCenter,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 5),
@@ -4532,34 +4672,44 @@ class _WorkspaceSectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: MoolColors.navy,
-              fontSize: 18,
-              height: 1,
-              fontWeight: FontWeight.w900,
-            ),
+    final largeText = MediaQuery.textScalerOf(context).scale(1) >= 1.2;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stacked = largeText || constraints.maxWidth < 420;
+        final heading = Text(
+          title,
+          style: const TextStyle(
+            color: MoolColors.navy,
+            fontSize: 18,
+            height: 1.05,
+            fontWeight: FontWeight.w900,
           ),
-        ),
-        Flexible(
-          child: Text(
-            detail,
-            textAlign: TextAlign.end,
-            maxLines: 2,
-            style: const TextStyle(
-              color: MoolColors.muted,
-              fontSize: 9.5,
-              height: 1.15,
-              fontWeight: FontWeight.w700,
-            ),
+        );
+        final supporting = Text(
+          detail,
+          textAlign: stacked ? TextAlign.start : TextAlign.end,
+          maxLines: 2,
+          style: const TextStyle(
+            color: MoolColors.muted,
+            fontSize: 9.5,
+            height: 1.2,
+            fontWeight: FontWeight.w700,
           ),
-        ),
-      ],
+        );
+        if (stacked) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [heading, const SizedBox(height: 3), supporting],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(child: heading),
+            Flexible(child: supporting),
+          ],
+        );
+      },
     );
   }
 }
@@ -4840,12 +4990,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     };
     final content = ListView(
       key: Key('work-dashboard-${operation.name}-screen'),
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.md,
-        MoolSpacing.xs,
-        MoolSpacing.md,
-        MoolSpacing.xl,
-      ),
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, MoolSpacing.xl),
       children: [..._operationContent()],
     );
     return Column(
@@ -6204,55 +6349,49 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                     detail: 'Shown in customer search and product details',
                   ),
                   const SizedBox(height: MoolSpacing.xs),
-                  TextField(
-                    key: const Key('work-product-title'),
+                  _AccessibleWorkTextField(
+                    keyName: 'work-product-title',
                     controller: _title,
-                    decoration: const InputDecoration(
-                      labelText: 'Product name',
-                    ),
+                    label: 'Product name',
                   ),
                   const SizedBox(height: MoolSpacing.xs),
                   _ResponsiveFieldPair(
-                    first: TextField(
-                      key: const Key('work-product-brand'),
+                    first: _AccessibleWorkTextField(
+                      keyName: 'work-product-brand',
                       controller: _brand,
-                      decoration: const InputDecoration(
-                        labelText: 'Brand or maker',
-                      ),
+                      label: 'Brand or maker',
                     ),
-                    second: TextField(
-                      key: const Key('work-product-category'),
+                    second: _AccessibleWorkTextField(
+                      keyName: 'work-product-category',
                       controller: _category,
-                      decoration: const InputDecoration(labelText: 'Category'),
+                      label: 'Category',
                     ),
                   ),
                   const SizedBox(height: MoolSpacing.xs),
                   _ResponsiveFieldPair(
-                    first: TextField(
-                      key: const Key('work-product-variant'),
+                    first: _AccessibleWorkTextField(
+                      keyName: 'work-product-variant',
                       controller: _variant,
-                      decoration: const InputDecoration(labelText: 'Variant'),
+                      label: 'Variant',
                     ),
-                    second: TextField(
-                      key: const Key('work-product-pack'),
+                    second: _AccessibleWorkTextField(
+                      keyName: 'work-product-pack',
                       controller: _pack,
-                      decoration: const InputDecoration(
-                        labelText: 'Pack or size',
-                      ),
+                      label: 'Pack or size',
                     ),
                   ),
                   const SizedBox(height: MoolSpacing.xs),
                   _ResponsiveFieldPair(
-                    first: TextField(
-                      key: const Key('work-product-sku'),
+                    first: _AccessibleWorkTextField(
+                      keyName: 'work-product-sku',
                       controller: _sku,
-                      decoration: const InputDecoration(labelText: 'Store SKU'),
+                      label: 'Store SKU',
                     ),
-                    second: TextField(
-                      key: const Key('work-product-barcode'),
+                    second: _AccessibleWorkTextField(
+                      keyName: 'work-product-barcode',
                       controller: _barcode,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Barcode'),
+                      label: 'Barcode',
                     ),
                   ),
                   const SizedBox(height: MoolSpacing.sm),
@@ -6280,49 +6419,39 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                       controller: _mrp,
                       label: 'MRP',
                     ),
-                    second: TextField(
-                      key: const Key('work-product-stock'),
+                    second: _AccessibleWorkTextField(
+                      keyName: 'work-product-stock',
                       controller: _stock,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Available stock',
-                      ),
+                      label: 'Available stock',
                     ),
                   ),
                   const SizedBox(height: MoolSpacing.xs),
-                  TextField(
-                    key: const Key('work-product-delivery'),
+                  _AccessibleWorkTextField(
+                    keyName: 'work-product-delivery',
                     controller: _delivery,
-                    decoration: const InputDecoration(
-                      labelText: 'Customer delivery promise',
-                    ),
+                    label: 'Customer delivery promise',
                   ),
                   const SizedBox(height: MoolSpacing.xs),
                   _ResponsiveFieldPair(
-                    first: TextField(
-                      key: const Key('work-product-unit-price'),
+                    first: _AccessibleWorkTextField(
+                      keyName: 'work-product-unit-price',
                       controller: _unitPrice,
-                      decoration: const InputDecoration(
-                        labelText: 'Unit price label',
-                        hintText: 'For example ₹264/L',
-                      ),
+                      label: 'Unit price label',
+                      hint: 'For example ₹264/L',
                     ),
-                    second: TextField(
-                      key: const Key('work-product-minimum-order'),
+                    second: _AccessibleWorkTextField(
+                      keyName: 'work-product-minimum-order',
                       controller: _minimumOrder,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Minimum order',
-                      ),
+                      label: 'Minimum order',
                     ),
                   ),
                   const SizedBox(height: MoolSpacing.xs),
-                  TextField(
-                    key: const Key('work-product-origin'),
+                  _AccessibleWorkTextField(
+                    keyName: 'work-product-origin',
                     controller: _origin,
-                    decoration: const InputDecoration(
-                      labelText: 'Country of origin',
-                    ),
+                    label: 'Country of origin',
                   ),
                   const SizedBox(height: MoolSpacing.sm),
                   const _WorkspaceSectionLabel(
@@ -6330,39 +6459,31 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                     detail: 'Used on the public Buy product page',
                   ),
                   const SizedBox(height: MoolSpacing.xs),
-                  TextField(
-                    key: const Key('work-product-return-policy'),
+                  _AccessibleWorkTextField(
+                    keyName: 'work-product-return-policy',
                     controller: _returnPolicy,
                     maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: 'Return policy',
-                    ),
+                    label: 'Return policy',
                   ),
                   const SizedBox(height: MoolSpacing.xs),
-                  TextField(
-                    key: const Key('work-product-composition'),
+                  _AccessibleWorkTextField(
+                    keyName: 'work-product-composition',
                     controller: _composition,
                     maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: 'Composition or ingredients',
-                    ),
+                    label: 'Composition or ingredients',
                   ),
                   const SizedBox(height: MoolSpacing.xs),
-                  TextField(
-                    key: const Key('work-product-regulatory'),
+                  _AccessibleWorkTextField(
+                    keyName: 'work-product-regulatory',
                     controller: _regulatory,
                     maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: 'Regulatory or safety information',
-                    ),
+                    label: 'Regulatory or safety information',
                   ),
                   const SizedBox(height: MoolSpacing.xs),
-                  TextField(
-                    key: const Key('work-product-visual-label'),
+                  _AccessibleWorkTextField(
+                    keyName: 'work-product-visual-label',
                     controller: _visualLabel,
-                    decoration: const InputDecoration(
-                      labelText: 'Product image description',
-                    ),
+                    label: 'Product image description',
                   ),
                   SwitchListTile.adaptive(
                     key: const Key('work-product-public'),
@@ -6450,6 +6571,57 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   }
 }
 
+class _AccessibleWorkTextField extends StatelessWidget {
+  const _AccessibleWorkTextField({
+    required this.keyName,
+    required this.controller,
+    required this.label,
+    this.hint,
+    this.keyboardType,
+    this.textInputAction,
+    this.onChanged,
+    this.maxLines = 1,
+    this.prefixIcon,
+    this.prefixText,
+  });
+
+  final String keyName;
+  final TextEditingController controller;
+  final String label;
+  final String? hint;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onChanged;
+  final int? maxLines;
+  final Widget? prefixIcon;
+  final String? prefixText;
+
+  @override
+  Widget build(BuildContext context) {
+    return MergeSemantics(
+      child: Semantics(
+        container: true,
+        label: label,
+        textField: true,
+        child: TextField(
+          key: Key(keyName),
+          controller: controller,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          onChanged: onChanged,
+          maxLines: maxLines,
+          decoration: InputDecoration(
+            label: ExcludeSemantics(child: Text(label)),
+            hintText: hint,
+            prefixIcon: prefixIcon,
+            prefixText: prefixText,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MoneyField extends StatelessWidget {
   const _MoneyField({
     required this.keyName,
@@ -6463,16 +6635,12 @@ class _MoneyField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
+    return _AccessibleWorkTextField(
+      keyName: keyName,
+      controller: controller,
       label: label,
-      textField: true,
-      excludeSemantics: true,
-      child: TextField(
-        key: Key(keyName),
-        controller: controller,
-        keyboardType: TextInputType.number,
-        decoration: InputDecoration(labelText: label, prefixText: '₹ '),
-      ),
+      keyboardType: TextInputType.number,
+      prefixText: '₹ ',
     );
   }
 }
@@ -6505,7 +6673,7 @@ class _CustomerStorePreviewSurface extends StatelessWidget {
         ),
         const SizedBox(height: MoolSpacing.xs),
         Container(
-          padding: const EdgeInsets.all(MoolSpacing.sm),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: MoolColors.navy,
             borderRadius: BorderRadius.circular(MoolRadii.card),
@@ -6529,13 +6697,15 @@ class _CustomerStorePreviewSurface extends StatelessWidget {
                 maxLines: 2,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 20,
+                  fontSize: 18,
                   fontWeight: FontWeight.w900,
                 ),
               ),
               Text(
                 '${session.activeWorkspace?.area ?? ''} · Mool Retail Partner',
-                style: const TextStyle(color: Color(0xFFD9DAFF)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Color(0xFFD9DAFF), fontSize: 11),
               ),
               const SizedBox(height: MoolSpacing.xs),
               Wrap(
@@ -6558,19 +6728,86 @@ class _CustomerStorePreviewSurface extends StatelessWidget {
                     icon: Icons.local_shipping_outlined,
                     label: session.workspaceFulfilmentMode,
                   ),
-                  const _PreviewFactChip(
-                    icon: Icons.fact_check_outlined,
-                    label: 'Business details reviewed',
-                  ),
                 ],
               ),
             ],
           ),
         ),
         const SizedBox(height: MoolSpacing.xs),
+        const _WorkspaceSectionLabel(
+          title: 'Available products',
+          detail: 'Customer price and delivery',
+        ),
+        const SizedBox(height: MoolSpacing.xs),
+        if (products.isEmpty)
+          const WorkCard(
+            keyName: 'work-preview-empty',
+            child: Text(
+              'No public product is available yet. Add stock and enable customer visibility from Catalogue.',
+              style: TextStyle(color: MoolColors.muted, height: 1.3),
+            ),
+          )
+        else
+          for (final product in products) ...[
+            WorkCard(
+              keyName: 'work-preview-product-${product.id}',
+              padding: const EdgeInsets.all(10),
+              onTap: () =>
+                  _showCustomerProductPreview(context, session, product),
+              child: Row(
+                children: [
+                  const CircleAvatar(
+                    backgroundColor: Color(0xFFEAF2FF),
+                    child: Icon(
+                      Icons.shopping_bag_outlined,
+                      color: MoolColors.navy,
+                    ),
+                  ),
+                  const SizedBox(width: MoolSpacing.xs),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: MoolColors.ink,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          '${product.pack} · ${product.deliveryPromise}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: MoolColors.muted,
+                            fontSize: 9.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '₹${product.sellingPrice}',
+                    style: const TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded),
+                ],
+              ),
+            ),
+            const SizedBox(height: MoolSpacing.xs),
+          ],
         WorkCard(
           keyName: 'work-preview-retailer-controls',
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Row(
             children: [
               const Expanded(
@@ -6621,6 +6858,7 @@ class _CustomerStorePreviewSurface extends StatelessWidget {
         WorkCard(
           keyName: 'work-preview-trust',
           color: const Color(0xFFF4F6FF),
+          padding: const EdgeInsets.all(10),
           child: Row(
             children: [
               const CircleAvatar(
@@ -6633,15 +6871,16 @@ class _CustomerStorePreviewSurface extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'MoolSocial business partner',
+                      'MoolSocial partner',
                       style: TextStyle(
                         color: MoolColors.ink,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     Text(
-                      'Ratings and reliability build from completed customer orders.',
+                      'Reliability grows with completed customer orders.',
                       style: TextStyle(color: MoolColors.muted, fontSize: 10),
+                      maxLines: 2,
                     ),
                   ],
                 ),
@@ -6660,72 +6899,6 @@ class _CustomerStorePreviewSurface extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: MoolSpacing.md),
-        const _WorkspaceSectionLabel(
-          title: 'Available products',
-          detail: 'Customer price and delivery',
-        ),
-        const SizedBox(height: MoolSpacing.xs),
-        if (products.isEmpty)
-          const WorkCard(
-            keyName: 'work-preview-empty',
-            child: Text(
-              'No public product is available yet. Add stock and enable customer visibility from Catalogue.',
-              style: TextStyle(color: MoolColors.muted, height: 1.3),
-            ),
-          )
-        else
-          for (final product in products) ...[
-            WorkCard(
-              keyName: 'work-preview-product-${product.id}',
-              onTap: () =>
-                  _showCustomerProductPreview(context, session, product),
-              child: Row(
-                children: [
-                  const CircleAvatar(
-                    backgroundColor: Color(0xFFEAF2FF),
-                    child: Icon(
-                      Icons.shopping_bag_outlined,
-                      color: MoolColors.navy,
-                    ),
-                  ),
-                  const SizedBox(width: MoolSpacing.xs),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          product.title,
-                          style: const TextStyle(
-                            color: MoolColors.ink,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        Text(
-                          '${product.pack} · ${product.deliveryPromise}',
-                          style: const TextStyle(
-                            color: MoolColors.muted,
-                            fontSize: 9.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '₹${product.sellingPrice}',
-                    style: const TextStyle(
-                      color: MoolColors.navy,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right_rounded),
-                ],
-              ),
-            ),
-            const SizedBox(height: MoolSpacing.xs),
-          ],
       ],
     );
   }
@@ -6835,7 +7008,17 @@ Future<void> _showCustomerProductPreview(
             onPressed: session.workspaceVisibleToCustomers && product.published
                 ? () {
                     Navigator.of(sheetContext).pop();
-                    context.push('/app/buy?view=product&product=${product.id}');
+                    context.push(
+                      Uri(
+                        path: '/app/buy',
+                        queryParameters: {
+                          'view': 'product',
+                          'product': product.id,
+                          'workspaceProduct': product.id,
+                          'return': GoRouterState.of(context).uri.toString(),
+                        },
+                      ).toString(),
+                    );
                   }
                 : null,
             icon: const Icon(Icons.shopping_bag_outlined),
@@ -7342,16 +7525,11 @@ class _NumberField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
+    return _AccessibleWorkTextField(
+      keyName: keyName,
+      controller: controller,
       label: label,
-      textField: true,
-      excludeSemantics: true,
-      child: TextField(
-        key: Key(keyName),
-        controller: controller,
-        keyboardType: TextInputType.number,
-        decoration: InputDecoration(labelText: label),
-      ),
+      keyboardType: TextInputType.number,
     );
   }
 }
@@ -8222,6 +8400,8 @@ class _CustomersDestinationSurface extends StatelessWidget {
                                       'return': GoRouterState.of(
                                         context,
                                       ).uri.toString(),
+                                      'type': 'business',
+                                      'recipient': latestOrder.customer,
                                       'draft':
                                           'Customer support for ${latestOrder.customer}',
                                     },
@@ -9101,21 +9281,19 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
           detail: 'Publish a clear Store offer, then promote it if needed',
         ),
         const SizedBox(height: 10),
-        TextField(
-          key: const Key('work-offer-title'),
+        _AccessibleWorkTextField(
+          keyName: 'work-offer-title',
           controller: _title,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(labelText: 'Offer headline'),
+          label: 'Offer headline',
         ),
         const SizedBox(height: 8),
-        TextField(
-          key: const Key('work-offer-detail'),
+        _AccessibleWorkTextField(
+          keyName: 'work-offer-detail',
           controller: _detail,
           onChanged: (_) => setState(() {}),
           maxLines: 2,
-          decoration: const InputDecoration(
-            labelText: 'Customer saving and conditions',
-          ),
+          label: 'Customer saving and terms',
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
@@ -9273,34 +9451,30 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
           detail: 'Candidates see the requirement, eligibility and payment',
         ),
         const SizedBox(height: 10),
-        TextField(
-          key: const Key('work-paid-position'),
+        _AccessibleWorkTextField(
+          keyName: 'work-paid-position',
           controller: _position,
-          decoration: const InputDecoration(
-            labelText: 'Position or assignment',
-          ),
+          label: 'Position or assignment',
         ),
         const SizedBox(height: 8),
-        TextField(
-          key: const Key('work-paid-work'),
+        _AccessibleWorkTextField(
+          keyName: 'work-paid-work',
           controller: _work,
           maxLines: 2,
-          decoration: const InputDecoration(labelText: 'Work to be completed'),
+          label: 'Work to be completed',
         ),
         const SizedBox(height: 8),
-        TextField(
-          key: const Key('work-paid-candidate'),
+        _AccessibleWorkTextField(
+          keyName: 'work-paid-candidate',
           controller: _candidate,
           maxLines: 2,
-          decoration: const InputDecoration(
-            labelText: 'Required qualification or experience',
-          ),
+          label: 'Experience or qualification',
         ),
         const SizedBox(height: 8),
-        TextField(
-          key: const Key('work-paid-location'),
+        _AccessibleWorkTextField(
+          keyName: 'work-paid-location',
           controller: _location,
-          decoration: const InputDecoration(labelText: 'City, area or pincode'),
+          label: 'City, area or pincode',
         ),
         const SizedBox(height: 8),
         _ResponsiveFieldPair(
@@ -9351,10 +9525,13 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
           key: const Key('work-paid-publish'),
           onPressed: widget.session.busy ? null : _publish,
           icon: const Icon(Icons.publish_outlined),
-          label: Text(
-            reference == null
-                ? 'Fund and publish to Earn Today'
-                : 'Published · $reference',
+          label: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              reference == null
+                  ? 'Fund and publish to Earn Today'
+                  : 'Published · $reference',
+            ),
           ),
         ),
       ],
@@ -10122,22 +10299,15 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Semantics(
+                _AccessibleWorkTextField(
+                  keyName: 'work-order-customer',
+                  controller: _customer,
                   label: 'Customer mobile number',
-                  textField: true,
-                  excludeSemantics: true,
-                  child: TextField(
-                    key: const Key('work-order-customer'),
-                    controller: _customer,
-                    keyboardType: TextInputType.phone,
-                    textInputAction: TextInputAction.next,
-                    onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      labelText: 'Customer mobile number',
-                      hintText: 'Number used for order updates',
-                      prefixIcon: Icon(Icons.phone_outlined),
-                    ),
-                  ),
+                  hint: 'Number used for order updates',
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.next,
+                  onChanged: (_) => setState(() {}),
+                  prefixIcon: const Icon(Icons.phone_outlined),
                 ),
               ],
             ),

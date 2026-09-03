@@ -9,6 +9,7 @@ import '../book/screens/doctor_screens.dart';
 import '../book/screens/salon_screens.dart';
 import '../book/screens/task_screens.dart';
 import '../buy/buy_session.dart';
+import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 import '../buy/buy_v2_session.dart';
 import '../buy/screens/buy_basket_screen.dart';
@@ -119,6 +120,88 @@ import 'journey_session.dart';
 import 'journey_services.dart';
 import 'screens/universal_shell.dart';
 
+final class _WorkspacePublicBuyCommerceAdapter implements BuyV2CommerceAdapter {
+  const _WorkspacePublicBuyCommerceAdapter(this.product);
+
+  final BuyV2Product product;
+
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: [product],
+    paymentMethods: const {'UPI'},
+  );
+
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrder(
+    BuyV2OrderPlacementRequest request,
+  ) async => const BuyV2OrderPlacementResult(
+    outcome: BuyV2OrderPlacementOutcome.unavailable,
+    customerMessage:
+        'Ordering is unavailable until the Store catalogue is synchronized. Your Cart is unchanged.',
+  );
+
+  @override
+  Future<BuyV2OrderPlacementResult> reconcileOrder({
+    required String idempotencyKey,
+    required String paymentReference,
+  }) async => const BuyV2OrderPlacementResult(
+    outcome: BuyV2OrderPlacementOutcome.unavailable,
+    customerMessage: 'Payment status is unavailable right now.',
+  );
+
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({
+    required String orderId,
+  }) async => const BuyV2OrderRefreshResult(
+    state: BuyV2CommerceLoadState.unavailable,
+    customerMessage: 'Order updates are unavailable right now.',
+  );
+
+  @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() async =>
+      const BuyV2OrderAlertsResult(
+        available: true,
+        enabled: false,
+        customerMessage: '',
+      );
+
+  @override
+  Future<BuyV2OrderAlertsResult> setOrderAlerts({
+    required bool enabled,
+  }) async => const BuyV2OrderAlertsResult(
+    available: false,
+    enabled: false,
+    customerMessage: 'Order alerts are unavailable right now.',
+  );
+
+  @override
+  Future<BuyV2MutationResult> submitProductReview({
+    required BuyV2Product product,
+    required int rating,
+    required String comment,
+  }) async => const BuyV2MutationResult(
+    accepted: false,
+    customerMessage: 'Reviews are unavailable right now.',
+  );
+
+  @override
+  Future<BuyV2MutationResult> reportProduct({
+    required BuyV2Product product,
+    required String reason,
+  }) async => const BuyV2MutationResult(
+    accepted: false,
+    customerMessage: 'Product reporting is unavailable right now.',
+  );
+
+  @override
+  Future<BuyV2AddressRequestResult> createAddressRequest({
+    String recipient = '',
+  }) async => const BuyV2AddressRequestResult(
+    customerMessage: 'Address requests are unavailable right now.',
+  );
+}
+
 bool journeyRouteRequiresAuthentication(
   Uri uri, {
   required bool allowGuestReady,
@@ -150,6 +233,42 @@ GoRouter createJourneyRouter(
   bool legacyPresentationForTestsOnly = false,
 }) {
   final buyV2Session = BuyV2Session(core: buySession);
+  BuyV2Session? workspacePublicBuySession;
+  String? workspacePublicBuySignature;
+  Future<void>? workspacePublicBuyRestore;
+  BuyV2Session resolveWorkspacePublicBuySession(String productId) {
+    final product = workSession.workspaceCatalogueItems
+        .where((item) => item.id == productId && item.published)
+        .firstOrNull;
+    if (product == null) return buyV2Session;
+    final signature = [
+      product.id,
+      product.sellingPrice,
+      product.stock,
+      product.deliveryPromise,
+      product.publicListing,
+      workSession.activeWorkspace?.name ?? workSession.workName,
+    ].join('|');
+    if (workspacePublicBuySession != null &&
+        workspacePublicBuySignature == signature) {
+      return workspacePublicBuySession!;
+    }
+    workspacePublicBuySession?.dispose();
+    final publicProduct = product.toBuyPublicProduct(
+      storeName: workSession.activeWorkspace?.name ?? workSession.workName,
+      confirmedOn: 'Updated by Store',
+    );
+    final next = BuyV2Session(
+      core: buySession,
+      commerceAdapter: _WorkspacePublicBuyCommerceAdapter(publicProduct),
+      reviewDataEnabled: false,
+    );
+    workspacePublicBuySession = next;
+    workspacePublicBuySignature = signature;
+    workspacePublicBuyRestore = next.restoreCommerce();
+    return next;
+  }
+
   late final GoRouter router;
   VoidCallback buyExit(BuildContext context, GoRouterState state) => () {
     if (context.canPop()) {
@@ -305,25 +424,47 @@ GoRouter createJourneyRouter(
                 state.uri.queryParameters['sub'] ??
                 state.uri.queryParameters['context'],
           );
+          final workspaceProductId =
+              state.uri.queryParameters['workspaceProduct'];
+          final routedBuySession = workspaceProductId == null
+              ? buyV2Session
+              : resolveWorkspacePublicBuySession(workspaceProductId);
+          Widget buildBuyScreen() => BuyV2Screen(
+            key: ValueKey(
+              workspaceProductId == null
+                  ? 'buy-main'
+                  : 'workspace-public-buy-$workspaceProductId',
+            ),
+            session: routedBuySession,
+            accountIdentity: session.accountIdentity,
+            accountAuthenticated: session.isAuthenticated,
+            initialDestination: destination,
+            initialOffersActive: state.uri.queryParameters['sub'] == 'offers',
+            initialView: view,
+            initialCartScope: cartScope,
+            productId: state.uri.queryParameters['product'],
+            orderId: state.uri.queryParameters['order'],
+            recoveryKind: _buyV2Recovery(state.uri.queryParameters['recovery']),
+            onExit: buyExit(context, state),
+            onOpenMool: openMoolFromBuy(context),
+            onDestinationChanged: rememberBuyDestination,
+          );
           return moolMainDestinationPage(
             state: state,
-            child: BuyV2Screen(
-              session: buyV2Session,
-              accountIdentity: session.accountIdentity,
-              accountAuthenticated: session.isAuthenticated,
-              initialDestination: destination,
-              initialOffersActive: state.uri.queryParameters['sub'] == 'offers',
-              initialView: view,
-              initialCartScope: cartScope,
-              productId: state.uri.queryParameters['product'],
-              orderId: state.uri.queryParameters['order'],
-              recoveryKind: _buyV2Recovery(
-                state.uri.queryParameters['recovery'],
-              ),
-              onExit: buyExit(context, state),
-              onOpenMool: openMoolFromBuy(context),
-              onDestinationChanged: rememberBuyDestination,
-            ),
+            child: workspaceProductId == null
+                ? buildBuyScreen()
+                : FutureBuilder<void>(
+                    future: workspacePublicBuyRestore,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState != ConnectionState.done) {
+                        return const ColoredBox(
+                          color: Color(0xFFF8FAFF),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      return buildBuyScreen();
+                    },
+                  ),
           );
         },
       ),
@@ -584,6 +725,7 @@ GoRouter createJourneyRouter(
               initialFilter: filter,
               initialTargetUserId: state.uri.queryParameters['start'],
               initialMessageDraft: state.uri.queryParameters['draft'],
+              initialRecipientQuery: state.uri.queryParameters['recipient'],
               initialSection: switch (state.uri.queryParameters['section']) {
                 'people' => ChatHomeSection.people,
                 'discover' => ChatHomeSection.discover,
@@ -613,6 +755,7 @@ GoRouter createJourneyRouter(
               initialFilter: filter,
               initialTargetUserId: state.uri.queryParameters['start'],
               initialMessageDraft: state.uri.queryParameters['draft'],
+              initialRecipientQuery: state.uri.queryParameters['recipient'],
               initialSection: switch (state.uri.queryParameters['section']) {
                 'people' => ChatHomeSection.people,
                 'discover' => ChatHomeSection.discover,

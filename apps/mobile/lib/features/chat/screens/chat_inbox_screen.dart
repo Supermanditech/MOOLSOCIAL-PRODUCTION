@@ -26,6 +26,7 @@ class ChatInboxScreen extends StatefulWidget {
     this.initialFilter,
     this.initialTargetUserId,
     this.initialMessageDraft,
+    this.initialRecipientQuery,
     this.initialSection = ChatHomeSection.chats,
     super.key,
   });
@@ -38,6 +39,7 @@ class ChatInboxScreen extends StatefulWidget {
   final ChatThreadType? initialFilter;
   final String? initialTargetUserId;
   final String? initialMessageDraft;
+  final String? initialRecipientQuery;
   final ChatHomeSection initialSection;
 
   @override
@@ -66,6 +68,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   void initState() {
     super.initState();
     _section = widget.initialSection;
+    _peopleSearchController.text = widget.initialRecipientQuery?.trim() ?? '';
     _searchFocusNode.addListener(_handleSearchFocusChange);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -102,6 +105,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         oldWidget.initialFilter != widget.initialFilter ||
         oldWidget.initialTargetUserId != widget.initialTargetUserId ||
         oldWidget.initialMessageDraft != widget.initialMessageDraft ||
+        oldWidget.initialRecipientQuery != widget.initialRecipientQuery ||
         oldWidget.initialSection != widget.initialSection ||
         oldWidget.returnRoute != widget.returnRoute) {
       if (oldWidget.initialSection != widget.initialSection) {
@@ -109,6 +113,10 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
         if (_section != ChatHomeSection.chats) {
           unawaited(_ensurePeopleDirectory());
         }
+      }
+      if (oldWidget.initialRecipientQuery != widget.initialRecipientQuery) {
+        _peopleSearchController.text =
+            widget.initialRecipientQuery?.trim() ?? '';
       }
       _queueRouteApplication();
     }
@@ -750,6 +758,61 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 ],
               ),
               const SizedBox(height: MoolSpacing.sm),
+              if ((widget.initialMessageDraft ?? '').trim().isNotEmpty &&
+                  (widget.initialTargetUserId ?? '').trim().isEmpty) ...[
+                Container(
+                  key: const Key('chat-pending-draft-card'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF2F5FF),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFDCE2F2)),
+                  ),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        backgroundColor: MoolColors.navy,
+                        foregroundColor: Colors.white,
+                        child: Icon(Icons.receipt_long_outlined),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              (widget.initialRecipientQuery ?? '')
+                                      .trim()
+                                      .isEmpty
+                                  ? 'Message ready to send'
+                                  : 'For ${widget.initialRecipientQuery!.trim()}',
+                              style: const TextStyle(
+                                color: MoolColors.ink,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            Text(
+                              widget.initialMessageDraft!.trim(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: MoolColors.muted,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        key: const Key('chat-pending-draft-find-customer'),
+                        onPressed: () => _selectSection(ChatHomeSection.people),
+                        child: const Text('Find customer'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.sm),
+              ],
               if (_entryContext.showThreadFilters && !searchActive) ...[
                 _FilterStrip(session: widget.session),
                 const SizedBox(height: MoolSpacing.sm),

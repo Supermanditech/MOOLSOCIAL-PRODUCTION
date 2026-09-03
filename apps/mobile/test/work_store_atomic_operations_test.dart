@@ -295,6 +295,32 @@ void main() {
     ]);
     expect(session.workspaceId, 'workspace-store-2');
   });
+
+  test('repeat basket reconstructs an available legacy purchase summary', () {
+    final session = liveSession();
+    session.addOrUpdateWorkspaceProduct(
+      _product(
+        id: 'oil-1l',
+        sku: 'OIL-1L',
+        title: 'Fortune Sunlite Oil',
+        stock: 8,
+        sellingPrice: 155,
+      ),
+    );
+    session
+      ..workspaceOrderCustomer = 'Rakesh · 98290 12345'
+      ..workspaceOrderItems = 'Fortune Oil × 2 · Aashirvaad Atta × 1'
+      ..workspaceOrderAmount = '1468'
+      ..workspaceOrderStage = 'Completed'
+      ..workspaceOrderPayment = 'Paid online'
+      ..workspaceOrderFulfilment = 'Pickup';
+
+    expect(session.prepareRepeatWorkspaceOrder(), isTrue);
+    expect(session.workspaceOrderSource, 'Repeat order');
+    expect(session.workspaceOrderCustomer, 'Rakesh · 98290 12345');
+    expect(session.workspaceOrderQuantities['oil-1l'], 2);
+    expect(session.noticeMessage, contains('Available products'));
+  });
 }
 
 WorkspaceCatalogueItem _product({
