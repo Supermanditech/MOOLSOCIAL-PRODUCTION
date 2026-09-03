@@ -1790,6 +1790,49 @@ if ($ProductionLane -ceq 'baseline') {
             ) 'r65.4 evidence-slot coordination changed an unexpected owner.'
             $sealedCoordinationCommit = $r65FourSlotCommit
           }
+          $goldenFailureEvidenceSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit retained golden failure evidence'
+          $matchingGoldenFailureEvidenceCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'golden-failure evidence subject read failed.'
+            if ([string]$candidateSubject[0] -ceq
+                $goldenFailureEvidenceSubject) {
+              $matchingGoldenFailureEvidenceCommits +=
+                [string]$candidateCommit
+            }
+          }
+          Assert-Coordination (
+            $matchingGoldenFailureEvidenceCommits.Count -le 1
+          ) 'golden-failure evidence coordination commit is duplicated.'
+          if ($matchingGoldenFailureEvidenceCommits.Count -eq 1) {
+            $goldenFailureEvidenceCommit =
+              [string]$matchingGoldenFailureEvidenceCommits[0]
+            $goldenFailureEvidenceParent = @(& git -C $root show -s `
+                --format=%P $goldenFailureEvidenceCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingR65FourSlotCommits.Count -eq 1 -and
+              $goldenFailureEvidenceParent.Count -eq 1 -and
+              [string]$goldenFailureEvidenceParent[0] -ceq
+                $r65FourSlotCommit
+            ) 'golden-failure evidence coordination parent changed.'
+            $goldenFailureEvidenceOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $goldenFailureEvidenceCommit)
+            $expectedGoldenFailureEvidenceOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($goldenFailureEvidenceOwners | Sort-Object) -join '|') -ceq
+              (@($expectedGoldenFailureEvidenceOwners | Sort-Object) -join '|')
+            ) 'golden-failure evidence coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $goldenFailureEvidenceCommit
+          }
           & git -C $root diff --quiet $sealedCoordinationCommit -- `
             'config/codex-subagent-coordination-policy.json' `
             'scripts/check-codex-subagent-coordination-policy.ps1'
