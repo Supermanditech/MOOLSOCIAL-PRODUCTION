@@ -1564,8 +1564,12 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/work/workspace/dashboard',
-        builder: (context, state) =>
-            WorkWorkspaceDashboardScreen(session: workSession),
+        builder: (context, state) => WorkWorkspaceDashboardScreen(
+          session: workSession,
+          procurementSession: buyV2Session,
+          accountIdentity: session.accountIdentity,
+          accountAuthenticated: session.isAuthenticated,
+        ),
       ),
       GoRoute(
         path: '/app/work/retailer/setup',

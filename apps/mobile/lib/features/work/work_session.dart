@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'work_models.dart';
@@ -14,7 +16,7 @@ class WorkSession extends ChangeNotifier {
 
   final WorkGateway gateway;
   final WorkProofPicker proofPicker;
-
+  bool _disposed = false;
   bool busy = false;
   String? errorMessage;
   String? noticeMessage;
@@ -85,7 +87,12 @@ class WorkSession extends ChangeNotifier {
   bool retailerSetupSaved = false;
   bool initialWorkspaceStateLoaded = false;
   String workspaceSearchQuery = '';
-  bool workspaceAcceptingOrders = true;
+  WorkspaceStoreState workspaceStoreState = WorkspaceStoreState.off;
+  WorkspaceDashboardState workspaceDashboardState =
+      WorkspaceDashboardState.ready;
+  DateTime? workspaceLastUpdatedAt;
+  String workspaceDashboardError = '';
+  bool workspaceAcceptingOrders = false;
   String workspaceFulfilmentMode = 'Delivery and pickup';
   int workspaceBusyMinutes = 0;
   String workspaceReopensAt = '';
@@ -100,19 +107,57 @@ class WorkSession extends ChangeNotifier {
   String workspaceOrderAddress = '';
   String workspaceOrderStage = 'No order';
   int workspaceOrderExtraMinutes = 0;
+  DateTime? workspaceOrderActionDeadline;
+  String workspaceOrderFilter = 'Live';
+  String workspaceCustomerPeriod = 'Month';
+  String workspaceMoneyPeriod = 'Today';
+  DateTime? workspaceCustomerCustomStart;
+  DateTime? workspaceCustomerCustomEnd;
   int workspaceSalesToday = 0;
+  int workspaceCompletedSalesCount = 0;
+  int workspacePlatformAdjustments = 0;
+  int workspaceRefunds = 0;
+  int workspaceTaxWithheld = 0;
   int workspaceSettlementBalance = 0;
   int workspaceSettlementRequested = 0;
+  String? workspaceSettlementReference;
   final List<WorkspaceCatalogueItem> workspaceCatalogueItems = [];
   final Map<String, int> workspaceOrderQuantities = {};
+  final List<WorkspaceOrderRecord> workspaceOrders = [];
+  final Set<String> workspacePackedProductIds = <String>{};
+  final List<WorkspaceCustomerInvoice> workspaceInvoices = [];
+  final List<WorkspaceStoreOffer> workspaceOffers = [];
+  String? currentWorkspaceOrderId;
+  WorkspaceDeliveryAssignment? workspaceDeliveryAssignment;
+  bool workspaceOperationsSyncing = false;
+  String? workspaceOperationsSyncError;
+  bool workspaceHandoverBusy = false;
   final List<WorkspaceActivityEntry> workspaceActivity = [];
   WorkspaceGroupBuy? activeGroupBuy;
+  int workspaceDeliveryRadiusKm = 5;
+  int workspaceDeliveryFee = 30;
+  int workspaceFreeDeliveryAbove = 499;
+  bool workspaceStaffAccessEnabled = false;
+  int workspaceCounterCount = 1;
+  String? workspacePaidRequirementReference;
   final Set<String> dismissedWorkspaceAlerts = <String>{};
 
   int get workspaceOrderItemCount => workspaceOrderQuantities.values.fold(
     0,
     (total, quantity) => total + quantity,
   );
+
+  int get workspaceOrderDisplayItemCount {
+    final selected = workspaceOrderItemCount;
+    if (selected > 0) return selected;
+    final summary = workspaceOrderItems.trim();
+    if (summary.isEmpty) return 0;
+    final quantities = RegExp(
+      r'×\s*(\d+)',
+    ).allMatches(summary).map((match) => int.tryParse(match.group(1)!) ?? 0);
+    final total = quantities.fold(0, (sum, quantity) => sum + quantity);
+    return total > 0 ? total : summary.split(',').length;
+  }
 
   int get workspaceOrderTotal =>
       workspaceCatalogueItems.fold(0, (total, product) {
@@ -131,6 +176,153 @@ class WorkSession extends ChangeNotifier {
       workspaceOrderCustomer.isNotEmpty &&
       workspaceOrderStage != 'Completed' &&
       workspaceOrderStage != 'Cancelled';
+
+  WorkspaceOrderRecord? get currentWorkspaceOrder => workspaceOrders
+      .where((order) => order.id == currentWorkspaceOrderId)
+      .firstOrNull;
+
+  List<WorkspaceOrderRecord> get visibleWorkspaceOrders {
+    if (workspaceOrders.isNotEmpty) {
+      return List<WorkspaceOrderRecord>.unmodifiable(workspaceOrders);
+    }
+    if (workspaceOrderCustomer.trim().isEmpty ||
+        workspaceOrderStage == 'No order') {
+      return const <WorkspaceOrderRecord>[];
+    }
+    return [
+      WorkspaceOrderRecord(
+        id: currentWorkspaceOrderId ?? 'current-store-order',
+        customer: workspaceOrderCustomer,
+        items: workspaceOrderItems,
+        quantities: Map<String, int>.unmodifiable(workspaceOrderQuantities),
+        amount: int.tryParse(workspaceOrderAmount) ?? 0,
+        source: workspaceOrderSource,
+        fulfilment: workspaceOrderFulfilment,
+        payment: workspaceOrderPayment,
+        address: workspaceOrderAddress,
+        stage: workspaceOrderStage,
+        needsDelivery: workspaceOrderNeedsDelivery,
+        createdAt: DateTime.now(),
+        actionDeadline: workspaceOrderActionDeadline,
+      ),
+    ];
+  }
+
+  List<WorkspaceOrderRecord> get filteredWorkspaceCustomerOrders {
+    final now = DateTime.now();
+    final start = switch (workspaceCustomerPeriod) {
+      'Week' => now.subtract(const Duration(days: 7)),
+      'Month' => DateTime(now.year, now.month, 1),
+      'Quarter' => DateTime(now.year, now.month - 2, 1),
+      'Financial year' => DateTime(
+        now.month >= 4 ? now.year : now.year - 1,
+        4,
+        1,
+      ),
+      'Custom' => workspaceCustomerCustomStart,
+      _ => null,
+    };
+    final end = workspaceCustomerPeriod == 'Custom'
+        ? workspaceCustomerCustomEnd
+        : null;
+    return visibleWorkspaceOrders
+        .where((order) {
+          if (start != null && order.createdAt.isBefore(start)) return false;
+          if (end != null &&
+              order.createdAt.isAfter(end.add(const Duration(days: 1)))) {
+            return false;
+          }
+          return true;
+        })
+        .toList(growable: false);
+  }
+
+  List<WorkspaceOrderRecord> get filteredWorkspaceMoneyOrders {
+    final now = DateTime.now();
+    final start = switch (workspaceMoneyPeriod) {
+      'Today' => DateTime(now.year, now.month, now.day),
+      'Week' => now.subtract(const Duration(days: 7)),
+      'Month' => DateTime(now.year, now.month, 1),
+      'Financial year' => DateTime(
+        now.month >= 4 ? now.year : now.year - 1,
+        4,
+        1,
+      ),
+      _ => null,
+    };
+    return visibleWorkspaceOrders
+        .where((order) {
+          return start == null || !order.createdAt.isBefore(start);
+        })
+        .toList(growable: false);
+  }
+
+  List<WorkspacePackingLine> get workspacePackingLines {
+    final order = currentWorkspaceOrder;
+    if (order != null && order.quantities.isNotEmpty) {
+      return order.quantities.entries
+          .map((entry) {
+            final product = workspaceCatalogueItems
+                .where((item) => item.id == entry.key)
+                .firstOrNull;
+            return WorkspacePackingLine(
+              id: entry.key,
+              label: product?.title ?? entry.key,
+              quantity: entry.value,
+              packed: workspacePackedProductIds.contains(entry.key),
+            );
+          })
+          .toList(growable: false);
+    }
+    final parts = workspaceOrderItems
+        .split(RegExp(r'\s+[·,]\s+'))
+        .where((part) => part.trim().isNotEmpty)
+        .toList(growable: false);
+    return [
+      for (var index = 0; index < parts.length; index++)
+        WorkspacePackingLine(
+          id: 'summary-$index',
+          label: parts[index].replaceFirst(RegExp(r'\s*×\s*\d+\s*$'), ''),
+          quantity:
+              int.tryParse(
+                RegExp(r'×\s*(\d+)').firstMatch(parts[index])?.group(1) ?? '',
+              ) ??
+              1,
+          packed: workspacePackedProductIds.contains('summary-$index'),
+        ),
+    ];
+  }
+
+  double get workspacePackingProgress {
+    final lines = workspacePackingLines;
+    if (lines.isEmpty) return 0;
+    return lines.where((line) => line.packed).length / lines.length;
+  }
+
+  bool get workspacePackingComplete =>
+      workspacePackingLines.isNotEmpty &&
+      workspacePackingLines.every((line) => line.packed);
+
+  WorkspaceCustomerInvoice? get latestWorkspaceInvoice =>
+      workspaceInvoices.firstOrNull;
+
+  int get workspaceSettlementEligible =>
+      (workspaceSettlementBalance -
+              workspacePlatformAdjustments -
+              workspaceRefunds -
+              workspaceTaxWithheld)
+          .clamp(0, 1 << 31)
+          .toInt();
+
+  String get workspaceOrderRemainingLabel {
+    final deadline = workspaceOrderActionDeadline;
+    if (deadline == null) return 'Review now';
+    final remaining = deadline.difference(DateTime.now());
+    if (remaining.isNegative) return 'Action due';
+    final minutes = remaining.inMinutes;
+    final seconds = remaining.inSeconds.remainder(60);
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
 
   List<WorkOpportunity> get filteredOpportunities {
     final normalized = searchQuery.trim().toLowerCase();
@@ -310,6 +502,173 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setWorkspaceOrderFilter(String value) {
+    workspaceOrderFilter = value;
+    notifyListeners();
+  }
+
+  void setWorkspaceCustomerPeriod(String value) {
+    workspaceCustomerPeriod = value;
+    notifyListeners();
+  }
+
+  void setWorkspaceCustomerCustomPeriod(DateTime start, DateTime end) {
+    workspaceCustomerPeriod = 'Custom';
+    workspaceCustomerCustomStart = DateTime(start.year, start.month, start.day);
+    workspaceCustomerCustomEnd = DateTime(end.year, end.month, end.day);
+    notifyListeners();
+  }
+
+  void setWorkspaceMoneyPeriod(String value) {
+    workspaceMoneyPeriod = value;
+    notifyListeners();
+  }
+
+  bool prepareRepeatWorkspaceOrder() {
+    final source = workspaceOrders
+        .where((order) => order.quantities.isNotEmpty)
+        .firstOrNull;
+    if (source == null) {
+      showError('No previous basket is available for this customer yet.');
+      return false;
+    }
+    startNewWorkspaceOrder();
+    workspaceOrderSource = 'Repeat order';
+    workspaceOrderFulfilment = source.fulfilment;
+    workspaceOrderNeedsDelivery = source.needsDelivery;
+    workspaceOrderCustomer = source.customer;
+    workspaceOrderAddress = source.address;
+    workspaceOrderQuantities.addAll(source.quantities);
+    notifyListeners();
+    return true;
+  }
+
+  void activateWorkspace(WorkWorkspace workspace) {
+    final current = activeWorkspace;
+    if (current == null || current.id == workspace.id) return;
+    otherWorkspaces.removeWhere((item) => item.id == workspace.id);
+    otherWorkspaces.add(current);
+    activeWorkspace = workspace;
+    workspaceId = workspace.id;
+    workName = workspace.name;
+    workArea = workspace.area;
+    selectedProfile = workProfiles
+        .where((profile) => profile.id == workspace.profileId)
+        .firstOrNull;
+    workspaceSearchQuery = '';
+    clearMessages();
+    notifyListeners();
+  }
+
+  Map<String, Object?> _operationalState() => {
+    'storeState': workspaceStoreState.name,
+    'acceptingOrders': workspaceAcceptingOrders,
+    'visibleToCustomers': workspaceVisibleToCustomers,
+    'fulfilmentMode': workspaceFulfilmentMode,
+    'busyMinutes': workspaceBusyMinutes,
+    'reopensAt': workspaceReopensAt,
+    'catalogue': [
+      for (final product in workspaceCatalogueItems)
+        {
+          'id': product.id,
+          'canonicalId': product.canonicalId,
+          'categoryId': product.categoryId,
+          'brand': product.brand,
+          'title': product.title,
+          'variant': product.variant,
+          'pack': product.pack,
+          'sku': product.sku,
+          'barcode': product.barcode,
+          'purchasePrice': product.purchasePrice,
+          'sellingPrice': product.sellingPrice,
+          'mrp': product.mrp,
+          'stock': product.stock,
+          'deliveryPromise': product.deliveryPromise,
+          'origin': product.origin,
+          'minimumOrder': product.minimumOrder,
+          'returnPolicy': product.returnPolicy,
+          'available': product.available,
+          'publicListing': product.publicListing,
+        },
+    ],
+    'orders': [
+      for (final order in workspaceOrders)
+        {
+          'id': order.id,
+          'customer': order.customer,
+          'items': order.items,
+          'quantities': order.quantities,
+          'amount': order.amount,
+          'source': order.source,
+          'fulfilment': order.fulfilment,
+          'payment': order.payment,
+          'address': order.address,
+          'stage': order.stage,
+          'needsDelivery': order.needsDelivery,
+          'createdAt': order.createdAt.toUtc().toIso8601String(),
+          'actionDeadline': order.actionDeadline?.toUtc().toIso8601String(),
+          'extraMinutes': order.extraMinutes,
+          'stockReserved': order.stockReserved,
+        },
+    ],
+    'invoices': [
+      for (final invoice in workspaceInvoices)
+        {
+          'id': invoice.id,
+          'orderId': invoice.orderId,
+          'customer': invoice.customer,
+          'items': invoice.items,
+          'amount': invoice.amount,
+          'payment': invoice.payment,
+          'issuedAt': invoice.issuedAt.toUtc().toIso8601String(),
+          'sharedChannels': invoice.sharedChannels.toList(growable: false),
+        },
+    ],
+    'deliveryRadiusKm': workspaceDeliveryRadiusKm,
+    'deliveryFee': workspaceDeliveryFee,
+    'freeDeliveryAbove': workspaceFreeDeliveryAbove,
+    'staffAccessEnabled': workspaceStaffAccessEnabled,
+    'counterCount': workspaceCounterCount,
+    'salesToday': workspaceSalesToday,
+    'completedSalesCount': workspaceCompletedSalesCount,
+    'settlementBalance': workspaceSettlementBalance,
+    'settlementRequested': workspaceSettlementRequested,
+  };
+
+  void _persistOperationalState(String reason) {
+    final id = activeWorkspace?.id ?? workspaceId;
+    if (id == null || id.isEmpty) return;
+    workspaceOperationsSyncing = true;
+    workspaceOperationsSyncError = null;
+    notifyListeners();
+    final key = 'OPS-$id-${DateTime.now().microsecondsSinceEpoch}';
+    unawaited(
+      gateway
+          .saveOperationalState(
+            WorkOperationalSnapshot(
+              workspaceId: id,
+              reason: reason,
+              state: _operationalState(),
+              idempotencyKey: key,
+            ),
+          )
+          .then((_) {
+            if (_disposed) return;
+            workspaceOperationsSyncing = false;
+            workspaceOperationsSyncError = null;
+            notifyListeners();
+          })
+          .catchError((Object error) {
+            if (_disposed) return;
+            workspaceOperationsSyncing = false;
+            workspaceOperationsSyncError = error is WorkGatewayException
+                ? error.message
+                : 'Store changes could not sync. Your draft remains on this device.';
+            notifyListeners();
+          }),
+    );
+  }
+
   void saveWorkspaceAvailability({
     required bool acceptingOrders,
     required String fulfilmentMode,
@@ -320,6 +679,12 @@ class WorkSession extends ChangeNotifier {
     workspaceFulfilmentMode = fulfilmentMode;
     workspaceBusyMinutes = busyMinutes;
     workspaceReopensAt = acceptingOrders ? '' : reopensAt;
+    workspaceStoreState = acceptingOrders
+        ? WorkspaceStoreState.open
+        : reopensAt.isEmpty
+        ? WorkspaceStoreState.off
+        : WorkspaceStoreState.paused;
+    workspaceLastUpdatedAt = DateTime.now();
     _recordWorkspaceActivity(
       acceptingOrders
           ? busyMinutes > 0
@@ -332,6 +697,7 @@ class WorkSession extends ChangeNotifier {
           ? 'Store availability updated for customers.'
           : 'Store paused. Customers can see when ordering resumes.',
     );
+    _persistOperationalState('availability');
   }
 
   void dismissWorkspaceAlert(String alertId) {
@@ -339,8 +705,100 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setWorkspacePackingLine(String id, bool packed) {
+    if (packed) {
+      workspacePackedProductIds.add(id);
+    } else {
+      workspacePackedProductIds.remove(id);
+    }
+    notifyListeners();
+  }
+
+  void saveWorkspaceDeliverySettings({
+    required int radiusKm,
+    required int fee,
+    required int freeAbove,
+  }) {
+    workspaceDeliveryRadiusKm = radiusKm.clamp(1, 50);
+    workspaceDeliveryFee = fee.clamp(0, 10000);
+    workspaceFreeDeliveryAbove = freeAbove.clamp(0, 1000000);
+    _recordWorkspaceActivity('Store delivery coverage and charges updated.');
+    showNotice('Delivery area and customer charges updated.');
+    _persistOperationalState('delivery-settings');
+  }
+
+  void saveWorkspaceStaffSettings({
+    required bool staffAccessEnabled,
+    required int counterCount,
+  }) {
+    workspaceStaffAccessEnabled = staffAccessEnabled;
+    workspaceCounterCount = counterCount.clamp(1, 20);
+    _recordWorkspaceActivity('Store counter and staff access updated.');
+    showNotice('Staff and counter settings updated.');
+    _persistOperationalState('staff-settings');
+  }
+
+  WorkspaceCustomerInvoice _createInvoice(WorkspaceOrderRecord order) {
+    final existing = workspaceInvoices
+        .where((invoice) => invoice.orderId == order.id)
+        .firstOrNull;
+    if (existing != null) return existing;
+    final invoice = WorkspaceCustomerInvoice(
+      id: 'INV-${DateTime.now().millisecondsSinceEpoch}',
+      orderId: order.id,
+      customer: order.customer,
+      items: order.items,
+      amount: order.amount,
+      payment: order.payment,
+      issuedAt: DateTime.now(),
+    );
+    workspaceInvoices.insert(0, invoice);
+    _recordWorkspaceActivity(
+      'Invoice ${invoice.id} created for ${invoice.customer}.',
+    );
+    return invoice;
+  }
+
+  WorkspaceCustomerInvoice? completeWorkspaceCounterSale() {
+    var order = _ensureCurrentOrderRecord();
+    if (!order.stockReserved) {
+      if (!_reserveOrderStock(order)) return null;
+      order = order.copyWith(stockReserved: true);
+    }
+    workspaceOrderStage = 'Completed';
+    workspaceOrderActionDeadline = null;
+    final index = workspaceOrders.indexWhere((item) => item.id == order.id);
+    final completed = order.copyWith(stage: 'Completed', stockReserved: true);
+    if (index >= 0) workspaceOrders[index] = completed;
+    workspaceSalesToday += order.amount;
+    workspaceSettlementBalance += order.amount;
+    workspaceCompletedSalesCount++;
+    final invoice = _createInvoice(completed);
+    showNotice('Sale completed. Invoice ${invoice.id} is ready to send.');
+    _persistOperationalState('counter-sale-completed');
+    notifyListeners();
+    return invoice;
+  }
+
+  void markWorkspaceInvoiceShared(String invoiceId, String channel) {
+    final index = workspaceInvoices.indexWhere(
+      (invoice) => invoice.id == invoiceId,
+    );
+    if (index < 0) return;
+    final invoice = workspaceInvoices[index];
+    workspaceInvoices[index] = invoice.copyWith(
+      sharedChannels: {...invoice.sharedChannels, channel},
+    );
+    _recordWorkspaceActivity(
+      '${invoice.id} sent through $channel and added to the customer relationship history.',
+    );
+    showNotice('Invoice ready in $channel. Customer history is updated.');
+    _persistOperationalState('invoice-shared');
+  }
+
   void setWorkspaceVisibility(bool visible) {
     workspaceVisibleToCustomers = visible;
+    workspaceLastUpdatedAt = DateTime.now();
     _recordWorkspaceActivity(
       visible
           ? 'Store published for customer discovery.'
@@ -351,6 +809,24 @@ class WorkSession extends ChangeNotifier {
           ? 'Your store is now visible to customers.'
           : 'Your store is hidden from customer discovery.',
     );
+    _persistOperationalState('visibility');
+  }
+
+  void setWorkspaceDashboardState(
+    WorkspaceDashboardState state, {
+    String error = '',
+    DateTime? lastUpdatedAt,
+  }) {
+    workspaceDashboardState = state;
+    workspaceDashboardError = error.trim();
+    workspaceLastUpdatedAt = lastUpdatedAt ?? workspaceLastUpdatedAt;
+    notifyListeners();
+  }
+
+  void retryWorkspaceDashboard() {
+    workspaceDashboardState = WorkspaceDashboardState.refreshing;
+    workspaceDashboardError = '';
+    notifyListeners();
   }
 
   void saveWorkspaceOrderDraft({
@@ -365,7 +841,10 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderFulfilment = fulfilment;
     workspaceOrderPayment = payment;
     workspaceOrderAddress = address.trim();
-    workspaceOrderNeedsDelivery = fulfilment != 'At the shop';
+    workspaceOrderNeedsDelivery = const {
+      'Mool delivery',
+      'Own delivery',
+    }.contains(fulfilment);
     workspaceOrderItems = workspaceCatalogueItems
         .where((product) => (workspaceOrderQuantities[product.id] ?? 0) > 0)
         .map(
@@ -376,6 +855,37 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderAmount = '$workspaceOrderTotal';
     workspaceOrderStage = 'Confirmed';
     workspaceOrderExtraMinutes = 0;
+    workspacePackedProductIds.clear();
+    workspaceOrderActionDeadline = DateTime.now().add(
+      const Duration(minutes: 3),
+    );
+    final orderId =
+        currentWorkspaceOrderId ??
+        'ORD-${DateTime.now().microsecondsSinceEpoch}';
+    currentWorkspaceOrderId = orderId;
+    final record = WorkspaceOrderRecord(
+      id: orderId,
+      customer: workspaceOrderCustomer,
+      items: workspaceOrderItems,
+      quantities: Map<String, int>.from(workspaceOrderQuantities),
+      amount: workspaceOrderTotal,
+      source: workspaceOrderSource,
+      fulfilment: workspaceOrderFulfilment,
+      payment: workspaceOrderPayment,
+      address: workspaceOrderAddress,
+      stage: workspaceOrderStage,
+      needsDelivery: workspaceOrderNeedsDelivery,
+      createdAt: DateTime.now(),
+      actionDeadline: workspaceOrderActionDeadline,
+    );
+    final existingIndex = workspaceOrders.indexWhere(
+      (order) => order.id == orderId,
+    );
+    if (existingIndex == -1) {
+      workspaceOrders.insert(0, record);
+    } else {
+      workspaceOrders[existingIndex] = record;
+    }
     _recordWorkspaceActivity(
       '$source order saved · $workspaceOrderItemCount products · ₹$workspaceOrderTotal.',
     );
@@ -384,52 +894,371 @@ class WorkSession extends ChangeNotifier {
           ? 'Order saved. Add the delivery address when the customer confirms.'
           : 'Counter order saved for customer confirmation.',
     );
+    _persistOperationalState('order-created');
+  }
+
+  WorkspaceOrderRecord _ensureCurrentOrderRecord() {
+    final existing = currentWorkspaceOrder;
+    if (existing != null) return existing;
+    final id =
+        currentWorkspaceOrderId ??
+        'ORD-${DateTime.now().microsecondsSinceEpoch}';
+    currentWorkspaceOrderId = id;
+    final created = WorkspaceOrderRecord(
+      id: id,
+      customer: workspaceOrderCustomer,
+      items: workspaceOrderItems,
+      quantities: Map<String, int>.from(workspaceOrderQuantities),
+      amount: int.tryParse(workspaceOrderAmount) ?? 0,
+      source: workspaceOrderSource,
+      fulfilment: workspaceOrderFulfilment,
+      payment: workspaceOrderPayment,
+      address: workspaceOrderAddress,
+      stage: workspaceOrderStage,
+      needsDelivery: workspaceOrderNeedsDelivery,
+      createdAt: DateTime.now(),
+      actionDeadline: workspaceOrderActionDeadline,
+    );
+    workspaceOrders.insert(0, created);
+    return created;
+  }
+
+  bool _reserveOrderStock(WorkspaceOrderRecord order) {
+    for (final entry in order.quantities.entries) {
+      final product = workspaceCatalogueItems
+          .where((item) => item.id == entry.key)
+          .firstOrNull;
+      if (product == null || product.stock < entry.value) {
+        showError(
+          product == null
+              ? 'A product in this order is no longer in the catalogue.'
+              : '${product.title} has only ${product.stock} available.',
+        );
+        return false;
+      }
+    }
+    for (final entry in order.quantities.entries) {
+      final index = workspaceCatalogueItems.indexWhere(
+        (item) => item.id == entry.key,
+      );
+      if (index < 0) continue;
+      final product = workspaceCatalogueItems[index];
+      workspaceCatalogueItems[index] = product.copyWith(
+        stock: product.stock - entry.value,
+        available: product.stock - entry.value > 0,
+      );
+    }
+    return true;
+  }
+
+  void _releaseOrderStock(WorkspaceOrderRecord order) {
+    for (final entry in order.quantities.entries) {
+      final index = workspaceCatalogueItems.indexWhere(
+        (item) => item.id == entry.key,
+      );
+      if (index < 0) continue;
+      final product = workspaceCatalogueItems[index];
+      workspaceCatalogueItems[index] = product.copyWith(
+        stock: product.stock + entry.value,
+        available: true,
+      );
+    }
   }
 
   void advanceWorkspaceOrder() {
     final previous = workspaceOrderStage;
+    var order = _ensureCurrentOrderRecord();
+    if (previous == 'Confirmed' && !order.stockReserved) {
+      if (!_reserveOrderStock(order)) return;
+      order = order.copyWith(stockReserved: true);
+    }
+    if (previous == 'Delivery requested') {
+      showError('Confirm the customer delivery OTP before handover.');
+      return;
+    }
+    if (previous == 'Preparing' && !workspacePackingComplete) {
+      showError('Mark every product packed before the order is ready.');
+      return;
+    }
+    if (previous == 'Ready for pickup') {
+      _completeWorkspaceOrder(order, activity: 'Customer pickup confirmed.');
+      return;
+    }
+    if (previous == 'Ready' &&
+        workspaceOrderNeedsDelivery &&
+        workspaceOrderAddress.trim().isEmpty) {
+      showError('Add the confirmed customer delivery address first.');
+      return;
+    }
     workspaceOrderStage = switch (previous) {
       'Confirmed' => 'Preparing',
-      'Preparing' => 'Ready',
+      'Preparing' when workspaceOrderNeedsDelivery => 'Ready',
+      'Preparing' => 'Ready for pickup',
       'Ready' when workspaceOrderNeedsDelivery => 'Delivery requested',
       'Ready' => 'Completed',
-      'Delivery requested' => 'Completed',
+      'Delivery requested' => 'Delivery requested',
       _ => workspaceOrderStage,
     };
+    workspaceOrderActionDeadline = switch (workspaceOrderStage) {
+      'Preparing' => DateTime.now().add(const Duration(minutes: 15)),
+      'Ready' => DateTime.now().add(const Duration(minutes: 10)),
+      'Ready for pickup' => DateTime.now().add(const Duration(minutes: 10)),
+      'Delivery requested' => workspaceDeliveryAssignment?.eta,
+      _ => null,
+    };
+    order = order.copyWith(
+      stage: workspaceOrderStage,
+      actionDeadline: workspaceOrderActionDeadline,
+      stockReserved: order.stockReserved || previous == 'Confirmed',
+    );
+    final orderIndex = workspaceOrders.indexWhere(
+      (item) => item.id == order.id,
+    );
+    if (orderIndex >= 0) workspaceOrders[orderIndex] = order;
     if (workspaceOrderStage == 'Completed' && previous != 'Completed') {
       final amount = int.tryParse(workspaceOrderAmount) ?? 0;
       workspaceSalesToday += amount;
       workspaceSettlementBalance += amount;
+      workspaceCompletedSalesCount++;
     }
     _recordWorkspaceActivity('Order moved to $workspaceOrderStage.');
     showNotice('Order is now ${workspaceOrderStage.toLowerCase()}.');
+    _persistOperationalState('order-$workspaceOrderStage');
+    if (workspaceOrderStage == 'Delivery requested') {
+      unawaited(_requestWorkspaceDeliveryAssignment(order.id));
+    }
   }
 
-  void requestWorkspaceSettlement() {
-    if (workspaceSettlementBalance <= 0) {
+  WorkspaceCustomerInvoice _completeWorkspaceOrder(
+    WorkspaceOrderRecord order, {
+    required String activity,
+  }) {
+    workspaceOrderStage = 'Completed';
+    workspaceOrderActionDeadline = null;
+    final index = workspaceOrders.indexWhere((item) => item.id == order.id);
+    final completed = order.copyWith(stage: 'Completed');
+    if (index >= 0) workspaceOrders[index] = completed;
+    workspaceSalesToday += order.amount;
+    workspaceSettlementBalance += order.amount;
+    workspaceCompletedSalesCount++;
+    final invoice = _createInvoice(completed);
+    _recordWorkspaceActivity(activity);
+    showNotice('Order completed. Invoice ${invoice.id} is ready.');
+    _persistOperationalState('order-completed');
+    notifyListeners();
+    return invoice;
+  }
+
+  Future<void> _requestWorkspaceDeliveryAssignment(String orderId) async {
+    final id = activeWorkspace?.id ?? workspaceId;
+    if (id == null || id.isEmpty) return;
+    workspaceOperationsSyncing = true;
+    notifyListeners();
+    try {
+      final result = await gateway.requestDeliveryAssignment(
+        workspaceId: id,
+        orderId: orderId,
+        address: workspaceOrderAddress,
+        idempotencyKey:
+            'DEL-$id-$orderId-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      workspaceDeliveryAssignment = WorkspaceDeliveryAssignment(
+        orderId: orderId,
+        partnerName: result.partnerName,
+        vehicleLabel: result.vehicleLabel,
+        eta: result.eta,
+        stage: result.stage,
+      );
+      workspaceOrderActionDeadline = result.eta;
+      showNotice('Delivery partner assigned. Track arrival at your store.');
+    } on WorkGatewayException catch (error) {
+      workspaceOperationsSyncError = error.message;
+      showError(error.message);
+    } finally {
+      workspaceOperationsSyncing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> verifyWorkspaceHandover(String otp) async {
+    final id = activeWorkspace?.id ?? workspaceId;
+    final order = currentWorkspaceOrder;
+    if (id == null || id.isEmpty || order == null || workspaceHandoverBusy) {
+      return false;
+    }
+    final normalized = otp.replaceAll(RegExp(r'\D'), '');
+    if (normalized.length != 6) {
+      showError('Enter the 6-digit delivery OTP shared by the customer.');
+      return false;
+    }
+    workspaceHandoverBusy = true;
+    clearMessages();
+    notifyListeners();
+    try {
+      await gateway.verifyOrderHandover(
+        workspaceId: id,
+        orderId: order.id,
+        otp: normalized,
+        idempotencyKey:
+            'HANDOVER-$id-${order.id}-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      _completeWorkspaceOrder(
+        order,
+        activity: 'Order handover confirmed by customer OTP.',
+      );
+      return true;
+    } on WorkGatewayException catch (error) {
+      showError(error.message);
+      return false;
+    } finally {
+      workspaceHandoverBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> requestWorkspaceSettlement({int? amount}) async {
+    final eligible = workspaceSettlementEligible;
+    if (eligible <= 0) {
       showError('No completed-sale balance is available for settlement yet.');
       return;
     }
-    workspaceSettlementRequested += workspaceSettlementBalance;
-    _recordWorkspaceActivity(
-      'Settlement requested for ₹$workspaceSettlementBalance.',
+    final requestedAmount = (amount ?? eligible).clamp(1, eligible).toInt();
+    final id = activeWorkspace?.id ?? workspaceId;
+    if (id == null || id.isEmpty || busy) return;
+    busy = true;
+    clearMessages();
+    notifyListeners();
+    try {
+      final result = await gateway.requestSettlement(
+        workspaceId: id,
+        amount: requestedAmount,
+        idempotencyKey: 'SET-$id-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      final accepted = result.acceptedAmount.clamp(0, requestedAmount).toInt();
+      workspaceSettlementRequested += accepted;
+      workspaceSettlementBalance = (workspaceSettlementBalance - accepted)
+          .clamp(0, 1 << 31)
+          .toInt();
+      workspaceSettlementReference = result.reference;
+      _recordWorkspaceActivity(
+        'Settlement ${result.reference} requested for ₹$accepted.',
+      );
+      showNotice('Settlement request received for processing.');
+      _persistOperationalState('settlement-requested');
+    } on WorkGatewayException catch (error) {
+      showError(error.message);
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  void addWorkspaceOffer({
+    required String title,
+    required String detail,
+    required DateTime validUntil,
+  }) {
+    workspaceOffers.insert(
+      0,
+      WorkspaceStoreOffer(
+        id: 'OFFER-${DateTime.now().millisecondsSinceEpoch}',
+        title: title.trim(),
+        detail: detail.trim(),
+        validUntil: validUntil,
+        active: true,
+      ),
     );
-    workspaceSettlementBalance = 0;
-    showNotice('Settlement request received for processing.');
+    _recordWorkspaceActivity('Store offer published: ${title.trim()}.');
+    showNotice('Offer published for your Store customers.');
+    _persistOperationalState('offer-published');
+  }
+
+  Future<bool> createWorkspacePaidRequirement({
+    required String position,
+    required String work,
+    required String candidateRequirement,
+    required String location,
+    required int peopleNeeded,
+    required int paymentAmount,
+    required String paymentFormat,
+    required DateTime deadline,
+  }) async {
+    final id = activeWorkspace?.id ?? workspaceId;
+    if (id == null || id.isEmpty || busy) return false;
+    busy = true;
+    clearMessages();
+    notifyListeners();
+    try {
+      final reference = await gateway.createPaidRequirement(
+        WorkPaidRequirementSubmission(
+          workspaceId: id,
+          values: {
+            'position': position.trim(),
+            'work': work.trim(),
+            'candidateRequirement': candidateRequirement.trim(),
+            'location': location.trim(),
+            'peopleNeeded': peopleNeeded,
+            'paymentAmount': paymentAmount,
+            'paymentFormat': paymentFormat,
+            'deadline': deadline.toUtc().toIso8601String(),
+            'funded': true,
+            'publisherType': 'workspace',
+          },
+          idempotencyKey:
+              'WORK-REQ-$id-${DateTime.now().microsecondsSinceEpoch}',
+        ),
+      );
+      workspacePaidRequirementReference = reference;
+      _recordWorkspaceActivity('Paid work $reference published for $position.');
+      showNotice('Paid work published to Earn Today.');
+      _persistOperationalState('paid-work-published');
+      return true;
+    } on WorkGatewayException catch (error) {
+      showError(error.message);
+      return false;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
   }
 
   void extendWorkspaceOrder(int minutes) {
     workspaceOrderExtraMinutes += minutes;
+    workspaceOrderActionDeadline =
+        (workspaceOrderActionDeadline ?? DateTime.now()).add(
+          Duration(minutes: minutes),
+        );
+    final order = currentWorkspaceOrder;
+    if (order != null) {
+      final index = workspaceOrders.indexWhere((item) => item.id == order.id);
+      if (index >= 0) {
+        workspaceOrders[index] = order.copyWith(
+          extraMinutes: workspaceOrderExtraMinutes,
+          actionDeadline: workspaceOrderActionDeadline,
+        );
+      }
+    }
     _recordWorkspaceActivity(
       'Customer preparation estimate extended by $minutes minutes.',
     );
     showNotice('Customer preparation estimate updated.');
+    _persistOperationalState('order-time-extended');
   }
 
   void cancelWorkspaceOrder() {
+    final order = _ensureCurrentOrderRecord();
+    if (order.stockReserved) _releaseOrderStock(order);
     workspaceOrderStage = 'Cancelled';
+    final index = workspaceOrders.indexWhere((item) => item.id == order.id);
+    if (index >= 0) {
+      workspaceOrders[index] = order.copyWith(
+        stage: 'Cancelled',
+        stockReserved: false,
+      );
+    }
     _recordWorkspaceActivity('Customer order cancelled.');
     showNotice('Order cancelled. Stock remains available.');
+    _persistOperationalState('order-cancelled');
   }
 
   void startNewWorkspaceOrder() {
@@ -443,6 +1272,10 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderAddress = '';
     workspaceOrderStage = 'No order';
     workspaceOrderExtraMinutes = 0;
+    workspaceOrderActionDeadline = null;
+    workspacePackedProductIds.clear();
+    workspaceDeliveryAssignment = null;
+    currentWorkspaceOrderId = null;
     workspaceOrderQuantities.clear();
     clearMessages();
     notifyListeners();
@@ -471,6 +1304,40 @@ class WorkSession extends ChangeNotifier {
           ? '${product.title} is ready for store publishing.'
           : '${product.title} saved for store use only.',
     );
+    _persistOperationalState('catalogue-updated');
+  }
+
+  void importWorkspaceProducts(List<WorkspaceCatalogueItem> products) {
+    for (final product in products) {
+      final index = workspaceCatalogueItems.indexWhere(
+        (item) => item.id == product.id || item.sku == product.sku,
+      );
+      if (index < 0) {
+        workspaceCatalogueItems.add(product);
+      } else {
+        workspaceCatalogueItems[index] = product;
+      }
+    }
+    retailerProductAdded = workspaceCatalogueItems.isNotEmpty;
+    _recordWorkspaceActivity('${products.length} catalogue products imported.');
+    showNotice('${products.length} products imported into your catalogue.');
+    _persistOperationalState('catalogue-imported');
+  }
+
+  void retireWorkspaceProduct(String productId) {
+    final index = workspaceCatalogueItems.indexWhere(
+      (product) => product.id == productId,
+    );
+    if (index < 0) return;
+    final product = workspaceCatalogueItems[index];
+    workspaceCatalogueItems[index] = product.copyWith(
+      available: false,
+      publicListing: false,
+      stock: 0,
+    );
+    _recordWorkspaceActivity('${product.title} removed from active catalogue.');
+    showNotice('${product.title} is no longer shown to customers.');
+    _persistOperationalState('catalogue-retired');
   }
 
   void adjustWorkspaceOrderQuantity(String productId, int change) {
@@ -507,6 +1374,12 @@ class WorkSession extends ChangeNotifier {
     selectedPincode = pincode?.trim() ?? '';
     clearMessages();
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 
   void clearOpportunityFilters() {
@@ -1316,11 +2189,14 @@ class WorkSession extends ChangeNotifier {
     startNewWorkspaceOrder();
     workspaceOrderSource = source;
     workspaceOrderFulfilment = fulfilment;
-    workspaceOrderNeedsDelivery = fulfilment != 'At the shop';
+    workspaceOrderNeedsDelivery = const {
+      'Mool delivery',
+      'Own delivery',
+    }.contains(fulfilment);
     notifyListeners();
   }
 
-  void startWorkspaceGroupBuy({
+  void applyConfirmedWorkspaceGroupBuyPayment({
     required String productName,
     required String specification,
     required int targetQuantity,
@@ -1331,9 +2207,16 @@ class WorkSession extends ChangeNotifier {
     required int facilitationFee,
     required int deliveryFee,
     required int confirmationAmount,
+    required String paymentReference,
     required String closingLabel,
     required String storeDeliveryLabel,
   }) {
+    if (paymentReference.trim().isEmpty) {
+      showError(
+        'Group Bulk Buying becomes active only after payment confirmation is received.',
+      );
+      return;
+    }
     final storeName = activeWorkspace?.name ?? workName;
     activeGroupBuy = WorkspaceGroupBuy(
       id: 'GB-${DateTime.now().millisecondsSinceEpoch}',
@@ -1354,11 +2237,78 @@ class WorkSession extends ChangeNotifier {
       paymentConfirmed: true,
     );
     _recordWorkspaceActivity(
-      '$storeName confirmed $securedQuantity $unitLabel of $productName for Group Buying.',
+      '$storeName confirmed $securedQuantity $unitLabel of $productName for Group Bulk Buying.',
     );
     showNotice(
-      'Group Buying request confirmed and visible to eligible retailers.',
+      'Payment confirmed. This Group Bulk Buying offer is now visible to eligible retailers.',
     );
+    _persistOperationalState('group-buy-confirmed');
+  }
+
+  Future<bool> createWorkspaceGroupBuy({
+    required String productName,
+    required String specification,
+    required int targetQuantity,
+    required int securedQuantity,
+    required String unitLabel,
+    required int regularUnitPrice,
+    required int groupUnitPrice,
+    required int facilitationFee,
+    required int deliveryFee,
+    required int confirmationAmount,
+    required String closingLabel,
+    required String storeDeliveryLabel,
+  }) async {
+    final id = activeWorkspace?.id ?? workspaceId;
+    if (id == null || id.isEmpty || busy) return false;
+    busy = true;
+    clearMessages();
+    notifyListeners();
+    final values = <String, Object?>{
+      'productName': productName,
+      'specification': specification,
+      'targetQuantity': targetQuantity,
+      'securedQuantity': securedQuantity,
+      'unitLabel': unitLabel,
+      'regularUnitPrice': regularUnitPrice,
+      'groupUnitPrice': groupUnitPrice,
+      'facilitationFee': facilitationFee,
+      'deliveryFee': deliveryFee,
+      'confirmationAmount': confirmationAmount,
+      'closingLabel': closingLabel,
+      'storeDeliveryLabel': storeDeliveryLabel,
+    };
+    try {
+      final reference = await gateway.createGroupBuy(
+        WorkGroupBuySubmission(
+          workspaceId: id,
+          values: values,
+          idempotencyKey: 'GROUP-$id-${DateTime.now().microsecondsSinceEpoch}',
+        ),
+      );
+      applyConfirmedWorkspaceGroupBuyPayment(
+        productName: productName,
+        specification: specification,
+        targetQuantity: targetQuantity,
+        securedQuantity: securedQuantity,
+        unitLabel: unitLabel,
+        regularUnitPrice: regularUnitPrice,
+        groupUnitPrice: groupUnitPrice,
+        facilitationFee: facilitationFee,
+        deliveryFee: deliveryFee,
+        confirmationAmount: confirmationAmount,
+        paymentReference: reference,
+        closingLabel: closingLabel,
+        storeDeliveryLabel: storeDeliveryLabel,
+      );
+      return true;
+    } on WorkGatewayException catch (error) {
+      showError(error.message);
+      return false;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> finishRetailerSetup() async {
@@ -1415,6 +2365,10 @@ class WorkSession extends ChangeNotifier {
         reviewStage = WorkReviewStage.live;
         workspaceVisibleToCustomers = retailerPublishAfterSetup;
         workspaceAcceptingOrders = retailerPublishAfterSetup;
+        workspaceStoreState = retailerPublishAfterSetup
+            ? WorkspaceStoreState.open
+            : WorkspaceStoreState.off;
+        workspaceLastUpdatedAt = DateTime.now();
         _recordWorkspaceActivity(
           retailerPublishAfterSetup
               ? 'Store setup completed and opened for customers.'
@@ -1452,6 +2406,10 @@ class WorkSession extends ChangeNotifier {
           publicListing: true,
         ),
       );
+    workspaceStoreState = WorkspaceStoreState.off;
+    workspaceAcceptingOrders = false;
+    workspaceVisibleToCustomers = false;
+    workspaceLastUpdatedAt = DateTime.now();
     notifyListeners();
   }
 

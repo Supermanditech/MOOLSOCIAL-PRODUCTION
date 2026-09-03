@@ -670,74 +670,85 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           ),
           sliver: SliverList.list(
             children: [
-              ChatSearchFocusMotion(
-                focused: _searchFocusNode.hasFocus,
-                child: TextField(
-                  key: const Key('chat-search-field'),
-                  focusNode: _searchFocusNode,
-                  controller: _searchController,
-                  onChanged: (_) => setState(() {}),
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: (_) => _searchFocusNode.unfocus(),
-                  decoration: InputDecoration(
-                    hintText: 'Search conversations',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    suffixIcon: IconButton(
-                      key: Key(
-                        hasSearchQuery
-                            ? 'chat-clear-search'
-                            : searchFocused
-                            ? 'chat-close-inline-search'
-                            : 'chat-open-inline-search',
-                      ),
-                      tooltip: hasSearchQuery
-                          ? 'Clear conversation search'
-                          : searchFocused
-                          ? 'Close conversation search'
-                          : 'Search conversations',
-                      onPressed: hasSearchQuery
-                          ? _clearConversationSearch
-                          : searchFocused
-                          ? _closeInlineConversationSearch
-                          : _openInlineConversationSearch,
-                      icon: ChatActionIconMotion(
-                        key: const Key('chat-search-action-icon-motion'),
-                        stateKey: hasSearchQuery
-                            ? 'clear'
-                            : searchFocused
-                            ? 'close'
-                            : 'search',
-                        icon: hasSearchQuery
-                            ? Icons.close_rounded
-                            : searchFocused
-                            ? Icons.keyboard_hide_rounded
-                            : Icons.search_rounded,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: ChatSearchFocusMotion(
+                      focused: _searchFocusNode.hasFocus,
+                      child: TextField(
+                        key: const Key('chat-search-field'),
+                        focusNode: _searchFocusNode,
+                        controller: _searchController,
+                        onChanged: (_) => setState(() {}),
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => _searchFocusNode.unfocus(),
+                        decoration: InputDecoration(
+                          hintText: 'Search conversations',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          suffixIcon: IconButton(
+                            key: Key(
+                              hasSearchQuery
+                                  ? 'chat-clear-search'
+                                  : searchFocused
+                                  ? 'chat-close-inline-search'
+                                  : 'chat-open-inline-search',
+                            ),
+                            tooltip: hasSearchQuery
+                                ? 'Clear conversation search'
+                                : searchFocused
+                                ? 'Close conversation search'
+                                : 'Search conversations',
+                            onPressed: hasSearchQuery
+                                ? _clearConversationSearch
+                                : searchFocused
+                                ? _closeInlineConversationSearch
+                                : _openInlineConversationSearch,
+                            icon: ChatActionIconMotion(
+                              key: const Key('chat-search-action-icon-motion'),
+                              stateKey: hasSearchQuery
+                                  ? 'clear'
+                                  : searchFocused
+                                  ? 'close'
+                                  : 'search',
+                              icon: hasSearchQuery
+                                  ? Icons.close_rounded
+                                  : searchFocused
+                                  ? Icons.keyboard_hide_rounded
+                                  : Icons.search_rounded,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
+                  if (threads.isNotEmpty && !searchActive) ...[
+                    const SizedBox(width: MoolSpacing.xs),
+                    Semantics(
+                      button: true,
+                      label: 'Start a conversation',
+                      child: IconButton.filled(
+                        key: const Key('chat-new'),
+                        tooltip: 'Start a conversation',
+                        onPressed: () =>
+                            _selectSection(ChatHomeSection.discover),
+                        style: IconButton.styleFrom(
+                          backgroundColor: MoolColors.navy,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(44, 44),
+                          maximumSize: const Size(44, 44),
+                          padding: EdgeInsets.zero,
+                        ),
+                        icon: const Icon(Icons.person_add_alt_1_rounded),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              if (threads.isNotEmpty && !searchActive) ...[
-                const SizedBox(height: MoolSpacing.xs),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.icon(
-                    key: const Key('chat-new'),
-                    onPressed: () => _selectSection(ChatHomeSection.discover),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: MoolColors.navy,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(44, 44),
-                    ),
-                    icon: const Icon(Icons.person_add_alt_1_rounded),
-                    label: const Text('New conversation'),
-                  ),
-                ),
-              ],
               const SizedBox(height: MoolSpacing.sm),
               if (_entryContext.showThreadFilters && !searchActive) ...[
                 _FilterStrip(session: widget.session),
@@ -816,95 +827,53 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   }
 }
 
-class _FilterStrip extends StatefulWidget {
+class _FilterStrip extends StatelessWidget {
   const _FilterStrip({required this.session});
 
   final ChatSession session;
-
-  @override
-  State<_FilterStrip> createState() => _FilterStripState();
-}
-
-class _FilterStripState extends State<_FilterStrip> {
-  final _anchors = List<GlobalKey>.generate(6, (_) => GlobalKey());
-  String? _revealedSelection;
-
-  String get _selection => widget.session.unreadOnly
-      ? 'Unread'
-      : widget.session.selectedFilter?.label ?? 'All';
-
-  void _scheduleSelectedReveal() {
-    final selection = _selection;
-    if (_revealedSelection == selection) return;
-    _revealedSelection = selection;
-    final index = switch (selection) {
-      'All' => 0,
-      'Unread' => 1,
-      _ =>
-        2 + ChatThreadType.values.indexWhere((type) => type.label == selection),
-    };
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || index < 0 || index >= _anchors.length) return;
-      final anchorContext = _anchors[index].currentContext;
-      if (anchorContext == null) return;
-      unawaited(
-        Scrollable.ensureVisible(
-          anchorContext,
-          alignment: .88,
-          duration: MoolMotion.accessible(context, MoolMotion.quick),
-          curve: MoolMotion.enter,
-        ),
-      );
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     final values = <(String, bool, VoidCallback)>[
       (
         'All',
-        widget.session.selectedFilter == null && !widget.session.unreadOnly,
-        widget.session.chooseAll,
+        session.selectedFilter == null && !session.unreadOnly,
+        session.chooseAll,
       ),
-      ('Unread', widget.session.unreadOnly, widget.session.chooseUnread),
+      ('Unread', session.unreadOnly, session.chooseUnread),
       for (final type in ChatThreadType.values)
         (
           type.label,
-          widget.session.selectedFilter == type,
-          () => widget.session.chooseFilter(type),
+          session.selectedFilter == type,
+          () => session.chooseFilter(type),
         ),
     ];
-    _scheduleSelectedReveal();
-    return SizedBox(
-      height: MoolMetrics.minimumTapTarget,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.only(right: MoolSpacing.sm),
-        itemCount: values.length,
-        separatorBuilder: (_, _) => const SizedBox(width: MoolSpacing.xs),
-        itemBuilder: (context, index) => KeyedSubtree(
-          key: _anchors[index],
-          child: ChatSelectionMotion(
-            selected: values[index].$2,
+    return Wrap(
+      key: const Key('chat-filter-strip'),
+      spacing: MoolSpacing.xs,
+      runSpacing: MoolSpacing.xs,
+      children: [
+        for (final value in values)
+          ChatSelectionMotion(
+            selected: value.$2,
             child: ChoiceChip(
-              key: Key('chat-filter-${values[index].$1.toLowerCase()}'),
-              label: Text(values[index].$1),
-              selected: values[index].$2,
+              key: Key('chat-filter-${value.$1.toLowerCase()}'),
+              label: Text(value.$1),
+              selected: value.$2,
               showCheckmark: true,
-              checkmarkColor: values[index].$2 ? Colors.white : MoolColors.navy,
+              checkmarkColor: value.$2 ? Colors.white : MoolColors.navy,
               selectedColor: MoolColors.navy,
               backgroundColor: const Color(0xFFF0F1F5),
               side: BorderSide.none,
               shape: const StadiumBorder(),
               labelStyle: TextStyle(
-                color: values[index].$2 ? Colors.white : MoolColors.ink,
+                color: value.$2 ? Colors.white : MoolColors.ink,
                 fontWeight: FontWeight.w700,
               ),
-              onSelected: (_) => values[index].$3(),
+              onSelected: (_) => value.$3(),
             ),
           ),
-        ),
-      ),
+      ],
     );
   }
 }
@@ -1192,33 +1161,37 @@ class _EmptyInbox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final compact = keyboardVisible || MediaQuery.sizeOf(context).height < 650;
     return Align(
-      alignment: keyboardVisible ? Alignment.topCenter : Alignment.center,
+      alignment: compact ? Alignment.topCenter : Alignment.center,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          MoolSpacing.xl,
-          keyboardVisible ? MoolSpacing.sm : MoolSpacing.xl,
-          MoolSpacing.xl,
-          MoolSpacing.xl,
+          compact ? MoolSpacing.md : MoolSpacing.xl,
+          compact ? MoolSpacing.xs : MoolSpacing.xl,
+          compact ? MoolSpacing.md : MoolSpacing.xl,
+          compact ? MoolSpacing.sm : MoolSpacing.xl,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.mark_chat_unread_outlined,
-              size: 48,
-              color: MoolColors.muted,
-            ),
-            const SizedBox(height: MoolSpacing.sm),
+            if (!compact) ...[
+              const Icon(
+                Icons.mark_chat_unread_outlined,
+                size: 48,
+                color: MoolColors.muted,
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+            ],
             Text(
               hasQuery
                   ? 'No matching conversations'
                   : socialOnly
                   ? 'No people conversations yet'
                   : 'No conversations yet',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: MoolColors.ink,
-                fontSize: 20,
+                fontSize: compact ? 18 : 20,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -1231,7 +1204,7 @@ class _EmptyInbox extends StatelessWidget {
                   : 'Open a public Feed profile to start a private conversation.',
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: MoolSpacing.md),
+            SizedBox(height: compact ? MoolSpacing.sm : MoolSpacing.md),
             if (hasQuery || socialOnly)
               OutlinedButton(
                 key: Key(hasQuery ? 'chat-reset-search' : 'chat-open-discover'),
@@ -1240,7 +1213,7 @@ class _EmptyInbox extends StatelessWidget {
               )
             else
               Transform.translate(
-                offset: const Offset(0, -MoolSpacing.sm),
+                offset: Offset(0, compact ? 0 : -MoolSpacing.sm),
                 child: Wrap(
                   key: const Key('chat-empty-actions'),
                   alignment: WrapAlignment.center,

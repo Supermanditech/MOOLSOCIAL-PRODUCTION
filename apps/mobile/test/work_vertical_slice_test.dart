@@ -1045,10 +1045,7 @@ void main() {
         workSession: work,
       );
 
-      expect(
-        find.byKey(const Key('work-dashboard-command-centre')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
       await tapVisible(tester, const Key('work-store-stock'));
       expect(
         find.byKey(const Key('work-dashboard-catalogue-screen')),
@@ -1121,7 +1118,19 @@ void main() {
       if (retailer) {
         expect(accountState, findsNothing, reason: profile.id);
         expect(
-          find.byKey(const Key('work-dashboard-store-state')),
+          find
+                  .byKey(const Key('work-store-activity-deck'))
+                  .evaluate()
+                  .isNotEmpty ||
+              find
+                  .byKey(const Key('work-activity-setup'))
+                  .evaluate()
+                  .isNotEmpty,
+          isTrue,
+          reason: profile.id,
+        );
+        expect(
+          find.byKey(const Key('work-dashboard-settings')),
           findsOneWidget,
           reason: profile.id,
         );

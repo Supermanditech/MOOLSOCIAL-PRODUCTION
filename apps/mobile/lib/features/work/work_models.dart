@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../buy/buy_v2_content_contracts.dart';
+import '../buy/buy_v2_models.dart';
+
 enum WorkFeedFilter { forYou, jobs, freelance, campaigns, nearby }
 
 extension WorkFeedFilterLabel on WorkFeedFilter {
@@ -13,6 +16,10 @@ extension WorkFeedFilterLabel on WorkFeedFilter {
 }
 
 enum WorkReviewStage { none, drafting, gstPending, approved, setup, live }
+
+enum WorkspaceStoreState { open, paused, off }
+
+enum WorkspaceDashboardState { ready, refreshing, offline, failed }
 
 class WorkspaceProductCompliance {
   const WorkspaceProductCompliance({
@@ -38,6 +45,158 @@ class WorkspaceProductCompliance {
   final String? bestBeforeOrUseBy;
   final String? fssaiLicenseNumber;
   final String? consumerCare;
+}
+
+class WorkspaceOrderRecord {
+  const WorkspaceOrderRecord({
+    required this.id,
+    required this.customer,
+    required this.items,
+    required this.quantities,
+    required this.amount,
+    required this.source,
+    required this.fulfilment,
+    required this.payment,
+    required this.address,
+    required this.stage,
+    required this.needsDelivery,
+    required this.createdAt,
+    this.actionDeadline,
+    this.extraMinutes = 0,
+    this.stockReserved = false,
+  });
+
+  final String id;
+  final String customer;
+  final String items;
+  final Map<String, int> quantities;
+  final int amount;
+  final String source;
+  final String fulfilment;
+  final String payment;
+  final String address;
+  final String stage;
+  final bool needsDelivery;
+  final DateTime createdAt;
+  final DateTime? actionDeadline;
+  final int extraMinutes;
+  final bool stockReserved;
+
+  WorkspaceOrderRecord copyWith({
+    String? customer,
+    String? items,
+    Map<String, int>? quantities,
+    int? amount,
+    String? source,
+    String? fulfilment,
+    String? payment,
+    String? address,
+    String? stage,
+    bool? needsDelivery,
+    DateTime? actionDeadline,
+    int? extraMinutes,
+    bool? stockReserved,
+  }) => WorkspaceOrderRecord(
+    id: id,
+    customer: customer ?? this.customer,
+    items: items ?? this.items,
+    quantities: Map<String, int>.unmodifiable(quantities ?? this.quantities),
+    amount: amount ?? this.amount,
+    source: source ?? this.source,
+    fulfilment: fulfilment ?? this.fulfilment,
+    payment: payment ?? this.payment,
+    address: address ?? this.address,
+    stage: stage ?? this.stage,
+    needsDelivery: needsDelivery ?? this.needsDelivery,
+    createdAt: createdAt,
+    actionDeadline: actionDeadline ?? this.actionDeadline,
+    extraMinutes: extraMinutes ?? this.extraMinutes,
+    stockReserved: stockReserved ?? this.stockReserved,
+  );
+}
+
+class WorkspaceDeliveryAssignment {
+  const WorkspaceDeliveryAssignment({
+    required this.orderId,
+    required this.partnerName,
+    required this.vehicleLabel,
+    required this.eta,
+    required this.stage,
+  });
+
+  final String orderId;
+  final String partnerName;
+  final String vehicleLabel;
+  final DateTime eta;
+  final String stage;
+}
+
+class WorkspacePackingLine {
+  const WorkspacePackingLine({
+    required this.id,
+    required this.label,
+    required this.quantity,
+    required this.packed,
+  });
+
+  final String id;
+  final String label;
+  final int quantity;
+  final bool packed;
+}
+
+class WorkspaceCustomerInvoice {
+  const WorkspaceCustomerInvoice({
+    required this.id,
+    required this.orderId,
+    required this.customer,
+    required this.items,
+    required this.amount,
+    required this.payment,
+    required this.issuedAt,
+    this.sharedChannels = const <String>{},
+  });
+
+  final String id;
+  final String orderId;
+  final String customer;
+  final String items;
+  final int amount;
+  final String payment;
+  final DateTime issuedAt;
+  final Set<String> sharedChannels;
+
+  bool get needsCustomerHandoff => sharedChannels.isEmpty;
+
+  WorkspaceCustomerInvoice copyWith({Set<String>? sharedChannels}) =>
+      WorkspaceCustomerInvoice(
+        id: id,
+        orderId: orderId,
+        customer: customer,
+        items: items,
+        amount: amount,
+        payment: payment,
+        issuedAt: issuedAt,
+        sharedChannels: Set<String>.unmodifiable(
+          sharedChannels ?? this.sharedChannels,
+        ),
+      );
+}
+
+class WorkspaceStoreOffer {
+  const WorkspaceStoreOffer({
+    required this.id,
+    required this.title,
+    required this.detail,
+    required this.validUntil,
+    required this.active,
+  });
+
+  final String id;
+  final String title;
+  final String detail;
+  final DateTime validUntil;
+  final bool active;
 }
 
 class WorkspaceCatalogueItem {
@@ -99,40 +258,130 @@ class WorkspaceCatalogueItem {
 
   bool get published => publicListing && available && stock > 0;
 
-  WorkspaceCatalogueItem copyWith({
-    int? purchasePrice,
-    int? sellingPrice,
-    String? unitPrice,
-    int? stock,
-    String? deliveryPromise,
-    int? mrp,
-    bool? available,
-    bool? publicListing,
-  }) => WorkspaceCatalogueItem(
+  BuyV2Product toBuyPublicProduct({
+    required String storeName,
+    String badge = 'Store price',
+    String confirmedOn = 'Updated by store',
+  }) => BuyV2Product(
     id: id,
     canonicalId: canonicalId,
+    destination: BuyV2Destination.shop,
     categoryId: categoryId,
     brand: brand,
     title: title,
     variant: variant,
     pack: pack,
-    sku: sku,
-    barcode: barcode,
+    price: sellingPrice,
+    unitPrice: unitPrice,
+    badge: badge,
+    seller: storeName,
+    sellerType: 'Verified retailer',
+    deliveryPromise: deliveryPromise,
+    origin: origin,
+    confirmedOn: confirmedOn,
+    visualLabel: visualLabel,
+    visualKind: visualKind,
+    mrp: mrp,
+    requiresPrescription: requiresPrescription,
+    composition: composition,
+    regulatoryNote: regulatoryNote,
+    minimumOrder: minimumOrder,
+    returnPolicy: returnPolicy,
+    catalogueListing: publicListing,
+  );
+
+  BuyV2ProductFactsSnapshot toBuyPublicFacts({
+    required String storeName,
+    required String sourceId,
+    required bool storeVisible,
+    required bool acceptingOrders,
+    required DateTime observedAt,
+    String? nextOpeningLabel,
+    String? orderCutoffLabel,
+    String? deliveryFeeLabel,
+  }) {
+    final product = toBuyPublicProduct(storeName: storeName);
+    final orderable =
+        storeVisible &&
+        publicListing &&
+        available &&
+        stock > 0 &&
+        acceptingOrders;
+    return BuyV2ProductFactsSnapshot(
+      productId: id,
+      price: sellingPrice,
+      deliveryPromise: deliveryPromise,
+      partner: storeName,
+      orderabilityLabel: orderable
+          ? 'Available to order'
+          : !storeVisible || !publicListing
+          ? 'Not listed for customers'
+          : !available || stock <= 0
+          ? 'Out of stock'
+          : 'Store is not accepting orders',
+      sourceId: sourceId,
+      fulfilmentMode: buyV2CatalogueFulfilmentModeFor(product),
+      storeOperatingState: acceptingOrders
+          ? BuyV2StoreOperatingState.open
+          : BuyV2StoreOperatingState.closed,
+      nextOpeningLabel: nextOpeningLabel,
+      orderCutoffLabel: orderCutoffLabel,
+      deliveryFeeLabel: deliveryFeeLabel,
+      observedAt: observedAt,
+    );
+  }
+
+  WorkspaceCatalogueItem copyWith({
+    String? canonicalId,
+    String? categoryId,
+    String? brand,
+    String? title,
+    String? variant,
+    String? pack,
+    String? sku,
+    String? barcode,
+    int? purchasePrice,
+    int? sellingPrice,
+    String? unitPrice,
+    int? stock,
+    String? deliveryPromise,
+    String? origin,
+    String? visualLabel,
+    String? visualKind,
+    int? mrp,
+    int? minimumOrder,
+    String? returnPolicy,
+    bool? requiresPrescription,
+    String? composition,
+    String? regulatoryNote,
+    WorkspaceProductCompliance? compliance,
+    bool? available,
+    bool? publicListing,
+  }) => WorkspaceCatalogueItem(
+    id: id,
+    canonicalId: canonicalId ?? this.canonicalId,
+    categoryId: categoryId ?? this.categoryId,
+    brand: brand ?? this.brand,
+    title: title ?? this.title,
+    variant: variant ?? this.variant,
+    pack: pack ?? this.pack,
+    sku: sku ?? this.sku,
+    barcode: barcode ?? this.barcode,
     purchasePrice: purchasePrice ?? this.purchasePrice,
     sellingPrice: sellingPrice ?? this.sellingPrice,
     unitPrice: unitPrice ?? this.unitPrice,
     stock: stock ?? this.stock,
     deliveryPromise: deliveryPromise ?? this.deliveryPromise,
-    origin: origin,
-    visualLabel: visualLabel,
-    visualKind: visualKind,
+    origin: origin ?? this.origin,
+    visualLabel: visualLabel ?? this.visualLabel,
+    visualKind: visualKind ?? this.visualKind,
     mrp: mrp ?? this.mrp,
-    minimumOrder: minimumOrder,
-    returnPolicy: returnPolicy,
-    requiresPrescription: requiresPrescription,
-    composition: composition,
-    regulatoryNote: regulatoryNote,
-    compliance: compliance,
+    minimumOrder: minimumOrder ?? this.minimumOrder,
+    returnPolicy: returnPolicy ?? this.returnPolicy,
+    requiresPrescription: requiresPrescription ?? this.requiresPrescription,
+    composition: composition ?? this.composition,
+    regulatoryNote: regulatoryNote ?? this.regulatoryNote,
+    compliance: compliance ?? this.compliance,
     available: available ?? this.available,
     publicListing: publicListing ?? this.publicListing,
   );

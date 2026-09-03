@@ -243,6 +243,68 @@ class WorkReviewResult {
   final String? primaryActivity;
 }
 
+class WorkOperationalSnapshot {
+  const WorkOperationalSnapshot({
+    required this.workspaceId,
+    required this.reason,
+    required this.state,
+    required this.idempotencyKey,
+  });
+
+  final String workspaceId;
+  final String reason;
+  final Map<String, Object?> state;
+  final String idempotencyKey;
+}
+
+class WorkGroupBuySubmission {
+  const WorkGroupBuySubmission({
+    required this.workspaceId,
+    required this.values,
+    required this.idempotencyKey,
+  });
+
+  final String workspaceId;
+  final Map<String, Object?> values;
+  final String idempotencyKey;
+}
+
+class WorkPaidRequirementSubmission {
+  const WorkPaidRequirementSubmission({
+    required this.workspaceId,
+    required this.values,
+    required this.idempotencyKey,
+  });
+
+  final String workspaceId;
+  final Map<String, Object?> values;
+  final String idempotencyKey;
+}
+
+class WorkSettlementResult {
+  const WorkSettlementResult({
+    required this.reference,
+    required this.acceptedAmount,
+  });
+
+  final String reference;
+  final int acceptedAmount;
+}
+
+class WorkDeliveryAssignmentResult {
+  const WorkDeliveryAssignmentResult({
+    required this.partnerName,
+    required this.vehicleLabel,
+    required this.eta,
+    required this.stage,
+  });
+
+  final String partnerName;
+  final String vehicleLabel;
+  final DateTime eta;
+  final String stage;
+}
+
 abstract interface class WorkGateway {
   Future<List<WorkReviewResult>> loadFeed();
   Future<String> apply(String opportunityId);
@@ -271,6 +333,28 @@ abstract interface class WorkGateway {
     required int sellPrice,
     required bool homeDelivery,
     required bool storeCollection,
+  });
+  Future<void> saveOperationalState(WorkOperationalSnapshot snapshot);
+  Future<String> createGroupBuy(WorkGroupBuySubmission submission);
+  Future<String> createPaidRequirement(
+    WorkPaidRequirementSubmission submission,
+  );
+  Future<WorkSettlementResult> requestSettlement({
+    required String workspaceId,
+    required int amount,
+    required String idempotencyKey,
+  });
+  Future<void> verifyOrderHandover({
+    required String workspaceId,
+    required String orderId,
+    required String otp,
+    required String idempotencyKey,
+  });
+  Future<WorkDeliveryAssignmentResult> requestDeliveryAssignment({
+    required String workspaceId,
+    required String orderId,
+    required String address,
+    required String idempotencyKey,
   });
 }
 
@@ -317,6 +401,36 @@ class UnavailableWorkGateway implements WorkGateway {
     required int sellPrice,
     required bool homeDelivery,
     required bool storeCollection,
+  }) async => throw _error;
+  @override
+  Future<void> saveOperationalState(WorkOperationalSnapshot snapshot) async =>
+      throw _error;
+  @override
+  Future<String> createGroupBuy(WorkGroupBuySubmission submission) async =>
+      throw _error;
+  @override
+  Future<String> createPaidRequirement(
+    WorkPaidRequirementSubmission submission,
+  ) async => throw _error;
+  @override
+  Future<WorkSettlementResult> requestSettlement({
+    required String workspaceId,
+    required int amount,
+    required String idempotencyKey,
+  }) async => throw _error;
+  @override
+  Future<void> verifyOrderHandover({
+    required String workspaceId,
+    required String orderId,
+    required String otp,
+    required String idempotencyKey,
+  }) async => throw _error;
+  @override
+  Future<WorkDeliveryAssignmentResult> requestDeliveryAssignment({
+    required String workspaceId,
+    required String orderId,
+    required String address,
+    required String idempotencyKey,
   }) async => throw _error;
   @override
   Future<List<WorkReviewResult>> loadFeed() async => throw _error;
@@ -511,6 +625,102 @@ class AuthenticatedWorkGateway implements WorkGateway {
     'storeCollection': storeCollection,
   }, mutation: true);
 
+  @override
+  Future<void> saveOperationalState(WorkOperationalSnapshot snapshot) =>
+      _invoke('saveWorkspaceOperations', {
+        'workspaceId': snapshot.workspaceId,
+        'reason': snapshot.reason,
+        'state': snapshot.state,
+        'idempotencyKey': snapshot.idempotencyKey,
+      }, mutation: true);
+
+  @override
+  Future<String> createGroupBuy(WorkGroupBuySubmission submission) async =>
+      _requiredString(
+        _map(
+          await _invoke('createWorkspaceGroupBuy', {
+            'workspaceId': submission.workspaceId,
+            'values': submission.values,
+            'idempotencyKey': submission.idempotencyKey,
+          }, mutation: true),
+        )['paymentReference'],
+      );
+
+  @override
+  Future<String> createPaidRequirement(
+    WorkPaidRequirementSubmission submission,
+  ) async => _requiredString(
+    _map(
+      await _invoke('createWorkspacePaidRequirement', {
+        'workspaceId': submission.workspaceId,
+        'values': submission.values,
+        'idempotencyKey': submission.idempotencyKey,
+      }, mutation: true),
+    )['reference'],
+  );
+
+  @override
+  Future<WorkSettlementResult> requestSettlement({
+    required String workspaceId,
+    required int amount,
+    required String idempotencyKey,
+  }) async {
+    final result = _map(
+      await _invoke('requestWorkspaceSettlement', {
+        'workspaceId': workspaceId,
+        'amount': amount,
+        'idempotencyKey': idempotencyKey,
+      }, mutation: true),
+    );
+    return WorkSettlementResult(
+      reference: _requiredString(result['reference']),
+      acceptedAmount: (result['acceptedAmount'] as num?)?.round() ?? amount,
+    );
+  }
+
+  @override
+  Future<void> verifyOrderHandover({
+    required String workspaceId,
+    required String orderId,
+    required String otp,
+    required String idempotencyKey,
+  }) => _invoke('verifyWorkspaceOrderHandover', {
+    'workspaceId': workspaceId,
+    'orderId': orderId,
+    'otp': otp,
+    'idempotencyKey': idempotencyKey,
+  }, mutation: true);
+
+  @override
+  Future<WorkDeliveryAssignmentResult> requestDeliveryAssignment({
+    required String workspaceId,
+    required String orderId,
+    required String address,
+    required String idempotencyKey,
+  }) async {
+    final result = _map(
+      await _invoke('requestWorkspaceDelivery', {
+        'workspaceId': workspaceId,
+        'orderId': orderId,
+        'address': address,
+        'idempotencyKey': idempotencyKey,
+      }, mutation: true),
+    );
+    final eta = DateTime.tryParse(_requiredString(result['eta']));
+    if (eta == null) {
+      throw const WorkGatewayException(
+        'Delivery assignment returned an invalid arrival time.',
+        retryable: true,
+      );
+    }
+    return WorkDeliveryAssignmentResult(
+      partnerName: _requiredString(result['partnerName']),
+      vehicleLabel: _requiredString(result['vehicleLabel']),
+      eta: eta,
+      stage: _requiredString(result['stage']),
+    );
+  }
+
   Future<Object?> _invoke(
     String operation,
     Map<String, Object?> body, {
@@ -575,6 +785,15 @@ class ReviewWorkGateway implements WorkGateway {
   int reviewCalls = 0;
   int gstCalls = 0;
   int setupCalls = 0;
+  int operationalSaveCalls = 0;
+  int groupBuyCalls = 0;
+  int paidRequirementCalls = 0;
+  int settlementCalls = 0;
+  int handoverCalls = 0;
+  int deliveryAssignmentCalls = 0;
+  WorkOperationalSnapshot? lastOperationalSnapshot;
+  WorkGroupBuySubmission? lastGroupBuySubmission;
+  WorkPaidRequirementSubmission? lastPaidRequirementSubmission;
   Future<void> _wait() =>
       Future<void>.delayed(const Duration(milliseconds: 24));
   @override
@@ -753,6 +972,78 @@ class ReviewWorkGateway implements WorkGateway {
         'Shop setup was not completed. Product and fulfilment choices remain saved.',
       );
     }
+  }
+
+  @override
+  Future<void> saveOperationalState(WorkOperationalSnapshot snapshot) async {
+    operationalSaveCalls++;
+    lastOperationalSnapshot = snapshot;
+    await _wait();
+  }
+
+  @override
+  Future<String> createGroupBuy(WorkGroupBuySubmission submission) async {
+    groupBuyCalls++;
+    lastGroupBuySubmission = submission;
+    await _wait();
+    return 'PAY-GROUP-${1200 + groupBuyCalls}';
+  }
+
+  @override
+  Future<String> createPaidRequirement(
+    WorkPaidRequirementSubmission submission,
+  ) async {
+    paidRequirementCalls++;
+    lastPaidRequirementSubmission = submission;
+    await _wait();
+    return 'WORK-REQ-${1200 + paidRequirementCalls}';
+  }
+
+  @override
+  Future<WorkSettlementResult> requestSettlement({
+    required String workspaceId,
+    required int amount,
+    required String idempotencyKey,
+  }) async {
+    settlementCalls++;
+    await _wait();
+    return WorkSettlementResult(
+      reference: 'SET-${1200 + settlementCalls}',
+      acceptedAmount: amount,
+    );
+  }
+
+  @override
+  Future<void> verifyOrderHandover({
+    required String workspaceId,
+    required String orderId,
+    required String otp,
+    required String idempotencyKey,
+  }) async {
+    handoverCalls++;
+    await _wait();
+    if (otp != '123456') {
+      throw const WorkGatewayException(
+        'Enter the 6-digit delivery OTP shared by the customer.',
+      );
+    }
+  }
+
+  @override
+  Future<WorkDeliveryAssignmentResult> requestDeliveryAssignment({
+    required String workspaceId,
+    required String orderId,
+    required String address,
+    required String idempotencyKey,
+  }) async {
+    deliveryAssignmentCalls++;
+    await _wait();
+    return WorkDeliveryAssignmentResult(
+      partnerName: 'Review delivery partner',
+      vehicleLabel: 'Review vehicle',
+      eta: DateTime.now().add(const Duration(minutes: 15)),
+      stage: 'Assigned',
+    );
   }
 }
 

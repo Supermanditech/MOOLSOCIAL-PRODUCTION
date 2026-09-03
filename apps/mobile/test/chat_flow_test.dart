@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/chat/chat_models.dart';
@@ -896,59 +897,88 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Chat keeps a high-contrast add-person action on a native root', (
-    tester,
-  ) async {
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    final journey = await readyJourney();
-    final chat = ChatSession(
-      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
-    );
-    addTearDown(journey.dispose);
-    addTearDown(chat.dispose);
-    await mount(
-      tester,
-      route: '/app/chat/inbox?return=/app/social',
-      journey: journey,
-      chat: chat,
-      size: const Size(360, 800),
-    );
+  testWidgets(
+    'Chat keeps compact add-person and every filter visible at large text',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+      await mount(
+        tester,
+        route: '/app/chat/inbox?return=/app/social',
+        journey: journey,
+        chat: chat,
+        size: const Size(360, 800),
+      );
 
-    final newChat = tester.widget<FilledButton>(
-      find.byKey(const Key('chat-new')),
-    );
-    expect(
-      newChat.style?.backgroundColor?.resolve(const <WidgetState>{}),
-      const Color(0xFF000080),
-    );
-    expect(
-      newChat.style?.foregroundColor?.resolve(const <WidgetState>{}),
-      Colors.white,
-    );
-    expect(
-      find.ancestor(
-        of: find.byKey(const Key('chat-new')),
-        matching: find.byType(CustomScrollView),
-      ),
-      findsOneWidget,
-    );
+      final newChat = tester.widget<IconButton>(
+        find.byKey(const Key('chat-new')),
+      );
+      expect(
+        newChat.style?.backgroundColor?.resolve(const <WidgetState>{}),
+        const Color(0xFF000080),
+      );
+      expect(
+        newChat.style?.foregroundColor?.resolve(const <WidgetState>{}),
+        Colors.white,
+      );
+      expect(newChat.tooltip, 'Start a conversation');
+      expect(find.text('New conversation'), findsNothing);
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('chat-new')),
+          matching: find.byType(CustomScrollView),
+        ),
+        findsOneWidget,
+      );
 
-    expect(find.byKey(const Key('chat-global-edge-navigation')), findsNothing);
-    expect(
-      find.byKey(const Key('chat-compact-global-edge-rail')),
-      findsNothing,
-    );
-    expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
-    expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
-    expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
-    expect(find.byKey(const Key('chat-native-navigation')), findsOneWidget);
-    final addPerson = find.byKey(const Key('chat-new'));
-    expect(tester.getSize(addPerson).width, greaterThanOrEqualTo(44));
-    expect(tester.getSize(addPerson).height, greaterThanOrEqualTo(44));
-    expect(tester.takeException(), isNull);
-  });
+      expect(
+        find.byKey(const Key('chat-global-edge-navigation')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('chat-compact-global-edge-rail')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+      expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
+      expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
+      expect(find.byKey(const Key('chat-native-navigation')), findsOneWidget);
+      final addPerson = find.byKey(const Key('chat-new'));
+      expect(tester.getSize(addPerson).width, greaterThanOrEqualTo(44));
+      expect(tester.getSize(addPerson).width, lessThanOrEqualTo(48));
+      expect(tester.getSize(addPerson).height, greaterThanOrEqualTo(44));
+      expect(tester.getSize(addPerson).height, lessThanOrEqualTo(48));
+      final search = find.byKey(const Key('chat-search-field'));
+      expect(
+        (tester.getCenter(addPerson).dy - tester.getCenter(search).dy).abs(),
+        lessThanOrEqualTo(4),
+      );
+
+      final filterStrip = find.byKey(const Key('chat-filter-strip'));
+      final businessFilter = find.byKey(const Key('chat-filter-business'));
+      expect(filterStrip, findsOneWidget);
+      expect(businessFilter, findsOneWidget);
+      expect(
+        find.descendant(of: filterStrip, matching: find.byType(ListView)),
+        findsNothing,
+      );
+      final businessBounds = tester.getRect(businessFilter);
+      expect(businessBounds.left, greaterThanOrEqualTo(0));
+      expect(businessBounds.right, lessThanOrEqualTo(360));
+      final businessLabel = tester.renderObject<RenderParagraph>(
+        find.descendant(of: businessFilter, matching: find.text('Business')),
+      );
+      expect(businessLabel.didExceedMaxLines, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('Chat section motion resolves immediately for reduced motion', (
     tester,

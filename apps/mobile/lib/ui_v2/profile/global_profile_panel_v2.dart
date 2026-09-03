@@ -719,8 +719,8 @@ class _ActiveWorkspaceCard extends StatelessWidget {
               children: [
                 Text(
                   workspace.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  overflow: TextOverflow.visible,
                   style: const TextStyle(
                     color: MoolColors.ink,
                     fontSize: 12,

@@ -448,6 +448,122 @@ void main() {
     },
   );
 
+  test('store operations use exact authenticated mutation contracts', () async {
+    final transport = _RecordingTransport([
+      _ok(const {}),
+      _ok({'paymentReference': 'PAY-GROUP-1'}),
+      _ok({'reference': 'WORK-1'}),
+      _ok({'reference': 'SET-1', 'acceptedAmount': 800}),
+      _ok(const {}),
+      _ok({
+        'partnerName': 'Mool Delivery Partner',
+        'vehicleLabel': 'RJ19 AB 1234',
+        'eta': '2026-09-03T12:15:00.000Z',
+        'stage': 'Assigned',
+      }),
+    ]);
+    final credentials = _RecordingCredentials();
+    final gateway = AuthenticatedWorkGateway(
+      endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace',
+      ),
+      credentials: credentials,
+      transport: transport,
+      random: Random(19),
+    );
+
+    await gateway.saveOperationalState(
+      const WorkOperationalSnapshot(
+        workspaceId: 'workspace-1',
+        reason: 'catalogue-updated',
+        state: {
+          'storeState': 'open',
+          'catalogue': [
+            {'sku': 'ATTA-5KG', 'sellingPrice': 275, 'stock': 10},
+          ],
+        },
+        idempotencyKey: 'OPS-1',
+      ),
+    );
+    expect(
+      await gateway.createGroupBuy(
+        const WorkGroupBuySubmission(
+          workspaceId: 'workspace-1',
+          values: {
+            'productName': 'Premium red onion',
+            'targetQuantity': 1000,
+            'confirmationAmount': 3920,
+          },
+          idempotencyKey: 'GROUP-1',
+        ),
+      ),
+      'PAY-GROUP-1',
+    );
+    expect(
+      await gateway.createPaidRequirement(
+        const WorkPaidRequirementSubmission(
+          workspaceId: 'workspace-1',
+          values: {
+            'position': 'Evening packing assistant',
+            'peopleNeeded': 2,
+            'paymentAmount': 600,
+          },
+          idempotencyKey: 'WORK-1',
+        ),
+      ),
+      'WORK-1',
+    );
+    final settlement = await gateway.requestSettlement(
+      workspaceId: 'workspace-1',
+      amount: 800,
+      idempotencyKey: 'SETTLEMENT-1',
+    );
+    await gateway.verifyOrderHandover(
+      workspaceId: 'workspace-1',
+      orderId: 'order-1',
+      otp: '123456',
+      idempotencyKey: 'HANDOVER-1',
+    );
+    final delivery = await gateway.requestDeliveryAssignment(
+      workspaceId: 'workspace-1',
+      orderId: 'order-1',
+      address: '21 Residency Road, Jodhpur',
+      idempotencyKey: 'DELIVERY-1',
+    );
+
+    expect(settlement.reference, 'SET-1');
+    expect(settlement.acceptedAmount, 800);
+    expect(delivery.partnerName, 'Mool Delivery Partner');
+    expect(delivery.eta.toUtc().toIso8601String(), '2026-09-03T12:15:00.000Z');
+    expect(transport.bodies.map((body) => body['operation']), [
+      'saveWorkspaceOperations',
+      'createWorkspaceGroupBuy',
+      'createWorkspacePaidRequirement',
+      'requestWorkspaceSettlement',
+      'verifyWorkspaceOrderHandover',
+      'requestWorkspaceDelivery',
+    ]);
+    expect(transport.bodies.first['state'], isA<Map<String, Object?>>());
+    expect(transport.bodies[1]['values'], containsPair('targetQuantity', 1000));
+    expect(
+      transport.bodies[2]['values'],
+      containsPair('position', 'Evening packing assistant'),
+    );
+    expect(transport.bodies[3], containsPair('amount', 800));
+    expect(transport.bodies[4], containsPair('otp', '123456'));
+    expect(
+      transport.bodies.last,
+      containsPair('address', '21 Residency Road, Jodhpur'),
+    );
+    expect(
+      credentials.modes,
+      List<SocialAppCheckTokenMode>.filled(
+        6,
+        SocialAppCheckTokenMode.limitedUse,
+      ),
+    );
+  });
+
   test(
     'proof document is privately uploaded and confirmed before acceptance',
     () async {

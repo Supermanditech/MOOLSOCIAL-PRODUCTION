@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -25,6 +27,9 @@ class WorkPageScaffold extends StatelessWidget {
     this.contextualLocalActions,
     this.contextualActiveId,
     this.contextualDestinationLabel,
+    this.manageSystemBack = true,
+    this.hideNavigationWhenKeyboardVisible = false,
+    this.navigationOverBody = false,
     super.key,
   });
 
@@ -44,6 +49,9 @@ class WorkPageScaffold extends StatelessWidget {
   final List<MoolLocalNavigationAction>? contextualLocalActions;
   final String? contextualActiveId;
   final String? contextualDestinationLabel;
+  final bool manageSystemBack;
+  final bool hideNavigationWhenKeyboardVisible;
+  final bool navigationOverBody;
 
   @override
   Widget build(BuildContext context) {
@@ -119,9 +127,86 @@ class WorkPageScaffold extends StatelessWidget {
       localActions[target].onPressed?.call();
     }
 
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final showNavigation =
+        !hideNavigationWhenKeyboardVisible || !keyboardVisible;
+    final navigation = MoolDestinationNavigationV2(
+      activeId: 'work',
+      destinationLabel: contextualDestinationLabel ?? 'Work',
+      showFamilyRootAction: false,
+      selectedLocalIndex: selectedLocalIndex,
+      localActionCount: localActions.length,
+      localNavigation: MoolLocalNavigationRail(
+        key: const Key('work-local-navigation'),
+        familyId: 'work',
+        surfaceTone: MoolLocalNavigationSurfaceTone.light,
+        semanticLabel: contextualLocalActions == null
+            ? 'Work choices: Earn Today and Workspace.'
+            : 'Store choices: Store, Orders, Sell and Stock.',
+        activeId: resolvedActiveId,
+        actions: localActions,
+      ),
+      onOpenMool: () => openGlobal('/app/mool?from=work'),
+      onOpenAction: (action) => switchGlobalDestination(action.route),
+      onPreviousLocalAction: () => moveLocal(-1),
+      onNextLocalAction: () => moveLocal(1),
+      onOpenChat: openChat,
+    );
+    final pageBody = SafeArea(
+      top: false,
+      bottom: true,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: MoolMetrics.maximumContentWidth,
+          ),
+          child: Column(
+            children: [
+              WorkMessageBanner(session: session),
+              Expanded(child: _WorkPageReveal(child: body)),
+              if (bottomAction != null)
+                Material(
+                  key: const Key('work-sticky-action-bar'),
+                  color: Colors.white,
+                  elevation: 8,
+                  shadowColor: const Color(0x22000050),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      MoolSpacing.md,
+                      MoolSpacing.sm,
+                      MoolSpacing.md,
+                      MoolSpacing.xs,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: _WorkActionReveal(child: bottomAction!),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final composedBody = navigationOverBody && showNavigation
+        ? Stack(
+            children: [
+              Positioned.fill(child: pageBody),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: BlockSemantics(child: navigation),
+              ),
+            ],
+          )
+        : pageBody;
+
     return PopScope<Object?>(
-      canPop: onBack == null && canPop,
+      canPop: manageSystemBack ? onBack == null && canPop : true,
       onPopInvokedWithResult: (didPop, _) {
+        if (!manageSystemBack) return;
         if (!didPop) {
           leaveContentDepth();
         }
@@ -182,65 +267,10 @@ class WorkPageScaffold extends StatelessWidget {
               ),
           ],
         ),
-        body: SafeArea(
-          top: false,
-          bottom: true,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: MoolMetrics.maximumContentWidth,
-              ),
-              child: Column(
-                children: [
-                  WorkMessageBanner(session: session),
-                  Expanded(child: _WorkPageReveal(child: body)),
-                  if (bottomAction != null)
-                    Material(
-                      key: const Key('work-sticky-action-bar'),
-                      color: Colors.white,
-                      elevation: 8,
-                      shadowColor: const Color(0x22000050),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          MoolSpacing.md,
-                          MoolSpacing.sm,
-                          MoolSpacing.md,
-                          MoolSpacing.xs,
-                        ),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: _WorkActionReveal(child: bottomAction!),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        bottomNavigationBar: MoolDestinationNavigationV2(
-          activeId: 'work',
-          destinationLabel: contextualDestinationLabel ?? 'Work',
-          showFamilyRootAction: false,
-          selectedLocalIndex: selectedLocalIndex,
-          localActionCount: localActions.length,
-          localNavigation: MoolLocalNavigationRail(
-            key: const Key('work-local-navigation'),
-            familyId: 'work',
-            surfaceTone: MoolLocalNavigationSurfaceTone.light,
-            semanticLabel: contextualLocalActions == null
-                ? 'Work choices: Earn Today and Workspace.'
-                : 'Store choices: Store, Orders, Sell and Stock.',
-            activeId: resolvedActiveId,
-            actions: localActions,
-          ),
-          onOpenMool: () => openGlobal('/app/mool?from=work'),
-          onOpenAction: (action) => switchGlobalDestination(action.route),
-          onPreviousLocalAction: () => moveLocal(-1),
-          onNextLocalAction: () => moveLocal(1),
-          onOpenChat: openChat,
-        ),
+        body: composedBody,
+        bottomNavigationBar: navigationOverBody || !showNavigation
+            ? null
+            : navigation,
       ),
     );
   }
@@ -293,15 +323,40 @@ class _WorkActionReveal extends StatelessWidget {
   }
 }
 
-class WorkMessageBanner extends StatelessWidget {
+class WorkMessageBanner extends StatefulWidget {
   const WorkMessageBanner({required this.session, super.key});
 
   final WorkSession session;
 
   @override
+  State<WorkMessageBanner> createState() => _WorkMessageBannerState();
+}
+
+class _WorkMessageBannerState extends State<WorkMessageBanner> {
+  Timer? _dismissTimer;
+  String? _scheduledNotice;
+
+  void _scheduleNoticeDismissal(String? notice) {
+    if (notice == null || notice == _scheduledNotice) return;
+    _dismissTimer?.cancel();
+    _scheduledNotice = notice;
+    _dismissTimer = Timer(const Duration(milliseconds: 1800), () {
+      if (!mounted || widget.session.noticeMessage != notice) return;
+      widget.session.dismissMessages();
+    });
+  }
+
+  @override
+  void dispose() {
+    _dismissTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final error = session.errorMessage;
-    final notice = session.noticeMessage;
+    final error = widget.session.errorMessage;
+    final notice = widget.session.noticeMessage;
+    _scheduleNoticeDismissal(notice);
     if (error == null && notice == null) return const SizedBox.shrink();
     final isError = error != null;
     return Semantics(
@@ -352,7 +407,7 @@ class WorkMessageBanner extends StatelessWidget {
               key: const Key('dismiss-work-message'),
               tooltip: 'Dismiss message',
               visualDensity: VisualDensity.compact,
-              onPressed: session.dismissMessages,
+              onPressed: widget.session.dismissMessages,
               icon: const Icon(Icons.close_rounded, size: 18),
             ),
           ],
