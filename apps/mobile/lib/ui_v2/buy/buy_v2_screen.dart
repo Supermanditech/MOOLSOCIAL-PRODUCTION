@@ -867,6 +867,14 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         brandOnly: brandOnly,
         onAskStore: _openStoreQuestion,
         onOpenProduct: _openStoreProduct,
+        onOpenCart: () => widget.session.openCart(
+          scope: switch (product.destination) {
+            BuyV2Destination.shop ||
+            BuyV2Destination.orders => BuyV2CartScope.shop,
+            BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+            BuyV2Destination.medicine => BuyV2CartScope.medicine,
+          },
+        ),
       ),
     );
   }

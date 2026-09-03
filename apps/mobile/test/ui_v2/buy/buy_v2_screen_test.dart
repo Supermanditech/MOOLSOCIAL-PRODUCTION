@@ -4670,11 +4670,27 @@ void main() {
       expect(storeSheet, findsOneWidget);
       expect(find.text('MoolSocial Fulfilment Store'), findsOneWidget);
       expect(find.textContaining('Address confirmed'), findsOneWidget);
+      final storeTruth = find.byKey(
+        const ValueKey('buy-public-store-truth-s-eggs'),
+      );
+      expect(
+        find.descendant(of: storeTruth, matching: find.text('Open')),
+        findsNothing,
+      );
+      await tester.tap(
+        find.descendant(
+          of: storeTruth,
+          matching: find.byKey(
+            const ValueKey('buy-public-store-fulfilment-toggle'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
       expect(find.text('Open'), findsOneWidget);
       expect(find.text('Quick 10m'), findsWidgets);
       final askStore = find.byKey(const ValueKey('buy-public-store-ask'));
       expect(askStore, findsOneWidget);
-      expect(tester.getSize(askStore), const Size(112, 44));
+      expect(tester.getSize(askStore), const Size(78, 44));
       expect(
         tester
             .getSize(find.byKey(const ValueKey('buy-public-store-ask-visible')))
@@ -5064,13 +5080,19 @@ void main() {
         find.byKey(const ValueKey('buy-related-store-card-s-tomato')),
       );
       final relatedDecoration = relatedCard.decoration! as BoxDecoration;
-      expect(relatedDecoration.gradient, isA<LinearGradient>());
-      expect((relatedDecoration.gradient! as LinearGradient).colors, const [
-        Color(0xFFFFFFFF),
-        Color(0xFFEAF0FF),
-        Color(0xFFD8E5FF),
-      ]);
+      expect(relatedDecoration.gradient, isNull);
+      expect(relatedDecoration.color, Colors.white);
+      expect(relatedDecoration.border, isNotNull);
       expect(relatedDecoration.boxShadow, isNotEmpty);
+      expect(
+        tester
+            .widget<Container>(
+              find.byKey(const ValueKey('buy-related-store-header-s-tomato')),
+            )
+            .decoration,
+        isNull,
+      );
+      expect(tester.getSize(relatedStore).width, lessThanOrEqualTo(208));
       expect(tester.getSize(relatedStore).height, lessThan(170));
       expect(
         find.descendant(
@@ -5242,7 +5264,7 @@ void main() {
       isA<SingleChildScrollView>(),
     );
     expect(tester.getSize(relatedStore).height, inInclusiveRange(140, 210));
-    expect(tester.getSize(relatedStore).width, 224);
+    expect(tester.getSize(relatedStore).width, 208);
     expect(tester.takeException(), isNull);
   });
 
@@ -5418,6 +5440,11 @@ void main() {
 
     expect(find.textContaining('Safe Protein Store'), findsWidgets);
     expect(find.text('MoolSocial Fulfilment Store'), findsOneWidget);
+    expect(find.text('Open'), findsNothing);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-public-store-fulfilment-toggle')),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Open'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-public-store-no-products')),
@@ -5526,14 +5553,40 @@ void main() {
 
     final title = find.text('More from Masala Ghar').first;
     expect(tester.widget<Text>(title).style?.fontSize, 16);
+    final route = find.byKey(
+      const ValueKey('buy-shop-seller-route-s-turmeric'),
+    );
+    expect(tester.getTopLeft(route).dy, 0);
+    expect(tester.getSize(route).height, 844);
     final header = find.byKey(const ValueKey('buy-shop-seller-sheet-header'));
     expect(tester.getSize(header).height, lessThanOrEqualTo(58));
     final truth = find.byKey(
       const ValueKey('buy-public-store-truth-s-turmeric'),
     );
-    expect(tester.getSize(truth).height, lessThanOrEqualTo(150));
+    expect(tester.getSize(truth).height, lessThanOrEqualTo(112));
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('buy-public-store-ask'))).dy,
+      lessThanOrEqualTo(tester.getTopLeft(truth).dy + 12),
+    );
+    final storeName = tester.widget<Text>(
+      find.byKey(const ValueKey('buy-public-store-name')),
+    );
+    final storeLocation = tester.widget<Text>(
+      find.byKey(const ValueKey('buy-public-store-location')),
+    );
+    expect(storeName.data, 'Masala Ghar');
+    expect(storeName.maxLines, isNull);
+    expect(storeLocation.maxLines, isNull);
+    expect(
+      find.byKey(const ValueKey('buy-public-store-fulfilment-details')),
+      findsNothing,
+    );
     final grid = find.byKey(const ValueKey('buy-horizontal-product-grid'));
     expect(grid, findsOneWidget);
+    expect(
+      tester.getTopLeft(grid).dy - tester.getBottomLeft(truth).dy,
+      lessThanOrEqualTo(12),
+    );
     for (final product in session.partnerCatalogueFor(storeProduct).take(3)) {
       final card = find
           .descendant(
@@ -5547,12 +5600,42 @@ void main() {
     final viewAll = find.byKey(
       const ValueKey('buy-shop-seller-view-more-s-turmeric'),
     );
-    expect(tester.getSize(viewAll).height, inInclusiveRange(44, 48));
+    expect(tester.getSize(viewAll).height, inInclusiveRange(44, 58));
     final visibleViewAll = find.byKey(
       const ValueKey('buy-shop-seller-view-more-visible-s-turmeric'),
     );
-    expect(tester.getSize(visibleViewAll).height, 32);
-    expect(tester.getSize(visibleViewAll).width, lessThan(190));
+    expect(tester.getSize(visibleViewAll).height, lessThanOrEqualTo(18));
+    expect(
+      tester.getRect(header).contains(tester.getCenter(visibleViewAll)),
+      isTrue,
+    );
+    final relatedTitle = tester.widget<Text>(
+      find.text('Other stores you may like'),
+    );
+    expect(relatedTitle.style?.fontSize, 14);
+    expect(
+      tester.getTopLeft(find.text('Other stores you may like')).dy -
+          tester.getBottomLeft(grid).dy,
+      lessThanOrEqualTo(14),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('buy-public-store-fulfilment-toggle')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-public-store-fulfilment-details')),
+      findsOneWidget,
+    );
+    expect(find.text('Open'), findsOneWidget);
+    expect(find.text('Quick 10m'), findsWidgets);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-public-store-fulfilment-toggle')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-public-store-fulfilment-details')),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -5567,6 +5650,7 @@ void main() {
       await tester.pumpWidget(app(session));
       await tester.pumpAndSettle();
       session.openDestination(BuyV2Destination.wholesale);
+      session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.bulk);
       expect(session.openProduct('w-rice'), isTrue);
       await tester.pumpAndSettle();
 
@@ -5593,12 +5677,28 @@ void main() {
       expect(supplierSheet, findsOneWidget);
       expect(find.text('MoolSocial Fulfilment Partner'), findsOneWidget);
       expect(find.textContaining('Wholesaler'), findsWidgets);
+      final supplierTruth = find.byKey(
+        const ValueKey('buy-public-store-truth-w-rice'),
+      );
+      expect(
+        find.descendant(of: supplierTruth, matching: find.text('Open')),
+        findsNothing,
+      );
+      await tester.tap(
+        find.descendant(
+          of: supplierTruth,
+          matching: find.byKey(
+            const ValueKey('buy-public-store-fulfilment-toggle'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
       expect(find.text('Open'), findsOneWidget);
       expect(find.text('Bulk delivery'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('buy-public-store-ask-visible')),
-          matching: find.text('Ask supplier'),
+          matching: find.text('Ask'),
         ),
         findsOneWidget,
       );
@@ -5611,6 +5711,26 @@ void main() {
       expect(session.selectedProductId, 'w-rice');
       expect(find.byKey(const ValueKey('buy-store-cart-bar')), findsOneWidget);
       expect(find.text('Cart is empty'), findsOneWidget);
+      final primary = find.byKey(const ValueKey('buy-product-primary-w-rice'));
+      final productScroll = scrollableWithin(
+        const PageStorageKey('buy-product-w-rice'),
+      );
+      await tester.scrollUntilVisible(primary, 220, scrollable: productScroll);
+      await tester.tap(primary);
+      await tester.pumpAndSettle();
+      expect(session.quantityFor('w-rice'), greaterThanOrEqualTo(1));
+      await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.cart);
+      expect(session.cartScope, BuyV2CartScope.wholesale);
+      expect(
+        find.byKey(const ValueKey('buy-cart-continue-store')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-cart-continue-store')));
+      await tester.pumpAndSettle();
+      expect(supplierSheet, findsOneWidget);
+      expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.bulk);
       expect(tester.takeException(), isNull);
     },
   );
