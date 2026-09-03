@@ -1629,6 +1629,12 @@ void main() {
     await tester.tap(find.byKey(const Key('work-quick-new-sale')));
     await tester.pumpAndSettle();
     expect(find.bySemanticsLabel('Customer mobile number'), findsOne);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('Customer mobile number'))
+          .identifier,
+      'work-order-customer',
+    );
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-quick-group-buy')));
@@ -1774,6 +1780,23 @@ void main() {
     );
   });
 
+  testWidgets('finishing Store search clears its inactive term', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-dashboard-search')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('work-dashboard-search-field')),
+      'oil',
+    );
+    await tester.tap(find.byKey(const Key('work-dashboard-search-close')));
+    await tester.pumpAndSettle();
+    expect(work.workspaceSearchQuery, isEmpty);
+    expect(find.text('Search your store'), findsOneWidget);
+  });
+
   testWidgets('Workspace product opens exact public Buy product details', (
     tester,
   ) async {
@@ -1788,6 +1811,31 @@ void main() {
     expect(find.text('Fortune Sunflower Oil'), findsWidgets);
     expect(find.textContaining('1 L pouch'), findsWidgets);
     expect(find.text('This product could not be found.'), findsNothing);
+  });
+
+  testWidgets('Storefront Buy Back returns directly to Storefront', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-business-storefront')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('work-preview-product-oil-fortune-1l')),
+    );
+    await tester.pumpAndSettle();
+    await reveal(
+      tester,
+      find.byKey(const Key('work-preview-open-buy-product')),
+    );
+    await tester.tap(find.byKey(const Key('work-preview-open-buy-product')));
+    await tester.pumpAndSettle();
+    expect(find.text('Fortune Sunflower Oil'), findsWidgets);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-dashboard-preview-screen')), findsOne);
   });
 
   testWidgets('funded work uses compact named customer fields', (tester) async {

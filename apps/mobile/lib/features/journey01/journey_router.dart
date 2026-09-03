@@ -202,6 +202,24 @@ final class _WorkspacePublicBuyCommerceAdapter implements BuyV2CommerceAdapter {
   );
 }
 
+final class _WorkspacePublicBuySession extends BuyV2Session {
+  _WorkspacePublicBuySession({
+    required super.core,
+    required BuyV2CommerceAdapter commerceAdapter,
+  }) : super(commerceAdapter: commerceAdapter, reviewDataEnabled: false);
+
+  VoidCallback? directProductExit;
+
+  @override
+  void goBack() {
+    if (view == BuyV2View.product && directProductExit != null) {
+      directProductExit!();
+      return;
+    }
+    super.goBack();
+  }
+}
+
 bool journeyRouteRequiresAuthentication(
   Uri uri, {
   required bool allowGuestReady,
@@ -233,7 +251,7 @@ GoRouter createJourneyRouter(
   bool legacyPresentationForTestsOnly = false,
 }) {
   final buyV2Session = BuyV2Session(core: buySession);
-  BuyV2Session? workspacePublicBuySession;
+  _WorkspacePublicBuySession? workspacePublicBuySession;
   String? workspacePublicBuySignature;
   Future<void>? workspacePublicBuyRestore;
   BuyV2Session resolveWorkspacePublicBuySession(String productId) {
@@ -258,10 +276,9 @@ GoRouter createJourneyRouter(
       storeName: workSession.activeWorkspace?.name ?? workSession.workName,
       confirmedOn: 'Updated by Store',
     );
-    final next = BuyV2Session(
+    final next = _WorkspacePublicBuySession(
       core: buySession,
       commerceAdapter: _WorkspacePublicBuyCommerceAdapter(publicProduct),
-      reviewDataEnabled: false,
     );
     workspacePublicBuySession = next;
     workspacePublicBuySignature = signature;
@@ -429,6 +446,9 @@ GoRouter createJourneyRouter(
           final routedBuySession = workspaceProductId == null
               ? buyV2Session
               : resolveWorkspacePublicBuySession(workspaceProductId);
+          if (routedBuySession case final _WorkspacePublicBuySession session) {
+            session.directProductExit = buyExit(context, state);
+          }
           Widget buildBuyScreen() => BuyV2Screen(
             key: ValueKey(
               workspaceProductId == null

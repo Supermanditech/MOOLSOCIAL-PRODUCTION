@@ -455,7 +455,7 @@ class _WorkWorkspaceDashboardScreenState
                   : null,
               onSearch: _showSearch,
               onSearchChanged: session.updateWorkspaceSearch,
-              onCloseSearch: _showDashboard,
+              onCloseSearch: _finishSearch,
               onScan: () => _showOperation(_WorkspaceOperation.catalogue),
               onSettings: _showStatus,
               onAlerts: _showAlerts,
@@ -475,6 +475,7 @@ class _WorkWorkspaceDashboardScreenState
         _WorkspaceControlView.procurement => _showDashboard,
         _WorkspaceControlView.status => () => unawaited(_leaveSettings()),
         _WorkspaceControlView.operation => () => unawaited(_leaveOperation()),
+        _WorkspaceControlView.search => _finishSearch,
         _ => _showDashboard,
       },
       manageSystemBack: _view != _WorkspaceControlView.procurement,
@@ -847,6 +848,12 @@ class _WorkWorkspaceDashboardScreenState
     _searchController.clear();
     session.updateWorkspaceSearch('');
     _searchFocus.requestFocus();
+  }
+
+  void _finishSearch() {
+    _searchController.clear();
+    session.updateWorkspaceSearch('');
+    _showDashboard();
   }
 
   void _saveAvailability() {
@@ -6636,7 +6643,9 @@ class _AccessibleWorkTextFieldState extends State<_AccessibleWorkTextField> {
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
+      identifier: widget.keyName,
       label: widget.label,
+      hint: 'Enter ${widget.label.toLowerCase()}',
       value: widget.controller.text,
       textField: true,
       onTap: _focusNode.requestFocus,
