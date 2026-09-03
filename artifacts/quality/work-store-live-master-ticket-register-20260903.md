@@ -3,6 +3,21 @@
 Date: 2026-09-03
 Status: planning only; no ticket in this register is implemented or authorized by this document alone.
 
+## Founder disposition — Store first view accepted
+
+The main Store first-view architecture is accepted. It is now the fixed design authority for the Store landing experience:
+
+- compact Store identity and operating state;
+- inline Store search, Scan, Alerts and Profile;
+- Live Business Pulse;
+- ranked Live Action Stage;
+- first-tap retailer command band; and
+- Store-owned bottom rail.
+
+Do not replace this main Store architecture in later tickets. Only implement it faithfully, correct responsive/accessibility defects and connect it to truthful live state.
+
+Full UI/UX replacement is permitted from the first destination tap onward. Orders, order detail, packing, pickup, delivery, Sell, catalogue, stock, customers, money, Group Bulk Buying, settings, growth, Storefront and their sheets may receive completely new destination layouts. Their existing route, session, transaction, state, draft-preservation and exact Back/return contracts must not regress.
+
 ## Authority and replacement rule
 
 This register combines:
@@ -576,21 +591,31 @@ The retailer must understand the highest-priority action within three seconds, b
 
 **Acceptance:** No open Store-owned visual, keyboard, Android inset, route, state or wording defect; shared-owner failures remain explicitly separated.
 
-## First implementation package for founder visual approval
+## Accepted Store first-view implementation package
 
-The first package should contain only STORE-LIVE-01 through STORE-LIVE-09:
+The first package should contain STORE-LIVE-01 through STORE-LIVE-06. These tickets implement and qualify the accepted architecture; they do not reopen its design direction:
 
 1. one Store shell;
 2. Live Business Pulse;
 3. ranked Live Action Stage;
 4. operational motion/feedback;
 5. universal search continuity;
-6. responsive/input foundation;
-7. scalable Orders queue;
-8. order decision; and
-9. packing/shortage handling.
+6. responsive/input foundation.
 
-This package gives the founder the complete first view, first tap and first operational destination before catalogue, customer and money screens are restyled.
+This package gives the founder the accepted complete first view and proves every first-tap entry. Destination replacement begins with STORE-LIVE-07.
+
+## Destination replacement sequence after the accepted Store first view
+
+1. **Orders:** STORE-LIVE-07 and 08 replace the current Orders list and decision presentation while preserving order identity, filter and stock-reservation rules.
+2. **Packing, pickup and delivery:** STORE-LIVE-09 through 11 replace the current operational cards/sheets while preserving the order state machine and invoice/delivery owners.
+3. **Sell:** STORE-LIVE-12 through 15 replace New Sale and Deliver Order with one composer and the approved Call-to-Delivery/customer-claim flow.
+4. **Products and stock:** STORE-LIVE-16 through 20 replace catalogue/product/stock presentation around the shared catalogue and Store Assortment contract.
+5. **Procurement:** STORE-LIVE-21 and 22 retain the existing Wholesale owner but replace Store-host and Group Buy presentation where Work owns it.
+6. **Customers and money:** STORE-LIVE-23 through 25 replace customer, statement and settlement layouts with dense operational views.
+7. **Growth:** STORE-LIVE-26 and 27 replace the current sparse Grow, Offers and funded-work destination layouts.
+8. **Settings and identity:** STORE-LIVE-28 and 29 replace configuration/business-record layouts while preserving approval truth and Store scope.
+9. **Storefront:** STORE-LIVE-30 replaces the mixed owner/customer preview with an exact public rendering plus a slim owner toolbar.
+10. **Connected ecosystem:** STORE-LIVE-31 through 35 add the approved benefits/contracts and qualify shared handoffs without duplicating their owners.
 
 ## Finding coverage
 
