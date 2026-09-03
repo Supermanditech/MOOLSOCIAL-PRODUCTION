@@ -1129,12 +1129,19 @@ foreach ($claim in $claims) {
   foreach ($ownerValue in @($claim.owners)) {
     $owner = Get-CanonicalOwner ([string]$ownerValue)
     $resolvedOwner = [IO.Path]::GetFullPath((Join-Path $root $owner))
+    $predeclaredR65FourEvidenceOwner = (
+      [string]$claim.task -ceq
+        '/root/cursor_shop_mvp_go_live_v1_20260829' -and
+      $owner -cmatch
+        '^artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/[^/]+$'
+    )
     Assert-Coordination (
       $resolvedOwner.StartsWith(
         $root + [IO.Path]::DirectorySeparatorChar,
         [StringComparison]::OrdinalIgnoreCase
       ) -and
-      (Test-Path -LiteralPath $resolvedOwner -PathType Leaf)
+      ((Test-Path -LiteralPath $resolvedOwner -PathType Leaf) -or
+        $predeclaredR65FourEvidenceOwner)
     ) "recorded owner is missing: $owner"
     $key = $owner.ToLowerInvariant()
     Assert-Coordination (-not $localOwners.Contains($key)) `
@@ -1747,6 +1754,41 @@ if ($ProductionLane -ceq 'baseline') {
               (@($expectedR65FourEvidenceOwners | Sort-Object) -join '|')
             ) 'r65.4 evidence coordination changed an unexpected owner.'
             $sealedCoordinationCommit = $r65FourEvidenceCommit
+          }
+          $r65FourSlotSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): permit predeclared r65.4 evidence slots'
+          $matchingR65FourSlotCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.4 evidence-slot coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $r65FourSlotSubject) {
+              $matchingR65FourSlotCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingR65FourSlotCommits.Count -le 1) `
+            'r65.4 evidence-slot coordination commit is duplicated.'
+          if ($matchingR65FourSlotCommits.Count -eq 1) {
+            $r65FourSlotCommit = [string]$matchingR65FourSlotCommits[0]
+            $r65FourSlotParent = @(& git -C $root show -s --format=%P `
+                $r65FourSlotCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingR65FourEvidenceCommits.Count -eq 1 -and
+              $r65FourSlotParent.Count -eq 1 -and
+              [string]$r65FourSlotParent[0] -ceq $r65FourEvidenceCommit
+            ) 'r65.4 evidence-slot coordination parent changed.'
+            $r65FourSlotOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $r65FourSlotCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $r65FourSlotOwners.Count -eq 1 -and
+              [string]$r65FourSlotOwners[0] -ceq
+                'scripts/check-codex-subagent-coordination-policy.ps1'
+            ) 'r65.4 evidence-slot coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65FourSlotCommit
           }
           & git -C $root diff --quiet $sealedCoordinationCommit -- `
             'config/codex-subagent-coordination-policy.json' `
