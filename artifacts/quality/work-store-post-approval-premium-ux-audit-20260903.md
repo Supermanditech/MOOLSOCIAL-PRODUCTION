@@ -1,5 +1,7 @@
 # Work Store post-approval premium UI/UX audit — 2026-09-03
 
+> Planning disposition: findings 59–92 remain valid evidence, but their earlier implementation grouping is superseded by `work-store-live-master-ticket-register-20260903.md`, which combines them with the Store master plan and the latest MoolSocial Store Live architecture.
+
 ## Scope and status
 
 - Read-only founder audit of the approved Store Workspace from the live dashboard onward.
