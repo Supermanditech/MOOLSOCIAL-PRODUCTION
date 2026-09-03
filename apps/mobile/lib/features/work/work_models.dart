@@ -535,6 +535,7 @@ class WorkspaceGroupBuy {
     required this.storeDeliveryLabel,
     required this.paymentConfirmed,
     this.deliveryPartnerName,
+    this.participants = const [],
   });
 
   final String id;
@@ -554,11 +555,33 @@ class WorkspaceGroupBuy {
   final String storeDeliveryLabel;
   final bool paymentConfirmed;
   final String? deliveryPartnerName;
+  final List<WorkspaceGroupBuyParticipant> participants;
 
   int get remainingQuantity =>
       (targetQuantity - securedQuantity).clamp(0, targetQuantity);
   int get savingPerUnit => regularUnitPrice - groupUnitPrice;
   int get totalSaving => savingPerUnit * securedQuantity;
+  int get goodsValue => groupUnitPrice * securedQuantity;
+  int get deliveredTotal => goodsValue + facilitationFee + deliveryFee;
+  int get referenceTotal => regularUnitPrice * securedQuantity;
+  int get netSaving => (referenceTotal - deliveredTotal).clamp(0, 1 << 31);
+  int get balanceDue => (deliveredTotal - confirmationAmount).clamp(0, 1 << 31);
+}
+
+class WorkspaceGroupBuyParticipant {
+  const WorkspaceGroupBuyParticipant({
+    required this.businessName,
+    required this.locality,
+    required this.quantity,
+    required this.unitLabel,
+    required this.milestone,
+  });
+
+  final String businessName;
+  final String locality;
+  final int quantity;
+  final String unitLabel;
+  final String milestone;
 }
 
 enum WorkOpportunityPosterType {

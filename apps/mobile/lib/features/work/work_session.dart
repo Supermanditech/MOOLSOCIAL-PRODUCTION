@@ -2541,6 +2541,15 @@ class WorkSession extends ChangeNotifier {
       closingLabel: closingLabel.trim(),
       storeDeliveryLabel: storeDeliveryLabel.trim(),
       paymentConfirmed: true,
+      participants: [
+        WorkspaceGroupBuyParticipant(
+          businessName: storeName,
+          locality: activeWorkspace?.area ?? workArea,
+          quantity: securedQuantity,
+          unitLabel: unitLabel.trim(),
+          milestone: 'Payment confirmed',
+        ),
+      ],
     );
     _recordWorkspaceActivity(
       '$storeName confirmed $securedQuantity $unitLabel of $productName for Group Bulk Buying.',

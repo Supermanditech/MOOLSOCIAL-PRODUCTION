@@ -876,8 +876,8 @@ void main() {
       );
       expect(find.text('₹14/kg'), findsWidgets);
       expect(find.text('₹400'), findsOneWidget);
-      await reveal(tester, find.text('Confirmed · payment received'));
-      expect(find.text('Confirmed · payment received'), findsOneWidget);
+      await reveal(tester, find.text('Payment confirmed'));
+      expect(find.text('Payment confirmed'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -1791,6 +1791,62 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Group Bulk keeps the full decision and next action visible', (
+    tester,
+  ) async {
+    final work = liveStore()
+      ..applyConfirmedWorkspaceGroupBuyPayment(
+        productName: 'Premium red onion',
+        specification: 'Grade A · 45 mm+ · 25 kg mesh bags',
+        targetQuantity: 1000,
+        securedQuantity: 280,
+        unitLabel: 'kg',
+        regularUnitPrice: 18,
+        groupUnitPrice: 14,
+        facilitationFee: 200,
+        deliveryFee: 0,
+        confirmationAmount: 3920,
+        paymentReference: 'PAY-REVIEW-001',
+        closingLabel: '5 Sep · 8:00 PM',
+        storeDeliveryLabel: '7 Sep · Door delivery',
+      );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+    );
+    await tester.tap(find.byKey(const Key('work-quick-group-buy')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('280 kg secured'), findsOneWidget);
+    expect(find.text('720 kg left'), findsOneWidget);
+    expect(find.text('Target 1000 kg'), findsOneWidget);
+    expect(find.text('₹14/kg'), findsWidgets);
+    expect(find.text('₹18/kg'), findsWidgets);
+    expect(find.text('₹920'), findsOneWidget);
+    expect(find.text('Your amount paid'), findsOneWidget);
+    expect(find.text('Payment confirmed'), findsOneWidget);
+    final next = find.byKey(const Key('work-group-buy-next-action'));
+    expect(next.hitTestable(), findsOneWidget);
+    expect(find.text('Review balance ₹200'), findsOneWidget);
+    expect(
+      tester.getBottomRight(next).dy,
+      lessThanOrEqualTo(
+        tester.getTopLeft(find.byKey(const Key('work-local-navigation'))).dy,
+      ),
+    );
+    expect(work.activeGroupBuy?.deliveredTotal, 4120);
+    expect(work.activeGroupBuy?.netSaving, 920);
+    expect(work.activeGroupBuy?.balanceDue, 200);
+
+    await tester.tap(next);
+    await tester.pumpAndSettle();
+    expect(find.text('Your payment schedule'), findsOneWidget);
+    expect(find.text('Balance before dispatch'), findsOneWidget);
+    expect(find.text('₹200'), findsWidgets);
+  });
+
   testWidgets('Workspace switcher keeps the approval action above Android', (
     tester,
   ) async {
@@ -2673,6 +2729,38 @@ void main() {
           await tester.tap(
             find.byKey(const Key('work-catalogue-stock-statement')),
           );
+        },
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - live Group Bulk Buying',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore()
+        ..applyConfirmedWorkspaceGroupBuyPayment(
+          productName: 'Premium red onion',
+          specification: 'Grade A · 45 mm+ · 25 kg mesh bags',
+          targetQuantity: 1000,
+          securedQuantity: 280,
+          unitLabel: 'kg',
+          regularUnitPrice: 18,
+          groupUnitPrice: 14,
+          facilitationFee: 200,
+          deliveryFee: 0,
+          confirmationAmount: 3920,
+          paymentReference: 'PAY-REVIEW-001',
+          closingLabel: '5 Sep · 8:00 PM',
+          storeDeliveryLabel: '7 Sep · Door delivery',
+        );
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-procurement-v1-local-review-20260904',
+        fileName: '01-live-group-bulk-buying-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-quick-group-buy')));
         },
       );
     },

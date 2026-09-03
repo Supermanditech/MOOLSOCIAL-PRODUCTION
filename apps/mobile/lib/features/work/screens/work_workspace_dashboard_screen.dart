@@ -9174,6 +9174,499 @@ class _ActiveGroupBuyView extends StatelessWidget {
 
   final WorkspaceGroupBuy groupBuy;
 
+  Future<void> _showNextStep(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              groupBuy.balanceDue > 0
+                  ? 'Your payment schedule'
+                  : 'Your stock is secured',
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _GroupBuyReviewLine(
+              label: 'Product value',
+              value: '₹${_formatStoreAmount(groupBuy.goodsValue)}',
+            ),
+            _GroupBuyReviewLine(
+              label: 'MoolSocial trade fee',
+              value: '₹${_formatStoreAmount(groupBuy.facilitationFee)}',
+            ),
+            _GroupBuyReviewLine(
+              label: 'Delivery',
+              value: groupBuy.deliveryFee == 0
+                  ? 'Free'
+                  : '₹${_formatStoreAmount(groupBuy.deliveryFee)}',
+            ),
+            _GroupBuyReviewLine(
+              label: 'Your amount paid',
+              value: '₹${_formatStoreAmount(groupBuy.confirmationAmount)}',
+              positive: true,
+            ),
+            _GroupBuyReviewLine(
+              label: 'Balance before dispatch',
+              value: '₹${_formatStoreAmount(groupBuy.balanceDue)}',
+              strong: true,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              groupBuy.balanceDue > 0
+                  ? 'MoolSocial will show the payment action when the balance becomes payable. Your confirmed quantity remains secured.'
+                  : 'Delivery updates will appear here after dispatch. Stock increases only after you confirm receipt.',
+              style: const TextStyle(color: MoolColors.muted, height: 1.35),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = groupBuy.targetQuantity == 0
+        ? 0.0
+        : (groupBuy.securedQuantity / groupBuy.targetQuantity).clamp(0.0, 1.0);
+    final participants = groupBuy.participants.isNotEmpty
+        ? groupBuy.participants
+        : [
+            for (final retailer in groupBuy.confirmedRetailers)
+              WorkspaceGroupBuyParticipant(
+                businessName: retailer,
+                locality: 'Location confirmed',
+                quantity: retailer == groupBuy.leadRetailer
+                    ? groupBuy.securedQuantity
+                    : 0,
+                unitLabel: groupBuy.unitLabel,
+                milestone: 'Confirmed',
+              ),
+          ];
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return Container(
+      key: const Key('work-group-buy-active-screen'),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF070A2D), Color(0xFF11176A)],
+        ),
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'GROUP BULK BUYING',
+                        style: TextStyle(
+                          color: Color(0xFFFFB34E),
+                          fontSize: 10,
+                          letterSpacing: .8,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      key: const Key('work-group-buy-payment-confirmed'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0C6F59),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.verified_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Quantity secured',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  groupBuy.productName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  groupBuy.specification,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFBFC6FF),
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .08),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${groupBuy.securedQuantity} ${groupBuy.unitLabel} secured',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${groupBuy.remainingQuantity} ${groupBuy.unitLabel} left',
+                            style: const TextStyle(
+                              color: Color(0xFFFFB34E),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TweenAnimationBuilder<double>(
+                        duration: reduceMotion
+                            ? Duration.zero
+                            : const Duration(milliseconds: 560),
+                        tween: Tween(begin: 0, end: progress),
+                        builder: (context, value, _) => LinearProgressIndicator(
+                          value: value,
+                          minHeight: 9,
+                          borderRadius: BorderRadius.circular(999),
+                          backgroundColor: Colors.white12,
+                          color: const Color(0xFFFFA31A),
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Target ${groupBuy.targetQuantity} ${groupBuy.unitLabel}',
+                              style: const TextStyle(
+                                color: Color(0xFFBFC6FF),
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                          Flexible(
+                            child: Text(
+                              'Closes ${groupBuy.closingLabel}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 9),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .08),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _GroupBulkPrice(
+                              label: 'Delivered price',
+                              value:
+                                  '₹${groupBuy.groupUnitPrice}/${groupBuy.unitLabel}',
+                              accent: const Color(0xFF52E5A3),
+                            ),
+                          ),
+                          Expanded(
+                            child: _GroupBulkPrice(
+                              label: 'Reference price',
+                              value:
+                                  '₹${groupBuy.regularUnitPrice}/${groupBuy.unitLabel}',
+                            ),
+                          ),
+                          Expanded(
+                            child: _GroupBulkPrice(
+                              label: 'Net saving',
+                              value:
+                                  '₹${_formatStoreAmount(groupBuy.netSaving)}',
+                              accent: const Color(0xFFFFB34E),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(color: Colors.white12, height: 16),
+                      _GroupBulkLine(
+                        label: 'Your quantity',
+                        value:
+                            '${groupBuy.securedQuantity} ${groupBuy.unitLabel}',
+                      ),
+                      _GroupBulkLine(
+                        label: 'Product value',
+                        value: '₹${_formatStoreAmount(groupBuy.goodsValue)}',
+                      ),
+                      _GroupBulkLine(
+                        label: 'MoolSocial trade fee',
+                        value:
+                            '₹${_formatStoreAmount(groupBuy.facilitationFee)}',
+                      ),
+                      _GroupBulkLine(
+                        label: 'Delivery',
+                        value: groupBuy.deliveryFee == 0
+                            ? 'Free · ${groupBuy.storeDeliveryLabel}'
+                            : '₹${groupBuy.deliveryFee} · ${groupBuy.storeDeliveryLabel}',
+                      ),
+                      _GroupBulkLine(
+                        label: 'Your amount paid',
+                        value:
+                            '₹${_formatStoreAmount(groupBuy.confirmationAmount)}',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'VERIFIED PARTICIPATING STORES',
+                        style: TextStyle(
+                          color: Color(0xFFBFC6FF),
+                          fontSize: 9.5,
+                          letterSpacing: .55,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${participants.length} confirmed',
+                      style: const TextStyle(
+                        color: Color(0xFF52E5A3),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                SizedBox(
+                  height: 78,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: participants.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) => _GroupBulkParticipantCard(
+                      participant: participants[index],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const Key('work-group-buy-next-action'),
+                  onPressed: () => _showNextStep(context),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFA31A),
+                    foregroundColor: const Color(0xFF171000),
+                  ),
+                  icon: Icon(
+                    groupBuy.balanceDue > 0
+                        ? Icons.account_balance_wallet_outlined
+                        : Icons.local_shipping_outlined,
+                  ),
+                  label: Text(
+                    groupBuy.balanceDue > 0
+                        ? 'Review balance ₹${_formatStoreAmount(groupBuy.balanceDue)}'
+                        : 'Track delivery',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GroupBulkParticipantCard extends StatelessWidget {
+  const _GroupBulkParticipantCard({required this.participant});
+
+  final WorkspaceGroupBuyParticipant participant;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 280,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.verified_rounded,
+            color: Color(0xFF52E5A3),
+            size: 20,
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  participant.businessName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  participant.locality,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFFBFC6FF), fontSize: 9),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        participant.milestone,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF52E5A3),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${participant.quantity} ${participant.unitLabel}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GroupBuyReviewLine extends StatelessWidget {
+  const _GroupBuyReviewLine({
+    required this.label,
+    required this.value,
+    this.positive = false,
+    this.strong = false,
+  });
+
+  final String label;
+  final String value;
+  final bool positive;
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label, style: const TextStyle(color: MoolColors.muted)),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: positive ? const Color(0xFF08765D) : MoolColors.ink,
+              fontSize: strong ? 17 : 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
+class _LegacyActiveGroupBuyView extends StatelessWidget {
+  const _LegacyActiveGroupBuyView({required this.groupBuy});
+
+  final WorkspaceGroupBuy groupBuy;
+
   @override
   Widget build(BuildContext context) {
     final progress = groupBuy.targetQuantity == 0
