@@ -6646,7 +6646,9 @@ class _AccessibleWorkTextFieldState extends State<_AccessibleWorkTextField> {
       identifier: widget.keyName,
       label: widget.label,
       hint: 'Enter ${widget.label.toLowerCase()}',
-      value: widget.controller.text,
+      value: widget.controller.text.trim().isEmpty
+          ? 'Not entered'
+          : widget.controller.text,
       textField: true,
       onTap: _focusNode.requestFocus,
       onSetText: (value) {

@@ -1629,12 +1629,11 @@ void main() {
     await tester.tap(find.byKey(const Key('work-quick-new-sale')));
     await tester.pumpAndSettle();
     expect(find.bySemanticsLabel('Customer mobile number'), findsOne);
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('Customer mobile number'))
-          .identifier,
-      'work-order-customer',
+    final customerSemantics = tester.getSemantics(
+      find.bySemanticsLabel('Customer mobile number'),
     );
+    expect(customerSemantics.identifier, 'work-order-customer');
+    expect(customerSemantics.value, 'Not entered');
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-quick-group-buy')));
