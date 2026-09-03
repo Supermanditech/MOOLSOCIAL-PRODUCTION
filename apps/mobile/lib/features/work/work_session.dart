@@ -1157,6 +1157,57 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
+  Future<bool> verifyWorkspacePickup(String code) async {
+    final id = activeWorkspace?.id ?? workspaceId;
+    final order = currentWorkspaceOrder;
+    if (id == null ||
+        id.isEmpty ||
+        order == null ||
+        workspaceOrderStage != 'Ready for pickup' ||
+        workspaceHandoverBusy) {
+      return false;
+    }
+    final normalized = code.replaceAll(RegExp(r'\D'), '');
+    if (normalized.length != 6) {
+      showError('Enter the 6-digit pickup code shared with the customer.');
+      return false;
+    }
+    workspaceHandoverBusy = true;
+    clearMessages();
+    notifyListeners();
+    try {
+      await gateway.verifyOrderHandover(
+        workspaceId: id,
+        orderId: order.id,
+        otp: normalized,
+        idempotencyKey:
+            'PICKUP-$id-${order.id}-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      _completeWorkspaceOrder(
+        order,
+        activity: 'Customer pickup confirmed with the order pickup code.',
+      );
+      return true;
+    } on WorkGatewayException catch (error) {
+      showError(error.message.replaceAll('delivery OTP', 'pickup code'));
+      return false;
+    } finally {
+      workspaceHandoverBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> retryWorkspaceDeliveryAssignment() async {
+    final order = currentWorkspaceOrder;
+    if (order == null ||
+        workspaceOrderStage != 'Delivery requested' ||
+        workspaceOperationsSyncing) {
+      return;
+    }
+    workspaceOperationsSyncError = null;
+    await _requestWorkspaceDeliveryAssignment(order.id);
+  }
+
   Future<void> requestWorkspaceSettlement({int? amount}) async {
     final eligible = workspaceSettlementEligible;
     if (eligible <= 0) {

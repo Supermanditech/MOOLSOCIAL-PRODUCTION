@@ -1830,13 +1830,18 @@ class _StoreActivityDeck extends StatelessWidget {
     } else {
       content = const _StoreReadyActivity();
     }
-    final compact = content is _StoreReadyActivity;
     return Padding(
       key: const Key('work-store-activity-deck'),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 86),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final desiredHeight = compact ? 190.0 : 430.0;
+          final desiredHeight = switch (content) {
+            _StoreReadyActivity() => 190.0,
+            _PackingActivityCard() => 390.0,
+            _PickupReadyActivityCard() => 260.0,
+            _InvoiceReadyActivityCard() => 340.0,
+            _ => 430.0,
+          };
           final availableHeight = constraints.maxHeight < desiredHeight
               ? constraints.maxHeight
               : desiredHeight;
@@ -2105,6 +2110,15 @@ class _PackingActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lines = session.workspacePackingLines;
+    final totalUnits = lines.fold<int>(
+      0,
+      (total, line) => total + line.quantity,
+    );
+    final packedUnits = lines
+        .where((line) => line.packed)
+        .fold<int>(0, (total, line) => total + line.quantity);
+    final progress = totalUnits == 0 ? 0.0 : packedUnits / totalUnits;
     return Padding(
       key: const Key('work-activity-packing'),
       padding: const EdgeInsets.all(16),
@@ -2162,13 +2176,13 @@ class _PackingActivityCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               LinearProgressIndicator(
-                value: session.workspacePackingProgress,
+                value: progress,
                 minHeight: 8,
                 borderRadius: BorderRadius.circular(999),
               ),
               const SizedBox(height: 5),
               Text(
-                '${session.workspaceOrderDisplayItemCount} products reserved for packing',
+                '$packedUnits of $totalUnits units packed',
                 style: const TextStyle(
                   color: MoolColors.navy,
                   fontWeight: FontWeight.w900,
@@ -2184,7 +2198,7 @@ class _PackingActivityCard extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 children: [
-                  for (final line in session.workspacePackingLines)
+                  for (final line in lines)
                     SizedBox(
                       height: 42,
                       child: CheckboxListTile(
@@ -2199,7 +2213,7 @@ class _PackingActivityCard extends StatelessWidget {
                           value == true,
                         ),
                         title: Text(
-                          '${line.label} · ${line.quantity}',
+                          '${line.label} × ${line.quantity}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -2211,6 +2225,30 @@ class _PackingActivityCard extends StatelessWidget {
                       ),
                     ),
                 ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 36,
+            child: OutlinedButton.icon(
+              key: const Key('work-packing-contact-customer'),
+              onPressed: () => context.push(
+                Uri(
+                  path: '/app/chat/inbox',
+                  queryParameters: {
+                    'return': GoRouterState.of(context).uri.toString(),
+                    'type': 'business',
+                    'recipient': session.workspaceOrderCustomer,
+                    'draft':
+                        'I need to confirm a product or quantity in your ₹${session.workspaceOrderAmount} order.',
+                  },
+                ).toString(),
+              ),
+              icon: const Icon(Icons.report_problem_outlined, size: 17),
+              label: const FittedBox(
+                child: Text('Packing problem? Message customer'),
               ),
             ),
           ),
@@ -2239,66 +2277,201 @@ class _PickupReadyActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return Padding(
       key: const Key('work-activity-pickup-ready'),
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'READY FOR CUSTOMER PICKUP',
-            style: TextStyle(
-              color: Color(0xFF08765D),
-              fontSize: 11,
-              letterSpacing: .7,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Center(
-            child: CircleAvatar(
-              radius: 42,
-              backgroundColor: Color(0xFFE8F7F1),
-              child: Icon(
-                Icons.store_mall_directory_rounded,
-                color: Color(0xFF08765D),
-                size: 42,
+          Row(
+            children: [
+              const _LiveDot(color: Color(0xFF08765D)),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'READY FOR PICKUP',
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: Color(0xFF08765D),
+                    fontSize: 11,
+                    letterSpacing: .7,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            session.workspaceOrderCustomer,
-            style: const TextStyle(
-              color: MoolColors.ink,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            '${session.workspaceOrderItems} · ₹${session.workspaceOrderAmount}',
-            style: const TextStyle(color: MoolColors.muted),
+              _LiveCountdownText(
+                deadline: session.workspaceOrderActionDeadline,
+                fallback: 'Ready at counter',
+                style: const TextStyle(
+                  color: Color(0xFF08765D),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 18),
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 25,
+                backgroundColor: Color(0xFFE8F7F1),
+                child: Icon(
+                  Icons.store_mall_directory_rounded,
+                  color: Color(0xFF08765D),
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      session.workspaceOrderCustomer,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      '${session.workspaceOrderPayment} · ₹${session.workspaceOrderAmount}',
+                      style: const TextStyle(color: MoolColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            session.workspaceOrderItems,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: MoolColors.ink,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Spacer(),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
               key: const Key('work-confirm-customer-pickup'),
-              onPressed: () {
-                session.advanceWorkspaceOrder();
-                final invoice = session.latestWorkspaceInvoice;
-                if (invoice != null) {
-                  _showWorkspaceInvoiceSheet(context, session, invoice);
-                }
-              },
-              icon: const Icon(Icons.receipt_long_outlined),
-              label: const Text('Confirm pickup and send invoice'),
+              onPressed: session.workspaceHandoverBusy
+                  ? null
+                  : () => _showWorkspacePickupSheet(context, session),
+              icon: const Icon(Icons.password_rounded),
+              label: const FittedBox(
+                child: Text('Confirm pickup code & create invoice'),
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+Future<void> _showWorkspacePickupSheet(
+  BuildContext context,
+  WorkSession session,
+) async {
+  final pageContext = context;
+  var pickupCode = '';
+  String? error;
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (context, setSheetState) => AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.fromLTRB(
+          18,
+          0,
+          18,
+          MediaQuery.viewInsetsOf(context).bottom +
+              MediaQuery.viewPaddingOf(context).bottom +
+              18,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Confirm customer pickup',
+                style: TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                '${session.workspaceOrderCustomer} · ₹${session.workspaceOrderAmount}',
+                style: const TextStyle(color: MoolColors.muted),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Enter the 6-digit pickup code shown to the customer. The invoice is created after confirmation.',
+                style: TextStyle(color: MoolColors.muted),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: const Key('work-pickup-code'),
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                maxLength: 6,
+                onChanged: (value) => pickupCode = value,
+                decoration: InputDecoration(
+                  labelText: 'Customer pickup code',
+                  errorText: error,
+                  prefixIcon: const Icon(Icons.password_rounded),
+                ),
+              ),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                key: const Key('work-pickup-confirm'),
+                onPressed: session.workspaceHandoverBusy
+                    ? null
+                    : () async {
+                        final success = await session.verifyWorkspacePickup(
+                          pickupCode,
+                        );
+                        if (!sheetContext.mounted) return;
+                        if (!success) {
+                          setSheetState(() => error = session.errorMessage);
+                          return;
+                        }
+                        final invoice = session.latestWorkspaceInvoice;
+                        Navigator.of(sheetContext).pop();
+                        await Future<void>.delayed(
+                          const Duration(milliseconds: 260),
+                        );
+                        if (invoice != null && pageContext.mounted) {
+                          await _showWorkspaceInvoiceSheet(
+                            pageContext,
+                            session,
+                            invoice,
+                          );
+                        }
+                      },
+                icon: const Icon(Icons.verified_rounded),
+                label: const Text('Confirm pickup'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _InvoiceReadyActivityCard extends StatelessWidget {
@@ -2543,7 +2716,7 @@ class _DeliveryActivityCard extends StatelessWidget {
                     fit: BoxFit.scaleDown,
                     child: _LiveCountdownText(
                       deadline: assignment?.eta,
-                      fallback: assignment == null ? 'Assigning' : 'Live',
+                      fallback: assignment == null ? 'Finding rider' : 'Live',
                       style: const TextStyle(
                         color: Color(0xFF08765D),
                         fontWeight: FontWeight.w900,
@@ -2571,17 +2744,16 @@ class _DeliveryActivityCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        assignment?.partnerName ??
-                            'Delivery partner assignment pending',
+                        assignment?.partnerName ?? 'Finding a delivery partner',
                         style: const TextStyle(
                           color: MoolColors.ink,
-                          fontSize: 18,
+                          fontSize: 17,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                       Text(
                         assignment == null
-                            ? 'You can continue after a partner accepts.'
+                            ? 'We will alert you when a rider accepts.'
                             : '${assignment.vehicleLabel} · ${assignment.stage}',
                         style: const TextStyle(color: MoolColors.muted),
                       ),
@@ -2590,11 +2762,54 @@ class _DeliveryActivityCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 26),
-            _DeliveryProgressTrack(stage: assignment?.stage),
-            const SizedBox(height: 24),
+            if (assignment != null) ...[
+              const SizedBox(height: 16),
+              _DeliveryProgressTrack(stage: assignment.stage),
+            ],
+            if (assignment == null &&
+                session.workspaceOperationsSyncError != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF0EE),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: Color(0xFFB42318),
+                      size: 19,
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        session.workspaceOperationsSyncError!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF8B211B),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      key: const Key('work-delivery-retry'),
+                      onPressed: session.workspaceOperationsSyncing
+                          ? null
+                          : session.retryWorkspaceDeliveryAssignment,
+                      child: const Text('Try again'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
             Text(
               session.workspaceOrderCustomer,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: MoolColors.ink,
                 fontSize: 17,
@@ -2611,11 +2826,29 @@ class _DeliveryActivityCard extends StatelessWidget {
                     : MoolColors.muted,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
+                    key: const Key('work-delivery-call-customer'),
+                    onPressed: () {
+                      final digits = session.workspaceOrderCustomer.replaceAll(
+                        RegExp(r'[^0-9]'),
+                        '',
+                      );
+                      if (digits.length >= 10) {
+                        unawaited(launchUrl(Uri(scheme: 'tel', path: digits)));
+                      }
+                    },
+                    icon: const Icon(Icons.call_outlined, size: 18),
+                    label: const Text('Call'),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('work-delivery-chat-customer'),
                     onPressed: () => context.push(
                       Uri(
                         path: '/app/chat/inbox',
@@ -2626,25 +2859,52 @@ class _DeliveryActivityCard extends StatelessWidget {
                         },
                       ).toString(),
                     ),
-                    icon: const Icon(Icons.chat_bubble_outline_rounded),
+                    icon: const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 18,
+                    ),
                     label: const Text('Chat'),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(
-                  child: FilledButton.icon(
-                    key: const Key('work-activity-confirm-handover'),
-                    onPressed:
-                        assignment == null ||
-                            session.workspaceOrderAddress.isEmpty ||
-                            session.workspaceHandoverBusy
+                  child: OutlinedButton.icon(
+                    key: const Key('work-delivery-open-map'),
+                    onPressed: session.workspaceOrderAddress.isEmpty
                         ? null
-                        : () => _showWorkspaceHandoverSheet(context, session),
-                    icon: const Icon(Icons.qr_code_scanner_rounded),
-                    label: const Text('Confirm handover'),
+                        : () => unawaited(
+                            launchUrl(
+                              Uri.https('www.google.com', '/maps/search/', {
+                                'api': '1',
+                                'query': session.workspaceOrderAddress,
+                              }),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                          ),
+                    icon: const Icon(Icons.map_outlined, size: 18),
+                    label: const Text('Map'),
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const Key('work-activity-confirm-handover'),
+                onPressed:
+                    assignment == null ||
+                        session.workspaceOrderAddress.isEmpty ||
+                        session.workspaceHandoverBusy
+                    ? null
+                    : () => _showWorkspaceHandoverSheet(context, session),
+                icon: const Icon(Icons.qr_code_scanner_rounded, size: 19),
+                label: Text(
+                  assignment == null
+                      ? 'Waiting for rider'
+                      : 'Confirm rider pickup',
+                ),
+              ),
             ),
           ],
         ),
@@ -2660,46 +2920,67 @@ class _DeliveryProgressTrack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const steps = ['Assigned', 'At store', 'Collected', 'Delivered'];
+    const steps = ['Assigned', 'At store', 'Picked up', 'Delivered'];
     final currentIndex = stage == null
         ? -1
         : steps.indexWhere(
-            (step) => step.toLowerCase() == stage!.trim().toLowerCase(),
+            (step) =>
+                step.toLowerCase() == stage!.trim().toLowerCase() ||
+                (step == 'Picked up' &&
+                    stage!.trim().toLowerCase() == 'collected'),
           );
-    return Row(
-      children: [
-        for (var index = 0; index < steps.length; index++) ...[
-          Expanded(
-            child: Column(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 320),
-                  width: index == currentIndex ? 18 : 12,
-                  height: index == currentIndex ? 18 : 12,
-                  decoration: BoxDecoration(
-                    color: index <= currentIndex
-                        ? const Color(0xFF08765D)
-                        : const Color(0xFFDCE2F2),
-                    shape: BoxShape.circle,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F8F6),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          for (var index = 0; index < steps.length; index++)
+            Expanded(
+              child: Column(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 320),
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: index <= currentIndex
+                          ? const Color(0xFF08765D)
+                          : const Color(0xFFDCE2F2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      index < currentIndex
+                          ? Icons.check_rounded
+                          : index == currentIndex
+                          ? Icons.circle
+                          : Icons.circle_outlined,
+                      color: index <= currentIndex
+                          ? Colors.white
+                          : MoolColors.muted,
+                      size: index == currentIndex ? 10 : 14,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  steps[index] == 'Collected' ? 'Pickup' : steps[index],
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: MoolColors.muted,
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w700,
+                  const SizedBox(height: 5),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      steps[index],
+                      maxLines: 1,
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          if (index < steps.length - 1)
-            const Expanded(child: Divider(height: 1)),
         ],
-      ],
+      ),
     );
   }
 }

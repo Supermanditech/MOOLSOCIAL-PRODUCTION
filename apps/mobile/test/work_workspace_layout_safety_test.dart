@@ -1513,6 +1513,59 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Packing counts units and keeps customer help visible', (
+    tester,
+  ) async {
+    final work = liveStore();
+    seedIncomingOrder(work, stage: 'Preparing', delivery: true);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    expect(find.text('0 of 3 units packed'), findsOneWidget);
+    expect(
+      find.byKey(const Key('work-packing-contact-customer')).hitTestable(),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('work-pack-summary-0')));
+    await tester.pump();
+    expect(find.text('2 of 3 units packed'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Delivery keeps call Chat map and handover actions visible', (
+    tester,
+  ) async {
+    final work = liveStore();
+    seedIncomingOrder(work, stage: 'Ready', delivery: true);
+    work.workspaceDeliveryAssignment = WorkspaceDeliveryAssignment(
+      orderId: 'current-store-order',
+      partnerName: 'Ravi Kumar',
+      vehicleLabel: 'Bike RJ19 AB 1234',
+      eta: DateTime.now().add(const Duration(minutes: 8)),
+      stage: 'Assigned',
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+      textScale: 1.4,
+    );
+
+    expect(find.text('Assigned'), findsOneWidget);
+    expect(find.text('At store'), findsOneWidget);
+    expect(find.text('Picked up'), findsOneWidget);
+    expect(find.text('Delivered'), findsOneWidget);
+    for (final key in const [
+      'work-delivery-call-customer',
+      'work-delivery-chat-customer',
+      'work-delivery-open-map',
+      'work-activity-confirm-handover',
+    ]) {
+      expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Settings owns configuration and excludes SKU commercial data', (
     tester,
   ) async {
@@ -1672,6 +1725,18 @@ void main() {
     expect(find.byKey(const Key('work-activity-pickup-ready')), findsOne);
     expect(find.text('Delivery partner assignment pending'), findsNothing);
     await tester.tap(find.byKey(const Key('work-confirm-customer-pickup')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-pickup-code')), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('work-pickup-code')), '123');
+    await tester.tap(find.byKey(const Key('work-pickup-confirm')));
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderStage, 'Ready for pickup');
+    expect(
+      find.text('Enter the 6-digit pickup code shared with the customer.'),
+      findsWidgets,
+    );
+    await tester.enterText(find.byKey(const Key('work-pickup-code')), '123456');
+    await tester.tap(find.byKey(const Key('work-pickup-confirm')));
     await tester.pumpAndSettle();
     expect(work.workspaceOrderStage, 'Completed');
     expect(find.byKey(const Key('work-invoice-share-chat')), findsOne);
@@ -2094,6 +2159,64 @@ void main() {
         afterMount: () async {
           await tester.tap(find.byKey(const Key('work-pulse-orders')));
         },
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - pickup ready',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore();
+      seedIncomingOrder(work, stage: 'Ready for pickup');
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-v1-local-review-20260903',
+        fileName: '06-store-live-pickup-ready-412x915.png',
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - pickup code',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore();
+      seedIncomingOrder(work, stage: 'Ready for pickup');
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-v1-local-review-20260903',
+        fileName: '07-store-live-pickup-code-412x915.png',
+        target: find.byType(MaterialApp),
+        afterMount: () async {
+          await tester.tap(
+            find.byKey(const Key('work-confirm-customer-pickup')),
+          );
+        },
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - assigned delivery',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore();
+      seedIncomingOrder(work, stage: 'Ready', delivery: true);
+      work.workspaceDeliveryAssignment = WorkspaceDeliveryAssignment(
+        orderId: 'current-store-order',
+        partnerName: 'Ravi Kumar',
+        vehicleLabel: 'Bike RJ19 AB 1234',
+        eta: DateTime.now().add(const Duration(minutes: 8)),
+        stage: 'Assigned',
+      );
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-v1-local-review-20260903',
+        fileName: '08-store-live-delivery-assigned-412x915.png',
       );
     },
   );
