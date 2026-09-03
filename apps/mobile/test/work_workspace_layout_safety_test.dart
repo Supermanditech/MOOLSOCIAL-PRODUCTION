@@ -1803,6 +1803,55 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'customer OTP completes delivery without a sheet lifecycle error',
+    (tester) async {
+      final work = liveStore();
+      seedIncomingOrder(work, stage: 'Delivery requested', delivery: true);
+      work.currentWorkspaceOrderId = 'current-store-order';
+      work.workspaceOrders.add(
+        WorkspaceOrderRecord(
+          id: 'current-store-order',
+          customer: work.workspaceOrderCustomer,
+          items: work.workspaceOrderItems,
+          quantities: const {'oil-fortune-1l': 1},
+          amount: 1468,
+          source: work.workspaceOrderSource,
+          fulfilment: work.workspaceOrderFulfilment,
+          payment: work.workspaceOrderPayment,
+          address: work.workspaceOrderAddress,
+          stage: 'Delivery requested',
+          needsDelivery: true,
+          createdAt: DateTime(2026, 9, 4, 4, 45),
+        ),
+      );
+      work.workspaceDeliveryAssignment = WorkspaceDeliveryAssignment(
+        orderId: 'current-store-order',
+        partnerName: 'Ravi Kumar',
+        vehicleLabel: 'Bike RJ19 AB 1234',
+        eta: DateTime.now().add(const Duration(minutes: 8)),
+        stage: 'Assigned',
+      );
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+      await tester.tap(find.byKey(const Key('work-activity-confirm-handover')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('work-handover-otp')),
+        '123456',
+      );
+      final confirm = find.byKey(const Key('work-handover-confirm'));
+      await tester.ensureVisible(confirm);
+      await tester.pump();
+      await tester.tap(confirm.hitTestable());
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderStage, 'Completed');
+      expect(work.workspaceInvoices, isNotEmpty);
+      expect(find.byKey(const Key('work-handover-otp')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('Settings owns configuration and excludes SKU commercial data', (
     tester,
   ) async {

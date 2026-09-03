@@ -3089,75 +3089,95 @@ Future<void> _showWorkspaceHandoverSheet(
   BuildContext context,
   WorkSession session,
 ) async {
-  final controller = TextEditingController();
-  String? error;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (sheetContext) => StatefulBuilder(
-      builder: (context, setSheetState) => AnimatedPadding(
-        duration: const Duration(milliseconds: 180),
-        padding: EdgeInsets.fromLTRB(
-          18,
-          0,
-          18,
-          MediaQuery.viewInsetsOf(context).bottom + 18,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Confirm customer handover',
-              style: TextStyle(
-                color: MoolColors.navy,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const Text(
-              'Enter the 6-digit OTP shared by the customer after receiving the order.',
-              style: TextStyle(color: MoolColors.muted),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('work-handover-otp'),
-              controller: controller,
-              autofocus: true,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              decoration: InputDecoration(
-                labelText: 'Customer delivery OTP',
-                errorText: error,
-                prefixIcon: const Icon(Icons.password_rounded),
-              ),
-            ),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              key: const Key('work-handover-confirm'),
-              onPressed: session.workspaceHandoverBusy
-                  ? null
-                  : () async {
-                      final success = await session.verifyWorkspaceHandover(
-                        controller.text,
-                      );
-                      if (success && sheetContext.mounted) {
-                        Navigator.of(sheetContext).pop();
-                      } else if (sheetContext.mounted) {
-                        setSheetState(() => error = session.errorMessage);
-                      }
-                    },
-              icon: const Icon(Icons.verified_rounded),
-              label: const Text('Verify and complete order'),
-            ),
-          ],
-        ),
-      ),
-    ),
+    builder: (_) => _WorkspaceHandoverSheet(session: session),
   );
-  controller.dispose();
+}
+
+class _WorkspaceHandoverSheet extends StatefulWidget {
+  const _WorkspaceHandoverSheet({required this.session});
+
+  final WorkSession session;
+
+  @override
+  State<_WorkspaceHandoverSheet> createState() =>
+      _WorkspaceHandoverSheetState();
+}
+
+class _WorkspaceHandoverSheetState extends State<_WorkspaceHandoverSheet> {
+  final TextEditingController _controller = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      padding: EdgeInsets.fromLTRB(
+        18,
+        0,
+        18,
+        MediaQuery.viewInsetsOf(context).bottom + 18,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Confirm customer handover',
+            style: TextStyle(
+              color: MoolColors.navy,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const Text(
+            'Enter the 6-digit OTP shared by the customer after receiving the order.',
+            style: TextStyle(color: MoolColors.muted),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('work-handover-otp'),
+            controller: _controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            decoration: InputDecoration(
+              labelText: 'Customer delivery OTP',
+              errorText: _error,
+              prefixIcon: const Icon(Icons.password_rounded),
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            key: const Key('work-handover-confirm'),
+            onPressed: widget.session.workspaceHandoverBusy
+                ? null
+                : () async {
+                    final success = await widget.session
+                        .verifyWorkspaceHandover(_controller.text);
+                    if (success && mounted) {
+                      Navigator.of(this.context).pop();
+                    } else if (mounted) {
+                      setState(() => _error = widget.session.errorMessage);
+                    }
+                  },
+            icon: const Icon(Icons.verified_rounded),
+            label: const Text('Verify and complete order'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _StockActivityCard extends StatelessWidget {
