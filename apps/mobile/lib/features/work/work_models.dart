@@ -115,6 +115,36 @@ class WorkspaceOrderRecord {
   );
 }
 
+class WorkspaceCustomerRecord {
+  const WorkspaceCustomerRecord({
+    required this.id,
+    required this.name,
+    required this.mobile,
+    required this.orders,
+    required this.totalSpend,
+    required this.amountDue,
+    required this.lastPurchaseAt,
+    required this.followingStore,
+    required this.messagesAllowed,
+    this.lastContactAt,
+  });
+
+  final String id;
+  final String name;
+  final String mobile;
+  final List<WorkspaceOrderRecord> orders;
+  final int totalSpend;
+  final int amountDue;
+  final DateTime lastPurchaseAt;
+  final bool followingStore;
+  final bool messagesAllowed;
+  final DateTime? lastContactAt;
+
+  int get orderCount => orders.length;
+  int get averageBasket => orderCount == 0 ? 0 : totalSpend ~/ orderCount;
+  bool get repeatCustomer => orderCount > 1;
+}
+
 class WorkspaceDeliveryAssignment {
   const WorkspaceDeliveryAssignment({
     required this.orderId,

@@ -5344,11 +5344,12 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     if (operation == _WorkspaceOperation.customers) {
       return _CustomersDestinationSurface(
         session: session,
-        onRepeatBasket: () {
-          if (session.prepareRepeatWorkspaceOrder()) {
+        onRepeatBasket: (customerId) {
+          if (session.prepareRepeatWorkspaceOrderFor(customerId: customerId)) {
             onOpenOperation(_WorkspaceOperation.counterOrder);
           }
         },
+        onOffer: () => onOpenOperation(_WorkspaceOperation.offers),
       );
     }
     if (operation == _WorkspaceOperation.payments) {
@@ -10485,8 +10486,726 @@ class _DeliverySourceIcon extends StatelessWidget {
   }
 }
 
-class _CustomersDestinationSurface extends StatelessWidget {
+class _CustomersDestinationSurface extends StatefulWidget {
   const _CustomersDestinationSurface({
+    required this.session,
+    required this.onRepeatBasket,
+    required this.onOffer,
+  });
+
+  final WorkSession session;
+  final ValueChanged<String> onRepeatBasket;
+  final VoidCallback onOffer;
+
+  @override
+  State<_CustomersDestinationSurface> createState() =>
+      _CustomersDestinationSurfaceState();
+}
+
+class _CustomersDestinationSurfaceState
+    extends State<_CustomersDestinationSurface> {
+  late final TextEditingController _search = TextEditingController(
+    text: widget.session.workspaceCustomerSearch,
+  );
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _call(WorkspaceCustomerRecord customer) async {
+    final digits = customer.mobile.replaceAll(RegExp(r'\D'), '');
+    final opened =
+        digits.length >= 10 &&
+        await launchUrl(Uri(scheme: 'tel', path: digits));
+    if (opened) {
+      widget.session.markWorkspaceCustomerContacted(customer.id);
+    } else {
+      widget.session.showError('Calling could not open on this device.');
+    }
+  }
+
+  Future<void> _whatsApp(WorkspaceCustomerRecord customer) async {
+    final digits = customer.mobile.replaceAll(RegExp(r'\D'), '');
+    final number = digits.length > 10 ? digits : '91$digits';
+    final uri = Uri.https('wa.me', '/$number', {
+      'text':
+          'Hello ${customer.name}, this is ${widget.session.activeWorkspace?.name ?? widget.session.workName}.',
+    });
+    final opened =
+        digits.length >= 10 &&
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (opened) {
+      widget.session.markWorkspaceCustomerContacted(customer.id);
+    } else {
+      widget.session.showError(
+        'WhatsApp could not open. You can contact this customer through MoolSocial Chat.',
+      );
+    }
+  }
+
+  void _chat(BuildContext context, WorkspaceCustomerRecord customer) {
+    widget.session.markWorkspaceCustomerContacted(customer.id);
+    context.push(
+      Uri(
+        path: '/app/chat/inbox',
+        queryParameters: {
+          'return': GoRouterState.of(context).uri.toString(),
+          'type': 'business',
+          'recipient': customer.mobile,
+          'name': customer.name,
+          'draft': 'Customer support for ${customer.name}',
+        },
+      ).toString(),
+    );
+  }
+
+  void _invoice(BuildContext context, WorkspaceCustomerRecord customer) {
+    final invoice = widget.session.workspaceInvoices
+        .where(
+          (invoice) =>
+              widget.session.workspaceCustomerId(invoice.customer) ==
+              customer.id,
+        )
+        .firstOrNull;
+    if (invoice == null) {
+      widget.session.showError(
+        'No invoice is available for this customer yet.',
+      );
+      return;
+    }
+    _showWorkspaceInvoiceSheet(context, widget.session, invoice);
+  }
+
+  Future<void> _showCustomer(
+    BuildContext context,
+    WorkspaceCustomerRecord customer,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) => FractionallySizedBox(
+        heightFactor: .72,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: const Color(0xFFE5EAFF),
+                    foregroundColor: MoolColors.navy,
+                    child: Text(
+                      customer.name.substring(0, 1).toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          customer.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: MoolColors.navy,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          customer.mobile,
+                          style: const TextStyle(color: MoolColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (customer.amountDue > 0)
+                    Text(
+                      '₹${customer.amountDue} due',
+                      style: const TextStyle(
+                        color: Color(0xFFB42318),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _CustomerAction(
+                      icon: Icons.call_outlined,
+                      label: 'Call',
+                      onTap: () => _call(customer),
+                    ),
+                  ),
+                  Expanded(
+                    child: _CustomerAction(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      label: 'Chat',
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _chat(context, customer);
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: _CustomerAction(
+                      icon: Icons.message_outlined,
+                      label: 'WhatsApp',
+                      onTap: () => _whatsApp(customer),
+                    ),
+                  ),
+                  Expanded(
+                    child: _CustomerAction(
+                      keyName: 'work-customer-repeat',
+                      icon: Icons.repeat_rounded,
+                      label: 'Repeat',
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        widget.onRepeatBasket(customer.id);
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: _CustomerAction(
+                      icon: Icons.receipt_long_outlined,
+                      label: 'Invoice',
+                      onTap: () => _invoice(sheetContext, customer),
+                    ),
+                  ),
+                  Expanded(
+                    child: _CustomerAction(
+                      icon: Icons.local_offer_outlined,
+                      label: customer.messagesAllowed
+                          ? 'Send offer'
+                          : 'Offer locked',
+                      onTap: customer.messagesAllowed
+                          ? () {
+                              Navigator.pop(sheetContext);
+                              widget.onOffer();
+                            }
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  _CustomerMiniFact(
+                    label: 'Orders',
+                    value: '${customer.orderCount}',
+                  ),
+                  _CustomerMiniFact(
+                    label: 'Spent',
+                    value: '₹${_formatStoreAmount(customer.totalSpend)}',
+                  ),
+                  _CustomerMiniFact(
+                    label: 'Average',
+                    value: '₹${_formatStoreAmount(customer.averageBasket)}',
+                  ),
+                ],
+              ),
+            ),
+            if (!customer.messagesAllowed)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 2),
+                child: Text(
+                  'Order help remains available. Send promotional offers only after the customer allows store messages.',
+                  style: TextStyle(color: MoolColors.muted, fontSize: 10),
+                ),
+              ),
+            const Divider(height: 18),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                itemCount: customer.orders.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 7),
+                itemBuilder: (context, index) {
+                  final order = customer.orders[index];
+                  return WorkCard(
+                    keyName: 'work-customer-order-${order.id}',
+                    padding: const EdgeInsets.all(10),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.receipt_long_outlined),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                order.items,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: MoolColors.ink,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              Text(
+                                '${order.payment} · ${order.stage} · ${order.createdAt.day}/${order.createdAt.month}/${order.createdAt.year}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: MoolColors.muted,
+                                  fontSize: 9.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '₹${order.amount}',
+                          style: const TextStyle(
+                            color: MoolColors.navy,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _chooseCustomPeriod(BuildContext context) async {
+    final now = DateTime.now();
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 3),
+      lastDate: now,
+      initialDateRange:
+          widget.session.workspaceCustomerCustomStart != null &&
+              widget.session.workspaceCustomerCustomEnd != null
+          ? DateTimeRange(
+              start: widget.session.workspaceCustomerCustomStart!,
+              end: widget.session.workspaceCustomerCustomEnd!,
+            )
+          : null,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: MediaQuery.textScalerOf(
+            context,
+          ).clamp(minScaleFactor: 1, maxScaleFactor: 1.2),
+        ),
+        child: child!,
+      ),
+    );
+    if (range != null) {
+      widget.session.setWorkspaceCustomerCustomPeriod(range.start, range.end);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final customers = widget.session.visibleWorkspaceCustomers;
+    final allCustomers = widget.session.workspaceCustomerBook;
+    final repeat = allCustomers
+        .where((customer) => customer.repeatCustomer)
+        .length;
+    final due = allCustomers.fold<int>(
+      0,
+      (total, customer) => total + customer.amountDue,
+    );
+    return Container(
+      key: const Key('work-customers-destination'),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFF9FAFF), Color(0xFFEEF2FF)],
+        ),
+      ),
+      child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 28),
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Customers',
+                  style: TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              _CustomerHeaderFact(
+                label: 'Total',
+                value: '${allCustomers.length}',
+              ),
+              _CustomerHeaderFact(label: 'Repeat', value: '$repeat'),
+              _CustomerHeaderFact(
+                label: 'Due',
+                value: '₹${_formatStoreAmount(due)}',
+                attention: due > 0,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            key: const Key('work-customer-search'),
+            controller: _search,
+            onChanged: widget.session.updateWorkspaceCustomerSearch,
+            textInputAction: TextInputAction.search,
+            decoration: const InputDecoration(
+              hintText: 'Search name or mobile',
+              prefixIcon: Icon(Icons.search_rounded),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 42,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: 5,
+              separatorBuilder: (_, _) => const SizedBox(width: 6),
+              itemBuilder: (context, index) {
+                final filter = const [
+                  'Recent',
+                  'Repeat',
+                  'Payment due',
+                  'Following Store',
+                  'Messages allowed',
+                ][index];
+                return ChoiceChip(
+                  key: Key(
+                    'work-customer-filter-${filter.toLowerCase().replaceAll(' ', '-')}',
+                  ),
+                  label: Text(filter),
+                  selected: widget.session.workspaceCustomerFilter == filter,
+                  onSelected: (_) =>
+                      widget.session.setWorkspaceCustomerFilter(filter),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 7),
+          if (customers.isEmpty)
+            const _StoreEmptyPanel(
+              icon: Icons.people_outline_rounded,
+              title: 'No customers found',
+              detail:
+                  'Completed counter, phone, Chat and app orders will build your customer book.',
+            )
+          else
+            for (final customer in customers) ...[
+              _CustomerBookRow(
+                customer: customer,
+                onOpen: () => _showCustomer(context, customer),
+                onCall: () => _call(customer),
+                onChat: () => _chat(context, customer),
+              ),
+              const SizedBox(height: 6),
+            ],
+          const SizedBox(height: 6),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                children: [
+                  const Icon(Icons.date_range_outlined, size: 18),
+                  const SizedBox(width: 7),
+                  const Expanded(
+                    child: Text(
+                      'Customer statement',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  DropdownButton<String>(
+                    key: const Key('work-customer-period'),
+                    value: widget.session.workspaceCustomerPeriod,
+                    underline: const SizedBox.shrink(),
+                    items: const [
+                      DropdownMenuItem(value: 'Week', child: Text('Week')),
+                      DropdownMenuItem(value: 'Month', child: Text('Month')),
+                      DropdownMenuItem(
+                        value: 'Quarter',
+                        child: Text('Quarter'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Financial year',
+                        child: Text('Financial year'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Custom',
+                        child: Text('Custom dates'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == 'Custom') {
+                        _chooseCustomPeriod(context);
+                      } else if (value != null) {
+                        widget.session.setWorkspaceCustomerPeriod(value);
+                      }
+                    },
+                  ),
+                  IconButton(
+                    key: const Key('work-customer-custom-period'),
+                    tooltip: 'Choose custom dates',
+                    onPressed: () => _chooseCustomPeriod(context),
+                    icon: const Icon(Icons.tune_rounded),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomerBookRow extends StatelessWidget {
+  const _CustomerBookRow({
+    required this.customer,
+    required this.onOpen,
+    required this.onCall,
+    required this.onChat,
+  });
+
+  final WorkspaceCustomerRecord customer;
+  final VoidCallback onOpen;
+  final VoidCallback onCall;
+  final VoidCallback onChat;
+
+  @override
+  Widget build(BuildContext context) {
+    final lastContact = customer.lastContactAt;
+    return Material(
+      key: Key('work-customer-${customer.id}'),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(9, 7, 4, 7),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 19,
+                backgroundColor: const Color(0xFFE5EAFF),
+                foregroundColor: MoolColors.navy,
+                child: Text(
+                  customer.name.substring(0, 1).toUpperCase(),
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customer.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      '${customer.mobile} · ${customer.orderCount} orders · ₹${_formatStoreAmount(customer.totalSpend)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 9,
+                      ),
+                    ),
+                    Text(
+                      customer.amountDue > 0
+                          ? '₹${customer.amountDue} payment due'
+                          : lastContact == null
+                          ? 'Last purchase ${customer.lastPurchaseAt.day}/${customer.lastPurchaseAt.month}'
+                          : 'Contacted ${lastContact.day}/${lastContact.month}',
+                      style: TextStyle(
+                        color: customer.amountDue > 0
+                            ? const Color(0xFFB42318)
+                            : const Color(0xFF08765D),
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                key: Key('work-customer-call-${customer.id}'),
+                tooltip: 'Call ${customer.name}',
+                visualDensity: VisualDensity.compact,
+                onPressed: onCall,
+                icon: const Icon(Icons.call_outlined, size: 19),
+              ),
+              IconButton(
+                key: Key('work-customer-chat-${customer.id}'),
+                tooltip: 'Chat with ${customer.name}',
+                visualDensity: VisualDensity.compact,
+                onPressed: onChat,
+                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 19),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomerHeaderFact extends StatelessWidget {
+  const _CustomerHeaderFact({
+    required this.label,
+    required this.value,
+    this.attention = false,
+  });
+
+  final String label;
+  final String value;
+  final bool attention;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              color: attention ? const Color(0xFFB42318) : MoolColors.navy,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(color: MoolColors.muted, fontSize: 8),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomerMiniFact extends StatelessWidget {
+  const _CustomerMiniFact({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F6FF),
+          borderRadius: BorderRadius.circular(13),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(color: MoolColors.muted, fontSize: 9),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomerAction extends StatelessWidget {
+  const _CustomerAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.keyName,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final String? keyName;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: keyName == null ? null : Key(keyName!),
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: SizedBox(
+        width: 74,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 19,
+              backgroundColor: onTap == null
+                  ? const Color(0xFFF0F1F5)
+                  : const Color(0xFFE5EAFF),
+              foregroundColor: onTap == null
+                  ? MoolColors.muted
+                  : MoolColors.navy,
+              child: Icon(icon, size: 19),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: onTap == null ? MoolColors.muted : MoolColors.navy,
+                fontSize: 8.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
+class _LegacyCustomersDestinationSurface extends StatelessWidget {
+  const _LegacyCustomersDestinationSurface({
     required this.session,
     required this.onRepeatBasket,
   });
@@ -10822,51 +11541,115 @@ class _MoneyDestinationSurface extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            '₹${session.workspaceSettlementEligible}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 42,
-              height: 1,
-              fontWeight: FontWeight.w900,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  '₹${_formatStoreAmount(session.workspaceSettlementEligible)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 38,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 136,
+                child: FilledButton.icon(
+                  key: const Key('work-money-request-settlement'),
+                  onPressed:
+                      session.workspaceSettlementEligible > 0 && !session.busy
+                      ? () => _showWorkspaceSettlementReview(context, session)
+                      : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF52E5A3),
+                    foregroundColor: const Color(0xFF071B19),
+                  ),
+                  icon: const Icon(Icons.account_balance_outlined, size: 18),
+                  label: const FittedBox(child: Text('Request')),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           Row(
             children: [
               _MoneyDestinationFact(
                 label: 'Sales today',
-                value: '₹${session.workspaceSalesToday}',
+                value: '₹${_formatStoreAmount(session.workspaceSalesToday)}',
               ),
               _MoneyDestinationFact(
-                label: 'Pending fulfilment',
+                label: 'Sales awaiting completion',
                 value: '₹$pendingFulfilment',
               ),
               _MoneyDestinationFact(
-                label: 'Requested',
+                label: 'Settlement requested',
                 value: '₹${session.workspaceSettlementRequested}',
               ),
             ],
           ),
-          const SizedBox(height: 22),
-          Wrap(
-            spacing: 7,
-            runSpacing: 7,
+          const SizedBox(height: 14),
+          Row(
             children: [
-              for (final period in const [
-                'Today',
-                'Week',
-                'Month',
-                'Financial year',
-              ])
-                ChoiceChip(
-                  label: Text(period),
-                  selected: session.workspaceMoneyPeriod == period,
-                  onSelected: (_) => session.setWorkspaceMoneyPeriod(period),
+              const Expanded(
+                child: Text(
+                  'Payment statement',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
+              ),
+              PopupMenuButton<String>(
+                key: const Key('work-money-period'),
+                tooltip: 'Choose statement period',
+                onSelected: session.setWorkspaceMoneyPeriod,
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'Today', child: Text('Today')),
+                  PopupMenuItem(value: 'Week', child: Text('Week')),
+                  PopupMenuItem(value: 'Month', child: Text('Month')),
+                  PopupMenuItem(
+                    value: 'Financial year',
+                    child: Text('Financial year'),
+                  ),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        session.workspaceMoneyPeriod,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.expand_more_rounded,
+                        color: Colors.white,
+                        size: 17,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -10876,20 +11659,33 @@ class _MoneyDestinationSurface extends StatelessWidget {
             child: Column(
               children: [
                 _MoneyDestinationLine(
-                  label: 'Completed sales',
-                  value: '${session.workspaceCompletedSalesCount}',
+                  label: 'Completed-sale balance',
+                  value:
+                      '₹${_formatStoreAmount(session.workspaceSettlementBalance + session.workspaceSettlementRequested)}',
                 ),
                 _MoneyDestinationLine(
-                  label: 'Platform and fulfilment adjustments',
-                  value: '₹${session.workspacePlatformAdjustments}',
+                  label: 'MoolSocial fees',
+                  value:
+                      '− ₹${_formatStoreAmount(session.workspacePlatformAdjustments)}',
+                ),
+                _MoneyDestinationLine(
+                  label: 'Delivery adjustments',
+                  value:
+                      '− ₹${_formatStoreAmount(session.workspaceDeliveryAdjustments)}',
                 ),
                 _MoneyDestinationLine(
                   label: 'Refunds and holds',
-                  value: '₹${session.workspaceRefunds}',
+                  value: '− ₹${_formatStoreAmount(session.workspaceRefunds)}',
                 ),
                 _MoneyDestinationLine(
                   label: 'Tax withheld',
-                  value: '₹${session.workspaceTaxWithheld}',
+                  value:
+                      '− ₹${_formatStoreAmount(session.workspaceTaxWithheld)}',
+                ),
+                _MoneyDestinationLine(
+                  label: 'Net available',
+                  value:
+                      '₹${_formatStoreAmount(session.workspaceSettlementEligible)}',
                 ),
               ],
             ),
@@ -10970,21 +11766,22 @@ class _MoneyDestinationSurface extends StatelessWidget {
                   style: const TextStyle(color: Color(0xFFBFC6FF)),
                 ),
               ),
-          const SizedBox(height: 22),
-          FilledButton(
-            onPressed: session.workspaceSettlementEligible > 0 && !session.busy
-                ? () => _showWorkspaceSettlementReview(context, session)
-                : null,
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF52E5A3),
-              foregroundColor: const Color(0xFF071B19),
-            ),
-            child: const Text('Review and request settlement'),
-          ),
         ],
       ),
     );
   }
+}
+
+String _settlementExpectedDateLabel() {
+  var date = DateTime.now();
+  var workingDays = 0;
+  while (workingDays < 2) {
+    date = date.add(const Duration(days: 1));
+    if (date.weekday != DateTime.saturday && date.weekday != DateTime.sunday) {
+      workingDays++;
+    }
+  }
+  return '${date.day}/${date.month}/${date.year}';
 }
 
 Future<void> _showWorkspaceSettlementReview(
@@ -11013,6 +11810,7 @@ Future<void> _showWorkspaceSettlementReview(
                 18,
           ),
           child: Column(
+            key: const Key('work-settlement-review'),
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -11041,33 +11839,58 @@ Future<void> _showWorkspaceSettlementReview(
                 color: const Color(0xFFF4F6FF),
                 child: Column(
                   children: [
-                    const _ProductPreviewLine(
-                      label: 'Payout destination',
-                      value: 'Workspace bank account',
+                    _ProductPreviewLine(
+                      label: 'Receiving account',
+                      value: session.workspacePayoutBankName.isEmpty
+                          ? 'Bank details required'
+                          : '${session.workspacePayoutBankName} · •••• ${session.workspacePayoutAccountEnding}',
                     ),
                     _ProductPreviewLine(
-                      label: 'Platform adjustments',
-                      value: '₹${session.workspacePlatformAdjustments}',
+                      label: 'MoolSocial fees',
+                      value:
+                          '₹${_formatStoreAmount(session.workspacePlatformAdjustments)}',
+                    ),
+                    _ProductPreviewLine(
+                      label: 'Delivery adjustments',
+                      value:
+                          '₹${_formatStoreAmount(session.workspaceDeliveryAdjustments)}',
                     ),
                     _ProductPreviewLine(
                       label: 'Refunds and holds',
-                      value: '₹${session.workspaceRefunds}',
+                      value: '₹${_formatStoreAmount(session.workspaceRefunds)}',
                     ),
                     _ProductPreviewLine(
                       label: 'Tax withheld',
-                      value: '₹${session.workspaceTaxWithheld}',
+                      value:
+                          '₹${_formatStoreAmount(session.workspaceTaxWithheld)}',
                     ),
-                    const _ProductPreviewLine(
-                      label: 'Expected processing',
-                      value: 'Up to 2 working days',
+                    _ProductPreviewLine(
+                      label: 'Net payout requested',
+                      value: '₹${controller.text.trim()}',
+                    ),
+                    _ProductPreviewLine(
+                      label: 'Expected by',
+                      value: _settlementExpectedDateLabel(),
                     ),
                   ],
                 ),
               ),
+              if (session.workspacePayoutBankName.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Add your receiving bank account in Business details before requesting payment.',
+                    style: TextStyle(
+                      color: Color(0xFFB42318),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 12),
               FilledButton.icon(
                 key: const Key('work-settlement-confirm'),
-                onPressed: session.busy
+                onPressed:
+                    session.busy || session.workspacePayoutBankName.isEmpty
                     ? null
                     : () async {
                         final amount = int.tryParse(controller.text.trim());
@@ -11097,7 +11920,9 @@ Future<void> _showWorkspaceSettlementReview(
       ),
     ),
   );
-  controller.dispose();
+  unawaited(
+    Future<void>.delayed(const Duration(milliseconds: 320), controller.dispose),
+  );
 }
 
 class _MoneyDestinationFact extends StatelessWidget {
@@ -12582,7 +13407,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                   onChanged: (_) => setState(() {}),
                   prefixIcon: const Icon(Icons.phone_outlined),
                 ),
-                if (_recentCustomers.isNotEmpty) ...[
+                if (_recentCustomers.isNotEmpty &&
+                    _customer.text.trim().isEmpty) ...[
                   const SizedBox(height: 7),
                   SizedBox(
                     height: 34,

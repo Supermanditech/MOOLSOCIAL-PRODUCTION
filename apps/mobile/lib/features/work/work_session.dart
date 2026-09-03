@@ -110,17 +110,22 @@ class WorkSession extends ChangeNotifier {
   DateTime? workspaceOrderActionDeadline;
   String workspaceOrderFilter = 'Live';
   String workspaceCustomerPeriod = 'Month';
+  String workspaceCustomerSearch = '';
+  String workspaceCustomerFilter = 'Recent';
   String workspaceMoneyPeriod = 'Today';
   DateTime? workspaceCustomerCustomStart;
   DateTime? workspaceCustomerCustomEnd;
   int workspaceSalesToday = 0;
   int workspaceCompletedSalesCount = 0;
   int workspacePlatformAdjustments = 0;
+  int workspaceDeliveryAdjustments = 0;
   int workspaceRefunds = 0;
   int workspaceTaxWithheld = 0;
   int workspaceSettlementBalance = 0;
   int workspaceSettlementRequested = 0;
   String? workspaceSettlementReference;
+  String workspacePayoutBankName = '';
+  String workspacePayoutAccountEnding = '';
   final List<WorkspaceCatalogueItem> workspaceCatalogueItems = [];
   final List<WorkspaceStockMovement> workspaceStockMovements = [];
   final Map<String, int> workspaceOrderQuantities = {};
@@ -142,6 +147,10 @@ class WorkSession extends ChangeNotifier {
   int workspaceCounterCount = 1;
   String? workspacePaidRequirementReference;
   final Set<String> dismissedWorkspaceAlerts = <String>{};
+  final Set<String> workspaceCustomersFollowingStore = <String>{};
+  final Set<String> workspaceCustomersAllowingMessages = <String>{};
+  final Map<String, DateTime> workspaceCustomerLastContactAt =
+      <String, DateTime>{};
 
   int get workspaceOrderItemCount => workspaceOrderQuantities.values.fold(
     0,
@@ -317,6 +326,101 @@ class WorkSession extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  String workspaceCustomerId(String customer) {
+    final digits = customer.replaceAll(RegExp(r'\D'), '');
+    if (digits.length >= 10) return digits.substring(digits.length - 10);
+    return customer.trim().toLowerCase();
+  }
+
+  List<WorkspaceCustomerRecord> get workspaceCustomerBook {
+    final grouped = <String, List<WorkspaceOrderRecord>>{};
+    for (final order in visibleWorkspaceOrders.where(
+      (order) => order.stage != 'Cancelled',
+    )) {
+      final id = workspaceCustomerId(order.customer);
+      grouped.putIfAbsent(id, () => <WorkspaceOrderRecord>[]).add(order);
+    }
+    final customers = <WorkspaceCustomerRecord>[];
+    for (final entry in grouped.entries) {
+      final orders = [...entry.value]
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final raw = orders.first.customer.trim();
+      final parts = raw
+          .split('·')
+          .map((part) => part.trim())
+          .where((part) => part.isNotEmpty)
+          .toList(growable: false);
+      final mobileMatch = RegExp(
+        r'(?:\+?91[\s-]?)?[6-9]\d(?:[\s-]?\d){8}',
+      ).firstMatch(raw);
+      final mobile = mobileMatch?.group(0)?.trim() ?? entry.key;
+      final firstPart = parts.firstOrNull ?? raw;
+      final name = RegExp(r'^\+?[\d\s-]+$').hasMatch(firstPart)
+          ? 'Customer ending ${entry.key.length >= 4 ? entry.key.substring(entry.key.length - 4) : entry.key}'
+          : firstPart;
+      final totalSpend = orders
+          .where((order) => order.stage == 'Completed')
+          .fold<int>(0, (total, order) => total + order.amount);
+      final amountDue = orders
+          .where((order) => order.payment.toLowerCase().contains('due'))
+          .fold<int>(0, (total, order) => total + order.amount);
+      customers.add(
+        WorkspaceCustomerRecord(
+          id: entry.key,
+          name: name,
+          mobile: mobile,
+          orders: List<WorkspaceOrderRecord>.unmodifiable(orders),
+          totalSpend: totalSpend,
+          amountDue: amountDue,
+          lastPurchaseAt: orders.first.createdAt,
+          followingStore: workspaceCustomersFollowingStore.contains(entry.key),
+          messagesAllowed: workspaceCustomersAllowingMessages.contains(
+            entry.key,
+          ),
+          lastContactAt: workspaceCustomerLastContactAt[entry.key],
+        ),
+      );
+    }
+    customers.sort((a, b) => b.lastPurchaseAt.compareTo(a.lastPurchaseAt));
+    return List<WorkspaceCustomerRecord>.unmodifiable(customers);
+  }
+
+  List<WorkspaceCustomerRecord> get visibleWorkspaceCustomers {
+    final query = workspaceCustomerSearch.trim().toLowerCase();
+    return workspaceCustomerBook
+        .where((customer) {
+          final searchMatch =
+              query.isEmpty ||
+              '${customer.name} ${customer.mobile}'.toLowerCase().contains(
+                query,
+              );
+          final filterMatch = switch (workspaceCustomerFilter) {
+            'Repeat' => customer.repeatCustomer,
+            'Payment due' => customer.amountDue > 0,
+            'Following Store' => customer.followingStore,
+            'Messages allowed' => customer.messagesAllowed,
+            _ => true,
+          };
+          return searchMatch && filterMatch;
+        })
+        .toList(growable: false);
+  }
+
+  void updateWorkspaceCustomerSearch(String value) {
+    workspaceCustomerSearch = value;
+    notifyListeners();
+  }
+
+  void setWorkspaceCustomerFilter(String value) {
+    workspaceCustomerFilter = value;
+    notifyListeners();
+  }
+
+  void markWorkspaceCustomerContacted(String customerId) {
+    workspaceCustomerLastContactAt[customerId] = DateTime.now();
+    notifyListeners();
+  }
+
   List<WorkspaceOrderRecord> get filteredWorkspaceMoneyOrders {
     final now = DateTime.now();
     final start = switch (workspaceMoneyPeriod) {
@@ -389,6 +493,7 @@ class WorkSession extends ChangeNotifier {
   int get workspaceSettlementEligible =>
       (workspaceSettlementBalance -
               workspacePlatformAdjustments -
+              workspaceDeliveryAdjustments -
               workspaceRefunds -
               workspaceTaxWithheld)
           .clamp(0, 1 << 31)
@@ -604,12 +709,21 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool prepareRepeatWorkspaceOrder() {
+  bool prepareRepeatWorkspaceOrder() => prepareRepeatWorkspaceOrderFor();
+
+  bool prepareRepeatWorkspaceOrderFor({String? customerId}) {
+    final eligibleOrders = customerId == null
+        ? visibleWorkspaceOrders
+        : visibleWorkspaceOrders
+              .where(
+                (order) => workspaceCustomerId(order.customer) == customerId,
+              )
+              .toList(growable: false);
     final source =
-        visibleWorkspaceOrders
+        eligibleOrders
             .where((order) => order.stage == 'Completed')
             .firstOrNull ??
-        visibleWorkspaceOrders.firstOrNull;
+        eligibleOrders.firstOrNull;
     if (source == null) {
       showError('No previous basket is available for this customer yet.');
       return false;
@@ -637,12 +751,35 @@ class WorkSession extends ChangeNotifier {
           final candidate = '${item.brand} ${item.title}'.toLowerCase();
           return words.isNotEmpty && words.every(candidate.contains);
         }).firstOrNull;
-        if (product == null || product.stock <= 0 || !product.available) {
+        if (product == null ||
+            !product.available ||
+            (product.stockMode == WorkspaceStockMode.exactQuantity &&
+                product.stock <= 0)) {
           unavailableLines++;
           continue;
         }
-        repeatQuantities[product.id] = quantity.clamp(1, product.stock);
+        repeatQuantities[product.id] =
+            product.stockMode == WorkspaceStockMode.availabilityOnly
+            ? quantity.clamp(1, 99)
+            : quantity.clamp(1, product.stock);
       }
+    }
+    for (final entry in repeatQuantities.entries.toList(growable: false)) {
+      final product = workspaceCatalogueItems
+          .where((item) => item.id == entry.key)
+          .firstOrNull;
+      if (product == null ||
+          !product.available ||
+          (product.stockMode == WorkspaceStockMode.exactQuantity &&
+              product.stock <= 0)) {
+        repeatQuantities.remove(entry.key);
+        unavailableLines++;
+        continue;
+      }
+      repeatQuantities[entry.key] =
+          product.stockMode == WorkspaceStockMode.availabilityOnly
+          ? entry.value.clamp(1, 99)
+          : entry.value.clamp(1, product.stock);
     }
     if (repeatQuantities.isEmpty) {
       showError(
@@ -652,7 +789,9 @@ class WorkSession extends ChangeNotifier {
     }
     startNewWorkspaceOrder();
     workspaceOrderSource = 'Repeat order';
-    workspaceOrderFulfilment = source.fulfilment;
+    workspaceOrderFulfilment = source.needsDelivery
+        ? source.fulfilment
+        : 'At the shop';
     workspaceOrderNeedsDelivery = source.needsDelivery;
     workspaceOrderCustomer = source.customer;
     workspaceOrderAddress = source.address;
@@ -768,6 +907,10 @@ class WorkSession extends ChangeNotifier {
     'completedSalesCount': workspaceCompletedSalesCount,
     'settlementBalance': workspaceSettlementBalance,
     'settlementRequested': workspaceSettlementRequested,
+    'moolSocialFees': workspacePlatformAdjustments,
+    'deliveryAdjustments': workspaceDeliveryAdjustments,
+    'payoutBankName': workspacePayoutBankName,
+    'payoutAccountEnding': workspacePayoutAccountEnding,
   };
 
   void _persistOperationalState(String reason) {
@@ -2726,6 +2869,8 @@ class WorkSession extends ChangeNotifier {
     workspaceAcceptingOrders = false;
     workspaceVisibleToCustomers = false;
     workspaceLastUpdatedAt = DateTime.now();
+    workspacePayoutBankName = 'State Bank of India';
+    workspacePayoutAccountEnding = '2486';
     notifyListeners();
   }
 

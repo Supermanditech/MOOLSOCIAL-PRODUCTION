@@ -169,6 +169,28 @@ void main() {
       ..workspaceOrderAddress = '12 Market Road, Sardarpura';
   }
 
+  WorkspaceOrderRecord customerOrder({
+    required String id,
+    required String customer,
+    required DateTime createdAt,
+    int amount = 264,
+    String payment = 'Paid online',
+    String stage = 'Completed',
+  }) => WorkspaceOrderRecord(
+    id: id,
+    customer: customer,
+    items: 'Fortune Sunflower Oil × 1',
+    quantities: const {'oil-fortune-1l': 1},
+    amount: amount,
+    source: 'App',
+    fulfilment: 'Pickup',
+    payment: payment,
+    address: '',
+    stage: stage,
+    needsDelivery: false,
+    createdAt: createdAt,
+  );
+
   testWidgets(
     'selected Workspace profile keeps contact clear of sticky Continue',
     (tester) async {
@@ -1951,11 +1973,123 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Rakesh'), findsWidgets);
     expect(find.text('No customer sale yet'), findsNothing);
+    await tester.tap(find.byKey(const Key('work-customer-9829012345')));
+    await tester.pumpAndSettle();
     final statement = find.byKey(
       const Key('work-customer-order-current-store-order'),
     );
     await reveal(tester, statement);
     expect(statement, findsOne);
+  });
+
+  testWidgets('Customer Book fits four customers with direct daily actions', (
+    tester,
+  ) async {
+    final work = liveStore();
+    final now = DateTime.now();
+    work.workspaceOrders.addAll([
+      customerOrder(
+        id: 'CUST-1',
+        customer: 'Rakesh · 98290 12345',
+        createdAt: now,
+      ),
+      customerOrder(
+        id: 'CUST-2',
+        customer: 'Sunita · 98290 22345',
+        createdAt: now.subtract(const Duration(days: 1)),
+      ),
+      customerOrder(
+        id: 'CUST-3',
+        customer: 'Imran · 98290 32345',
+        createdAt: now.subtract(const Duration(days: 2)),
+      ),
+      customerOrder(
+        id: 'CUST-4',
+        customer: 'Meena · 98290 42345',
+        createdAt: now.subtract(const Duration(days: 3)),
+      ),
+    ]);
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-business-customers')));
+    await tester.pumpAndSettle();
+
+    final fourth = find.byKey(const Key('work-customer-9829042345'));
+    expect(fourth, findsOneWidget);
+    expect(fourth.hitTestable(), findsOneWidget);
+    expect(
+      tester.getBottomRight(fourth).dy,
+      lessThanOrEqualTo(
+        tester.getTopLeft(find.byKey(const Key('work-local-navigation'))).dy,
+      ),
+    );
+    expect(
+      find.byKey(const Key('work-customer-call-9829012345')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('work-customer-chat-9829012345')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Customer filters and repeat basket keep exact customer stock', (
+    tester,
+  ) async {
+    final work = liveStore();
+    final now = DateTime.now();
+    work.workspaceOrders.addAll([
+      customerOrder(
+        id: 'REP-1',
+        customer: 'Rakesh · 98290 12345',
+        createdAt: now,
+      ),
+      customerOrder(
+        id: 'REP-2',
+        customer: 'Rakesh · 98290 12345',
+        createdAt: now.subtract(const Duration(days: 5)),
+      ),
+      customerOrder(
+        id: 'DUE-1',
+        customer: 'Sunita · 98290 22345',
+        createdAt: now.subtract(const Duration(days: 1)),
+        amount: 540,
+        payment: 'Customer due',
+      ),
+    ]);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-business-customers')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-customer-filter-repeat')));
+    await tester.pumpAndSettle();
+    expect(find.text('Rakesh'), findsOneWidget);
+    expect(find.text('Sunita'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('work-customer-9829012345')));
+    await tester.pumpAndSettle();
+    expect(find.text('Offer locked'), findsOneWidget);
+    expect(
+      find.textContaining('only after the customer allows store messages'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('work-customer-repeat')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-dashboard-counter-order-screen')),
+      findsOneWidget,
+    );
+    expect(work.workspaceOrderCustomer, 'Rakesh · 98290 12345');
+    expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
   });
 
   testWidgets('settlement requires review before gateway mutation', (
@@ -1969,11 +2103,48 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-money')));
     await tester.pumpAndSettle();
-    await reveal(tester, find.text('Review and request settlement'));
-    await tester.tap(find.text('Review and request settlement'));
+    await tester.tap(find.byKey(const Key('work-money-request-settlement')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-settlement-confirm')), findsOne);
     expect(gateway.settlementCalls, 0);
+  });
+
+  testWidgets('Money keeps net payout and receiving account in first action', (
+    tester,
+  ) async {
+    final work = liveStore()
+      ..workspaceSettlementBalance = 20000
+      ..workspacePlatformAdjustments = 900
+      ..workspaceDeliveryAdjustments = 300
+      ..workspaceRefunds = 400
+      ..workspaceTaxWithheld = 200
+      ..workspaceSalesToday = 28450;
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+    );
+    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-business-money')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('₹18,200'), findsWidgets);
+    expect(find.text('Sales awaiting completion'), findsOneWidget);
+    expect(find.text('MoolSocial fees'), findsOneWidget);
+    expect(find.text('Delivery adjustments'), findsOneWidget);
+    expect(find.text('Platform and fulfilment adjustments'), findsNothing);
+    final request = find.byKey(const Key('work-money-request-settlement'));
+    expect(request.hitTestable(), findsOneWidget);
+    await tester.tap(request);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-settlement-review')), findsOneWidget);
+    expect(find.textContaining('State Bank of India'), findsOneWidget);
+    expect(find.textContaining('•••• 2486'), findsOneWidget);
+    expect(find.text('Net payout requested'), findsOneWidget);
+    expect(find.text('Expected by'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Group Bulk product discovery searches beyond Store catalogue', (
@@ -2761,6 +2932,111 @@ void main() {
         fileName: '01-live-group-bulk-buying-412x915.png',
         afterMount: () async {
           await tester.tap(find.byKey(const Key('work-quick-group-buy')));
+        },
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - Customer Book',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore();
+      final now = DateTime.now();
+      work.workspaceOrders.addAll([
+        customerOrder(
+          id: 'CUST-1',
+          customer: 'Rakesh · 98290 12345',
+          createdAt: now,
+        ),
+        customerOrder(
+          id: 'CUST-2',
+          customer: 'Sunita · 98290 22345',
+          createdAt: now.subtract(const Duration(days: 1)),
+          amount: 540,
+          payment: 'Customer due',
+        ),
+        customerOrder(
+          id: 'CUST-3',
+          customer: 'Imran · 98290 32345',
+          createdAt: now.subtract(const Duration(days: 2)),
+        ),
+        customerOrder(
+          id: 'CUST-4',
+          customer: 'Meena · 98290 42345',
+          createdAt: now.subtract(const Duration(days: 3)),
+        ),
+      ]);
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-customers-money-v1-local-review-20260904',
+        fileName: '01-customer-book-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-business-customers')));
+        },
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - customer actions',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore();
+      final now = DateTime.now();
+      work.workspaceOrders.addAll([
+        customerOrder(
+          id: 'REP-1',
+          customer: 'Rakesh · 98290 12345',
+          createdAt: now,
+        ),
+        customerOrder(
+          id: 'REP-2',
+          customer: 'Rakesh · 98290 12345',
+          createdAt: now.subtract(const Duration(days: 5)),
+        ),
+      ]);
+      work.workspaceCustomersAllowingMessages.add('9829012345');
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-customers-money-v1-local-review-20260904',
+        fileName: '02-customer-actions-412x915.png',
+        target: find.byType(MaterialApp),
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-business-customers')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-customer-9829012345')));
+        },
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - Money',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore()
+        ..workspaceSettlementBalance = 20000
+        ..workspacePlatformAdjustments = 900
+        ..workspaceDeliveryAdjustments = 300
+        ..workspaceRefunds = 400
+        ..workspaceTaxWithheld = 200
+        ..workspaceSalesToday = 28450;
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-customers-money-v1-local-review-20260904',
+        fileName: '03-money-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-business-money')));
         },
       );
     },
