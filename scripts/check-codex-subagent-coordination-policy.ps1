@@ -1458,7 +1458,8 @@ if ($ProductionLane -ceq 'baseline') {
           'cursor_buy_mvp_ticket14_v1_20260902' -and
         $effectiveOwner -cin @(
           'apps/mobile/.dart_tool/package_config.json',
-          'apps/mobile/.dart_tool/package_graph.json'
+          'apps/mobile/.dart_tool/package_graph.json',
+          'apps/mobile/.flutter-plugins-dependencies'
         )
       )
       $allowedOwner = $false
@@ -1631,6 +1632,44 @@ if ($ProductionLane -ceq 'baseline') {
               (@($expectedMetadataOwners | Sort-Object) -join '|')
             ) 'generated-metadata coordination changed an unexpected owner.'
             $sealedCoordinationCommit = $metadataCommit
+          }
+          $pluginMetadataSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): preserve generated plugin metadata'
+          $matchingPluginMetadataCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'generated-plugin coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $pluginMetadataSubject) {
+              $matchingPluginMetadataCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingPluginMetadataCommits.Count -le 1) `
+            'generated-plugin coordination commit is duplicated.'
+          if ($matchingPluginMetadataCommits.Count -eq 1) {
+            $pluginMetadataCommit = [string]$matchingPluginMetadataCommits[0]
+            $pluginMetadataParent = @(& git -C $root show -s --format=%P `
+                $pluginMetadataCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingMetadataCommits.Count -eq 1 -and
+              $pluginMetadataParent.Count -eq 1 -and
+              [string]$pluginMetadataParent[0] -ceq $metadataCommit
+            ) 'generated-plugin coordination parent changed.'
+            $pluginMetadataOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $pluginMetadataCommit)
+            $expectedPluginMetadataOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($pluginMetadataOwners | Sort-Object) -join '|') -ceq
+              (@($expectedPluginMetadataOwners | Sort-Object) -join '|')
+            ) 'generated-plugin coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $pluginMetadataCommit
           }
           & git -C $root diff --quiet $sealedCoordinationCommit -- `
             'config/codex-subagent-coordination-policy.json' `

@@ -182,6 +182,7 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart",
         "apps/mobile/.dart_tool/package_config.json",
         "apps/mobile/.dart_tool/package_graph.json",
+        "apps/mobile/.flutter-plugins-dependencies",
         "artifacts/quality/buy-v2-r65-1-cursor-75-defect-review-20260903/apk-regression-state.json",
         "artifacts/quality/buy-v2-r65-1-cursor-75-defect-review-20260903/candidate-contract.md",
         "artifacts/quality/buy-v2-r65-1-cursor-75-defect-review-20260903/motion-disposition.md",
