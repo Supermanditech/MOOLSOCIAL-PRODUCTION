@@ -152,6 +152,7 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_discovery_contract_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_manual_code_sheet_motion_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart",

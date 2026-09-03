@@ -1671,6 +1671,44 @@ if ($ProductionLane -ceq 'baseline') {
             ) 'generated-plugin coordination changed an unexpected owner.'
             $sealedCoordinationCommit = $pluginMetadataCommit
           }
+          $scannerTestSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit focused scanner test owner'
+          $matchingScannerTestCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'scanner-test coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $scannerTestSubject) {
+              $matchingScannerTestCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingScannerTestCommits.Count -le 1) `
+            'scanner-test coordination commit is duplicated.'
+          if ($matchingScannerTestCommits.Count -eq 1) {
+            $scannerTestCommit = [string]$matchingScannerTestCommits[0]
+            $scannerTestParent = @(& git -C $root show -s --format=%P `
+                $scannerTestCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingPluginMetadataCommits.Count -eq 1 -and
+              $scannerTestParent.Count -eq 1 -and
+              [string]$scannerTestParent[0] -ceq $pluginMetadataCommit
+            ) 'scanner-test coordination parent changed.'
+            $scannerTestOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $scannerTestCommit)
+            $expectedScannerTestOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($scannerTestOwners | Sort-Object) -join '|') -ceq
+              (@($expectedScannerTestOwners | Sort-Object) -join '|')
+            ) 'scanner-test coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $scannerTestCommit
+          }
           & git -C $root diff --quiet $sealedCoordinationCommit -- `
             'config/codex-subagent-coordination-policy.json' `
             'scripts/check-codex-subagent-coordination-policy.ps1'
