@@ -6571,7 +6571,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   }
 }
 
-class _AccessibleWorkTextField extends StatelessWidget {
+class _AccessibleWorkTextField extends StatefulWidget {
   const _AccessibleWorkTextField({
     required this.keyName,
     required this.controller,
@@ -6597,24 +6597,69 @@ class _AccessibleWorkTextField extends StatelessWidget {
   final String? prefixText;
 
   @override
+  State<_AccessibleWorkTextField> createState() =>
+      _AccessibleWorkTextFieldState();
+}
+
+class _AccessibleWorkTextFieldState extends State<_AccessibleWorkTextField> {
+  late final FocusNode _focusNode = FocusNode(
+    debugLabel: 'work-${widget.keyName}',
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_handleValueChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AccessibleWorkTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_handleValueChanged);
+      widget.controller.addListener(_handleValueChanged);
+    }
+  }
+
+  void _handleValueChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_handleValueChanged);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MergeSemantics(
-      child: Semantics(
-        container: true,
-        label: label,
-        textField: true,
+    return Semantics(
+      container: true,
+      label: widget.label,
+      value: widget.controller.text,
+      textField: true,
+      onTap: _focusNode.requestFocus,
+      onSetText: (value) {
+        widget.controller
+          ..text = value
+          ..selection = TextSelection.collapsed(offset: value.length);
+        widget.onChanged?.call(value);
+      },
+      child: ExcludeSemantics(
         child: TextField(
-          key: Key(keyName),
-          controller: controller,
-          keyboardType: keyboardType,
-          textInputAction: textInputAction,
-          onChanged: onChanged,
-          maxLines: maxLines,
+          key: Key(widget.keyName),
+          controller: widget.controller,
+          focusNode: _focusNode,
+          keyboardType: widget.keyboardType,
+          textInputAction: widget.textInputAction,
+          onChanged: widget.onChanged,
+          maxLines: widget.maxLines,
           decoration: InputDecoration(
-            label: ExcludeSemantics(child: Text(label)),
-            hintText: hint,
-            prefixIcon: prefixIcon,
-            prefixText: prefixText,
+            label: Text(widget.label),
+            hintText: widget.hint,
+            prefixIcon: widget.prefixIcon,
+            prefixText: widget.prefixText,
           ),
         ),
       ),
