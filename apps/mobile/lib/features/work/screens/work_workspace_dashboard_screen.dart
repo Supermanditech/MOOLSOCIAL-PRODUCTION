@@ -63,6 +63,11 @@ class _WorkWorkspaceDashboardScreenState
   String _draftFulfilmentMode = 'Delivery and pickup';
   int _draftBusyMinutes = 0;
   String _draftReopensAt = '';
+  String _draftOpeningTime = '8:00 AM';
+  String _draftClosingTime = '10:00 PM';
+  int _draftMaximumActiveOrders = 8;
+  bool _draftOrderAlertSound = true;
+  bool _draftOrderAlertVibration = true;
   _WorkspaceOperation _operation = _WorkspaceOperation.orders;
   _WorkspaceControlView _operationReturnView = _WorkspaceControlView.dashboard;
   _WorkspaceOperation? _operationReturnOperation;
@@ -346,9 +351,8 @@ class _WorkWorkspaceDashboardScreenState
       _WorkspaceControlView.dashboard => '${profile.label} · ${workspace.area}',
       _WorkspaceControlView.search =>
         'Find orders, products, customers or business records',
-      _WorkspaceControlView.status => 'Daily controls and store configuration',
-      _WorkspaceControlView.alerts =>
-        'Resolve the most important store actions first',
+      _WorkspaceControlView.status => 'Open, pause and run your store',
+      _WorkspaceControlView.alerts => 'Orders and tasks needing action',
       _WorkspaceControlView.procurement => 'Store purchase · ${workspace.name}',
       _WorkspaceControlView.operation =>
         _operation == _WorkspaceOperation.counterOrder &&
@@ -548,6 +552,11 @@ class _WorkWorkspaceDashboardScreenState
           fulfilmentMode: _draftFulfilmentMode,
           busyMinutes: _draftBusyMinutes,
           reopensAt: _draftReopensAt,
+          openingTime: _draftOpeningTime,
+          closingTime: _draftClosingTime,
+          maximumActiveOrders: _draftMaximumActiveOrders,
+          alertSound: _draftOrderAlertSound,
+          alertVibration: _draftOrderAlertVibration,
           onAcceptingChanged: (value) => setState(() {
             _draftAcceptingOrders = value;
             if (!value && _draftReopensAt.isEmpty) {
@@ -565,6 +574,21 @@ class _WorkWorkspaceDashboardScreenState
           }),
           onReopensChanged: (value) => setState(() {
             _draftReopensAt = value;
+          }),
+          onOpeningTimeChanged: (value) => setState(() {
+            _draftOpeningTime = value;
+          }),
+          onClosingTimeChanged: (value) => setState(() {
+            _draftClosingTime = value;
+          }),
+          onMaximumActiveOrdersChanged: (value) => setState(() {
+            _draftMaximumActiveOrders = value;
+          }),
+          onAlertSoundChanged: (value) => setState(() {
+            _draftOrderAlertSound = value;
+          }),
+          onAlertVibrationChanged: (value) => setState(() {
+            _draftOrderAlertVibration = value;
           }),
           onProductControls: () =>
               _showOperation(_WorkspaceOperation.catalogue),
@@ -622,6 +646,11 @@ class _WorkWorkspaceDashboardScreenState
       _draftFulfilmentMode = session.workspaceFulfilmentMode;
       _draftBusyMinutes = session.workspaceBusyMinutes;
       _draftReopensAt = session.workspaceReopensAt;
+      _draftOpeningTime = session.workspaceOpeningTime;
+      _draftClosingTime = session.workspaceClosingTime;
+      _draftMaximumActiveOrders = session.workspaceMaximumActiveOrders;
+      _draftOrderAlertSound = session.workspaceOrderAlertSound;
+      _draftOrderAlertVibration = session.workspaceOrderAlertVibration;
       _view = _WorkspaceControlView.status;
     });
   }
@@ -905,6 +934,13 @@ class _WorkWorkspaceDashboardScreenState
       busyMinutes: _draftBusyMinutes,
       reopensAt: _draftReopensAt,
     );
+    session.saveWorkspaceTradingControls(
+      openingTime: _draftOpeningTime,
+      closingTime: _draftClosingTime,
+      maximumActiveOrders: _draftMaximumActiveOrders,
+      alertSound: _draftOrderAlertSound,
+      alertVibration: _draftOrderAlertVibration,
+    );
     setState(() => _view = _WorkspaceControlView.dashboard);
   }
 
@@ -913,7 +949,12 @@ class _WorkWorkspaceDashboardScreenState
       _draftVisibleToCustomers != session.workspaceVisibleToCustomers ||
       _draftFulfilmentMode != session.workspaceFulfilmentMode ||
       _draftBusyMinutes != session.workspaceBusyMinutes ||
-      _draftReopensAt != session.workspaceReopensAt;
+      _draftReopensAt != session.workspaceReopensAt ||
+      _draftOpeningTime != session.workspaceOpeningTime ||
+      _draftClosingTime != session.workspaceClosingTime ||
+      _draftMaximumActiveOrders != session.workspaceMaximumActiveOrders ||
+      _draftOrderAlertSound != session.workspaceOrderAlertSound ||
+      _draftOrderAlertVibration != session.workspaceOrderAlertVibration;
 
   Future<void> _leaveSettings() async {
     if (!_settingsDirty) {
@@ -4963,7 +5004,10 @@ class _StoreActionRow extends StatelessWidget {
               child: TextButton(
                 key: actionKey == null ? null : Key(actionKey!),
                 onPressed: onPressed,
-                child: Text(actionLabel),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(actionLabel, maxLines: 1),
+                ),
               ),
             ),
           ),
@@ -5362,7 +5406,10 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       return _WorkspaceStaffSettingsSurface(session: session);
     }
     if (operation == _WorkspaceOperation.businessRecord) {
-      return _WorkspaceBusinessRecordSurface(session: session);
+      return _WorkspaceBusinessRecordSurface(
+        session: session,
+        onPreview: () => onOpenOperation(_WorkspaceOperation.preview),
+      );
     }
     if (operation == _WorkspaceOperation.offers) {
       return _WorkspaceOffersSurface(
@@ -5383,7 +5430,8 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       return _WorkspacePaidWorkSurface(session: session);
     }
     if (operation == _WorkspaceOperation.growth) {
-      return _GrowDestinationSurface(
+      return _GrowDestinationSurfaceV2(
+        session: session,
         onCustomers: () => onOpenOperation(_WorkspaceOperation.customers),
         onOffers: () => onOpenOperation(_WorkspaceOperation.offers),
         onPromote: () => onOpenRoute(
@@ -5565,7 +5613,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         title: 'GST and tax assistance',
         detail:
             'Keep business records ready and request professional filing assistance when needed.',
-        actionLabel: 'Review assistance',
+        actionLabel: 'Ask for help',
         onPressed: () => onOpenRoute(
           '/app/chat/inbox?type=support&draft=GST%20and%20tax%20assistance',
         ),
@@ -5576,7 +5624,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         title: 'Bookkeeping and accounts',
         detail:
             'Organise sales, purchases, stock and settlement records for your accountant.',
-        actionLabel: 'Review assistance',
+        actionLabel: 'Ask for help',
         onPressed: () => onOpenRoute(
           '/app/chat/inbox?type=support&draft=Bookkeeping%20and%20accounts%20assistance',
         ),
@@ -5587,7 +5635,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         title: 'Audit support',
         detail:
             'Request document and record assistance without changing your store operations.',
-        actionLabel: 'Review assistance',
+        actionLabel: 'Ask for help',
         onPressed: () => onOpenRoute(
           '/app/chat/inbox?type=support&draft=Business%20audit%20assistance',
         ),
@@ -11998,6 +12046,16 @@ class _WorkspaceDeliverySettingsSurface extends StatefulWidget {
 
 class _WorkspaceDeliverySettingsSurfaceState
     extends State<_WorkspaceDeliverySettingsSurface> {
+  late final TextEditingController _city = TextEditingController(
+    text: widget.session.workspaceDeliveryCity,
+  );
+  late final TextEditingController _area = TextEditingController(
+    text: widget.session.workspaceDeliveryArea,
+  );
+  late final TextEditingController _pincode = TextEditingController(
+    text: widget.session.workspaceDeliveryPincode,
+  );
+  late bool _pickupEnabled = widget.session.workspacePickupEnabled;
   late final TextEditingController _radius = TextEditingController(
     text: '${widget.session.workspaceDeliveryRadiusKm}',
   );
@@ -12010,6 +12068,9 @@ class _WorkspaceDeliverySettingsSurfaceState
 
   @override
   void dispose() {
+    _city.dispose();
+    _area.dispose();
+    _pincode.dispose();
     _radius.dispose();
     _fee.dispose();
     _freeAbove.dispose();
@@ -12027,6 +12088,35 @@ class _WorkspaceDeliverySettingsSurfaceState
           detail: 'Shown before the customer confirms an order',
         ),
         const SizedBox(height: 12),
+        _AccessibleWorkTextField(
+          keyName: 'work-delivery-city',
+          controller: _city,
+          label: 'City',
+        ),
+        const SizedBox(height: 8),
+        _ResponsiveFieldPair(
+          first: _AccessibleWorkTextField(
+            keyName: 'work-delivery-area',
+            controller: _area,
+            label: 'Area',
+          ),
+          second: _AccessibleWorkTextField(
+            keyName: 'work-delivery-pincode',
+            controller: _pincode,
+            keyboardType: TextInputType.number,
+            label: 'Pincode',
+          ),
+        ),
+        SwitchListTile.adaptive(
+          key: const Key('work-delivery-pickup'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Customer pickup available'),
+          subtitle: const Text(
+            'Customers can collect a packed order in store.',
+          ),
+          value: _pickupEnabled,
+          onChanged: (value) => setState(() => _pickupEnabled = value),
+        ),
         _NumberField(
           keyName: 'work-delivery-radius',
           controller: _radius,
@@ -12044,11 +12134,11 @@ class _WorkspaceDeliverySettingsSurfaceState
           controller: _freeAbove,
           label: 'Free delivery above',
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         const WorkCard(
           color: Color(0xFFF4F6FF),
           child: Text(
-            'Customer serviceability, delivery fee and free-delivery threshold must be confirmed before checkout.',
+            'Customers see where you deliver, the delivery charge and whether pickup is available before checkout.',
             style: TextStyle(color: MoolColors.ink, height: 1.35),
           ),
         ),
@@ -12060,6 +12150,10 @@ class _WorkspaceDeliverySettingsSurfaceState
               radiusKm: int.tryParse(_radius.text) ?? 0,
               fee: int.tryParse(_fee.text) ?? 0,
               freeAbove: int.tryParse(_freeAbove.text) ?? 0,
+              city: _city.text,
+              area: _area.text,
+              pincode: _pincode.text,
+              pickupEnabled: _pickupEnabled,
             );
           },
           icon: const Icon(Icons.check_rounded),
@@ -12101,7 +12195,8 @@ class _WorkspaceStaffSettingsSurfaceState
       children: [
         const _WorkspaceSectionLabel(
           title: 'Staff and counters',
-          detail: 'Owner-controlled access to daily Store operations',
+          detail:
+              'Give staff access without sharing payments or business documents',
         ),
         const SizedBox(height: 12),
         WorkCard(
@@ -12110,9 +12205,9 @@ class _WorkspaceStaffSettingsSurfaceState
             contentPadding: EdgeInsets.zero,
             value: _enabled,
             onChanged: (value) => setState(() => _enabled = value),
-            title: const Text('Allow staff access'),
+            title: const Text('Allow counter staff access'),
             subtitle: const Text(
-              'Staff permissions are granted individually; owner settlement and business records remain private.',
+              'Use this only on Store-managed devices. Payments and business documents remain owner-only.',
             ),
           ),
         ),
@@ -12140,9 +12235,13 @@ class _WorkspaceStaffSettingsSurfaceState
 }
 
 class _WorkspaceBusinessRecordSurface extends StatelessWidget {
-  const _WorkspaceBusinessRecordSurface({required this.session});
+  const _WorkspaceBusinessRecordSurface({
+    required this.session,
+    required this.onPreview,
+  });
 
   final WorkSession session;
+  final VoidCallback onPreview;
 
   @override
   Widget build(BuildContext context) {
@@ -12166,7 +12265,7 @@ class _WorkspaceBusinessRecordSurface extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Active MoolSocial business partner',
+                      'Registered MoolSocial Business Partner',
                       style: TextStyle(
                         color: Color(0xFF08765D),
                         fontWeight: FontWeight.w900,
@@ -12180,17 +12279,24 @@ class _WorkspaceBusinessRecordSurface extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    Text(workspace?.profileLabel ?? 'Store Workspace'),
+                    Text(workspace?.profileLabel ?? 'Store'),
                   ],
                 ),
               ),
             ],
           ),
         ),
+        const SizedBox(height: 10),
+        FilledButton.tonalIcon(
+          key: const Key('work-business-public-preview'),
+          onPressed: onPreview,
+          icon: const Icon(Icons.storefront_outlined),
+          label: const Text('View your customer Store'),
+        ),
         const SizedBox(height: 14),
         const _WorkspaceSectionLabel(
           title: 'Business record',
-          detail: 'Approved details currently used for Store operations',
+          detail: 'Business details approved for this store',
         ),
         const SizedBox(height: 10),
         WorkCard(
@@ -12208,7 +12314,29 @@ class _WorkspaceBusinessRecordSurface extends StatelessWidget {
                 leading: const Icon(Icons.folder_copy_outlined),
                 title: const Text('Documents on record'),
                 subtitle: Text(
-                  '${session.addedProofs.length} document references available',
+                  '${session.addedProofs.length} ${session.addedProofs.length == 1 ? 'document' : 'documents'} on file',
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.workspace_premium_outlined),
+                title: const Text('MoolSocial Store plan'),
+                subtitle: Text(
+                  session.subscriptionPlan == 'free'
+                      ? 'Free plan'
+                      : session.subscriptionPlan,
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.groups_outlined),
+                title: const Text('Store team'),
+                subtitle: Text(
+                  session.workspaceStaffAccessEnabled
+                      ? '${session.workspaceCounterCount} active counters'
+                      : 'Only you have Store access',
                 ),
               ),
               const Divider(height: 1),
@@ -12261,12 +12389,40 @@ class _WorkspaceOffersSurface extends StatefulWidget {
 class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
   final TextEditingController _title = TextEditingController();
   final TextEditingController _detail = TextEditingController();
+  final TextEditingController _orderCap = TextEditingController(text: '50');
+  String? _productId;
   DateTime? _validUntil;
+
+  void _useTemplate(String template) {
+    final copy = switch (template) {
+      'Monthly essentials' => (
+        'Save on your monthly essentials',
+        'Buy selected monthly essentials before the offer ends.',
+      ),
+      'Back in stock' => (
+        'Your requested product is back',
+        'Order while fresh stock is available at the Store.',
+      ),
+      'Festival saving' => (
+        'Festival savings at your Store',
+        'Save on selected products during the festival offer period.',
+      ),
+      _ => (
+        'Repeat your recent basket',
+        'Reorder your recent basket while the selected products are available.',
+      ),
+    };
+    setState(() {
+      _title.text = copy.$1;
+      _detail.text = copy.$2;
+    });
+  }
 
   @override
   void dispose() {
     _title.dispose();
     _detail.dispose();
+    _orderCap.dispose();
     super.dispose();
   }
 
@@ -12283,15 +12439,69 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
 
   @override
   Widget build(BuildContext context) {
+    final eligibleCustomers = widget.session.workspaceCustomerBook
+        .where((customer) => customer.messagesAllowed)
+        .length;
+    final products = widget.session.workspaceCatalogueItems
+        .where((product) => product.published)
+        .toList(growable: false);
+    final selectedProduct = products
+        .where((product) => product.id == _productId)
+        .firstOrNull;
+    final cap = int.tryParse(_orderCap.text.trim()) ?? 0;
     return ListView(
       key: const Key('work-store-offers-screen'),
       padding: const EdgeInsets.all(18),
       children: [
         const _WorkspaceSectionLabel(
           title: 'Bring customers back',
-          detail: 'Publish a clear Store offer, then promote it if needed',
+          detail:
+              'Choose a useful offer for customers who allow Store messages',
         ),
         const SizedBox(height: 10),
+        SizedBox(
+          height: 38,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: 4,
+            separatorBuilder: (_, _) => const SizedBox(width: 6),
+            itemBuilder: (context, index) {
+              final template = const [
+                'Monthly essentials',
+                'Back in stock',
+                'Festival saving',
+                'Repeat your basket',
+              ][index];
+              return ActionChip(
+                label: Text(template),
+                onPressed: () => _useTemplate(template),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          key: const Key('work-offer-product'),
+          isExpanded: true,
+          initialValue: _productId,
+          decoration: const InputDecoration(
+            labelText: 'Product customers can buy',
+          ),
+          items: products
+              .map(
+                (product) => DropdownMenuItem(
+                  value: product.id,
+                  child: Text(
+                    '${product.title} · ${product.pack}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(growable: false),
+          onChanged: (value) => setState(() => _productId = value),
+        ),
+        const SizedBox(height: 8),
         _AccessibleWorkTextField(
           keyName: 'work-offer-title',
           controller: _title,
@@ -12317,19 +12527,71 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
                 : 'Valid until ${_validUntil!.day}/${_validUntil!.month}/${_validUntil!.year}',
           ),
         ),
+        const SizedBox(height: 8),
+        _NumberField(
+          keyName: 'work-offer-order-cap',
+          controller: _orderCap,
+          label: 'Maximum customer orders for this offer',
+        ),
+        const SizedBox(height: 8),
+        Container(
+          key: const Key('work-offer-preview'),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F6FF),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _title.text.trim().isEmpty
+                    ? 'Your offer preview'
+                    : _title.text.trim(),
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                selectedProduct == null
+                    ? 'Choose an available product.'
+                    : '${selectedProduct.title} · ${selectedProduct.pack} · ₹${selectedProduct.sellingPrice}',
+                style: const TextStyle(color: MoolColors.muted, fontSize: 10),
+              ),
+              Text(
+                eligibleCustomers == 0
+                    ? 'No customer has allowed Store offers yet.'
+                    : '$eligibleCustomers customers can receive this offer · first $cap orders',
+                style: TextStyle(
+                  color: eligibleCustomers == 0
+                      ? const Color(0xFFB42318)
+                      : const Color(0xFF08765D),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 10),
         FilledButton.icon(
           key: const Key('work-offer-publish'),
           onPressed:
               _title.text.trim().isEmpty ||
                   _detail.text.trim().isEmpty ||
-                  _validUntil == null
+                  _validUntil == null ||
+                  selectedProduct == null ||
+                  eligibleCustomers == 0 ||
+                  cap <= 0
               ? null
               : () {
                   widget.session.addWorkspaceOffer(
                     title: _title.text,
                     detail: _detail.text,
                     validUntil: _validUntil!,
+                    productId: selectedProduct.id,
+                    orderCap: cap,
                   );
                   setState(() {});
                 },
@@ -12412,10 +12674,10 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
     if (selected != null) setState(() => _deadline = selected);
   }
 
-  Future<void> _publish() async {
+  String? _validationError() {
     final people = int.tryParse(_people.text.trim());
     final amount = int.tryParse(_amount.text.trim());
-    final error = _position.text.trim().isEmpty
+    return _position.text.trim().isEmpty
         ? 'Enter the paid position or assignment.'
         : _work.text.trim().isEmpty
         ? 'Explain the work to be completed.'
@@ -12430,6 +12692,111 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
         : _deadline == null
         ? 'Choose the final application deadline.'
         : null;
+  }
+
+  Future<void> _review() async {
+    final error = _validationError();
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    final publish = await showModalBottomSheet<bool>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: .78,
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+                child: Column(
+                  key: const Key('work-paid-review'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Review what candidates will see',
+                      style: TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    WorkCard(
+                      color: const Color(0xFFF3F6FF),
+                      child: Column(
+                        children: [
+                          _ProductPreviewLine(
+                            label: 'Published by',
+                            value:
+                                widget.session.activeWorkspace?.name ??
+                                widget.session.workName,
+                          ),
+                          _ProductPreviewLine(
+                            label: 'Position',
+                            value: _position.text.trim(),
+                          ),
+                          _ProductPreviewLine(
+                            label: 'Work',
+                            value: _work.text.trim(),
+                          ),
+                          _ProductPreviewLine(
+                            label: 'Candidate needs',
+                            value: _candidate.text.trim(),
+                          ),
+                          _ProductPreviewLine(
+                            label: 'Location',
+                            value: _location.text.trim(),
+                          ),
+                          _ProductPreviewLine(
+                            label: 'People needed',
+                            value: _people.text.trim(),
+                          ),
+                          _ProductPreviewLine(
+                            label: 'Funded payment',
+                            value: '₹${_amount.text.trim()} · $_format',
+                          ),
+                          _ProductPreviewLine(
+                            label: 'Apply by',
+                            value:
+                                '${_deadline!.day}/${_deadline!.month}/${_deadline!.year}',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    key: const Key('work-paid-review-confirm'),
+                    onPressed: () => Navigator.pop(context, true),
+                    icon: const Icon(Icons.account_balance_wallet_outlined),
+                    label: const Text('Fund and publish to Earn Today'),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (publish == true) await _publish();
+  }
+
+  Future<void> _publish() async {
+    final people = int.tryParse(_people.text.trim());
+    final amount = int.tryParse(_amount.text.trim());
+    final error = _validationError();
     if (error != null) {
       setState(() => _error = error);
       return;
@@ -12534,13 +12901,17 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
         const SizedBox(height: 12),
         FilledButton.icon(
           key: const Key('work-paid-publish'),
-          onPressed: widget.session.busy ? null : _publish,
-          icon: const Icon(Icons.publish_outlined),
+          onPressed: widget.session.busy || reference != null ? null : _review,
+          icon: Icon(
+            reference == null
+                ? Icons.preview_outlined
+                : Icons.check_circle_outline_rounded,
+          ),
           label: FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
               reference == null
-                  ? 'Fund and publish to Earn Today'
+                  ? 'Review funded posting'
                   : 'Published · $reference',
             ),
           ),
@@ -12576,6 +12947,189 @@ class _ResponsiveFieldPair extends StatelessWidget {
   }
 }
 
+class _GrowDestinationSurfaceV2 extends StatelessWidget {
+  const _GrowDestinationSurfaceV2({
+    required this.session,
+    required this.onCustomers,
+    required this.onOffers,
+    required this.onPromote,
+    required this.onPaidWork,
+    required this.onServices,
+  });
+
+  final WorkSession session;
+  final VoidCallback onCustomers;
+  final VoidCallback onOffers;
+  final VoidCallback onPromote;
+  final VoidCallback onPaidWork;
+  final VoidCallback onServices;
+
+  @override
+  Widget build(BuildContext context) {
+    final repeatCustomers = session.workspaceCustomerBook
+        .where((customer) => customer.repeatCustomer)
+        .length;
+    final activeOffers = session.workspaceOffers
+        .where(
+          (offer) => offer.active && offer.validUntil.isAfter(DateTime.now()),
+        )
+        .length;
+    final paidWorkOpen = session.workspacePaidRequirementReference == null
+        ? 0
+        : 1;
+    return Container(
+      key: const Key('work-grow-destination'),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFF9FAFF), Color(0xFFE9EEFF)],
+        ),
+      ),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 28),
+        children: [
+          const Text(
+            'Grow repeat business',
+            style: TextStyle(
+              color: MoolColors.ink,
+              fontSize: 21,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const Text(
+            'Bring customers back with offers, useful reminders and your Store presence.',
+            style: TextStyle(color: MoolColors.muted, fontSize: 10.5),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _GrowthMetric(value: '$repeatCustomers', label: 'Repeat'),
+              _GrowthMetric(value: '$activeOffers', label: 'Offers live'),
+              _GrowthMetric(value: '$paidWorkOpen', label: 'Paid work'),
+              _GrowthMetric(
+                value: session.workspaceVisibleToCustomers
+                    ? 'Public'
+                    : 'Private',
+                label: 'Store reach',
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                _StoreActionRow(
+                  keyName: 'work-growth-customers',
+                  icon: Icons.repeat_rounded,
+                  eyebrow: 'REPEAT BUSINESS',
+                  title: 'Bring customers back',
+                  detail:
+                      '$repeatCustomers repeat customers · purchase history and repeat baskets',
+                  actionLabel: 'Customers',
+                  onPressed: onCustomers,
+                ),
+                const Divider(height: 1),
+                _StoreActionRow(
+                  keyName: 'work-growth-offers',
+                  icon: Icons.local_offer_outlined,
+                  eyebrow: 'CUSTOMER OFFERS',
+                  title: 'Create a Store offer',
+                  detail:
+                      '$activeOffers active · choose products and customers who allow offers',
+                  actionLabel: 'Create',
+                  onPressed: onOffers,
+                ),
+                const Divider(height: 1),
+                _StoreActionRow(
+                  keyName: 'work-growth-social',
+                  icon: Icons.campaign_outlined,
+                  eyebrow: 'STORE REACH',
+                  title: 'Promote your Store',
+                  detail:
+                      'Create a Social post with your Store identity and return here.',
+                  actionLabel: 'Promote',
+                  onPressed: onPromote,
+                ),
+                const Divider(height: 1),
+                _StoreActionRow(
+                  keyName: 'work-growth-paid-work',
+                  icon: Icons.work_outline_rounded,
+                  eyebrow: 'FUNDED LOCAL WORK',
+                  title: 'Publish paid work',
+                  detail: paidWorkOpen == 0
+                      ? 'Create a funded requirement for delivery, sales or Store support.'
+                      : '1 funded Store requirement is published.',
+                  actionLabel: paidWorkOpen == 0 ? 'Prepare' : 'View',
+                  onPressed: onPaidWork,
+                ),
+                const Divider(height: 1),
+                _StoreActionRow(
+                  keyName: 'work-growth-services',
+                  icon: Icons.business_center_outlined,
+                  eyebrow: 'BUSINESS SUPPORT',
+                  title: 'GST, books and audit support',
+                  detail:
+                      'Request scoped professional help without leaving Store operations.',
+                  actionLabel: 'View',
+                  onPressed: onServices,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GrowthMetric extends StatelessWidget {
+  const _GrowthMetric({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                maxLines: 1,
+                style: const TextStyle(color: MoolColors.muted, fontSize: 8),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
 class _GrowDestinationSurface extends StatelessWidget {
   const _GrowDestinationSurface({
     required this.onCustomers,
@@ -14035,11 +14589,21 @@ class _WorkspaceStatusSurface extends StatelessWidget {
     required this.fulfilmentMode,
     required this.busyMinutes,
     required this.reopensAt,
+    required this.openingTime,
+    required this.closingTime,
+    required this.maximumActiveOrders,
+    required this.alertSound,
+    required this.alertVibration,
     required this.onAcceptingChanged,
     required this.onVisibilityChanged,
     required this.onFulfilmentChanged,
     required this.onBusyMinutesChanged,
     required this.onReopensChanged,
+    required this.onOpeningTimeChanged,
+    required this.onClosingTimeChanged,
+    required this.onMaximumActiveOrdersChanged,
+    required this.onAlertSoundChanged,
+    required this.onAlertVibrationChanged,
     required this.onProductControls,
     required this.onDeliveryControls,
     required this.onStaffControls,
@@ -14052,11 +14616,21 @@ class _WorkspaceStatusSurface extends StatelessWidget {
   final String fulfilmentMode;
   final int busyMinutes;
   final String reopensAt;
+  final String openingTime;
+  final String closingTime;
+  final int maximumActiveOrders;
+  final bool alertSound;
+  final bool alertVibration;
   final ValueChanged<bool> onAcceptingChanged;
   final ValueChanged<bool> onVisibilityChanged;
   final ValueChanged<String> onFulfilmentChanged;
   final ValueChanged<int> onBusyMinutesChanged;
   final ValueChanged<String> onReopensChanged;
+  final ValueChanged<String> onOpeningTimeChanged;
+  final ValueChanged<String> onClosingTimeChanged;
+  final ValueChanged<int> onMaximumActiveOrdersChanged;
+  final ValueChanged<bool> onAlertSoundChanged;
+  final ValueChanged<bool> onAlertVibrationChanged;
   final VoidCallback onProductControls;
   final VoidCallback onDeliveryControls;
   final VoidCallback onStaffControls;
@@ -14081,7 +14655,7 @@ class _WorkspaceStatusSurface extends StatelessWidget {
       children: [
         const _SettingsSectionLabel(
           title: 'Today',
-          detail: 'Controls you may change during the trading day',
+          detail: 'Today’s store controls',
         ),
         const SizedBox(height: 10),
         SegmentedButton<WorkspaceStoreState>(
@@ -14135,25 +14709,77 @@ class _WorkspaceStatusSurface extends StatelessWidget {
                 onChanged: onVisibilityChanged,
               ),
               const Divider(height: 1, indent: 16, endIndent: 16),
-              const ListTile(
+              ListTile(
+                key: const Key('work-status-opening-time'),
                 leading: Icon(Icons.schedule_rounded),
-                title: Text('Today’s hours'),
-                subtitle: Text('8:00 AM–10:00 PM'),
-                trailing: Icon(Icons.chevron_right_rounded),
+                title: const Text('Opens'),
+                subtitle: Text(openingTime),
+                trailing: const Icon(Icons.edit_outlined),
+                onTap: () async {
+                  final selected = await showTimePicker(
+                    context: context,
+                    initialTime: const TimeOfDay(hour: 8, minute: 0),
+                  );
+                  if (selected != null && context.mounted) {
+                    onOpeningTimeChanged(selected.format(context));
+                  }
+                },
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              ListTile(
+                key: const Key('work-status-closing-time'),
+                leading: const Icon(Icons.nightlight_outlined),
+                title: const Text('Closes'),
+                subtitle: Text(closingTime),
+                trailing: const Icon(Icons.edit_outlined),
+                onTap: () async {
+                  final selected = await showTimePicker(
+                    context: context,
+                    initialTime: const TimeOfDay(hour: 22, minute: 0),
+                  );
+                  if (selected != null && context.mounted) {
+                    onClosingTimeChanged(selected.format(context));
+                  }
+                },
               ),
               const Divider(height: 1, indent: 16, endIndent: 16),
               const ListTile(
                 leading: Icon(Icons.layers_outlined),
                 title: Text('Maximum active orders'),
-                subtitle: Text('8 orders'),
-                trailing: Icon(Icons.chevron_right_rounded),
+                subtitle: Text('Pause new orders when this limit is reached'),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final count in const [4, 8, 12, 20])
+                      ChoiceChip(
+                        key: Key('work-status-max-orders-$count'),
+                        label: Text('$count orders'),
+                        selected: maximumActiveOrders == count,
+                        onSelected: (selected) {
+                          if (selected) onMaximumActiveOrdersChanged(count);
+                        },
+                      ),
+                  ],
+                ),
               ),
               const Divider(height: 1, indent: 16, endIndent: 16),
-              const ListTile(
-                leading: Icon(Icons.notifications_active_outlined),
-                title: Text('Order alerts'),
-                subtitle: Text('Sound and vibration on'),
-                trailing: Icon(Icons.chevron_right_rounded),
+              SwitchListTile.adaptive(
+                key: const Key('work-status-alert-sound'),
+                secondary: const Icon(Icons.volume_up_outlined),
+                title: const Text('Order alert sound'),
+                value: alertSound,
+                onChanged: onAlertSoundChanged,
+              ),
+              SwitchListTile.adaptive(
+                key: const Key('work-status-alert-vibration'),
+                secondary: const Icon(Icons.vibration_rounded),
+                title: const Text('Order alert vibration'),
+                value: alertVibration,
+                onChanged: onAlertVibrationChanged,
               ),
             ],
           ),
@@ -14183,7 +14809,7 @@ class _WorkspaceStatusSurface extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         const _SettingsSectionLabel(
-          title: 'Fulfilment',
+          title: 'Pickup and delivery',
           detail: 'Only enabled choices appear to customers',
         ),
         const SizedBox(height: 10),

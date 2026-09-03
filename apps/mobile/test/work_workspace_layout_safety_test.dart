@@ -1739,8 +1739,8 @@ void main() {
     expect(find.text('Public storefront'), findsOneWidget);
     await reveal(tester, find.text('Default preparation time'));
     expect(find.text('Default preparation time'), findsOneWidget);
-    await reveal(tester, find.text('Fulfilment'));
-    expect(find.text('Fulfilment'), findsOneWidget);
+    await reveal(tester, find.text('Pickup and delivery'));
+    expect(find.text('Pickup and delivery'), findsOneWidget);
     expect(find.text('Selling Price'), findsNothing);
     expect(find.text('MRP'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -2422,16 +2422,179 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-grow')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Offers'));
+    await tester.tap(find.byKey(const Key('work-growth-offers')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-store-offers-screen')), findsOne);
     expect(find.byKey(const Key('work-local-navigation')), findsOne);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-grow-destination')), findsOne);
-    await tester.tap(find.text('Publish paid work'));
+    await tester.ensureVisible(find.byKey(const Key('work-growth-paid-work')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-growth-paid-work')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-paid-requirement-screen')), findsOne);
+  });
+
+  testWidgets('Grow shows live Store outcomes before its first actions', (
+    tester,
+  ) async {
+    final work = liveStore()..workspaceVisibleToCustomers = true;
+    final now = DateTime.now();
+    work.workspaceOrders.addAll([
+      customerOrder(
+        id: 'GROW-1',
+        customer: 'Rakesh · 98290 12345',
+        createdAt: now,
+      ),
+      customerOrder(
+        id: 'GROW-2',
+        customer: 'Rakesh · 98290 12345',
+        createdAt: now.subtract(const Duration(days: 5)),
+      ),
+    ]);
+    work.workspaceOffers.add(
+      WorkspaceStoreOffer(
+        id: 'OFFER-1',
+        title: 'Monthly essentials',
+        detail: 'Save on monthly essentials.',
+        validUntil: now.add(const Duration(days: 5)),
+        active: true,
+      ),
+    );
+    work.workspacePaidRequirementReference = 'WORK-1';
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-business-grow')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Grow repeat business'), findsOneWidget);
+    expect(find.text('Repeat'), findsOneWidget);
+    expect(find.text('Offers live'), findsOneWidget);
+    expect(find.text('Paid work'), findsOneWidget);
+    expect(find.text('Public'), findsOneWidget);
+    for (final keyName in const [
+      'work-growth-customers',
+      'work-growth-offers',
+      'work-growth-social',
+      'work-growth-paid-work',
+      'work-growth-services',
+    ]) {
+      expect(find.byKey(Key(keyName)), findsOneWidget);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Store offer preview requires an available product and permission',
+    (tester) async {
+      final work = liveStore();
+      final customer = customerOrder(
+        id: 'OFFER-CUSTOMER',
+        customer: 'Rakesh · 98290 12345',
+        createdAt: DateTime.now(),
+      );
+      work.workspaceOrders.add(customer);
+      work.workspaceCustomersAllowingMessages.add('9829012345');
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await tester.tap(find.byKey(const Key('work-business-drawer')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-business-grow')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-growth-offers')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Monthly essentials'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-offer-product')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('Fortune Sunflower Oil').last);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('work-offer-preview')), findsOneWidget);
+      expect(find.text('Save on your monthly essentials'), findsWidgets);
+      expect(find.textContaining('1 customers can receive'), findsOneWidget);
+      expect(find.textContaining('₹264'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'funded Store work reviews candidate-facing facts before publish',
+    (tester) async {
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await tester.tap(find.byKey(const Key('work-business-drawer')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-business-grow')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-growth-paid-work')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('work-paid-position')),
+        'Store delivery helper',
+      );
+      await tester.enterText(
+        find.byKey(const Key('work-paid-work')),
+        'Deliver packed customer orders in Sardarpura.',
+      );
+      await tester.enterText(
+        find.byKey(const Key('work-paid-candidate')),
+        'Own bike and valid driving licence.',
+      );
+      await tester.enterText(find.byKey(const Key('work-paid-amount')), '500');
+      await tester.drag(
+        find.byKey(const Key('work-paid-requirement-screen')),
+        const Offset(0, -520),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('work-paid-deadline')));
+      await tester.tap(find.byKey(const Key('work-paid-deadline')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.byKey(const Key('work-paid-requirement-screen')),
+        const Offset(0, -360),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('work-paid-publish')));
+      await tester.tap(find.byKey(const Key('work-paid-publish')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('work-paid-review')), findsOneWidget);
+      expect(find.text('Review what candidates will see'), findsOneWidget);
+      expect(find.text('Mahadev Fresh Mart'), findsWidgets);
+      expect(find.text('₹500 · Assignment'), findsOneWidget);
+      expect(work.workspacePaidRequirementReference, isNull);
+      await tester.tap(find.byKey(const Key('work-paid-review-confirm')));
+      await tester.pumpAndSettle();
+      expect(
+        work.workspacePaidRequirementState,
+        WorkspacePaidRequirementState.published,
+      );
+      expect(work.workspacePaidRequirementReference, isNotNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Store settings save editable hours capacity and alerts', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+    await tester.pumpAndSettle();
+    await reveal(tester, find.byKey(const Key('work-status-max-orders-12')));
+    await tester.tap(find.byKey(const Key('work-status-max-orders-12')));
+    await reveal(tester, find.byKey(const Key('work-status-alert-sound')));
+    await tester.tap(find.byKey(const Key('work-status-alert-sound')));
+    await tester.tap(find.byKey(const Key('work-status-save')));
+    await tester.pumpAndSettle();
+    expect(work.workspaceMaximumActiveOrders, 12);
+    expect(work.workspaceOrderAlertSound, isFalse);
+    expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('active Store business record never shows pending onboarding', (
@@ -2445,7 +2608,7 @@ void main() {
     await tester.tap(find.text('Business details and documents'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-business-record-screen')), findsOne);
-    expect(find.text('Active MoolSocial business partner'), findsOne);
+    expect(find.text('Registered MoolSocial Business Partner'), findsOne);
     expect(find.textContaining('Decision Pending'), findsNothing);
   });
 
@@ -2486,7 +2649,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-grow')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Offers'));
+    await tester.tap(find.byKey(const Key('work-growth-offers')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-operation-back')));
     await tester.pumpAndSettle();
@@ -2615,7 +2778,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-grow')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Publish paid work'));
+    await tester.ensureVisible(
+      find.byKey(const Key('work-growth-paid-work')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-growth-paid-work')));
     await tester.pumpAndSettle();
     expect(find.text('Experience or qualification'), findsOneWidget);
     expect(
@@ -3043,6 +3210,73 @@ void main() {
   );
 
   testWidgets(
+    'Store Live v1 capture - Growth',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore()..workspaceVisibleToCustomers = true;
+      final now = DateTime.now();
+      work.workspaceOrders.addAll([
+        customerOrder(
+          id: 'GROW-1',
+          customer: 'Rakesh · 98290 12345',
+          createdAt: now,
+        ),
+        customerOrder(
+          id: 'GROW-2',
+          customer: 'Rakesh · 98290 12345',
+          createdAt: now.subtract(const Duration(days: 5)),
+        ),
+      ]);
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-growth-settings-v1-local-review-20260904',
+        fileName: '01-growth-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-business-grow')));
+        },
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - Store settings',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      await captureActivityDeck(
+        tester,
+        work: liveStore(),
+        directory: 'work-store-live-growth-settings-v1-local-review-20260904',
+        fileName: '02-store-settings-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+        },
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - Business record',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      await captureActivityDeck(
+        tester,
+        work: liveStore(),
+        directory: 'work-store-live-growth-settings-v1-local-review-20260904',
+        fileName: '03-business-record-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+          await tester.pumpAndSettle();
+          await reveal(tester, find.text('Business details and documents'));
+          await tester.tap(find.text('Business details and documents'));
+        },
+      );
+    },
+  );
+
+  testWidgets(
     'founder Activity Deck capture - idle live store',
     skip: !captureFounderEvidence,
     (tester) async {
@@ -3343,7 +3577,7 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-business-grow')));
           await tester.pumpAndSettle();
-          await tester.tap(find.text('Offers'));
+          await tester.tap(find.byKey(const Key('work-growth-offers')));
         },
       );
     },

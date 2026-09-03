@@ -96,6 +96,11 @@ class WorkSession extends ChangeNotifier {
   String workspaceFulfilmentMode = 'Delivery and pickup';
   int workspaceBusyMinutes = 0;
   String workspaceReopensAt = '';
+  String workspaceOpeningTime = '8:00 AM';
+  String workspaceClosingTime = '10:00 PM';
+  int workspaceMaximumActiveOrders = 8;
+  bool workspaceOrderAlertSound = true;
+  bool workspaceOrderAlertVibration = true;
   bool workspaceVisibleToCustomers = false;
   String workspaceOrderCustomer = '';
   String workspaceOrderItems = '';
@@ -143,9 +148,15 @@ class WorkSession extends ChangeNotifier {
   int workspaceDeliveryRadiusKm = 5;
   int workspaceDeliveryFee = 30;
   int workspaceFreeDeliveryAbove = 499;
+  String workspaceDeliveryCity = 'Jodhpur';
+  String workspaceDeliveryArea = 'Sardarpura';
+  String workspaceDeliveryPincode = '342003';
+  bool workspacePickupEnabled = true;
   bool workspaceStaffAccessEnabled = false;
   int workspaceCounterCount = 1;
   String? workspacePaidRequirementReference;
+  WorkspacePaidRequirementState workspacePaidRequirementState =
+      WorkspacePaidRequirementState.draft;
   final Set<String> dismissedWorkspaceAlerts = <String>{};
   final Set<String> workspaceCustomersFollowingStore = <String>{};
   final Set<String> workspaceCustomersAllowingMessages = <String>{};
@@ -827,6 +838,11 @@ class WorkSession extends ChangeNotifier {
     'fulfilmentMode': workspaceFulfilmentMode,
     'busyMinutes': workspaceBusyMinutes,
     'reopensAt': workspaceReopensAt,
+    'openingTime': workspaceOpeningTime,
+    'closingTime': workspaceClosingTime,
+    'maximumActiveOrders': workspaceMaximumActiveOrders,
+    'orderAlertSound': workspaceOrderAlertSound,
+    'orderAlertVibration': workspaceOrderAlertVibration,
     'catalogue': [
       for (final product in workspaceCatalogueItems)
         {
@@ -901,6 +917,10 @@ class WorkSession extends ChangeNotifier {
     'deliveryRadiusKm': workspaceDeliveryRadiusKm,
     'deliveryFee': workspaceDeliveryFee,
     'freeDeliveryAbove': workspaceFreeDeliveryAbove,
+    'deliveryCity': workspaceDeliveryCity,
+    'deliveryArea': workspaceDeliveryArea,
+    'deliveryPincode': workspaceDeliveryPincode,
+    'pickupEnabled': workspacePickupEnabled,
     'staffAccessEnabled': workspaceStaffAccessEnabled,
     'counterCount': workspaceCounterCount,
     'salesToday': workspaceSalesToday,
@@ -978,6 +998,23 @@ class WorkSession extends ChangeNotifier {
     _persistOperationalState('availability');
   }
 
+  void saveWorkspaceTradingControls({
+    required String openingTime,
+    required String closingTime,
+    required int maximumActiveOrders,
+    required bool alertSound,
+    required bool alertVibration,
+  }) {
+    workspaceOpeningTime = openingTime.trim();
+    workspaceClosingTime = closingTime.trim();
+    workspaceMaximumActiveOrders = maximumActiveOrders.clamp(1, 100);
+    workspaceOrderAlertSound = alertSound;
+    workspaceOrderAlertVibration = alertVibration;
+    _recordWorkspaceActivity('Store hours and order alerts updated.');
+    _persistOperationalState('trading-controls');
+    notifyListeners();
+  }
+
   void dismissWorkspaceAlert(String alertId) {
     dismissedWorkspaceAlerts.add(alertId);
     notifyListeners();
@@ -996,10 +1033,18 @@ class WorkSession extends ChangeNotifier {
     required int radiusKm,
     required int fee,
     required int freeAbove,
+    String? city,
+    String? area,
+    String? pincode,
+    bool? pickupEnabled,
   }) {
     workspaceDeliveryRadiusKm = radiusKm.clamp(1, 50);
     workspaceDeliveryFee = fee.clamp(0, 10000);
     workspaceFreeDeliveryAbove = freeAbove.clamp(0, 1000000);
+    workspaceDeliveryCity = city?.trim() ?? workspaceDeliveryCity;
+    workspaceDeliveryArea = area?.trim() ?? workspaceDeliveryArea;
+    workspaceDeliveryPincode = pincode?.trim() ?? workspaceDeliveryPincode;
+    workspacePickupEnabled = pickupEnabled ?? workspacePickupEnabled;
     _recordWorkspaceActivity('Store delivery coverage and charges updated.');
     showNotice('Delivery area and customer charges updated.');
     _persistOperationalState('delivery-settings');
@@ -1505,6 +1550,9 @@ class WorkSession extends ChangeNotifier {
     required String title,
     required String detail,
     required DateTime validUntil,
+    String? productId,
+    String audience = 'Customers who allow Store offers',
+    int orderCap = 0,
   }) {
     workspaceOffers.insert(
       0,
@@ -1514,6 +1562,9 @@ class WorkSession extends ChangeNotifier {
         detail: detail.trim(),
         validUntil: validUntil,
         active: true,
+        productId: productId,
+        audience: audience,
+        orderCap: orderCap,
       ),
     );
     _recordWorkspaceActivity('Store offer published: ${title.trim()}.');
@@ -1557,6 +1608,7 @@ class WorkSession extends ChangeNotifier {
         ),
       );
       workspacePaidRequirementReference = reference;
+      workspacePaidRequirementState = WorkspacePaidRequirementState.published;
       _recordWorkspaceActivity('Paid work $reference published for $position.');
       showNotice('Paid work published to Earn Today.');
       _persistOperationalState('paid-work-published');

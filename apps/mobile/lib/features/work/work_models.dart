@@ -21,6 +21,14 @@ enum WorkspaceStoreState { open, paused, off }
 
 enum WorkspaceDashboardState { ready, refreshing, offline, failed }
 
+enum WorkspacePaidRequirementState {
+  draft,
+  clarification,
+  published,
+  closed,
+  full,
+}
+
 class WorkspaceProductCompliance {
   const WorkspaceProductCompliance({
     this.genericName,
@@ -220,6 +228,9 @@ class WorkspaceStoreOffer {
     required this.detail,
     required this.validUntil,
     required this.active,
+    this.productId,
+    this.audience = 'Customers who allow Store offers',
+    this.orderCap = 0,
   });
 
   final String id;
@@ -227,6 +238,9 @@ class WorkspaceStoreOffer {
   final String detail;
   final DateTime validUntil;
   final bool active;
+  final String? productId;
+  final String audience;
+  final int orderCap;
 }
 
 enum WorkspaceStockMode { availabilityOnly, exactQuantity }
