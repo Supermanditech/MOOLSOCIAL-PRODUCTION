@@ -8011,20 +8011,31 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    final stageMatches = switch (_filter) {
-      'Live' => session.hasActiveWorkspaceOrder,
-      'New' => session.workspaceOrderStage == 'Confirmed',
-      'Packing' => session.workspaceOrderStage == 'Preparing',
+    final allOrders = session.visibleWorkspaceOrders;
+    bool matches(WorkspaceOrderRecord order, String filter) => switch (filter) {
+      'Live' => !const {'Completed', 'Cancelled'}.contains(order.stage),
+      'New' => order.stage == 'Confirmed',
+      'Packing' => order.stage == 'Preparing',
       'Ready' => const {
         'Ready',
         'Ready for pickup',
         'Delivery requested',
-      }.contains(session.workspaceOrderStage),
-      'Done' => const {
-        'Completed',
-        'Cancelled',
-      }.contains(session.workspaceOrderStage),
+      }.contains(order.stage),
+      'Done' => const {'Completed', 'Cancelled'}.contains(order.stage),
       _ => false,
+    };
+
+    int countFor(String filter) =>
+        allOrders.where((order) => matches(order, filter)).length;
+    final visibleOrders = allOrders
+        .where((order) => matches(order, _filter))
+        .toList(growable: false);
+    const filterLabels = {
+      'Live': 'All',
+      'New': 'New',
+      'Packing': 'Packing',
+      'Ready': 'Ready',
+      'Done': 'History',
     };
     return Container(
       key: const Key('work-orders-destination'),
@@ -8038,96 +8049,114 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             child: Row(
               children: [
                 const Expanded(
                   child: Text(
-                    'Orders',
+                    'Customer orders',
                     style: TextStyle(
                       color: MoolColors.ink,
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-                Text(
-                  session.hasActiveWorkspaceOrder ? '1 live' : 'No live order',
-                  style: const TextStyle(
-                    color: MoolColors.muted,
-                    fontWeight: FontWeight.w800,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F7F1),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${countFor('Live')} active',
+                    style: const TextStyle(
+                      color: Color(0xFF08765D),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          Padding(
+          SingleChildScrollView(
+            key: const Key('work-orders-filter-strip'),
+            scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            child: Wrap(
-              spacing: 7,
-              runSpacing: 7,
+            child: Row(
               children: [
-                for (final filter in const [
-                  'Live',
-                  'New',
-                  'Packing',
-                  'Ready',
-                  'Done',
-                ])
+                for (final filter in filterLabels.keys) ...[
                   ChoiceChip(
-                    label: Text(filter),
+                    key: Key('work-orders-filter-${filter.toLowerCase()}'),
+                    label: Text('${filterLabels[filter]} ${countFor(filter)}'),
                     selected: _filter == filter,
                     onSelected: (_) {
                       widget.session.setWorkspaceOrderFilter(filter);
                       setState(() => _filter = filter);
                     },
                   ),
+                  const SizedBox(width: 7),
+                ],
               ],
             ),
           ),
           Expanded(
-            child: stageMatches
+            child: visibleOrders.isNotEmpty
                 ? ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 100),
                     children: [
-                      _LiveOrderTicket(
-                        session: session,
-                        onOpenDelivery: widget.onOpenDelivery,
-                      ),
+                      for (final order in visibleOrders) ...[
+                        _LiveOrderTicket(
+                          session: session,
+                          order: order,
+                          active:
+                              session.hasActiveWorkspaceOrder &&
+                              (session.currentWorkspaceOrderId == null ||
+                                  order.id == session.currentWorkspaceOrderId),
+                          onOpenDelivery: widget.onOpenDelivery,
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                     ],
                   )
                 : Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(32),
+                      padding: const EdgeInsets.all(24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const CircleAvatar(
-                            radius: 38,
+                            radius: 26,
                             backgroundColor: Color(0xFFE5EAFF),
                             child: Icon(
                               Icons.receipt_long_outlined,
                               color: MoolColors.navy,
-                              size: 34,
+                              size: 25,
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           Text(
-                            'No $_filter order needs action',
+                            _filter == 'Done'
+                                ? 'No completed order yet'
+                                : 'No ${filterLabels[_filter]!.toLowerCase()} order needs action',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: MoolColors.ink,
-                              fontSize: 20,
+                              fontSize: 16,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             _filter == 'Done'
-                                ? 'Completed and cancelled orders will appear here.'
-                                : 'Orders move here automatically as their status changes.',
+                                ? 'Completed and cancelled orders are saved here.'
+                                : 'A new order will appear here when it needs this action.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: MoolColors.muted),
+                            style: const TextStyle(color: MoolColors.muted),
                           ),
                         ],
                       ),
@@ -8142,7 +8171,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                 key: const Key('work-orders-create'),
                 onPressed: widget.onCreateOrder,
                 icon: const Icon(Icons.add_rounded),
-                label: const Text('Record store order'),
+                label: const Text('New customer order'),
               ),
             ),
           ),
@@ -8153,18 +8182,25 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
 }
 
 class _LiveOrderTicket extends StatelessWidget {
-  const _LiveOrderTicket({required this.session, required this.onOpenDelivery});
+  const _LiveOrderTicket({
+    required this.session,
+    required this.order,
+    required this.active,
+    required this.onOpenDelivery,
+  });
 
   final WorkSession session;
+  final WorkspaceOrderRecord order;
+  final bool active;
   final VoidCallback onOpenDelivery;
 
   @override
   Widget build(BuildContext context) {
-    final stage = session.workspaceOrderStage;
+    final stage = order.stage;
     final nextAction = switch (stage) {
       'Confirmed' => 'Start packing',
       'Preparing' => 'Mark ready',
-      'Ready' when session.workspaceOrderNeedsDelivery => 'Arrange delivery',
+      'Ready' when order.needsDelivery => 'Arrange delivery',
       'Ready' => 'Complete pickup',
       'Delivery requested' => 'Track delivery',
       _ => 'Review',
@@ -8172,11 +8208,11 @@ class _LiveOrderTicket extends StatelessWidget {
     return Material(
       key: const Key('work-live-order-ticket'),
       color: Colors.white,
-      elevation: 10,
-      shadowColor: const Color(0x1F001B4D),
-      borderRadius: BorderRadius.circular(26),
+      elevation: 3,
+      shadowColor: const Color(0x16001B4D),
+      borderRadius: BorderRadius.circular(18),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(13),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -8188,66 +8224,88 @@ class _LiveOrderTicket extends StatelessWidget {
                       : MoolColors.navy,
                 ),
                 const SizedBox(width: 7),
-                Text(
-                  stage.toUpperCase(),
-                  style: const TextStyle(
-                    color: MoolColors.navy,
-                    fontSize: 10,
-                    letterSpacing: .6,
-                    fontWeight: FontWeight.w900,
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          stage.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: MoolColors.navy,
+                            fontSize: 10,
+                            letterSpacing: .6,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      if (order.actionDeadline case final deadline?) ...[
+                        const SizedBox(width: 8),
+                        _LiveCountdownText(
+                          deadline: deadline,
+                          fallback: 'Review',
+                          style: const TextStyle(
+                            color: Color(0xFF9A4A00),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                const Spacer(),
                 Text(
-                  '₹${session.workspaceOrderAmount}',
+                  '₹${_formatStoreAmount(order.amount)}',
                   style: const TextStyle(
                     color: MoolColors.navy,
-                    fontSize: 22,
+                    fontSize: 19,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
             Text(
-              session.workspaceOrderCustomer,
+              order.customer,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: MoolColors.ink,
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.w900,
               ),
             ),
             Text(
-              '${session.workspaceOrderSource} · ${session.workspaceOrderPayment} · ${session.workspaceOrderFulfilment}',
-              style: const TextStyle(color: MoolColors.muted),
+              '${order.source} · ${order.payment} · ${order.fulfilment}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: MoolColors.muted, fontSize: 10.5),
             ),
-            const SizedBox(height: 14),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF4F6FF),
-                borderRadius: BorderRadius.circular(16),
+            const SizedBox(height: 7),
+            Text(
+              order.items,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: MoolColors.ink,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
               ),
-              child: Text(
-                session.workspaceOrderItems,
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontWeight: FontWeight.w700,
+            ),
+            if (active) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: stage == 'Ready' && order.needsDelivery
+                      ? onOpenDelivery
+                      : session.advanceWorkspaceOrder,
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 17),
+                  label: Text(nextAction),
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed:
-                    stage == 'Ready' && session.workspaceOrderNeedsDelivery
-                    ? onOpenDelivery
-                    : session.advanceWorkspaceOrder,
-                child: Text(nextAction),
-              ),
-            ),
+            ],
           ],
         ),
       ),

@@ -1299,6 +1299,41 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Store Live Orders is a compact counted queue at large text', (
+    tester,
+  ) async {
+    final work = liveStore();
+    seedIncomingOrder(work);
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+      textScale: 1.4,
+    );
+
+    await tester.tap(find.byKey(const Key('work-pulse-orders')));
+    await tester.pumpAndSettle();
+    expect(find.text('Customer orders'), findsOneWidget);
+    expect(find.text('1 active'), findsOneWidget);
+    expect(find.text('All 1'), findsOneWidget);
+    expect(find.text('New 1'), findsOneWidget);
+    expect(find.text('New customer order'), findsOneWidget);
+    final order = find.byKey(const Key('work-live-order-ticket'));
+    expect(order, findsOneWidget);
+    expect(tester.getRect(order).height, lessThan(220));
+    final filterTop = tester
+        .getTopLeft(find.byKey(const Key('work-orders-filter-live')))
+        .dy;
+    for (final filter in const ['new', 'packing', 'ready', 'done']) {
+      expect(
+        tester.getTopLeft(find.byKey(Key('work-orders-filter-$filter'))).dy,
+        filterTop,
+      );
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Store hosts Wholesale and Bulk with one Store navigation owner',
     (tester) async {
@@ -2014,6 +2049,24 @@ void main() {
         work: work,
         directory: 'work-store-live-v1-local-review-20260903',
         fileName: '04-store-live-delivery-412x915.png',
+      );
+    },
+  );
+
+  testWidgets(
+    'Store Live v1 capture - Orders destination',
+    skip: !captureStoreLiveEvidence,
+    (tester) async {
+      final work = liveStore();
+      seedIncomingOrder(work);
+      await captureActivityDeck(
+        tester,
+        work: work,
+        directory: 'work-store-live-v1-local-review-20260903',
+        fileName: '05-store-live-orders-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-pulse-orders')));
+        },
       );
     },
   );
