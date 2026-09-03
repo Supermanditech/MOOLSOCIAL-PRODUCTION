@@ -458,10 +458,17 @@ class _WorkWorkspaceDashboardScreenState
               ),
       ),
     ];
+    final focusedFormSurface =
+        _view == _WorkspaceControlView.operation &&
+        const {
+          _WorkspaceOperation.groupBuying,
+          _WorkspaceOperation.offers,
+          _WorkspaceOperation.paidWork,
+        }.contains(_operation);
     final storeRootSurface =
         _view == _WorkspaceControlView.dashboard ||
         _view == _WorkspaceControlView.search ||
-        _view == _WorkspaceControlView.operation;
+        (_view == _WorkspaceControlView.operation && !focusedFormSurface);
 
     return WorkPageScaffold(
       session: session,
@@ -662,6 +669,7 @@ class _WorkWorkspaceDashboardScreenState
 
   void _showOperation(_WorkspaceOperation operation) {
     _searchFocus.unfocus();
+    session.clearMessages();
     setState(() {
       if (_view == _WorkspaceControlView.status) {
         _operationReturnView = _WorkspaceControlView.status;
@@ -8821,76 +8829,18 @@ class _WorkspaceGroupBuyingSurfaceState
   }
 
   Future<void> _chooseProduct() async {
-    final query = TextEditingController();
-    WorkspaceCatalogueItem? selected;
-    await showModalBottomSheet<void>(
+    final selected = await showModalBottomSheet<WorkspaceCatalogueItem>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          final normalized = query.text.trim().toLowerCase();
-          final matches = _availableProducts
-              .where((product) {
-                return normalized.isEmpty ||
-                    '${product.title} ${product.brand} ${product.variant} ${product.pack} ${product.sku}'
-                        .toLowerCase()
-                        .contains(normalized);
-              })
-              .toList(growable: false);
-          return SafeArea(
-            top: false,
-            child: FractionallySizedBox(
-              heightFactor: .72,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: TextField(
-                      key: const Key('work-group-buy-product-search'),
-                      controller: query,
-                      autofocus: true,
-                      onChanged: (_) => setSheetState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'Search wholesale product or commodity',
-                        prefixIcon: Icon(Icons.search_rounded),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: matches.length,
-                      itemBuilder: (context, index) {
-                        final product = matches[index];
-                        return ListTile(
-                          title: Text(product.title),
-                          subtitle: Text(
-                            '${product.brand} · ${product.variant} · ${product.pack}',
-                          ),
-                          trailing: const Icon(Icons.arrow_forward_rounded),
-                          onTap: () {
-                            selected = product;
-                            Navigator.of(sheetContext).pop();
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+      builder: (_) => _GroupBuyProductPicker(products: _availableProducts),
     );
-    query.dispose();
     if (selected == null || !mounted) return;
     setState(() {
-      _productId = selected!.id;
+      _productId = selected.id;
       if (_specification.text.isEmpty) {
-        _specification.text = '${selected!.variant} · ${selected!.pack}';
+        _specification.text = '${selected.variant} · ${selected.pack}';
       }
     });
   }
@@ -9192,6 +9142,78 @@ class _WorkspaceGroupBuyingSurfaceState
           label: const Text('Continue to secure your quantity'),
         ),
       ],
+    );
+  }
+}
+
+class _GroupBuyProductPicker extends StatefulWidget {
+  const _GroupBuyProductPicker({required this.products});
+
+  final List<WorkspaceCatalogueItem> products;
+
+  @override
+  State<_GroupBuyProductPicker> createState() => _GroupBuyProductPickerState();
+}
+
+class _GroupBuyProductPickerState extends State<_GroupBuyProductPicker> {
+  final TextEditingController _query = TextEditingController();
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = _query.text.trim().toLowerCase();
+    final matches = widget.products
+        .where((product) {
+          return normalized.isEmpty ||
+              '${product.title} ${product.brand} ${product.variant} ${product.pack} ${product.sku}'
+                  .toLowerCase()
+                  .contains(normalized);
+        })
+        .toList(growable: false);
+    return SafeArea(
+      top: false,
+      child: FractionallySizedBox(
+        heightFactor: .72,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                key: const Key('work-group-buy-product-search'),
+                controller: _query,
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'Search wholesale product or commodity',
+                  prefixIcon: Icon(Icons.search_rounded),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView.builder(
+                itemCount: matches.length,
+                itemBuilder: (context, index) {
+                  final product = matches[index];
+                  return ListTile(
+                    title: Text(product.title),
+                    subtitle: Text(
+                      '${product.brand} · ${product.variant} · ${product.pack}',
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_rounded),
+                    onTap: () => Navigator.of(context).pop(product),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -10273,6 +10295,16 @@ class _LiveOrderTicket extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stage = order.stage;
+    final packingLines = active && stage == 'Preparing'
+        ? session.workspacePackingLines
+        : const <WorkspacePackingLine>[];
+    final packedUnits = packingLines
+        .where((line) => line.packed)
+        .fold<int>(0, (total, line) => total + line.quantity);
+    final totalUnits = packingLines.fold<int>(
+      0,
+      (total, line) => total + line.quantity,
+    );
     final nextAction = switch (stage) {
       'Confirmed' => 'Start packing',
       'Preparing' => 'Mark ready',
@@ -10369,12 +10401,64 @@ class _LiveOrderTicket extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (packingLines.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: LinearProgressIndicator(
+                      value: totalUnits == 0 ? 0 : packedUnits / totalUnits,
+                      minHeight: 7,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '$packedUnits/$totalUnits packed',
+                    style: const TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              for (final line in packingLines)
+                Material(
+                  color: const Color(0xFFF4F6FF),
+                  borderRadius: BorderRadius.circular(12),
+                  child: CheckboxListTile(
+                    key: Key('work-order-pack-${line.id}'),
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    controlAffinity: ListTileControlAffinity.trailing,
+                    value: line.packed,
+                    onChanged: (value) =>
+                        session.setWorkspacePackingLine(line.id, value == true),
+                    title: Text(
+                      '${line.label} × ${line.quantity}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
             if (active) ...[
               const SizedBox(height: 10),
               Align(
                 alignment: Alignment.centerRight,
                 child: FilledButton.icon(
-                  onPressed: stage == 'Ready' && order.needsDelivery
+                  onPressed:
+                      stage == 'Preparing' && !session.workspacePackingComplete
+                      ? null
+                      : stage == 'Ready' && order.needsDelivery
                       ? onOpenDelivery
                       : session.advanceWorkspaceOrder,
                   icon: const Icon(Icons.arrow_forward_rounded, size: 17),
@@ -13996,7 +14080,6 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                     label: 'Customer delivery address',
                     hint: 'House, street, area and landmark',
                     textInputAction: TextInputAction.done,
-                    maxLines: 2,
                     onChanged: (_) => setState(() {}),
                     prefixIcon: const Icon(Icons.location_on_outlined),
                   ),

@@ -1495,6 +1495,53 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'Preparing Orders exposes the packing checklist before Mark ready',
+    (tester) async {
+      final work = liveStore();
+      seedIncomingOrder(work, stage: 'Preparing', delivery: true);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-order-pack-summary-0')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('work-order-pack-summary-1')),
+        findsOneWidget,
+      );
+      expect(find.text('0/3 packed'), findsOneWidget);
+
+      final action = find.widgetWithText(FilledButton, 'Mark ready');
+      expect(tester.widget<FilledButton>(action).onPressed, isNull);
+      await tester.tap(find.byKey(const Key('work-order-pack-summary-0')));
+      await tester.tap(find.byKey(const Key('work-order-pack-summary-1')));
+      await tester.pump();
+      expect(find.text('3/3 packed'), findsOneWidget);
+      expect(tester.widget<FilledButton>(action).onPressed, isNotNull);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderStage, 'Ready');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('leaving an operation clears its action error', (tester) async {
+    final work = liveStore();
+    seedIncomingOrder(work, stage: 'Preparing');
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+
+    work.showError('Mark every product packed before the order is ready.');
+    await tester.pump();
+    expect(find.byKey(const Key('work-error')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-store-orders')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-error')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Store Live order decision keeps one clear action row', (
     tester,
   ) async {
@@ -2161,6 +2208,16 @@ void main() {
     await tester.enterText(search, 'atta');
     await tester.pumpAndSettle();
     expect(find.textContaining('Aashirvaad'), findsWidgets);
+    await tester.tap(
+      find.widgetWithText(ListTile, 'Aashirvaad Whole Wheat Atta'),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-group-buy-product-search')),
+      findsNothing,
+    );
+    expect(find.text('Aashirvaad Whole Wheat Atta'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('product editor keeps Save and Cancel above keyboard', (
@@ -2429,7 +2486,9 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-grow-destination')), findsOne);
-    await tester.ensureVisible(find.byKey(const Key('work-growth-paid-work')));
+    await tester.ensureVisible(
+      find.byKey(const Key('work-growth-paid-work')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-growth-paid-work')));
     await tester.pumpAndSettle();
@@ -2651,7 +2710,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-growth-offers')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-operation-back')));
+    expect(find.byKey(const Key('work-back')).hitTestable(), findsOneWidget);
+    expect(find.byKey(const Key('work-operation-back')), findsNothing);
+    await tester.tap(find.byKey(const Key('work-back')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-grow-destination')), findsOne);
   });
@@ -2778,9 +2839,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-grow')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('work-growth-paid-work')),
-    );
+    await tester.ensureVisible(find.byKey(const Key('work-growth-paid-work')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-growth-paid-work')));
     await tester.pumpAndSettle();
@@ -3646,6 +3705,25 @@ void main() {
     expect(work.workspaceOrderSource, 'Phone');
     expect(work.workspaceOrderNeedsDelivery, isTrue);
     expect(work.workspaceOrderFulfilment, 'Mool delivery');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Mool delivery composer fits a 360x800 Store viewport', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(360, 800),
+    );
+
+    await tester.tap(find.byKey(const Key('work-quick-delivery')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-order-customer')), findsOneWidget);
+    expect(find.byKey(const Key('work-order-address')), findsOneWidget);
+    expect(find.byKey(const Key('work-order-review')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
