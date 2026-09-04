@@ -92,7 +92,7 @@ abstract final class UniversalIntentCatalog {
             'home delivery.',
       ),
       UniversalIntentSpec(
-        section: 'buy',
+        section: 'book',
         id: 'medicine',
         label: 'Medicine',
         title: 'Find medicine safely',

@@ -2218,6 +2218,9 @@ String? _canonicalPersistedReadyRoute(String? location) {
     }
     return _canonicalPersistedReadyRoute(returnLocation) ?? '/app/social';
   }
+  if (path == '/app/book/medicine') {
+    return '/app/book/medicine';
+  }
   if (path.startsWith('/app/buy')) {
     return _canonicalBuyResumeRoute(uri);
   }
@@ -2341,13 +2344,15 @@ String? _canonicalBuyResumeRoute(Uri uri) {
       'orders' || 'tracking' => 'orders',
       _ => 'shop',
     };
-    return '/app/buy?sub=$destination';
+    return destination == 'medicine'
+        ? '/app/book/medicine'
+        : '/app/buy?sub=$destination';
   }
   if (path == '/app/buy/grocery' || isBuyProduct) {
     return '/app/buy?sub=shop';
   }
   if (path == '/app/buy/medicine') {
-    return '/app/buy?sub=medicine';
+    return '/app/book/medicine';
   }
   if (path == '/app/buy/basket' || path == '/app/buy/review') {
     return '/app/buy?view=cart';
