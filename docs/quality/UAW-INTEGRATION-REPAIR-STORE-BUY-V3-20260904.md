@@ -21,4 +21,12 @@ All product and test owners must merge automatically. No APK, device, deployment
 
 ## Qualification
 
-Pre-merge and post-merge results will be recorded here without changing product behavior.
+### Pre-merge
+
+- Bootstrap: `a9339eaaf02ce3550e00664dfce152f519eb8b33`
+- Both locked parent branches equal their remotes exactly.
+- Regression memory: 4,443 entries passed.
+- Coordination bootstrap, task-start and repair fixture: passed.
+- Read-only merge preview: exactly the three declared coordination conflicts; zero product or test conflicts.
+
+Post-merge results will be recorded here without changing product behavior.
