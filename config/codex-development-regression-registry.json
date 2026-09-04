@@ -44703,6 +44703,26 @@
       "prevention": "Use a JavaScript template string with a PowerShell single-quoted exact token, require one match and read only the bounded codex_ui lane region before insertion.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260904-4455-C20E-CURRENT-EAT-AND-RIDE-ACCENTS-MISS-COMPOSITED-CONTRAST",
+      "status": "registered-shared-universal-accessibility-failure",
+      "appliesTo": ["primary", "codex_ui", "universal", "accessibility", "test", "implementation"],
+      "mistake": "After stale C20E layout assertions were corrected, the focused test exposed selected-text contrast of 4.407 for Eat and 4.471 for Ride against the selected surface, both below the required 4.5 ratio.",
+      "rootCause": "The current Eat and Ride navigation accent literals were selected against the untinted base rather than the accent-tinted selected surface used by the rendered AnimatedContainer.",
+      "prevention": "Darken only the Eat and Ride navigation accents while preserving hue, calculate contrast against the actual composited selected fill with a safety margin, and retain the exact source plus C20E test as the only functional owners.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/core/design/mool_design_system.dart", "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart"]
+    },
+    {
+      "id": "REG-20260904-4456-C20E-MECHANICAL-CLAIM-OVERLAPPED-INACTIVE-REPAIR-CLAIM",
+      "status": "registered-stale-active-claim-overlap",
+      "appliesTo": ["primary", "codex_ui", "universal", "test", "implementation"],
+      "mistake": "The first post-bootstrap C20E implementation gate rejected because the completed historical shop-chat repair remained in activeClaims and still owned the registry, policy and coordination checker.",
+      "rootCause": "The new exact ticket claim correctly included its authorized mechanical owners, but the stale completed repair claim had not been released from the active claim map.",
+      "prevention": "Remove only the inactive repair entry from activeClaims while preserving its continuation binding and Git history, retain the C20E ticket's five exact owners, then replay memory and coordination gates before source mutation.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
     }
   ]
 }
