@@ -44723,6 +44723,36 @@
       "prevention": "Remove only the inactive repair entry from activeClaims while preserving its continuation binding and Git history, retain the C20E ticket's five exact owners, then replay memory and coordination gates before source mutation.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260904-4457-STORE-DESCENDED-C20E-BATCH-LACKED-CURSOR-UAT073-METADATA",
+      "status": "registered-cross-branch-dependency-boundary",
+      "appliesTo": ["primary", "codex_ui", "universal", "test", "integration"],
+      "mistake": "The exact ten-file child batch was invoked with --no-pub on the Store-descended branch and stopped during compilation because accepted Cursor-owned package metadata for share_plus was not present; 6 tests passed and 9 load failures were reported before termination.",
+      "rootCause": "The combined Work routes compile shared Buy and Chat owners whose accepted dependency metadata exists only on the unchanged Cursor tip, while this child correctly owns only Universal design and test files.",
+      "prevention": "Do not copy, regenerate or commit Cursor-owned UAT-BUY-073 metadata in the Store child. Qualify the exact two child owners with focused analysis and tests, then require the ten-file batch and full analysis on the replacement repair containing both accepted inputs.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/core/design/mool_design_system.dart", "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart"]
+    },
+    {
+      "id": "REG-20260904-4458-C20E-RELATED-UNIVERSAL-BATCH-CROSSED-UNOWNED-DEPENDENCY-AND-STALE-TEST-BOUNDARIES",
+      "status": "registered-cross-owner-related-suite-failure",
+      "appliesTo": ["primary", "codex_ui", "universal", "test", "integration"],
+      "mistake": "The related Universal batch on the Store-descended child crossed into full-app imports requiring Cursor-owned package metadata and also exposed separate inherited C27B/C28B size-token expectations outside this ticket; the run ended with 3 passes and 8 failures.",
+      "rootCause": "The related-suite selection was based on filenames rather than import closure and exact owner scope, mixing the C20E design owner with unowned application and stale historical test contracts.",
+      "prevention": "Keep this child qualified by its focused C20E suite and two-owner analysis, do not edit unrelated tests or dependency metadata, and run the complete related/full boundary only on the combined replacement repair where each failure can be assigned to its exact owner lane.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart"]
+    },
+    {
+      "id": "REG-20260904-4459-C20E-RELATED-UNIVERSAL-BATCH-OUTPUT-TRUNCATED",
+      "status": "registered-test-output-truncation",
+      "appliesTo": ["primary", "codex_ui", "universal", "test", "integration"],
+      "mistake": "The related Universal batch emitted dependency errors and repeated framework diagnostics until the tool output truncated, so it is not complete qualification evidence.",
+      "rootCause": "Several import-heavy files were grouped under the compact reporter without a retained log or bounded per-file preflight.",
+      "prevention": "Do not retry this batch on the Store child. On the combined repair, inventory dependency-ready owners first and capture complete per-file or bounded aggregate results with exact native exits.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json"]
     }
   ]
 }

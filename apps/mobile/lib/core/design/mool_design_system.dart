@@ -491,10 +491,10 @@ abstract final class MoolLocalNavigationTokens {
   static Color navigationAccentForFamily(String familyId) => switch (familyId) {
     'social' => const Color(0xFF3155C6),
     'buy' => const Color(0xFF7B3FB5),
-    'eat' => const Color(0xFFC64E2B),
-    'ride' => const Color(0xFF087E9A),
-    'book' => const Color(0xFF16825D),
-    'work' => const Color(0xFF9A6400),
+    'eat' => const Color(0xFFB83E23),
+    'ride' => const Color(0xFF077289),
+    'book' => const Color(0xFF137652),
+    'work' => const Color(0xFF915D00),
     _ => MoolColors.navy,
   };
 
