@@ -34,6 +34,44 @@ void main() {
     );
   });
 
+  test(
+    'Android sharing keeps MoolSocial and the destination in separate tasks',
+    () {
+      final activity = File(
+        'android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
+      ).readAsStringSync();
+      final manifest = File(
+        'android/app/src/main/AndroidManifest.xml',
+      ).readAsStringSync();
+      final shareStart = activity.indexOf('private fun shareInSeparateTask');
+      final shareEnd = activity.indexOf(
+        'private fun shareMimeType',
+        shareStart,
+      );
+
+      expect(shareStart, greaterThanOrEqualTo(0));
+      expect(shareEnd, greaterThan(shareStart));
+      final shareOwner = activity.substring(shareStart, shareEnd);
+      expect(activity, contains('"dev.fluttercommunity.plus/share"'));
+      expect(activity, contains('"share" -> shareInSeparateTask'));
+      expect(shareOwner, contains('Intent.createChooser(sendIntent, title)'));
+      expect(shareOwner, contains('Intent.FLAG_ACTIVITY_NEW_TASK'));
+      expect(shareOwner, contains('startActivity(chooserIntent)'));
+      expect(shareOwner, isNot(contains('startActivityForResult')));
+      expect(shareOwner, contains('Intent.EXTRA_TEXT'));
+      expect(shareOwner, contains('Intent.EXTRA_STREAM'));
+      expect(shareOwner, contains('Intent.FLAG_GRANT_READ_URI_PERMISSION'));
+      expect(activity, contains('externalShareLeftActivity = true'));
+      expect(activity, contains('override fun onResume()'));
+      expect(
+        activity,
+        contains('window.decorView.post { result.success("") }'),
+      );
+      expect(manifest, contains('android:launchMode="singleTop"'));
+      expect(manifest, contains('android:taskAffinity=""'));
+    },
+  );
+
   test('iOS identity, deployment target and permissions are aligned', () {
     final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
     final project = File(
@@ -78,7 +116,9 @@ void main() {
     expect(mainSource, contains('MOOLSOCIAL_DEVICE_REVIEW'));
     expect(
       mainSource,
-      contains('Device review mode requires the isolated local emulator'),
+      contains('isQualifiedDeviceReviewRuntimeMode('),
+      reason:
+          'Device review must continue through the shared qualified-runtime gate.',
     );
     expect(mainSource, contains('MOOLSOCIAL_FIREBASE_API_KEY'));
     expect(mainSource, contains('MOOLSOCIAL_FIREBASE_APP_ID'));
@@ -86,9 +126,13 @@ void main() {
     expect(mainSource, contains('MOOLSOCIAL_FIREBASE_PROJECT_ID'));
     expect(
       mainSource,
-      contains('Release configuration is incomplete. Missing:'),
+      contains('if (!_releaseRuntimeConfiguration.isComplete)'),
       reason:
           'A release must fail closed instead of silently using demo services.',
+    );
+    expect(
+      mainSource,
+      contains("_showReleaseBootstrapFailure('release_configuration')"),
     );
   });
 
