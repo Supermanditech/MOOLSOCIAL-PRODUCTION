@@ -314,75 +314,96 @@ class _LoginScreenV5State extends State<LoginScreenV5> {
   }
 
   Widget _buildMethodChooser() {
+    final availableProviders = SocialAuthProvider.values
+        .where(widget.session.isSocialAuthProviderAvailable)
+        .toList(growable: false);
+    final socialCreate =
+        widget.session.authenticationPurpose ==
+        JourneyAuthenticationPurpose.socialCreate;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Sign in', style: Screen03Text.title),
-        const SizedBox(height: 8),
-        const Text('Choose one method to continue.', style: Screen03Text.body),
-        const SizedBox(height: 14),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Screen03Colors.navy),
-            borderRadius: BorderRadius.circular(8),
+        if (widget.session.canCancelSignIn)
+          IconButton.outlined(
+            key: const Key('sign-in-context-back'),
+            tooltip: 'Back',
+            onPressed: widget.session.cancelSignIn,
+            icon: const Icon(Icons.arrow_back_rounded),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('SOCIAL ACCOUNT', style: Screen03Text.cardLabel),
-              const SizedBox(height: 12),
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 3,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 1.08,
-                children: [
-                  for (final provider in SocialAuthProvider.values)
-                    _ProviderButton(
-                      provider: provider,
-                      available: widget.session.isSocialAuthProviderAvailable(
-                        provider,
-                      ),
-                      pending:
-                          widget.session.busy &&
-                          widget.session.socialAuthProvider == provider,
-                      enabled: !widget.session.busy,
-                      onTap: () => _startProvider(provider),
-                    ),
-                ],
-              ),
-            ],
-          ),
+        if (widget.session.canCancelSignIn) const SizedBox(height: 8),
+        Text(
+          socialCreate ? 'Create on MoolSocial' : 'Sign in',
+          style: Screen03Text.title,
         ),
-        const SizedBox(height: 9),
+        const SizedBox(height: 8),
+        Text(
+          socialCreate
+              ? 'Sign in to create a post. After sign-in, you will return to Create with your intent retained.'
+              : 'Choose one method to continue.',
+          key: socialCreate ? const Key('sign-in-social-create-context') : null,
+          style: Screen03Text.body,
+        ),
+        const SizedBox(height: 14),
+        if (availableProviders.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: Screen03Colors.navy),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('SIGN-IN METHODS', style: Screen03Text.cardLabel),
+                const SizedBox(height: 12),
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 6,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 1.32,
+                  children: [
+                    for (final provider in availableProviders)
+                      _ProviderButton(
+                        provider: provider,
+                        available: true,
+                        pending:
+                            widget.session.busy &&
+                            widget.session.socialAuthProvider == provider,
+                        enabled: !widget.session.busy,
+                        onTap: () => _startProvider(provider),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 9),
+        ],
         _MethodButton(
           key: const Key('email-link-method'),
           title: 'Email link',
           subtitle: widget.session.emailLinkAvailable
               ? 'Use any email address'
-              : 'Not available on this build',
+              : 'Choose another sign-in method',
           icon: const _EmailArtwork(),
           onTap: widget.session.busy || !widget.session.emailLinkAvailable
               ? null
               : widget.session.openEmailLinkEntry,
         ),
-        const SizedBox(height: 9),
-        _MethodButton(
-          key: const Key('mobile-otp-method'),
-          title: 'Mobile OTP',
-          subtitle: widget.session.mobileOtpAvailable
-              ? 'Use mobile number'
-              : 'Not available on this build',
-          icon: const _MobileArtwork(),
-          onTap: widget.session.busy || !widget.session.mobileOtpAvailable
-              ? null
-              : _showMobileTarget,
-        ),
+        if (widget.session.mobileOtpAvailable) ...[
+          const SizedBox(height: 9),
+          _MethodButton(
+            key: const Key('mobile-otp-method'),
+            title: 'Mobile OTP',
+            subtitle: 'Use mobile number',
+            icon: const _MobileArtwork(),
+            onTap: widget.session.busy ? null : _showMobileTarget,
+          ),
+        ],
         const SizedBox(height: 24),
         _buildLegalCopy(),
       ],

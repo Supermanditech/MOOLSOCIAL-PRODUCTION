@@ -1,0 +1,11 @@
+{
+  "schema": "moolsocial_ticket_founder_acceptance_v1",
+  "ticketId": "UAW-GLOBAL-NATIVE-BACK-CONTROL-V1-20260828",
+  "workId": "global-native-back-control-v1-20260828",
+  "lane": "codex_ui",
+  "acceptedCommit": "c2c702f6e68303a24152dc7c29fe57f81ae233be",
+  "requirementsSatisfied": true,
+  "founderDecision": "accepted",
+  "acceptedAtIst": "2026-08-28T20:27:53.1434914+05:30",
+  "privateValuesEmitted": false
+}

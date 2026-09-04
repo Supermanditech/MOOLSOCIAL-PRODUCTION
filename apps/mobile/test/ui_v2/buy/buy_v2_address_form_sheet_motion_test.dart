@@ -68,7 +68,17 @@ void main() {
       disableAnimations: disableAnimations,
       textScale: textScale,
     );
-    await tester.tap(find.byKey(const ValueKey('buy-address-request')));
+    final request = find.byKey(const ValueKey('buy-address-request'));
+    await tester.scrollUntilVisible(
+      request,
+      120,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('buy-address-sheet-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(request);
     await tester.pumpAndSettle();
   }
 
@@ -84,35 +94,58 @@ void main() {
       disableAnimations: disableAnimations,
       textScale: textScale,
     );
-    await tester.tap(find.byKey(const ValueKey('buy-address-add')));
+    final add = find.byKey(const ValueKey('buy-address-add'));
+    await tester.scrollUntilVisible(
+      add,
+      120,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('buy-address-sheet-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openEdit(
+    WidgetTester tester,
+    BuyV2Session session,
+    String addressId,
+  ) async {
+    await openChoice(tester, session);
+    await tester.tap(
+      find.byKey(ValueKey<String>('buy-address-actions-$addressId')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(ValueKey<String>('buy-address-edit-$addressId')),
+    );
     await tester.pumpAndSettle();
   }
 
   Future<void> enterCompleteAddress(WidgetTester tester) async {
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-add-recipient')),
-      'Meera Sharma',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-add-phone')),
-      '9876543210',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-add-line')),
-      '12 Market Road',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-add-pin')),
-      '342001',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-add-area')),
-      'Jodhpur',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-add-landmark')),
-      'Near market gate',
-    );
+    Future<void> enter(ValueKey<String> key, String value) async {
+      final list = find.byKey(const ValueKey('buy-address-add-form-list'));
+      final field = find.byKey(key);
+      for (
+        var attempt = 0;
+        attempt < 10 && field.evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.drag(list, const Offset(0, -220));
+        await tester.pumpAndSettle();
+      }
+      expect(field, findsOneWidget);
+      await tester.enterText(field, value);
+    }
+
+    await enter(const ValueKey('buy-address-add-recipient'), 'Meera Sharma');
+    await enter(const ValueKey('buy-address-add-phone'), '9876543210');
+    await enter(const ValueKey('buy-address-add-line'), '12 Market Road');
+    await enter(const ValueKey('buy-address-add-area'), 'Jodhpur');
+    await enter(const ValueKey('buy-address-add-pin'), '342001');
+    await enter(const ValueKey('buy-address-add-landmark'), 'Near market gate');
   }
 
   Future<Finder> revealInForm(
@@ -206,22 +239,19 @@ void main() {
     await openRequest(tester, session);
 
     final route = find.byKey(const ValueKey('buy-address-request-form-route'));
-    expect(tester.getSemantics(route).label, 'Request their address');
+    expect(tester.getSemantics(route).label, 'Request an address');
     expect(
       tester
           .getSize(find.byKey(const ValueKey('buy-address-request-form-close')))
           .height,
       greaterThanOrEqualTo(44),
     );
-    final whatsapp = tester.getSemantics(
-      find.byKey(const ValueKey('buy-address-request-whatsapp')),
+    final share = tester.getSemantics(
+      find.byKey(const ValueKey('buy-address-request-device-share')),
     );
-    expect(whatsapp.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
-    await expectNamedEditableField(
-      tester,
-      'Recipient name or phone (optional)',
-    );
-    expect(find.text('Kept on this sheet; not added to the link.'), findsOne);
+    expect(share.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+    await expectNamedEditableField(tester, 'Recipient name (optional)');
+    expect(find.text('Helps you confirm who the request is for.'), findsOne);
     tester.testTextInput.hide();
     await tester.pump();
     expect(tester.testTextInput.isVisible, isFalse);
@@ -250,52 +280,51 @@ void main() {
     expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
   });
 
-  testWidgets('request copies only the established link and closes once', (
-    tester,
-  ) async {
-    final session = BuyV2Session(core: BuySession());
-    addTearDown(session.dispose);
-    await openRequest(tester, session);
-    String? copiedText;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') {
-          copiedText =
-              (call.arguments as Map<Object?, Object?>)['text'] as String?;
-        }
-        return null;
-      },
-    );
-    addTearDown(
-      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+  testWidgets(
+    'request copies only the established link and stays recoverable',
+    (tester) async {
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      await openRequest(tester, session);
+      String? copiedText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
-        null,
-      ),
-    );
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copiedText =
+                (call.arguments as Map<Object?, Object?>)['text'] as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
 
-    await tester.enterText(
-      find.byKey(const ValueKey('buy-address-request-recipient')),
-      'Meera',
-    );
-    await tester.tap(
-      find.byKey(const ValueKey('buy-address-request-whatsapp')),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-address-request-recipient')),
+        'Meera',
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-address-request-copy')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-    expect(copiedText, 'https://moolsocial.com/address/request');
-    expect(
-      find.text('Address request link copied for Meera via WhatsApp'),
-      findsOne,
-    );
-    expect(
-      find.byKey(const ValueKey('buy-address-request-form-route')),
-      findsNothing,
-    );
-    expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
-    expect(session.selectedAddressId, 'home');
-  });
+      expect(copiedText, 'https://moolsocial.com/address/request');
+      expect(
+        find.text('Address request link copied. Paste it into a message.'),
+        findsOne,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-address-request-form-route')),
+        findsOne,
+      );
+      expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
+      expect(session.selectedAddressId, 'home');
+    },
+  );
 
   testWidgets('manual entry nests and Back restores the request form', (
     tester,
@@ -328,11 +357,11 @@ void main() {
 
     for (final label in const [
       'Recipient name',
-      'Recipient phone',
-      'House, street and full address',
-      'PIN code',
+      '10-digit phone number',
+      'House, building and street',
       'Area or locality',
-      'Landmark',
+      '6-digit PIN code',
+      'Nearby landmark (optional)',
     ]) {
       await expectNamedEditableField(tester, label);
     }
@@ -345,26 +374,186 @@ void main() {
     await tester.tap(submit);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('buy-address-add-validation')), findsOne);
-    expect(find.text('Complete every delivery detail'), findsOne);
+    expect(
+      find.text('Add the recipient, street address and locality.'),
+      findsOne,
+    );
     expect(session.addresses.length, before);
     expect(session.selectedAddressId, 'home');
   });
 
-  testWidgets('location intents never fabricate a provider result', (
+  testWidgets('phone and PIN validation recover in place', (tester) async {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    await openAdd(tester, session);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-address-add-recipient')),
+      'Meera Sharma',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-address-add-line')),
+      '12 Market Road',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-address-add-area')),
+      'Jodhpur',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-address-add-phone')),
+      '123',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-address-add-pin')),
+      '12',
+    );
+    final submit = await revealInForm(
+      tester,
+      listKey: const ValueKey('buy-address-add-form-list'),
+      targetKey: const ValueKey('buy-address-add-submit'),
+    );
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a 10-digit phone number.'), findsOne);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-address-add-phone')),
+      '9876543210',
+    );
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a valid 6-digit PIN code.'), findsOne);
+    expect(find.byKey(const ValueKey('buy-address-add-form-route')), findsOne);
+    expect(session.addresses.length, 2);
+  });
+
+  testWidgets('Home and Work edits are prefilled and Back restores choice', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final homeBefore = session.addresses.firstWhere(
+      (address) => address.id == 'home',
+    );
+    final workBefore = session.addresses.firstWhere(
+      (address) => address.id == 'work',
+    );
+
+    await openEdit(tester, session, 'home');
+    expect(find.text('Edit Home address'), findsOne);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('buy-address-add-recipient')),
+          )
+          .controller!
+          .text,
+      homeBefore.recipient,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
+
+    await tester.tap(find.byKey(const ValueKey('buy-address-actions-work')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-address-edit-work')));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Work address'), findsOne);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('buy-address-add-recipient')),
+          )
+          .controller!
+          .text,
+      workBefore.recipient,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(session.selectedAddressId, 'home');
+    expect(session.addresses.firstWhere((a) => a.id == 'home'), homeBefore);
+    expect(session.addresses.firstWhere((a) => a.id == 'work'), workBefore);
+  });
+
+  testWidgets('saving an edit updates once and preserves selection', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final before = session.addresses.length;
+    await openEdit(tester, session, 'home');
+
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-address-add-recipient')),
+      'Asha Verma',
+    );
+    final submit = await revealInForm(
+      tester,
+      listKey: const ValueKey('buy-address-add-form-list'),
+      targetKey: const ValueKey('buy-address-add-submit'),
+    );
+    expect(find.text('Save changes'), findsOne);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+
+    expect(session.addresses.length, before);
+    expect(session.selectedAddressId, 'home');
+    expect(
+      session.addresses.firstWhere((address) => address.id == 'home').recipient,
+      'Asha Verma',
+    );
+    expect(
+      find.byKey(const ValueKey('buy-address-add-form-route')),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsNothing);
+  });
+
+  testWidgets('address removal confirms and leaves existing orders unchanged', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    final orderCount = session.orders.length;
+    await openChoice(tester, session);
+
+    await tester.tap(find.byKey(const ValueKey('buy-address-actions-work')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-address-delete-work')));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove Work address?'), findsOne);
+    await tester.tap(find.byKey(const ValueKey('buy-address-delete-cancel')));
+    await tester.pumpAndSettle();
+    expect(session.addresses.any((address) => address.id == 'work'), isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('buy-address-actions-work')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-address-delete-work')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-address-delete-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(session.addresses.any((address) => address.id == 'work'), isFalse);
+    expect(session.orders.length, orderCount);
+    expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsNothing);
+  });
+
+  testWidgets('manual address form is truthful and provider-neutral', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
     addTearDown(session.dispose);
     await openAdd(tester, session);
 
-    await tester.tap(find.byKey(const ValueKey('buy-address-add-current')));
-    await tester.pumpAndSettle();
     expect(
       find.text(
-        'Current-location lookup is not connected in this session. Enter the delivery details manually.',
+        'Enter the complete address below. You can review it before placing the order.',
       ),
       findsOne,
     );
+    expect(find.byKey(const ValueKey('buy-address-add-current')), findsNothing);
+    expect(find.byKey(const ValueKey('buy-address-add-map-pin')), findsNothing);
+    expect(find.byKey(const ValueKey('buy-address-add-google')), findsNothing);
     final pin = tester.widget<TextField>(
       find.byKey(const ValueKey('buy-address-add-pin')),
     );
@@ -373,8 +562,7 @@ void main() {
     );
     expect(pin.controller!.text, isEmpty);
     expect(area.controller!.text, isEmpty);
-    expect(find.text('342003'), findsNothing);
-    expect(find.text('Sardarpura, Jodhpur'), findsNothing);
+    expect(find.textContaining('not connected'), findsNothing);
   });
 
   testWidgets('complete add changes the existing session owner once', (
@@ -389,6 +577,10 @@ void main() {
     );
     await tester.pump();
     await enterCompleteAddress(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-address-add-landmark')),
+      '',
+    );
     final submit = await revealInForm(
       tester,
       listKey: const ValueKey('buy-address-add-form-list'),
@@ -400,6 +592,7 @@ void main() {
     expect(session.addresses.length, before + 1);
     expect(session.selectedAddress.label, 'Other place');
     expect(session.selectedAddress.recipient, 'Meera Sharma');
+    expect(session.selectedAddress.landmark, 'No nearby landmark');
     expect(
       find.byKey(const ValueKey('buy-address-add-form-route')),
       findsNothing,
@@ -508,7 +701,7 @@ void main() {
       await expectLater(
         find.byType(MaterialApp),
         matchesGoldenFile(
-          'candidate_captures/buy-v2-r56-10-request-${capture.$4}.png',
+          'candidate_captures/buy-v2-r61-6-shop-address-request-${capture.$4}.png',
         ),
       );
       await tester.tap(
@@ -518,7 +711,7 @@ void main() {
       await expectLater(
         find.byType(MaterialApp),
         matchesGoldenFile(
-          'candidate_captures/buy-v2-r56-10-add-${capture.$4}.png',
+          'candidate_captures/buy-v2-r61-6-shop-address-add-${capture.$4}.png',
         ),
       );
       session.dispose();

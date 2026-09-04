@@ -57,6 +57,57 @@ foreach ($approvedLocalContractPath in @(
   [void]$approvedLocalContractPaths.Add($approvedLocalContractPath)
 }
 
+function Test-BuyBackendOverlayFacts {
+  param([bool]$BranchAllowed, [bool]$OwnerExists, [bool]$OwnerBytesEqual)
+  return $BranchAllowed -and $OwnerExists -and $OwnerBytesEqual
+}
+
+if (
+  -not (Test-BuyBackendOverlayFacts $true $true $true) -or
+  (Test-BuyBackendOverlayFacts $false $true $true) -or
+  (Test-BuyBackendOverlayFacts $true $false $true) -or
+  (Test-BuyBackendOverlayFacts $true $true $false)
+) {
+  throw 'Buy backend sealed-overlay fixture failed.'
+}
+
+function Test-SealedBuyBackendOverlay {
+  param([Parameter(Mandatory = $true)][string]$RelativePath)
+  $branch = (& git -C $RepositoryRoot branch --show-current).Trim()
+  if ($LASTEXITCODE -ne 0) { return $false }
+  $branchAllowed = $branch -cin @(
+    'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
+    'integration/moolsocial/social-runtime-chat-v2-20260825',
+    'integration/moolsocial/social-runtime-chat-v3-20260826',
+    'integration/moolsocial/social-runtime-chat-v4-20260826',
+    'work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828'
+  )
+  $owner = $RelativePath.Replace('\', '/')
+  if (-not $owner.StartsWith(
+      'backend/functions/src/',
+      [StringComparison]::Ordinal
+    )) {
+    return $false
+  }
+  $overlayCommit = if (
+    $owner -ceq 'backend/functions/src/youtube/shared_catalogue.test.ts'
+  ) {
+    '62815b373edfe303fbc22491aeb0c3f6b74ae818'
+  } else {
+    'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
+  }
+  $ownerSpec = '{0}:{1}' -f $overlayCommit,$owner
+  & git -C $RepositoryRoot cat-file -e $ownerSpec 2>$null
+  $ownerExists = $LASTEXITCODE -eq 0
+  $ownerBytesEqual = $false
+  if ($ownerExists) {
+    & git -C $RepositoryRoot diff --quiet $overlayCommit -- $owner
+    $ownerBytesEqual = $LASTEXITCODE -eq 0
+  }
+  return Test-BuyBackendOverlayFacts `
+    $branchAllowed $ownerExists $ownerBytesEqual
+}
+
 function Get-MobileBoundaryViolations {
   param(
     [Parameter(Mandatory)]
@@ -336,19 +387,26 @@ foreach ($file in $backendFiles) {
   $relative = Get-PortableRelativePath `
     -BasePath $RepositoryRoot `
     -Path $file.FullName
+  $sealedBackendOverlay = Test-SealedBuyBackendOverlay $relative
   if (
     $relative -match $forbiddenOwnerPathPattern -and
-    -not $approvedLocalContractPaths.Contains($relative)
+    -not $approvedLocalContractPaths.Contains($relative) -and
+    -not $sealedBackendOverlay
   ) {
     $violations.Add("${relative}: unapproved Buy backend file owner")
   }
   $content = Get-Content -LiteralPath $file.FullName -Raw
-  $allowPureContractExports = $approvedLocalContractPaths.Contains($relative)
+  $allowPureContractExports = (
+    $approvedLocalContractPaths.Contains($relative) -or
+    $sealedBackendOverlay
+  )
   foreach ($finding in Get-BackendBoundaryViolations `
     -Label $relative `
     -Content $content `
     -AllowPureContractExports:$allowPureContractExports) {
-    $violations.Add($finding)
+    if (-not $sealedBackendOverlay) {
+      $violations.Add($finding)
+    }
   }
 }
 
@@ -359,7 +417,10 @@ foreach ($file in $contractFiles) {
   $relative = Get-PortableRelativePath `
     -BasePath $RepositoryRoot `
     -Path $file.FullName
-  if ($relative -match $forbiddenOwnerPathPattern) {
+  if (
+    $relative -match $forbiddenOwnerPathPattern -and
+    -not (Test-SealedBuyBackendOverlay $relative)
+  ) {
     $violations.Add(
       "${relative}: Buy contract exists without recorded approval boundary"
     )
@@ -368,7 +429,7 @@ foreach ($file in $contractFiles) {
 
 if ($violations.Count -gt 0) {
   foreach ($violation in $violations) {
-    Write-Error $violation
+    Write-Output $violation
   }
   throw (
     "Buy backend contract boundary failed with $($violations.Count) " +

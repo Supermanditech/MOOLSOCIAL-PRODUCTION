@@ -3,9 +3,11 @@ import 'dart:ui' show SemanticsAction;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/core/design/mool_design_system.dart';
 import 'package:moolsocial/core/design/mool_service_home.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 
@@ -68,15 +70,18 @@ void main() {
         );
         addTearDown(sessions.dispose);
 
-        expect(find.byKey(const Key('work-search')), findsOneWidget);
-        expect(find.byKey(const Key('work-filter-list')), findsOneWidget);
         expect(
-          find.descendant(
-            of: find.byKey(const Key('work-filter-list')),
-            matching: find.byType(Scrollable),
-          ),
-          findsNothing,
+          find.byKey(const Key('work-earn-inline-header')),
+          findsOneWidget,
         );
+        expect(find.byKey(const Key('work-search')), findsOneWidget);
+        expect(find.byKey(const Key('work-filter-button')), findsOneWidget);
+        expect(
+          find.byKey(const Key('work-earn-global-profile')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('work-earn-hero')), findsNothing);
+        expect(find.text('Opportunities'), findsNothing);
         expect(find.byKey(const Key('work-local-navigation')), findsOneWidget);
         for (final key in const ['work-local-earn', 'work-local-workspace']) {
           final control = find.byKey(Key(key));
@@ -92,7 +97,9 @@ void main() {
 
         expect(
           tester
-              .widget<ListView>(find.byKey(const Key('work-earn-screen')))
+              .widget<CustomScrollView>(
+                find.byKey(const Key('work-earn-screen')),
+              )
               .scrollDirection,
           Axis.vertical,
         );
@@ -111,71 +118,241 @@ void main() {
       );
       addTearDown(sessions.dispose);
 
+      await tester.tap(find.byKey(const Key('work-search')));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const Key('work-search')), 'Jodhpur');
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-filter-nearby')));
-      await tester.pumpAndSettle();
 
-      final card = find.byKey(const Key('work-opportunity-mahadev-orders'));
+      final card = find.byKey(
+        const Key('work-opportunity-quick-delivery-biker'),
+      );
       await _scrollTo(tester, card, const Key('work-earn-screen'));
-      expect(find.text('₹20 per delivered order'), findsOneWidget);
-      expect(find.text('Jodhpur · 4 km'), findsOneWidget);
-      expect(find.text('Ends 21 Jul · 9:00 PM'), findsOneWidget);
-      expect(find.text('Funded · maximum payout ₹400'), findsOneWidget);
+      expect(find.text('Quick Delivery Biker'), findsOneWidget);
+      expect(
+        find.text('Up to ₹19,500 monthly for 30 completed shifts'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Sardarpura, Jodhpur'), findsWidgets);
+      expect(
+        find.text('Bike, valid licence and Android phone required'),
+        findsOneWidget,
+      );
 
-      final review = find.byKey(const Key('work-review-mahadev-orders'));
-      await _scrollTo(tester, review, const Key('work-earn-screen'));
-      expect(tester.getSize(review).height, greaterThanOrEqualTo(48));
-      final semantics = tester
-          .getSemantics(
-            find.descendant(of: review, matching: find.byType(FilledButton)),
-          )
-          .getSemanticsData();
+      final semantics = tester.getSemantics(card).getSemanticsData();
       expect(semantics.hasAction(SemanticsAction.tap), isTrue);
-      await tester.tap(review);
+      await tester.tap(card);
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('work-opportunity-screen')), findsOneWidget);
-      expect(sessions.work.selectedOpportunity?.id, 'mahadev-orders');
+      expect(sessions.work.selectedOpportunity?.id, 'quick-delivery-biker');
     },
   );
 
+  testWidgets('C24G Workspace opens the professional chooser directly', (
+    tester,
+  ) async {
+    final sessions = await _mount(
+      tester,
+      route: '/app/work/my-work',
+      size: const Size(320, 568),
+      textScale: 1.4,
+    );
+    addTearDown(sessions.dispose);
+
+    expect(find.byKey(const Key('my-work-screen')), findsNothing);
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(find.byKey(const Key('workspace-chooser-hero')), findsOneWidget);
+    expect(find.text('Grow your business with MoolSocial'), findsOneWidget);
+    expect(find.text('Signed in'), findsOneWidget);
+    expect(find.text('Build your Workspace'), findsNothing);
+    expect(find.text('Verified account'), findsNothing);
+    expect(find.textContaining('GST category'), findsNothing);
+    expect(find.byKey(const Key('work-global-chat')), findsNothing);
+    expect(find.byKey(const Key('work-help')), findsNothing);
+    expect(find.text('18 orders'), findsNothing);
+    expect(find.text('₹12,840'), findsNothing);
+    expect(find.text('7 items'), findsNothing);
+    final workspace = find.byKey(const Key('work-profile-retailer-grocery'));
+    await _scrollTo(tester, workspace, const Key('work-choose-screen'));
+    expect(tester.getSize(workspace).height, greaterThanOrEqualTo(44));
+    final semantics = tester.getSemantics(workspace).getSemanticsData();
+    expect(semantics.hasAction(SemanticsAction.tap), isTrue);
+    expect(find.text('Growth opportunity'), findsNothing);
+    expect(find.text('Workspace advantage'), findsNothing);
+    expect(find.text('See how MoolSocial helps'), findsWidgets);
+
+    await tester.tap(workspace);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-requirements-screen')), findsNothing);
+    expect(
+      find.byKey(const Key('workspace-benefits-retailer-grocery')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'A customer who forgets your shop becomes someone else’s customer.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('What changes with MoolSocial'), findsOneWidget);
+    expect(find.text('Bring customers back'), findsOneWidget);
+    expect(find.text('Choose this Workspace'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('work-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(
+      find.byKey(const Key('workspace-benefits-retailer-grocery')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('work-requirements-screen')), findsNothing);
+
+    await tester.tap(workspace);
+    await tester.pumpAndSettle();
+
+    await _scrollTo(
+      tester,
+      find.byKey(const Key('work-profile-choose-retailer-grocery')),
+      const Key('work-choose-screen'),
+    );
+    await tester.tap(
+      find.byKey(const Key('work-profile-choose-retailer-grocery')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-requirements-screen')), findsOneWidget);
+    expect(
+      find.byKey(const Key('work-requirements-role-summary')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('work-requirements-ready')), findsOneWidget);
+    expect(find.text('I have these documents ready'), findsOneWidget);
+    expect(find.text('Continue to secure Workspace setup'), findsOneWidget);
+    expect(find.textContaining('GST category'), findsNothing);
+    await _scrollTo(
+      tester,
+      find.text('GST registration certificate'),
+      const Key('work-requirements-screen'),
+    );
+    expect(
+      find.text(
+        'Required when GST registration applies to this Workspace. '
+        'Applicability is confirmed during verification.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Required when applicable'), findsWidgets);
+    expect(find.textContaining('GST certificate is optional'), findsNothing);
+    await _scrollTo(
+      tester,
+      find.byKey(const Key('work-gst-compliance-guidance')),
+      const Key('work-requirements-screen'),
+    );
+    expect(find.textContaining('Central and State/UT'), findsOneWidget);
+    expect(find.textContaining('Rajasthan'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('work-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(sessions.work.selectedProfile, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
-    'C24G Workspace has one direct setup action and no fake metrics',
+    'C24G Workspace separates Travel Partners and Delivery roles with one affordance',
     (tester) async {
       final sessions = await _mount(
         tester,
         route: '/app/work/my-work',
-        size: const Size(320, 568),
-        textScale: 1.4,
+        size: const Size(390, 844),
       );
       addTearDown(sessions.dispose);
 
-      expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
-      expect(find.byKey(const Key('my-work-start')), findsOneWidget);
-      expect(find.byKey(const Key('my-work-choice-earn')), findsNothing);
-      expect(find.byKey(const Key('my-work-choice-business')), findsNothing);
-      expect(find.byKey(const Key('my-work-choice-create')), findsNothing);
-      expect(find.text('18 orders'), findsNothing);
-      expect(find.text('₹12,840'), findsNothing);
-      expect(find.text('7 items'), findsNothing);
+      final labels = workProfiles.map((profile) => profile.label).toList();
+      expect(labels, isNot(contains('Local Service Provider')));
+      expect(labels, isNot(contains('Ride / Delivery Captain')));
       expect(
-        tester.getSize(find.byKey(const Key('my-work-start'))).height,
-        greaterThanOrEqualTo(48),
+        labels,
+        containsAll(const [
+          'Bike Travel Provider',
+          'Auto Travel Provider',
+          'Cab Travel Provider',
+          'Bus Travel Provider',
+          'Quick Delivery Biker',
+          'Wholesale Fleet Delivery',
+          'Bulk Delivery Fleet',
+        ]),
       );
-      final semantics = tester
-          .getSemantics(
-            find.descendant(
-              of: find.byKey(const Key('my-work-start')),
-              matching: find.byType(FilledButton),
-            ),
-          )
-          .getSemanticsData();
-      expect(semantics.hasAction(SemanticsAction.tap), isTrue);
 
-      await tester.tap(find.byKey(const Key('my-work-start')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+      const expectedSectionsAndRoles = [
+        'Travel Partners',
+        'Bike Travel Provider',
+        'Auto Travel Provider',
+        'Cab Travel Provider',
+        'Bus Travel Provider',
+        'Delivery & Logistics',
+        'Quick Delivery Biker',
+        'Wholesale Fleet Delivery',
+        'Bulk Delivery Fleet',
+      ];
+      for (final label in expectedSectionsAndRoles) {
+        final labelFinder = find.text(label);
+        await _scrollTo(tester, labelFinder, const Key('work-choose-screen'));
+        expect(labelFinder, findsOneWidget, reason: label);
+
+        if (label == 'Travel Partners' || label == 'Delivery & Logistics') {
+          continue;
+        }
+        final card = find.ancestor(
+          of: labelFinder,
+          matching: find.byType(MoolCardSurface),
+        );
+        expect(card, findsOneWidget, reason: '$label card');
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.byIcon(Icons.chevron_right_rounded),
+          ),
+          findsNothing,
+          reason: '$label has no redundant top chevron',
+        );
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.byIcon(Icons.arrow_forward_rounded),
+          ),
+          findsNothing,
+          reason: '$label does not duplicate the chevron',
+        );
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Text &&
+                  widget.data?.trim().toLowerCase() == 'explore this role',
+            ),
+          ),
+          findsNothing,
+          reason: '$label has no redundant Explore This Role prompt',
+        );
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.text('See how MoolSocial helps'),
+          ),
+          findsOneWidget,
+          reason: '$label keeps one clear expandable action',
+        );
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.text('Choose this Workspace'),
+          ),
+          findsNothing,
+          reason: '$label does not navigate before benefits are opened',
+        );
+      }
       expect(tester.takeException(), isNull);
     },
   );
@@ -193,6 +370,15 @@ void main() {
 
     final context = tester.element(find.byKey(const Key('work-search')));
     expect(MoolServiceHomeTokens.accessibleDuration(context), Duration.zero);
+    final liveStatus = find.byKey(
+      const Key('work-opportunity-live-status-quick-delivery-biker'),
+    );
+    final fade = tester.widget<FadeTransition>(
+      find
+          .descendant(of: liveStatus, matching: find.byType(FadeTransition))
+          .first,
+    );
+    expect(fade.opacity.value, 1);
     expect(tester.takeException(), isNull);
   });
 }

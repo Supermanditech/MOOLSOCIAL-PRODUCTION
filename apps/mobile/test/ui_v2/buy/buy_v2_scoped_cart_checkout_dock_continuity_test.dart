@@ -11,7 +11,9 @@ void main() {
 
   Future<void> settleVisibleImages(WidgetTester tester) async {
     for (final image in tester.widgetList<Image>(find.byType(Image))) {
-      await precacheImage(image.image, tester.element(find.byWidget(image)));
+      await tester.runAsync(
+        () => precacheImage(image.image, tester.element(find.byWidget(image))),
+      );
     }
     await tester.pumpAndSettle();
   }
@@ -70,7 +72,32 @@ void main() {
   ) {
     expect(session.activeDockDestination, expected);
     expect(find.byKey(const Key('mool-home-launcher')), findsOneWidget);
-    expect(find.byKey(const Key('buy-local-destination-tabs')), findsNothing);
+    expect(find.byKey(const Key('buy-scoped-purchase-owner')), findsNothing);
+    if (expected == BuyV2Destination.medicine) {
+      expect(
+        find.byKey(const Key('care-local-destination-tabs')),
+        findsOneWidget,
+      );
+      for (final key in const [
+        'care-local-tab-doctor',
+        'care-local-tab-medicine',
+        'care-local-tab-salon',
+      ]) {
+        expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+      }
+    } else {
+      expect(
+        find.byKey(const Key('buy-local-destination-tabs')),
+        findsOneWidget,
+      );
+      for (final key in const [
+        'buy-local-tab-wholesale',
+        'buy-local-tab-orders',
+        'buy-local-tab-offers',
+      ]) {
+        expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+      }
+    }
   }
 
   const cases = [
@@ -124,7 +151,7 @@ void main() {
     },
   );
 
-  testWidgets('scoped Cart and Checkout retain one truthful connected owner', (
+  testWidgets('scoped Cart and Checkout retain every established rail action', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -184,6 +211,48 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets(
+    'compact Mool launcher opens and Back closes the menu without losing Cart',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final semantics = tester.ensureSemantics();
+      final session = mixedSession();
+      addTearDown(session.dispose);
+      session.openDestination(BuyV2Destination.shop);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      final cartIds = session.cartLines.map((line) => line.product.id).toList();
+
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      final launcher = find.byKey(const Key('mool-home-launcher'));
+      expect(launcher, findsOneWidget);
+      expect(tester.getSemantics(launcher).label, 'Open MoolSocial main menu');
+
+      await tester.tap(launcher);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('moolsocial-main-menu-arrival-motion')),
+        findsOneWidget,
+      );
+      expect(tester.getSemantics(launcher).label, 'Close MoolSocial main menu');
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('moolsocial-main-menu-arrival-motion')),
+        findsNothing,
+      );
+      expect(session.view, BuyV2View.cart);
+      expect(session.cartScope, BuyV2CartScope.wholesale);
+      expect(
+        session.cartLines.map((line) => line.product.id),
+        orderedEquals(cartIds),
+      );
+      semantics.dispose();
+    },
+  );
+
   testWidgets('320px 140% reduced motion is immediate and semantically exact', (
     tester,
   ) async {
@@ -207,61 +276,61 @@ void main() {
     await tester.pump();
     expectConnectedOwner(tester, session, BuyV2Destination.shop);
     expect(session.destination, BuyV2Destination.medicine);
-    expect(find.textContaining('Shop fulfilment ·'), findsOneWidget);
+    expect(find.textContaining('Shop delivery ·'), findsOneWidget);
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
 
-  testWidgets(
-    'R58.8.7 responsive Android and iOS candidate captures',
-    (tester) async {
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-
-      for (final viewport in const [
-        (
-          size: Size(320, 568),
-          safe: EdgeInsets.symmetric(vertical: 24),
-          textScale: 1.0,
-          reduced: false,
-          checkout: true,
-          label: '320x568-android-checkout',
-        ),
-        (
-          size: Size(360, 800),
-          safe: EdgeInsets.symmetric(vertical: 24),
-          textScale: 1.0,
-          reduced: false,
-          checkout: false,
-          label: '360x800-android-cart',
-        ),
-        (
-          size: Size(390, 844),
-          safe: EdgeInsets.only(top: 47, bottom: 34),
-          textScale: 1.0,
-          reduced: false,
-          checkout: true,
-          label: '390x844-ios-checkout',
-        ),
-        (
-          size: Size(430, 932),
-          safe: EdgeInsets.only(top: 59, bottom: 34),
-          textScale: 1.0,
-          reduced: false,
-          checkout: false,
-          label: '430x932-ios-cart',
-        ),
-        (
-          size: Size(320, 568),
-          safe: EdgeInsets.symmetric(vertical: 24),
-          textScale: 1.4,
-          reduced: true,
-          checkout: true,
-          label: '320x568-a11y140-reduced',
-        ),
-      ]) {
+  for (final viewport in const [
+    (
+      size: Size(320, 568),
+      safe: EdgeInsets.symmetric(vertical: 24),
+      textScale: 1.0,
+      reduced: false,
+      checkout: true,
+      label: '320x568-android-checkout',
+    ),
+    (
+      size: Size(360, 800),
+      safe: EdgeInsets.symmetric(vertical: 24),
+      textScale: 1.0,
+      reduced: false,
+      checkout: false,
+      label: '360x800-android-cart',
+    ),
+    (
+      size: Size(390, 844),
+      safe: EdgeInsets.only(top: 47, bottom: 34),
+      textScale: 1.0,
+      reduced: false,
+      checkout: true,
+      label: '390x844-ios-checkout',
+    ),
+    (
+      size: Size(430, 932),
+      safe: EdgeInsets.only(top: 59, bottom: 34),
+      textScale: 1.0,
+      reduced: false,
+      checkout: false,
+      label: '430x932-ios-cart',
+    ),
+    (
+      size: Size(320, 568),
+      safe: EdgeInsets.symmetric(vertical: 24),
+      textScale: 1.4,
+      reduced: true,
+      checkout: true,
+      label: '320x568-a11y140-reduced',
+    ),
+  ]) {
+    testWidgets(
+      'R58.8.7 responsive ${viewport.label} candidate capture',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
         tester.view.physicalSize = viewport.size;
         final session = mixedSession();
+        addTearDown(session.dispose);
         session.openDestination(BuyV2Destination.medicine);
         session.openCart(scope: BuyV2CartScope.shop);
         if (viewport.checkout) {
@@ -286,12 +355,8 @@ void main() {
             'candidate_captures/buy-v2-r58-8-7-c24f-${viewport.label}.png',
           ),
         );
-
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-        session.dispose();
-      }
-    },
-    tags: 'protected-reference',
-  );
+      },
+      tags: 'protected-reference',
+    );
+  }
 }

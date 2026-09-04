@@ -4,6 +4,14 @@ import test from "node:test";
 import {
   ChatError,
   type ChatMessageRecord,
+  type ChatPrivacySettings,
+  type ChatCallPreferences,
+  type ChatCallRecord,
+  type ChatAttachmentKind,
+  type ChatAttachmentUploadGrant,
+  type ChatGroupInfoRecord,
+  type ChatGroupInviteRecord,
+  type ChatNotificationPreferences,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
   type ChatProfile,
@@ -250,6 +258,190 @@ test("finalizes a photo with one request digest and optional caption", async () 
   assert.equal(repository.sendPhotoInput?.[9], undefined);
 });
 
+test("persists complete privacy choices without partial or invalid values", async () => {
+  const repository = new FakeChatRepository();
+  const service = createService(repository);
+  const saved = await service.updatePrivacySettings(actor.userId, {
+    whoCanMessage: "connections",
+    messageRequestsEnabled: true,
+    shareLastSeen: false,
+    readReceipts: false,
+  });
+  assert.equal(saved.whoCanMessage, "connections");
+  assert.deepEqual(repository.privacyInput, [actor.userId, {
+    whoCanMessage: "connections",
+    messageRequestsEnabled: true,
+    shareLastSeen: false,
+    readReceipts: false,
+  }]);
+  assert.throws(
+    () => service.updatePrivacySettings(actor.userId, {
+      whoCanMessage: "followers",
+      messageRequestsEnabled: true,
+      shareLastSeen: false,
+      readReceipts: false,
+    }),
+    (error: unknown) => error instanceof ChatError && error.code === "bad_request",
+  );
+});
+
+test("binds blocking and request decisions to the authenticated member", async () => {
+  const repository = new FakeChatRepository();
+  const service = createService(repository);
+  assert.deepEqual(
+    await service.setBlockedAccount(actor.userId, {
+      targetUserId: target.userId,
+      blocked: true,
+    }),
+    { blocked: true },
+  );
+  assert.deepEqual(repository.blockInput, [actor, target, true]);
+  assert.deepEqual(
+    await service.resolveMessageRequest(actor.userId, {
+      threadId: "thread-1",
+      accepted: false,
+    }),
+    { threadId: "thread-1", accepted: false },
+  );
+  assert.deepEqual(repository.requestInput, [actor.userId, "thread-1", false]);
+  await assert.rejects(
+    service.setBlockedAccount(actor.userId, {
+      targetUserId: actor.userId,
+      blocked: true,
+    }),
+    (error: unknown) => error instanceof ChatError && error.code === "bad_request",
+  );
+});
+
+test("validates account call choices presence and exact call actions", async () => {
+  const repository = new FakeChatRepository();
+  const service = createService(repository);
+  await service.updateCallPreferences(actor.userId, {
+    voiceCallsEnabled: false,
+    videoCallsEnabled: true,
+  });
+  await service.setPresence(actor.userId, { state: "active" });
+  await service.startCall(actor.userId, {
+    threadId: "thread-1",
+    kind: "voice",
+    idempotencyKey: "chat-call-retry-0001",
+  });
+  assert.deepEqual(repository.callPreferencesInput, [actor.userId, {
+    voiceCallsEnabled: false,
+    videoCallsEnabled: true,
+  }]);
+  assert.deepEqual(repository.presenceInput, [actor.userId, "active"]);
+  assert.deepEqual(repository.startCallInput, [
+    actor,
+    "thread-1",
+    "voice",
+    "chat-call-retry-0001",
+  ]);
+  await assert.rejects(
+    service.startCall(actor.userId, {
+      threadId: "thread-1",
+      kind: "audio",
+      idempotencyKey: "chat-call-retry-0002",
+    }),
+    (error: unknown) => error instanceof ChatError && error.code === "bad_request",
+  );
+});
+
+test("binds document video and voice delivery to one validated upload", async () => {
+  const repository = new FakeChatRepository();
+  const service = createService(repository);
+  const grant = await service.prepareAttachmentUpload(actor.userId, {
+    threadId: "thread-1",
+    kind: "voice",
+    fileName: "Voice message.m4a",
+    contentType: "audio/mp4",
+    sizeBytes: 4096,
+    durationMilliseconds: 2400,
+  });
+  assert.equal(grant.uploadId, "00000000-0000-4000-8000-000000000002");
+  const delivered = await service.sendAttachmentMessage(actor.userId, {
+    threadId: "thread-1",
+    kind: "voice",
+    uploadId: grant.uploadId,
+    fileName: "Voice message.m4a",
+    contentType: "audio/mp4",
+    sizeBytes: 4096,
+    durationMilliseconds: 2400,
+    caption: "Listen when free",
+    idempotencyKey: "chat-attachment-retry-0001",
+  });
+  assert.equal(delivered.attachment?.kind, "voice");
+  assert.equal(repository.prepareAttachmentInput?.[2], "voice");
+  assert.equal(repository.sendAttachmentInput?.[2], "voice");
+  assert.match(String(repository.sendAttachmentInput?.[10] ?? ""), /^[a-f0-9]{64}$/u);
+  await assert.rejects(
+    service.prepareAttachmentUpload(actor.userId, {
+      threadId: "thread-1",
+      kind: "archive",
+      fileName: "unsafe.zip",
+      contentType: "application/zip",
+      sizeBytes: 100,
+    }),
+    (error: unknown) => error instanceof ChatError && error.code === "bad_request",
+  );
+});
+
+test("binds group membership permissions invites and leave to one thread", async () => {
+  const repository = new FakeChatRepository();
+  const service = createService(repository);
+  const info = await service.getGroupInfo(actor.userId, { threadId: "group-1" });
+  assert.equal(info.members.length, 3);
+  await service.inviteGroupMember(actor.userId, {
+    threadId: "group-1",
+    targetUserId: target.userId,
+  });
+  await service.updateGroupPermissions(actor.userId, {
+    threadId: "group-1",
+    invitePermission: "members",
+  });
+  await service.leaveGroup(actor.userId, { threadId: "group-1" });
+  assert.deepEqual(repository.groupInviteInput, [actor, "group-1", target]);
+  assert.deepEqual(repository.groupPermissionInput, [
+    actor.userId,
+    "group-1",
+    "members",
+  ]);
+  assert.deepEqual(repository.groupLeaveInput, [actor.userId, "group-1"]);
+});
+
+test("validates notification categories quiet hours and device registration", async () => {
+  const repository = new FakeChatRepository();
+  const service = createService(repository);
+  const saved = await service.updateNotificationPreferences(actor.userId, {
+    messagesEnabled: true,
+    callsEnabled: true,
+    groupInvitesEnabled: false,
+    showPreview: false,
+    quietHoursEnabled: true,
+    quietStartMinutes: 1320,
+    quietEndMinutes: 420,
+    utcOffsetMinutes: 330,
+  });
+  assert.equal(saved.quietHoursEnabled, true);
+  const token = "a".repeat(64);
+  await service.registerNotificationDevice(actor.userId, {
+    token,
+    platform: "android",
+  });
+  assert.deepEqual(repository.notificationDeviceInput, [
+    actor.userId,
+    token,
+    "android",
+  ]);
+  assert.throws(
+    () => service.registerNotificationDevice(actor.userId, {
+      token: "short",
+      platform: "android",
+    }),
+    (error: unknown) => error instanceof ChatError && error.code === "bad_request",
+  );
+});
+
 function createService(repository: ChatRepository): ChatService {
   return new ChatService(repository, async (userId) => {
     if (userId === actor.userId) return actor;
@@ -284,6 +476,30 @@ class FakeChatRepository implements ChatRepository {
   reactionInput?: [ChatProfile, string, string, boolean];
   forwardInput?: [ChatProfile, string, string, string, string, string];
   readInput?: [string, string];
+  privacyInput?: [string, Omit<ChatPrivacySettings, "updatedAt">];
+  blockInput?: [ChatProfile, ChatProfile, boolean];
+  requestInput?: [string, string, boolean];
+  callPreferencesInput?: [string, Omit<ChatCallPreferences, "updatedAt">];
+  presenceInput?: [string, "active" | "background" | "offline"];
+  startCallInput?: [ChatProfile, string, "voice" | "video", string];
+  prepareAttachmentInput?: [
+    ChatProfile,
+    string,
+    ChatAttachmentKind,
+    string,
+    string,
+    number,
+    number | undefined,
+  ];
+  sendAttachmentInput?: unknown[];
+  groupInviteInput?: [ChatProfile, string, ChatProfile];
+  groupPermissionInput?: [string, string, "admins" | "members"];
+  groupLeaveInput?: [string, string];
+  notificationPreferencesInput?: [
+    string,
+    Omit<ChatNotificationPreferences, "updatedAt">,
+  ];
+  notificationDeviceInput?: [string, string, "android" | "ios"];
 
   async listThreads(userId: string, limit: number): Promise<ChatThreadRecord[]> {
     this.listThreadsInput = [userId, limit];
@@ -406,7 +622,294 @@ class FakeChatRepository implements ChatRepository {
     this.readInput = [userId, threadId];
     return { threadId, unreadCount: 0 };
   }
+
+  async getPrivacySettings(): Promise<ChatPrivacySettings> {
+    return privacy;
+  }
+
+  async updatePrivacySettings(
+    userId: string,
+    settings: Omit<ChatPrivacySettings, "updatedAt">,
+  ): Promise<ChatPrivacySettings> {
+    this.privacyInput = [userId, settings];
+    return { ...settings, updatedAt: privacy.updatedAt };
+  }
+
+  async listBlockedAccounts() {
+    return [];
+  }
+
+  async setBlockedAccount(
+    selectedActor: ChatProfile,
+    selectedTarget: ChatProfile,
+    blocked: boolean,
+  ) {
+    this.blockInput = [selectedActor, selectedTarget, blocked];
+    return { blocked };
+  }
+
+  async listMessageRequests() {
+    return [];
+  }
+
+  async resolveMessageRequest(
+    userId: string,
+    threadId: string,
+    accepted: boolean,
+  ) {
+    this.requestInput = [userId, threadId, accepted];
+    return { threadId, accepted };
+  }
+
+  async getCallPreferences(): Promise<ChatCallPreferences> {
+    return callPreferences;
+  }
+
+  async updateCallPreferences(
+    userId: string,
+    preferences: Omit<ChatCallPreferences, "updatedAt">,
+  ): Promise<ChatCallPreferences> {
+    this.callPreferencesInput = [userId, preferences];
+    return { ...preferences, updatedAt: callPreferences.updatedAt };
+  }
+
+  async setPresence(
+    userId: string,
+    state: "active" | "background" | "offline",
+  ) {
+    this.presenceInput = [userId, state];
+    return { state, updatedAt: callPreferences.updatedAt };
+  }
+
+  async getCallAvailability(
+    userId: string,
+    threadId: string,
+    kind: "voice" | "video",
+  ) {
+    return {
+      threadId,
+      kind,
+      recipientUserId: target.userId,
+      recipientName: target.name,
+      canStart: true,
+      status: "available" as const,
+      message: "Available",
+    };
+  }
+
+  async startCall(
+    selectedActor: ChatProfile,
+    threadId: string,
+    kind: "voice" | "video",
+    idempotencyKey: string,
+  ): Promise<ChatCallRecord> {
+    this.startCallInput = [selectedActor, threadId, kind, idempotencyKey];
+    return call;
+  }
+
+  async respondToCall(): Promise<ChatCallRecord> {
+    return { ...call, status: "accepted" };
+  }
+
+  async endCall(): Promise<ChatCallRecord> {
+    return { ...call, status: "ended" };
+  }
+
+  async listIncomingCalls(): Promise<ChatCallRecord[]> {
+    return [call];
+  }
+
+  async prepareAttachmentUpload(
+    selectedActor: ChatProfile,
+    threadId: string,
+    kind: ChatAttachmentKind,
+    fileName: string,
+    contentType: string,
+    sizeBytes: number,
+    durationMilliseconds?: number,
+  ): Promise<ChatAttachmentUploadGrant> {
+    this.prepareAttachmentInput = [
+      selectedActor,
+      threadId,
+      kind,
+      fileName,
+      contentType,
+      sizeBytes,
+      durationMilliseconds,
+    ];
+    return attachmentGrant;
+  }
+
+  async sendAttachmentMessage(
+    ...values: Parameters<NonNullable<ChatRepository["sendAttachmentMessage"]>>
+  ): Promise<ChatMessageRecord> {
+    this.sendAttachmentInput = values;
+    return attachmentMessage;
+  }
+
+  async getGroupInfo(): Promise<ChatGroupInfoRecord> {
+    return groupInfo;
+  }
+
+  async inviteGroupMember(
+    selectedActor: ChatProfile,
+    threadId: string,
+    selectedTarget: ChatProfile,
+  ): Promise<ChatGroupInviteRecord> {
+    this.groupInviteInput = [selectedActor, threadId, selectedTarget];
+    return groupInvite;
+  }
+
+  async updateGroupPermissions(
+    userId: string,
+    threadId: string,
+    permission: "admins" | "members",
+  ): Promise<ChatGroupInfoRecord> {
+    this.groupPermissionInput = [userId, threadId, permission];
+    return { ...groupInfo, invitePermission: permission };
+  }
+
+  async leaveGroup(userId: string, threadId: string) {
+    this.groupLeaveInput = [userId, threadId];
+    return { threadId, left: true };
+  }
+
+  async listGroupInvites(): Promise<ChatGroupInviteRecord[]> {
+    return [groupInvite];
+  }
+
+  async respondToGroupInvite(
+    userId: string,
+    inviteId: string,
+    accepted: boolean,
+  ) {
+    return { inviteId, accepted, threadId: "group-1" };
+  }
+
+  async getNotificationPreferences(): Promise<ChatNotificationPreferences> {
+    return notificationPreferences;
+  }
+
+  async updateNotificationPreferences(
+    userId: string,
+    preferences: Omit<ChatNotificationPreferences, "updatedAt">,
+  ): Promise<ChatNotificationPreferences> {
+    this.notificationPreferencesInput = [userId, preferences];
+    return { ...preferences, updatedAt: notificationPreferences.updatedAt };
+  }
+
+  async registerNotificationDevice(
+    userId: string,
+    token: string,
+    platform: "android" | "ios",
+  ) {
+    this.notificationDeviceInput = [userId, token, platform];
+    return { registered: true };
+  }
+
+  async unregisterNotificationDevice() {
+    return { registered: false };
+  }
 }
+
+const privacy: ChatPrivacySettings = {
+  whoCanMessage: "everyone",
+  messageRequestsEnabled: true,
+  shareLastSeen: true,
+  readReceipts: true,
+  updatedAt: "2026-08-29T00:00:00.000Z",
+};
+
+const callPreferences: ChatCallPreferences = {
+  voiceCallsEnabled: true,
+  videoCallsEnabled: true,
+  updatedAt: "2026-08-29T00:00:00.000Z",
+};
+
+const call: ChatCallRecord = {
+  id: "call-1",
+  threadId: "thread-1",
+  kind: "voice",
+  callerUserId: actor.userId,
+  recipientUserId: target.userId,
+  status: "ringing",
+  createdAt: "2026-08-29T00:00:00.000Z",
+  updatedAt: "2026-08-29T00:00:00.000Z",
+};
+
+const attachmentGrant: ChatAttachmentUploadGrant = {
+  uploadId: "00000000-0000-4000-8000-000000000002",
+  uploadUrl: "https://storage.googleapis.test/private-upload",
+  expiresAt: "2026-08-29T04:05:00.000Z",
+  requiredHeaders: { "content-type": "audio/mp4" },
+};
+
+const attachmentMessage: ChatMessageRecord = {
+  id: "attachment-message-1",
+  threadId: "thread-1",
+  senderId: actor.userId,
+  senderName: actor.name,
+  text: "Listen when free",
+  createdAt: "2026-08-29T04:00:00.000Z",
+  mine: true,
+  reactionCount: 0,
+  reactedByMe: false,
+  readCount: 0,
+  readByOthers: false,
+  forwarded: false,
+  attachment: {
+    id: attachmentGrant.uploadId,
+    kind: "voice",
+    name: "Voice message.m4a",
+    contentType: "audio/mp4",
+    sizeBytes: 4096,
+    durationMilliseconds: 2400,
+    readUrl: "https://storage.googleapis.test/private-read",
+    readUrlExpiresAt: "2026-08-29T04:05:00.000Z",
+  },
+};
+
+const groupInfo: ChatGroupInfoRecord = {
+  threadId: "group-1",
+  title: "Home Group",
+  description: "Coordinate together.",
+  members: [actor, target, {
+    userId: "user-3",
+    name: "Third member",
+    handle: "@third",
+  }].map((profile, index) => ({
+    userId: profile.userId,
+    name: profile.name,
+    handle: profile.handle,
+    isAdmin: index === 0,
+    isMe: index === 0,
+  })),
+  invitePermission: "admins",
+  canInvite: true,
+  canManage: true,
+  canLeave: true,
+};
+
+const groupInvite: ChatGroupInviteRecord = {
+  id: "invite-1",
+  threadId: "group-1",
+  groupTitle: "Home Group",
+  invitedByUserId: actor.userId,
+  invitedByName: actor.name,
+  invitedAt: "2026-08-29T05:00:00.000Z",
+};
+
+const notificationPreferences: ChatNotificationPreferences = {
+  messagesEnabled: true,
+  callsEnabled: true,
+  groupInvitesEnabled: true,
+  showPreview: true,
+  quietHoursEnabled: false,
+  quietStartMinutes: 1320,
+  quietEndMinutes: 420,
+  utcOffsetMinutes: 330,
+  updatedAt: "2026-08-29T06:00:00.000Z",
+};
 
 const thread: ChatThreadRecord = {
   id: "thread-1",

@@ -1,6 +1,175 @@
 enum ChatThreadType { people, business, order, support }
 
+enum ChatSafetyTarget { person, business, conversation }
+
 enum ChatDeliveryState { sending, delivered, read, failed }
+
+enum ChatMessagePermission { everyone, connections, nobody }
+
+enum ChatCallKind { voice, video }
+
+enum ChatCallStatus { ringing, accepted, declined, ended }
+
+enum ChatCallAvailabilityStatus { available, offline, callsOff, busy }
+
+enum ChatPresenceState { active, background, offline }
+
+enum ChatAttachmentKind { document, video, voice }
+
+class ChatAttachment {
+  const ChatAttachment({
+    required this.id,
+    required this.kind,
+    required this.name,
+    required this.contentType,
+    required this.sizeBytes,
+    required this.readUrl,
+    required this.readUrlExpiresAt,
+    this.duration,
+  });
+
+  final String id;
+  final ChatAttachmentKind kind;
+  final String name;
+  final String contentType;
+  final int sizeBytes;
+  final Uri readUrl;
+  final DateTime readUrlExpiresAt;
+  final Duration? duration;
+}
+
+class ChatCallPreferences {
+  const ChatCallPreferences({
+    required this.voiceCallsEnabled,
+    required this.videoCallsEnabled,
+    this.updatedAt,
+  });
+
+  static const defaults = ChatCallPreferences(
+    voiceCallsEnabled: true,
+    videoCallsEnabled: true,
+  );
+
+  final bool voiceCallsEnabled;
+  final bool videoCallsEnabled;
+  final DateTime? updatedAt;
+
+  ChatCallPreferences copyWith({
+    bool? voiceCallsEnabled,
+    bool? videoCallsEnabled,
+    DateTime? updatedAt,
+  }) => ChatCallPreferences(
+    voiceCallsEnabled: voiceCallsEnabled ?? this.voiceCallsEnabled,
+    videoCallsEnabled: videoCallsEnabled ?? this.videoCallsEnabled,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+}
+
+class ChatCallAvailability {
+  const ChatCallAvailability({
+    required this.threadId,
+    required this.kind,
+    required this.recipientUserId,
+    required this.recipientName,
+    required this.canStart,
+    required this.status,
+    required this.message,
+  });
+
+  final String threadId;
+  final ChatCallKind kind;
+  final String recipientUserId;
+  final String recipientName;
+  final bool canStart;
+  final ChatCallAvailabilityStatus status;
+  final String message;
+}
+
+class ChatCall {
+  const ChatCall({
+    required this.id,
+    required this.threadId,
+    required this.kind,
+    required this.callerUserId,
+    required this.recipientUserId,
+    required this.status,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String threadId;
+  final ChatCallKind kind;
+  final String callerUserId;
+  final String recipientUserId;
+  final ChatCallStatus status;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+}
+
+class ChatPrivacySettings {
+  const ChatPrivacySettings({
+    required this.whoCanMessage,
+    required this.messageRequestsEnabled,
+    required this.shareLastSeen,
+    required this.readReceipts,
+    this.updatedAt,
+  });
+
+  static const defaults = ChatPrivacySettings(
+    whoCanMessage: ChatMessagePermission.everyone,
+    messageRequestsEnabled: true,
+    shareLastSeen: true,
+    readReceipts: true,
+  );
+
+  final ChatMessagePermission whoCanMessage;
+  final bool messageRequestsEnabled;
+  final bool shareLastSeen;
+  final bool readReceipts;
+  final DateTime? updatedAt;
+
+  ChatPrivacySettings copyWith({
+    ChatMessagePermission? whoCanMessage,
+    bool? messageRequestsEnabled,
+    bool? shareLastSeen,
+    bool? readReceipts,
+    DateTime? updatedAt,
+  }) => ChatPrivacySettings(
+    whoCanMessage: whoCanMessage ?? this.whoCanMessage,
+    messageRequestsEnabled:
+        messageRequestsEnabled ?? this.messageRequestsEnabled,
+    shareLastSeen: shareLastSeen ?? this.shareLastSeen,
+    readReceipts: readReceipts ?? this.readReceipts,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+}
+
+class ChatBlockedAccount {
+  const ChatBlockedAccount({
+    required this.userId,
+    required this.name,
+    required this.handle,
+    required this.blockedAt,
+  });
+
+  final String userId;
+  final String name;
+  final String handle;
+  final DateTime blockedAt;
+}
+
+class ChatMessageRequest {
+  const ChatMessageRequest({
+    required this.thread,
+    required this.requestedByUserId,
+    required this.requestedAt,
+  });
+
+  final ChatThread thread;
+  final String requestedByUserId;
+  final DateTime requestedAt;
+}
 
 class ChatPhotoAttachment {
   const ChatPhotoAttachment({
@@ -32,6 +201,125 @@ class ChatReplyReference {
   final String text;
 }
 
+class ChatParticipant {
+  const ChatParticipant({
+    required this.id,
+    required this.name,
+    required this.subtitle,
+    this.isMe = false,
+    this.verified = false,
+    this.isAdmin = false,
+  });
+
+  final String id;
+  final String name;
+  final String subtitle;
+  final bool isMe;
+  final bool verified;
+  final bool isAdmin;
+}
+
+enum ChatGroupInvitePermission { admins, members }
+
+class ChatGroupInfo {
+  const ChatGroupInfo({
+    required this.threadId,
+    required this.title,
+    required this.description,
+    required this.members,
+    required this.invitePermission,
+    required this.canInvite,
+    required this.canManage,
+    required this.canLeave,
+  });
+
+  final String threadId;
+  final String title;
+  final String description;
+  final List<ChatParticipant> members;
+  final ChatGroupInvitePermission invitePermission;
+  final bool canInvite;
+  final bool canManage;
+  final bool canLeave;
+}
+
+class ChatGroupInvite {
+  const ChatGroupInvite({
+    required this.id,
+    required this.threadId,
+    required this.groupTitle,
+    required this.invitedByUserId,
+    required this.invitedByName,
+    required this.invitedAt,
+  });
+
+  final String id;
+  final String threadId;
+  final String groupTitle;
+  final String invitedByUserId;
+  final String invitedByName;
+  final DateTime invitedAt;
+}
+
+enum ChatNotificationPermission { unknown, denied, provisional, authorized }
+
+class ChatNotificationPreferences {
+  const ChatNotificationPreferences({
+    required this.messagesEnabled,
+    required this.callsEnabled,
+    required this.groupInvitesEnabled,
+    required this.showPreview,
+    required this.quietHoursEnabled,
+    required this.quietStartMinutes,
+    required this.quietEndMinutes,
+    required this.utcOffsetMinutes,
+    this.updatedAt,
+  });
+
+  static ChatNotificationPreferences defaults() => ChatNotificationPreferences(
+    messagesEnabled: true,
+    callsEnabled: true,
+    groupInvitesEnabled: true,
+    showPreview: true,
+    quietHoursEnabled: false,
+    quietStartMinutes: 22 * 60,
+    quietEndMinutes: 7 * 60,
+    utcOffsetMinutes: DateTime.now().timeZoneOffset.inMinutes.clamp(-840, 840),
+  );
+
+  final bool messagesEnabled;
+  final bool callsEnabled;
+  final bool groupInvitesEnabled;
+  final bool showPreview;
+  final bool quietHoursEnabled;
+  final int quietStartMinutes;
+  final int quietEndMinutes;
+  final int utcOffsetMinutes;
+  final DateTime? updatedAt;
+
+  ChatNotificationPreferences copyWith({
+    bool? messagesEnabled,
+    bool? callsEnabled,
+    bool? groupInvitesEnabled,
+    bool? showPreview,
+    bool? quietHoursEnabled,
+    int? quietStartMinutes,
+    int? quietEndMinutes,
+    int? utcOffsetMinutes,
+    DateTime? updatedAt,
+  }) => ChatNotificationPreferences(
+    messagesEnabled: messagesEnabled ?? this.messagesEnabled,
+    callsEnabled: callsEnabled ?? this.callsEnabled,
+    groupInvitesEnabled: groupInvitesEnabled ?? this.groupInvitesEnabled,
+    showPreview: showPreview ?? this.showPreview,
+    quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
+    quietStartMinutes: quietStartMinutes ?? this.quietStartMinutes,
+    quietEndMinutes: quietEndMinutes ?? this.quietEndMinutes,
+    utcOffsetMinutes: utcOffsetMinutes ?? this.utcOffsetMinutes,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+}
+
 class ChatThread {
   const ChatThread({
     required this.id,
@@ -42,6 +330,12 @@ class ChatThread {
     required this.type,
     this.unreadCount = 0,
     this.verified = false,
+    this.safetyTarget,
+    this.suggestedPrompts = const [],
+    this.participants = const [],
+    this.groupDescription,
+    this.targetUserId,
+    this.messageRequestPending = false,
   });
 
   final String id;
@@ -52,6 +346,23 @@ class ChatThread {
   final ChatThreadType type;
   final int unreadCount;
   final bool verified;
+  final ChatSafetyTarget? safetyTarget;
+  final List<String> suggestedPrompts;
+  final List<ChatParticipant> participants;
+  final String? groupDescription;
+  final String? targetUserId;
+  final bool messageRequestPending;
+
+  bool get isGroup => participants.isNotEmpty;
+
+  ChatSafetyTarget get effectiveSafetyTarget =>
+      safetyTarget ??
+      switch (type) {
+        ChatThreadType.people => ChatSafetyTarget.person,
+        ChatThreadType.business => ChatSafetyTarget.business,
+        ChatThreadType.order ||
+        ChatThreadType.support => ChatSafetyTarget.conversation,
+      };
 }
 
 class ChatMessage {
@@ -69,6 +380,7 @@ class ChatMessage {
     this.readCount = 0,
     this.forwarded = false,
     this.photo,
+    this.attachment,
   });
 
   final String id;
@@ -84,6 +396,7 @@ class ChatMessage {
   final int readCount;
   final bool forwarded;
   final ChatPhotoAttachment? photo;
+  final ChatAttachment? attachment;
 
   ChatMessage copyWith({
     ChatDeliveryState? deliveryState,
@@ -104,6 +417,7 @@ class ChatMessage {
       readCount: readCount,
       forwarded: forwarded,
       photo: photo,
+      attachment: attachment,
     );
   }
 

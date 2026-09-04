@@ -22,7 +22,9 @@ abstract final class MoolTheme {
       fontFamily: 'Inter',
       colorScheme: scheme,
       scaffoldBackgroundColor: MoolColors.canvas,
-      splashFactory: InkSparkle.splashFactory,
+      splashFactory: NoSplash.splashFactory,
+      splashColor: Colors.transparent,
+      highlightColor: MoolColors.navy.withValues(alpha: .045),
       visualDensity: VisualDensity.standard,
       materialTapTargetSize: MaterialTapTargetSize.padded,
       appBarTheme: const AppBarTheme(

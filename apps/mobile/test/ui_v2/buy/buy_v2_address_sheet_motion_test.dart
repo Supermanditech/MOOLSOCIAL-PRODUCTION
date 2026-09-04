@@ -140,7 +140,7 @@ void main() {
     expect(reduced.reverseCurve, Curves.linear);
   });
 
-  testWidgets('real Account and Checkout callers reach the R56.9 sheet', (
+  testWidgets('Account retains its sheet and Checkout embeds address editing', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
@@ -170,13 +170,20 @@ void main() {
     await tester.pumpWidget(
       app(
         session,
-        home: Scaffold(body: BuyV2CheckoutView(session: session)),
+        home: Scaffold(
+          body: BuyV2CheckoutView(
+            session: session,
+            gstInvoiceController: BuyV2GstInvoiceController(),
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Edit'));
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-address-edit-home')),
+    );
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
+    expect(find.byKey(const ValueKey('buy-address-add-form-route')), findsOne);
   });
 
   testWidgets('selection commits once only after the reverse route', (
@@ -261,12 +268,26 @@ void main() {
     expect(selected.flagsCollection.isSelected, Tristate.isTrue);
     expect(selected.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
     expect(
+      find.byKey(const ValueKey('buy-address-selected-home')),
+      findsOneWidget,
+    );
+    final manage = tester.getSemantics(
+      find.byKey(const ValueKey('buy-address-actions-home')),
+    );
+    expect(manage.label, contains('Manage Home address'));
+    expect(manage.flagsCollection.isButton, isTrue);
+    expect(manage.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+    expect(
       tester.getSize(find.byKey(const ValueKey('buy-address-home'))).height,
       greaterThanOrEqualTo(76),
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('buy-address-close'))).height,
       greaterThanOrEqualTo(44),
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('buy-address-actions-home'))),
+      const Size(48, 48),
     );
     semantics.dispose();
   });
@@ -295,7 +316,13 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('buy-address-request')));
     await tester.pumpAndSettle();
-    expect(find.text('Request their address'), findsOne);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-address-request-form-route')),
+        matching: find.text('Request an address'),
+      ),
+      findsOne,
+    );
     expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
     expect(session.selectedAddressId, 'home');
   });
@@ -393,7 +420,7 @@ void main() {
       await expectLater(
         find.byType(MaterialApp),
         matchesGoldenFile(
-          'candidate_captures/buy-v2-r56-9-address-${capture.$4}.png',
+          'candidate_captures/buy-v2-r61-6-shop-address-${capture.$4}.png',
         ),
       );
       session.dispose();

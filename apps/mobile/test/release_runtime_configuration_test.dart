@@ -91,6 +91,38 @@ void main() {
     );
   });
 
+  test('UI review-only mode is debug, isolated, and provider-free', () {
+    bool qualifies({
+      bool uiReviewOnly = true,
+      bool isDebugMode = true,
+      bool deviceReview = true,
+      bool useEmulators = true,
+      bool youtubePublicReview = false,
+      bool youtubePrivateDevProof = false,
+      bool sideloadPreflightEnabled = false,
+      bool globalSocialLoginAudit = false,
+    }) => isQualifiedUiReviewOnlyRuntimeMode(
+      uiReviewOnly: uiReviewOnly,
+      isDebugMode: isDebugMode,
+      deviceReview: deviceReview,
+      useEmulators: useEmulators,
+      youtubePublicReview: youtubePublicReview,
+      youtubePrivateDevProof: youtubePrivateDevProof,
+      sideloadPreflightEnabled: sideloadPreflightEnabled,
+      globalSocialLoginAudit: globalSocialLoginAudit,
+    );
+
+    expect(qualifies(), isTrue);
+    expect(qualifies(uiReviewOnly: false, isDebugMode: false), isTrue);
+    expect(qualifies(isDebugMode: false), isFalse);
+    expect(qualifies(deviceReview: false), isFalse);
+    expect(qualifies(useEmulators: false), isFalse);
+    expect(qualifies(youtubePublicReview: true), isFalse);
+    expect(qualifies(youtubePrivateDevProof: true), isFalse);
+    expect(qualifies(sideloadPreflightEnabled: true), isFalse);
+    expect(qualifies(globalSocialLoginAudit: true), isFalse);
+  });
+
   test('live device review accepts only exact qualified profiles', () {
     expect(
       isQualifiedDeviceReviewRuntimeMode(
@@ -182,6 +214,55 @@ void main() {
         reason: '$invalid',
       );
     }
+  });
+
+  test('social runtime candidate requires every live dependency', () {
+    bool qualifies({
+      bool globalSocialLoginAudit = true,
+      bool useEmulators = false,
+      String firebaseProjectId = socialRuntimeFirebaseProjectId,
+      bool youtubePrivateDevProof = true,
+      bool youtubeEmbeddedPlayerEnabled = true,
+      String youtubeProviderUrl = socialRuntimeYouTubeProviderUrl,
+      String socialContentUrl = socialRuntimeContentUrl,
+      String chatUrl = socialRuntimeChatUrl,
+    }) => isQualifiedSocialRuntimeDependencySet(
+      globalSocialLoginAudit: globalSocialLoginAudit,
+      useEmulators: useEmulators,
+      firebaseProjectId: firebaseProjectId,
+      youtubePrivateDevProof: youtubePrivateDevProof,
+      youtubeEmbeddedPlayerEnabled: youtubeEmbeddedPlayerEnabled,
+      youtubeProviderUrl: youtubeProviderUrl,
+      socialContentUrl: socialContentUrl,
+      chatUrl: chatUrl,
+    );
+
+    expect(qualifies(), isTrue);
+    for (final invalid in <bool>[
+      qualifies(useEmulators: true),
+      qualifies(firebaseProjectId: 'wrong-project'),
+      qualifies(youtubePrivateDevProof: false),
+      qualifies(youtubeEmbeddedPlayerEnabled: false),
+      qualifies(youtubeProviderUrl: ''),
+      qualifies(socialContentUrl: ''),
+      qualifies(chatUrl: ''),
+    ]) {
+      expect(invalid, isFalse);
+    }
+    expect(
+      qualifies(
+        globalSocialLoginAudit: false,
+        useEmulators: true,
+        firebaseProjectId: '',
+        youtubePrivateDevProof: false,
+        youtubeEmbeddedPlayerEnabled: false,
+        youtubeProviderUrl: '',
+        socialContentUrl: '',
+        chatUrl: '',
+      ),
+      isTrue,
+      reason: 'Normal non-audit builds retain their existing composition.',
+    );
   });
 
   test('global social login audit selects only live shared auth owners', () {

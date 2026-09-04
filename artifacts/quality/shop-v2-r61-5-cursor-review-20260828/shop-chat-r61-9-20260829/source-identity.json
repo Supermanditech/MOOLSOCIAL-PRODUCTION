@@ -1,0 +1,21 @@
+{
+  "schema": "moolsocial_shop_chat_r61_9_source_identity_v1",
+  "candidateId": "UAW-SHOP-CHAT-CONTEXT-R61.9-CURSOR-UI-REVIEW-20260829",
+  "branch": "work/integration-repair/shop-chat-shared-v1-20260829",
+  "head": "e0b1ad3eace7094f9bc0e73ce7d36eb30dcfdb1c",
+  "buyAdapterCommit": "e5720cb86bd2119afc3d84a83d3116018f17f9a3",
+  "sharedChatCommit": "30f4614574aae3c315d586944636a35ba314873d",
+  "manifestPath": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-source-manifest.txt",
+  "manifestSha256": "9A1D95F77A454287D7E069924FEC0235AD3ED252E7DB27EEF13D485559247A70",
+  "fileCount": 640,
+  "profileBlob": "0b0d95796b2b5d1e41ff1be1c983867d14dc2279",
+  "shopThreadIds": [
+    "shop-order",
+    "shop-partner",
+    "shop-offers"
+  ],
+  "runtimePackageTouched": false,
+  "androidConfigurationTouched": false,
+  "backendTouched": false,
+  "privateValuesEmitted": false
+}

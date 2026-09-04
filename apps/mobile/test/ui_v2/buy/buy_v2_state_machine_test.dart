@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 
@@ -135,8 +136,14 @@ void _expectExactState({
 void main() {
   test('mixed Buy actions preserve exact commerce state after every step', () {
     final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
     final products = BuyV2Catalogue.products
-        .where((product) => !product.requiresPrescription)
+        .where((product) {
+          final facts = session.productFactsFor(product);
+          return !product.requiresPrescription &&
+              facts.storeOperatingState != BuyV2StoreOperatingState.closed &&
+              !facts.orderabilityLabel.toLowerCase().contains('unavailable');
+        })
         .toList(growable: false);
     const destinations = [
       BuyV2Destination.shop,
@@ -197,7 +204,12 @@ void main() {
             final confirmedDestinations = session.checkoutDestinations;
             final itemCountBefore = session.itemCount;
 
-            session.confirmOrder();
+            expect(
+              session.confirmOrder(),
+              isTrue,
+              reason:
+                  'step $step confirmation must complete: ${session.notice}',
+            );
 
             confirmations += 1;
             expect(

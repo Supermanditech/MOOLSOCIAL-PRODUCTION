@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -13,6 +15,271 @@ final NumberFormat _buyV2Currency = NumberFormat.currency(
 );
 
 String buyV2Money(num value) => _buyV2Currency.format(value);
+
+/// Converts the server-owned delivery fact into one compact buyer promise.
+///
+/// Google route duration is only one upstream input. This presentation helper
+/// never calculates or guesses an ETA; it renders the complete promise already
+/// supplied through [BuyV2ProductFactsSnapshot].
+String buyV2BuyerDeliveryPromise(BuyV2ProductFactsSnapshot facts) {
+  if (facts.stale) return 'Delivery time needs review';
+
+  final orderability = facts.orderabilityLabel.trim().toLowerCase();
+  if (orderability.contains('checking')) return 'Checking delivery time';
+  if (orderability.contains('unavailable') ||
+      orderability.contains('not available')) {
+    return 'Currently unavailable';
+  }
+
+  return buyV2BuyerDeliveryPromiseSource(facts.deliveryPromise);
+}
+
+String buyV2BuyerDeliveryPromiseSource(String value) {
+  final source = value.trim();
+  final normalized = source.toLowerCase();
+  if (normalized.startsWith('delivered ') ||
+      normalized.startsWith('delivery ') ||
+      normalized.contains('delivery schedule')) {
+    return source;
+  }
+  final minutes = RegExp(
+    r'(\d+)\s*(?:min|minute)s?',
+    caseSensitive: false,
+  ).firstMatch(source);
+  if (minutes != null) return 'Delivered in ${minutes.group(1)} min';
+  final longerDuration = RegExp(
+    r'(\d+)\s*(hour|day)s?',
+    caseSensitive: false,
+  ).firstMatch(source);
+  if (longerDuration != null) {
+    final amount = longerDuration.group(1)!;
+    final unit = longerDuration.group(2)!.toLowerCase();
+    return 'Delivered in $amount $unit${amount == '1' ? '' : 's'}';
+  }
+  return 'Delivery $source';
+}
+
+String buyV2DeliveryPromiseSummary({
+  required String promise,
+  String? promisedByLabel,
+}) {
+  final relative = buyV2BuyerDeliveryPromiseSource(promise);
+  final deadline = promisedByLabel?.trim();
+  return deadline == null || deadline.isEmpty
+      ? relative
+      : '$relative · $deadline';
+}
+
+String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
+    switch (destination) {
+      BuyV2Destination.shop ||
+      BuyV2Destination.wholesale => 'Mool delivery partner',
+      BuyV2Destination.medicine => 'Mool Pharmacy Partner',
+      BuyV2Destination.orders => 'Mool delivery partner',
+    };
+
+String buyV2FulfilmentModeLabel(BuyV2FulfilmentMode mode) => switch (mode) {
+  BuyV2FulfilmentMode.quickLocal => 'Quick local delivery',
+  BuyV2FulfilmentMode.standardCourier => 'Standard/courier delivery',
+  BuyV2FulfilmentMode.bulkFreight => 'Bulk freight',
+};
+
+String buyV2CompactFulfilmentModeLabel(BuyV2FulfilmentMode mode) =>
+    switch (mode) {
+      BuyV2FulfilmentMode.quickLocal => 'Quick local',
+      BuyV2FulfilmentMode.standardCourier => 'Courier',
+      BuyV2FulfilmentMode.bulkFreight => 'Bulk freight',
+    };
+
+const buyV2ProductOfferDecisionContractVersion =
+    'buy-product-offer-decision-v1';
+
+/// UI/API handoff for optional, workspace-authorized Wholesale trade context.
+///
+/// The genuine runtime adapter must resolve the authenticated retailer
+/// workspace outside this presentation layer. It receives only the stable
+/// product IDs and the customer-visible delivery locality, and returns a
+/// timestamped signal that must never override price, stock, delivery or Cart
+/// authorization from [BuyV2ProductFactsSnapshot].
+const buyV2WholesaleTradeDecisionContractVersion =
+    'buy-wholesale-trade-decision-v1';
+
+const buyV2WholesaleCartTradeSummaryContractVersion =
+    'buy-wholesale-cart-trade-summary-v1';
+
+const buyV2WholesaleCheckoutPackCountContractVersion =
+    'buy-wholesale-checkout-pack-count-v1';
+
+const buyV2WholesaleCheckoutReceivingLinesContractVersion =
+    'buy-wholesale-checkout-receiving-lines-v1';
+
+const buyV2WholesaleCheckoutReceivingLocationContractVersion =
+    'buy-wholesale-checkout-receiving-location-v1';
+
+enum BuyV2WholesaleTradeSignalState { ready, unavailable, stale, error }
+
+@immutable
+class BuyV2WholesaleTradeSignal {
+  const BuyV2WholesaleTradeSignal({
+    required this.productId,
+    required this.state,
+    required this.localityLabel,
+    required this.headline,
+    required this.detail,
+    required this.sourceLabel,
+    required this.updatedLabel,
+    this.priceValidUntilLabel,
+  });
+
+  const BuyV2WholesaleTradeSignal.unavailable({required this.productId})
+    : state = BuyV2WholesaleTradeSignalState.unavailable,
+      localityLabel = '',
+      headline = 'Local market insight unavailable',
+      detail =
+          'You can still compare the current price, stock and delivery time.',
+      sourceLabel = '',
+      updatedLabel = '',
+      priceValidUntilLabel = null;
+
+  final String productId;
+  final BuyV2WholesaleTradeSignalState state;
+  final String localityLabel;
+  final String headline;
+  final String detail;
+  final String sourceLabel;
+  final String updatedLabel;
+  final String? priceValidUntilLabel;
+
+  bool get hasCurrentSignal =>
+      state == BuyV2WholesaleTradeSignalState.ready &&
+      localityLabel.trim().isNotEmpty &&
+      headline.trim().isNotEmpty &&
+      detail.trim().isNotEmpty &&
+      sourceLabel.trim().isNotEmpty &&
+      updatedLabel.trim().isNotEmpty;
+}
+
+abstract interface class BuyV2WholesaleTradeDecisionAdapter {
+  Future<BuyV2WholesaleTradeSignal> load({
+    required String productId,
+    required String canonicalProductId,
+    required String? deliveryLocality,
+  });
+}
+
+/// Production-safe default. Tests inject contract-conforming fixtures; the
+/// application never manufactures local demand, popularity or price validity.
+final class BuyV2UnavailableWholesaleTradeDecisionAdapter
+    implements BuyV2WholesaleTradeDecisionAdapter {
+  const BuyV2UnavailableWholesaleTradeDecisionAdapter();
+
+  @override
+  Future<BuyV2WholesaleTradeSignal> load({
+    required String productId,
+    required String canonicalProductId,
+    required String? deliveryLocality,
+  }) async => BuyV2WholesaleTradeSignal.unavailable(productId: productId);
+}
+
+enum BuyV2ProductOfferDecisionState {
+  ready,
+  checking,
+  stale,
+  unavailable,
+  changedPrice,
+  missingFulfilment,
+}
+
+@immutable
+class BuyV2ProductOfferDecision {
+  const BuyV2ProductOfferDecision({
+    required this.state,
+    required this.statusLabel,
+    required this.detail,
+  });
+
+  final BuyV2ProductOfferDecisionState state;
+  final String statusLabel;
+  final String detail;
+
+  bool get canAdd => state == BuyV2ProductOfferDecisionState.ready;
+}
+
+BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
+  required BuyV2Product product,
+  required BuyV2ProductFactsSnapshot facts,
+}) {
+  final orderability = facts.orderabilityLabel.trim().toLowerCase();
+  final partner = facts.partner.trim().toLowerCase();
+  final automaticFulfilment =
+      product.destination == BuyV2Destination.shop ||
+      product.destination == BuyV2Destination.wholesale;
+
+  if (facts.storeOperatingState == BuyV2StoreOperatingState.closed) {
+    final nextOpening = facts.nextOpeningLabel?.trim();
+    return BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.unavailable,
+      statusLabel: 'Store closed',
+      detail: nextOpening == null || nextOpening.isEmpty
+          ? 'This store is closed. Check again before adding to Cart.'
+          : 'This store is closed. $nextOpening.',
+    );
+  }
+  if (facts.stale) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.stale,
+      statusLabel: 'Check current availability',
+      detail:
+          'Price, stock or delivery may have changed. Check again before adding to Cart.',
+    );
+  }
+  if (orderability.contains('unavailable') ||
+      orderability.contains('not available') ||
+      orderability.contains('out of stock')) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.unavailable,
+      statusLabel: 'Currently unavailable',
+      detail:
+          'This product cannot be added to Cart right now. Check again or choose another product.',
+    );
+  }
+  if (orderability.contains('checking') ||
+      orderability.contains('loading') ||
+      orderability.contains('pending review')) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.checking,
+      statusLabel: 'Checking availability',
+      detail:
+          'We’re confirming current stock and delivery before you add this product.',
+    );
+  }
+  if (facts.price != product.price) {
+    return BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.changedPrice,
+      statusLabel: 'Price changed',
+      detail:
+          'The price changed from ${buyV2Money(product.price)} to ${buyV2Money(facts.price)}. Check again or choose another product.',
+    );
+  }
+  if (automaticFulfilment &&
+      (facts.deliveryPromise.trim().isEmpty ||
+          partner.isEmpty ||
+          partner.contains('assignment pending') ||
+          partner.contains('not assigned') ||
+          partner.contains('missing'))) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.missingFulfilment,
+      statusLabel: 'Delivery unavailable',
+      detail:
+          'A delivery time and delivery partner must be confirmed before adding to Cart.',
+    );
+  }
+  return const BuyV2ProductOfferDecision(
+    state: BuyV2ProductOfferDecisionState.ready,
+    statusLabel: 'Available now',
+    detail: 'Current price, stock and delivery are confirmed.',
+  );
+}
 
 abstract final class BuyV2Colors {
   static const navy = Color(0xFF000080);
@@ -343,6 +610,157 @@ class BuyV2FiniteDepthReveal extends StatelessWidget {
   }
 }
 
+/// One finite cinematic card reveal with a single blue-white light sweep.
+/// It never loops, owns no semantics or hit testing, and resolves immediately
+/// when reduced motion is requested.
+class BuyV2CinematicCardReveal extends StatefulWidget {
+  const BuyV2CinematicCardReveal({
+    super.key,
+    required this.stateKey,
+    required this.child,
+    this.delay = Duration.zero,
+    this.duration = const Duration(milliseconds: 780),
+    this.borderRadius = const BorderRadius.all(Radius.circular(16)),
+  });
+
+  final Object stateKey;
+  final Widget child;
+  final Duration delay;
+  final Duration duration;
+  final BorderRadius borderRadius;
+
+  @override
+  State<BuyV2CinematicCardReveal> createState() =>
+      _BuyV2CinematicCardRevealState();
+}
+
+class _BuyV2CinematicCardRevealState extends State<BuyV2CinematicCardReveal>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: widget.duration,
+  );
+  Timer? _delayTimer;
+  bool _scheduled = false;
+
+  void _schedule() {
+    if (_scheduled || MediaQuery.disableAnimationsOf(context)) return;
+    _scheduled = true;
+    if (widget.delay == Duration.zero) {
+      _controller.forward();
+      return;
+    }
+    _delayTimer = Timer(widget.delay, () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _delayTimer?.cancel();
+      _controller.value = 1;
+      _scheduled = true;
+      return;
+    }
+    _schedule();
+  }
+
+  @override
+  void didUpdateWidget(covariant BuyV2CinematicCardReveal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _controller.duration = widget.duration;
+    if (oldWidget.stateKey == widget.stateKey) return;
+    _delayTimer?.cancel();
+    _scheduled = false;
+    _controller.value = MediaQuery.disableAnimationsOf(context) ? 1 : 0;
+    _schedule();
+  }
+
+  @override
+  void dispose() {
+    _delayTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      key: ValueKey<Object>(widget.stateKey),
+      animation: _controller,
+      child: widget.child,
+      builder: (context, child) {
+        final progress = Curves.easeOutCubic.transform(_controller.value);
+        final shineProgress = ((_controller.value - .2) / .68).clamp(0.0, 1.0);
+        final shineOpacity =
+            (1 - ((shineProgress * 2) - 1).abs()).clamp(0.0, 1.0) * .52;
+        final transform =
+            Matrix4.translationValues((1 - progress) * 7, (1 - progress) * 9, 0)
+              ..setEntry(3, 2, .0012)
+              ..rotateY((1 - progress) * .045)
+              ..scaleByDouble(
+                .97 + (.03 * progress),
+                .97 + (.03 * progress),
+                1,
+                1,
+              );
+        return Stack(
+          fit: StackFit.passthrough,
+          children: [
+            Opacity(
+              key: ValueKey('buy-cinematic-card-content-${widget.stateKey}'),
+              opacity: .58 + (.42 * progress),
+              child: Transform(
+                alignment: Alignment.center,
+                transform: transform,
+                transformHitTests: false,
+                child: child,
+              ),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: ClipRRect(
+                  borderRadius: widget.borderRadius,
+                  child: Opacity(
+                    key: ValueKey(
+                      'buy-cinematic-card-sheen-${widget.stateKey}',
+                    ),
+                    opacity: shineOpacity,
+                    child: Align(
+                      alignment: Alignment(-1.7 + (3.4 * shineProgress), 0),
+                      child: FractionallySizedBox(
+                        widthFactor: .34,
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()..setEntry(0, 1, -.16),
+                          child: const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Color(0x00FFFFFF),
+                                  Color(0xB8FFFFFF),
+                                  Color(0x5C63A4FF),
+                                  Color(0x00FFFFFF),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 @immutable
 class BuyV2ThemeSpec {
   const BuyV2ThemeSpec({
@@ -495,7 +913,7 @@ class _BuyV2IntentDepthState extends State<BuyV2IntentDepth> {
   double _tiltY = 0;
 
   void _setPressed(bool value, [Offset? localPosition]) {
-    if (_pressed == value) return;
+    if (!mounted || _pressed == value) return;
     setState(() {
       _pressed = value;
       if (value && widget.spatial && localPosition != null) {
@@ -1154,23 +1572,24 @@ class _BuyV2PromotionCardState extends State<BuyV2PromotionCard>
                                   children: [
                                     Text(
                                       widget.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.clip,
                                       style: const TextStyle(
                                         color: BuyV2Colors.ink,
-                                        fontSize: 11,
+                                        fontSize: 10.5,
+                                        height: 1.08,
                                         fontWeight: FontWeight.w900,
                                       ),
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
                                       widget.detail,
-                                      maxLines: 2,
+                                      maxLines: 4,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         color: BuyV2Colors.muted,
-                                        fontSize: 8,
-                                        height: 1.15,
+                                        fontSize: 9.5,
+                                        height: 1.2,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),

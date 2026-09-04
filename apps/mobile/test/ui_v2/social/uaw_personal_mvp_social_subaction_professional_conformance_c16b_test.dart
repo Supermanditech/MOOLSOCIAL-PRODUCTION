@@ -29,9 +29,10 @@ void main() {
         findsNothing,
       );
       expect(MoolLocalNavigationTokens.destinationRailHeight, 58);
-      expect(tester.getSize(mool).width, 44);
+      final uniformWidth = tester.getSize(mool).width;
+      expect(uniformWidth, closeTo(320 / 6, .01));
       expect(tester.getSize(mool).height, greaterThanOrEqualTo(44));
-      expect(tester.getSize(chat).width, 44);
+      expect(tester.getSize(chat).width, closeTo(uniformWidth, .01));
       expect(tester.getSize(chat).height, greaterThanOrEqualTo(44));
       expect(tester.getCenter(mool).dx, lessThan(tester.getCenter(chat).dx));
       expect(
@@ -40,7 +41,7 @@ void main() {
               find.byKey(const Key('mool-compact-launcher-white-surface')),
             )
             .color,
-        Colors.white,
+        Colors.transparent,
       );
       expect(
         tester
@@ -48,13 +49,13 @@ void main() {
               find.byKey(const Key('mool-global-chat-white-surface')),
             )
             .color,
-        Colors.white,
+        Colors.transparent,
       );
 
       for (final id in const ['videos', 'shorts', 'create', 'feed']) {
         final action = find.byKey(Key('screen04-rail-$id'));
         final size = tester.getSize(action);
-        expect(size.width, greaterThanOrEqualTo(44), reason: id);
+        expect(size.width, closeTo(uniformWidth, .01), reason: id);
         expect(size.height, greaterThanOrEqualTo(44), reason: id);
       }
       expect(tester.takeException(), isNull);

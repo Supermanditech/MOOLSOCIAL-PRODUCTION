@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -60,6 +62,10 @@ void main() {
     session.openCart();
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('buy-cart-empty')), findsOneWidget);
+    expect(find.byTooltip('Empty cart'), findsOneWidget);
+    expect(find.text('Clear'), findsNothing);
 
     for (final product in products) {
       final packshot = find.byKey(ValueKey('buy-cart-packshot-${product.id}'));
@@ -334,7 +340,7 @@ void main() {
 
       expect(session.isSaved(shop.id), isFalse);
       expect(session.quantityFor(shop.id), shop.minimumOrder);
-      expect(find.text('No Saved products here'), findsOneWidget);
+      expect(find.text('No saved products yet'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -453,7 +459,7 @@ void main() {
   );
 
   testWidgets(
-    'validated coupon selects, removes and projects into Checkout without changing total',
+    'validated coupon selects, removes and projects its saving into Checkout',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(320, 700));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -480,7 +486,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(select);
       await tester.pumpAndSettle();
-      expect(find.text('Selected for Checkout review'), findsOneWidget);
+      expect(find.text('Applied to Cart total'), findsOneWidget);
       expect(session.cartTotal, originalTotal);
 
       await tester.tap(
@@ -501,26 +507,125 @@ void main() {
       await tester.pumpAndSettle();
       expect(session.openCheckout(), isTrue);
       await tester.pumpAndSettle();
-
-      final checkoutBenefit = find.byKey(
-        const ValueKey('buy-checkout-benefit-shop-coupon'),
-      );
-      await tester.scrollUntilVisible(
-        checkoutBenefit,
-        300,
-        scrollable: find.byType(Scrollable).first,
-        maxScrolls: 20,
-      );
-      await tester.pumpAndSettle();
-      expect(checkoutBenefit, findsOneWidget);
+      expect(session.checkoutCouponSaving, greaterThan(0));
       expect(
-        find.textContaining('No amount has been deducted'),
-        findsOneWidget,
+        session.checkoutPayableTotal,
+        originalTotal - session.checkoutCouponSaving,
       );
-      expect(session.checkoutPayableTotal, originalTotal);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('live coupon shows eligibility, saving and offline retry', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final adapter = _WidgetLiveBenefitsAdapter();
+    final session = BuyV2Session(
+      core: BuySession(),
+      cartBenefitsAdapter: adapter,
+    );
+    addTearDown(session.dispose);
+    final shop = productFor(BuyV2Destination.shop);
+    expect(session.addProduct(shop.id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+
+    await tester.pumpWidget(app(session));
+    await tester.pump();
+    final coupons = find.byKey(const ValueKey('buy-cart-coupons'));
+    await showInMainCartList(tester, coupons);
+    await tester.tap(coupons);
+    await tester.pump();
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('buy-cart-benefits-loading')),
+      findsOneWidget,
+    );
+
+    final evaluatedAt = DateTime.utc(2026, 8, 29, 12);
+    adapter.complete(
+      BuyV2CartBenefitsSnapshot(
+        state: BuyV2CartBenefitsLoadState.ready,
+        evaluatedAt: evaluatedAt,
+        benefits: [
+          BuyV2CartBenefit(
+            id: 'live-retailer-sale',
+            kind: BuyV2CartBenefitKind.coupon,
+            destination: BuyV2Destination.shop,
+            title: 'Fresh basket sale',
+            detail: 'Eligible for the current basket.',
+            sourceId: 'retailer-live-source',
+            strategy: BuyV2CartBenefitStrategy.timedSale,
+            sponsor: BuyV2CartBenefitSponsor.retailer,
+            sponsorName: 'Shree Balaji Fresh',
+            savingAmount: 10,
+            validUntil: evaluatedAt.add(const Duration(hours: 4)),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Time-bound sale · Retailer · Shree Balaji Fresh'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Save ₹10 now'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-cart-benefit-select-live-retailer-sale')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Applied to Cart total'), findsOneWidget);
+    expect(session.scopedCouponSaving, 10);
+
+    adapter.begin();
+    unawaited(session.refreshCartBenefits());
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('buy-cart-benefits-loading')),
+      findsOneWidget,
+    );
+    adapter.complete(
+      BuyV2CartBenefitsSnapshot(
+        state: BuyV2CartBenefitsLoadState.offline,
+        evaluatedAt: evaluatedAt,
+        customerMessage: 'Reconnect to check current eligibility.',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-cart-benefits-offline')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-cart-benefits-retry')),
+      findsOneWidget,
+    );
+    expect(session.scopedCouponSaving, 0);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+class _WidgetLiveBenefitsAdapter implements BuyV2LiveCartBenefitsAdapter {
+  Completer<BuyV2CartBenefitsSnapshot> _pending = Completer();
+
+  void begin() => _pending = Completer();
+
+  void complete(BuyV2CartBenefitsSnapshot snapshot) {
+    if (!_pending.isCompleted) _pending.complete(snapshot);
+  }
+
+  @override
+  List<BuyV2CartBenefit> benefitsFor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotal,
+  }) => const [];
+
+  @override
+  Future<BuyV2CartBenefitsSnapshot> loadEligibility(
+    BuyV2CartBenefitsRequest request,
+  ) => _pending.future;
 }
 
 class _AvailableBenefitsAdapter implements BuyV2CartBenefitsAdapter {
@@ -542,6 +647,9 @@ class _AvailableBenefitsAdapter implements BuyV2CartBenefitsAdapter {
           title: 'Provider coupon',
           detail: 'Eligibility returned by the test provider.',
           sourceId: 'test-coupon-source',
+          sponsor: BuyV2CartBenefitSponsor.retailer,
+          sponsorName: 'Retail partner',
+          savingAmount: 10,
         ),
       if (kind == BuyV2CartBenefitKind.paymentOffer)
         const BuyV2CartBenefit(

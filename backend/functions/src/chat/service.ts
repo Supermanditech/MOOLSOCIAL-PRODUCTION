@@ -3,11 +3,20 @@ import { createHash } from "node:crypto";
 import {
   ChatError,
   type ChatMessageRecord,
+  type ChatMessagePermission,
+  type ChatCallKind,
+  type ChatAttachmentKind,
+  type ChatAttachmentUploadGrant,
+  type ChatGroupInvitePermission,
+  type ChatNotificationPreferences,
+  type ChatCallPreferences,
+  type ChatPresenceState,
   type ChatPhotoContentType,
   type ChatPhotoUploadGrant,
   type ChatProfileResolver,
   type ChatRepository,
   type ChatThreadRecord,
+  type ChatPrivacySettings,
 } from "./contracts.js";
 
 export class ChatService {
@@ -154,6 +163,209 @@ export class ChatService {
     );
   }
 
+  async prepareAttachmentUpload(
+    userId: string,
+    raw: unknown,
+  ): Promise<ChatAttachmentUploadGrant> {
+    const body = object(raw);
+    const kind = requiredAttachmentKind(body.kind);
+    const fileName = requiredAttachmentFileName(body);
+    const contentType = requiredText(body, "contentType", 128);
+    const sizeBytes = boundedInteger(
+      body.sizeBytes,
+      0,
+      1,
+      50 * 1024 * 1024,
+      "Attachment size",
+    );
+    const durationMilliseconds = optionalBoundedInteger(
+      body.durationMilliseconds,
+      500,
+      300_000,
+      "Voice duration",
+    );
+    const actor = await this.resolveProfile(userId);
+    return this.requireCapability("prepareAttachmentUpload")(
+      actor,
+      requiredIdentifier(body, "threadId"),
+      kind,
+      fileName,
+      contentType,
+      sizeBytes,
+      durationMilliseconds,
+    );
+  }
+
+  async sendAttachmentMessage(
+    userId: string,
+    raw: unknown,
+  ): Promise<ChatMessageRecord> {
+    const body = object(raw);
+    const threadId = requiredIdentifier(body, "threadId");
+    const kind = requiredAttachmentKind(body.kind);
+    const uploadId = requiredIdentifier(body, "uploadId");
+    const fileName = requiredAttachmentFileName(body);
+    const contentType = requiredText(body, "contentType", 128);
+    const sizeBytes = boundedInteger(
+      body.sizeBytes,
+      0,
+      1,
+      50 * 1024 * 1024,
+      "Attachment size",
+    );
+    const durationMilliseconds = optionalBoundedInteger(
+      body.durationMilliseconds,
+      500,
+      300_000,
+      "Voice duration",
+    );
+    const caption = optionalText(body, "caption", 1_000) ?? "";
+    const replyToMessageId = optionalIdentifier(body, "replyToMessageId");
+    const idempotencyKey = requiredText(body, "idempotencyKey", 128);
+    assertRetryKey(idempotencyKey, "attachment");
+    const actor = await this.resolveProfile(userId);
+    const requestDigest = createHash("sha256").update(JSON.stringify({
+      threadId,
+      kind,
+      uploadId,
+      fileName,
+      contentType,
+      sizeBytes,
+      durationMilliseconds,
+      caption,
+      replyToMessageId,
+    })).digest("hex");
+    return this.requireCapability("sendAttachmentMessage")(
+      actor,
+      threadId,
+      kind,
+      uploadId,
+      fileName,
+      contentType,
+      sizeBytes,
+      durationMilliseconds,
+      caption,
+      idempotencyKey,
+      requestDigest,
+      replyToMessageId,
+    );
+  }
+
+  getGroupInfo(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("getGroupInfo")(
+      userId,
+      requiredIdentifier(body, "threadId"),
+    );
+  }
+
+  async inviteGroupMember(userId: string, raw: unknown) {
+    const body = object(raw);
+    const targetUserId = requiredIdentifier(body, "targetUserId");
+    if (targetUserId === userId) {
+      throw new ChatError("bad_request", "You are already in this group.", 400);
+    }
+    const [actor, target] = await Promise.all([
+      this.resolveProfile(userId),
+      this.resolveProfile(targetUserId),
+    ]);
+    return this.requireCapability("inviteGroupMember")(
+      actor,
+      requiredIdentifier(body, "threadId"),
+      target,
+    );
+  }
+
+  updateGroupPermissions(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("updateGroupPermissions")(
+      userId,
+      requiredIdentifier(body, "threadId"),
+      requiredGroupInvitePermission(body.invitePermission),
+    );
+  }
+
+  leaveGroup(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("leaveGroup")(
+      userId,
+      requiredIdentifier(body, "threadId"),
+    );
+  }
+
+  listGroupInvites(userId: string, raw: unknown) {
+    object(raw);
+    return this.requireCapability("listGroupInvites")(userId);
+  }
+
+  respondToGroupInvite(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("respondToGroupInvite")(
+      userId,
+      requiredIdentifier(body, "inviteId"),
+      requiredBoolean(body, "accepted"),
+    );
+  }
+
+  getNotificationPreferences(
+    userId: string,
+    raw: unknown,
+  ): Promise<ChatNotificationPreferences> {
+    object(raw);
+    return this.requireCapability("getNotificationPreferences")(userId);
+  }
+
+  updateNotificationPreferences(
+    userId: string,
+    raw: unknown,
+  ): Promise<ChatNotificationPreferences> {
+    const body = object(raw);
+    return this.requireCapability("updateNotificationPreferences")(userId, {
+      messagesEnabled: requiredBoolean(body, "messagesEnabled"),
+      callsEnabled: requiredBoolean(body, "callsEnabled"),
+      groupInvitesEnabled: requiredBoolean(body, "groupInvitesEnabled"),
+      showPreview: requiredBoolean(body, "showPreview"),
+      quietHoursEnabled: requiredBoolean(body, "quietHoursEnabled"),
+      quietStartMinutes: boundedInteger(
+        body.quietStartMinutes,
+        22 * 60,
+        0,
+        1439,
+        "Quiet start",
+      ),
+      quietEndMinutes: boundedInteger(
+        body.quietEndMinutes,
+        7 * 60,
+        0,
+        1439,
+        "Quiet end",
+      ),
+      utcOffsetMinutes: boundedSignedInteger(
+        body.utcOffsetMinutes,
+        -840,
+        840,
+        "Time-zone offset",
+      ),
+    });
+  }
+
+  registerNotificationDevice(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("registerNotificationDevice")(
+      userId,
+      requiredDeviceToken(body),
+      requiredDevicePlatform(body.platform),
+    );
+  }
+
+  unregisterNotificationDevice(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("unregisterNotificationDevice")(
+      userId,
+      requiredDeviceToken(body),
+    );
+  }
+
   async setReaction(
     userId: string,
     raw: unknown,
@@ -219,6 +431,173 @@ export class ChatService {
       requiredIdentifier(body, "threadId"),
     );
   }
+
+  getPrivacySettings(userId: string, raw: unknown): Promise<ChatPrivacySettings> {
+    object(raw);
+    return this.requireCapability("getPrivacySettings")(userId);
+  }
+
+  updatePrivacySettings(
+    userId: string,
+    raw: unknown,
+  ): Promise<ChatPrivacySettings> {
+    const body = object(raw);
+    const whoCanMessage = requiredMessagePermission(body.whoCanMessage);
+    return this.requireCapability("updatePrivacySettings")(userId, {
+      whoCanMessage,
+      messageRequestsEnabled: requiredBoolean(body, "messageRequestsEnabled"),
+      shareLastSeen: requiredBoolean(body, "shareLastSeen"),
+      readReceipts: requiredBoolean(body, "readReceipts"),
+    });
+  }
+
+  listBlockedAccounts(userId: string, raw: unknown) {
+    object(raw);
+    return this.requireCapability("listBlockedAccounts")(userId);
+  }
+
+  async setBlockedAccount(userId: string, raw: unknown) {
+    const body = object(raw);
+    const targetUserId = requiredIdentifier(body, "targetUserId");
+    if (targetUserId === userId) {
+      throw new ChatError("bad_request", "You cannot block yourself.", 400);
+    }
+    const [actor, target] = await Promise.all([
+      this.resolveProfile(userId),
+      this.resolveProfile(targetUserId),
+    ]);
+    return this.requireCapability("setBlockedAccount")(
+      actor,
+      target,
+      requiredBoolean(body, "blocked"),
+    );
+  }
+
+  listMessageRequests(userId: string, raw: unknown) {
+    object(raw);
+    return this.requireCapability("listMessageRequests")(userId);
+  }
+
+  resolveMessageRequest(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("resolveMessageRequest")(
+      userId,
+      requiredIdentifier(body, "threadId"),
+      requiredBoolean(body, "accepted"),
+    );
+  }
+
+  getCallPreferences(userId: string, raw: unknown): Promise<ChatCallPreferences> {
+    object(raw);
+    return this.requireCapability("getCallPreferences")(userId);
+  }
+
+  updateCallPreferences(
+    userId: string,
+    raw: unknown,
+  ): Promise<ChatCallPreferences> {
+    const body = object(raw);
+    return this.requireCapability("updateCallPreferences")(userId, {
+      voiceCallsEnabled: requiredBoolean(body, "voiceCallsEnabled"),
+      videoCallsEnabled: requiredBoolean(body, "videoCallsEnabled"),
+    });
+  }
+
+  setPresence(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("setPresence")(
+      userId,
+      requiredPresenceState(body.state),
+    );
+  }
+
+  getCallAvailability(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("getCallAvailability")(
+      userId,
+      requiredIdentifier(body, "threadId"),
+      requiredCallKind(body.kind),
+    );
+  }
+
+  async startCall(userId: string, raw: unknown) {
+    const body = object(raw);
+    const idempotencyKey = requiredText(body, "idempotencyKey", 128);
+    assertRetryKey(idempotencyKey, "call");
+    const actor = await this.resolveProfile(userId);
+    return this.requireCapability("startCall")(
+      actor,
+      requiredIdentifier(body, "threadId"),
+      requiredCallKind(body.kind),
+      idempotencyKey,
+    );
+  }
+
+  respondToCall(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("respondToCall")(
+      userId,
+      requiredIdentifier(body, "callId"),
+      requiredBoolean(body, "accepted"),
+    );
+  }
+
+  endCall(userId: string, raw: unknown) {
+    const body = object(raw);
+    return this.requireCapability("endCall")(
+      userId,
+      requiredIdentifier(body, "callId"),
+    );
+  }
+
+  listIncomingCalls(userId: string, raw: unknown) {
+    object(raw);
+    return this.requireCapability("listIncomingCalls")(userId);
+  }
+
+  private requireCapability<K extends keyof ChatRepository>(
+    name: K,
+  ): NonNullable<ChatRepository[K]> {
+    const capability = this.repository[name];
+    if (typeof capability !== "function") {
+      throw new ChatError(
+        "service_unavailable",
+        "Chat privacy controls are unavailable right now. Try again later.",
+        503,
+        true,
+      );
+    }
+    return capability.bind(this.repository) as NonNullable<ChatRepository[K]>;
+  }
+}
+
+function requiredMessagePermission(value: unknown): ChatMessagePermission {
+  if (value === "everyone" || value === "connections" || value === "nobody") {
+    return value;
+  }
+  throw new ChatError("bad_request", "Choose who can message you.", 400);
+}
+
+function requiredCallKind(value: unknown): ChatCallKind {
+  if (value === "voice" || value === "video") return value;
+  throw new ChatError("bad_request", "Choose voice or video calling.", 400);
+}
+
+function requiredPresenceState(value: unknown): ChatPresenceState {
+  if (value === "active" || value === "background" || value === "offline") {
+    return value;
+  }
+  throw new ChatError("bad_request", "A valid presence state is required.", 400);
+}
+
+function requiredBoolean(
+  body: Record<string, unknown>,
+  name: string,
+): boolean {
+  if (typeof body[name] !== "boolean") {
+    throw new ChatError("bad_request", `${name} must be confirmed.`, 400);
+  }
+  return body[name] as boolean;
 }
 
 function requiredPhotoFileName(body: Record<string, unknown>): string {
@@ -227,6 +606,41 @@ function requiredPhotoFileName(body: Record<string, unknown>): string {
     throw new ChatError("bad_request", "Photo name must be valid.", 400);
   }
   return fileName;
+}
+
+function requiredAttachmentFileName(body: Record<string, unknown>): string {
+  const fileName = requiredText(body, "fileName", 160);
+  if (/[\\/\u0000-\u001f\u007f]/u.test(fileName)) {
+    throw new ChatError("bad_request", "Attachment name must be valid.", 400);
+  }
+  return fileName;
+}
+
+function requiredAttachmentKind(value: unknown): ChatAttachmentKind {
+  if (value === "document" || value === "video" || value === "voice") {
+    return value;
+  }
+  throw new ChatError("bad_request", "Choose a supported attachment.", 400);
+}
+
+function requiredGroupInvitePermission(
+  value: unknown,
+): ChatGroupInvitePermission {
+  if (value === "admins" || value === "members") return value;
+  throw new ChatError("bad_request", "Choose who can invite members.", 400);
+}
+
+function requiredDeviceToken(body: Record<string, unknown>): string {
+  const token = requiredText(body, "token", 4096);
+  if (token.length < 32 || /\s/u.test(token)) {
+    throw new ChatError("bad_request", "A valid notification device is required.", 400);
+  }
+  return token;
+}
+
+function requiredDevicePlatform(value: unknown): "android" | "ios" {
+  if (value === "android" || value === "ios") return value;
+  throw new ChatError("bad_request", "A supported notification device is required.", 400);
 }
 
 function requiredPhotoContentType(
@@ -247,7 +661,10 @@ function requiredPhotoContentType(
   return contentType;
 }
 
-function assertRetryKey(value: string, label: "forward" | "photo"): void {
+function assertRetryKey(
+  value: string,
+  label: "forward" | "photo" | "call" | "attachment",
+): void {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{15,127}$/u.test(value)) {
     throw new ChatError(
       "bad_request",
@@ -255,6 +672,33 @@ function assertRetryKey(value: string, label: "forward" | "photo"): void {
       400,
     );
   }
+}
+
+function optionalBoundedInteger(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  label: string,
+): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  return boundedInteger(value, minimum, minimum, maximum, label);
+}
+
+function boundedSignedInteger(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+  label: string,
+): number {
+  if (!Number.isSafeInteger(value) ||
+      (value as number) < minimum || (value as number) > maximum) {
+    throw new ChatError(
+      "bad_request",
+      `${label} must be between ${minimum} and ${maximum}.`,
+      400,
+    );
+  }
+  return value as number;
 }
 
 function object(value: unknown): Record<string, unknown> {

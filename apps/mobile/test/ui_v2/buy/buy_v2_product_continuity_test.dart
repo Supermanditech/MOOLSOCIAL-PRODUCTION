@@ -204,7 +204,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(firstSection, findsOneWidget);
     expect(find.text('You may also like'), findsOneWidget);
-    expect(find.text('More from the current Shop catalogue'), findsOneWidget);
+    expect(find.text('More products selected for you'), findsOneWidget);
     expect(
       find.byKey(ValueKey('buy-product-continuation-${origin.id}')),
       findsNothing,
@@ -311,10 +311,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('More for business restocking'), findsOneWidget);
-    expect(
-      find.text('Trade packs from the current Wholesale catalogue'),
-      findsOneWidget,
-    );
+    expect(find.text('Trade packs for your next order'), findsOneWidget);
     expect(
       session.productContinuationsFor(product),
       everyElement(

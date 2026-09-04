@@ -2,11 +2,113 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
+import '../../../core/design/mool_service_home.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/profile/global_profile_panel_v2.dart';
 import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
+import '../book_models.dart';
 import '../book_session.dart';
 
 String bookMoney(int value) => '₹$value';
+
+GlobalProfileContextAction _busTravelProfileContext(
+  BookSession session,
+  ValueChanged<String> onOpenRoute,
+) {
+  final selected = session.selectedBus;
+  return GlobalProfileContextAction(
+    id: selected == null
+        ? 'travel-cab-discovery'
+        : 'travel-selected-bus-alternative',
+    title: selected == null ? 'Travel by cab' : 'Compare another option',
+    detail: selected == null
+        ? 'Review pickup time, vehicle and fare before you book.'
+        : '${selected.from} → ${selected.to} remains selected while you compare.',
+    actionLabel: 'Compare a cab',
+    icon: Icons.local_taxi_outlined,
+    accentColor: const Color(0xFF0284C7),
+    gradientColors: const [Color(0xFF075985), Color(0xFF0EA5E9)],
+    onPressed: () => onOpenRoute('/app/ride/book?type=cab'),
+  );
+}
+
+GlobalProfileContextAction _careProfileContext(
+  BookSession session,
+  String activeSubAction,
+  ValueChanged<String> onOpenRoute,
+) {
+  final appointment = session.appointment;
+  if (appointment != null) {
+    return GlobalProfileContextAction(
+      id: 'care-doctor-appointment',
+      title: 'Your doctor appointment',
+      detail:
+          '${appointment.care.label} · ${appointment.patient} · ${appointment.need}',
+      actionLabel: 'View appointment',
+      icon: Icons.medical_services_outlined,
+      accentColor: const Color(0xFF0F766E),
+      gradientColors: const [Color(0xFF0F766E), Color(0xFF14B8A6)],
+      onPressed: () => onOpenRoute('/app/book/doctor/details'),
+    );
+  }
+
+  final salon = session.salonBooking;
+  if (salon != null) {
+    final route = session.salonServiceDone
+        ? '/app/book/salon/complete'
+        : session.salonCheckedIn
+        ? '/app/book/salon/visit'
+        : '/app/book/salon/confirmed';
+    return GlobalProfileContextAction(
+      id: 'care-salon-booking',
+      title: 'Your salon booking',
+      detail: '${salon.service} · ${salon.mode.label}',
+      actionLabel: session.salonServiceDone
+          ? 'View completion'
+          : 'Open booking',
+      icon: Icons.content_cut_rounded,
+      accentColor: const Color(0xFF7C3AED),
+      gradientColors: const [Color(0xFF5B21B6), Color(0xFF8B5CF6)],
+      onPressed: () => onOpenRoute(route),
+    );
+  }
+
+  final task = session.task;
+  if (task != null) {
+    final route = session.taskReleased
+        ? '/app/book/task/completed'
+        : session.taskProofReceived
+        ? '/app/book/task/proof'
+        : '/app/book/task/live';
+    return GlobalProfileContextAction(
+      id: 'care-active-task',
+      title: 'Your active task',
+      detail: '${task.type.label} · ${task.city}',
+      actionLabel: session.taskReleased ? 'View receipt' : 'Open task',
+      icon: Icons.task_alt_outlined,
+      accentColor: const Color(0xFF2563EB),
+      gradientColors: const [Color(0xFF1D4ED8), Color(0xFF3B82F6)],
+      onPressed: () => onOpenRoute(route),
+    );
+  }
+
+  final salonOrigin = activeSubAction == 'salon';
+  return GlobalProfileContextAction(
+    id: salonOrigin ? 'care-doctor-discovery' : 'care-salon-discovery',
+    title: salonOrigin ? 'Book a doctor' : 'Book a salon',
+    detail: salonOrigin
+        ? 'Choose clinic, hospital OPD, video or follow-up care.'
+        : 'Choose a salon visit, home visit, makeup or package.',
+    actionLabel: salonOrigin ? 'Find a doctor' : 'Find a salon',
+    icon: salonOrigin
+        ? Icons.medical_services_outlined
+        : Icons.content_cut_rounded,
+    accentColor: const Color(0xFF0F766E),
+    gradientColors: const [Color(0xFF0F766E), Color(0xFF14B8A6)],
+    onPressed: () =>
+        onOpenRoute(salonOrigin ? '/app/book/doctor' : '/app/book/salon'),
+  );
+}
 
 class BookPageScaffold extends StatelessWidget {
   const BookPageScaffold({
@@ -17,6 +119,7 @@ class BookPageScaffold extends StatelessWidget {
     this.activeLocalAction = '',
     this.fallbackBackRoute = '/app/book',
     this.showBack = true,
+    this.onBack,
     this.trailing,
     this.bottomAction,
     super.key,
@@ -29,12 +132,13 @@ class BookPageScaffold extends StatelessWidget {
   final String activeLocalAction;
   final String fallbackBackRoute;
   final bool showBack;
+  final VoidCallback? onBack;
   final Widget? trailing;
   final Widget? bottomAction;
 
   @override
   Widget build(BuildContext context) {
-    final canPop = Navigator.of(context).canPop();
+    final canPop = onBack == null && Navigator.of(context).canPop();
     final currentPath = GoRouterState.of(context).uri.path;
     final routeSubAction = currentPath.startsWith('/app/book/doctor')
         ? 'doctor'
@@ -53,6 +157,11 @@ class BookPageScaffold extends StatelessWidget {
 
     void leaveContentDepth() {
       session.clearMessages();
+      final customBack = onBack;
+      if (customBack != null) {
+        customBack();
+        return;
+      }
       if (context.canPop()) {
         context.pop();
       } else {
@@ -107,45 +216,18 @@ class BookPageScaffold extends StatelessWidget {
           leading: showBack
               ? Padding(
                   padding: const EdgeInsets.only(left: MoolSpacing.sm),
-                  child: IconButton.outlined(
-                    key: const Key('book-back'),
-                    tooltip: 'Go back',
+                  child: MoolNativeBackButton(
+                    keyName: 'book-back',
                     onPressed: leaveContentDepth,
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 19,
-                    ),
                   ),
                 )
               : null,
           titleSpacing: showBack ? 4 : MoolSpacing.md,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -.35,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.muted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          title: MoolServiceHeaderTitle(
+            title: title,
+            subtitle: subtitle,
+            titleKey: const Key('book-page-title'),
+            subtitleKey: const Key('book-page-subtitle'),
           ),
           actions: [
             MoolGlobalChatShortcut(
@@ -174,6 +256,26 @@ class BookPageScaffold extends StatelessWidget {
                     icon: const Icon(Icons.support_agent_rounded),
                   ),
             ),
+            if (!showBack)
+              Padding(
+                padding: const EdgeInsets.only(right: MoolSpacing.sm),
+                child: MoolGlobalProfileShortcutV2(
+                  keyName: travelNavigation
+                      ? 'travel-global-profile'
+                      : 'care-global-profile',
+                  onPressed: () => showGlobalProfilePanelV2(
+                    context,
+                    contextAction: travelNavigation
+                        ? _busTravelProfileContext(session, openGlobal)
+                        : _careProfileContext(
+                            session,
+                            activeSubAction,
+                            openGlobal,
+                          ),
+                    onOpenRoute: openGlobal,
+                  ),
+                ),
+              ),
           ],
         ),
         body: SafeArea(
@@ -213,6 +315,7 @@ class BookPageScaffold extends StatelessWidget {
         bottomNavigationBar: MoolDestinationNavigationV2(
           activeId: navigationFamilyId,
           destinationLabel: travelNavigation ? 'Travel' : 'Care',
+          familyRootSelected: false,
           selectedLocalIndex: travelNavigation
               ? 3
               : activeSubAction == 'salon'

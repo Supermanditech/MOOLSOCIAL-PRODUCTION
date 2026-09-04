@@ -57,14 +57,20 @@ void main() {
       expect(tester.getSize(control).width, greaterThanOrEqualTo(44));
       expect(tester.getSize(control).height, greaterThanOrEqualTo(44));
     }
-    expect(
-      tester.getSize(find.byKey(const Key('mool-compact-launcher'))),
-      const Size(44, 58),
+    final edgeSize = tester.getSize(
+      find.byKey(const Key('mool-compact-launcher')),
     );
-    expect(
-      tester.getSize(find.byKey(const Key('mool-global-chat'))),
-      const Size(44, 58),
-    );
+    expect(edgeSize.width, closeTo(320 / 6, .01));
+    expect(edgeSize.height, 58);
+    expect(tester.getSize(find.byKey(const Key('mool-global-chat'))), edgeSize);
+    for (final id in const ['a', 'b', 'c', 'd']) {
+      expect(
+        tester
+            .getSize(find.byKey(ValueKey('moolsocial-local-$id-selection')))
+            .width,
+        closeTo(edgeSize.width, .01),
+      );
+    }
     expect(
       tester.getCenter(find.byKey(const Key('mool-compact-launcher'))).dx,
       lessThan(tester.getCenter(find.byKey(const Key('mool-global-chat'))).dx),
@@ -132,15 +138,16 @@ void main() {
     final cluster = tester.getSize(
       find.byKey(const Key('moolsocial-local-navigation-compact-cluster')),
     );
-    expect(cluster.width, 152);
+    expect(cluster.width, 156);
     expect(cluster.width, lessThan(200));
+    const uniformCell = 390 / 5;
     expect(
       tester.getSize(find.byKey(const ValueKey('moolsocial-family-root-eat'))),
-      const Size(54, 58),
+      const Size(uniformCell, 58),
     );
     expect(
       tester.getSize(find.byKey(const Key('mool-global-chat'))),
-      const Size(54, 58),
+      const Size(uniformCell, 58),
     );
   });
 }

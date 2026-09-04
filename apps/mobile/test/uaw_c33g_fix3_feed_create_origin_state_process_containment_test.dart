@@ -69,18 +69,18 @@ void main() {
       );
 
       expect(harness.journey.isAuthenticated, isTrue);
+      expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
+      await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('screen04-create-workbench')),
         findsOneWidget,
       );
-      expect(tester.takeException(), isNull);
-
-      await tester.tap(find.byKey(const Key('screen04-create-close')));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('screen04-moolsocial-feed-brand')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -189,6 +189,7 @@ Future<_SocialHarness> _mountSocial(
         retailerSession: retailer,
         sharedSession: shared,
         initialSubAction: initialSubAction,
+        initialState: initialSubAction == 'create' ? 'home' : null,
         youtubePublicAccessOverride: false,
         youtubeCreatorAccessOverride: false,
       ),

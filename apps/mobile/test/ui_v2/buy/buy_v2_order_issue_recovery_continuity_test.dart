@@ -17,6 +17,7 @@ void main() {
     double textScale = 1,
     bool reducedMotion = false,
     EdgeInsets safeArea = EdgeInsets.zero,
+    VoidCallback? onOpenChat,
   }) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -34,11 +35,12 @@ void main() {
         session: session,
         initialDestination: session.destination,
         initialView: session.view,
+        onOpenChat: onOpenChat,
       ),
     );
   }
 
-  testWidgets('delivered Tracking owns direct exact-order Help', (
+  testWidgets('delivered Tracking owns direct exact-order Chat Help', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -46,8 +48,9 @@ void main() {
     final session = newSession();
     addTearDown(session.dispose);
     expect(session.openTracking('MS-240741'), isTrue);
+    var chatOpens = 0;
 
-    await tester.pumpWidget(app(session));
+    await tester.pumpWidget(app(session, onOpenChat: () => chatOpens += 1));
     await tester.pumpAndSettle();
 
     final help = find.byKey(const ValueKey('buy-tracking-delivered-help'));
@@ -65,51 +68,55 @@ void main() {
     await tester.tap(help);
     await tester.pumpAndSettle();
 
-    expect(session.view, BuyV2View.assist);
-    expect(session.assistOrder.id, 'MS-240741');
-    expect(find.textContaining('MS-240741'), findsOneWidget);
-    expect(find.text('Return, replacement or refund'), findsOneWidget);
-    expect(find.text('Cancel or change order'), findsNothing);
-    expect(
-      find.text('Topics prepare support; no order changes happen here.'),
-      findsOneWidget,
-    );
-    expect(find.text('Cancellation · return · refund help'), findsOneWidget);
+    expect(chatOpens, 1);
+    expect(session.view, BuyV2View.tracking);
+    expect(session.selectedOrder.id, 'MS-240741');
+    expect(find.byKey(const ValueKey('buy-assist-hero')), findsNothing);
   });
 
-  testWidgets(
-    'active Assist exposes cancellation preparation without mutation',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(390, 844));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final session = newSession();
-      addTearDown(session.dispose);
-      expect(session.openTracking('PO-240783'), isTrue);
-      final itemCount = session.itemCount;
-      final cartTotal = session.cartTotal;
-      final activeCount = session.activeOrderCount;
-      session.openAssist();
+  testWidgets('retired active Assist exposes Manage order without mutation', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = newSession();
+    addTearDown(session.dispose);
+    expect(session.openTracking('PO-240783'), isTrue);
+    final itemCount = session.itemCount;
+    final cartTotal = session.cartTotal;
+    final activeCount = session.activeOrderCount;
+    session.openAssist();
 
-      await tester.pumpWidget(app(session));
-      await tester.pumpAndSettle();
-      final cancel = find.text('Cancel or change order');
-      expect(cancel, findsOneWidget);
-      expect(find.text('Return, replacement or refund'), findsNothing);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    final manage = find.byKey(
+      const ValueKey('buy-tracking-manage-order-PO-240783'),
+    );
+    await tester.scrollUntilVisible(
+      manage,
+      240,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(manage, findsOneWidget);
+    expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
 
-      await tester.tap(cancel);
-      await tester.pumpAndSettle();
+    await tester.tap(manage);
+    await tester.pumpAndSettle();
 
-      expect(session.assistOrder.id, 'PO-240783');
-      expect(session.selectedOrder.id, 'PO-240783');
-      expect(session.itemCount, itemCount);
-      expect(session.cartTotal, cartTotal);
-      expect(session.activeOrderCount, activeCount);
-      expect(session.view, BuyV2View.assist);
-      expect(find.textContaining('selected. Add details'), findsOneWidget);
-    },
-  );
+    expect(session.assistOrder.id, 'PO-240783');
+    expect(session.selectedOrder.id, 'PO-240783');
+    expect(session.itemCount, itemCount);
+    expect(session.cartTotal, cartTotal);
+    expect(session.activeOrderCount, activeCount);
+    expect(session.view, BuyV2View.assist);
+    expect(
+      find.byKey(const ValueKey('buy-order-resolution-sheet')),
+      findsOneWidget,
+    );
+    expect(find.text('Manage order'), findsWidgets);
+  });
 
-  testWidgets('visible Assist return restores exact Tracking and Items depth', (
+  testWidgets('retired Assist compatibility restores exact prior order depth', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -127,7 +134,12 @@ void main() {
       await tester.pumpWidget(app(session));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Back'));
+      expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
+      expect(
+        find.byKey(const PageStorageKey('buy-tracking-PO-240783')),
+        findsOneWidget,
+      );
+      session.closeAssist();
       await tester.pumpAndSettle();
 
       expect(session.view, origin);
@@ -135,58 +147,67 @@ void main() {
     }
   });
 
-  testWidgets('Assist Back semantic centre is compact and physically active', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final session = newSession();
-    addTearDown(session.dispose);
-    expect(session.openTracking('MS-240741'), isTrue);
-    session.openAssist();
+  testWidgets(
+    'retired Assist exact-order Help is semantic and physically active',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = newSession();
+      addTearDown(session.dispose);
+      expect(session.openTracking('MS-240741'), isTrue);
+      session.openAssist();
+      var chatOpens = 0;
 
-    await tester.pumpWidget(app(session));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(app(session, onOpenChat: () => chatOpens += 1));
+      await tester.pumpAndSettle();
 
-    final back = find.byKey(const ValueKey('buy-assist-return'));
-    final semanticNode = tester.getSemantics(back);
-    final semanticData = semanticNode.getSemanticsData();
-    expect(semanticData.hasAction(SemanticsAction.tap), isTrue);
-    expect(semanticNode.rect.width, lessThan(140));
+      final help = find.byKey(const ValueKey('buy-tracking-delivered-help'));
+      await tester.scrollUntilVisible(
+        help,
+        240,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, -180));
+      await tester.pumpAndSettle();
+      final semanticNode = tester.getSemantics(help);
+      final semanticData = semanticNode.getSemanticsData();
+      expect(semanticData.hasAction(SemanticsAction.tap), isTrue);
 
-    await tester.tapAt(tester.getCenter(back));
-    await tester.pumpAndSettle();
+      await tester.tap(help);
+      await tester.pumpAndSettle();
 
-    expect(session.view, BuyV2View.tracking);
-    expect(session.selectedOrder.id, 'MS-240741');
-    expect(
-      find.byKey(const PageStorageKey('buy-tracking-MS-240741')),
-      findsOneWidget,
-    );
-  });
+      expect(chatOpens, 1);
+      expect(session.view, BuyV2View.assist);
+      expect(session.selectedOrder.id, 'MS-240741');
+      expect(
+        find.byKey(const PageStorageKey('buy-tracking-MS-240741')),
+        findsOneWidget,
+      );
+    },
+  );
 
-  testWidgets('general Assist visible return preserves catalogue query', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final session = newSession();
-    addTearDown(session.dispose);
-    session.openDestination(BuyV2Destination.wholesale);
-    session.updateQuery('rice');
-    session.openAssist();
+  testWidgets(
+    'retired general Assist preserves catalogue query without local UI',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = newSession();
+      addTearDown(session.dispose);
+      session.openDestination(BuyV2Destination.wholesale);
+      session.updateQuery('rice');
+      session.openAssist();
 
-    await tester.pumpWidget(app(session));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Back'));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
 
-    expect(session.destination, BuyV2Destination.wholesale);
-    expect(session.view, BuyV2View.catalogue);
-    expect(session.query, 'rice');
-  });
+      expect(session.destination, BuyV2Destination.wholesale);
+      expect(session.view, BuyV2View.assist);
+      expect(session.query, 'rice');
+      expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
+    },
+  );
 
-  testWidgets('320px 140% reduced motion stays stable and state-appropriate', (
+  testWidgets('320px 140% retired Assist keeps exact Tracking stable', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(320, 568));
@@ -199,9 +220,12 @@ void main() {
     await tester.pumpWidget(app(session, textScale: 1.4, reducedMotion: true));
     await tester.pump();
 
-    expect(find.text('Return, replacement or refund'), findsOneWidget);
-    expect(find.text('Medicine support'), findsOneWidget);
-    expect(find.text('Cancel or change order'), findsNothing);
+    expect(
+      find.byKey(const PageStorageKey('buy-tracking-RX-240719')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
+    expect(find.textContaining('RX-240719'), findsOneWidget);
     expect(
       tester.getSize(find.byKey(const ValueKey('buy-v2-screen'))).width,
       lessThanOrEqualTo(320),

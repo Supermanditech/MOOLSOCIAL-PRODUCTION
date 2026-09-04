@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/chat/chat_models.dart';
+import 'package:moolsocial/features/chat/screens/chat_inbox_screen.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/journey01/universal_intent_catalog.dart';
@@ -271,12 +273,12 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final session = await readySession();
     addTearDown(session.dispose);
-    await openProductionSection(tester, session, 'work');
+    await openProductionSection(tester, session, 'work/earn');
 
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
     expect(find.byKey(const Key('mvp-action-root-work')), findsNothing);
     await tapVisible(tester, const Key('work-local-workspace'));
-    expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
     await tapVisible(tester, const Key('work-local-earn'));
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
   });
@@ -295,11 +297,14 @@ void main() {
       await tapVisible(tester, const Key('search-result-chat-business-chat'));
 
       expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+      final businessFilter = find.byKey(const Key('chat-filter-business'));
+      expect(businessFilter, findsOneWidget);
+      expect(tester.widget<ChoiceChip>(businessFilter).selected, isTrue);
       expect(
         tester
-            .widget<ChoiceChip>(find.byKey(const Key('chat-filter-business')))
-            .selected,
-        isTrue,
+            .widget<ChatInboxScreen>(find.byType(ChatInboxScreen))
+            .initialFilter,
+        ChatThreadType.business,
       );
       expect(find.byKey(const Key('chat-open-thread-mahadev')), findsOneWidget);
       expect(

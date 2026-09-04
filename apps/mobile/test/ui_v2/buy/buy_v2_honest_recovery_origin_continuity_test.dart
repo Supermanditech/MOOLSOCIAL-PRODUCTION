@@ -3,9 +3,23 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+
+final class _RecoveryFactsAdapter implements BuyV2ProductFactsAdapter {
+  String orderabilityLabel = 'Available to add';
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
+      const BuyV2CatalogueProductFactsAdapter()
+          .snapshotFor(product)
+          .copyWith(
+            orderabilityLabel: orderabilityLabel,
+            sourceId: 'recovery-test-facts',
+          );
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -126,8 +140,9 @@ void main() {
     expect(session.view, BuyV2View.recovery);
     session.retryRecovery();
 
-    expect(session.view, BuyV2View.cart);
-    expect(session.cartScope, BuyV2CartScope.shop);
+    expect(session.view, BuyV2View.checkout);
+    expect(session.checkoutStep, BuyV2CheckoutStep.address);
+    expect(session.checkoutScope, BuyV2CartScope.shop);
     expect(session.notice, 'Choose a delivery address to continue.');
     expect(session.itemCount, 1);
   });
@@ -144,10 +159,6 @@ void main() {
       expect(session.recoveryReturnLabel, 'Return to order');
       expect(session.canOpenRecoveryOrderHelp, isTrue);
       expect(session.openRecoveryOrderHelp(), isTrue);
-      expect(session.view, BuyV2View.assist);
-      expect(session.assistOrder.id, 'PO-240783');
-
-      session.closeAssist();
       expect(session.view, origin);
       expect(session.selectedOrder.id, 'PO-240783');
       session.dispose();
@@ -173,6 +184,85 @@ void main() {
     expect(session.destination, BuyV2Destination.wholesale);
     expect(session.view, BuyV2View.catalogue);
     expect(session.query, 'basmati');
+  });
+
+  testWidgets('stock recovery resolves the exact Cart product in place', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final facts = _RecoveryFactsAdapter();
+    final session = BuyV2Session(
+      core: BuySession(),
+      productFactsAdapter: facts,
+    );
+    addTearDown(session.dispose);
+    final product = firstProduct(BuyV2Destination.shop);
+    expect(session.addProduct(product.id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    facts.orderabilityLabel = 'Out of stock';
+    expect(session.confirmOrder(), isFalse);
+    expect(session.view, BuyV2View.recovery);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-recovery-affected-product')),
+      findsOneWidget,
+    );
+    expect(find.text(product.title), findsOneWidget);
+    expect(find.text('Out of stock'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-recovery-retry-availability')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-recovery-remove-product')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-recovery-view-product')),
+      findsOneWidget,
+    );
+
+    facts.orderabilityLabel = 'Available to add';
+    await tester.tap(
+      find.byKey(const ValueKey('buy-recovery-retry-availability')),
+    );
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.checkout);
+    expect(session.cartLines.single.product.id, product.id);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('service-area recovery changes address from exact Checkout', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = newSession();
+    addTearDown(session.dispose);
+    final product = firstProduct(BuyV2Destination.shop);
+    expect(session.addProduct(product.id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    session.openRecovery(BuyV2RecoveryKind.serviceAreaUnavailable);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-recovery-affected-address')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('buy-recovery-change-address')));
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.checkout);
+    expect(
+      find.byKey(const ValueKey('buy-address-sheet-route')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('all six recovery states use honest copy and origin semantics', (

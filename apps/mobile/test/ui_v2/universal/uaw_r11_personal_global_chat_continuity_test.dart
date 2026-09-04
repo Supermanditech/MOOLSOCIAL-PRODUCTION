@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
+import 'package:moolsocial/features/chat/screens/chat_inbox_screen.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 
@@ -62,7 +63,7 @@ void main() {
       id: 'buy',
       entryRoute: '/app/buy?sub=shop',
       returnOwnerKey: Key('buy-v2-screen'),
-      chatKey: Key('buy-global-chat'),
+      chatKey: Key('mool-global-chat-tap'),
     ),
     (
       id: 'eat',
@@ -109,7 +110,14 @@ void main() {
       await tester.tap(find.byKey(origin.chatKey));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+      expect(
+        find.byKey(
+          origin.id == 'buy'
+              ? const Key('buy-shop-chat')
+              : const Key('chat-inbox-screen'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('WhatsApp'), findsNothing);
       expect(find.byKey(const Key('chat-back')), findsNothing);
       await tester.binding.handlePopRoute();
@@ -118,4 +126,43 @@ void main() {
       expect(find.byKey(origin.returnOwnerKey), findsOneWidget);
     });
   }
+
+  testWidgets('Buy contextual send preserves its draft in production Chat', (
+    tester,
+  ) async {
+    final journey = signedInSession();
+    final chat = ChatSession();
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await journey.start();
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/buy?sub=shop',
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mool-global-chat-tap')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('buy-shop-chat-entry-retail-partner')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('buy-shop-chat-composer-field')),
+      'Please help with this purchase',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('buy-shop-chat-send')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    final inbox = tester.widget<ChatInboxScreen>(
+      find.byType(ChatInboxScreen),
+    );
+    expect(inbox.initialMessageDraft, 'Please help with this purchase');
+    expect(inbox.returnRoute, contains('/app/buy'));
+  });
 }

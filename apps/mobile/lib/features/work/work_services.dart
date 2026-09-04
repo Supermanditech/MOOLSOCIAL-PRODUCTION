@@ -1,34 +1,803 @@
+import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
+import 'dart:math';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../shared/social_content_gateway.dart';
+import 'work_models.dart';
+
+const moolSocialWorkspaceUrl = String.fromEnvironment(
+  'MOOLSOCIAL_WORKSPACE_URL',
+);
+
 class WorkGatewayException implements Exception {
-  const WorkGatewayException(this.message);
-
+  const WorkGatewayException(
+    this.message, {
+    this.retryable = false,
+    this.cancelled = false,
+  });
   final String message;
-
+  final bool retryable;
+  final bool cancelled;
   @override
   String toString() => message;
 }
 
-class ReviewWorkGateway {
+enum WorkProofSource { camera, gallery, upload, cloudDrive }
+
+class WorkPickedProof {
+  const WorkPickedProof({
+    required this.fileName,
+    required this.contentType,
+    required this.bytes,
+  });
+
+  final String fileName;
+  final String contentType;
+  final Uint8List bytes;
+}
+
+abstract interface class WorkProofPicker {
+  Future<WorkPickedProof?> pick(WorkProofSource source);
+}
+
+class NativeWorkProofPicker implements WorkProofPicker {
+  NativeWorkProofPicker({ImagePicker? imagePicker})
+    : _imagePicker = imagePicker ?? ImagePicker();
+
+  final ImagePicker _imagePicker;
+
+  @override
+  Future<WorkPickedProof?> pick(WorkProofSource source) async {
+    try {
+      if (source == WorkProofSource.upload ||
+          source == WorkProofSource.cloudDrive) {
+        final file = await FilePicker.pickFile(
+          type: FileType.custom,
+          allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+        );
+        if (file == null) return null;
+        final bytes = await file.readAsBytes();
+        return _validateProof(file.name, bytes);
+      }
+      final image = await _imagePicker.pickImage(
+        source: source == WorkProofSource.camera
+            ? ImageSource.camera
+            : ImageSource.gallery,
+        imageQuality: 92,
+        maxWidth: 2400,
+        maxHeight: 2400,
+      );
+      if (image == null) return null;
+      return _validateProof(image.name, await image.readAsBytes());
+    } on WorkGatewayException {
+      rethrow;
+    } on PlatformException catch (error) {
+      final denied =
+          error.code.toLowerCase().contains('denied') ||
+          error.code.toLowerCase().contains('permission');
+      throw WorkGatewayException(
+        denied
+            ? 'Camera or photo access was denied. Allow access in device settings, then try again.'
+            : 'The device could not open that option. Choose another way to add the document.',
+      );
+    } on FileSystemException {
+      throw const WorkGatewayException(
+        'That document could not be read. Choose it again.',
+      );
+    } on Object {
+      throw const WorkGatewayException(
+        'The device could not open that option. Choose another way to add the document.',
+      );
+    }
+  }
+}
+
+class ReviewWorkProofPicker implements WorkProofPicker {
+  @override
+  Future<WorkPickedProof?> pick(
+    WorkProofSource source,
+  ) async => WorkPickedProof(
+    fileName:
+        source == WorkProofSource.upload || source == WorkProofSource.cloudDrive
+        ? 'review-proof.pdf'
+        : 'review-proof.jpg',
+    contentType:
+        source == WorkProofSource.upload || source == WorkProofSource.cloudDrive
+        ? 'application/pdf'
+        : 'image/jpeg',
+    bytes: Uint8List.fromList(const [0xff, 0xd8, 0xff, 0xd9]),
+  );
+}
+
+abstract interface class WorkProofUploadTransport {
+  Future<void> put({
+    required Uri url,
+    required Map<String, String> headers,
+    required Uint8List bytes,
+  });
+}
+
+class IoWorkProofUploadTransport implements WorkProofUploadTransport {
+  IoWorkProofUploadTransport({HttpClient? client})
+    : _client = client ?? HttpClient();
+
+  final HttpClient _client;
+
+  @override
+  Future<void> put({
+    required Uri url,
+    required Map<String, String> headers,
+    required Uint8List bytes,
+  }) async {
+    if (url.scheme != 'https' || !url.host.endsWith('googleapis.com')) {
+      throw const WorkGatewayException(
+        'Document upload could not be prepared. Choose the document again.',
+      );
+    }
+    try {
+      final request = await _client
+          .putUrl(url)
+          .timeout(const Duration(seconds: 15));
+      request.contentLength = bytes.length;
+      for (final entry in headers.entries) {
+        if (entry.key.toLowerCase() == 'content-length') continue;
+        request.headers.set(entry.key, entry.value);
+      }
+      request.add(bytes);
+      final response = await request.close().timeout(
+        const Duration(seconds: 45),
+      );
+      await response.drain<void>();
+      if ((response.statusCode >= 200 && response.statusCode < 300) ||
+          response.statusCode == HttpStatus.preconditionFailed) {
+        return;
+      }
+      throw WorkGatewayException(
+        response.statusCode == HttpStatus.unauthorized ||
+                response.statusCode == HttpStatus.forbidden
+            ? 'Document upload expired. Choose the document again.'
+            : 'Document could not upload. Check your connection and try again.',
+        retryable:
+            response.statusCode == HttpStatus.requestTimeout ||
+            response.statusCode == HttpStatus.tooManyRequests ||
+            response.statusCode >= 500,
+      );
+    } on WorkGatewayException {
+      rethrow;
+    } on TimeoutException {
+      throw const WorkGatewayException(
+        'Document upload timed out. Check your connection and try again.',
+        retryable: true,
+      );
+    } on SocketException {
+      throw const WorkGatewayException(
+        'Document could not upload. Check your connection and try again.',
+        retryable: true,
+      );
+    } on Object {
+      throw const WorkGatewayException(
+        'Document could not upload. Choose the document again.',
+      );
+    }
+  }
+}
+
+class WorkProfileSubmission {
+  const WorkProfileSubmission({
+    required this.familyId,
+    required this.profileId,
+    required this.name,
+    required this.area,
+    required this.primaryActivity,
+    required this.proofReferences,
+    this.primaryMobile = '',
+    this.email = '',
+    this.alternateMobile = '',
+    this.connectedProvider = '',
+    this.connectedProviderAccount = '',
+    required this.alternateMobileVerified,
+    required this.idempotencyKey,
+  });
+  final String familyId;
+  final String profileId;
+  final String name;
+  final String area;
+  final String primaryActivity;
+  final Map<String, String> proofReferences;
+  final String primaryMobile;
+  final String email;
+  final String alternateMobile;
+  final String connectedProvider;
+  final String connectedProviderAccount;
+  final bool alternateMobileVerified;
+  final String idempotencyKey;
+}
+
+enum WorkRemoteReviewStatus { pending, approved, rejected, suspended, live }
+
+class WorkReviewResult {
+  const WorkReviewResult({
+    required this.caseId,
+    required this.status,
+    required this.plan,
+    this.workspaceId,
+    this.reason,
+    this.profileId,
+    this.name,
+    this.area,
+    this.primaryActivity,
+  });
+  final String caseId;
+  final WorkRemoteReviewStatus status;
+  final String plan;
+  final String? workspaceId;
+  final String? reason;
+  final String? profileId;
+  final String? name;
+  final String? area;
+  final String? primaryActivity;
+}
+
+class WorkOperationalSnapshot {
+  const WorkOperationalSnapshot({
+    required this.workspaceId,
+    required this.reason,
+    required this.state,
+    required this.idempotencyKey,
+  });
+
+  final String workspaceId;
+  final String reason;
+  final Map<String, Object?> state;
+  final String idempotencyKey;
+}
+
+class WorkGroupBuySubmission {
+  const WorkGroupBuySubmission({
+    required this.workspaceId,
+    required this.values,
+    required this.idempotencyKey,
+  });
+
+  final String workspaceId;
+  final Map<String, Object?> values;
+  final String idempotencyKey;
+}
+
+class WorkPaidRequirementSubmission {
+  const WorkPaidRequirementSubmission({
+    required this.workspaceId,
+    required this.values,
+    required this.idempotencyKey,
+  });
+
+  final String workspaceId;
+  final Map<String, Object?> values;
+  final String idempotencyKey;
+}
+
+class WorkSettlementResult {
+  const WorkSettlementResult({
+    required this.reference,
+    required this.acceptedAmount,
+  });
+
+  final String reference;
+  final int acceptedAmount;
+}
+
+class WorkDeliveryAssignmentResult {
+  const WorkDeliveryAssignmentResult({
+    required this.partnerName,
+    required this.vehicleLabel,
+    required this.eta,
+    required this.stage,
+  });
+
+  final String partnerName;
+  final String vehicleLabel;
+  final DateTime eta;
+  final String stage;
+}
+
+abstract interface class WorkGateway {
+  Future<List<WorkReviewResult>> loadFeed();
+  Future<String> apply(String opportunityId);
+  Future<void> withdraw(String applicationId, String opportunityId);
+  Future<void> sendContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+  });
+  Future<void> verifyContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+    required String code,
+  });
+  Future<String> saveProof(String proofId, WorkPickedProof proof);
+  Future<WorkReviewResult> submitProfile(WorkProfileSubmission submission);
+  Future<WorkReviewResult> submitCorrection(
+    String caseId,
+    WorkProfileSubmission submission,
+  );
+  Future<WorkReviewResult> checkReview(String caseId);
+  Future<String> submitGst(String caseId, String gstin, String proofReference);
+  Future<void> finishSetup({
+    required String workspaceId,
+    required int quantity,
+    required int buyPrice,
+    required int sellPrice,
+    required bool homeDelivery,
+    required bool storeCollection,
+  });
+  Future<void> saveOperationalState(WorkOperationalSnapshot snapshot);
+  Future<String> createGroupBuy(WorkGroupBuySubmission submission);
+  Future<String> createPaidRequirement(
+    WorkPaidRequirementSubmission submission,
+  );
+  Future<WorkSettlementResult> requestSettlement({
+    required String workspaceId,
+    required int amount,
+    required String idempotencyKey,
+  });
+  Future<void> verifyOrderHandover({
+    required String workspaceId,
+    required String orderId,
+    required String otp,
+    required String idempotencyKey,
+  });
+  Future<WorkDeliveryAssignmentResult> requestDeliveryAssignment({
+    required String workspaceId,
+    required String orderId,
+    required String address,
+    required String idempotencyKey,
+  });
+}
+
+WorkGateway buildWorkGateway() {
+  final endpoint = Uri.tryParse(moolSocialWorkspaceUrl.trim());
+  if (endpoint == null ||
+      endpoint.scheme != 'https' ||
+      endpoint.host != 'asia-south1-moolsocial-dev-503018.cloudfunctions.net' ||
+      endpoint.path != '/moolSocialWorkspace' ||
+      endpoint.hasQuery ||
+      endpoint.hasFragment) {
+    return const UnavailableWorkGateway();
+  }
+  return AuthenticatedWorkGateway(
+    endpoint: endpoint,
+    credentials: FirebaseSocialContentCredentials(),
+    transport: IoSocialContentTransport(),
+  );
+}
+
+class UnavailableWorkGateway implements WorkGateway {
+  const UnavailableWorkGateway();
+  WorkGatewayException get _error => const WorkGatewayException(
+    'Workspace service is unavailable right now. Your personal account remains active.',
+    retryable: true,
+  );
+  @override
+  Future<String> apply(String opportunityId) async => throw _error;
+  @override
+  Future<void> withdraw(String applicationId, String opportunityId) async =>
+      throw _error;
+  @override
+  Future<WorkReviewResult> checkReview(String caseId) async => throw _error;
+  @override
+  Future<WorkReviewResult> submitCorrection(
+    String caseId,
+    WorkProfileSubmission submission,
+  ) async => throw _error;
+  @override
+  Future<void> finishSetup({
+    required String workspaceId,
+    required int quantity,
+    required int buyPrice,
+    required int sellPrice,
+    required bool homeDelivery,
+    required bool storeCollection,
+  }) async => throw _error;
+  @override
+  Future<void> saveOperationalState(WorkOperationalSnapshot snapshot) async =>
+      throw _error;
+  @override
+  Future<String> createGroupBuy(WorkGroupBuySubmission submission) async =>
+      throw _error;
+  @override
+  Future<String> createPaidRequirement(
+    WorkPaidRequirementSubmission submission,
+  ) async => throw _error;
+  @override
+  Future<WorkSettlementResult> requestSettlement({
+    required String workspaceId,
+    required int amount,
+    required String idempotencyKey,
+  }) async => throw _error;
+  @override
+  Future<void> verifyOrderHandover({
+    required String workspaceId,
+    required String orderId,
+    required String otp,
+    required String idempotencyKey,
+  }) async => throw _error;
+  @override
+  Future<WorkDeliveryAssignmentResult> requestDeliveryAssignment({
+    required String workspaceId,
+    required String orderId,
+    required String address,
+    required String idempotencyKey,
+  }) async => throw _error;
+  @override
+  Future<List<WorkReviewResult>> loadFeed() async => throw _error;
+  @override
+  Future<String> saveProof(String proofId, WorkPickedProof proof) async =>
+      throw _error;
+  @override
+  Future<void> sendContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+  }) async => throw _error;
+  @override
+  Future<void> verifyContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+    required String code,
+  }) async => throw _error;
+  @override
+  Future<WorkReviewResult> submitProfile(
+    WorkProfileSubmission submission,
+  ) async => throw _error;
+  @override
+  Future<String> submitGst(
+    String caseId,
+    String gstin,
+    String proofReference,
+  ) async => throw _error;
+}
+
+class AuthenticatedWorkGateway implements WorkGateway {
+  AuthenticatedWorkGateway({
+    required this.endpoint,
+    required this.credentials,
+    required this.transport,
+    WorkProofUploadTransport? proofUploadTransport,
+    Random? random,
+  }) : proofUploadTransport =
+           proofUploadTransport ?? IoWorkProofUploadTransport(),
+       random = random ?? Random.secure();
+  final Uri endpoint;
+  final SocialContentCredentials credentials;
+  final SocialContentTransport transport;
+  final WorkProofUploadTransport proofUploadTransport;
+  final Random random;
+
+  @override
+  Future<List<WorkReviewResult>> loadFeed() async {
+    final data = _map(await _invoke('listWorkspaces', const {}));
+    final items = data['workspaces'];
+    if (items is! List) {
+      throw const WorkGatewayException(
+        'Workspace returned an invalid response. Try again.',
+        retryable: true,
+      );
+    }
+    return items.map((item) => _decodeReview(_map(item))).toList();
+  }
+
+  @override
+  Future<String> apply(String opportunityId) async => _requiredString(
+    _map(
+      await _invoke('applyOpportunity', {
+        'opportunityId': opportunityId,
+      }, mutation: true),
+    )['applicationId'],
+  );
+  @override
+  Future<void> withdraw(String applicationId, String opportunityId) => _invoke(
+    'withdrawOpportunity',
+    {'applicationId': applicationId, 'opportunityId': opportunityId},
+    mutation: true,
+  );
+  @override
+  Future<void> sendContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+  }) => _invoke('sendWorkspaceContactOtp', {
+    'channel': channel.apiValue,
+    'value': value,
+  }, mutation: true);
+  @override
+  Future<void> verifyContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+    required String code,
+  }) => _invoke('verifyWorkspaceContactOtp', {
+    'channel': channel.apiValue,
+    'value': value,
+    'code': code,
+  }, mutation: true);
+  @override
+  Future<String> saveProof(String proofId, WorkPickedProof proof) async {
+    final prepared = _map(
+      await _invoke('prepareProofUpload', {
+        'proofId': proofId,
+        'fileName': proof.fileName,
+        'contentType': proof.contentType,
+        'sizeBytes': proof.bytes.length,
+      }, mutation: true),
+    );
+    final uploadUrl = Uri.tryParse(_requiredString(prepared['uploadUrl']));
+    final expiresAt = DateTime.tryParse(_requiredString(prepared['expiresAt']));
+    if (uploadUrl == null ||
+        expiresAt == null ||
+        !expiresAt.isAfter(DateTime.now())) {
+      throw const WorkGatewayException(
+        'Document upload could not be prepared. Choose the document again.',
+        retryable: true,
+      );
+    }
+    final headers = _map(
+      prepared['requiredHeaders'],
+    ).map((key, value) => MapEntry(key, _requiredString(value)));
+    await proofUploadTransport.put(
+      url: uploadUrl,
+      headers: headers,
+      bytes: proof.bytes,
+    );
+    return _requiredString(
+      _map(
+        await _invoke('confirmProofUpload', {
+          'proofId': proofId,
+          'uploadId': _requiredString(prepared['uploadId']),
+          'fileName': proof.fileName,
+          'contentType': proof.contentType,
+          'sizeBytes': proof.bytes.length,
+        }, mutation: true),
+      )['proofReference'],
+    );
+  }
+
+  @override
+  Future<WorkReviewResult> submitProfile(WorkProfileSubmission value) async =>
+      _decodeReview(
+        _map(
+          await _invoke('submitProfile', {
+            'familyId': value.familyId,
+            'profileId': value.profileId,
+            'name': value.name,
+            'area': value.area,
+            'primaryActivity': value.primaryActivity,
+            'proofReferences': value.proofReferences,
+            'primaryMobile': value.primaryMobile,
+            'email': value.email,
+            'alternateMobile': value.alternateMobile,
+            'connectedProvider': value.connectedProvider,
+            'connectedProviderAccount': value.connectedProviderAccount,
+            'alternateMobileVerified': value.alternateMobileVerified,
+            'idempotencyKey': value.idempotencyKey,
+          }, mutation: true),
+        ),
+      );
+  @override
+  Future<WorkReviewResult> submitCorrection(
+    String caseId,
+    WorkProfileSubmission value,
+  ) async => throw const WorkGatewayException(
+    'Sending corrections to an existing review is not available yet. Your changes remain saved; contact MoolSocial Support for this review.',
+    retryable: false,
+  );
+  @override
+  Future<WorkReviewResult> checkReview(String caseId) async =>
+      _decodeReview(_map(await _invoke('reviewStatus', {'caseId': caseId})));
+  @override
+  Future<String> submitGst(
+    String caseId,
+    String gstin,
+    String proofReference,
+  ) async => _requiredString(
+    _map(
+      await _invoke('submitGst', {
+        'caseId': caseId,
+        'gstin': gstin,
+        'proofReference': proofReference,
+      }, mutation: true),
+    )['gstReference'],
+  );
+  @override
+  Future<void> finishSetup({
+    required String workspaceId,
+    required int quantity,
+    required int buyPrice,
+    required int sellPrice,
+    required bool homeDelivery,
+    required bool storeCollection,
+  }) => _invoke('finishRetailerSetup', {
+    'workspaceId': workspaceId,
+    'quantity': quantity,
+    'buyPrice': buyPrice,
+    'sellPrice': sellPrice,
+    'homeDelivery': homeDelivery,
+    'storeCollection': storeCollection,
+  }, mutation: true);
+
+  @override
+  Future<void> saveOperationalState(WorkOperationalSnapshot snapshot) =>
+      _invoke('saveWorkspaceOperations', {
+        'workspaceId': snapshot.workspaceId,
+        'reason': snapshot.reason,
+        'state': snapshot.state,
+        'idempotencyKey': snapshot.idempotencyKey,
+      }, mutation: true);
+
+  @override
+  Future<String> createGroupBuy(WorkGroupBuySubmission submission) async =>
+      _requiredString(
+        _map(
+          await _invoke('createWorkspaceGroupBuy', {
+            'workspaceId': submission.workspaceId,
+            'values': submission.values,
+            'idempotencyKey': submission.idempotencyKey,
+          }, mutation: true),
+        )['paymentReference'],
+      );
+
+  @override
+  Future<String> createPaidRequirement(
+    WorkPaidRequirementSubmission submission,
+  ) async => _requiredString(
+    _map(
+      await _invoke('createWorkspacePaidRequirement', {
+        'workspaceId': submission.workspaceId,
+        'values': submission.values,
+        'idempotencyKey': submission.idempotencyKey,
+      }, mutation: true),
+    )['reference'],
+  );
+
+  @override
+  Future<WorkSettlementResult> requestSettlement({
+    required String workspaceId,
+    required int amount,
+    required String idempotencyKey,
+  }) async {
+    final result = _map(
+      await _invoke('requestWorkspaceSettlement', {
+        'workspaceId': workspaceId,
+        'amount': amount,
+        'idempotencyKey': idempotencyKey,
+      }, mutation: true),
+    );
+    return WorkSettlementResult(
+      reference: _requiredString(result['reference']),
+      acceptedAmount: (result['acceptedAmount'] as num?)?.round() ?? amount,
+    );
+  }
+
+  @override
+  Future<void> verifyOrderHandover({
+    required String workspaceId,
+    required String orderId,
+    required String otp,
+    required String idempotencyKey,
+  }) => _invoke('verifyWorkspaceOrderHandover', {
+    'workspaceId': workspaceId,
+    'orderId': orderId,
+    'otp': otp,
+    'idempotencyKey': idempotencyKey,
+  }, mutation: true);
+
+  @override
+  Future<WorkDeliveryAssignmentResult> requestDeliveryAssignment({
+    required String workspaceId,
+    required String orderId,
+    required String address,
+    required String idempotencyKey,
+  }) async {
+    final result = _map(
+      await _invoke('requestWorkspaceDelivery', {
+        'workspaceId': workspaceId,
+        'orderId': orderId,
+        'address': address,
+        'idempotencyKey': idempotencyKey,
+      }, mutation: true),
+    );
+    final eta = DateTime.tryParse(_requiredString(result['eta']));
+    if (eta == null) {
+      throw const WorkGatewayException(
+        'Delivery assignment returned an invalid arrival time.',
+        retryable: true,
+      );
+    }
+    return WorkDeliveryAssignmentResult(
+      partnerName: _requiredString(result['partnerName']),
+      vehicleLabel: _requiredString(result['vehicleLabel']),
+      eta: eta,
+      stage: _requiredString(result['stage']),
+    );
+  }
+
+  Future<Object?> _invoke(
+    String operation,
+    Map<String, Object?> body, {
+    bool mutation = false,
+  }) async {
+    final response = await transport.postJson(
+      endpoint,
+      headers: {
+        'accept': 'application/json',
+        'authorization': 'Bearer ${await credentials.firebaseIdToken()}',
+        'x-firebase-appcheck': await credentials.appCheckToken(
+          mutation
+              ? SocialAppCheckTokenMode.limitedUse
+              : SocialAppCheckTokenMode.standard,
+        ),
+        'x-request-id': List<int>.generate(
+          16,
+          (_) => random.nextInt(256),
+        ).map((value) => value.toRadixString(16).padLeft(2, '0')).join(),
+      },
+      body: {'operation': operation, ...body},
+    );
+    Object? decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } on FormatException {
+      throw const WorkGatewayException(
+        'Workspace returned an invalid response. Try again.',
+        retryable: true,
+      );
+    }
+    final envelope = _map(decoded);
+    if (envelope['ok'] == true) return envelope['data'];
+    final error = _map(envelope['error']);
+    throw WorkGatewayException(
+      _requiredString(error['message']),
+      retryable: error['retryable'] == true,
+    );
+  }
+}
+
+class ReviewWorkGateway implements WorkGateway {
   bool failFeed = false;
   bool failApplication = false;
+  bool failWithdrawal = false;
   bool failOtp = false;
   bool failProof = false;
   bool failSubmission = false;
   bool failReview = false;
   bool failGst = false;
   bool failSetup = false;
-
   int applicationCalls = 0;
+  int withdrawalCalls = 0;
   int otpCalls = 0;
+  int otpVerificationCalls = 0;
+  WorkContactChannel? lastOtpChannel;
+  String? lastOtpValue;
+  WorkProfileSubmission? lastSubmission;
   int proofCalls = 0;
   int submissionCalls = 0;
+  int correctionCalls = 0;
   int reviewCalls = 0;
   int gstCalls = 0;
   int setupCalls = 0;
-
+  int operationalSaveCalls = 0;
+  int groupBuyCalls = 0;
+  int paidRequirementCalls = 0;
+  int settlementCalls = 0;
+  int handoverCalls = 0;
+  int deliveryAssignmentCalls = 0;
+  WorkOperationalSnapshot? lastOperationalSnapshot;
+  WorkGroupBuySubmission? lastGroupBuySubmission;
+  WorkPaidRequirementSubmission? lastPaidRequirementSubmission;
   Future<void> _wait() =>
       Future<void>.delayed(const Duration(milliseconds: 24));
-
-  Future<void> loadFeed() async {
+  @override
+  Future<List<WorkReviewResult>> loadFeed() async {
     await _wait();
     if (failFeed) {
       failFeed = false;
@@ -36,10 +805,12 @@ class ReviewWorkGateway {
         'Work could not be refreshed. Check your connection and try again.',
       );
     }
+    return const [];
   }
 
+  @override
   Future<String> apply(String opportunityId) async {
-    applicationCalls += 1;
+    applicationCalls++;
     await _wait();
     if (failApplication) {
       failApplication = false;
@@ -50,8 +821,27 @@ class ReviewWorkGateway {
     return 'APP-${opportunityId.toUpperCase()}-${1200 + applicationCalls}';
   }
 
-  Future<void> sendOtp(String mobile) async {
-    otpCalls += 1;
+  @override
+  Future<void> withdraw(String applicationId, String opportunityId) async {
+    withdrawalCalls++;
+    await _wait();
+    if (failWithdrawal) {
+      failWithdrawal = false;
+      throw const WorkGatewayException(
+        'Application could not be withdrawn. It remains active; try again.',
+        retryable: true,
+      );
+    }
+  }
+
+  @override
+  Future<void> sendContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+  }) async {
+    otpCalls++;
+    lastOtpChannel = channel;
+    lastOtpValue = value;
     await _wait();
     if (failOtp) {
       failOtp = false;
@@ -61,32 +851,78 @@ class ReviewWorkGateway {
     }
   }
 
-  Future<String> saveProof(String proofId, String source) async {
-    proofCalls += 1;
+  @override
+  Future<void> verifyContactOtp({
+    required WorkContactChannel channel,
+    required String value,
+    required String code,
+  }) async {
+    otpVerificationCalls++;
+    lastOtpChannel = channel;
+    lastOtpValue = value;
+    await _wait();
+    if (code != '123456') {
+      throw const WorkGatewayException(
+        'Enter the 6-digit OTP sent to this contact.',
+      );
+    }
+  }
+
+  @override
+  Future<String> saveProof(String proofId, WorkPickedProof proof) async {
+    proofCalls++;
     await _wait();
     if (failProof) {
       failProof = false;
       throw const WorkGatewayException(
-        'Proof was not added. Choose the same file or source and retry.',
+        'Document not added. Choose the same file or another option and try again.',
       );
     }
     return 'PROOF-${proofId.toUpperCase()}-$proofCalls';
   }
 
-  Future<String> submitProfile() async {
-    submissionCalls += 1;
+  @override
+  Future<WorkReviewResult> submitProfile(WorkProfileSubmission value) async {
+    submissionCalls++;
+    lastSubmission = value;
     await _wait();
     if (failSubmission) {
       failSubmission = false;
       throw const WorkGatewayException(
-        'Work profile was not submitted. Your details and proof remain saved.',
+        'Workspace profile was not submitted. Your details and documents remain saved.',
       );
     }
-    return 'WP-${240700 + submissionCalls}';
+    return WorkReviewResult(
+      caseId: 'WP-${240700 + submissionCalls}',
+      status: WorkRemoteReviewStatus.pending,
+      plan: 'free',
+    );
   }
 
-  Future<String> checkReview() async {
-    reviewCalls += 1;
+  @override
+  Future<WorkReviewResult> submitCorrection(
+    String caseId,
+    WorkProfileSubmission value,
+  ) async {
+    correctionCalls++;
+    lastSubmission = value;
+    await _wait();
+    if (failSubmission) {
+      failSubmission = false;
+      throw const WorkGatewayException(
+        'Workspace corrections were not sent. Your changes remain saved.',
+      );
+    }
+    return WorkReviewResult(
+      caseId: caseId,
+      status: WorkRemoteReviewStatus.pending,
+      plan: 'free',
+    );
+  }
+
+  @override
+  Future<WorkReviewResult> checkReview(String caseId) async {
+    reviewCalls++;
     await _wait();
     if (failReview) {
       failReview = false;
@@ -94,23 +930,41 @@ class ReviewWorkGateway {
         'Review update is unavailable. No duplicate request was created.',
       );
     }
-    return 'WK-${510000 + reviewCalls}';
+    return WorkReviewResult(
+      caseId: caseId,
+      status: WorkRemoteReviewStatus.approved,
+      plan: 'free',
+      workspaceId: 'WK-${510000 + reviewCalls}',
+    );
   }
 
-  Future<String> submitGst() async {
-    gstCalls += 1;
+  @override
+  Future<String> submitGst(
+    String caseId,
+    String gstin,
+    String proofReference,
+  ) async {
+    gstCalls++;
     await _wait();
     if (failGst) {
       failGst = false;
       throw const WorkGatewayException(
-        'GST proof was not submitted. Your review remains active.',
+        'GST certificate was not submitted. Your Workspace review is still active.',
       );
     }
     return 'GST-$gstCalls';
   }
 
-  Future<void> finishSetup() async {
-    setupCalls += 1;
+  @override
+  Future<void> finishSetup({
+    required String workspaceId,
+    required int quantity,
+    required int buyPrice,
+    required int sellPrice,
+    required bool homeDelivery,
+    required bool storeCollection,
+  }) async {
+    setupCalls++;
     await _wait();
     if (failSetup) {
       failSetup = false;
@@ -119,4 +973,141 @@ class ReviewWorkGateway {
       );
     }
   }
+
+  @override
+  Future<void> saveOperationalState(WorkOperationalSnapshot snapshot) async {
+    operationalSaveCalls++;
+    lastOperationalSnapshot = snapshot;
+    await _wait();
+  }
+
+  @override
+  Future<String> createGroupBuy(WorkGroupBuySubmission submission) async {
+    groupBuyCalls++;
+    lastGroupBuySubmission = submission;
+    await _wait();
+    return 'PAY-GROUP-${1200 + groupBuyCalls}';
+  }
+
+  @override
+  Future<String> createPaidRequirement(
+    WorkPaidRequirementSubmission submission,
+  ) async {
+    paidRequirementCalls++;
+    lastPaidRequirementSubmission = submission;
+    await _wait();
+    return 'WORK-REQ-${1200 + paidRequirementCalls}';
+  }
+
+  @override
+  Future<WorkSettlementResult> requestSettlement({
+    required String workspaceId,
+    required int amount,
+    required String idempotencyKey,
+  }) async {
+    settlementCalls++;
+    await _wait();
+    return WorkSettlementResult(
+      reference: 'SET-${1200 + settlementCalls}',
+      acceptedAmount: amount,
+    );
+  }
+
+  @override
+  Future<void> verifyOrderHandover({
+    required String workspaceId,
+    required String orderId,
+    required String otp,
+    required String idempotencyKey,
+  }) async {
+    handoverCalls++;
+    await _wait();
+    if (otp != '123456') {
+      throw const WorkGatewayException(
+        'Enter the 6-digit delivery OTP shared by the customer.',
+      );
+    }
+  }
+
+  @override
+  Future<WorkDeliveryAssignmentResult> requestDeliveryAssignment({
+    required String workspaceId,
+    required String orderId,
+    required String address,
+    required String idempotencyKey,
+  }) async {
+    deliveryAssignmentCalls++;
+    await _wait();
+    return WorkDeliveryAssignmentResult(
+      partnerName: 'Review delivery partner',
+      vehicleLabel: 'Review vehicle',
+      eta: DateTime.now().add(const Duration(minutes: 15)),
+      stage: 'Assigned',
+    );
+  }
 }
+
+WorkPickedProof _validateProof(String fileName, Uint8List bytes) {
+  final extension = fileName.split('.').last.toLowerCase();
+  final contentType = switch (extension) {
+    'pdf' => 'application/pdf',
+    'jpg' || 'jpeg' => 'image/jpeg',
+    'png' => 'image/png',
+    'webp' => 'image/webp',
+    _ => throw const WorkGatewayException(
+      'Choose a PDF, JPG, PNG or WebP document.',
+    ),
+  };
+  if (bytes.isEmpty || bytes.length > 10 * 1024 * 1024) {
+    throw const WorkGatewayException('Choose a document up to 10 MB.');
+  }
+  return WorkPickedProof(
+    fileName: fileName,
+    contentType: contentType,
+    bytes: bytes,
+  );
+}
+
+Map<String, Object?> _map(Object? value) {
+  if (value is! Map) {
+    throw const WorkGatewayException(
+      'Workspace returned an invalid response. Try again.',
+      retryable: true,
+    );
+  }
+  return value.map((key, item) => MapEntry(key.toString(), item));
+}
+
+String _requiredString(Object? value) {
+  if (value is! String || value.trim().isEmpty) {
+    throw const WorkGatewayException(
+      'Workspace returned an invalid response. Try again.',
+      retryable: true,
+    );
+  }
+  return value.trim();
+}
+
+WorkReviewResult _decodeReview(Map<String, Object?> data) => WorkReviewResult(
+  caseId: _requiredString(data['caseId']),
+  status: switch (_requiredString(data['status'])) {
+    'approved' => WorkRemoteReviewStatus.approved,
+    'rejected' => WorkRemoteReviewStatus.rejected,
+    'suspended' => WorkRemoteReviewStatus.suspended,
+    'live' => WorkRemoteReviewStatus.live,
+    _ => WorkRemoteReviewStatus.pending,
+  },
+  plan: _requiredString(data['plan']),
+  workspaceId: data['workspaceId'] is String
+      ? _requiredString(data['workspaceId'])
+      : null,
+  reason: data['reason'] is String ? _requiredString(data['reason']) : null,
+  profileId: data['profileId'] is String
+      ? _requiredString(data['profileId'])
+      : null,
+  name: data['name'] is String ? _requiredString(data['name']) : null,
+  area: data['area'] is String ? _requiredString(data['area']) : null,
+  primaryActivity: data['primaryActivity'] is String
+      ? _requiredString(data['primaryActivity'])
+      : null,
+);

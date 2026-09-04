@@ -1,0 +1,16 @@
+PASS scripts\check-approved-ui-locks.ps1
+Approved UI reference and production locks passed.
+PASS scripts\check-brand-integrity.ps1
+Brand integrity gate passed for surface: App
+PASS scripts\check-buy-protected-baseline.ps1
+Protected Buy baseline passed: 47 runtime files, tree 23267fc722cad9dadab0ac8455be6368ef72de70888d01af4b9b41a4a06668a0.
+PASS scripts\check-social-protected-baseline.ps1
+Protected Social baseline passed: 231 files, tree 52ef43844548757e9f89cd033198a3be00567fac5a792899f5c7842acba1ce4b.
+PASS scripts\check-buy-approved-reference.ps1
+Founder FINAL Buy reference lock passed (25 immutable files).
+PASS scripts\check-interaction-contracts.ps1
+Interaction contract gate passed: 156 unique routes, all literal app targets resolve and no static no-op controls remain.
+PASS scripts\check-user-facing-copy.ps1
+User-facing copy gate passed.
+PASS scripts/check-buy-backend-contract-boundary.ps1 evidence=backend-boundary-pass.log
+PASS scripts/check-buy-data-egress-boundary.ps1 evidence=data-egress-pass.log

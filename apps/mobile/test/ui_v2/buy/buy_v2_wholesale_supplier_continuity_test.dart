@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
-import 'package:moolsocial/ui_v2/buy/buy_v2_supplier_sheet_motion.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -93,92 +91,54 @@ void main() {
   });
 
   testWidgets(
-    'supplier action exposes exact packs and selects only after reverse',
+    'Wholesale keeps automatic fulfilment and exact supplier continuity',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final semantics = tester.ensureSemantics();
       final session = wholesaleProductSession();
 
       await tester.pumpWidget(app(session));
       await tester.pumpAndSettle();
-      final action = find.byKey(
-        const ValueKey('buy-wholesale-supplier-action-w-oil'),
+      final supplier = find.byKey(
+        const ValueKey('buy-wholesale-store-action-w-oil'),
       );
-      await revealSupplierAction(tester, action);
-      expect(action, findsOneWidget);
-      final semanticAction = find.bySemanticsLabel(
-        'View 3 more products from Surya Oils India in the current '
-        'Wholesale catalogue',
-      );
-      expect(semanticAction, findsOneWidget);
-      expect(
-        tester
-            .getSemantics(semanticAction)
-            .getSemanticsData()
-            .hasAction(SemanticsAction.tap),
-        isTrue,
-      );
-
-      await tester.ensureVisible(action);
-      await tester.tap(action);
+      await revealSupplierAction(tester, supplier);
+      expect(supplier, findsOneWidget);
+      expect(find.textContaining(session.product('w-oil').seller), findsWidgets);
+      expect(find.text('Surya Oils India'), findsOneWidget);
+      expect(find.textContaining('Surya Oils India'), findsWidgets);
+      await tester.tap(supplier);
       await tester.pumpAndSettle();
-      expect(find.text('More from Surya Oils India'), findsOneWidget);
-      expect(find.textContaining('listed pack, MOQ'), findsOneWidget);
       expect(
-        find.byKey(
-          const ValueKey('buy-wholesale-supplier-product-w-mustard-oil'),
-        ),
+        find.byKey(const ValueKey('buy-wholesale-supplier-sheet-w-oil')),
         findsOneWidget,
       );
       expect(
-        find.byKey(
-          const ValueKey('buy-wholesale-supplier-product-w-groundnut-oil'),
-        ),
+        find.byKey(const ValueKey('buy-horizontal-product-grid')),
         findsOneWidget,
       );
+      expect(find.byKey(const ValueKey('buy-product-w-oil')), findsOneWidget);
+      final continuation = session
+          .supplierContinuationsFor(session.product('w-oil'))
+          .first;
       expect(
-        find.byKey(const ValueKey('buy-wholesale-supplier-product-w-ghee')),
+        find.byKey(ValueKey('buy-product-${continuation.id}')),
         findsOneWidget,
       );
-      expect(
-        find.byKey(const ValueKey('buy-wholesale-supplier-product-w-oil')),
-        findsNothing,
+      await tester.tap(
+        find.byKey(const ValueKey('buy-wholesale-supplier-sheet-close')),
       );
-      expect(find.text('Stone-ground wheat atta'), findsNothing);
-
-      final mustard = find.byKey(
-        const ValueKey('buy-wholesale-supplier-product-w-mustard-oil'),
-      );
-      await tester.tap(mustard);
-      await tester.pump();
-      expect(session.selectedProductId, 'w-oil');
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.product);
-      expect(session.selectedProductId, 'w-mustard-oil');
-
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(session.view, BuyV2View.catalogue);
-      expect(session.destination, BuyV2Destination.wholesale);
-      semantics.dispose();
+      expect(session.selectedProductId, 'w-oil');
     },
   );
 
-  testWidgets('supplier dismissal does not change product or catalogue state', (
+  testWidgets('canonical recommendations preserve Wholesale product state', (
     tester,
   ) async {
     final session = wholesaleProductSession();
     await tester.pumpWidget(app(session));
-    await tester.pumpAndSettle();
-
-    final action = find.byKey(
-      const ValueKey('buy-wholesale-supplier-action-w-oil'),
-    );
-    await revealSupplierAction(tester, action);
-    await tester.tap(action);
-    await tester.pumpAndSettle();
-    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
     expect(session.view, BuyV2View.product);
@@ -198,7 +158,35 @@ void main() {
     );
   });
 
-  testWidgets('supplier sheet is static and stable at 320px 140 percent', (
+  testWidgets('unverified business sees one Workspace recovery and no Add', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = wholesaleProductSession()..businessVerified = false;
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    final verification = find.byKey(
+      const ValueKey('buy-wholesale-verification-unavailable'),
+    );
+    await revealSupplierAction(tester, verification);
+    expect(verification, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-wholesale-open-workspace')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-wholesale-verify-business-w-oil')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-product-primary-w-oil')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('automatic fulfilment is stable at 320px 140 percent', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(320, 700));
@@ -207,28 +195,11 @@ void main() {
 
     await tester.pumpWidget(app(session, textScale: 1.4, reducedMotion: true));
     await tester.pumpAndSettle();
-    final action = find.byKey(
-      const ValueKey('buy-wholesale-supplier-action-w-oil'),
+    final supplier = find.byKey(
+      const ValueKey('buy-wholesale-store-action-w-oil'),
     );
-    await revealSupplierAction(tester, action);
-    final listener = tester.widget<Listener>(
-      find.descendant(of: action, matching: find.byType(Listener)).first,
-    );
-    expect(listener.onPointerDown, isNull);
-
-    final motion = BuyV2SupplierSheetMotion.resolve(tester.element(action));
-    expect(motion.duration, Duration.zero);
-    expect(motion.reverseDuration, Duration.zero);
-    await tester.tap(action);
-    await tester.pump();
-
-    expect(
-      find.byKey(const ValueKey('buy-wholesale-supplier-sheet-w-oil')),
-      findsOneWidget,
-    );
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('buy-wholesale-supplier-product-w-ghee')),
-    );
+    await revealSupplierAction(tester, supplier);
+    expect(supplier, findsOneWidget);
     await tester.pumpAndSettle();
     expect(tester.binding.transientCallbackCount, 0);
     expect(tester.takeException(), isNull);

@@ -80,7 +80,7 @@ const destinations = <DestinationCase>[
     name: 'Work',
     familyId: 'work',
     route: '/app/work/my-work',
-    sourceOwner: Key('my-work-screen'),
+    sourceOwner: Key('work-choose-screen'),
     localNavigationOwner: Key('work-local-navigation'),
     localAction: Key('work-local-earn'),
     destinationOwner: Key('work-earn-screen'),

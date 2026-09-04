@@ -8,6 +8,8 @@ import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/retailer/retailer_session.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
+import 'package:moolsocial/ui_v2/profile/global_personal_profile_v2.dart';
+import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_public_runtime.dart';
 
@@ -39,6 +41,15 @@ void main() {
               ),
             ),
           ),
+          GoRoute(
+            path: '/app/account/identity',
+            builder: (_, state) => GlobalPersonalProfileV2(
+              session: owners.journey,
+              surfaceTone: state.uri.queryParameters['surface'] == 'social'
+                  ? GlobalProfileSurfaceTone.socialDark
+                  : GlobalProfileSurfaceTone.light,
+            ),
+          ),
         ],
       );
       addTearDown(router.dispose);
@@ -54,7 +65,7 @@ void main() {
 
       expect(find.text('Public provider video'), findsOneWidget);
       expect(find.byTooltip('YouTube channel status'), findsOneWidget);
-      expect(find.byTooltip('MoolSocial account'), findsNothing);
+      expect(find.byTooltip('Your MoolSocial profile'), findsOneWidget);
       expect(
         find.byKey(const Key('c30j-youtube-status-destination')),
         findsNothing,
@@ -63,6 +74,72 @@ void main() {
       expect(owners.journey.isAuthenticated, isFalse);
 
       await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+      expect(find.text('Your MoolSocial profile'), findsOneWidget);
+      expect(
+        find.byKey(const Key('global-profile-context-youtube')),
+        findsOneWidget,
+      );
+      expect(find.text('Connect your YouTube channel'), findsOneWidget);
+      final identityIcons = tester
+          .widgetList<Icon>(
+            find.descendant(
+              of: find.byKey(const Key('global-profile-identity')),
+              matching: find.byType(Icon),
+            ),
+          )
+          .map((icon) => icon.color)
+          .toList(growable: false);
+      expect(identityIcons, contains(const Color(0xFFFF3355)));
+      expect(identityIcons, isNot(contains(const Color(0xFF000080))));
+      expect(
+        tester
+            .widget<Material>(find.byKey(const Key('global-profile-panel-v2')))
+            .color,
+        const Color(0xFF0F0F0F),
+      );
+      expect(
+        find.byKey(const Key('youtube-connect-auth-explanation')),
+        findsNothing,
+      );
+      await tester.tap(
+        find.byKey(const Key('global-profile-context-action-youtube')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('youtube-connect-auth-explanation')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('youtube-connect-auth-cancel')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('global-profile-identity')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('global-personal-profile-v2')),
+        findsOneWidget,
+      );
+      expect(find.text('Personal profile'), findsWidgets);
+      expect(
+        tester
+            .widget<Scaffold>(
+              find.byKey(const Key('global-personal-profile-v2')),
+            )
+            .backgroundColor,
+        const Color(0xFF0F0F0F),
+      );
+      await tester.tap(find.byKey(const Key('global-personal-profile-back')));
+      await tester.pumpAndSettle();
+      expect(find.text('Public provider video'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const Key('screen04-youtube-home-channel-status')),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -97,7 +174,7 @@ void main() {
     },
   );
 
-  test('C30J source never infers YouTube authorization from an avatar', () {
+  test('C30J source separates MoolSocial account from YouTube status', () {
     final source = File(
       'lib/ui_v2/social/social_v2_consumer.dart',
     ).readAsStringSync();
@@ -108,8 +185,8 @@ void main() {
     final header = source.substring(headerStart, nextOwner);
 
     expect(header, contains("tooltip: 'YouTube channel status'"));
-    expect(header, contains('Icons.account_circle_outlined'));
-    expect(header, isNot(contains("tooltip: 'MoolSocial account'")));
+    expect(header, contains('MoolGlobalProfileShortcutV2('));
+    expect(header, contains('Icons.ondemand_video_outlined'));
     expect(header, isNot(contains('CircleAvatar')));
     const statusSignature = 'Future<void> _openYouTubeChannelStatus() async {';
     final statusStart = source.indexOf(statusSignature);
@@ -133,6 +210,13 @@ void main() {
       source.contains('onChannelStatus: _openYouTubeChannelStatus'),
       isTrue,
     );
+    expect(source.contains('onAccount: _openAccount'), isTrue);
+    expect(
+      source.contains('surfaceTone: GlobalProfileSurfaceTone.socialDark'),
+      isTrue,
+    );
+    expect(source.contains("id: 'youtube'"), isTrue);
+    expect(source.contains(r"'$route?surface=social'"), isTrue);
     expect(
       source.contains('onCreateYouTubeShort: _openYouTubeChannelStatus'),
       isFalse,

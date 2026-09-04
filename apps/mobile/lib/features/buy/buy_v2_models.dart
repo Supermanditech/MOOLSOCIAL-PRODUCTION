@@ -2,6 +2,13 @@ import 'buy_v2_catalogue_data.dart';
 
 enum BuyV2Destination { shop, wholesale, medicine, orders }
 
+enum BuyV2ShoppingIntent {
+  monthlyBasket,
+  businessBuying,
+  flexibleRestocking,
+  homeShopping,
+}
+
 /// Presentation-only direction for a genuine Buy surface replacement.
 ///
 /// Route, Back and restoration outcomes remain owned by [BuyV2Session]. This
@@ -22,7 +29,22 @@ enum BuyV2View {
   recovery,
 }
 
+enum BuyV2CheckoutStep { address, payment, confirm }
+
 enum BuyV2CartScope { all, shop, wholesale, medicine }
+
+enum BuyV2ProductSort {
+  relevance,
+  priceLowToHigh,
+  priceHighToLow,
+  deliveryFastest,
+}
+
+enum BuyV2PackFilter { standard, multipack, bulk }
+
+enum BuyV2ShopSaleType { quickDelivery, courier }
+
+enum BuyV2WholesaleSaleType { wholesale, bulk }
 
 enum BuyV2AddressKind { home, work, thirdParty, other }
 
@@ -51,6 +73,66 @@ class BuyV2Category {
   final String glyph;
 }
 
+class BuyV2PurchaseProtection {
+  const BuyV2PurchaseProtection({
+    required this.summary,
+    this.remedies = const [],
+    this.windowLabel,
+    this.conditionsLabel,
+    this.verificationLabel,
+    this.initiationLabel,
+    this.approvalLabel,
+    this.pickupLabel,
+    this.refundMethodLabel,
+    this.refundTimelineLabel,
+    this.warrantyLabel,
+    this.nonReturnableReason,
+    this.policyVersion,
+    this.effectiveFromLabel,
+  });
+
+  final String summary;
+  final List<String> remedies;
+  final String? windowLabel;
+  final String? conditionsLabel;
+  final String? verificationLabel;
+  final String? initiationLabel;
+  final String? approvalLabel;
+  final String? pickupLabel;
+  final String? refundMethodLabel;
+  final String? refundTimelineLabel;
+  final String? warrantyLabel;
+  final String? nonReturnableReason;
+  final String? policyVersion;
+  final String? effectiveFromLabel;
+}
+
+class BuyV2ProductCompliance {
+  const BuyV2ProductCompliance({
+    this.genericName,
+    this.netQuantity,
+    this.manufacturerName,
+    this.packerName,
+    this.importerName,
+    this.countryOfOrigin,
+    this.manufacturedOrPackedOnLabel,
+    this.bestBeforeOrUseByLabel,
+    this.fssaiLicenseNumber,
+    this.consumerCare,
+  });
+
+  final String? genericName;
+  final String? netQuantity;
+  final String? manufacturerName;
+  final String? packerName;
+  final String? importerName;
+  final String? countryOfOrigin;
+  final String? manufacturedOrPackedOnLabel;
+  final String? bestBeforeOrUseByLabel;
+  final String? fssaiLicenseNumber;
+  final String? consumerCare;
+}
+
 class BuyV2Product {
   const BuyV2Product({
     required this.id,
@@ -77,8 +159,11 @@ class BuyV2Product {
     this.regulatoryNote,
     this.minimumOrder = 1,
     this.returnPolicy,
+    this.purchaseProtection,
+    this.compliance,
     this.freightIncluded = false,
     this.manufacturerVerified = false,
+    this.catalogueListing = true,
   }) : canonicalId = canonicalId ?? id;
 
   final String id;
@@ -105,8 +190,59 @@ class BuyV2Product {
   final String? regulatoryNote;
   final int minimumOrder;
   final String? returnPolicy;
+  final BuyV2PurchaseProtection? purchaseProtection;
+  final BuyV2ProductCompliance? compliance;
   final bool freightIncluded;
   final bool manufacturerVerified;
+  final bool catalogueListing;
+
+  BuyV2Product copyWith({
+    String? id,
+    String? canonicalId,
+    String? variant,
+    String? pack,
+    int? price,
+    String? unitPrice,
+    String? badge,
+    String? deliveryPromise,
+    String? seller,
+    String? sellerType,
+    String? confirmedOn,
+    int? minimumOrder,
+    bool? catalogueListing,
+    BuyV2PurchaseProtection? purchaseProtection,
+    BuyV2ProductCompliance? compliance,
+  }) => BuyV2Product(
+    id: id ?? this.id,
+    canonicalId: canonicalId ?? this.canonicalId,
+    destination: destination,
+    categoryId: categoryId,
+    brand: brand,
+    title: title,
+    variant: variant ?? this.variant,
+    pack: pack ?? this.pack,
+    price: price ?? this.price,
+    unitPrice: unitPrice ?? this.unitPrice,
+    badge: badge ?? this.badge,
+    seller: seller ?? this.seller,
+    sellerType: sellerType ?? this.sellerType,
+    deliveryPromise: deliveryPromise ?? this.deliveryPromise,
+    origin: origin,
+    confirmedOn: confirmedOn ?? this.confirmedOn,
+    visualLabel: visualLabel,
+    visualKind: visualKind,
+    mrp: mrp,
+    requiresPrescription: requiresPrescription,
+    composition: composition,
+    regulatoryNote: regulatoryNote,
+    minimumOrder: minimumOrder ?? this.minimumOrder,
+    returnPolicy: returnPolicy,
+    purchaseProtection: purchaseProtection ?? this.purchaseProtection,
+    compliance: compliance ?? this.compliance,
+    freightIncluded: freightIncluded,
+    manufacturerVerified: manufacturerVerified,
+    catalogueListing: catalogueListing ?? this.catalogueListing,
+  );
 
   String get partnerRole => buyV2PartnerRoleFor(destination, sellerType);
 
@@ -117,13 +253,13 @@ class BuyV2Product {
 String buyV2PartnerRoleFor(BuyV2Destination destination, String sourceRole) {
   final normalized = sourceRole.toLowerCase();
   if (normalized.contains('manufacturer')) {
-    return 'Mool Manufacturer Partner';
+    return 'MoolSocial Fulfilment Partner';
   }
   return switch (destination) {
-    BuyV2Destination.shop => 'Mool Retail Partner',
-    BuyV2Destination.wholesale => 'Mool Trade Partner',
+    BuyV2Destination.shop => 'MoolSocial Fulfilment Store',
+    BuyV2Destination.wholesale => 'MoolSocial Fulfilment Partner',
     BuyV2Destination.medicine => 'Mool Pharmacy Partner',
-    BuyV2Destination.orders => 'Mool Fulfilment Partner',
+    BuyV2Destination.orders => 'MoolSocial Delivery Partner',
   };
 }
 
@@ -149,30 +285,43 @@ class BuyV2CartLine {
 
   int get total => product.price * quantity;
 
-  BuyV2CartLine copyWith({int? quantity}) =>
-      BuyV2CartLine(product: product, quantity: quantity ?? this.quantity);
+  BuyV2CartLine copyWith({BuyV2Product? product, int? quantity}) =>
+      BuyV2CartLine(
+        product: product ?? this.product,
+        quantity: quantity ?? this.quantity,
+      );
 }
 
 class BuyV2FulfilmentGroup {
   const BuyV2FulfilmentGroup({
+    required this.groupKey,
     required this.destination,
     required this.partner,
     required this.partnerType,
     required this.promise,
     required this.lines,
+    this.promisedByLabel,
+    this.dispatchPromise,
+    this.deliveryProviderName,
+    this.deliveryServiceLevel,
   });
 
+  final String groupKey;
   final BuyV2Destination destination;
   final String partner;
   final String partnerType;
   final String promise;
   final List<BuyV2CartLine> lines;
+  final String? promisedByLabel;
+  final String? dispatchPromise;
+  final String? deliveryProviderName;
+  final String? deliveryServiceLevel;
 
   int get itemCount => lines.fold(0, (total, line) => total + line.quantity);
 
   int get total => lines.fold(0, (total, line) => total + line.total);
 
-  String get key => '${destination.name}|$partner';
+  String get key => groupKey;
 
   List<String> get productIds =>
       lines.map((line) => line.product.id).toList(growable: false);
@@ -206,6 +355,86 @@ class BuyV2Address {
   String get compactLine => '${area.split(',').first.trim()} · $pinCode';
 }
 
+enum BuyV2TaxInvoiceState { pending, ready, corrected, unavailable }
+
+class BuyV2TaxInvoiceLine {
+  const BuyV2TaxInvoiceLine({
+    required this.description,
+    required this.hsnSac,
+    required this.taxableValue,
+    required this.gstRate,
+    required this.cgst,
+    required this.sgst,
+    required this.igst,
+    required this.cess,
+    this.quantity,
+    this.unit,
+    this.unitPrice,
+  });
+
+  final String description;
+  final String hsnSac;
+  final int taxableValue;
+  final double gstRate;
+  final int cgst;
+  final int sgst;
+  final int igst;
+  final int cess;
+  final int? quantity;
+  final String? unit;
+  final int? unitPrice;
+
+  int get totalTax => cgst + sgst + igst + cess;
+}
+
+class BuyV2TaxInvoiceDetails {
+  const BuyV2TaxInvoiceDetails({
+    required this.invoiceNumber,
+    required this.issuedAt,
+    required this.sellerLegalName,
+    required this.sellerAddress,
+    required this.sellerGstin,
+    required this.placeOfSupply,
+    required this.sourceId,
+    required this.lines,
+    this.buyerGstin,
+    this.revisionLabel,
+    this.recipientLegalName,
+    this.recipientBillingAddress,
+    this.sellerPan,
+    this.sellerCin,
+    this.sellerFssaiNumber,
+    this.reverseCharge = false,
+    this.irn,
+    this.acknowledgementNumber,
+    this.authorizedSignatory,
+    this.supplyStatement,
+  });
+
+  final String invoiceNumber;
+  final DateTime issuedAt;
+  final String sellerLegalName;
+  final String sellerAddress;
+  final String sellerGstin;
+  final String? buyerGstin;
+  final String placeOfSupply;
+  final String sourceId;
+  final List<BuyV2TaxInvoiceLine> lines;
+  final String? revisionLabel;
+  final String? recipientLegalName;
+  final String? recipientBillingAddress;
+  final String? sellerPan;
+  final String? sellerCin;
+  final String? sellerFssaiNumber;
+  final bool reverseCharge;
+  final String? irn;
+  final String? acknowledgementNumber;
+  final String? authorizedSignatory;
+  final String? supplyStatement;
+
+  int get totalTax => lines.fold(0, (total, line) => total + line.totalTax);
+}
+
 class BuyV2Order {
   const BuyV2Order({
     required this.id,
@@ -219,9 +448,40 @@ class BuyV2Order {
     required this.destinationLabel,
     required this.progress,
     required this.status,
+    this.purchaseId,
+    this.promisedByLabel,
+    this.updatedDeliveryEstimate,
     this.productIds = const [],
+    this.lines = const [],
+    this.paymentMethod,
+    this.purchaseOrderReference,
+    this.recipient,
+    this.addressLine,
     this.deliveryInstruction,
     this.tip = 0,
+    this.discount = 0,
+    this.paymentTermLabel,
+    this.amountPaidNow,
+    this.balanceDue = 0,
+    this.balanceDueLabel,
+    this.paymentStatusLabel,
+    this.buyerName,
+    this.buyerType,
+    this.tax = 0,
+    this.freight = 0,
+    this.deliveryFee = 0,
+    this.paymentCharge = 0,
+    this.dispatchPromise,
+    this.deliveryPartnerName,
+    this.deliveryPartnerType,
+    this.trackingReference,
+    this.deliveryServiceLevel,
+    this.proofOfDeliveryStatus,
+    this.taxInvoiceState,
+    this.taxInvoiceDetails,
+    this.platformTaxInvoiceDetails,
+    this.invoiceAvailable = true,
+    this.receiptReference,
   });
 
   final String id;
@@ -235,9 +495,40 @@ class BuyV2Order {
   final String destinationLabel;
   final double progress;
   final BuyV2OrderStatus status;
+  final String? purchaseId;
+  final String? promisedByLabel;
+  final String? updatedDeliveryEstimate;
   final List<String> productIds;
+  final List<BuyV2CartLine> lines;
+  final String? paymentMethod;
+  final String? purchaseOrderReference;
+  final String? recipient;
+  final String? addressLine;
   final String? deliveryInstruction;
   final int tip;
+  final int discount;
+  final String? paymentTermLabel;
+  final int? amountPaidNow;
+  final int balanceDue;
+  final String? balanceDueLabel;
+  final String? paymentStatusLabel;
+  final String? buyerName;
+  final String? buyerType;
+  final int tax;
+  final int freight;
+  final int deliveryFee;
+  final int paymentCharge;
+  final String? dispatchPromise;
+  final String? deliveryPartnerName;
+  final String? deliveryPartnerType;
+  final String? trackingReference;
+  final String? deliveryServiceLevel;
+  final String? proofOfDeliveryStatus;
+  final BuyV2TaxInvoiceState? taxInvoiceState;
+  final BuyV2TaxInvoiceDetails? taxInvoiceDetails;
+  final BuyV2TaxInvoiceDetails? platformTaxInvoiceDetails;
+  final bool invoiceAvailable;
+  final String? receiptReference;
 }
 
 class _BuyV2CommerceSeed {
@@ -504,6 +795,51 @@ abstract final class BuyV2Catalogue {
       .map((row) => _BuyV2CommerceSeed.fromRow(row.trim()))
       .toList(growable: false);
 
+  static final _commerceVariantProducts = <BuyV2Product>[
+    _commerceVariant(
+      canonicalId: 'milk',
+      destination: BuyV2Destination.shop,
+      id: 's-milk-500ml',
+      variant: 'Toned fresh milk · 500 ml',
+      pack: '500 ml pouch',
+      price: 35,
+      unitPrice: '₹70/L',
+      badge: 'Quick local choice',
+    ),
+    _commerceVariant(
+      canonicalId: 'milk',
+      destination: BuyV2Destination.shop,
+      id: 's-milk-2l',
+      variant: 'Toned fresh milk · family pack',
+      pack: '2 × 1 L pouches',
+      price: 128,
+      unitPrice: '₹64/L',
+      badge: 'Family pack',
+    ),
+    _commerceVariant(
+      canonicalId: 'rice',
+      destination: BuyV2Destination.wholesale,
+      id: 'w-rice-50kg',
+      variant: 'Aged basmati · 50 kg trade sack',
+      pack: '50 kg sack',
+      price: 3200,
+      unitPrice: '₹64/kg',
+      badge: 'Volume price',
+      minimumOrder: 1,
+    ),
+    _commerceVariant(
+      canonicalId: 'oil',
+      destination: BuyV2Destination.wholesale,
+      id: 'w-oil-10l',
+      variant: 'Refined sunflower · 10 L trade pack',
+      pack: '2 × 5 L cans',
+      price: 1580,
+      unitPrice: '₹158/L',
+      badge: 'Flexible bulk pack',
+      minimumOrder: 1,
+    ),
+  ];
+
   static final products = <BuyV2Product>[
     for (final seed in _commerceSeeds)
       _commerceProduct(seed, BuyV2Destination.shop),
@@ -511,6 +847,36 @@ abstract final class BuyV2Catalogue {
       _commerceProduct(seed, BuyV2Destination.wholesale),
     ..._medicineProducts,
   ];
+
+  static final allProducts = <BuyV2Product>[
+    ...products,
+    ..._commerceVariantProducts,
+  ];
+
+  static BuyV2Product _commerceVariant({
+    required String canonicalId,
+    required BuyV2Destination destination,
+    required String id,
+    required String variant,
+    required String pack,
+    required int price,
+    required String unitPrice,
+    required String badge,
+    int? minimumOrder,
+  }) {
+    final seed = _commerceSeeds.firstWhere((item) => item.id == canonicalId);
+    return _commerceProduct(seed, destination).copyWith(
+      id: id,
+      canonicalId: canonicalId,
+      variant: variant,
+      pack: pack,
+      price: price,
+      unitPrice: unitPrice,
+      badge: badge,
+      minimumOrder: minimumOrder,
+      catalogueListing: false,
+    );
+  }
 
   static BuyV2Product _commerceProduct(
     _BuyV2CommerceSeed seed,
@@ -537,20 +903,18 @@ abstract final class BuyV2Catalogue {
       seller: seller,
       sellerType: sellerType,
       deliveryPromise: wholesale
-          ? _wholesalePromise(originCity)
+          ? _wholesalePromise(seed.wholesaleDelivery)
           : _shopPromise(seed.shopDelivery),
       origin: wholesale
           ? '$originCity → Jodhpur 342003'
           : 'Jodhpur → Sardarpura 342003',
-      confirmedOn: 'Confirmed 29 Jul',
+      confirmedOn: 'Catalogue details verified',
       visualLabel: _visualLabel(seed.id.replaceAll('-', ' ')),
       visualKind: _visualKind(
         wholesale ? seed.wholesaleCategory : seed.shopCategory,
       ),
       minimumOrder: wholesale ? _minimumOrder(seed.id) : 1,
-      returnPolicy: wholesale
-          ? seed.wholesaleReturnPolicy
-          : seed.shopReturnPolicy,
+      returnPolicy: _returnPolicy(seed, wholesale: wholesale),
       freightIncluded: wholesale,
       manufacturerVerified:
           wholesale && sellerType.toLowerCase().contains('manufacturer'),
@@ -558,22 +922,46 @@ abstract final class BuyV2Catalogue {
   }
 
   static String _shopPromise(String source) {
+    final value = source.trim();
     final minutes = RegExp(
       r'(\d+)\s+minutes',
       caseSensitive: false,
-    ).firstMatch(source);
+    ).firstMatch(value);
     if (minutes != null) {
-      return 'Wed, 29 Jul · within ${minutes.group(1)} min';
+      return 'Delivered in ${minutes.group(1)} min';
     }
-    final by = RegExp(r'by\s+(.+)$', caseSensitive: false).firstMatch(source);
-    return 'Wed, 29 Jul · by ${by?.group(1) ?? '8:00 pm'}';
+    if (RegExp(
+      r'^(today|tomorrow)\s+by\s+',
+      caseSensitive: false,
+    ).hasMatch(value)) {
+      return 'Delivered ${value.toLowerCase()}';
+    }
+    return value;
   }
 
-  static String _wholesalePromise(String originCity) => switch (originCity) {
-    'Delhi' => 'Sat, 1 Aug – Sun, 2 Aug',
-    'Jaipur' => 'Fri, 31 Jul – Sat, 1 Aug',
-    _ => 'Thu, 30 Jul',
-  };
+  static String _wholesalePromise(String source) => source.trim();
+
+  static String _returnPolicy(
+    _BuyV2CommerceSeed seed, {
+    required bool wholesale,
+  }) {
+    if (wholesale) return seed.wholesaleReturnPolicy.trim();
+    final policy = seed.shopReturnPolicy.trim();
+    if (policy != 'Eligibility and return window shown before payment') {
+      return policy;
+    }
+    const perishableCategories = {
+      'fruits-vegetables',
+      'dairy-bakery',
+      'eggs-poultry',
+      'meat-seafood',
+      'frozen-foods',
+      'icecream-cheese',
+    };
+    return perishableCategories.contains(seed.shopCategory)
+        ? 'Refund or replacement within 24 hours for spoiled, damaged or incorrect unopened packs'
+        : 'Replacement within 7 days for damaged, defective or incorrect unopened packs';
+  }
 
   static String _supplierOrigin(String seller, String sellerType) {
     final name = seller.toLowerCase();
@@ -695,7 +1083,7 @@ abstract final class BuyV2Catalogue {
       badge: '18% off',
       seller: 'Sardarpura Health Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed at checkout',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Expiry and batch shown before dispatch',
       visualLabel: '500',
@@ -718,7 +1106,7 @@ abstract final class BuyV2Catalogue {
       badge: '16% off',
       seller: 'Jodhpur Care Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed at checkout',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Sealed tube',
       visualLabel: 'GEL',
@@ -740,7 +1128,7 @@ abstract final class BuyV2Catalogue {
       badge: 'Prescription required',
       seller: 'Sardarpura Health Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed after prescription review',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Pharmacist review required',
       visualLabel: 'SR 500',
@@ -763,7 +1151,7 @@ abstract final class BuyV2Catalogue {
       badge: '13% off',
       seller: 'Marwar Wellness Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed at checkout',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Check meter compatibility',
       visualLabel: '50',
@@ -786,7 +1174,7 @@ abstract final class BuyV2Catalogue {
       badge: 'Prescription required',
       seller: 'Sardarpura Health Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed after prescription review',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Pharmacist review required',
       visualLabel: '40',
@@ -809,7 +1197,7 @@ abstract final class BuyV2Catalogue {
       badge: 'Prescription required',
       seller: 'Marwar Wellness Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed after prescription review',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Pharmacist review required',
       visualLabel: '10',
@@ -832,7 +1220,7 @@ abstract final class BuyV2Catalogue {
       badge: 'Prescription required',
       seller: 'Sardarpura Health Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed at checkout',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Pharmacist review required',
       visualLabel: '40',
@@ -855,7 +1243,7 @@ abstract final class BuyV2Catalogue {
       badge: '20% off',
       seller: 'Sardarpura Health Pharmacy',
       sellerType: 'Licensed pharmacy',
-      deliveryPromise: 'Wed, 29 Jul · by 11:00 am',
+      deliveryPromise: 'Delivery time confirmed after prescription review',
       origin: 'Jodhpur → Sardarpura 342003',
       confirmedOn: 'Sealed single-use sachets',
       visualLabel: 'ORS',

@@ -21,20 +21,20 @@ void main() {
     );
   }
 
-  test('older orders never substitute catalogue products or mutate Cart', () {
+  test('historical orders retain exact products and reorder into Cart', () {
     final session = newSession();
     final order = session.orders.firstWhere(
       (candidate) => candidate.id == 'MS-240741',
     );
 
-    expect(order.productIds, isEmpty);
-    expect(session.productsForOrder(order), isEmpty);
+    expect(order.productIds, hasLength(8));
+    expect(session.productsForOrder(order), hasLength(8));
     expect(session.openTracking(order.id), isTrue);
-    expect(session.reorder(order), isFalse);
-    expect(session.view, BuyV2View.tracking);
-    expect(session.selectedOrder.id, order.id);
-    expect(session.cartLines, isEmpty);
-    expect(session.notice, 'Products from this order could not be found.');
+    expect(session.reorder(order), isTrue);
+    expect(session.view, BuyV2View.cart);
+    expect(session.cartScope, BuyV2CartScope.shop);
+    expect(session.cartLines, hasLength(8));
+    expect(session.notice, 'Previous products are ready to edit.');
   });
 
   test('stale duplicate and cross-vertical identities fail atomically', () {
@@ -143,7 +143,16 @@ void main() {
       );
       expect(action, findsOneWidget);
       expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
-      expect(tester.takeException(), isNull);
+      final layoutException = tester.takeException();
+      expect(
+        layoutException,
+        isNull,
+        reason: layoutException is FlutterError
+            ? layoutException.diagnostics
+                  .map((diagnostic) => diagnostic.toStringDeep())
+                  .join('\n')
+            : '$layoutException',
+      );
 
       await tester.tap(action);
       await tester.pump();

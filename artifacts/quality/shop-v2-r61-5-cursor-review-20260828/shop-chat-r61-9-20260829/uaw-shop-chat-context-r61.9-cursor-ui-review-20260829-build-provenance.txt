@@ -1,0 +1,15 @@
+CandidateId=UAW-SHOP-CHAT-CONTEXT-R61.9-CURSOR-UI-REVIEW-20260829
+RuntimeProfile=CursorUiReview
+RuntimeDefines=CursorUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-SHOP-CHAT-CONTEXT-R61.9-CURSOR-UI-REVIEW-20260829;AndroidDebugPackage=cursorreview;Promotable=false
+Version=1.0.0-r61.9
+VersionCode=2026082811
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-chat-shared-v1-20260829\config\apk-regression-gate-state-shop-chat-r61-9.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-chat-shared-v1-20260829\config\apk-regression-gate-state-shop-chat-r61-9.json
+Branch=work/integration-repair/shop-chat-shared-v1-20260829
+HEAD=e0b1ad3eace7094f9bc0e73ce7d36eb30dcfdb1c
+SourceFingerprint=9A1D95F77A454287D7E069924FEC0235AD3ED252E7DB27EEF13D485559247A70
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-chat-shared-v1-20260829\artifacts\quality\shop-v2-r61-5-cursor-review-20260828\shop-chat-r61-9-20260829\uaw-shop-chat-context-r61.9-cursor-ui-review-20260829-device-review-debug.apk
+Bytes=206453947
+SHA256=5262CE6011FB15F0D21EB3F8DCA8BDAFB2372914684C02AC2D3AF66F7A377CBB
+BuiltAt=2026-08-29T10:02:49.9750266+05:30

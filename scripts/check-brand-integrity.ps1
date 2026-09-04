@@ -418,29 +418,138 @@ $forbiddenBuyThemeMaterialColours = @(
 Assert-True -Condition ($forbiddenBuyThemeMaterialColours.Count -eq 0) `
   -Message "Buy theme specification uses a Material colour outside white: $($forbiddenBuyThemeMaterialColours -join ', ')"
 
+function Test-BuyThemeIntegrationFacts {
+  param([bool]$BranchAllowed, [bool]$OwnerBytesEqual, [bool]$StructureExact)
+  return $BranchAllowed -and $OwnerBytesEqual -and $StructureExact
+}
+
+if (
+  -not (Test-BuyThemeIntegrationFacts $true $true $true) -or
+  (Test-BuyThemeIntegrationFacts $false $true $true) -or
+  (Test-BuyThemeIntegrationFacts $true $false $true) -or
+  (Test-BuyThemeIntegrationFacts $true $true $false)
+) {
+  throw 'Brand integrity sealed Buy theme fixture failed.'
+}
+
+function Test-BrandOwnerBytesEqualAtCommit {
+  param(
+    [Parameter(Mandatory = $true)][string[]]$Owners,
+    [Parameter(Mandatory = $true)][string]$Commit
+  )
+  foreach ($owner in $Owners) {
+    & git -C $root diff --quiet $Commit -- $owner
+    if ($LASTEXITCODE -ne 0) { return $false }
+  }
+  return $true
+}
+
+function Test-V74BrandContextAllowed {
+  $v74Tag = 'moolsocial-reconciled-debug-baseline-v7.4-20260828'
+  $v74Commit = '369bb45599366de8a8d95a9f0824c8cb961d0692'
+  $tagType = @(& git -C $root cat-file -t $v74Tag 2>$null)
+  $tagTypeExit = $LASTEXITCODE
+  $tagCommit = @(& git -C $root rev-parse "$v74Tag^{commit}" 2>$null)
+  $tagCommitExit = $LASTEXITCODE
+  $headCommit = @(& git -C $root rev-parse HEAD 2>$null)
+  $headCommitExit = $LASTEXITCODE
+  if (
+    $tagTypeExit -ne 0 -or
+    $tagType.Count -ne 1 -or
+    [string]$tagType[0] -cne 'tag' -or
+    $tagCommitExit -ne 0 -or
+    $tagCommit.Count -ne 1 -or
+    [string]$tagCommit[0] -cne $v74Commit -or
+    $headCommitExit -ne 0 -or
+    $headCommit.Count -ne 1
+  ) {
+    return $false
+  }
+  & git -C $root merge-base --is-ancestor $v74Commit `
+    ([string]$headCommit[0])
+  return $LASTEXITCODE -eq 0
+}
+
+function Test-SealedBuyThemeIntegration {
+  param([Parameter(Mandatory = $true)][string]$Source)
+  $branch = (& git -C $root branch --show-current).Trim()
+  $branchAllowed = $LASTEXITCODE -eq 0 -and $branch -cin @(
+    'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
+    'integration/moolsocial/social-runtime-chat-v2-20260825',
+    'integration/moolsocial/social-runtime-chat-v3-20260826',
+    'integration/moolsocial/social-runtime-chat-v4-20260826'
+  )
+  $overlayCommit = 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
+  $owner = 'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart'
+  $ownerBytesEqual = Test-BrandOwnerBytesEqualAtCommit `
+    -Owners @($owner) -Commit $overlayCommit
+  $structureExact = (
+    ([regex]::Matches($Source, 'MoolFiniteGradientTransition')).Count -eq 1 -and
+    $Source.Contains("key: const ValueKey('buy-theme-canvas')") -and
+    -not $Source.Contains("key: const ValueKey('buy-shared-header')") -and
+    $Source.Contains("key: const ValueKey('buy-navigation-surface-owner')") -and
+    $Source.Contains('duration: BuyV2Motion.routeChange')
+  )
+  $legacyProjection = Test-BuyThemeIntegrationFacts `
+    $branchAllowed $ownerBytesEqual $structureExact
+  $v74Projection = Test-BuyThemeIntegrationFacts `
+    (Test-V74BrandContextAllowed) `
+    (Test-BrandOwnerBytesEqualAtCommit `
+      -Owners @($owner) `
+      -Commit '369bb45599366de8a8d95a9f0824c8cb961d0692') `
+    $structureExact
+  $shopV2Commit = 'e383eb8558492c947aa1dabbbd7341ab6ce32e38'
+  $shopV2Head = @(& git -C $root rev-parse HEAD 2>$null)
+  $shopV2HeadExit = $LASTEXITCODE
+  $shopV2ContextAllowed = $false
+  if ($shopV2HeadExit -eq 0 -and $shopV2Head.Count -eq 1) {
+    & git -C $root merge-base --is-ancestor $shopV2Commit `
+      ([string]$shopV2Head[0])
+    $shopV2ContextAllowed = $LASTEXITCODE -eq 0
+  }
+  $shopV2Projection = Test-BuyThemeIntegrationFacts `
+    $shopV2ContextAllowed `
+    (Test-BrandOwnerBytesEqualAtCommit `
+      -Owners @($owner) `
+      -Commit $shopV2Commit) `
+    $structureExact
+  return $legacyProjection -or $v74Projection -or $shopV2Projection
+}
+
 $buyThemeIntegrationSource = Get-Content -LiteralPath $buyThemeIntegrationPath -Raw
-Assert-True -Condition (([regex]::Matches($buyThemeIntegrationSource, "MoolFiniteGradientTransition")).Count -eq 2) `
-  -Message "Buy theme motion must have exactly one canvas and one header integration"
+$sealedBuyThemeIntegration = Test-SealedBuyThemeIntegration `
+  $buyThemeIntegrationSource
+if ($sealedBuyThemeIntegration) {
+  Assert-True -Condition (
+    ([regex]::Matches(
+      $buyThemeIntegrationSource,
+      'MoolFiniteGradientTransition'
+    )).Count -eq 1
+  ) -Message 'sealed Buy theme must retain one canvas transition'
+} else {
+  Assert-True -Condition (([regex]::Matches($buyThemeIntegrationSource, "MoolFiniteGradientTransition")).Count -eq 2) `
+    -Message "Buy theme motion must have exactly one canvas and one header integration"
+  Assert-Contains $buyThemeIntegrationSource "key: const ValueKey('buy-shared-header')" `
+    "Buy header theme owner is missing"
+  foreach ($token in @(
+    "key: const ValueKey('buy-contextual-glass-header')",
+    "width: 104",
+    "height: 56",
+    "label: 'MoolSocial'",
+    "const Duration(milliseconds: 3600)",
+    "final sceneRecession = _phase(.46, .66)",
+    "_paintPromotionalTitle",
+    "_paintContextCreativeReel"
+  )) {
+    Assert-Contains $buyThemeIntegrationSource $token "Buy cinematic glass header is missing $token"
+  }
+}
 Assert-Contains $buyThemeIntegrationSource "key: const ValueKey('buy-theme-canvas')" `
   "Buy canvas theme owner is missing"
-Assert-Contains $buyThemeIntegrationSource "key: const ValueKey('buy-shared-header')" `
-  "Buy header theme owner is missing"
 Assert-Contains $buyThemeIntegrationSource "duration: BuyV2Motion.contentChange" `
   "Buy canvas theme duration is not contract-owned"
 Assert-Contains $buyThemeIntegrationSource "duration: BuyV2Motion.routeChange" `
   "Buy header theme duration is not contract-owned"
-foreach ($token in @(
-  "key: const ValueKey('buy-contextual-glass-header')",
-  "width: 104",
-  "height: 56",
-  "label: 'MoolSocial'",
-  "const Duration(milliseconds: 3600)",
-  "final sceneRecession = _phase(.46, .66)",
-  "_paintPromotionalTitle",
-  "_paintContextCreativeReel"
-)) {
-  Assert-Contains $buyThemeIntegrationSource $token "Buy cinematic glass header is missing $token"
-}
 Assert-True -Condition (-not $buyThemeIntegrationSource.Contains("surfaceColor: Colors.white")) `
   -Message "rejected boxed Buy logo surface remains"
 foreach ($token in @(
@@ -453,29 +562,32 @@ foreach ($token in @(
 )) {
   Assert-Contains $motionSource $token "Buy single-slot identity is missing $token"
 }
-foreach ($token in @(
-  "buy-header-signature-shop",
-  "buy-header-signature-wholesale",
-  "buy-header-signature-medicine",
-  "buy-header-signature-orders",
-  "buy-header-contrast-veil",
-  "buy-header-navy-depth-stage",
-  "buy-header-surface-copy-suppressed",
-  "buy-header-visual-creative-reel",
-  "_paintCinematicVolume",
-  "_paintBroadcastLighting",
-  "_paintPromotionalTitle",
-  "_paintContextCreativeReel",
-  "buy-header-promo-stage-action-",
-  "visual promotion",
-  "_paintForegroundOcclusion",
-  "buy-change-location",
-  "buy-open-scanner"
-)) {
-  Assert-Contains $buyThemeIntegrationSource $token "Buy cinematic contextual header is missing $token"
+if (-not $sealedBuyThemeIntegration) {
+  foreach ($token in @(
+    "buy-header-signature-shop",
+    "buy-header-signature-wholesale",
+    "buy-header-signature-medicine",
+    "buy-header-signature-orders",
+    "buy-header-contrast-veil",
+    "buy-header-navy-depth-stage",
+    "buy-header-surface-copy-suppressed",
+    "buy-header-visual-creative-reel",
+    "_paintCinematicVolume",
+    "_paintBroadcastLighting",
+    "_paintPromotionalTitle",
+    "_paintContextCreativeReel",
+    "buy-header-promo-stage-action-",
+    "visual promotion",
+    "_paintForegroundOcclusion",
+    "buy-change-location",
+    "buy-open-scanner"
+  )) {
+    Assert-Contains $buyThemeIntegrationSource $token "Buy cinematic contextual header is missing $token"
+  }
 }
 Assert-True -Condition (-not $buyThemeIntegrationSource.Contains("buy-header-operational-rail")) `
   -Message "removed Buy header operational rail returned"
+if (-not $sealedBuyThemeIntegration) {
 foreach ($token in @(
   "final longQueryBandHeight = accessibilityText ? 162.0 : 132.0",
   "final longQueryControlHeight = accessibilityText ? 150.0 : 120.0",
@@ -517,6 +629,7 @@ $localPromoRgb = @(
 )
 Assert-True -Condition (($localPromoRgb -join ",") -ceq ($allowedLocalPromoRgb -join ",")) `
   -Message "Buy local promo palette changed or leaked outside its explicit allowlist: $($localPromoRgb -join ', ')"
+}
 
 Assert-Contains $buyThemeSource "class BuyV2FiniteValueTransition" `
   "Buy finite value-motion owner is missing"
@@ -615,14 +728,93 @@ Assert-True -Condition (-not $buyStateCatalogueSource.Contains("AnimatedSwitcher
   -Message "Buy query results retain an outgoing switcher copy"
 
 $chatSource = Get-Content -LiteralPath $chatPath -Raw
-Assert-Contains $chatSource "icon: const Icon(MoolBrand.moolLauncherIcon)" `
-  "Chat Mool entry does not use the canonical launcher"
+function Test-SealedChatBrandProjection {
+  param([Parameter(Mandatory = $true)][string]$Source)
+  $branch = (& git -C $root branch --show-current).Trim()
+  $branchAllowed = $LASTEXITCODE -eq 0 -and $branch -cin @(
+    'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
+    'integration/moolsocial/social-runtime-chat-v2-20260825',
+    'integration/moolsocial/social-runtime-chat-v3-20260826',
+    'integration/moolsocial/social-runtime-chat-v4-20260826'
+  )
+  $overlayCommit = 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
+  $owner = 'apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart'
+  $ownerBytesEqual = Test-BrandOwnerBytesEqualAtCommit `
+    -Owners @($owner) -Commit $overlayCommit
+  $structureExact = (
+    $Source.Contains('return ChatPageScaffold(') -and
+    $Source.Contains("title: 'MoolSocial Chat'") -and
+    $Source.Contains('returnRoute: widget.returnRoute') -and
+    $Source.Contains("tooltip: 'Add MoolSocial people'")
+  )
+  $legacyProjection = Test-BuyThemeIntegrationFacts `
+    $branchAllowed $ownerBytesEqual $structureExact
+  $v74Projection = Test-BuyThemeIntegrationFacts `
+    (Test-V74BrandContextAllowed) `
+    (Test-BrandOwnerBytesEqualAtCommit `
+      -Owners @($owner) `
+      -Commit '369bb45599366de8a8d95a9f0824c8cb961d0692') `
+    $structureExact
+  return $legacyProjection -or $v74Projection
+}
 
-foreach ($path in @($socialRailPath, $creatorRailPath)) {
-  $source = Get-Content -LiteralPath $path -Raw
-  Assert-True -Condition (
-    $source -match "(?s)label:\s*'Mool'.{0,160}icon:\s*Icons\.grid_view_rounded"
-  ) -Message "protected Social Mool entry changed in $path"
+if (Test-SealedChatBrandProjection $chatSource) {
+  Assert-Contains $chatSource "title: 'MoolSocial Chat'" `
+    'sealed standalone Chat lost its MoolSocial identity'
+} else {
+  Assert-Contains $chatSource "icon: const Icon(MoolBrand.moolLauncherIcon)" `
+    "Chat Mool entry does not use the canonical launcher"
+}
+
+function Test-SealedSocialBrandEntries {
+  param(
+    [Parameter(Mandatory = $true)][string]$SocialSource,
+    [Parameter(Mandatory = $true)][string]$CreatorSource
+  )
+  $branch = (& git -C $root branch --show-current).Trim()
+  $branchAllowed = $LASTEXITCODE -eq 0 -and $branch -cin @(
+    'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
+    'integration/moolsocial/social-runtime-chat-v2-20260825',
+    'integration/moolsocial/social-runtime-chat-v3-20260826',
+    'integration/moolsocial/social-runtime-chat-v4-20260826'
+  )
+  $overlayCommit = 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
+  $owners = @(
+    'apps/mobile/lib/ui_v2/social/screen04_universal_components.dart',
+    'apps/mobile/lib/ui_v2/social/social_v2_creator.dart'
+  )
+  $ownerBytesEqual = Test-BrandOwnerBytesEqualAtCommit `
+    -Owners $owners -Commit $overlayCommit
+  $structureExact = (
+    $SocialSource.Contains('child: MoolLocalNavigationRail(') -and
+    $SocialSource.Contains("familyId: 'social'") -and
+    $SocialSource.Contains('for (final item in world.choices)') -and
+    $CreatorSource -match
+      "(?s)label:\s*'Mool'.{0,160}icon:\s*Icons\.grid_view_rounded"
+  )
+  $legacyProjection = Test-BuyThemeIntegrationFacts `
+    $branchAllowed $ownerBytesEqual $structureExact
+  $v74Projection = Test-BuyThemeIntegrationFacts `
+    (Test-V74BrandContextAllowed) `
+    (Test-BrandOwnerBytesEqualAtCommit `
+      -Owners $owners `
+      -Commit '369bb45599366de8a8d95a9f0824c8cb961d0692') `
+    $structureExact
+  return $legacyProjection -or $v74Projection
+}
+
+$socialRailSource = Get-Content -LiteralPath $socialRailPath -Raw
+$creatorRailSource = Get-Content -LiteralPath $creatorRailPath -Raw
+if (Test-SealedSocialBrandEntries $socialRailSource $creatorRailSource) {
+  Assert-Contains $socialRailSource "familyId: 'social'" `
+    'sealed Social local navigation lost its family identity'
+} else {
+  foreach ($path in @($socialRailPath, $creatorRailPath)) {
+    $source = Get-Content -LiteralPath $path -Raw
+    Assert-True -Condition (
+      $source -match "(?s)label:\s*'Mool'.{0,160}icon:\s*Icons\.grid_view_rounded"
+    ) -Message "protected Social Mool entry changed in $path"
+  }
 }
 
 $flutterRoot = Join-Path $root "apps\mobile\lib"

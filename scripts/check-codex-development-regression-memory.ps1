@@ -6,7 +6,9 @@ param(
   [ValidateSet('none', 'debug', 'profile', 'release')]
   [string]$BuildMode = 'none',
 
-  [string]$RepositoryRoot
+  [string]$RepositoryRoot,
+
+  [string]$EvidenceArchiveRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,6 +38,76 @@ if ([bool]$registry.policy.deleteResolvedEntries -or [bool]$registry.policy.retr
   throw 'Regression registry weakened permanent founder rules.'
 }
 $entries = @($registry.entries)
+$evidenceRoots = [Collections.Generic.List[string]]::new()
+foreach ($candidateRoot in @($root, $dependencyFallbackRoot)) {
+  $resolvedRoot = [IO.Path]::GetFullPath($candidateRoot).TrimEnd([char[]]@('\', '/'))
+  if (-not $evidenceRoots.Contains($resolvedRoot)) {
+    $evidenceRoots.Add($resolvedRoot)
+  }
+}
+$workspaceRoot = [IO.Path]::GetFullPath((Split-Path -Parent $root)).TrimEnd(
+  [char[]]@('\', '/'))
+$worktreeLines = @(& git -C $root worktree list --porcelain)
+if ($LASTEXITCODE -ne 0) { throw 'Registered worktree discovery failed.' }
+foreach ($line in $worktreeLines) {
+  if (-not $line.StartsWith('worktree ', [StringComparison]::Ordinal)) {
+    continue
+  }
+  $candidateRoot = [IO.Path]::GetFullPath($line.Substring(9)).TrimEnd(
+    [char[]]@('\', '/'))
+  if (-not $candidateRoot.StartsWith(
+      $workspaceRoot + [IO.Path]::DirectorySeparatorChar,
+      [StringComparison]::OrdinalIgnoreCase
+    )) {
+    continue
+  }
+  if ((Test-Path -LiteralPath $candidateRoot -PathType Container) -and
+      -not $evidenceRoots.Contains($candidateRoot)) {
+    $evidenceRoots.Add($candidateRoot)
+  }
+}
+if (-not [string]::IsNullOrWhiteSpace($EvidenceArchiveRoot)) {
+  $resolvedArchiveRoot = [IO.Path]::GetFullPath($EvidenceArchiveRoot).TrimEnd(
+    [char[]]@('\', '/'))
+  if (-not $resolvedArchiveRoot.StartsWith(
+      $workspaceRoot + [IO.Path]::DirectorySeparatorChar + 'MOOLSOCIAL-ARCHIVE-',
+      [StringComparison]::OrdinalIgnoreCase
+    ) -or -not (Test-Path -LiteralPath $resolvedArchiveRoot -PathType Container)) {
+    throw 'Regression evidence archive root is invalid or unavailable.'
+  }
+  foreach ($archiveWorktree in @(Get-ChildItem -LiteralPath $resolvedArchiveRoot -Directory)) {
+    $archivedUntrackedRoot = Join-Path $archiveWorktree.FullName 'untracked'
+    $archiveMetadataPath = Join-Path $archiveWorktree.FullName 'archive-metadata.json'
+    $archiveManifestPath = Join-Path $archiveWorktree.FullName 'untracked-sha256.csv'
+    if ((Test-Path -LiteralPath $archivedUntrackedRoot -PathType Container) -and
+        (Test-Path -LiteralPath $archiveMetadataPath -PathType Leaf) -and
+        (Test-Path -LiteralPath $archiveManifestPath -PathType Leaf)) {
+      $resolvedEvidenceRoot = [IO.Path]::GetFullPath($archivedUntrackedRoot)
+      if (-not $evidenceRoots.Contains($resolvedEvidenceRoot)) {
+        $evidenceRoots.Add($resolvedEvidenceRoot)
+      }
+    }
+  }
+}
+
+function Test-RegistryOwnerExists([string]$Relative) {
+  foreach ($candidateRoot in $evidenceRoots) {
+    $resolved = [IO.Path]::GetFullPath((Join-Path $candidateRoot $Relative))
+    if (-not $resolved.StartsWith(
+        $candidateRoot + [IO.Path]::DirectorySeparatorChar,
+        [StringComparison]::OrdinalIgnoreCase
+      )) {
+      continue
+    }
+    if (Test-Path -LiteralPath $resolved) { return $true }
+  }
+  return $false
+}
+
+function Test-RepositoryPathGate([string]$Value) {
+  return $Value -cmatch '^[A-Za-z0-9._-]+(?:[\\/][A-Za-z0-9._-]+)+$'
+}
+
 $ids = @($entries | ForEach-Object { [string]$_.id })
 if ($entries.Count -eq 0 -or $ids.Count -ne @($ids | Select-Object -Unique).Count) {
   throw 'Regression registry entries are missing or duplicated.'
@@ -47,21 +119,19 @@ foreach ($entry in $entries) {
   if (@($entry.appliesTo).Count -eq 0 -or @($entry.gates).Count -eq 0 -or @($entry.evidence).Count -eq 0) {
     throw "Regression entry $($entry.id) lacks phase, gate or evidence."
   }
-  foreach ($relative in @($entry.gates) + @($entry.evidence)) {
-    $resolved = [IO.Path]::GetFullPath((Join-Path $root ([string]$relative)))
-    if (-not $resolved.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
+  foreach ($relative in @($entry.evidence)) {
+    if (-not (Test-RegistryOwnerExists ([string]$relative))) {
       throw "Regression entry $($entry.id) references missing repository evidence: $relative"
     }
-    if (-not (Test-Path -LiteralPath $resolved)) {
-      $fallback = [IO.Path]::GetFullPath(
-        (Join-Path $dependencyFallbackRoot ([string]$relative))
-      )
-      if (-not $fallback.StartsWith(
-          $dependencyFallbackRoot,
-          [StringComparison]::OrdinalIgnoreCase
-        ) -or -not (Test-Path -LiteralPath $fallback)) {
-        throw "Regression entry $($entry.id) references missing repository evidence: $relative"
-      }
+  }
+  foreach ($gate in @($entry.gates)) {
+    $gateValue = [string]$gate
+    if ([string]::IsNullOrWhiteSpace($gateValue)) {
+      throw "Regression entry $($entry.id) contains an empty gate."
+    }
+    if ((Test-RepositoryPathGate $gateValue) -and
+        -not (Test-RegistryOwnerExists $gateValue)) {
+      throw "Regression entry $($entry.id) references missing repository gate: $gateValue"
     }
   }
 }
