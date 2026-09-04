@@ -44803,6 +44803,26 @@
       "prevention": "Keep gates limited to existing repository gate owners, retain exact test commands in qualification evidence, and run the general regression-memory validator before staging the bootstrap.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json"]
+    },
+    {
+      "id": "REG-20260904-4470-CHAT-BOUNDARY-TEST-OWNER-ABSENT-FROM-CODEX-UI-ALLOWLIST",
+      "status": "registered-exact-owner-admission-failure",
+      "appliesTo": ["primary", "codex_ui", "universal", "test"],
+      "mistake": "The new Chat-boundary child recorded the exact test owner in its active claim, but task_start failed because the codex_ui lane allowlist contained only the earlier C20E Universal test owner.",
+      "rootCause": "The ticket-specific claim was updated without the matching exact-file lane admission required by the existing production gate.",
+      "prevention": "Add only apps/mobile/test/universal_intent_completion_test.dart to the existing codex_ui allowlist, keep all Chat and product-source roots forbidden, and rerun task_start before changing the test.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/test/universal_intent_completion_test.dart"]
+    },
+    {
+      "id": "REG-20260904-4471-CHAT-BOUNDARY-TASK-START-RERUN-WITH-UNCOMMITTED-OWNER-ADMISSION",
+      "status": "registered-lifecycle-order-failure",
+      "appliesTo": ["primary", "codex_ui", "universal", "test"],
+      "mistake": "Task-start was rerun after the exact test-owner admission was edited but before that mechanical correction was sealed, so the gate correctly rejected a non-clean required base.",
+      "rootCause": "The owner-admission correction was treated as part of task start rather than an atomic prerequisite correction requiring its own pre-commit and commit boundary.",
+      "prevention": "Seal the exact registry and allowlist correction atomically through pre_commit, restore a clean branch, then rerun task_start before touching the functional test owner.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
     }
   ]
 }

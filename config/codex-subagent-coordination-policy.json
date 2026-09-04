@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3924,
-    "sha256": "1EBBA0A74B9AC8EF2F486984877B90867F7A69747045C8EBA095FE2844503E4A"
+    "entryCount": 3926,
+    "sha256": "624C113D04F573EAB1FA6A65E1A7C8174D47BF79A6B68406539BF7A2F9D0D363"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -1573,11 +1573,12 @@
           "apps/mobile/lib/features/work/",
           "apps/mobile/test/ui_v2/work/",
           "apps/mobile/test/work_workspace_layout_safety_test.dart",
-          "apps/mobile/test/work_vertical_slice_test.dart",
-          "apps/mobile/test/work_production_gateway_test.dart",
-          "apps/mobile/lib/core/design/mool_design_system.dart",
-          "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart",
-          "config/codex-development-regression-registry.json",
+      "apps/mobile/test/work_vertical_slice_test.dart",
+      "apps/mobile/test/work_production_gateway_test.dart",
+      "apps/mobile/lib/core/design/mool_design_system.dart",
+      "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart",
+      "apps/mobile/test/universal_intent_completion_test.dart",
+      "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
