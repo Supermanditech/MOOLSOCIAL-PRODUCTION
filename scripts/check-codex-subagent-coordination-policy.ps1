@@ -2135,13 +2135,15 @@ if ($ProductionLane -ceq 'baseline') {
           if ($matchingR65ElevenEvidenceCommits.Count -eq 1) {
             $r65ElevenEvidenceCommit =
               [string]$matchingR65ElevenEvidenceCommits[0]
+            $r65ElevenExpectedParent =
+              '600dba97be8027de95e0ccbb89471f27aeb97529'
             $r65ElevenEvidenceParent = @(& git -C $root show -s --format=%P `
                 $r65ElevenEvidenceCommit)
             Assert-Coordination (
               $LASTEXITCODE -eq 0 -and
-              $matchingR65TenEvidenceCommits.Count -eq 1 -and
               $r65ElevenEvidenceParent.Count -eq 1 -and
-              [string]$r65ElevenEvidenceParent[0] -ceq $r65TenEvidenceCommit
+              [string]$r65ElevenEvidenceParent[0] -ceq
+                $r65ElevenExpectedParent
             ) 'r65.11 evidence coordination parent changed.'
             $r65ElevenEvidenceOwners = @(& git -C $root diff-tree `
                 --no-commit-id --name-only -r $r65ElevenEvidenceCommit)
@@ -2155,6 +2157,47 @@ if ($ProductionLane -ceq 'baseline') {
               (@($expectedR65ElevenEvidenceOwners | Sort-Object) -join '|')
             ) 'r65.11 evidence coordination changed an unexpected owner.'
             $sealedCoordinationCommit = $r65ElevenEvidenceCommit
+          }
+          $r65ElevenParentCorrectionSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): correct r65.11 parent binding'
+          $matchingR65ElevenParentCorrectionCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.11 parent-correction subject read failed.'
+            if ([string]$candidateSubject[0] -ceq
+                $r65ElevenParentCorrectionSubject) {
+              $matchingR65ElevenParentCorrectionCommits +=
+                [string]$candidateCommit
+            }
+          }
+          Assert-Coordination (
+            $matchingR65ElevenParentCorrectionCommits.Count -le 1
+          ) 'r65.11 parent-correction commit is duplicated.'
+          if ($matchingR65ElevenParentCorrectionCommits.Count -eq 1) {
+            $r65ElevenParentCorrectionCommit =
+              [string]$matchingR65ElevenParentCorrectionCommits[0]
+            $r65ElevenParentCorrectionParent = @(& git -C $root show -s `
+                --format=%P $r65ElevenParentCorrectionCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingR65ElevenEvidenceCommits.Count -eq 1 -and
+              $r65ElevenParentCorrectionParent.Count -eq 1 -and
+              [string]$r65ElevenParentCorrectionParent[0] -ceq
+                $r65ElevenEvidenceCommit
+            ) 'r65.11 parent-correction parent changed.'
+            $r65ElevenParentCorrectionOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r `
+                $r65ElevenParentCorrectionCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $r65ElevenParentCorrectionOwners.Count -eq 1 -and
+              [string]$r65ElevenParentCorrectionOwners[0] -ceq
+                'scripts/check-codex-subagent-coordination-policy.ps1'
+            ) 'r65.11 parent-correction changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65ElevenParentCorrectionCommit
           }
           & git -C $root diff --quiet $sealedCoordinationCommit -- `
             'config/codex-subagent-coordination-policy.json' `
