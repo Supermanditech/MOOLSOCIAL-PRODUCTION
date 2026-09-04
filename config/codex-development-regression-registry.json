@@ -44833,6 +44833,26 @@
       "prevention": "Rebind this same ticket once to the clean owner-admission commit, seal that exact three-owner bootstrap, then run task_start at the resulting clean bootstrap HEAD before editing the test.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CODEX-UNIVERSAL-CHAT-BOUNDARY-CONTRACT-V1-20260904.md"]
+    },
+    {
+      "id": "REG-20260904-4473-CHAT-BOUNDARY-DEPENDENCY-PREFLIGHT-INLINE-GIT-EXPRESSION-PARSE-FAILURE",
+      "status": "registered-read-only-command-parse-failure",
+      "appliesTo": ["primary", "codex_ui", "universal", "tooling"],
+      "mistake": "A read-only dependency preflight embedded a git command and LASTEXITCODE assignment inside one PowerShell hashtable expression, causing a missing-parenthesis parser error and no repository mutation.",
+      "rootCause": "Command execution and value construction were combined in a syntax shape PowerShell does not permit.",
+      "prevention": "Execute git lookup separately, capture its native exit, then construct the bounded result object; keep the functional test qualification independent of the preflight projection.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json"]
+    },
+    {
+      "id": "REG-20260904-4474-CHAT-BOUNDARY-FUNCTIONAL-COMMIT-USED-TEST-PREFIX-IN-CODEX-UI-LANE",
+      "status": "registered-atomic-subject-gate-failure",
+      "appliesTo": ["primary", "codex_ui", "universal", "test"],
+      "mistake": "The local unpushed functional commit used a test(...) subject even though the codex_ui lane requires its atomic ui(...) prefix, so the handoff gate rejected it.",
+      "rootCause": "The semantic content label was chosen instead of the lane's enforced commit prefix.",
+      "prevention": "Before sealing an unpushed owner commit, read the selected lane commitPrefix and use ui(work-id): subject; never push or hand off a commit rejected by the atomic-subject gate.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "apps/mobile/test/universal_intent_completion_test.dart"]
     }
   ]
 }

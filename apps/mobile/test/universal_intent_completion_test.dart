@@ -297,7 +297,9 @@ void main() {
       await tapVisible(tester, const Key('search-result-chat-business-chat'));
 
       expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-      expect(find.byKey(const Key('chat-filter-business')), findsNothing);
+      final businessFilter = find.byKey(const Key('chat-filter-business'));
+      expect(businessFilter, findsOneWidget);
+      expect(tester.widget<ChoiceChip>(businessFilter).selected, isTrue);
       expect(
         tester
             .widget<ChatInboxScreen>(find.byType(ChatInboxScreen))
