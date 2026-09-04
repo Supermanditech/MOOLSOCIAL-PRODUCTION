@@ -1171,6 +1171,12 @@ foreach ($claim in $claims) {
       $owner -cmatch
         '^artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/[^/]+$'
     )
+    $predeclaredR65ElevenEvidenceOwner = (
+      [string]$claim.task -ceq
+        '/root/cursor_shop_mvp_go_live_v1_20260829' -and
+      $owner -cmatch
+        '^artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/[^/]+$'
+    )
     Assert-Coordination (
       $resolvedOwner.StartsWith(
         $root + [IO.Path]::DirectorySeparatorChar,
@@ -1183,7 +1189,8 @@ foreach ($claim in $claims) {
         $predeclaredR65SevenEvidenceOwner -or
         $predeclaredR65EightEvidenceOwner -or
         $predeclaredR65NineEvidenceOwner -or
-        $predeclaredR65TenEvidenceOwner)
+        $predeclaredR65TenEvidenceOwner -or
+        $predeclaredR65ElevenEvidenceOwner)
     ) "recorded owner is missing: $owner"
     $key = $owner.ToLowerInvariant()
     Assert-Coordination (-not $localOwners.Contains($key)) `
@@ -1499,7 +1506,7 @@ if ($ProductionLane -ceq 'baseline') {
         [string]$selectedContinuationBinding.id -ceq
           'cursor_buy_mvp_ticket14_v1_20260902' -and
         $effectiveOwner -cmatch
-          '^(?:artifacts/quality/buy-v2-r65-[123]-cursor-75-defect-review-20260903|artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904|artifacts/quality/buy-v2-r65-5-cursor-redmi-child-fixes-review-20260904|artifacts/quality/buy-v2-r65-6-cursor-scanner-a11y-fix-review-20260904|artifacts/quality/buy-v2-r65-7-cursor-payment-prerequisite-review-20260904|artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904|artifacts/quality/buy-v2-r65-9-cursor-payment-brand-copy-review-20260904|artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904)/[^/]+$'
+          '^(?:artifacts/quality/buy-v2-r65-[123]-cursor-75-defect-review-20260903|artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904|artifacts/quality/buy-v2-r65-5-cursor-redmi-child-fixes-review-20260904|artifacts/quality/buy-v2-r65-6-cursor-scanner-a11y-fix-review-20260904|artifacts/quality/buy-v2-r65-7-cursor-payment-prerequisite-review-20260904|artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904|artifacts/quality/buy-v2-r65-9-cursor-payment-brand-copy-review-20260904|artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904|artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904)/[^/]+$'
       )
       $retainedBuyGeneratedPackageOwner = (
         $hasContinuationBinding -and
@@ -2108,6 +2115,46 @@ if ($ProductionLane -ceq 'baseline') {
               (@($expectedR65TenEvidenceOwners | Sort-Object) -join '|')
             ) 'r65.10 evidence coordination changed an unexpected owner.'
             $sealedCoordinationCommit = $r65TenEvidenceCommit
+          }
+          $r65ElevenEvidenceSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit r65.11 review evidence owners'
+          $matchingR65ElevenEvidenceCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.11 evidence coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $r65ElevenEvidenceSubject) {
+              $matchingR65ElevenEvidenceCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination (
+            $matchingR65ElevenEvidenceCommits.Count -le 1
+          ) 'r65.11 evidence coordination commit is duplicated.'
+          if ($matchingR65ElevenEvidenceCommits.Count -eq 1) {
+            $r65ElevenEvidenceCommit =
+              [string]$matchingR65ElevenEvidenceCommits[0]
+            $r65ElevenEvidenceParent = @(& git -C $root show -s --format=%P `
+                $r65ElevenEvidenceCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingR65TenEvidenceCommits.Count -eq 1 -and
+              $r65ElevenEvidenceParent.Count -eq 1 -and
+              [string]$r65ElevenEvidenceParent[0] -ceq $r65TenEvidenceCommit
+            ) 'r65.11 evidence coordination parent changed.'
+            $r65ElevenEvidenceOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $r65ElevenEvidenceCommit)
+            $expectedR65ElevenEvidenceOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r65ElevenEvidenceOwners | Sort-Object) -join '|') -ceq
+              (@($expectedR65ElevenEvidenceOwners | Sort-Object) -join '|')
+            ) 'r65.11 evidence coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65ElevenEvidenceCommit
           }
           & git -C $root diff --quiet $sealedCoordinationCommit -- `
             'config/codex-subagent-coordination-policy.json' `
