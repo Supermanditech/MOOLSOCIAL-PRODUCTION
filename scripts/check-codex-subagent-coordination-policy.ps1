@@ -225,7 +225,7 @@ function Assert-IntegrationRepairMerge(
   $expectedRepairConflictKeys = @($expectedRepairConflictOwners |
     ForEach-Object { $_.ToLowerInvariant() })
   $repairOwnerClaim = @($claims | Where-Object {
-    [string]$_.task -ceq '/root/repair_shop_chat_shared_v1_20260829'
+    [string]$_.task -ceq '/root/repair_store_buy_conflict_v3_20260904'
   })
   Assert-Coordination ($repairOwnerClaim.Count -eq 1) `
     'integration repair exact owner claim is missing or ambiguous.'
@@ -260,7 +260,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
   ) 'qualified integration repair tip is unavailable.'
   $repairBinding = @($continuationBindings | Where-Object {
     [string]$_.lane -ceq 'integration_repair' -and
-    [string]$_.task -ceq '/root/repair_shop_chat_shared_v1_20260829'
+    [string]$_.task -ceq '/root/repair_store_buy_conflict_v3_20260904'
   })
   Assert-Coordination ($repairBinding.Count -eq 1) `
     'qualified integration repair continuation is missing or ambiguous.'
@@ -329,7 +329,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
     Assert-Coordination (
       $LASTEXITCODE -eq 0 -and $preMergeSubject.Count -eq 1 -and
       [string]$preMergeSubject[0] -cmatch
-        '^repair\(shop-chat-shared-v1-20260829\): .+' -and
+        '^repair\(store-buy-conflict-repair-v3-20260904\): .+' -and
       @($preMergeCommitOwners | Where-Object {
         -not $preMergeAllowedKeys.Contains(([string]$_).ToLowerInvariant())
       }).Count -eq 0
@@ -341,7 +341,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
   Assert-Coordination (
     $LASTEXITCODE -eq 0 -and $repairMergeSubject.Count -eq 1 -and
     [string]$repairMergeSubject[0] -cmatch
-      '^repair\(shop-chat-shared-v1-20260829\): .+'
+      '^repair\(store-buy-conflict-repair-v3-20260904\): .+'
   ) 'qualified integration repair merge subject changed.'
   $repairMergeTree = (& git -C $root show -s --format='%T' `
       $repairMergeCommit).Trim()
@@ -382,7 +382,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
       Assert-Coordination (
         $LASTEXITCODE -eq 0 -and $postMergeSubject.Count -eq 1 -and
         [string]$postMergeSubject[0] -cmatch
-          '^repair\(shop-chat-shared-v1-20260829\): .+' -and
+          '^repair\(store-buy-conflict-repair-v3-20260904\): .+' -and
         @($postMergeCommitOwners | Where-Object {
           -not $postMergeAllowedKeys.Contains(
             ([string]$_).ToLowerInvariant()
@@ -562,7 +562,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 61) `
+Assert-Coordination ($continuationBindings.Count -eq 66) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -893,53 +893,43 @@ Assert-ExactNames $integrationRepair @(
   'freshIntegrationWorktreePath','freshIntegrationMergeSubject'
 ) 'integration repair discipline'
 $expectedRepairConflictOwners = @(
-  'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart',
   'config/codex-development-regression-registry.json',
   'config/codex-subagent-coordination-policy.json',
   'scripts/check-codex-subagent-coordination-policy.ps1'
 )
-$expectedRepairUnmergedOwners = @(
-  'config/codex-development-regression-registry.json',
-  'config/codex-subagent-coordination-policy.json'
-)
-Assert-Coordination (
-  $expectedRepairUnmergedOwners.Count -eq 2 -and
-  @($expectedRepairUnmergedOwners | Where-Object {
-    $expectedRepairConflictOwners -cnotcontains $_
-  }).Count -eq 0
-) 'integration repair unmerged owner contract changed.'
+$expectedRepairUnmergedOwners = @($expectedRepairConflictOwners)
 Assert-Coordination (
   [string]$integrationRepair.lane -ceq 'integration_repair' -and
   [string]$integrationRepair.requiredCodexCommit -ceq
-    '011fd09d1d94fce02d0bbc9c7b94c90f742624e6' -and
+    'f208fbef80303ad3c6b1bf41a385616adcc969b5' -and
   [string]$integrationRepair.requiredCodexBranch -ceq
-    'work/integration-repair/shop-chat-shared-v1-base-20260829' -and
+    'work/codex-ui/universal-chat-boundary-contract-v1-20260904' -and
   [string]$integrationRepair.requiredCursorCommit -ceq
-    '30f4614574aae3c315d586944636a35ba314873d' -and
+    'fd55d1cfffa5ed10f753f2ed24461ef9ac6a9a5d' -and
   [string]$integrationRepair.requiredCursorBranch -ceq
-    'work/cursor-ui/chat-shell-impl-v1-20260829' -and
+    'work/cursor-ui/buy-mvp-ticket14-v1-20260902' -and
   [int]$integrationRepair.maximumMergeCommits -eq 1 -and
   [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 1 -and
   (@($integrationRepair.preMergeCoordinationOwners) -join '|') -ceq
-    'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md' -and
-  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 9 -and
+    'docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md' -and
+  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 1 -and
   (@($integrationRepair.postMergeClosureOwners) -join '|') -ceq
-    'apps/mobile/lib/features/chat/chat_entry_context.dart|apps/mobile/lib/features/chat/chat_session.dart|apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart|apps/mobile/test/chat_flow_test.dart|apps/mobile/test/global_contextual_chat_shell_test.dart|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/clean-source-state.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/full-buy-cycle1.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/full-buy-cycle2.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/prebuild-validation.md|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-launch.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-launch.xml|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-shared.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-shared.xml|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-source-manifest.txt|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/source-identity.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/uaw-shop-chat-shared-r61.7-cursor-ui-review-20260829-build-provenance.txt|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/uaw-shop-chat-shared-r61.7-cursor-ui-review-20260829-device-review-debug.apk|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/clean-source-state.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/full-buy-cycle1.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/full-buy-cycle2.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/prebuild-validation.md|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/shop-chat-r61-8-source-manifest.txt|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/source-identity.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/clean-source-state.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/founder-review.md|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/full-buy-cycle1.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/full-buy-cycle2.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/install-result.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/prebuild-validation.md|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-back.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-chats.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-chats.xml|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-context.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-founder.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-installed-base.apk|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-launch.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-offers-origin.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-offers.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-shared.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-shared.xml|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-wholesale.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-source-manifest.txt|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/source-identity.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/uaw-shop-chat-context-r61.9-cursor-ui-review-20260829-build-provenance.txt|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/uaw-shop-chat-context-r61.9-cursor-ui-review-20260829-device-review-debug.apk|config/apk-regression-gate-state-shop-chat-r61-7.json|config/apk-regression-gate-state-shop-chat-r61-8.json|config/apk-regression-gate-state-shop-chat-r61-9.json|config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md|scripts/check-codex-subagent-coordination-policy.ps1' -and
+    'docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md' -and
   -not [bool]$integrationRepair.directSourceCommitsAllowed -and
   [bool]$integrationRepair.conflictResolutionAllowed -and
   (@($integrationRepair.exactConflictOwners | Sort-Object) -join '|') -ceq
     (@($expectedRepairConflictOwners | Sort-Object) -join '|') -and
   [bool]$integrationRepair.remoteRepairBranchMustEqualHeadBeforeAdmission -and
   [string]$integrationRepair.freshIntegrationWorkId -ceq
-    'shop-chat-shared-v1-20260829' -and
+    'work-store-buy-v3-20260904' -and
   [string]$integrationRepair.freshIntegrationTicketId -ceq
-    'UAW-INTEGRATION-SHOP-CHAT-SHARED-V1-20260829' -and
+    'UAW-INTEGRATION-WORK-STORE-BUY-V3-20260904' -and
   [string]$integrationRepair.freshIntegrationBranch -ceq
-    'integration/moolsocial/shop-chat-shared-v1-20260829' -and
+    'integration/moolsocial/work-store-buy-v3-20260904' -and
   [string]$integrationRepair.freshIntegrationWorktreePath -ceq
-    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-shop-chat-shared-v1-20260829' -and
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v3-20260904' -and
   [string]$integrationRepair.freshIntegrationMergeSubject -ceq
-    'merge(shop-chat-shared-v1-20260829): integrate shared Chat and Buy context'
+    'merge(work-store-buy-v3-20260904): integrate corrected Store Chat and Buy'
 ) 'integration repair discipline weakened or changed.'
 Assert-ExactNames $gitDiscipline.promotion @(
   'directFeatureToRemediationAllowed','mainFrozen','founderAuthorizationRequired',
@@ -1143,12 +1133,68 @@ foreach ($claim in $claims) {
   foreach ($ownerValue in @($claim.owners)) {
     $owner = Get-CanonicalOwner ([string]$ownerValue)
     $resolvedOwner = [IO.Path]::GetFullPath((Join-Path $root $owner))
+    $predeclaredR65FourEvidenceOwner = (
+      [string]$claim.task -ceq
+        '/root/cursor_shop_mvp_go_live_v1_20260829' -and
+      $owner -cmatch
+        '^artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/[^/]+$'
+    )
+    $predeclaredR65FiveEvidenceOwner = (
+      [string]$claim.task -ceq
+        '/root/cursor_shop_mvp_go_live_v1_20260829' -and
+      $owner -cmatch
+        '^artifacts/quality/buy-v2-r65-5-cursor-redmi-child-fixes-review-20260904/[^/]+$'
+    )
+    $predeclaredR65SixEvidenceOwner = (
+      [string]$claim.task -ceq
+        '/root/cursor_shop_mvp_go_live_v1_20260829' -and
+      $owner -cmatch
+        '^artifacts/quality/buy-v2-r65-6-cursor-scanner-a11y-fix-review-20260904/[^/]+$'
+    )
+    $predeclaredR65SevenEvidenceOwner = (
+      [string]$claim.task -ceq
+        '/root/cursor_shop_mvp_go_live_v1_20260829' -and
+      $owner -cmatch
+        '^artifacts/quality/buy-v2-r65-7-cursor-payment-prerequisite-review-20260904/[^/]+$'
+    )
+    $predeclaredR65EightEvidenceOwner = (
+      [string]$claim.task -ceq
+        '/root/cursor_shop_mvp_go_live_v1_20260829' -and
+      $owner -cmatch
+        '^artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/[^/]+$'
+    )
+    $predeclaredR65NineEvidenceOwner = (
+      [string]$claim.task -ceq
+        '/root/cursor_shop_mvp_go_live_v1_20260829' -and
+      $owner -cmatch
+        '^artifacts/quality/buy-v2-r65-9-cursor-payment-brand-copy-review-20260904/[^/]+$'
+    )
+    $predeclaredR65TenEvidenceOwner = (
+      [string]$claim.task -ceq
+        '/root/cursor_shop_mvp_go_live_v1_20260829' -and
+      $owner -cmatch
+        '^artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/[^/]+$'
+    )
+    $predeclaredR65ElevenEvidenceOwner = (
+      [string]$claim.task -ceq
+        '/root/cursor_shop_mvp_go_live_v1_20260829' -and
+      $owner -cmatch
+        '^artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/[^/]+$'
+    )
     Assert-Coordination (
       $resolvedOwner.StartsWith(
         $root + [IO.Path]::DirectorySeparatorChar,
         [StringComparison]::OrdinalIgnoreCase
       ) -and
-      (Test-Path -LiteralPath $resolvedOwner -PathType Leaf)
+      ((Test-Path -LiteralPath $resolvedOwner -PathType Leaf) -or
+        $predeclaredR65FourEvidenceOwner -or
+        $predeclaredR65FiveEvidenceOwner -or
+        $predeclaredR65SixEvidenceOwner -or
+        $predeclaredR65SevenEvidenceOwner -or
+        $predeclaredR65EightEvidenceOwner -or
+        $predeclaredR65NineEvidenceOwner -or
+        $predeclaredR65TenEvidenceOwner -or
+        $predeclaredR65ElevenEvidenceOwner)
     ) "recorded owner is missing: $owner"
     $key = $owner.ToLowerInvariant()
     Assert-Coordination (-not $localOwners.Contains($key)) `
@@ -1301,7 +1347,13 @@ if ($ProductionLane -ceq 'baseline') {
     Assert-Coordination (
       $hasContinuationBinding -and
       $AgentRole -ceq 'primary' -and
-      $AgentTask -ceq '/root'
+      (
+        $AgentTask -ceq '/root' -or
+        (
+          $ProductionLane -ceq 'integration_repair' -and
+          $AgentTask -ceq [string]$selectedContinuationBinding.task
+        )
+      )
     ) 'continuation bootstrap requires the primary coordination owner.'
   } else {
     Assert-Coordination (
@@ -1459,6 +1511,23 @@ if ($ProductionLane -ceq 'baseline') {
           'integration_repair_shop_v2_r61_5_cursor_review_build_20260828' -and
         $effectiveOwner -ceq 'apps/mobile/android/app/build.gradle.kts'
       )
+      $retainedBuyCandidateEvidenceOwner = (
+        $hasContinuationBinding -and
+        [string]$selectedContinuationBinding.id -ceq
+          'cursor_buy_mvp_ticket14_v1_20260902' -and
+        $effectiveOwner -cmatch
+          '^(?:artifacts/quality/buy-v2-r65-[123]-cursor-75-defect-review-20260903|artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904|artifacts/quality/buy-v2-r65-5-cursor-redmi-child-fixes-review-20260904|artifacts/quality/buy-v2-r65-6-cursor-scanner-a11y-fix-review-20260904|artifacts/quality/buy-v2-r65-7-cursor-payment-prerequisite-review-20260904|artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904|artifacts/quality/buy-v2-r65-9-cursor-payment-brand-copy-review-20260904|artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904|artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904)/[^/]+$'
+      )
+      $retainedBuyGeneratedPackageOwner = (
+        $hasContinuationBinding -and
+        [string]$selectedContinuationBinding.id -ceq
+          'cursor_buy_mvp_ticket14_v1_20260902' -and
+        $effectiveOwner -cin @(
+          'apps/mobile/.dart_tool/package_config.json',
+          'apps/mobile/.dart_tool/package_graph.json',
+          'apps/mobile/.flutter-plugins-dependencies'
+        )
+      )
       $allowedOwner = $false
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
@@ -1466,7 +1535,9 @@ if ($ProductionLane -ceq 'baseline') {
           break
         }
       }
-      if ($shopCursorReviewAndroidOwner) {
+      if ($shopCursorReviewAndroidOwner -or
+          $retainedBuyCandidateEvidenceOwner -or
+          $retainedBuyGeneratedPackageOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -1474,6 +1545,8 @@ if ($ProductionLane -ceq 'baseline') {
       foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
         Assert-Coordination (
           $shopCursorReviewAndroidOwner -or
+          $retainedBuyCandidateEvidenceOwner -or
+          $retainedBuyGeneratedPackageOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }
@@ -1514,6 +1587,642 @@ if ($ProductionLane -ceq 'baseline') {
 
   if ($ProductionLane -cne 'integration') {
     $changedOwners = @(Get-ProductionChangedOwners $baseCommit $head)
+    $primaryEvidenceCoordinationOwnerKeys = @()
+    if (
+      $ProductionLane -ceq 'cursor_ui' -and
+      $ProductionWorkId -ceq 'buy-mvp-ticket14-v1-20260902' -and
+      $ProductionTicketId -ceq 'UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902'
+    ) {
+      $coordinationSubject =
+        'ui(buy-mvp-ticket14-v1-20260902): register retained candidate evidence'
+      $matchingCoordinationCommits = @()
+      $continuationFeatureCommits = @(& git -C $root rev-list --reverse `
+          "$baseCommit..$head")
+      Assert-Coordination ($LASTEXITCODE -eq 0) `
+        'retained-evidence coordination commit inventory failed.'
+      foreach ($candidateCommit in $continuationFeatureCommits) {
+        $candidateSubject = @(& git -C $root show -s --format=%s `
+            $candidateCommit)
+        Assert-Coordination (
+          $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+        ) 'retained-evidence coordination subject read failed.'
+        if ([string]$candidateSubject[0] -ceq $coordinationSubject) {
+          $matchingCoordinationCommits += [string]$candidateCommit
+        }
+      }
+      Assert-Coordination ($matchingCoordinationCommits.Count -le 1) `
+        'retained-evidence coordination commit is duplicated.'
+      if ($matchingCoordinationCommits.Count -eq 1) {
+        $coordinationCommit = [string]$matchingCoordinationCommits[0]
+        $coordinationParent = @(& git -C $root show -s --format=%P `
+            $coordinationCommit)
+        Assert-Coordination (
+          $LASTEXITCODE -eq 0 -and $coordinationParent.Count -eq 1 -and
+          [string]$coordinationParent[0] -ceq
+            'fbc39fb4d6bc5ce3fb3ffd33063c273084634dc5'
+        ) 'retained-evidence coordination parent changed.'
+        $coordinationOwners = @(& git -C $root diff-tree --no-commit-id `
+            --name-only -r $coordinationCommit)
+        Assert-Coordination ($LASTEXITCODE -eq 0) `
+          'retained-evidence coordination owner inventory failed.'
+        $expectedCoordinationOwners = @(
+          'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1'
+        )
+        Assert-Coordination (
+          (@($coordinationOwners | Sort-Object) -join '|') -ceq
+          (@($expectedCoordinationOwners | Sort-Object) -join '|')
+        ) 'retained-evidence coordination changed an unexpected owner.'
+        $primaryEvidenceCoordinationOwnerKeys = @(
+          $expectedCoordinationOwners | ForEach-Object {
+            $_.ToLowerInvariant()
+          }
+        )
+        $admissionSubject =
+          'ui(buy-mvp-ticket14-v1-20260902): admit retained evidence owners'
+        $matchingAdmissionCommits = @()
+        foreach ($candidateCommit in $continuationFeatureCommits) {
+          $candidateSubject = @(& git -C $root show -s --format=%s `
+              $candidateCommit)
+          Assert-Coordination (
+            $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+          ) 'retained-evidence admission subject read failed.'
+          if ([string]$candidateSubject[0] -ceq $admissionSubject) {
+            $matchingAdmissionCommits += [string]$candidateCommit
+          }
+        }
+        Assert-Coordination ($matchingAdmissionCommits.Count -le 1) `
+          'retained-evidence admission commit is duplicated.'
+        if ($matchingAdmissionCommits.Count -eq 1) {
+          $admissionCommit = [string]$matchingAdmissionCommits[0]
+          $admissionParent = @(& git -C $root show -s --format=%P `
+              $admissionCommit)
+          Assert-Coordination (
+            $LASTEXITCODE -eq 0 -and $admissionParent.Count -eq 1 -and
+            [string]$admissionParent[0] -ceq $coordinationCommit
+          ) 'retained-evidence admission parent changed.'
+          $admissionOwners = @(& git -C $root diff-tree --no-commit-id `
+              --name-only -r $admissionCommit)
+          Assert-Coordination (
+            $LASTEXITCODE -eq 0 -and $admissionOwners.Count -eq 1 -and
+            [string]$admissionOwners[0] -ceq
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+          ) 'retained-evidence admission changed an unexpected owner.'
+          $sealedCoordinationCommit = $admissionCommit
+          $metadataSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): preserve generated package metadata'
+          $matchingMetadataCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'generated-metadata coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $metadataSubject) {
+              $matchingMetadataCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingMetadataCommits.Count -le 1) `
+            'generated-metadata coordination commit is duplicated.'
+          if ($matchingMetadataCommits.Count -eq 1) {
+            $metadataCommit = [string]$matchingMetadataCommits[0]
+            $metadataParent = @(& git -C $root show -s --format=%P `
+                $metadataCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $metadataParent.Count -eq 1 -and
+              [string]$metadataParent[0] -ceq $admissionCommit
+            ) 'generated-metadata coordination parent changed.'
+            $metadataOwners = @(& git -C $root diff-tree --no-commit-id `
+                --name-only -r $metadataCommit)
+            $expectedMetadataOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($metadataOwners | Sort-Object) -join '|') -ceq
+              (@($expectedMetadataOwners | Sort-Object) -join '|')
+            ) 'generated-metadata coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $metadataCommit
+          }
+          $pluginMetadataSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): preserve generated plugin metadata'
+          $matchingPluginMetadataCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'generated-plugin coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $pluginMetadataSubject) {
+              $matchingPluginMetadataCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingPluginMetadataCommits.Count -le 1) `
+            'generated-plugin coordination commit is duplicated.'
+          if ($matchingPluginMetadataCommits.Count -eq 1) {
+            $pluginMetadataCommit = [string]$matchingPluginMetadataCommits[0]
+            $pluginMetadataParent = @(& git -C $root show -s --format=%P `
+                $pluginMetadataCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingMetadataCommits.Count -eq 1 -and
+              $pluginMetadataParent.Count -eq 1 -and
+              [string]$pluginMetadataParent[0] -ceq $metadataCommit
+            ) 'generated-plugin coordination parent changed.'
+            $pluginMetadataOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $pluginMetadataCommit)
+            $expectedPluginMetadataOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($pluginMetadataOwners | Sort-Object) -join '|') -ceq
+              (@($expectedPluginMetadataOwners | Sort-Object) -join '|')
+            ) 'generated-plugin coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $pluginMetadataCommit
+          }
+          $scannerTestSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit focused scanner test owner'
+          $matchingScannerTestCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'scanner-test coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $scannerTestSubject) {
+              $matchingScannerTestCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingScannerTestCommits.Count -le 1) `
+            'scanner-test coordination commit is duplicated.'
+          if ($matchingScannerTestCommits.Count -eq 1) {
+            $scannerTestCommit = [string]$matchingScannerTestCommits[0]
+            $scannerTestParent = @(& git -C $root show -s --format=%P `
+                $scannerTestCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingPluginMetadataCommits.Count -eq 1 -and
+              $scannerTestParent.Count -eq 1 -and
+              [string]$scannerTestParent[0] -ceq $pluginMetadataCommit
+            ) 'scanner-test coordination parent changed.'
+            $scannerTestOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $scannerTestCommit)
+            $expectedScannerTestOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($scannerTestOwners | Sort-Object) -join '|') -ceq
+              (@($expectedScannerTestOwners | Sort-Object) -join '|')
+            ) 'scanner-test coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $scannerTestCommit
+          }
+          $r65FourEvidenceSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit r65.4 review evidence owners'
+          $matchingR65FourEvidenceCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.4 evidence coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $r65FourEvidenceSubject) {
+              $matchingR65FourEvidenceCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingR65FourEvidenceCommits.Count -le 1) `
+            'r65.4 evidence coordination commit is duplicated.'
+          if ($matchingR65FourEvidenceCommits.Count -eq 1) {
+            $r65FourEvidenceCommit =
+              [string]$matchingR65FourEvidenceCommits[0]
+            $r65FourEvidenceParent = @(& git -C $root show -s --format=%P `
+                $r65FourEvidenceCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingScannerTestCommits.Count -eq 1 -and
+              $r65FourEvidenceParent.Count -eq 1 -and
+              [string]$r65FourEvidenceParent[0] -ceq $scannerTestCommit
+            ) 'r65.4 evidence coordination parent changed.'
+            $r65FourEvidenceOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $r65FourEvidenceCommit)
+            $expectedR65FourEvidenceOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r65FourEvidenceOwners | Sort-Object) -join '|') -ceq
+              (@($expectedR65FourEvidenceOwners | Sort-Object) -join '|')
+            ) 'r65.4 evidence coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65FourEvidenceCommit
+          }
+          $r65FourSlotSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): permit predeclared r65.4 evidence slots'
+          $matchingR65FourSlotCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.4 evidence-slot coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $r65FourSlotSubject) {
+              $matchingR65FourSlotCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingR65FourSlotCommits.Count -le 1) `
+            'r65.4 evidence-slot coordination commit is duplicated.'
+          if ($matchingR65FourSlotCommits.Count -eq 1) {
+            $r65FourSlotCommit = [string]$matchingR65FourSlotCommits[0]
+            $r65FourSlotParent = @(& git -C $root show -s --format=%P `
+                $r65FourSlotCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingR65FourEvidenceCommits.Count -eq 1 -and
+              $r65FourSlotParent.Count -eq 1 -and
+              [string]$r65FourSlotParent[0] -ceq $r65FourEvidenceCommit
+            ) 'r65.4 evidence-slot coordination parent changed.'
+            $r65FourSlotOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $r65FourSlotCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $r65FourSlotOwners.Count -eq 1 -and
+              [string]$r65FourSlotOwners[0] -ceq
+                'scripts/check-codex-subagent-coordination-policy.ps1'
+            ) 'r65.4 evidence-slot coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65FourSlotCommit
+          }
+          $goldenFailureEvidenceSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit retained golden failure evidence'
+          $matchingGoldenFailureEvidenceCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'golden-failure evidence subject read failed.'
+            if ([string]$candidateSubject[0] -ceq
+                $goldenFailureEvidenceSubject) {
+              $matchingGoldenFailureEvidenceCommits +=
+                [string]$candidateCommit
+            }
+          }
+          Assert-Coordination (
+            $matchingGoldenFailureEvidenceCommits.Count -le 1
+          ) 'golden-failure evidence coordination commit is duplicated.'
+          if ($matchingGoldenFailureEvidenceCommits.Count -eq 1) {
+            $goldenFailureEvidenceCommit =
+              [string]$matchingGoldenFailureEvidenceCommits[0]
+            $goldenFailureEvidenceParent = @(& git -C $root show -s `
+                --format=%P $goldenFailureEvidenceCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingR65FourSlotCommits.Count -eq 1 -and
+              $goldenFailureEvidenceParent.Count -eq 1 -and
+              [string]$goldenFailureEvidenceParent[0] -ceq
+                $r65FourSlotCommit
+            ) 'golden-failure evidence coordination parent changed.'
+            $goldenFailureEvidenceOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $goldenFailureEvidenceCommit)
+            $expectedGoldenFailureEvidenceOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($goldenFailureEvidenceOwners | Sort-Object) -join '|') -ceq
+              (@($expectedGoldenFailureEvidenceOwners | Sort-Object) -join '|')
+            ) 'golden-failure evidence coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $goldenFailureEvidenceCommit
+          }
+          $r65FiveEvidenceSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit r65.5 review evidence owners'
+          $matchingR65FiveEvidenceCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.5 evidence coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $r65FiveEvidenceSubject) {
+              $matchingR65FiveEvidenceCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingR65FiveEvidenceCommits.Count -le 1) `
+            'r65.5 evidence coordination commit is duplicated.'
+          if ($matchingR65FiveEvidenceCommits.Count -eq 1) {
+            $r65FiveEvidenceCommit =
+              [string]$matchingR65FiveEvidenceCommits[0]
+            $r65FiveEvidenceParent = @(& git -C $root show -s --format=%P `
+                $r65FiveEvidenceCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingGoldenFailureEvidenceCommits.Count -eq 1 -and
+              $r65FiveEvidenceParent.Count -eq 1 -and
+              [string]$r65FiveEvidenceParent[0] -ceq
+                $goldenFailureEvidenceCommit
+            ) 'r65.5 evidence coordination parent changed.'
+            $r65FiveEvidenceOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $r65FiveEvidenceCommit)
+            $expectedR65FiveEvidenceOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r65FiveEvidenceOwners | Sort-Object) -join '|') -ceq
+              (@($expectedR65FiveEvidenceOwners | Sort-Object) -join '|')
+            ) 'r65.5 evidence coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65FiveEvidenceCommit
+          }
+          $r65SixEvidenceSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit r65.6 review evidence owners'
+          $matchingR65SixEvidenceCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.6 evidence coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $r65SixEvidenceSubject) {
+              $matchingR65SixEvidenceCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingR65SixEvidenceCommits.Count -le 1) `
+            'r65.6 evidence coordination commit is duplicated.'
+          if ($matchingR65SixEvidenceCommits.Count -eq 1) {
+            $r65SixEvidenceCommit =
+              [string]$matchingR65SixEvidenceCommits[0]
+            $r65SixEvidenceParent = @(& git -C $root show -s --format=%P `
+                $r65SixEvidenceCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingR65FiveEvidenceCommits.Count -eq 1 -and
+              $r65SixEvidenceParent.Count -eq 1 -and
+              [string]$r65SixEvidenceParent[0] -ceq $r65FiveEvidenceCommit
+            ) 'r65.6 evidence coordination parent changed.'
+            $r65SixEvidenceOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $r65SixEvidenceCommit)
+            $expectedR65SixEvidenceOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r65SixEvidenceOwners | Sort-Object) -join '|') -ceq
+              (@($expectedR65SixEvidenceOwners | Sort-Object) -join '|')
+            ) 'r65.6 evidence coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65SixEvidenceCommit
+          }
+          $r65SevenEvidenceSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit r65.7 review evidence owners'
+          $matchingR65SevenEvidenceCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.7 evidence coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $r65SevenEvidenceSubject) {
+              $matchingR65SevenEvidenceCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingR65SevenEvidenceCommits.Count -le 1) `
+            'r65.7 evidence coordination commit is duplicated.'
+          if ($matchingR65SevenEvidenceCommits.Count -eq 1) {
+            $r65SevenEvidenceCommit =
+              [string]$matchingR65SevenEvidenceCommits[0]
+            $r65SevenEvidenceParent = @(& git -C $root show -s --format=%P `
+                $r65SevenEvidenceCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingR65SixEvidenceCommits.Count -eq 1 -and
+              $r65SevenEvidenceParent.Count -eq 1 -and
+              [string]$r65SevenEvidenceParent[0] -ceq $r65SixEvidenceCommit
+            ) 'r65.7 evidence coordination parent changed.'
+            $r65SevenEvidenceOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $r65SevenEvidenceCommit)
+            $expectedR65SevenEvidenceOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r65SevenEvidenceOwners | Sort-Object) -join '|') -ceq
+              (@($expectedR65SevenEvidenceOwners | Sort-Object) -join '|')
+            ) 'r65.7 evidence coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65SevenEvidenceCommit
+          }
+          $r65EightEvidenceSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit r65.8 review evidence owners'
+          $matchingR65EightEvidenceCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.8 evidence coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $r65EightEvidenceSubject) {
+              $matchingR65EightEvidenceCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingR65EightEvidenceCommits.Count -le 1) `
+            'r65.8 evidence coordination commit is duplicated.'
+          if ($matchingR65EightEvidenceCommits.Count -eq 1) {
+            $r65EightEvidenceCommit =
+              [string]$matchingR65EightEvidenceCommits[0]
+            $r65EightEvidenceParent = @(& git -C $root show -s --format=%P `
+                $r65EightEvidenceCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingR65SevenEvidenceCommits.Count -eq 1 -and
+              $r65EightEvidenceParent.Count -eq 1 -and
+              [string]$r65EightEvidenceParent[0] -ceq $r65SevenEvidenceCommit
+            ) 'r65.8 evidence coordination parent changed.'
+            $r65EightEvidenceOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $r65EightEvidenceCommit)
+            $expectedR65EightEvidenceOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r65EightEvidenceOwners | Sort-Object) -join '|') -ceq
+              (@($expectedR65EightEvidenceOwners | Sort-Object) -join '|')
+            ) 'r65.8 evidence coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65EightEvidenceCommit
+          }
+          $r65NineEvidenceSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit r65.9 review evidence owners'
+          $matchingR65NineEvidenceCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.9 evidence coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $r65NineEvidenceSubject) {
+              $matchingR65NineEvidenceCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingR65NineEvidenceCommits.Count -le 1) `
+            'r65.9 evidence coordination commit is duplicated.'
+          if ($matchingR65NineEvidenceCommits.Count -eq 1) {
+            $r65NineEvidenceCommit =
+              [string]$matchingR65NineEvidenceCommits[0]
+            $r65NineEvidenceParent = @(& git -C $root show -s --format=%P `
+                $r65NineEvidenceCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingR65EightEvidenceCommits.Count -eq 1 -and
+              $r65NineEvidenceParent.Count -eq 1 -and
+              [string]$r65NineEvidenceParent[0] -ceq $r65EightEvidenceCommit
+            ) 'r65.9 evidence coordination parent changed.'
+            $r65NineEvidenceOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $r65NineEvidenceCommit)
+            $expectedR65NineEvidenceOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r65NineEvidenceOwners | Sort-Object) -join '|') -ceq
+              (@($expectedR65NineEvidenceOwners | Sort-Object) -join '|')
+            ) 'r65.9 evidence coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65NineEvidenceCommit
+          }
+          $r65TenEvidenceSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit r65.10 review evidence owners'
+          $matchingR65TenEvidenceCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.10 evidence coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $r65TenEvidenceSubject) {
+              $matchingR65TenEvidenceCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination ($matchingR65TenEvidenceCommits.Count -le 1) `
+            'r65.10 evidence coordination commit is duplicated.'
+          if ($matchingR65TenEvidenceCommits.Count -eq 1) {
+            $r65TenEvidenceCommit = [string]$matchingR65TenEvidenceCommits[0]
+            $r65TenEvidenceParent = @(& git -C $root show -s --format=%P `
+                $r65TenEvidenceCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingR65NineEvidenceCommits.Count -eq 1 -and
+              $r65TenEvidenceParent.Count -eq 1 -and
+              [string]$r65TenEvidenceParent[0] -ceq $r65NineEvidenceCommit
+            ) 'r65.10 evidence coordination parent changed.'
+            $r65TenEvidenceOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $r65TenEvidenceCommit)
+            $expectedR65TenEvidenceOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r65TenEvidenceOwners | Sort-Object) -join '|') -ceq
+              (@($expectedR65TenEvidenceOwners | Sort-Object) -join '|')
+            ) 'r65.10 evidence coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65TenEvidenceCommit
+          }
+          $r65ElevenEvidenceSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): admit r65.11 review evidence owners'
+          $matchingR65ElevenEvidenceCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.11 evidence coordination subject read failed.'
+            if ([string]$candidateSubject[0] -ceq $r65ElevenEvidenceSubject) {
+              $matchingR65ElevenEvidenceCommits += [string]$candidateCommit
+            }
+          }
+          Assert-Coordination (
+            $matchingR65ElevenEvidenceCommits.Count -le 1
+          ) 'r65.11 evidence coordination commit is duplicated.'
+          if ($matchingR65ElevenEvidenceCommits.Count -eq 1) {
+            $r65ElevenEvidenceCommit =
+              [string]$matchingR65ElevenEvidenceCommits[0]
+            $r65ElevenExpectedParent =
+              '600dba97be8027de95e0ccbb89471f27aeb97529'
+            $r65ElevenEvidenceParent = @(& git -C $root show -s --format=%P `
+                $r65ElevenEvidenceCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $r65ElevenEvidenceParent.Count -eq 1 -and
+              [string]$r65ElevenEvidenceParent[0] -ceq
+                $r65ElevenExpectedParent
+            ) 'r65.11 evidence coordination parent changed.'
+            $r65ElevenEvidenceOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r $r65ElevenEvidenceCommit)
+            $expectedR65ElevenEvidenceOwners = @(
+              'config/codex-subagent-coordination-policy.json',
+              'scripts/check-codex-subagent-coordination-policy.ps1'
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r65ElevenEvidenceOwners | Sort-Object) -join '|') -ceq
+              (@($expectedR65ElevenEvidenceOwners | Sort-Object) -join '|')
+            ) 'r65.11 evidence coordination changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65ElevenEvidenceCommit
+          }
+          $r65ElevenParentCorrectionSubject =
+            'ui(buy-mvp-ticket14-v1-20260902): correct r65.11 parent binding'
+          $matchingR65ElevenParentCorrectionCommits = @()
+          foreach ($candidateCommit in $continuationFeatureCommits) {
+            $candidateSubject = @(& git -C $root show -s --format=%s `
+                $candidateCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $candidateSubject.Count -eq 1
+            ) 'r65.11 parent-correction subject read failed.'
+            if ([string]$candidateSubject[0] -ceq
+                $r65ElevenParentCorrectionSubject) {
+              $matchingR65ElevenParentCorrectionCommits +=
+                [string]$candidateCommit
+            }
+          }
+          Assert-Coordination (
+            $matchingR65ElevenParentCorrectionCommits.Count -le 1
+          ) 'r65.11 parent-correction commit is duplicated.'
+          if ($matchingR65ElevenParentCorrectionCommits.Count -eq 1) {
+            $r65ElevenParentCorrectionCommit =
+              [string]$matchingR65ElevenParentCorrectionCommits[0]
+            $r65ElevenParentCorrectionParent = @(& git -C $root show -s `
+                --format=%P $r65ElevenParentCorrectionCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $matchingR65ElevenEvidenceCommits.Count -eq 1 -and
+              $r65ElevenParentCorrectionParent.Count -eq 1 -and
+              [string]$r65ElevenParentCorrectionParent[0] -ceq
+                $r65ElevenEvidenceCommit
+            ) 'r65.11 parent-correction parent changed.'
+            $r65ElevenParentCorrectionOwners = @(& git -C $root diff-tree `
+                --no-commit-id --name-only -r `
+                $r65ElevenParentCorrectionCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $r65ElevenParentCorrectionOwners.Count -eq 1 -and
+              [string]$r65ElevenParentCorrectionOwners[0] -ceq
+                'scripts/check-codex-subagent-coordination-policy.ps1'
+            ) 'r65.11 parent-correction changed an unexpected owner.'
+            $sealedCoordinationCommit = $r65ElevenParentCorrectionCommit
+          }
+          & git -C $root diff --quiet $sealedCoordinationCommit -- `
+            'config/codex-subagent-coordination-policy.json' `
+            'scripts/check-codex-subagent-coordination-policy.ps1'
+          Assert-Coordination ($LASTEXITCODE -eq 0) `
+            'retained-evidence coordination owners changed after admission.'
+        }
+      }
+    }
     if ($isCoordinationBootstrap) {
       $expectedBootstrapOwners = @(
         $selectedContinuationBinding.bootstrapOwners | ForEach-Object {
@@ -1543,9 +2252,12 @@ if ($ProductionLane -ceq 'baseline') {
             $_.ToLowerInvariant()
           }).Contains($changedOwnerKey)
         )
+        $primaryEvidenceCoordinationOwner =
+          $primaryEvidenceCoordinationOwnerKeys.Contains($changedOwnerKey)
         Assert-Coordination (
           $effectiveOwnerKeys.Contains($changedOwnerKey) -or
-          $repairAutomaticOwner
+          $repairAutomaticOwner -or
+          $primaryEvidenceCoordinationOwner
         ) "production feature changed an owner outside its claim: $changedOwner"
       }
     }
@@ -1719,29 +2431,134 @@ if ($ProductionLane -ceq 'baseline') {
             }).Count -eq 0
           ) 'Shop Buy regression repair staged owner set changed.'
         } else {
-          $preMergeCoordinationOwnerKeys = @(
-            $integrationRepair.preMergeCoordinationOwners | ForEach-Object {
-              ([string]$_).ToLowerInvariant()
-            }
+          $singleUseEvidenceOwners = @(
+            'config/codex-development-regression-registry.json',
+            'config/codex-subagent-coordination-policy.json',
+            'scripts/check-codex-subagent-coordination-policy.ps1',
+            'scripts/run-store-buy-diagnostic-evidence.ps1'
           )
-          Assert-Coordination (
-            $LASTEXITCODE -eq 0 -and
-            $existingCoordinationCommits.Count -lt
-              [int]$integrationRepair.maximumPreMergeCoordinationCommits -and
-            (
-              $existingCoordinationCommits.Count -eq 0 -or
-              @($existingCoordinationOwners | Where-Object {
+          $singleUseDiagnosticEvidenceOwners = @(
+            'config/codex-development-regression-registry.json',
+            'config/codex-subagent-coordination-policy.json',
+            'docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.result.json',
+            'docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.stderr.log',
+            'docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.stdout.log',
+            'docs/quality/store-buy-diagnostic-evidence-v2-20260904/toolchain-and-dependency-hashes.json',
+            'scripts/check-codex-subagent-coordination-policy.ps1',
+            'scripts/run-store-buy-diagnostic-evidence.ps1'
+          )
+          $singleUseEvidenceCorrection = (
+            [string]$selectedContinuationBinding.id -ceq
+              'integration_repair_store_buy_diagnostic_evidence_v2_20260904' -and
+            $branch -ceq
+              'work/integration-repair/store-buy-diagnostic-evidence-v2-20260904' -and
+            $head -ceq 'e1f5d6f060b9466c9efebec51d1b4e5b6c9932ea' -and
+            $AgentTask -ceq
+              '/root/repair_store_buy_diagnostic_evidence_v2_20260904' -and
+            $ProductionWorkId -ceq
+              'store-buy-diagnostic-evidence-v2-20260904' -and
+            $ProductionTicketId -ceq
+              'UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904' -and
+            [string]$selectedContinuationBinding.baselineHead -ceq
+              'c48e4ecc5c3ccc7a3079d3f64988437599cc78de' -and
+            $existingCoordinationCommits.Count -eq 0 -and
+            $existingRepairMerges.Count -eq 0
+          )
+          $singleUseDiagnosticEvidenceCapture = (
+            [string]$selectedContinuationBinding.id -ceq
+              'integration_repair_store_buy_diagnostic_evidence_v2_20260904' -and
+            $branch -ceq
+              'work/integration-repair/store-buy-diagnostic-evidence-v2-20260904' -and
+            $head -ceq 'd9d8fa3fe43c75330a834a598f691aeab52f88ac' -and
+            $AgentTask -ceq
+              '/root/repair_store_buy_diagnostic_evidence_v2_20260904' -and
+            $ProductionWorkId -ceq
+              'store-buy-diagnostic-evidence-v2-20260904' -and
+            $ProductionTicketId -ceq
+              'UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904' -and
+            [string]$selectedContinuationBinding.baselineHead -ceq
+              'c48e4ecc5c3ccc7a3079d3f64988437599cc78de' -and
+            $existingCoordinationCommits.Count -eq 1 -and
+            $existingRepairMerges.Count -eq 0 -and
+            -not $repairMergeActive
+          )
+          if ($singleUseDiagnosticEvidenceCapture) {
+            $bootstrapParentOutput = @(& git -C $root show -s --format='%P' `
+                'e1f5d6f060b9466c9efebec51d1b4e5b6c9932ea')
+            $bootstrapParentExit = $LASTEXITCODE
+            $bootstrapSubjectOutput = @(& git -C $root show -s --format='%s' `
+                'e1f5d6f060b9466c9efebec51d1b4e5b6c9932ea')
+            $bootstrapSubjectExit = $LASTEXITCODE
+            $bootstrapOwnerOutput = @(& git -C $root diff-tree --no-commit-id `
+                --name-only -r 'e1f5d6f060b9466c9efebec51d1b4e5b6c9932ea')
+            $bootstrapOwnerExit = $LASTEXITCODE
+            $correctionParentOutput = @(& git -C $root show -s --format='%P' `
+                'd9d8fa3fe43c75330a834a598f691aeab52f88ac')
+            $correctionParentExit = $LASTEXITCODE
+            $correctionSubjectOutput = @(& git -C $root show -s --format='%s' `
+                'd9d8fa3fe43c75330a834a598f691aeab52f88ac')
+            $correctionSubjectExit = $LASTEXITCODE
+            $correctionOwnerOutput = @(& git -C $root diff-tree --no-commit-id `
+                --name-only -r 'd9d8fa3fe43c75330a834a598f691aeab52f88ac')
+            $correctionOwnerExit = $LASTEXITCODE
+            Assert-Coordination (
+              $bootstrapParentExit -eq 0 -and
+              $bootstrapSubjectExit -eq 0 -and
+              $bootstrapOwnerExit -eq 0 -and
+              $correctionParentExit -eq 0 -and
+              $correctionSubjectExit -eq 0 -and
+              $correctionOwnerExit -eq 0 -and
+              $bootstrapParentOutput.Count -eq 1 -and
+              [string]$bootstrapParentOutput[0] -ceq
+                'c48e4ecc5c3ccc7a3079d3f64988437599cc78de' -and
+              $bootstrapSubjectOutput.Count -eq 1 -and
+              [string]$bootstrapSubjectOutput[0] -ceq
+                'coordination(store-buy-diagnostic-evidence-v2-20260904): bind serialized regression evidence' -and
+              (@($bootstrapOwnerOutput | Sort-Object) -join '|') -ceq
+                (@($selectedContinuationBinding.bootstrapOwners | Sort-Object) -join '|') -and
+              $correctionParentOutput.Count -eq 1 -and
+              [string]$correctionParentOutput[0] -ceq
+                'e1f5d6f060b9466c9efebec51d1b4e5b6c9932ea' -and
+              $correctionSubjectOutput.Count -eq 1 -and
+              [string]$correctionSubjectOutput[0] -ceq
+                'repair(store-buy-diagnostic-evidence-v2-20260904): correct serialized evidence path' -and
+              (@($correctionOwnerOutput | Sort-Object) -join '|') -ceq
+                (@($singleUseEvidenceOwners | Sort-Object) -join '|')
+            ) 'single-use v2 evidence lineage changed.'
+            Assert-Coordination (
+              (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
+                (@($singleUseDiagnosticEvidenceOwners | Sort-Object) -join '|')
+            ) 'single-use v2 diagnostic evidence owner set changed.'
+          } elseif ($singleUseEvidenceCorrection) {
+            Assert-Coordination (
+              (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
+                (@($singleUseEvidenceOwners | Sort-Object) -join '|')
+            ) 'single-use v2 evidence correction owner set changed.'
+          } else {
+            $preMergeCoordinationOwnerKeys = @(
+              $integrationRepair.preMergeCoordinationOwners | ForEach-Object {
+                ([string]$_).ToLowerInvariant()
+              }
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $existingCoordinationCommits.Count -lt
+                [int]$integrationRepair.maximumPreMergeCoordinationCommits -and
+              (
+                $existingCoordinationCommits.Count -eq 0 -or
+                @($existingCoordinationOwners | Where-Object {
+                  -not $preMergeCoordinationOwnerKeys.Contains(
+                    ([string]$_).ToLowerInvariant()
+                  )
+                }).Count -eq 0
+              ) -and
+              @($preCommitStagedOwners | Where-Object {
                 -not $preMergeCoordinationOwnerKeys.Contains(
                   ([string]$_).ToLowerInvariant()
                 )
               }).Count -eq 0
-            ) -and
-            @($preCommitStagedOwners | Where-Object {
-              -not $preMergeCoordinationOwnerKeys.Contains(
-                ([string]$_).ToLowerInvariant()
-              )
-            }).Count -eq 0
-          ) 'integration repair coordination correction owner set changed.'
+            ) 'integration repair coordination correction owner set changed.'
+          }
         }
       } else {
         $postMergeClosureOwnerKeys = @(
@@ -2153,7 +2970,7 @@ if ($ProductionLane -ceq 'baseline') {
     }
     if ($approvedBranches.Count -eq 1 -and
         [string]$approvedBranches[0] -ceq
-          'work/integration-repair/shop-chat-shared-v1-20260829') {
+          'work/integration-repair/store-buy-conflict-repair-v3-20260904') {
       $qualifiedRepairCommit = [string]$approvedCommits[0]
       Assert-QualifiedIntegrationRepairTip `
         -RepairCommit $qualifiedRepairCommit

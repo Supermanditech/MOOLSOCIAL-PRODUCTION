@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3929,
-    "sha256": "EDF47B7DE5E5E6CA3C200798210E4B0F71F2815ABA7F574D4C9AD71A16CCF86F"
+    "entryCount": 4443,
+    "sha256": "07238E91AE682F24D843A592E019E950FE2E922D42B19229540374FA6B4B63A8"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,10 +34,28 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/widgets/work_widgets.dart",
+        "apps/mobile/test/ui_v2/work/work_main_v2_test.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "apps/mobile/test/work_vertical_slice_test.dart",
+        "apps/mobile/test/work_production_gateway_test.dart"
+      ]
+    },
+    {
+      "task": "/root/repair_store_buy_conflict_v3_20260904",
+      "role": "primary",
+      "owners": [
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json",
-        "apps/mobile/test/universal_intent_completion_test.dart",
-        "scripts/check-codex-subagent-coordination-policy.ps1"
+        "docs/quality/STORE-BUY-V3-PRE-INTEGRATION-RECONCILIATION-20260904.md",
+        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/test-codex-integration-repair-coordination-policy.ps1"
       ]
     },
     {
@@ -1398,6 +1416,81 @@
         "integrationRequiredBeforeSuccessorApk": true
       },
       {
+        "id": "integration_repair_store_buy_conflict_v1_20260904",
+        "state": "founder_authorized_2026_09_04",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root/repair_store_buy_conflict_v1_20260904",
+        "workId": "store-buy-conflict-repair-v1-20260904",
+        "ticketId": "UAW-INTEGRATION-REPAIR-STORE-BUY-V1-20260904",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-conflict-repair-v1-20260904",
+        "branch": "work/integration-repair/store-buy-conflict-repair-v1-20260904",
+        "baselineHead": "aa335eb1497d77c859e7d34b549716350612c5c8",
+        "bootstrapCommitSubject": "coordination(store-buy-conflict-repair-v1-20260904): bind Store and Buy conflict repair",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/STORE-BUY-PRE-INTEGRATION-RECONCILIATION-20260904.md",
+          "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V1-20260904.md",
+          "scripts/check-codex-development-regression-memory.ps1",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/test-codex-integration-repair-coordination-policy.ps1"
+        ],
+        "cursorIndependent": false,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_buy_mvp_ticket14_v1_20260902",
+        "state": "founder_authorized_2026_09_02",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_shop_mvp_go_live_v1_20260829",
+        "workId": "buy-mvp-ticket14-v1-20260902",
+        "ticketId": "UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902",
+        "branch": "work/cursor-ui/buy-mvp-ticket14-v1-20260902",
+        "baselineHead": "958e767e6f910e40b8f475d99173011f0f07ea78",
+        "bootstrapCommitSubject": "coordination(buy-mvp-ticket14-v1-20260902): bind founder-authorized Ticket 14 continuation",
+        "bootstrapOwners": [
+          "artifacts/quality/buy-cursor-full-r63-0-review-20260901/redmi-install-attempt1-version-downgrade.md",
+          "artifacts/quality/buy-cursor-full-r63-1-review-20260901/post-build-host-retry-package-metadata.md",
+          "artifacts/quality/buy-cursor-full-r63-1-review-20260901/redmi-confirmation-product-count-defect.md",
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902-MVP-STATE.json",
+          "docs/quality/UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "integration_repair_store_buy_diagnostic_evidence_v2_20260904",
+        "state": "founder_authorized_2026_09_04",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root/repair_store_buy_diagnostic_evidence_v2_20260904",
+        "workId": "store-buy-diagnostic-evidence-v2-20260904",
+        "ticketId": "UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904",
+        "branch": "work/integration-repair/store-buy-diagnostic-evidence-v2-20260904",
+        "baselineHead": "c48e4ecc5c3ccc7a3079d3f64988437599cc78de",
+        "bootstrapCommitSubject": "coordination(store-buy-diagnostic-evidence-v2-20260904): bind serialized regression evidence",
+        "bootstrapOwners": [
+          "docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.result.json",
+          "docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.stderr.log",
+          "docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.stdout.log",
+          "docs/quality/store-buy-diagnostic-evidence-v2-20260904/toolchain-and-dependency-hashes.json",
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/run-store-buy-diagnostic-evidence.ps1"
+        ],
+        "cursorIndependent": false,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
         "id": "codex_universal_c20e_test_contract_v2_20260904",
         "state": "founder_authorized_2026_09_04",
         "lane": "codex_ui",
@@ -1419,6 +1512,30 @@
         "integrationRequiredBeforeSuccessorApk": true
       },
       {
+        "id": "integration_repair_store_buy_conflict_v2_20260904",
+        "state": "founder_authorized_2026_09_04",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root/repair_store_buy_conflict_v2_20260904",
+        "workId": "store-buy-conflict-repair-v2-20260904",
+        "ticketId": "UAW-INTEGRATION-REPAIR-STORE-BUY-V2-20260904",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-conflict-repair-v2-20260904",
+        "branch": "work/integration-repair/store-buy-conflict-repair-v2-20260904",
+        "baselineHead": "300f4247165a097d82624f4b40c9c2d611c7bc48",
+        "bootstrapCommitSubject": "coordination(store-buy-conflict-repair-v2-20260904): bind corrected Store and Buy repair",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/STORE-BUY-V2-PRE-INTEGRATION-RECONCILIATION-20260904.md",
+          "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V2-20260904.md",
+          "scripts/check-codex-development-regression-memory.ps1",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/test-codex-integration-repair-coordination-policy.ps1"
+        ],
+        "cursorIndependent": false,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
         "id": "codex_universal_chat_boundary_contract_v1_20260904",
         "state": "founder_authorized_2026_09_04",
         "lane": "codex_ui",
@@ -1436,6 +1553,30 @@
           "docs/quality/UAW-CODEX-UNIVERSAL-CHAT-BOUNDARY-CONTRACT-V1-20260904.md"
         ],
         "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "integration_repair_store_buy_conflict_v3_20260904",
+        "state": "founder_authorized_2026_09_04",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root/repair_store_buy_conflict_v3_20260904",
+        "workId": "store-buy-conflict-repair-v3-20260904",
+        "ticketId": "UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-conflict-repair-v2-20260904",
+        "branch": "work/integration-repair/store-buy-conflict-repair-v3-20260904",
+        "baselineHead": "f208fbef80303ad3c6b1bf41a385616adcc969b5",
+        "bootstrapCommitSubject": "coordination(store-buy-conflict-repair-v3-20260904): bind corrected Store Chat and Buy repair",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/STORE-BUY-V3-PRE-INTEGRATION-RECONCILIATION-20260904.md",
+          "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
+          "scripts/check-codex-development-regression-memory.ps1",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/test-codex-integration-repair-coordination-policy.ps1"
+        ],
+        "cursorIndependent": false,
         "integrationRequiredBeforeSuccessorApk": true
       }
     ],
@@ -1572,14 +1713,8 @@
           "apps/mobile/lib/features/work/",
           "apps/mobile/test/ui_v2/work/",
           "apps/mobile/test/work_workspace_layout_safety_test.dart",
-      "apps/mobile/test/work_vertical_slice_test.dart",
-      "apps/mobile/test/work_production_gateway_test.dart",
-      "apps/mobile/lib/core/design/mool_design_system.dart",
-      "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart",
-      "apps/mobile/test/universal_intent_completion_test.dart",
-      "config/codex-development-regression-registry.json",
-          "config/codex-subagent-coordination-policy.json",
-          "scripts/check-codex-subagent-coordination-policy.ps1"
+          "apps/mobile/test/work_vertical_slice_test.dart",
+          "apps/mobile/test/work_production_gateway_test.dart"
         ],
         "forbiddenOwnerRoots": [
           "apps/mobile/lib/core/auth/",
@@ -1745,86 +1880,32 @@
       "integrationOwnerGitClosureResponsible": true,
       "repair": {
         "lane": "integration_repair",
-        "requiredCodexCommit": "011fd09d1d94fce02d0bbc9c7b94c90f742624e6",
-        "requiredCodexBranch": "work/integration-repair/shop-chat-shared-v1-base-20260829",
-        "requiredCursorCommit": "30f4614574aae3c315d586944636a35ba314873d",
-        "requiredCursorBranch": "work/cursor-ui/chat-shell-impl-v1-20260829",
+        "requiredCodexCommit": "f208fbef80303ad3c6b1bf41a385616adcc969b5",
+        "requiredCodexBranch": "work/codex-ui/universal-chat-boundary-contract-v1-20260904",
+        "requiredCursorCommit": "fd55d1cfffa5ed10f753f2ed24461ef9ac6a9a5d",
+        "requiredCursorBranch": "work/cursor-ui/buy-mvp-ticket14-v1-20260902",
         "maximumMergeCommits": 1,
         "maximumPreMergeCoordinationCommits": 1,
         "preMergeCoordinationOwners": [
-          "config/codex-development-regression-registry.json",
-          "config/codex-subagent-coordination-policy.json",
-          "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"
+          "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md"
         ],
-        "maximumPostMergeClosureCommits": 9,
+        "maximumPostMergeClosureCommits": 1,
         "postMergeClosureOwners": [
-          "apps/mobile/lib/features/chat/chat_entry_context.dart",
-          "apps/mobile/lib/features/chat/chat_session.dart",
-          "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart",
-          "apps/mobile/test/chat_flow_test.dart",
-          "apps/mobile/test/global_contextual_chat_shell_test.dart",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/clean-source-state.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/full-buy-cycle1.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/full-buy-cycle2.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/prebuild-validation.md",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-launch.png",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-launch.xml",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-shared.png",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-shared.xml",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-source-manifest.txt",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/source-identity.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/uaw-shop-chat-shared-r61.7-cursor-ui-review-20260829-build-provenance.txt",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/uaw-shop-chat-shared-r61.7-cursor-ui-review-20260829-device-review-debug.apk",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/clean-source-state.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/full-buy-cycle1.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/full-buy-cycle2.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/prebuild-validation.md",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/shop-chat-r61-8-source-manifest.txt",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/source-identity.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/clean-source-state.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/founder-review.md",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/full-buy-cycle1.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/full-buy-cycle2.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/install-result.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/prebuild-validation.md",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-back.png",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-chats.png",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-chats.xml",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-context.png",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-founder.png",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-installed-base.apk",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-launch.png",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-offers-origin.png",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-offers.png",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-shared.png",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-shared.xml",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-wholesale.png",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-source-manifest.txt",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/source-identity.json",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/uaw-shop-chat-context-r61.9-cursor-ui-review-20260829-build-provenance.txt",
-          "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/uaw-shop-chat-context-r61.9-cursor-ui-review-20260829-device-review-debug.apk",
-          "config/apk-regression-gate-state-shop-chat-r61-7.json",
-          "config/apk-regression-gate-state-shop-chat-r61-8.json",
-          "config/apk-regression-gate-state-shop-chat-r61-9.json",
-          "config/codex-development-regression-registry.json",
-          "config/codex-subagent-coordination-policy.json",
-          "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md",
-          "scripts/check-codex-subagent-coordination-policy.ps1"
+          "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md"
         ],
         "directSourceCommitsAllowed": false,
         "conflictResolutionAllowed": true,
         "exactConflictOwners": [
-          "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart",
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "remoteRepairBranchMustEqualHeadBeforeAdmission": true,
-        "freshIntegrationWorkId": "shop-chat-shared-v1-20260829",
-        "freshIntegrationTicketId": "UAW-INTEGRATION-SHOP-CHAT-SHARED-V1-20260829",
-        "freshIntegrationBranch": "integration/moolsocial/shop-chat-shared-v1-20260829",
-        "freshIntegrationWorktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-shop-chat-shared-v1-20260829",
-        "freshIntegrationMergeSubject": "merge(shop-chat-shared-v1-20260829): integrate shared Chat and Buy context"
+        "freshIntegrationWorkId": "work-store-buy-v3-20260904",
+        "freshIntegrationTicketId": "UAW-INTEGRATION-WORK-STORE-BUY-V3-20260904",
+        "freshIntegrationBranch": "integration/moolsocial/work-store-buy-v3-20260904",
+        "freshIntegrationWorktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v3-20260904",
+        "freshIntegrationMergeSubject": "merge(work-store-buy-v3-20260904): integrate corrected Store Chat and Buy"
       }
     },
     "promotion": {
