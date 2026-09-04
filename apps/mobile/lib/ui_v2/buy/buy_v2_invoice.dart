@@ -452,6 +452,8 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                     _InvoiceFact(label: 'Buyer role', value: buyerType),
                   if (order.paymentMethod case final payment?)
                     _InvoiceFact(label: 'Payment method', value: payment),
+                  if (order.purchaseOrderReference case final reference?)
+                    _InvoiceFact(label: 'Purchase order', value: reference),
                   if (order.paymentTermLabel case final term?)
                     _InvoiceFact(label: 'Payment term', value: term),
                   if (order.amountPaidNow case final paidNow?)

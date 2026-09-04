@@ -9,7 +9,7 @@ import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 final class _RecoveryFactsAdapter implements BuyV2ProductFactsAdapter {
-  String orderabilityLabel = 'Out of stock';
+  String orderabilityLabel = 'Available to add';
 
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
@@ -140,8 +140,9 @@ void main() {
     expect(session.view, BuyV2View.recovery);
     session.retryRecovery();
 
-    expect(session.view, BuyV2View.cart);
-    expect(session.cartScope, BuyV2CartScope.shop);
+    expect(session.view, BuyV2View.checkout);
+    expect(session.checkoutStep, BuyV2CheckoutStep.address);
+    expect(session.checkoutScope, BuyV2CartScope.shop);
     expect(session.notice, 'Choose a delivery address to continue.');
     expect(session.itemCount, 1);
   });
@@ -200,6 +201,7 @@ void main() {
     expect(session.addProduct(product.id), isTrue);
     session.openCart(scope: BuyV2CartScope.shop);
     expect(session.openCheckout(), isTrue);
+    facts.orderabilityLabel = 'Out of stock';
     expect(session.confirmOrder(), isFalse);
     expect(session.view, BuyV2View.recovery);
 

@@ -159,7 +159,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('missing local signal stays truthful and does not block trade', (
+  testWidgets('missing optional signal stays hidden and does not block trade', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -179,21 +179,22 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Local market insight unavailable'), findsOneWidget);
-    expect(
-      find.text(
-        'You can still compare the current price, stock and delivery time.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Local market insight unavailable'), findsNothing);
     expect(
       find.byKey(const ValueKey('buy-wholesale-trade-signal-retry')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.textContaining('retailers bought'), findsNothing);
     expect(find.text(product.confirmedOn), findsOneWidget);
     expect(
       find.byKey(ValueKey('buy-product-primary-${product.id}')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
+        matching: find.text('Seller'),
+      ),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);

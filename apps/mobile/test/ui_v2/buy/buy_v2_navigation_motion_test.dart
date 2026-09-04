@@ -104,9 +104,12 @@ void main() {
     session.openCart(scope: BuyV2CartScope.shop);
     final cartSequence = session.navigationMotionSequence;
     expect(session.restoreSelectedAddressId(null), isFalse);
-    expect(session.openCheckout(), isFalse);
-    expect(session.view, BuyV2View.cart);
-    expect(session.navigationMotionSequence, cartSequence);
+    expect(session.openCheckout(), isTrue);
+    expect(session.view, BuyV2View.checkout);
+    expect(session.navigationMotionSequence, cartSequence + 1);
+    final checkoutSequence = session.navigationMotionSequence;
+    expect(session.openCheckout(), isTrue);
+    expect(session.navigationMotionSequence, checkoutSequence);
 
     session.openOrders();
     final ordersSequence = session.navigationMotionSequence;

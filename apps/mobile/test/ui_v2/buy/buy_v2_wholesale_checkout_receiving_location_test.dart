@@ -66,17 +66,12 @@ void main() {
       buyV2WholesaleCheckoutReceivingLocationContractVersion,
       'buy-wholesale-checkout-receiving-location-v1',
     );
-    expect(find.text('Receiving location · Home'), findsOneWidget);
-    expect(find.text('Delivering to Home'), findsNothing);
-    expect(find.text('Sardarpura, Jodhpur · 342003'), findsOneWidget);
-    final location = find.byKey(
-      const ValueKey('buy-wholesale-checkout-receiving-location'),
-    );
+    expect(find.text('Receiving address'), findsOneWidget);
+    expect(find.text('Delivery address'), findsNothing);
+    expect(find.textContaining('Sardarpura, Jodhpur · 342003'), findsOneWidget);
+    final location = find.byKey(const ValueKey('buy-checkout-address-home'));
     expect(location, findsOneWidget);
-    expect(
-      tester.getSemantics(location).label,
-      contains('Receiving location · Home'),
-    );
+    expect(tester.getSemantics(location).label, contains('Home'));
     expect(
       tester.getSemantics(location).label,
       contains('Sardarpura, Jodhpur · 342003'),
@@ -84,7 +79,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('receiving-location Edit opens the retained address chooser', (
+  testWidgets('receiving-address Edit opens the retained address form', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -95,11 +90,13 @@ void main() {
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Edit'));
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-address-edit-home')),
+    );
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const ValueKey('buy-address-sheet-route')),
+      find.byKey(const ValueKey('buy-address-add-form-route')),
       findsOneWidget,
     );
     expect(session.view, BuyV2View.checkout);
@@ -122,8 +119,12 @@ void main() {
       await tester.pumpWidget(app(session));
       await tester.pumpAndSettle();
 
-      expect(find.text('Delivering to Home'), findsOneWidget);
-      expect(find.text('Receiving location · Home'), findsNothing);
+      expect(find.text('Delivery address'), findsOneWidget);
+      expect(find.text('Receiving address'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('buy-checkout-address-home')),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const ValueKey('buy-wholesale-checkout-receiving-location')),
         findsNothing,
@@ -155,8 +156,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Receiving location · Home'), findsOneWidget);
-    final edit = find.text('Edit');
+    expect(find.text('Receiving address'), findsOneWidget);
+    final edit = find.byKey(const ValueKey('buy-checkout-address-edit-home'));
     expect(edit, findsOneWidget);
     expect(tester.getSize(edit).height, greaterThan(0));
     expect(tester.takeException(), isNull);

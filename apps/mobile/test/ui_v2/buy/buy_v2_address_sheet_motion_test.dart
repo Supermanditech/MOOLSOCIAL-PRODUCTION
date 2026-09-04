@@ -140,7 +140,7 @@ void main() {
     expect(reduced.reverseCurve, Curves.linear);
   });
 
-  testWidgets('real Account and Checkout callers reach the R56.9 sheet', (
+  testWidgets('Account retains its sheet and Checkout embeds address editing', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
@@ -179,9 +179,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Edit'));
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-address-edit-home')),
+    );
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('buy-address-sheet-route')), findsOne);
+    expect(find.byKey(const ValueKey('buy-address-add-form-route')), findsOne);
   });
 
   testWidgets('selection commits once only after the reverse route', (

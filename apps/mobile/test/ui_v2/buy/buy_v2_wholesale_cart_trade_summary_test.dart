@@ -204,7 +204,7 @@ void main() {
     await tester.tap(find.text('Review order'));
     await tester.pumpAndSettle();
     expect(session.view, BuyV2View.checkout);
-    expect(find.textContaining('Wholesale fulfilment ·'), findsOneWidget);
+    expect(find.text('Receiving address'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-scoped-purchase-owner')),
       findsNothing,

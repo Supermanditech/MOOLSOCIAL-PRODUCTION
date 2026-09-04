@@ -289,7 +289,7 @@ void main() {
       expect(BuyV2Catalogue.medicineCategories.length, 14);
       expect(
         sha256.convert(utf8.encode(buyV2CommerceSeedRows.trim())).toString(),
-        'bc099e5a1f27fc033259b94ccd0f4be5d40fedcca96bdc14be38b792ce16c0e0',
+        'b591438729cd4d0eb2a44101ffd6701c7892abd6e53596f9d1019b322e7e30ac',
       );
 
       const approvedCommerceIds = <String>[
@@ -464,7 +464,7 @@ void main() {
 
     test('maps every Buy offer to a customer-facing partner role', () {
       for (final product in BuyV2Catalogue.products) {
-        expect(product.partnerRole, startsWith('Mool '), reason: product.id);
+        expect(product.partnerRole, startsWith('Mool'), reason: product.id);
         expect(
           product.partnerRole.toLowerCase(),
           isNot(contains('verified')),
@@ -533,6 +533,52 @@ void main() {
       expect(session.destination, BuyV2Destination.orders);
       expect(session.view, BuyV2View.orderItems);
       expect(session.selectedOrder.id, order.id);
+    });
+
+    test('one Shop checkout splits orders by fulfilling store', () {
+      final first = BuyV2Catalogue.products.firstWhere(
+        (item) => item.destination == BuyV2Destination.shop,
+      );
+      final second = BuyV2Catalogue.products.firstWhere(
+        (item) =>
+            item.destination == BuyV2Destination.shop &&
+            item.seller != first.seller,
+      );
+      expect(session.addProduct(first.id), isTrue);
+      expect(session.addProduct(second.id), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.confirmOrder(), isTrue);
+
+      expect(session.confirmedOrders, hasLength(2));
+      expect(session.confirmedOrders.map((order) => order.partner).toSet(), {
+        first.seller,
+        second.seller,
+      });
+      expect(
+        session.confirmedOrders.expand((order) => order.productIds).toSet(),
+        {first.id, second.id},
+      );
+      expect(
+        session.confirmedOrders.map((order) => order.purchaseId).toSet(),
+        hasLength(1),
+      );
+      for (final product in [first, second]) {
+        final purchased = session.confirmedOrders
+            .expand((order) => order.lines)
+            .singleWhere((line) => line.product.id == product.id)
+            .product;
+        expect(purchased.canonicalId, product.canonicalId);
+        expect(purchased.title, product.title);
+        expect(purchased.variant, product.variant);
+        expect(purchased.pack, product.pack);
+        expect(purchased.price, product.price);
+        expect(purchased.unitPrice, product.unitPrice);
+        expect(purchased.seller, product.seller);
+        expect(purchased.sellerType, product.sellerType);
+        expect(purchased.deliveryPromise, product.deliveryPromise);
+        expect(purchased.returnPolicy, product.returnPolicy);
+      }
     });
 
     test(
@@ -825,6 +871,7 @@ void main() {
           session.confirmedOrders.map((order) => order.id).toSet(),
           hasLength(groups.length),
         );
+        expect(session.confirmedProductCount, checkoutLines.length);
         expect(session.confirmedItemCount, checkoutItemCount);
         expect(session.confirmedTotal, checkoutTotal);
         expect(session.itemCount, 0);
@@ -852,7 +899,7 @@ void main() {
           );
           expect(order.total, group.total);
           expect(order.partnerType, group.partnerType);
-          expect(order.paymentMethod, 'UPI');
+          expect(order.paymentMethod, 'PhonePe');
           expect(order.recipient, session.selectedAddress.recipient);
           expect(order.addressLine, contains(session.selectedAddress.pinCode));
         }
@@ -968,11 +1015,13 @@ void main() {
       expect(confirmed.id, startsWith('MS-NEW-'));
       expect(confirmed.productIds, {shop.id, secondShop.id});
       expect(session.orders.first.id, confirmed.id);
+      session.rememberCartScrollOffset(BuyV2CartScope.shop, 640);
 
       session.reorder(confirmed);
 
       expect(session.view, BuyV2View.cart);
       expect(session.cartScope, BuyV2CartScope.shop);
+      expect(session.cartScrollOffsetFor(BuyV2CartScope.shop), 0);
       expect(session.cartLines.map((line) => line.product.id).toSet(), {
         shop.id,
         secondShop.id,
@@ -1217,6 +1266,23 @@ void main() {
       expect(session.selectedOrder.id, 'MS-240782');
     });
 
+    test('Medicine Tracking and Items remain Care-owned', () {
+      expect(session.openTracking('RX-240784'), isTrue);
+      expect(session.destination, BuyV2Destination.medicine);
+      expect(session.view, BuyV2View.tracking);
+
+      expect(session.openOrderItems('RX-240784'), isTrue);
+      expect(session.destination, BuyV2Destination.medicine);
+      expect(session.view, BuyV2View.orderItems);
+
+      session.goBack();
+      expect(session.destination, BuyV2Destination.medicine);
+      expect(session.view, BuyV2View.tracking);
+      session.goBack();
+      expect(session.destination, BuyV2Destination.medicine);
+      expect(session.view, BuyV2View.catalogue);
+    });
+
     test(
       'Account child journeys return through Account to the exact origin',
       () {
@@ -1316,15 +1382,40 @@ void main() {
     test('saved address and payment selections change independently', () {
       session.chooseAddress('work');
       expect(session.selectedAddressId, 'work');
-      expect(session.selectedPayment, 'UPI');
+      expect(session.selectedPayment, 'PhonePe');
 
-      expect(session.choosePayment('Bank transfer'), isTrue);
+      expect(session.choosePayment('Paytm'), isTrue);
       expect(session.selectedAddressId, 'work');
-      expect(session.selectedPayment, 'Bank transfer');
+      expect(session.selectedPayment, 'Paytm');
 
       session.chooseAddress('home');
       expect(session.selectedAddressId, 'home');
-      expect(session.selectedPayment, 'Bank transfer');
+      expect(session.selectedPayment, 'Paytm');
+    });
+
+    test('staged Checkout Back returns Confirm Payment Address then Cart', () {
+      final product = BuyV2Catalogue.products.firstWhere(
+        (item) => item.destination == BuyV2Destination.shop,
+      );
+      expect(session.addProduct(product.id), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.checkoutStep, BuyV2CheckoutStep.address);
+
+      expect(session.continueCheckoutFromAddress(), isTrue);
+      expect(session.checkoutStep, BuyV2CheckoutStep.payment);
+      expect(session.continueCheckoutFromPayment(), isTrue);
+      expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+
+      session.goBack();
+      expect(session.view, BuyV2View.checkout);
+      expect(session.checkoutStep, BuyV2CheckoutStep.payment);
+      session.goBack();
+      expect(session.view, BuyV2View.checkout);
+      expect(session.checkoutStep, BuyV2CheckoutStep.address);
+      session.goBack();
+      expect(session.view, BuyV2View.cart);
+      expect(session.cartScope, BuyV2CartScope.shop);
     });
 
     test('saved address update preserves identity count and selection', () {
@@ -1391,13 +1482,17 @@ void main() {
       expect(session.choosePayment('Purchase order'), isTrue);
 
       expect(session.choosePayment('Card<script>'), isFalse);
+      expect(session.choosePayment('UPI'), isFalse);
+      expect(session.choosePayment('Bank transfer'), isFalse);
 
       expect(session.selectedAddressId, 'work');
       expect(session.selectedPayment, 'Purchase order');
       expect(session.notice, 'This payment method is not available.');
       expect(BuyV2Session.paymentMethods, {
-        'UPI',
-        'Bank transfer',
+        'PhonePe',
+        'Paytm',
+        'Pine Labs',
+        'Cash on Delivery',
         'Purchase order',
       });
     });
@@ -1587,7 +1682,7 @@ void main() {
             landmark: 'Near the park',
           ),
         );
-        first.choosePayment('Bank transfer');
+        first.choosePayment('Paytm');
         final brand = first.discoveryBrands.first;
         first.toggleDiscoveryBrand(brand);
         first.chooseMaximumProductPrice(500);
@@ -1606,7 +1701,7 @@ void main() {
         expect(restored.quantityFor(product.id), product.minimumOrder);
         expect(restored.isSaved(product.id), isTrue);
         expect(restored.selectedAddressId, 'family');
-        expect(restored.selectedPayment, 'Bank transfer');
+        expect(restored.selectedPayment, 'Paytm');
         expect(restored.selectedBrands, {brand});
         expect(restored.maximumProductPrice, 500);
         expect(restored.selectedPackFilter, BuyV2PackFilter.standard);
@@ -1615,6 +1710,70 @@ void main() {
         expect(restored.availableProductsOnly, isTrue);
       },
     );
+
+    test('confirmed order survives a customer-session restart', () async {
+      final store = _MemoryCustomerStateStore('account-orders');
+      final first = BuyV2Session(core: BuySession(), customerStateStore: store);
+      addTearDown(first.dispose);
+      final product = first.product('s-tomato');
+
+      expect(first.addProduct(product.id), isTrue);
+      first.openCart(scope: BuyV2CartScope.shop);
+      expect(first.openCheckout(), isTrue);
+      expect(first.continueCheckoutFromAddress(), isTrue);
+      expect(first.choosePayment('Cash on Delivery'), isTrue);
+      expect(first.continueCheckoutFromPayment(), isTrue);
+      expect(await first.submitOrder(), isTrue);
+      expect(first.confirmedOrders, isNotEmpty);
+      final orderId = first.confirmedOrders.first.id;
+      await Future<void>.delayed(Duration.zero);
+
+      final restored = BuyV2Session(
+        core: BuySession(),
+        customerStateStore: store,
+      );
+      addTearDown(restored.dispose);
+      await restored.restoreCustomerState();
+
+      expect(restored.orders.any((order) => order.id == orderId), isTrue);
+      expect(
+        restored.productsForOrder(
+          restored.orders.firstWhere((order) => order.id == orderId),
+        ),
+        isNotEmpty,
+      );
+    });
+
+    test('delivery refinement keeps the visible Shop segment truthful', () {
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+
+      session.chooseShopSaleType(BuyV2ShopSaleType.courier);
+      session.chooseFulfilmentMode(BuyV2FulfilmentMode.quickLocal);
+
+      expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
+      expect(
+        session.catalogueSaleTypeProducts.every(
+          (product) =>
+              session.fulfilmentModeFor(product) ==
+              BuyV2FulfilmentMode.quickLocal,
+        ),
+        isTrue,
+      );
+    });
+
+    test('closed and no-products stores cannot add unavailable products', () {
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      final closedProduct = session.product('s-dog-food');
+      final unavailableProduct = session.product('s-shampoo');
+
+      expect(session.addProduct(closedProduct.id), isFalse);
+      expect(session.notice, contains('closed'));
+      expect(session.partnerCatalogueFor(unavailableProduct), isEmpty);
+      expect(session.addProduct(unavailableProduct.id), isFalse);
+      expect(session.notice, 'This product is unavailable right now.');
+    });
 
     test(
       'payment handoff locks one attempt and reconciliation confirms once',
@@ -2007,6 +2166,7 @@ void main() {
           fixture.session.orderRefreshMessage(fixture.order.id),
           'Order identity could not be verified.',
         );
+        expect(fixture.session.notice, isNull);
       },
     );
 
@@ -2039,13 +2199,13 @@ void main() {
     test(
       'stock recovery identifies one product and revalidates without ordering',
       () async {
-        final facts = _MutableCommerceFactsAdapter()
-          ..orderabilityLabel = 'Out of stock';
+        final facts = _MutableCommerceFactsAdapter();
         final fixture = await _openProductionCheckout(
           outcome: BuyV2OrderPlacementOutcome.failed,
           factsAdapter: facts,
         );
         addTearDown(fixture.session.dispose);
+        facts.orderabilityLabel = 'Out of stock';
 
         expect(await fixture.session.submitOrder(), isFalse);
         expect(fixture.adapter.placementCalls, 0);
@@ -2112,6 +2272,85 @@ void main() {
       expect(fixture.session.view, BuyV2View.checkout);
       expect(fixture.session.selectedAddress.id, addressId);
       expect(fixture.session.cartLines, isNotEmpty);
+    });
+
+    test('Shop sale type separates Quick delivery and Courier products', () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
+      expect(session.catalogueSaleTypeProducts, isNotEmpty);
+      expect(
+        session.catalogueSaleTypeProducts.every(
+          (product) =>
+              session.fulfilmentModeFor(product) ==
+              BuyV2FulfilmentMode.quickLocal,
+        ),
+        isTrue,
+      );
+
+      session.chooseShopSaleType(BuyV2ShopSaleType.courier);
+      expect(session.shopSaleType, BuyV2ShopSaleType.courier);
+      expect(session.catalogueSaleTypeProducts, isNotEmpty);
+      expect(
+        session.catalogueSaleTypeProducts.every(
+          (product) =>
+              session.fulfilmentModeFor(product) ==
+              BuyV2FulfilmentMode.standardCourier,
+        ),
+        isTrue,
+      );
+    });
+
+    test('Wholesale sale type separates regular and higher-volume MOQ', () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      session.openDestination(BuyV2Destination.wholesale);
+
+      expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.wholesale);
+      expect(session.catalogueSaleTypeProducts, isNotEmpty);
+      expect(
+        session.catalogueSaleTypeProducts.every(
+          (product) => product.minimumOrder <= 2,
+        ),
+        isTrue,
+      );
+
+      session.addProduct(session.catalogueSaleTypeProducts.first.id);
+      final itemCount = session.itemCount;
+      session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.bulk);
+      expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.bulk);
+      expect(session.catalogueSaleTypeProducts, isNotEmpty);
+      expect(
+        session.catalogueSaleTypeProducts.every(
+          (product) => product.minimumOrder > 2,
+        ),
+        isTrue,
+      );
+      expect(session.itemCount, itemCount);
+    });
+
+    test('placed Shop order distinguishes products from item quantity', () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      expect(session.addProduct('s-tomato'), isTrue);
+      session.increase('s-tomato');
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.confirmOrder(), isTrue);
+
+      expect(session.confirmedOrders, hasLength(1));
+      expect(
+        session.confirmedOrders.single.itemSummary,
+        startsWith('1 product · 2 items ·'),
+      );
     });
   });
 }
