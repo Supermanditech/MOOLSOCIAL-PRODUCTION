@@ -44753,6 +44753,56 @@
       "prevention": "Do not retry this batch on the Store child. On the combined repair, inventory dependency-ready owners first and capture complete per-file or bounded aggregate results with exact native exits.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json"]
+    },
+    {
+      "id": "REG-20260904-4465-REPAIR-V2-FULL-LEGACY-UNIVERSAL-SWEEP-CROSSED-UNRELATED-STALE-CONTRACTS",
+      "status": "registered-overbroad-regression-selection-and-output-truncation",
+      "appliesTo": ["primary", "codex_ui", "universal", "test", "integration"],
+      "mistake": "A whole-directory Universal sweep was started after the required C20E and ten-file batches passed; it crossed unrelated historical Social, Chat and fixed-width contracts, accumulated 54 inherited failures, emitted truncated output and was stopped before completion.",
+      "rootCause": "The phrase related Universal tests was expanded to every historical Universal test instead of the bounded navigation, accessibility and reduced-motion owners connected to the current correction.",
+      "prevention": "Define related suites by changed-owner import and behavior scope, run bounded files or named tests with complete output, and classify unrelated inherited historical contracts separately rather than turning integration into repository-wide cleanup.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart"]
+    },
+    {
+      "id": "REG-20260904-4466-UNIVERSAL-CHILD-BOUNDED-RG-OMITTED-WORKTREE-CONTEXT",
+      "status": "registered-read-only-path-context-failure",
+      "appliesTo": ["primary", "codex_ui", "universal", "tooling"],
+      "mistake": "A bounded search for Universal child qualification references omitted the child worktree as the command working directory, so both relative targets were reported missing and no repository bytes changed.",
+      "rootCause": "The command used relative paths while the shell remained in the desktop task workspace.",
+      "prevention": "Set the exact worktree for every relative repository command or use absolute literal paths, and verify the target exists before searching.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json"]
+    },
+    {
+      "id": "REG-20260904-4467-REPAIR-V2-BUY-BATCH-INCLUDED-PROTECTED-REFERENCE-GOLDENS",
+      "status": "registered-test-invocation-scope-failure",
+      "appliesTo": ["primary", "cursor_ui", "buy", "test", "integration"],
+      "mistake": "The combined Buy qualification command included five protected-reference checkout golden captures without the owning suite's exclusion, producing five expected image mismatches while 280 functional tests passed and one evidence capture skipped.",
+      "rootCause": "The focused test list was copied without preserving the established protected-reference tag boundary used for immutable historical captures.",
+      "prevention": "Run functional checkout qualification with --exclude-tags protected-reference, keep historical goldens unchanged, and report their exclusion separately from product failures; the corrected checkout run must pass all 16 active tests.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"]
+    },
+    {
+      "id": "REG-20260904-4468-UNIVERSAL-CHAT-BOUNDARY-EXPECTED-BUSINESS-FILTER-ABSENCE",
+      "status": "registered-inherited-shared-test-contract-failure",
+      "appliesTo": ["primary", "codex_ui", "universal", "chat", "test", "integration"],
+      "mistake": "The mandatory Universal intent-completion test expected the Business filter control to be absent even while asserting a Business initial filter and exact Business conversation results; the accepted inbox visibly renders that selected filter.",
+      "rootCause": "The shared test retained an obsolete hidden-filter assertion after the customer-facing Chat inbox adopted visible filter controls.",
+      "prevention": "Assert one visible selected Business filter together with the existing initial-filter and exact-thread checks, change no product behavior, and rerun the complete Universal intent and Store/Buy boundary batches before rebuilding repair.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/universal_intent_completion_test.dart"]
+    },
+    {
+      "id": "REG-20260904-4469-CHAT-BOUNDARY-BOOTSTRAP-REGISTRY-GATES-CONTAINED-COMMAND-TEXT",
+      "status": "registered-regression-registry-schema-failure",
+      "appliesTo": ["primary", "codex_ui", "universal", "test"],
+      "mistake": "Three new incident records placed full Flutter command text in the gates array, so the regression-memory validator correctly rejected the first value as a missing repository evidence path.",
+      "rootCause": "The registry's gates field was treated as descriptive command evidence instead of its required repository-path contract.",
+      "prevention": "Keep gates limited to existing repository gate owners, retain exact test commands in qualification evidence, and run the general regression-memory validator before staging the bootstrap.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json"]
     }
   ]
 }

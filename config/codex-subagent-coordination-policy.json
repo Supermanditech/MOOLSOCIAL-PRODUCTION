@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3919,
-    "sha256": "08BC2AD2DBC8844F5CF2C5BC65E1B7B51A3ADB4BC2A69B58906604710A8ED05F"
+    "entryCount": 3924,
+    "sha256": "1EBBA0A74B9AC8EF2F486984877B90867F7A69747045C8EBA095FE2844503E4A"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -36,8 +36,7 @@
       "owners": [
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json",
-        "apps/mobile/lib/core/design/mool_design_system.dart",
-        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart",
+        "apps/mobile/test/universal_intent_completion_test.dart",
         "scripts/check-codex-subagent-coordination-policy.ps1"
       ]
     },
@@ -1414,6 +1413,27 @@
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
           "docs/quality/UAW-CODEX-UNIVERSAL-C20E-TEST-CONTRACT-V2-20260904.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "codex_universal_chat_boundary_contract_v1_20260904",
+        "state": "founder_authorized_2026_09_04",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "universal-chat-boundary-contract-v1-20260904",
+        "ticketId": "UAW-CODEX-UNIVERSAL-CHAT-BOUNDARY-CONTRACT-V1-20260904",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-universal-c20e-test-contract-v2-20260904",
+        "branch": "work/codex-ui/universal-chat-boundary-contract-v1-20260904",
+        "baselineHead": "300f4247165a097d82624f4b40c9c2d611c7bc48",
+        "bootstrapCommitSubject": "coordination(universal-chat-boundary-contract-v1-20260904): bind shared Chat test correction",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CODEX-UNIVERSAL-CHAT-BOUNDARY-CONTRACT-V1-20260904.md",
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,
