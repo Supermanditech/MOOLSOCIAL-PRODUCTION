@@ -4,9 +4,15 @@ import 'chat_models.dart';
 import 'chat_services.dart';
 
 class ChatSession extends ChangeNotifier {
-  ChatSession({ChatSendGateway? sendGateway, this._photoPicker})
-    : _gateway = null,
-      _reviewSendGateway = sendGateway ?? ReviewChatSendGateway() {
+  ChatSession({
+    ChatSendGateway? sendGateway,
+    this._photoPicker,
+    this._attachmentPicker,
+    this._voiceRecorder,
+    this._attachmentPlayback,
+    this._notificationClient,
+  }) : _gateway = null,
+       _reviewSendGateway = sendGateway ?? ReviewChatSendGateway() {
     _threads.addAll(reviewThreads);
     _messages.addAll({
       'home-basket': [
@@ -53,12 +59,59 @@ class ChatSession extends ChangeNotifier {
           mine: false,
         ),
       ],
+      'shop-assist': [
+        const ChatMessage(
+          id: 'shop-assist-1',
+          sender: 'MoolSocial Assist',
+          text:
+              'Choose an order question below or write what you need help with.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'shop-order': [
+        const ChatMessage(
+          id: 'shop-order-1',
+          sender: 'Fresh Basket Order',
+          text: 'Your grocery order is being packed.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'shop-partner': [
+        const ChatMessage(
+          id: 'shop-partner-1',
+          sender: 'Metro Wholesale Partner',
+          text: 'Your bulk quote is ready to review.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'shop-offers': [
+        const ChatMessage(
+          id: 'shop-offers-1',
+          sender: 'Shop Offers Support',
+          text: 'Tell us which Shop offer you need help with.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
       'rasoi': [
         const ChatMessage(
           id: 'm6',
           sender: 'Rasoi Kitchen',
           text: 'Your lunch order is being prepared.',
           timeLabel: '10:21',
+          mine: false,
+        ),
+      ],
+      'ride-support': [
+        const ChatMessage(
+          id: 'm9',
+          sender: 'Trip Support',
+          text:
+              'Your Bike Saver trip from Sardarpura pickup gate to Railway Station is ready for coordination.',
+          timeLabel: 'Now',
           mine: false,
         ),
       ],
@@ -80,27 +133,187 @@ class ChatSession extends ChangeNotifier {
           mine: false,
         ),
       ],
+      'workspace-support': [
+        const ChatMessage(
+          id: 'workspace-review-1',
+          sender: 'Workspace Review',
+          text:
+              'Choose one work profile and complete only the requested details. Your personal account remains active during review.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'work-opportunity': [
+        const ChatMessage(
+          id: 'work-opportunity-1',
+          sender: 'MoolSocial Work',
+          text:
+              'Ask about eligibility, timing or the next step for an opportunity.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'work-support': [
+        const ChatMessage(
+          id: 'work-support-1',
+          sender: 'MoolSocial Work Support',
+          text:
+              'Tell us which opportunity or workspace step you need help with.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'pay-support': [
+        const ChatMessage(
+          id: 'pay-support-1',
+          sender: 'MoolSocial Pay Support',
+          text: 'Tell us which payment, request or receipt you need help with.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'retailer-order-ms-2841': [
+        const ChatMessage(
+          id: 'retailer-order-ms-2841-1',
+          sender: 'Amit Sharma',
+          text: 'Please message me here if the delivery time changes.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'retailer-order-ms-2840': [
+        const ChatMessage(
+          id: 'retailer-order-ms-2840-1',
+          sender: 'Neha Jain',
+          text: 'Thank you. The delivered order is complete.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'food-restaurant-spice-darbar': [
+        const ChatMessage(
+          id: 'food-restaurant-spice-darbar-1',
+          sender: 'Spice Darbar',
+          text: 'Your table and food questions can continue here.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'food-restaurant-taj-jodhpur': [
+        const ChatMessage(
+          id: 'food-restaurant-taj-jodhpur-1',
+          sender: 'Taj Jodhpur',
+          text: 'Ask about your table booking or dining visit here.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'food-restaurant-blue-lime': [
+        const ChatMessage(
+          id: 'food-restaurant-blue-lime-1',
+          sender: 'Blue Lime Cafe',
+          text: 'Ask about your table or cafe order here.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'food-restaurant-raas-rooftop': [
+        const ChatMessage(
+          id: 'food-restaurant-raas-rooftop-1',
+          sender: 'Raas Rooftop',
+          text: 'Ask about your booking or arrival details here.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
+      'ride-captain': [
+        const ChatMessage(
+          id: 'ride-captain-1',
+          sender: 'Arjun Singh',
+          text: 'I’m on the way. Message me here about the pickup point.',
+          timeLabel: 'Now',
+          mine: false,
+        ),
+      ],
     });
   }
 
-  ChatSession.production({ChatGateway? gateway, ChatPhotoPicker? photoPicker})
-    : _gateway = gateway ?? buildChatGateway(),
-      _reviewSendGateway = null,
-      _photoPicker = photoPicker ?? NativeChatPhotoPicker();
+  ChatSession.production({
+    ChatGateway? gateway,
+    ChatPhotoPicker? photoPicker,
+    ChatAttachmentPicker? attachmentPicker,
+    ChatVoiceRecorder? voiceRecorder,
+    ChatAttachmentPlayback? attachmentPlayback,
+    ChatNotificationClient? notificationClient,
+  }) : _gateway = gateway ?? buildChatGateway(),
+       _reviewSendGateway = null,
+       _photoPicker = photoPicker ?? NativeChatPhotoPicker(),
+       _attachmentPicker = attachmentPicker ?? NativeChatAttachmentPicker(),
+       _voiceRecorder = voiceRecorder ?? NativeChatVoiceRecorder(),
+       _attachmentPlayback =
+           attachmentPlayback ?? NativeChatAttachmentPlayback(),
+       _notificationClient =
+           notificationClient ?? FirebaseChatNotificationClient();
 
   final ChatGateway? _gateway;
   final ChatSendGateway? _reviewSendGateway;
   final ChatPhotoPicker? _photoPicker;
+  final ChatAttachmentPicker? _attachmentPicker;
+  final ChatVoiceRecorder? _voiceRecorder;
+  final ChatAttachmentPlayback? _attachmentPlayback;
+  final ChatNotificationClient? _notificationClient;
   final List<ChatThread> _threads = [];
   final Map<String, List<ChatMessage>> _messages = {};
   final Map<String, String> _messageLoadErrors = {};
   final Map<String, String> _threadActionErrors = {};
   final Map<String, String> _threadActionNotices = {};
+  final Map<String, Set<String>> _hiddenMessageIdsByThread = {};
+  final Map<String, String> _draftTextByThread = {};
   final Set<String> _readThreads = {};
+  final Set<String> _markedUnreadThreads = {};
+  final Set<String> _pinnedThreadIds = {'shop-assist'};
+  final Set<String> _reducedAttentionThreadIds = {};
+  final Set<String> _archivedThreadIds = {};
   final Map<String, String> _retryKeys = {};
   final Map<String, String> _forwardRetryKeys = {};
   final Map<String, ChatMessage> _replyTargets = {};
   final Map<String, _PendingChatPhoto> _pendingPhotos = {};
+  final Map<String, _PendingChatAttachment> _pendingAttachments = {};
+  final Set<String> _recordingThreads = {};
+  final Map<String, bool> _chatAvailableForSession = {};
+  final Map<String, bool> _voiceCallsAvailableForSession = {};
+  final Map<String, bool> _videoCallsAvailableForSession = {};
+  final Map<String, bool> _reviewBeforeSendingForSession = {};
+  bool _globalChatAvailableForSession = true;
+  bool _globalVoiceCallsAvailableForSession = true;
+  bool _globalVideoCallsAvailableForSession = true;
+  bool _globalReviewBeforeSendingForSession = false;
+  bool _hideMessagePreviewsForSession = false;
+  bool _showSuggestedPromptsForSession = true;
+  ChatPrivacySettings _privacySettings = ChatPrivacySettings.defaults;
+  final List<ChatBlockedAccount> _blockedAccounts = [];
+  final List<ChatMessageRequest> _messageRequests = [];
+  bool privacyLoading = false;
+  bool privacyLoaded = false;
+  String? privacyError;
+  ChatCallPreferences _callPreferences = ChatCallPreferences.defaults;
+  final List<ChatCall> _incomingCalls = [];
+  ChatCall? _activeCall;
+  bool callLoading = false;
+  bool callPreferencesLoaded = false;
+  String? callError;
+  final Map<String, ChatGroupInfo> _groupInfoByThread = {};
+  final List<ChatGroupInvite> _groupInvites = [];
+  bool groupLoading = false;
+  String? groupError;
+  ChatNotificationPreferences _notificationPreferences =
+      ChatNotificationPreferences.defaults();
+  ChatNotificationPermission notificationPermission =
+      ChatNotificationPermission.unknown;
+  bool notificationLoading = false;
+  bool notificationLoaded = false;
+  String? notificationError;
+  String? _registeredNotificationToken;
   int _messageSequence = 10;
 
   static const reviewThreads = <ChatThread>[
@@ -112,6 +325,49 @@ class ChatSession extends ChangeNotifier {
       timeLabel: 'Now',
       type: ChatThreadType.support,
       unreadCount: 1,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'shop-assist',
+      title: 'MoolSocial Assist',
+      subtitle: 'Shop order help',
+      preview: 'Choose an order question to continue.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
+      verified: true,
+      suggestedPrompts: [
+        'Where is my order?',
+        'Cancel or change order',
+        'Change delivery',
+        'Problem with an item',
+      ],
+    ),
+    ChatThread(
+      id: 'shop-order',
+      title: 'Fresh Basket Order',
+      subtitle: 'Order MS-240782',
+      preview: 'Your grocery order is being packed.',
+      timeLabel: 'Now',
+      type: ChatThreadType.order,
+      unreadCount: 1,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'shop-partner',
+      title: 'Metro Wholesale Partner',
+      subtitle: 'Verified wholesale partner',
+      preview: 'Your bulk quote is ready.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'shop-offers',
+      title: 'Shop Offers Support',
+      subtitle: 'Offer help',
+      preview: 'We can help with this Shop offer.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
       verified: true,
     ),
     ChatThread(
@@ -131,6 +387,19 @@ class ChatSession extends ChangeNotifier {
       preview: 'Amit: Add atta, rice and oil.',
       timeLabel: '10:49',
       type: ChatThreadType.people,
+      groupDescription: 'Plan household shopping together.',
+      participants: [
+        ChatParticipant(
+          id: 'current-user',
+          name: 'You',
+          subtitle: 'Group member',
+          isMe: true,
+        ),
+        ChatParticipant(id: 'amit', name: 'Amit', subtitle: 'Group member'),
+        ChatParticipant(id: 'rakesh', name: 'Rakesh', subtitle: 'Group member'),
+        ChatParticipant(id: 'neha', name: 'Neha', subtitle: 'Group member'),
+        ChatParticipant(id: 'priya', name: 'Priya', subtitle: 'Group member'),
+      ],
     ),
     ChatThread(
       id: 'rasoi',
@@ -139,6 +408,16 @@ class ChatSession extends ChangeNotifier {
       preview: 'Your lunch order is being prepared.',
       timeLabel: '10:21',
       type: ChatThreadType.order,
+      unreadCount: 1,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'ride-support',
+      title: 'Trip Support',
+      subtitle: 'Bike Saver · Sardarpura to Railway Station',
+      preview: 'Your trip is ready for coordination.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
       unreadCount: 1,
       verified: true,
     ),
@@ -158,6 +437,104 @@ class ChatSession extends ChangeNotifier {
       preview: 'I can see the approved task instructions.',
       timeLabel: 'Now',
       type: ChatThreadType.business,
+      verified: true,
+      safetyTarget: ChatSafetyTarget.person,
+    ),
+    ChatThread(
+      id: 'workspace-support',
+      title: 'Workspace Review',
+      subtitle: 'Setup and application support',
+      preview: 'Complete only the details requested for review.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'work-opportunity',
+      title: 'MoolSocial Work',
+      subtitle: 'Opportunity support',
+      preview: 'Ask about eligibility, timing or next steps.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'work-support',
+      title: 'MoolSocial Work Support',
+      subtitle: 'Opportunities and workspace help',
+      preview: 'Get help with an opportunity or workspace step.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'pay-support',
+      title: 'MoolSocial Pay Support',
+      subtitle: 'Payments and receipts',
+      preview: 'Get help with a payment, request or receipt.',
+      timeLabel: 'Now',
+      type: ChatThreadType.support,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'retailer-order-ms-2841',
+      title: 'Amit Sharma',
+      subtitle: 'Order MS-2841',
+      preview: 'Message here if the delivery time changes.',
+      timeLabel: 'Now',
+      type: ChatThreadType.people,
+    ),
+    ChatThread(
+      id: 'retailer-order-ms-2840',
+      title: 'Neha Jain',
+      subtitle: 'Order MS-2840',
+      preview: 'The delivered order is complete.',
+      timeLabel: 'Now',
+      type: ChatThreadType.people,
+    ),
+    ChatThread(
+      id: 'food-restaurant-spice-darbar',
+      title: 'Spice Darbar',
+      subtitle: 'Table bookings and food orders',
+      preview: 'Continue your table or food questions here.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'food-restaurant-taj-jodhpur',
+      title: 'Taj Jodhpur',
+      subtitle: 'Table bookings and dining',
+      preview: 'Ask about your table booking or visit.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'food-restaurant-blue-lime',
+      title: 'Blue Lime Cafe',
+      subtitle: 'Table bookings and cafe orders',
+      preview: 'Ask about your table or cafe order.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'food-restaurant-raas-rooftop',
+      title: 'Raas Rooftop',
+      subtitle: 'Table bookings and arrival',
+      preview: 'Ask about your booking or arrival details.',
+      timeLabel: 'Now',
+      type: ChatThreadType.business,
+      verified: true,
+    ),
+    ChatThread(
+      id: 'ride-captain',
+      title: 'Arjun Singh',
+      subtitle: 'Your verified captain',
+      preview: 'Message about the pickup point.',
+      timeLabel: 'Now',
+      type: ChatThreadType.people,
       verified: true,
     ),
   ];
@@ -180,19 +557,80 @@ class ChatSession extends ChangeNotifier {
 
   List<ChatThread> visibleThreads([String query = '']) {
     final normalized = query.trim().toLowerCase();
-    return _threads.where((thread) {
-      final filterMatches =
-          selectedFilter == null || thread.type == selectedFilter;
-      final unreadMatches =
-          !unreadOnly ||
-          (thread.unreadCount > 0 && !_readThreads.contains(thread.id));
-      final queryMatches =
-          normalized.isEmpty ||
-          thread.title.toLowerCase().contains(normalized) ||
-          thread.subtitle.toLowerCase().contains(normalized) ||
-          thread.preview.toLowerCase().contains(normalized);
-      return filterMatches && unreadMatches && queryMatches;
-    }).toList();
+    final matches = _threads
+        .where((thread) {
+          final filterMatches =
+              selectedFilter == null || thread.type == selectedFilter;
+          final unreadMatches = !unreadOnly || unreadFor(thread) > 0;
+          final queryMatches =
+              normalized.isEmpty ||
+              thread.title.toLowerCase().contains(normalized) ||
+              thread.subtitle.toLowerCase().contains(normalized) ||
+              thread.preview.toLowerCase().contains(normalized);
+          return !_archivedThreadIds.contains(thread.id) &&
+              filterMatches &&
+              unreadMatches &&
+              queryMatches;
+        })
+        .toList(growable: false);
+    return [
+      ...matches.where((thread) => _pinnedThreadIds.contains(thread.id)),
+      ...matches.where((thread) => !_pinnedThreadIds.contains(thread.id)),
+    ];
+  }
+
+  List<ChatThread> archivedThreads([String query = '']) {
+    final normalized = query.trim().toLowerCase();
+    return _threads
+        .where((thread) {
+          final queryMatches =
+              normalized.isEmpty ||
+              thread.title.toLowerCase().contains(normalized) ||
+              thread.subtitle.toLowerCase().contains(normalized) ||
+              thread.preview.toLowerCase().contains(normalized);
+          return _archivedThreadIds.contains(thread.id) && queryMatches;
+        })
+        .toList(growable: false);
+  }
+
+  bool isPinnedForSession(String threadId) =>
+      _pinnedThreadIds.contains(threadId);
+
+  bool hasReducedAttentionForSession(String threadId) =>
+      _reducedAttentionThreadIds.contains(threadId);
+
+  bool isArchivedForSession(String threadId) =>
+      _archivedThreadIds.contains(threadId);
+
+  int get archivedConversationCount => _archivedThreadIds.length;
+
+  void setPinnedForSession(String threadId, {required bool pinned}) {
+    final changed = pinned
+        ? _pinnedThreadIds.add(threadId)
+        : _pinnedThreadIds.remove(threadId);
+    if (changed) notifyListeners();
+  }
+
+  void setReducedAttentionForSession(String threadId, {required bool reduced}) {
+    final changed = reduced
+        ? _reducedAttentionThreadIds.add(threadId)
+        : _reducedAttentionThreadIds.remove(threadId);
+    if (changed) notifyListeners();
+  }
+
+  void setArchivedForSession(String threadId, {required bool archived}) {
+    final changed = archived
+        ? _archivedThreadIds.add(threadId)
+        : _archivedThreadIds.remove(threadId);
+    if (!changed) return;
+    notifyListeners();
+  }
+
+  void setReadForSession(String threadId, {required bool read}) {
+    final changed = read
+        ? _readThreads.add(threadId) | _markedUnreadThreads.remove(threadId)
+        : _markedUnreadThreads.add(threadId) | _readThreads.remove(threadId);
+    if (changed) notifyListeners();
   }
 
   List<ChatThread> availableForwardTargets(String sourceThreadId) {
@@ -216,7 +654,33 @@ class ChatSession extends ChangeNotifier {
   }
 
   List<ChatMessage> messages(String threadId) {
-    return List.unmodifiable(_messages[threadId] ?? const []);
+    final hiddenIds = _hiddenMessageIdsByThread[threadId];
+    final values = _messages[threadId] ?? const [];
+    if (hiddenIds == null || hiddenIds.isEmpty) {
+      return List.unmodifiable(values);
+    }
+    return List.unmodifiable(
+      values.where((message) => !hiddenIds.contains(message.id)),
+    );
+  }
+
+  bool isMessageHiddenForSession(String threadId, String messageId) =>
+      _hiddenMessageIdsByThread[threadId]?.contains(messageId) ?? false;
+
+  void setMessageHiddenForSession(
+    String threadId,
+    String messageId, {
+    required bool hidden,
+  }) {
+    final hiddenIds = _hiddenMessageIdsByThread.putIfAbsent(
+      threadId,
+      () => <String>{},
+    );
+    final changed = hidden
+        ? hiddenIds.add(messageId)
+        : hiddenIds.remove(messageId);
+    if (hiddenIds.isEmpty) _hiddenMessageIdsByThread.remove(threadId);
+    if (changed) notifyListeners();
   }
 
   String? messageLoadError(String threadId) => _messageLoadErrors[threadId];
@@ -226,6 +690,1100 @@ class ChatSession extends ChangeNotifier {
   String? threadActionNotice(String threadId) => _threadActionNotices[threadId];
 
   ChatMessage? replyTarget(String threadId) => _replyTargets[threadId];
+
+  String draftTextForSession(String threadId) =>
+      _draftTextByThread[threadId] ?? '';
+
+  bool hasDraftForSession(String threadId) =>
+      draftTextForSession(threadId).trim().isNotEmpty ||
+      replyTarget(threadId) != null ||
+      selectedPhoto(threadId) != null;
+
+  String? draftSummaryForSession(String threadId) {
+    final text = draftTextForSession(threadId).trim();
+    if (text.isNotEmpty) {
+      return text.replaceAll(RegExp(r'\s+'), ' ');
+    }
+    if (selectedPhoto(threadId) != null) return 'Photo ready to send';
+    if (selectedAttachment(threadId) case final attachment?) {
+      return attachment.kind == ChatAttachmentKind.voice
+          ? 'Voice message ready to send'
+          : '${attachment.kind == ChatAttachmentKind.video ? 'Video' : 'Document'} ready to send';
+    }
+    if (replyTarget(threadId) != null) return 'Reply ready to send';
+    return null;
+  }
+
+  void setDraftTextForSession(String threadId, String value) {
+    final changed = value.isEmpty
+        ? _draftTextByThread.remove(threadId) != null
+        : _draftTextByThread[threadId] != value;
+    if (value.isNotEmpty) {
+      _draftTextByThread[threadId] = value;
+    }
+    if (changed) notifyListeners();
+  }
+
+  void discardDraftForSession(String threadId) {
+    final hadText = _draftTextByThread.remove(threadId) != null;
+    final hadReply = _replyTargets.remove(threadId) != null;
+    final hadPhoto = _pendingPhotos.remove(threadId) != null;
+    final hadAttachment = _pendingAttachments.remove(threadId) != null;
+    final changed = hadText || hadReply || hadPhoto || hadAttachment;
+    if (changed) notifyListeners();
+  }
+
+  bool get globalChatAvailableForSession => _globalChatAvailableForSession;
+
+  bool get globalVoiceCallsAvailableForSession =>
+      _globalVoiceCallsAvailableForSession;
+
+  bool get globalVideoCallsAvailableForSession =>
+      _globalVideoCallsAvailableForSession;
+
+  bool get globalReviewBeforeSendingForSession =>
+      _globalReviewBeforeSendingForSession;
+
+  bool get hideMessagePreviewsForSession => _hideMessagePreviewsForSession;
+
+  bool get showSuggestedPromptsForSession => _showSuggestedPromptsForSession;
+
+  ChatPickedAttachment? selectedAttachment(String threadId) =>
+      _pendingAttachments[threadId]?.attachment;
+
+  bool get attachmentSelectionAvailable => _attachmentPicker != null;
+  bool get voiceRecordingAvailable => _voiceRecorder != null;
+
+  bool isRecordingVoice(String threadId) =>
+      _recordingThreads.contains(threadId);
+
+  Future<bool> selectAttachment(
+    String threadId,
+    ChatAttachmentKind kind,
+  ) async {
+    final picker = _attachmentPicker;
+    if (busy || picker == null || kind == ChatAttachmentKind.voice) {
+      _threadActionErrors[threadId] =
+          'Attachment selection is unavailable right now.';
+      notifyListeners();
+      return false;
+    }
+    busy = true;
+    _threadActionErrors.remove(threadId);
+    notifyListeners();
+    try {
+      final picked = await picker.pick(kind);
+      if (picked == null) return false;
+      _pendingAttachments[threadId] = _PendingChatAttachment(
+        attachment: picked,
+        idempotencyKey:
+            'chat-attachment-${DateTime.now().microsecondsSinceEpoch}-${++_messageSequence}',
+      );
+      _pendingPhotos.remove(threadId);
+      _threadActionNotices[threadId] =
+          '${kind == ChatAttachmentKind.video ? 'Video' : 'Document'} ready to send.';
+      return true;
+    } on ChatServiceException catch (error) {
+      _threadActionErrors[threadId] = error.userMessage;
+      return false;
+    } on Object {
+      _threadActionErrors[threadId] = 'That attachment could not be opened.';
+      return false;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> startVoiceRecording(String threadId) async {
+    final recorder = _voiceRecorder;
+    if (busy || recorder == null || _recordingThreads.isNotEmpty) {
+      _threadActionErrors[threadId] =
+          'Voice recording is unavailable right now.';
+      notifyListeners();
+      return false;
+    }
+    try {
+      await recorder.start();
+      _recordingThreads.add(threadId);
+      _threadActionErrors.remove(threadId);
+      _threadActionNotices[threadId] = 'Recording voice message…';
+      notifyListeners();
+      return true;
+    } on ChatServiceException catch (error) {
+      _threadActionErrors[threadId] = error.userMessage;
+      notifyListeners();
+      return false;
+    } on Object {
+      _threadActionErrors[threadId] = 'Voice recording could not start.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> stopVoiceRecording(String threadId) async {
+    final recorder = _voiceRecorder;
+    if (recorder == null || !_recordingThreads.contains(threadId)) return false;
+    busy = true;
+    notifyListeners();
+    try {
+      final picked = await recorder.stop();
+      _pendingAttachments[threadId] = _PendingChatAttachment(
+        attachment: picked,
+        idempotencyKey:
+            'chat-voice-${DateTime.now().microsecondsSinceEpoch}-${++_messageSequence}',
+      );
+      _pendingPhotos.remove(threadId);
+      _threadActionNotices[threadId] = 'Voice message ready to send.';
+      return true;
+    } on ChatServiceException catch (error) {
+      _threadActionErrors[threadId] = error.userMessage;
+      return false;
+    } on Object {
+      _threadActionErrors[threadId] = 'Voice recording could not be completed.';
+      return false;
+    } finally {
+      _recordingThreads.remove(threadId);
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> cancelVoiceRecording(String threadId) async {
+    if (!_recordingThreads.remove(threadId)) return;
+    await _voiceRecorder?.cancel();
+    _threadActionNotices.remove(threadId);
+    notifyListeners();
+  }
+
+  void cancelSelectedAttachment(String threadId) {
+    if (_pendingAttachments.remove(threadId) != null) notifyListeners();
+  }
+
+  Future<bool> sendSelectedAttachment(String threadId, String caption) async {
+    if (busy) return false;
+    final pending = _pendingAttachments[threadId];
+    final gateway = _gateway is ChatAttachmentGateway
+        ? _gateway as ChatAttachmentGateway
+        : null;
+    if (pending == null || gateway == null) {
+      _threadActionErrors[threadId] = 'Choose an attachment first.';
+      notifyListeners();
+      return false;
+    }
+    if (!pending.sendLocked) {
+      pending
+        ..caption = caption.trim()
+        ..replyTo = _replyReference(_replyTargets[threadId])
+        ..sendLocked = true;
+    }
+    busy = true;
+    _threadActionErrors.remove(threadId);
+    notifyListeners();
+    try {
+      final delivered = await gateway.sendAttachment(
+        threadId: threadId,
+        attachment: pending.attachment,
+        caption: pending.caption,
+        idempotencyKey: pending.idempotencyKey,
+        replyToMessageId: pending.replyTo?.messageId,
+      );
+      if (delivered.attachment == null) {
+        throw const ChatServiceException(
+          'Chat returned an invalid attachment. Try again.',
+        );
+      }
+      _messages.putIfAbsent(threadId, () => []).add(delivered);
+      _pendingAttachments.remove(threadId);
+      if (_replyTargets[threadId]?.id == pending.replyTo?.messageId) {
+        _replyTargets.remove(threadId);
+      }
+      _threadActionNotices.remove(threadId);
+      return true;
+    } on ChatServiceException catch (error) {
+      _threadActionErrors[threadId] = error.userMessage;
+      return false;
+    } on Object {
+      _threadActionErrors[threadId] =
+          'Attachment was not sent. Check your connection and retry.';
+      return false;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> openAttachment(
+    String threadId,
+    ChatAttachment attachment,
+  ) async {
+    final playback = _attachmentPlayback;
+    if (playback == null) return false;
+    try {
+      await playback.open(attachment);
+      return true;
+    } on ChatServiceException catch (error) {
+      _threadActionErrors[threadId] = error.userMessage;
+      notifyListeners();
+      return false;
+    } on Object {
+      _threadActionErrors[threadId] = 'That attachment could not be opened.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  ChatPrivacySettings get privacySettings => _privacySettings;
+
+  List<ChatBlockedAccount> get blockedAccounts =>
+      List.unmodifiable(_blockedAccounts);
+
+  List<ChatMessageRequest> get messageRequests =>
+      List.unmodifiable(_messageRequests);
+
+  ChatPrivacyGateway? get _privacyGateway =>
+      _gateway is ChatPrivacyGateway ? _gateway as ChatPrivacyGateway : null;
+
+  Future<bool> loadPrivacySettings({bool refresh = false}) async {
+    if (privacyLoading || (privacyLoaded && !refresh)) return privacyLoaded;
+    final gateway = _privacyGateway;
+    if (gateway == null) {
+      privacyLoaded = _gateway == null;
+      if (!privacyLoaded) {
+        privacyError = 'Privacy settings are unavailable right now.';
+        notifyListeners();
+      }
+      return privacyLoaded;
+    }
+    privacyLoading = true;
+    privacyError = null;
+    notifyListeners();
+    try {
+      _privacySettings = await gateway.getPrivacySettings();
+      privacyLoaded = true;
+      return true;
+    } on ChatServiceException catch (error) {
+      privacyError = error.userMessage;
+      return false;
+    } on Object {
+      privacyError = 'Privacy settings could not load. Try again.';
+      return false;
+    } finally {
+      privacyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updatePrivacySettings(ChatPrivacySettings requested) async {
+    if (privacyLoading) return false;
+    final previous = _privacySettings;
+    final gateway = _privacyGateway;
+    if (gateway == null && _gateway == null) {
+      _privacySettings = requested;
+      privacyLoaded = true;
+      notifyListeners();
+      return true;
+    }
+    if (gateway == null) {
+      privacyError = 'Privacy settings are unavailable right now.';
+      notifyListeners();
+      return false;
+    }
+    privacyLoading = true;
+    privacyError = null;
+    notifyListeners();
+    try {
+      _privacySettings = await gateway.updatePrivacySettings(requested);
+      privacyLoaded = true;
+      return true;
+    } on ChatServiceException catch (error) {
+      _privacySettings = previous;
+      privacyError = error.userMessage;
+      return false;
+    } on Object {
+      _privacySettings = previous;
+      privacyError = 'Privacy settings could not update. Nothing changed.';
+      return false;
+    } finally {
+      privacyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loadBlockedAccounts() async {
+    final gateway = _privacyGateway;
+    if (gateway == null || privacyLoading) return false;
+    privacyLoading = true;
+    privacyError = null;
+    notifyListeners();
+    try {
+      _blockedAccounts
+        ..clear()
+        ..addAll(await gateway.listBlockedAccounts());
+      return true;
+    } on ChatServiceException catch (error) {
+      privacyError = error.userMessage;
+      return false;
+    } on Object {
+      privacyError = 'Blocked accounts could not load. Try again.';
+      return false;
+    } finally {
+      privacyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> setBlockedAccount(
+    String targetUserId, {
+    required bool blocked,
+  }) async {
+    final gateway = _privacyGateway;
+    if (gateway == null || privacyLoading) {
+      privacyError = 'Blocking is unavailable right now. Nothing changed.';
+      notifyListeners();
+      return false;
+    }
+    privacyLoading = true;
+    privacyError = null;
+    notifyListeners();
+    try {
+      final saved = await gateway.setBlockedAccount(
+        targetUserId: targetUserId,
+        blocked: blocked,
+      );
+      if (saved != blocked) {
+        throw const ChatServiceException(
+          'Blocking returned an invalid result. Nothing changed.',
+        );
+      }
+      if (!blocked) {
+        _blockedAccounts.removeWhere((item) => item.userId == targetUserId);
+      }
+      return true;
+    } on ChatServiceException catch (error) {
+      privacyError = error.userMessage;
+      return false;
+    } on Object {
+      privacyError = 'Blocking could not update. Nothing changed.';
+      return false;
+    } finally {
+      privacyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loadMessageRequests() async {
+    final gateway = _privacyGateway;
+    if (gateway == null || privacyLoading) return false;
+    privacyLoading = true;
+    privacyError = null;
+    notifyListeners();
+    try {
+      _messageRequests
+        ..clear()
+        ..addAll(await gateway.listMessageRequests());
+      return true;
+    } on ChatServiceException catch (error) {
+      privacyError = error.userMessage;
+      return false;
+    } on Object {
+      privacyError = 'Message requests could not load. Try again.';
+      return false;
+    } finally {
+      privacyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> resolveMessageRequest(
+    String threadId, {
+    required bool accepted,
+  }) async {
+    final gateway = _privacyGateway;
+    if (gateway == null || privacyLoading) return false;
+    privacyLoading = true;
+    privacyError = null;
+    notifyListeners();
+    try {
+      final saved = await gateway.resolveMessageRequest(
+        threadId: threadId,
+        accepted: accepted,
+      );
+      if (saved != accepted) {
+        throw const ChatServiceException(
+          'Message request returned an invalid result. Nothing changed.',
+        );
+      }
+      final index = _messageRequests.indexWhere(
+        (request) => request.thread.id == threadId,
+      );
+      if (index >= 0) {
+        final request = _messageRequests.removeAt(index);
+        if (accepted && !_threads.any((thread) => thread.id == threadId)) {
+          _threads.insert(0, request.thread);
+        }
+      }
+      return true;
+    } on ChatServiceException catch (error) {
+      privacyError = error.userMessage;
+      return false;
+    } on Object {
+      privacyError = 'Message request could not update. Nothing changed.';
+      return false;
+    } finally {
+      privacyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  ChatCallPreferences get callPreferences => _callPreferences;
+
+  ChatCall? get activeCall => _activeCall;
+
+  List<ChatCall> get incomingCalls => List.unmodifiable(_incomingCalls);
+
+  ChatCallGateway? get _callGateway =>
+      _gateway is ChatCallGateway ? _gateway as ChatCallGateway : null;
+
+  bool get callPreferencesBackedByService => _callGateway != null;
+
+  Future<bool> loadCallPreferences({bool refresh = false}) async {
+    if (callLoading || (callPreferencesLoaded && !refresh)) {
+      return callPreferencesLoaded;
+    }
+    final gateway = _callGateway;
+    if (gateway == null) {
+      callPreferencesLoaded = _gateway == null;
+      return callPreferencesLoaded;
+    }
+    callLoading = true;
+    callError = null;
+    notifyListeners();
+    try {
+      _callPreferences = await gateway.getCallPreferences();
+      _globalVoiceCallsAvailableForSession = _callPreferences.voiceCallsEnabled;
+      _globalVideoCallsAvailableForSession = _callPreferences.videoCallsEnabled;
+      callPreferencesLoaded = true;
+      return true;
+    } on ChatServiceException catch (error) {
+      callError = error.userMessage;
+      return false;
+    } on Object {
+      callError = 'Call settings could not load. Try again.';
+      return false;
+    } finally {
+      callLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateCallPreferences(ChatCallPreferences requested) async {
+    if (callLoading) return false;
+    final gateway = _callGateway;
+    if (gateway == null && _gateway == null) {
+      _callPreferences = requested;
+      _globalVoiceCallsAvailableForSession = requested.voiceCallsEnabled;
+      _globalVideoCallsAvailableForSession = requested.videoCallsEnabled;
+      callPreferencesLoaded = true;
+      notifyListeners();
+      return true;
+    }
+    if (gateway == null) {
+      callError = 'Call settings are unavailable right now.';
+      notifyListeners();
+      return false;
+    }
+    final previous = _callPreferences;
+    callLoading = true;
+    callError = null;
+    notifyListeners();
+    try {
+      _callPreferences = await gateway.updateCallPreferences(requested);
+      _globalVoiceCallsAvailableForSession = _callPreferences.voiceCallsEnabled;
+      _globalVideoCallsAvailableForSession = _callPreferences.videoCallsEnabled;
+      callPreferencesLoaded = true;
+      return true;
+    } on ChatServiceException catch (error) {
+      _callPreferences = previous;
+      callError = error.userMessage;
+      return false;
+    } on Object {
+      _callPreferences = previous;
+      callError = 'Call settings could not update. Nothing changed.';
+      return false;
+    } finally {
+      callLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updatePresence(ChatPresenceState state) async {
+    final gateway = _callGateway;
+    if (gateway == null) return;
+    try {
+      await gateway.setPresence(state);
+    } on Object {
+      // Presence is best-effort. Call actions recheck authoritative state.
+    }
+  }
+
+  Future<ChatCallAvailability?> callAvailability(
+    String threadId,
+    ChatCallKind kind,
+  ) async {
+    final gateway = _callGateway;
+    if (gateway == null) return null;
+    try {
+      return await gateway.getCallAvailability(threadId: threadId, kind: kind);
+    } on ChatServiceException catch (error) {
+      callError = error.userMessage;
+      notifyListeners();
+      return null;
+    } on Object {
+      callError = 'Call availability could not be checked. Try again.';
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<ChatCall?> startCall(String threadId, ChatCallKind kind) async {
+    if (callLoading) return null;
+    final gateway = _callGateway;
+    if (gateway == null) {
+      callError =
+          '${kind == ChatCallKind.voice ? 'Voice' : 'Video'} calling is unavailable right now.';
+      notifyListeners();
+      return null;
+    }
+    callLoading = true;
+    callError = null;
+    notifyListeners();
+    try {
+      final availability = await gateway.getCallAvailability(
+        threadId: threadId,
+        kind: kind,
+      );
+      if (!availability.canStart) {
+        callError = availability.message;
+        return null;
+      }
+      final call = await gateway.startCall(
+        threadId: threadId,
+        kind: kind,
+        idempotencyKey:
+            'chat-call-${DateTime.now().microsecondsSinceEpoch}-${++_messageSequence}',
+      );
+      _activeCall = call;
+      return call;
+    } on ChatServiceException catch (error) {
+      callError = error.userMessage;
+      return null;
+    } on Object {
+      callError = 'The call request could not start. Try again.';
+      return null;
+    } finally {
+      callLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> endCall() async {
+    final call = _activeCall;
+    final gateway = _callGateway;
+    if (call == null || gateway == null || callLoading) return false;
+    callLoading = true;
+    callError = null;
+    notifyListeners();
+    try {
+      _activeCall = await gateway.endCall(callId: call.id);
+      return true;
+    } on ChatServiceException catch (error) {
+      callError = error.userMessage;
+      return false;
+    } on Object {
+      callError = 'The call could not end. Try again.';
+      return false;
+    } finally {
+      callLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loadIncomingCalls() async {
+    final gateway = _callGateway;
+    if (gateway == null || callLoading) return false;
+    try {
+      _incomingCalls
+        ..clear()
+        ..addAll(await gateway.listIncomingCalls());
+      notifyListeners();
+      return true;
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<bool> respondToCall(String callId, {required bool accepted}) async {
+    final gateway = _callGateway;
+    if (gateway == null || callLoading) return false;
+    callLoading = true;
+    callError = null;
+    notifyListeners();
+    try {
+      final call = await gateway.respondToCall(
+        callId: callId,
+        accepted: accepted,
+      );
+      _incomingCalls.removeWhere((item) => item.id == callId);
+      if (accepted) _activeCall = call;
+      return true;
+    } on ChatServiceException catch (error) {
+      callError = error.userMessage;
+      return false;
+    } on Object {
+      callError = 'The incoming call could not update. Nothing changed.';
+      return false;
+    } finally {
+      callLoading = false;
+      notifyListeners();
+    }
+  }
+
+  ChatGroupGateway? get _groupGateway =>
+      _gateway is ChatGroupGateway ? _gateway as ChatGroupGateway : null;
+
+  ChatGroupInfo? groupInfo(String threadId) => _groupInfoByThread[threadId];
+
+  List<ChatGroupInvite> get groupInvites => List.unmodifiable(_groupInvites);
+
+  Future<bool> loadGroupInfo(String threadId, {bool refresh = false}) async {
+    if (groupLoading ||
+        (!refresh && _groupInfoByThread.containsKey(threadId))) {
+      return _groupInfoByThread.containsKey(threadId);
+    }
+    final gateway = _groupGateway;
+    if (gateway == null) {
+      final selected = thread(threadId);
+      if (!selected.isGroup) return false;
+      _groupInfoByThread[threadId] = ChatGroupInfo(
+        threadId: threadId,
+        title: selected.title,
+        description:
+            selected.groupDescription ?? 'Coordinate together in Chat.',
+        members: selected.participants,
+        invitePermission: ChatGroupInvitePermission.admins,
+        canInvite: false,
+        canManage: false,
+        canLeave: false,
+      );
+      notifyListeners();
+      return true;
+    }
+    groupLoading = true;
+    groupError = null;
+    notifyListeners();
+    try {
+      _groupInfoByThread[threadId] = await gateway.getGroupInfo(
+        threadId: threadId,
+      );
+      return true;
+    } on ChatServiceException catch (error) {
+      groupError = error.userMessage;
+      return false;
+    } on Object {
+      groupError = 'Group info could not load. Try again.';
+      return false;
+    } finally {
+      groupLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> inviteGroupMember(String threadId, String targetUserId) async {
+    final gateway = _groupGateway;
+    if (gateway == null || groupLoading) return false;
+    groupLoading = true;
+    groupError = null;
+    notifyListeners();
+    try {
+      final invite = await gateway.inviteGroupMember(
+        threadId: threadId,
+        targetUserId: targetUserId,
+      );
+      _groupInvites.removeWhere((item) => item.id == invite.id);
+      _groupInvites.add(invite);
+      return true;
+    } on ChatServiceException catch (error) {
+      groupError = error.userMessage;
+      return false;
+    } on Object {
+      groupError = 'This member could not be invited. Nothing changed.';
+      return false;
+    } finally {
+      groupLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateGroupPermissions(
+    String threadId,
+    ChatGroupInvitePermission permission,
+  ) async {
+    final gateway = _groupGateway;
+    if (gateway == null || groupLoading) return false;
+    groupLoading = true;
+    groupError = null;
+    notifyListeners();
+    try {
+      _groupInfoByThread[threadId] = await gateway.updateGroupPermissions(
+        threadId: threadId,
+        invitePermission: permission,
+      );
+      return true;
+    } on ChatServiceException catch (error) {
+      groupError = error.userMessage;
+      return false;
+    } on Object {
+      groupError = 'Group permissions could not update. Nothing changed.';
+      return false;
+    } finally {
+      groupLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> leaveGroup(String threadId) async {
+    final gateway = _groupGateway;
+    if (gateway == null || groupLoading) return false;
+    groupLoading = true;
+    groupError = null;
+    notifyListeners();
+    try {
+      if (!await gateway.leaveGroup(threadId: threadId)) {
+        throw const ChatServiceException('Leaving returned an invalid result.');
+      }
+      _threads.removeWhere((thread) => thread.id == threadId);
+      _messages.remove(threadId);
+      _groupInfoByThread.remove(threadId);
+      return true;
+    } on ChatServiceException catch (error) {
+      groupError = error.userMessage;
+      return false;
+    } on Object {
+      groupError = 'You could not leave this group. Nothing changed.';
+      return false;
+    } finally {
+      groupLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loadGroupInvites() async {
+    final gateway = _groupGateway;
+    if (gateway == null || groupLoading) return false;
+    groupLoading = true;
+    groupError = null;
+    notifyListeners();
+    try {
+      _groupInvites
+        ..clear()
+        ..addAll(await gateway.listGroupInvites());
+      return true;
+    } on ChatServiceException catch (error) {
+      groupError = error.userMessage;
+      return false;
+    } on Object {
+      groupError = 'Group invitations could not load. Try again.';
+      return false;
+    } finally {
+      groupLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> respondToGroupInvite(
+    String inviteId, {
+    required bool accepted,
+  }) async {
+    final gateway = _groupGateway;
+    if (gateway == null || groupLoading) return false;
+    groupLoading = true;
+    groupError = null;
+    notifyListeners();
+    try {
+      final saved = await gateway.respondToGroupInvite(
+        inviteId: inviteId,
+        accepted: accepted,
+      );
+      if (saved != accepted) {
+        throw const ChatServiceException(
+          'Invitation returned an invalid result.',
+        );
+      }
+      _groupInvites.removeWhere((item) => item.id == inviteId);
+      if (accepted) await loadThreads(refresh: true);
+      return true;
+    } on ChatServiceException catch (error) {
+      groupError = error.userMessage;
+      return false;
+    } on Object {
+      groupError = 'Group invitation could not update. Nothing changed.';
+      return false;
+    } finally {
+      groupLoading = false;
+      notifyListeners();
+    }
+  }
+
+  ChatNotificationGateway? get _notificationGateway =>
+      _gateway is ChatNotificationGateway
+      ? _gateway as ChatNotificationGateway
+      : null;
+
+  ChatNotificationPreferences get notificationPreferences =>
+      _notificationPreferences;
+
+  bool get deviceNotificationsRegistered =>
+      _registeredNotificationToken != null;
+
+  Future<bool> loadNotificationPreferences({bool refresh = false}) async {
+    if (notificationLoading || (notificationLoaded && !refresh)) {
+      return notificationLoaded;
+    }
+    final gateway = _notificationGateway;
+    if (gateway == null) {
+      notificationLoaded = _gateway == null;
+      return notificationLoaded;
+    }
+    notificationLoading = true;
+    notificationError = null;
+    notifyListeners();
+    try {
+      _notificationPreferences = await gateway.getNotificationPreferences();
+      notificationPermission =
+          await _notificationClient?.permission(request: false) ??
+          ChatNotificationPermission.unknown;
+      notificationLoaded = true;
+      return true;
+    } on ChatServiceException catch (error) {
+      notificationError = error.userMessage;
+      return false;
+    } on Object {
+      notificationError = 'Notification settings could not load. Try again.';
+      return false;
+    } finally {
+      notificationLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateNotificationPreferences(
+    ChatNotificationPreferences requested,
+  ) async {
+    if (notificationLoading) return false;
+    final gateway = _notificationGateway;
+    if (gateway == null && _gateway == null) {
+      _notificationPreferences = requested;
+      notificationLoaded = true;
+      notifyListeners();
+      return true;
+    }
+    if (gateway == null) return false;
+    final previous = _notificationPreferences;
+    notificationLoading = true;
+    notificationError = null;
+    notifyListeners();
+    try {
+      _notificationPreferences = await gateway.updateNotificationPreferences(
+        requested,
+      );
+      notificationLoaded = true;
+      return true;
+    } on ChatServiceException catch (error) {
+      _notificationPreferences = previous;
+      notificationError = error.userMessage;
+      return false;
+    } on Object {
+      _notificationPreferences = previous;
+      notificationError =
+          'Notification settings could not update. Nothing changed.';
+      return false;
+    } finally {
+      notificationLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> enableDeviceNotifications() async {
+    final client = _notificationClient;
+    final gateway = _notificationGateway;
+    if (client == null || gateway == null || notificationLoading) return false;
+    notificationLoading = true;
+    notificationError = null;
+    notifyListeners();
+    try {
+      notificationPermission = await client.permission(request: true);
+      if (notificationPermission != ChatNotificationPermission.authorized &&
+          notificationPermission != ChatNotificationPermission.provisional) {
+        notificationError =
+            'Notifications are off in device settings. Your Chat choices remain saved.';
+        return false;
+      }
+      final token = await client.token();
+      if (token == null || token.trim().isEmpty) {
+        throw const ChatServiceException(
+          'This device could not register for notifications. Try again.',
+          retryable: true,
+        );
+      }
+      final registered = await gateway.registerNotificationDevice(
+        token: token,
+        platform: client.platform,
+      );
+      if (!registered) {
+        throw const ChatServiceException(
+          'This device could not register for notifications. Try again.',
+        );
+      }
+      _registeredNotificationToken = token;
+      return true;
+    } on ChatServiceException catch (error) {
+      notificationError = error.userMessage;
+      return false;
+    } on Object {
+      notificationError = 'This device could not enable notifications.';
+      return false;
+    } finally {
+      notificationLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> disableDeviceNotifications() async {
+    final token = _registeredNotificationToken;
+    final gateway = _notificationGateway;
+    if (token == null || gateway == null || notificationLoading) return false;
+    notificationLoading = true;
+    notificationError = null;
+    notifyListeners();
+    try {
+      await gateway.unregisterNotificationDevice(token: token);
+      _registeredNotificationToken = null;
+      return true;
+    } on ChatServiceException catch (error) {
+      notificationError = error.userMessage;
+      return false;
+    } on Object {
+      notificationError = 'This device could not disable notifications.';
+      return false;
+    } finally {
+      notificationLoading = false;
+      notifyListeners();
+    }
+  }
+
+  bool chatAvailableForConversationInSession(String threadId) =>
+      _chatAvailableForSession[threadId] ?? true;
+
+  bool voiceCallsAvailableForConversationInSession(String threadId) =>
+      _voiceCallsAvailableForSession[threadId] ?? true;
+
+  bool videoCallsAvailableForConversationInSession(String threadId) =>
+      _videoCallsAvailableForSession[threadId] ?? true;
+
+  bool reviewBeforeSendingForConversationInSession(String threadId) =>
+      _reviewBeforeSendingForSession[threadId] ?? false;
+
+  bool chatAvailableForSession(String threadId) =>
+      globalChatAvailableForSession &&
+      chatAvailableForConversationInSession(threadId);
+
+  bool voiceCallsAvailableForSession(String threadId) =>
+      globalVoiceCallsAvailableForSession &&
+      voiceCallsAvailableForConversationInSession(threadId);
+
+  bool videoCallsAvailableForSession(String threadId) =>
+      globalVideoCallsAvailableForSession &&
+      videoCallsAvailableForConversationInSession(threadId);
+
+  bool reviewBeforeSendingForSession(String threadId) =>
+      globalReviewBeforeSendingForSession ||
+      reviewBeforeSendingForConversationInSession(threadId);
+
+  void setGlobalChatAvailableForSession({required bool available}) {
+    if (globalChatAvailableForSession == available) return;
+    _globalChatAvailableForSession = available;
+    notifyListeners();
+  }
+
+  void setGlobalVoiceCallsAvailableForSession({required bool available}) {
+    if (globalVoiceCallsAvailableForSession == available) return;
+    _globalVoiceCallsAvailableForSession = available;
+    notifyListeners();
+  }
+
+  void setGlobalVideoCallsAvailableForSession({required bool available}) {
+    if (globalVideoCallsAvailableForSession == available) return;
+    _globalVideoCallsAvailableForSession = available;
+    notifyListeners();
+  }
+
+  void setGlobalReviewBeforeSendingForSession({required bool enabled}) {
+    if (globalReviewBeforeSendingForSession == enabled) return;
+    _globalReviewBeforeSendingForSession = enabled;
+    notifyListeners();
+  }
+
+  void setHideMessagePreviewsForSession({required bool hidden}) {
+    if (hideMessagePreviewsForSession == hidden) return;
+    _hideMessagePreviewsForSession = hidden;
+    notifyListeners();
+  }
+
+  void setShowSuggestedPromptsForSession({required bool visible}) {
+    if (showSuggestedPromptsForSession == visible) return;
+    _showSuggestedPromptsForSession = visible;
+    notifyListeners();
+  }
+
+  void setChatAvailableForSession(String threadId, {required bool available}) {
+    if (chatAvailableForConversationInSession(threadId) == available) return;
+    _chatAvailableForSession[threadId] = available;
+    notifyListeners();
+  }
+
+  void setVoiceCallsAvailableForSession(
+    String threadId, {
+    required bool available,
+  }) {
+    if (voiceCallsAvailableForConversationInSession(threadId) == available) {
+      return;
+    }
+    _voiceCallsAvailableForSession[threadId] = available;
+    notifyListeners();
+  }
+
+  void setVideoCallsAvailableForSession(
+    String threadId, {
+    required bool available,
+  }) {
+    if (videoCallsAvailableForConversationInSession(threadId) == available) {
+      return;
+    }
+    _videoCallsAvailableForSession[threadId] = available;
+    notifyListeners();
+  }
+
+  void setReviewBeforeSendingForSession(
+    String threadId, {
+    required bool enabled,
+  }) {
+    if (reviewBeforeSendingForConversationInSession(threadId) == enabled) {
+      return;
+    }
+    _reviewBeforeSendingForSession[threadId] = enabled;
+    notifyListeners();
+  }
 
   bool get photoSharingAvailable =>
       _gateway is ChatPhotoGateway && _photoPicker != null;
@@ -277,6 +1835,7 @@ class ChatSession extends ChangeNotifier {
         idempotencyKey:
             'chat-photo-${DateTime.now().microsecondsSinceEpoch}-${++_messageSequence}',
       );
+      _pendingAttachments.remove(threadId);
       _threadActionNotices[threadId] = 'Photo ready to send.';
       return true;
     } on ChatServiceException catch (error) {
@@ -346,7 +1905,7 @@ class ChatSession extends ChangeNotifier {
       if (_replyTargets[threadId]?.id == pending.replyTo?.messageId) {
         _replyTargets.remove(threadId);
       }
-      _threadActionNotices[threadId] = 'Photo delivered.';
+      _threadActionNotices.remove(threadId);
       return true;
     } on ChatServiceException catch (error) {
       _threadActionErrors[threadId] = error.userMessage;
@@ -475,6 +2034,7 @@ class ChatSession extends ChangeNotifier {
       final gateway = _gateway;
       if (gateway != null) await gateway.markThreadRead(threadId: threadId);
       _readThreads.add(threadId);
+      _markedUnreadThreads.remove(threadId);
       return true;
     } on ChatServiceException catch (error) {
       _threadActionErrors[threadId] = error.userMessage;
@@ -490,6 +2050,9 @@ class ChatSession extends ChangeNotifier {
   }
 
   int unreadFor(ChatThread thread) {
+    if (_markedUnreadThreads.contains(thread.id)) {
+      return thread.unreadCount > 0 ? thread.unreadCount : 1;
+    }
     return _readThreads.contains(thread.id) ? 0 : thread.unreadCount;
   }
 
@@ -555,7 +2118,7 @@ class ChatSession extends ChangeNotifier {
       if (_replyTargets[threadId]?.id == selectedReply?.messageId) {
         _replyTargets.remove(threadId);
       }
-      _threadActionNotices[threadId] = 'Message delivered.';
+      _threadActionNotices.remove(threadId);
       return true;
     } on ChatServiceException catch (error) {
       _replaceMessage(
@@ -793,6 +2356,75 @@ class ChatSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  void resetForAuthenticationBoundary() {
+    _threads.clear();
+    _messages.clear();
+    _messageLoadErrors.clear();
+    _threadActionErrors.clear();
+    _threadActionNotices.clear();
+    _hiddenMessageIdsByThread.clear();
+    _draftTextByThread.clear();
+    _readThreads.clear();
+    _markedUnreadThreads.clear();
+    _pinnedThreadIds
+      ..clear()
+      ..add('shop-assist');
+    _reducedAttentionThreadIds.clear();
+    _archivedThreadIds.clear();
+    _retryKeys.clear();
+    _forwardRetryKeys.clear();
+    _replyTargets.clear();
+    _pendingPhotos.clear();
+    _pendingAttachments.clear();
+    _recordingThreads.clear();
+    _chatAvailableForSession.clear();
+    _voiceCallsAvailableForSession.clear();
+    _videoCallsAvailableForSession.clear();
+    _reviewBeforeSendingForSession.clear();
+    _globalChatAvailableForSession = true;
+    _globalVoiceCallsAvailableForSession = true;
+    _globalVideoCallsAvailableForSession = true;
+    _globalReviewBeforeSendingForSession = false;
+    _hideMessagePreviewsForSession = false;
+    _showSuggestedPromptsForSession = true;
+    _privacySettings = ChatPrivacySettings.defaults;
+    _blockedAccounts.clear();
+    _messageRequests.clear();
+    privacyLoading = false;
+    privacyLoaded = false;
+    privacyError = null;
+    _callPreferences = ChatCallPreferences.defaults;
+    _incomingCalls.clear();
+    _activeCall = null;
+    callLoading = false;
+    callPreferencesLoaded = false;
+    callError = null;
+    _groupInfoByThread.clear();
+    _groupInvites.clear();
+    groupLoading = false;
+    groupError = null;
+    _notificationPreferences = ChatNotificationPreferences.defaults();
+    notificationPermission = ChatNotificationPermission.unknown;
+    notificationLoading = false;
+    notificationLoaded = false;
+    notificationError = null;
+    _registeredNotificationToken = null;
+    selectedFilter = null;
+    unreadOnly = false;
+    noticeMessage = null;
+    errorMessage = null;
+    busy = false;
+    loadingThreads = false;
+    threadsLoaded = false;
+    loadingMessageThreads.clear();
+    readingThreads.clear();
+    invitedMembers.clear();
+    pollOptions
+      ..clear()
+      ..addAll(const ['Today evening', 'Tomorrow morning', 'Tomorrow evening']);
+    notifyListeners();
+  }
+
   void clearThreadMessages(String threadId) {
     final hadError = _threadActionErrors.remove(threadId) != null;
     final hadNotice = _threadActionNotices.remove(threadId) != null;
@@ -815,6 +2447,10 @@ class ChatSession extends ChangeNotifier {
         ? message.text.trim()
         : message.photo != null
         ? 'Photo'
+        : message.attachment != null
+        ? message.attachment!.kind == ChatAttachmentKind.voice
+              ? 'Voice message'
+              : message.attachment!.name
         : message.attachmentLabel?.trim().isNotEmpty == true
         ? message.attachmentLabel!.trim()
         : 'Message';
@@ -824,12 +2460,32 @@ class ChatSession extends ChangeNotifier {
       text: text,
     );
   }
+
+  @override
+  void dispose() {
+    _voiceRecorder?.dispose();
+    _attachmentPlayback?.dispose();
+    super.dispose();
+  }
 }
 
 class _PendingChatPhoto {
   _PendingChatPhoto({required this.photo, required this.idempotencyKey});
 
   final ChatPickedPhoto photo;
+  final String idempotencyKey;
+  String caption = '';
+  ChatReplyReference? replyTo;
+  bool sendLocked = false;
+}
+
+class _PendingChatAttachment {
+  _PendingChatAttachment({
+    required this.attachment,
+    required this.idempotencyKey,
+  });
+
+  final ChatPickedAttachment attachment;
   final String idempotencyKey;
   String caption = '';
   ChatReplyReference? replyTo;

@@ -26,7 +26,7 @@ void main() {
         expect(order.itemSummary.trim(), isNotEmpty, reason: order.id);
         expect(order.total, greaterThan(0), reason: order.id);
         expect(order.partner.trim(), isNotEmpty, reason: order.id);
-        expect(order.partnerType, startsWith('Mool '), reason: order.id);
+        expect(order.partnerType, startsWith('Mool'), reason: order.id);
         expect(order.promise.trim(), isNotEmpty, reason: order.id);
         expect(order.destinationLabel.trim(), isNotEmpty, reason: order.id);
         expect(order.progress, greaterThan(0), reason: order.id);
@@ -51,12 +51,15 @@ void main() {
     });
 
     test('Active and Delivered partition history without loss', () {
-      final allIds = session.orders.map((order) => order.id).toSet();
-      final expectedActive = session.orders
+      final shopOrders = session.orders
+          .where((order) => order.destination != BuyV2Destination.medicine)
+          .toList(growable: false);
+      final allIds = shopOrders.map((order) => order.id).toSet();
+      final expectedActive = shopOrders
           .where((order) => order.status != BuyV2OrderStatus.delivered)
           .map((order) => order.id)
           .toSet();
-      final expectedDelivered = session.orders
+      final expectedDelivered = shopOrders
           .where((order) => order.status == BuyV2OrderStatus.delivered)
           .map((order) => order.id)
           .toSet();
@@ -75,7 +78,18 @@ void main() {
       expect(session.activeOrderCount, activeIds.length);
       expect(session.deliveredOrderCount, deliveredIds.length);
 
-      for (final order in session.orders) {
+      expect(
+        session.visibleOrders,
+        everyElement(
+          isA<BuyV2Order>().having(
+            (order) => order.destination,
+            'destination',
+            isNot(BuyV2Destination.medicine),
+          ),
+        ),
+      );
+
+      for (final order in shopOrders) {
         session.showOrdersTab(
           order.status == BuyV2OrderStatus.delivered
               ? BuyV2OrdersTab.delivered
@@ -144,18 +158,30 @@ void main() {
       }
 
       session.showOrdersTab(BuyV2OrdersTab.active);
+      final shopConfirmedIds = session.confirmedOrders
+          .where((order) => order.destination != BuyV2Destination.medicine)
+          .map((order) => order.id)
+          .toSet();
       expect(
         session.visibleOrders.map((order) => order.id).toSet(),
-        containsAll(session.confirmedOrders.map((order) => order.id)),
+        containsAll(shopConfirmedIds),
+      );
+      expect(
+        session.visibleOrders,
+        everyElement(
+          isA<BuyV2Order>().having(
+            (order) => order.destination,
+            'destination',
+            isNot(BuyV2Destination.medicine),
+          ),
+        ),
       );
       session.showOrdersTab(BuyV2OrdersTab.delivered);
       expect(
         session.visibleOrders
             .map((order) => order.id)
             .toSet()
-            .intersection(
-              session.confirmedOrders.map((order) => order.id).toSet(),
-            ),
+            .intersection(shopConfirmedIds),
         isEmpty,
       );
     });

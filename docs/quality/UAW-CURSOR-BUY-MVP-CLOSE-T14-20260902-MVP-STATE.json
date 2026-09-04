@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_ticket_assessed",
+    "currentTicketId": "UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902",
+    "selectedTicketAssessment": {
+      "ticketId": "UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902",
+      "customerOutcome": "Customers receive truthful supplier-confirmation recovery, continuous in-store browsing with visible Cart feedback, and organized Shop or Wholesale choices without duplicate screens.",
+      "manifestPath": "docs/delivery/BUY-MVP-READY-ORDER-DELIVERY-PORTFOLIO-20260805.md",
+      "manifestSha256": "64109EB766117B5CA1825102F18B034B7C31E71795BE8309232A189EADFF07C0",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": [
+        "reuse",
+        "configuration",
+        "thin_policy_adapter",
+        "new_necessary_work"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "necessityProof": "The current order status begins at preparing or confirmed and cannot truthfully represent supplier acceptance attempts; the current store-product path hides Cart feedback and repeatedly rebuilds store browsing; existing product facts already support the requested selectors.",
+      "robustnessCoverage": [
+        "truthful_supplier_assignment_and_recovery",
+        "payment_status_not_fabricated",
+        "store_product_and_scroll_return_continuity",
+        "immediate_accessible_cart_feedback",
+        "single_catalogue_and_cart_across_mode_selectors",
+        "offline_relaunch_back_and_responsive_recovery",
+        "professional_customer_copy"
+      ],
+      "adjustments": [
+        "extend_existing_order_status_contract",
+        "reuse_existing_store_catalogue_and_product_route",
+        "add_existing-surface_mode_selectors",
+        "add_focused_acceptance_coverage"
+      ],
+      "explicitExclusions": [
+        "no_new_top_level_screen_route_catalogue_or_cart",
+        "no_medicine_or_care_change",
+        "no_backend_inventory_payment_refund_timer_supplier_or_courier_logic",
+        "no_live_map_admin_workspace_provider_workspace_store_release_or_integration",
+        "no_speculative_personalization_or_marketplace_redesign"
+      ],
+      "dependenciesAndApprovals": [
+        "founder_approved_ticket_14_minimal_2026_09_02",
+        "founder_directed_store_browse_cart_feedback_and_mode_organization_2026_09_02",
+        "cursor_ui_only_until_founder_acceptance",
+        "codex_backend_authoritative_events_dependency_held"
+      ],
+      "timelineImpactDays": 2,
+      "within60To75DayLock": true,
+      "implementationState": "selected_for_minimal_cursor_ui_execution",
+      "evidencePath": "docs/quality/UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902.md"
+    }
+  },
+  "state": "ticket_disclosed_and_authorized",
+  "checkpoint": {
+    "successorRegistered": true
+  },
+  "ticket": {
+    "id": "UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902",
+    "customerOutcome": "Truthful supplier confirmation and recovery, continuous store browsing with visible Cart feedback, and organized Shop or Wholesale catalogue modes.",
+    "classification": "mvp_required",
+    "classificationReason": "The ticket removes a false fulfilment promise and confirmed Cart/navigation defects in the supported purchase journey; its bounded organization child supports the same core journey without expansion.",
+    "minimumCompleteScope": [
+      "shared supplier assignment and recovery states in existing post-order owners",
+      "store-product return continuity and persistent Cart feedback",
+      "Shop Quick delivery or Courier and Wholesale Wholesale or Bulk selectors"
+    ],
+    "explicitExclusions": [
+      "no new top-level route screen catalogue or cart",
+      "no Medicine Care backend live map Admin provider workspace release or integration"
+    ],
+    "dependenciesAndApprovals": [
+      "founder approval in chat on 2 September 2026",
+      "backend authoritative event adapters remain Codex-owned and held"
+    ],
+    "testAndEvidencePlan": [
+      "focused session widget navigation responsive and customer-copy tests",
+      "two full Buy regressions before a separately authorized Redmi APK"
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/UAW-CURSOR-BUY-MVP-CLOSE-T14-20260902.md",
+    "beyondMvpExplicitlyAuthorized": false
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}
