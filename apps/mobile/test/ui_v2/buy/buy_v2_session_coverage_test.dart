@@ -161,7 +161,7 @@ void main() {
       expect(wholesaleSession.quantityFor(wholesale.id), 0);
       expect(
         wholesaleSession.notice,
-        'Complete your Workspace business profile to place a wholesale order.',
+        'Complete your business profile to place a wholesale order.',
       );
 
       const prescriptionId = 'm-telmisartan-40';

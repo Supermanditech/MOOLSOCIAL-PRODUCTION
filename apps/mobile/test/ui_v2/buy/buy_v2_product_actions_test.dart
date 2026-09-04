@@ -21,7 +21,8 @@ void main() {
     );
     final uri = Uri.parse(location);
 
-    expect(uri.path, '/app/chat/thread/shop-partner');
+    expect(uri.path, startsWith('/app/chat/thread/shop-partner-shop-'));
+    expect(uri.queryParameters['supplier'], product.seller);
     expect(uri.queryParameters['draft'], contains('Toned fresh milk'));
     expect(uri.queryParameters['draft'], contains('2 × 1 L pouches'));
     expect(uri.queryParameters['directReturn'], 'true');
@@ -238,6 +239,67 @@ void main() {
     expect(chatOpened, isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'manufacturer Chat action stays readable and fails safely at 140 percent',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 700);
+      tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final product = BuyV2Catalogue.products.firstWhere(
+        (candidate) =>
+            candidate.destination == BuyV2Destination.wholesale &&
+            candidate.sellerType.toLowerCase().contains('manufacturer'),
+      );
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      expect(session.openProduct(product.id), isTrue);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: product.destination,
+            initialView: BuyV2View.product,
+            productId: product.id,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final productScroll = find
+          .descendant(
+            of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final actions = find.byKey(
+        ValueKey('buy-product-quick-actions-${product.id}'),
+      );
+      final ask = find.byKey(
+        ValueKey('buy-product-action-ask-manufacturer-${product.id}'),
+      );
+      await tester.scrollUntilVisible(ask, 220, scrollable: productScroll);
+      await tester.drag(productScroll, const Offset(0, -160));
+      await tester.pumpAndSettle();
+
+      expect(actions, findsOneWidget);
+      expect(tester.getSize(actions).height, 56);
+      expect(find.bySemanticsLabel('Ask manufacturer'), findsOneWidget);
+      await tester.tap(ask);
+      await tester.pumpAndSettle();
+      expect(
+        session.notice,
+        'Supplier Chat is unavailable right now. Your product is unchanged.',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'Cart action remains reachable and Back restores product at 320',

@@ -337,6 +337,16 @@ class _DeliveryExceptionAdapter implements BuyV2DeliveryExceptionAdapter {
   }
 }
 
+Future<bool> _submitAndCompleteReviewPayment(BuyV2Session session) async {
+  if (await session.submitOrder()) return true;
+  if (session.checkoutSubmissionState !=
+      BuyV2CheckoutSubmissionState.paymentActionRequired) {
+    return false;
+  }
+  if (!await session.continuePayment((_) async => true)) return false;
+  return session.reconcilePayment();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -394,6 +404,12 @@ void main() {
       expect(session.addProduct(productFor(destination).id), isTrue);
     }
     return session;
+  }
+
+  void advanceCheckoutToConfirm(BuyV2Session session) {
+    expect(session.continueCheckoutFromAddress(), isTrue);
+    expect(session.continueCheckoutFromPayment(), isTrue);
+    expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
   }
 
   testWidgets('visible Checkout return restores every exact Cart scope', (
@@ -497,6 +513,7 @@ void main() {
     addTearDown(session.dispose);
     session.openCart(scope: BuyV2CartScope.shop);
     expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
@@ -556,6 +573,7 @@ void main() {
       expect(session.addProduct(wholesale.id), isTrue);
       session.openCart();
       expect(session.openCheckout(), isTrue);
+      advanceCheckoutToConfirm(session);
       await session.refreshCommercialPaymentTerms();
 
       await tester.pumpWidget(app(session));
@@ -590,7 +608,7 @@ void main() {
         findsOneWidget,
       );
 
-      expect(await session.submitOrder(), isTrue);
+      expect(await _submitAndCompleteReviewPayment(session), isTrue);
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.confirmation);
       expect(
@@ -623,6 +641,7 @@ void main() {
     expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
     session.openCart(scope: BuyV2CartScope.shop);
     expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
     await session.refreshCommercialPaymentTerms();
 
     await tester.pumpWidget(app(session));
@@ -658,6 +677,7 @@ void main() {
     );
     session.openCart();
     expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
     expect(await session.refreshCheckoutQuote(), isTrue);
     await session.refreshCommercialPaymentTerms();
     final wholesaleGroup = session.checkoutFulfilmentGroups.firstWhere(
@@ -687,7 +707,7 @@ void main() {
     final quotedTotal = session.checkoutQuote!.total;
     expect(quotedTotal, greaterThan(session.checkoutTotal));
 
-    expect(await session.submitOrder(), isTrue);
+    expect(await _submitAndCompleteReviewPayment(session), isTrue);
     await tester.pumpAndSettle();
     expect(session.confirmedTotal, quotedTotal);
     expect(
@@ -722,6 +742,7 @@ void main() {
     expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
     session.openCart(scope: BuyV2CartScope.shop);
     expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
     expect(await session.refreshCheckoutQuote(), isFalse);
 
     await tester.pumpWidget(app(session));
@@ -769,15 +790,15 @@ void main() {
       expect(session.addProduct(product.id), isTrue);
       session.openCart(scope: BuyV2CartScope.wholesale);
       expect(session.openCheckout(), isTrue);
+      advanceCheckoutToConfirm(session);
       await tester.pumpAndSettle();
-      expect(find.textContaining('Dispatch · Dispatch within'), findsOneWidget);
-      expect(
-        find.textContaining('Delivery provider · Rajasthan Freight Network'),
-        findsOneWidget,
-      );
+      expect(find.text('Dispatches'), findsOneWidget);
+      expect(find.text('Dispatch within one business day'), findsOneWidget);
+      expect(find.text('Handled by'), findsOneWidget);
+      expect(find.text('Rajasthan Freight Network'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      expect(await session.submitOrder(), isTrue);
+      expect(await _submitAndCompleteReviewPayment(session), isTrue);
       final order = session.confirmedOrders.single;
       expect(order.deliveryPartnerName, 'Rajasthan Freight Network');
       expect(order.dispatchPromise, 'Dispatch within one business day');
@@ -816,7 +837,7 @@ void main() {
                 BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
           );
       expect(session.chooseCommercialPaymentTerm(booking), isTrue);
-      expect(await session.submitOrder(), isTrue);
+      expect(await _submitAndCompleteReviewPayment(session), isTrue);
       final order = session.confirmedOrders.single;
       balanceAdapter.amountDue = order.balanceDue;
       expect(session.openTracking(order.id), isTrue);
@@ -1069,6 +1090,7 @@ void main() {
     addTearDown(session.dispose);
     session.openCart(scope: BuyV2CartScope.shop);
     expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
@@ -1167,6 +1189,7 @@ void main() {
       final session = mixedSession(gstInvoiceProfileStore: gstStore);
       session.openCart(scope: BuyV2CartScope.wholesale);
       expect(session.openCheckout(), isTrue, reason: viewport.label);
+      advanceCheckoutToConfirm(session);
 
       await tester.pumpWidget(
         app(
@@ -1181,10 +1204,12 @@ void main() {
       await tester.pump();
       final request = find.byKey(const ValueKey('buy-gst-request-wholesale'));
       await tester.ensureVisible(request);
+      await tester.pump();
       await tester.tap(request);
       await tester.pumpAndSettle();
       final add = find.byKey(const ValueKey('buy-gst-add-wholesale'));
       await tester.ensureVisible(add);
+      await tester.pump();
       await tester.tap(add);
       await tester.pumpAndSettle();
 
@@ -1249,6 +1274,7 @@ void main() {
     addTearDown(session.dispose);
     session.openCart(scope: BuyV2CartScope.wholesale);
     expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
 
     await tester.pumpWidget(app(session, reducedMotion: true));
     await tester.pumpAndSettle();
@@ -1345,7 +1371,9 @@ void main() {
     );
     expect(semanticNode.rect.width, lessThan(150));
     expect(semanticNode.rect.height, greaterThanOrEqualTo(44));
-    expect(find.text('Delivery plan'), findsOneWidget);
+    advanceCheckoutToConfirm(session);
+    await tester.pump();
+    expect(find.text('Deliveries'), findsOneWidget);
     expect(session.checkoutFulfilmentGroups, hasLength(1));
     expect(
       session.checkoutFulfilmentGroups.single.destination,
@@ -1354,7 +1382,7 @@ void main() {
     expect(
       find.byKey(
         ValueKey(
-          'buy-checkout-delivery-plan-${session.checkoutFulfilmentGroups.single.key}',
+          'buy-checkout-confirm-delivery-${session.checkoutFulfilmentGroups.single.key}',
         ),
       ),
       findsOneWidget,

@@ -26,7 +26,7 @@ void main() {
         expect(order.itemSummary.trim(), isNotEmpty, reason: order.id);
         expect(order.total, greaterThan(0), reason: order.id);
         expect(order.partner.trim(), isNotEmpty, reason: order.id);
-        expect(order.partnerType, startsWith('Mool '), reason: order.id);
+        expect(order.partnerType, startsWith('Mool'), reason: order.id);
         expect(order.promise.trim(), isNotEmpty, reason: order.id);
         expect(order.destinationLabel.trim(), isNotEmpty, reason: order.id);
         expect(order.progress, greaterThan(0), reason: order.id);

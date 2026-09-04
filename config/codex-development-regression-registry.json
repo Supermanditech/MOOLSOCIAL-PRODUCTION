@@ -49714,6 +49714,66 @@
       "prevention": "Permit only `/root` or the exact selected primary integration_repair continuation task at coordination_bootstrap, preserve role and binding equality, and retain all subagent and unrelated-task rejections.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260904-4434-REPAIR-MERGE-WAS-INTERRUPTED-BEFORE-MERGE-HEAD",
+      "status": "registered-premature-merge-completion-classification",
+      "appliesTo": ["primary", "integration_repair", "integration", "git", "handoff"],
+      "mistake": "The first authorized no-commit repair merge was classified as interrupted when an immediate snapshot showed no MERGE_HEAD, but a later bounded readback proved the original merge had completed asynchronously with 429 staged paths and exactly three unmerged owners.",
+      "rootCause": "The tool cell returned before the underlying evidence-heavy Git process reached its durable merge-state boundary, and the first snapshot was treated as terminal without a process-aware wait.",
+      "prevention": "After an ambiguous merge call, poll the exact process or merge-state identity with bounded backoff before classifying failure; require MERGE_HEAD, staged-owner count and exact unmerged owners before resolution.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V1-20260904.md"]
+    },
+    {
+      "id": "REG-20260904-4435-POST-MERGE-DIAGNOSTIC-EMITTED-FULL-TRUNCATED-STATUS",
+      "status": "registered-prohibited-status-output-and-truncation",
+      "appliesTo": ["primary", "integration_repair", "integration", "git", "handoff"],
+      "mistake": "The interrupted-merge follow-up emitted broad `git status --porcelain=v1` output, which listed many paths and truncated before a complete inventory.",
+      "rootCause": "The diagnostic did not reuse the required non-emitting digest and literal conflict-owner status boundary after an ambiguous merge result.",
+      "prevention": "Use only branch and HEAD scalars, MERGE_HEAD existence, unmerged-owner count/list and non-emitting status digest; never emit broad status in this evidence-heavy repository.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json"]
+    },
+    {
+      "id": "REG-20260904-4436-INTERRUPTED-MERGE-INCIDENT-PATCH-USED-STALE-REGISTRY-TAIL",
+      "status": "registered-stale-patch-context-failure",
+      "appliesTo": ["primary", "integration_repair", "integration", "git", "handoff"],
+      "mistake": "The first interrupted-merge incident append was atomically rejected because it anchored to registry entry 4432 after entry 4433 had become the committed tail.",
+      "rootCause": "The append reused a pre-bootstrap tail assumption instead of the latest verified committed tail ID.",
+      "prevention": "Anchor every registry append to the current committed last ID after restoring an interrupted attempt owner and confirm the exact new tail immediately afterward.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json"]
+    },
+    {
+      "id": "REG-20260904-4437-SECOND-INCIDENT-PATCH-TARGETED-OVERWRITTEN-WORKTREE-REGISTRY",
+      "status": "registered-stale-worktree-owner-failure",
+      "appliesTo": ["primary", "integration_repair", "integration", "git", "handoff"],
+      "mistake": "The second incident append was rejected because the interrupted merge had replaced the working registry with Cursor content even though the repair HEAD still contained entry 4433.",
+      "rootCause": "The recovery attempt assumed HEAD identity also guaranteed working-owner identity after an interrupted non-atomic merge materialization.",
+      "prevention": "Restore the exact conflict owner from the committed repair HEAD before registry registration and verify the owner tail rather than inferring it from HEAD alone.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json"]
+    },
+    {
+      "id": "REG-20260904-4438-REPAIR-MERGE-CONTINUED-AFTER-PREMATURE-TERMINAL-SNAPSHOT",
+      "status": "registered-ambiguous-session-recovery",
+      "appliesTo": ["primary", "integration_repair", "integration", "git", "handoff"],
+      "mistake": "The repair merge became active after the tool cell and first MERGE_HEAD probe had returned, invalidating the earlier interrupted-merge classification while preserving the intended exact three conflicts.",
+      "rootCause": "The outer execution result and Git child completion were not synchronized for this large Windows checkout.",
+      "prevention": "Treat an absent MERGE_HEAD immediately after an ambiguous long Git call as unknown, wait on the exact returned session or poll branch, HEAD, MERGE_HEAD and process identity before any restore or retry, and never launch a duplicate merge.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V1-20260904.md"]
+    },
+    {
+      "id": "REG-20260904-4439-POLICY-OWNER-DELTA-REPORT-EMITTED-HUNDREDS-OF-EVIDENCE-PATHS",
+      "status": "registered-output-truncation-and-owner-disclosure",
+      "appliesTo": ["primary", "integration_repair", "integration", "git", "handoff"],
+      "mistake": "The first stage-two versus stage-three policy delta report emitted hundreds of Cursor evidence-owner paths and truncated before a bounded complete result.",
+      "rootCause": "The diagnostic printed full set differences instead of returning only missing binding IDs and owner counts or writing a checksum-bound union mechanically.",
+      "prevention": "Generate the policy union from parsed stage objects, emit only counts and missing binding identifiers, and validate the resulting claim with hashes and cardinalities rather than path floods.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
     }
   ]
 }

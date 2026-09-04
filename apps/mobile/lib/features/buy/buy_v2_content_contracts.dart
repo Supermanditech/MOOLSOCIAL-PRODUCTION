@@ -670,6 +670,61 @@ abstract interface class BuyV2DeliveryExceptionAdapter {
   });
 }
 
+enum BuyV2LiveDeliveryState { ready, delivered, offline, unavailable }
+
+@immutable
+class BuyV2GeoPoint {
+  const BuyV2GeoPoint({required this.latitude, required this.longitude});
+
+  final double latitude;
+  final double longitude;
+
+  bool get isValid =>
+      latitude.isFinite &&
+      longitude.isFinite &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      longitude >= -180 &&
+      longitude <= 180;
+}
+
+@immutable
+class BuyV2LiveDeliverySnapshot {
+  const BuyV2LiveDeliverySnapshot({
+    required this.orderId,
+    required this.state,
+    required this.customerMessage,
+    required this.sourceId,
+    this.courierPosition,
+    this.destinationPosition,
+    this.driverName,
+    this.vehicleLabel,
+    this.etaLabel,
+    this.lastUpdatedAt,
+    this.routeProgress,
+    this.trackingReference,
+  });
+
+  final String orderId;
+  final BuyV2LiveDeliveryState state;
+  final String customerMessage;
+  final String sourceId;
+  final BuyV2GeoPoint? courierPosition;
+  final BuyV2GeoPoint? destinationPosition;
+  final String? driverName;
+  final String? vehicleLabel;
+  final String? etaLabel;
+  final DateTime? lastUpdatedAt;
+  final double? routeProgress;
+  final String? trackingReference;
+}
+
+abstract interface class BuyV2LiveDeliveryAdapter {
+  const BuyV2LiveDeliveryAdapter();
+
+  Future<BuyV2LiveDeliverySnapshot> load({required String orderId});
+}
+
 abstract interface class BuyV2CommerceAdapter {
   const BuyV2CommerceAdapter();
 
@@ -710,16 +765,30 @@ final class BuyV2CatalogueProductFactsAdapter
 
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final closedForReview = product.seller == 'Pet Family Store';
+    final noProductsForReview = product.seller == 'Beauty Supply';
     return BuyV2ProductFactsSnapshot(
       productId: product.id,
       price: product.price,
       deliveryPromise: product.deliveryPromise,
       partner: product.seller,
-      orderabilityLabel: product.requiresPrescription
+      orderabilityLabel: closedForReview
+          ? 'Store closed'
+          : noProductsForReview
+          ? 'Products unavailable'
+          : product.requiresPrescription
           ? 'Prescription required'
           : 'Available to add',
       sourceId: 'approved-buy-catalogue',
       fulfilmentMode: buyV2CatalogueFulfilmentModeFor(product),
+      storeOperatingState:
+          product.destination == BuyV2Destination.shop ||
+              product.destination == BuyV2Destination.wholesale
+          ? closedForReview
+                ? BuyV2StoreOperatingState.closed
+                : BuyV2StoreOperatingState.open
+          : BuyV2StoreOperatingState.unknown,
+      nextOpeningLabel: closedForReview ? 'tomorrow at 8:00 am' : null,
     );
   }
 }

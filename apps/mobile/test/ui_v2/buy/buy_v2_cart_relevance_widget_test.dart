@@ -340,7 +340,7 @@ void main() {
 
       expect(session.isSaved(shop.id), isFalse);
       expect(session.quantityFor(shop.id), shop.minimumOrder);
-      expect(find.text('No Saved products here'), findsOneWidget);
+      expect(find.text('No saved products yet'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -459,7 +459,7 @@ void main() {
   );
 
   testWidgets(
-    'validated coupon selects, removes and projects into Checkout without changing total',
+    'validated coupon selects, removes and projects its saving into Checkout',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(320, 700));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -486,7 +486,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(select);
       await tester.pumpAndSettle();
-      expect(find.text('Selected for Checkout review'), findsOneWidget);
+      expect(find.text('Applied to Cart total'), findsOneWidget);
       expect(session.cartTotal, originalTotal);
 
       await tester.tap(
@@ -507,23 +507,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(session.openCheckout(), isTrue);
       await tester.pumpAndSettle();
-
-      final checkoutBenefit = find.byKey(
-        const ValueKey('buy-checkout-benefit-shop-coupon'),
-      );
-      await tester.scrollUntilVisible(
-        checkoutBenefit,
-        300,
-        scrollable: find.byType(Scrollable).first,
-        maxScrolls: 20,
-      );
-      await tester.pumpAndSettle();
-      expect(checkoutBenefit, findsOneWidget);
+      expect(session.checkoutCouponSaving, greaterThan(0));
       expect(
-        find.textContaining('No amount has been deducted'),
-        findsOneWidget,
+        session.checkoutPayableTotal,
+        originalTotal - session.checkoutCouponSaving,
       );
-      expect(session.checkoutPayableTotal, originalTotal);
       expect(tester.takeException(), isNull);
     },
   );
@@ -659,6 +647,9 @@ class _AvailableBenefitsAdapter implements BuyV2CartBenefitsAdapter {
           title: 'Provider coupon',
           detail: 'Eligibility returned by the test provider.',
           sourceId: 'test-coupon-source',
+          sponsor: BuyV2CartBenefitSponsor.retailer,
+          sponsorName: 'Retail partner',
+          savingAmount: 10,
         ),
       if (kind == BuyV2CartBenefitKind.paymentOffer)
         const BuyV2CartBenefit(
