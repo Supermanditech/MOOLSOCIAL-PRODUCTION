@@ -42,3 +42,14 @@ Stop without committing if merge-tree reports any conflict outside the three lis
 ## Qualification state
 
 Pre-merge and post-merge qualification results will be appended only after their commands complete successfully. No APK or device action belongs to this ticket.
+
+## Pre-merge qualification
+
+- Bootstrap commit: `c9be1e2f8a8774de2f2df02225270609b76b5696`
+- Regression memory: passed with 4,396 unique entries.
+- Repair coordination fixture: passed.
+- Coordination bootstrap and task-start phases: passed.
+- Store-Live remote readback: `aa335eb1497d77c859e7d34b549716350612c5c8`.
+- Cursor Buy remote readback: `fd55d1cfffa5ed10f753f2ed24461ef9ac6a9a5d`.
+- Merge-tree result: exactly the three declared coordination conflicts; no product-source or test conflict.
+- UAT-BUY-073 metadata, COD, Purchase Order and `productLink` remain automatic-merge owners and must not be manually edited.
