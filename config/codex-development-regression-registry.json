@@ -49774,6 +49774,169 @@
       "prevention": "Generate the policy union from parsed stage objects, emit only counts and missing binding identifiers, and validate the resulting claim with hashes and cardinalities rather than path floods.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260904-4440-STORE-BUY-COMBINED-TEN-FILE-REGRESSION-RETURNED-FIVE-FAILURES",
+      "status": "registered-combined-regression-failure",
+      "appliesTo": [
+        "primary",
+        "integration_repair",
+        "integration",
+        "work",
+        "store",
+        "test"
+      ],
+      "mistake": "The first post-repair combined ten-file Work and Store regression returned exit code 1 with 140 passed, 70 skipped and 5 failed tests.",
+      "rootCause": "The complete deterministic failure identities are not yet known because the original concurrent compact-report run did not retain a complete transcript.",
+      "prevention": "Run the exact ten-file set once with deterministic concurrency 1 and expanded reporting in the isolated evidence lane, retain the complete generated log and classify each failure against Store, Cursor and the failed repair before any fix ticket.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/run-store-buy-diagnostic-evidence.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"
+      ]
+    },
+    {
+      "id": "REG-20260904-4441-ORIGINAL-TEN-FILE-REGRESSION-OUTPUT-WAS-TRUNCATED-AND-NOT-RETAINED",
+      "status": "registered-unrecoverable-test-output-truncation",
+      "appliesTo": [
+        "primary",
+        "integration_repair",
+        "integration",
+        "work",
+        "store",
+        "test"
+      ],
+      "mistake": "The original combined regression output was truncated in the tool channel and no complete raw log was written, preventing truthful reconstruction of the five failing test names, assertions and stacks.",
+      "rootCause": "The large compact reporter and application debug stream were sent directly to the bounded tool output instead of a unique retained evidence log.",
+      "prevention": "Never fabricate the missing original transcript. Preserve the exact command, file list, known totals and truncation fact, then capture the serialized expanded rerun to a unique generated log and emit only its checksum and bounded summary.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/run-store-buy-diagnostic-evidence.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"
+      ]
+    },
+    {
+      "id": "REG-20260904-4442-DIAGNOSTIC-V1-TASK-START-REJECTED-UNAUTHORIZED-ARTIFACT-ROOT",
+      "status": "registered-evidence-lane-owner-root-failure",
+      "appliesTo": [
+        "primary",
+        "integration_repair",
+        "integration",
+        "git",
+        "test"
+      ],
+      "mistake": "The clean pushed diagnostic v1 bootstrap passed coordination_bootstrap but task_start rejected its artifacts/quality evidence owners because that root is not allowed for the integration_repair lane.",
+      "rootCause": "The evidence lane chose a conventional artifact directory without first validating the lane's exact allowedOwnerRoots.",
+      "prevention": "Preserve v1 as failed coordination evidence and use only the already allowed docs/quality, config and scripts roots in the fresh v2 lane before any diagnostic test.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"
+      ]
+    },
+    {
+      "id": "REG-20260904-4443-DIAGNOSTIC-V2-FIRST-WORKTREE-CHECKOUT-EXHAUSTED-DISK",
+      "status": "registered-worktree-checkout-disk-failure",
+      "appliesTo": [
+        "primary",
+        "integration_repair",
+        "integration",
+        "git",
+        "test"
+      ],
+      "mistake": "The first v2 evidence-worktree checkout stopped at 43 percent because the C drive had no space left while materializing retained APK evidence.",
+      "rootCause": "The checkout began with insufficient free capacity for the evidence-heavy failed repair tree.",
+      "prevention": "Keep the failed partial checkout unmodified until founder-directed cleanup, verify at least 10 GB free, prune only the stale registration after the path is removed, then recreate the existing branch and wait for its exact process exit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"
+      ]
+    },
+    {
+      "id": "REG-20260904-4444-POST-POWER-RECOVERY-PREFLIGHT-TOOL-CALL-WAS-MALFORMED",
+      "status": "registered-tool-invocation-syntax-failure",
+      "appliesTo": [
+        "primary",
+        "integration_repair",
+        "integration",
+        "git",
+        "handoff"
+      ],
+      "mistake": "The first post-power recovery preflight contained placeholder and malformed tool-call fields, so no shell command ran.",
+      "rootCause": "An unfinished wrapper draft was submitted instead of one complete direct shell call.",
+      "prevention": "Use one exact awaited shell command with literal path and branch values and no placeholder fields.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json"
+      ]
+    },
+    {
+      "id": "REG-20260904-4445-SECOND-RECOVERY-PREFLIGHT-DUPLICATED-JAVASCRIPT-DECLARATION",
+      "status": "registered-tool-invocation-syntax-failure",
+      "appliesTo": [
+        "primary",
+        "integration_repair",
+        "integration",
+        "git",
+        "handoff"
+      ],
+      "mistake": "The second post-power preflight failed JavaScript parsing because the declaration token was duplicated before the shell call.",
+      "rootCause": "The corrected wrapper was not syntax-reviewed before submission.",
+      "prevention": "Use a single literal declaration and plain result projection; a parser-rejected wrapper supplies no recovery evidence.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json"
+      ]
+    },
+    {
+      "id": "REG-20260904-4446-FIRST-V2-RECREATE-COMMAND-CONTAINED-AN-INCOMPLETE-PATH",
+      "status": "registered-git-command-construction-failure",
+      "appliesTo": [
+        "primary",
+        "integration_repair",
+        "integration",
+        "git",
+        "worktree"
+      ],
+      "mistake": "The first v2 recreate attempt used an incomplete malformed worktree path and returned no usable checkout evidence.",
+      "rootCause": "The command was submitted before the literal existing branch and complete target path were fully composed.",
+      "prevention": "Issue only `git worktree add <exact-path> <existing-branch>`, retain its session, wait for exit zero and verify branch, HEAD and zero status records independently.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json"
+      ]
+    },
+    {
+      "id": "REG-20260904-4447-V2-EVIDENCE-DOCUMENT-CONTAINED-TWO-DRAFT-FRAGMENTS",
+      "status": "registered-evidence-copy-quality-failure",
+      "appliesTo": ["primary", "integration_repair", "integration", "git", "test"],
+      "mistake": "The first v2 evidence document contained a misspelled scope fragment and an accidental placeholder line before the known result.",
+      "rootCause": "The Add File content was not visually reread before application and included two composition artifacts.",
+      "prevention": "Correct only the two literal lines, reread the complete short evidence owner, and require absence of draft and placeholder tokens before bootstrap gating.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"]
     }
   ]
 }

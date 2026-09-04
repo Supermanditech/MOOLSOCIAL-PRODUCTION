@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4402,
-    "sha256": "179F0890F4EA054B3C10BBBD0AFB2C73C22682CAA62FEE9E27C89F593252C268"
+    "entryCount": 4410,
+    "sha256": "FF7EF9841018F4398F7599FB64AA5AF26DFAF7422245EFD06FAECD7159871510"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -46,16 +46,18 @@
       ]
     },
     {
-      "task": "/root/repair_store_buy_conflict_v1_20260904",
+      "task": "/root/repair_store_buy_diagnostic_evidence_v2_20260904",
       "role": "primary",
       "owners": [
+        "docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.result.json",
+        "docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.stderr.log",
+        "docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.stdout.log",
+        "docs/quality/store-buy-diagnostic-evidence-v2-20260904/toolchain-and-dependency-hashes.json",
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json",
-        "docs/quality/STORE-BUY-PRE-INTEGRATION-RECONCILIATION-20260904.md",
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V1-20260904.md",
-        "scripts/check-codex-development-regression-memory.ps1",
+        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md",
         "scripts/check-codex-subagent-coordination-policy.ps1",
-        "scripts/test-codex-integration-repair-coordination-policy.ps1"
+        "scripts/run-store-buy-diagnostic-evidence.ps1"
       ]
     },
     {
@@ -2180,6 +2182,32 @@
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "integration_repair_store_buy_diagnostic_evidence_v2_20260904",
+        "state": "founder_authorized_2026_09_04",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root/repair_store_buy_diagnostic_evidence_v2_20260904",
+        "workId": "store-buy-diagnostic-evidence-v2-20260904",
+        "ticketId": "UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904",
+        "branch": "work/integration-repair/store-buy-diagnostic-evidence-v2-20260904",
+        "baselineHead": "c48e4ecc5c3ccc7a3079d3f64988437599cc78de",
+        "bootstrapCommitSubject": "coordination(store-buy-diagnostic-evidence-v2-20260904): bind serialized regression evidence",
+        "bootstrapOwners": [
+          "docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.result.json",
+          "docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.stderr.log",
+          "docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.stdout.log",
+          "docs/quality/store-buy-diagnostic-evidence-v2-20260904/toolchain-and-dependency-hashes.json",
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/run-store-buy-diagnostic-evidence.ps1"
+        ],
+        "cursorIndependent": false,
         "integrationRequiredBeforeSuccessorApk": true
       }
     ],
