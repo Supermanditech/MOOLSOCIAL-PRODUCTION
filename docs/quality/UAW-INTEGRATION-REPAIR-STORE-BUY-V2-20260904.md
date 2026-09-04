@@ -28,4 +28,14 @@ No automatically merged product or test owner may be manually changed.
 
 ## Qualification
 
-Pre-merge and post-merge gate results will be appended only after completion. No APK, device, deployment or private-account action belongs to this repair.
+### Pre-merge qualification
+
+- Bootstrap commit: `ec19b96d5d16faaac9810854c05297522ba83a4f`
+- Corrected Store/Universal parent: local and remote both `300f4247165a097d82624f4b40c9c2d611c7bc48`
+- Cursor Buy parent: local and remote both `fd55d1cfffa5ed10f753f2ed24461ef9ac6a9a5d`
+- Regression memory: 4,424 entries passed.
+- Coordination bootstrap and task-start gates: passed.
+- Integration-repair fixture before graph qualification: passed.
+- Read-only `git merge-tree --write-tree` preview: conflict exit `1`, with exactly the three declared coordination owners and no product or test conflict.
+
+Post-merge gate results will be appended only after completion. No APK, device, deployment or private-account action belongs to this repair.
