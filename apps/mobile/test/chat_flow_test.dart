@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
@@ -1281,6 +1283,97 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('supplier loading resolves to an honest named empty state', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final gateway = _ControlledMessagesChatGateway();
+    final chat = ChatSession.production(gateway: gateway);
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    final route = Uri(
+      path: '/app/chat/thread/shop-partner-shop-jodhpur-grocery',
+      queryParameters: {
+        'return': '/app/buy?sub=shop&view=product&product=grocery-atta-1kg',
+        'directReturn': 'true',
+        'context': 'supplier-product',
+        'supplier': 'Jodhpur Grocery',
+        'supplierType': 'Retail partner',
+        'productTitle': 'Whole Wheat Atta',
+        'skuId': 'grocery-atta-1kg',
+      },
+    ).toString();
+
+    await tester.binding.setSurfaceSize(const Size(412, 915));
+    await tester.pumpWidget(
+      MoolSocialApp(
+        key: ValueKey(route),
+        session: journey,
+        chatSession: chat,
+        initialLocation: route,
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      find.byKey(const Key('chat-thread-loading-message')),
+      findsOneWidget,
+    );
+    expect(find.text('Loading messages'), findsNothing);
+    expect(
+      find.text('Getting your latest messages from Jodhpur Grocery'),
+      findsOneWidget,
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chat-page-title'))).data,
+      'Jodhpur Grocery',
+    );
+
+    gateway.completeMessages(const []);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-thread-loading-message')), findsNothing);
+    expect(find.byKey(const Key('chat-thread-empty-state')), findsOneWidget);
+    expect(find.text('No messages with Jodhpur Grocery yet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('supplier message failure retries into the named empty state', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final gateway = _RetryMessagesChatGateway();
+    final chat = ChatSession.production(gateway: gateway);
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    final route = Uri(
+      path: '/app/chat/thread/shop-partner-wholesale-marwar-supplies',
+      queryParameters: {
+        'return': '/app/buy?sub=wholesale',
+        'directReturn': 'true',
+        'context': 'supplier-store',
+        'supplier': 'Marwar Supplies',
+        'supplierType': 'Wholesale partner',
+      },
+    ).toString();
+
+    await mount(tester, route: route, journey: journey, chat: chat);
+    expect(find.byKey(const Key('chat-retry-messages')), findsOneWidget);
+    expect(find.text('Messages could not load'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chat-page-title'))).data,
+      'Marwar Supplies',
+    );
+
+    await tapVisible(tester, const Key('chat-retry-messages'));
+    await tester.pumpAndSettle();
+    expect(gateway.messageCalls, 2);
+    expect(find.byKey(const Key('chat-retry-messages')), findsNothing);
+    expect(find.byKey(const Key('chat-thread-empty-state')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('compact phone keeps chat controls tappable without overflow', (
     tester,
   ) async {
@@ -1537,4 +1630,38 @@ class _PeopleChatGateway implements ChatGateway {
     required String messageId,
     required bool reacted,
   }) => Future.error(UnsupportedError('Not used by this test.'));
+}
+
+class _ControlledMessagesChatGateway extends _PeopleChatGateway {
+  final Completer<List<ChatMessage>> _messages = Completer();
+
+  void completeMessages(List<ChatMessage> values) {
+    if (!_messages.isCompleted) _messages.complete(values);
+  }
+
+  @override
+  Future<List<ChatMessage>> listMessages({
+    required String threadId,
+    int limit = 50,
+  }) => _messages.future;
+}
+
+class _RetryMessagesChatGateway extends _PeopleChatGateway {
+  int messageCalls = 0;
+
+  @override
+  Future<List<ChatMessage>> listMessages({
+    required String threadId,
+    int limit = 50,
+  }) async {
+    messageCalls += 1;
+    if (messageCalls == 1) {
+      throw const ChatServiceException(
+        'Messages are unavailable right now.',
+        code: 'offline',
+        retryable: true,
+      );
+    }
+    return const [];
+  }
 }

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/chat/chat_entry_context.dart';
 import 'package:moolsocial/features/chat/chat_models.dart';
 import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_chat_route_adapter.dart';
 import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
 
 void main() {
@@ -116,6 +118,43 @@ void main() {
       ).allowsThread('ride-support'),
       isTrue,
     );
+  });
+
+  test('Buy product route becomes complete shared Chat commerce context', () {
+    final product = BuyV2Catalogue.products.firstWhere(
+      (value) => value.destination == BuyV2Destination.wholesale,
+    );
+    final route = Uri.parse(
+      const BuyV2ChatRouteAdapter().productQuestionLocationFor(
+        product: product,
+        quantity: 4,
+      ),
+    );
+    final context = ChatCommerceContext.maybeFromUri(route);
+
+    expect(context, isNotNull);
+    expect(context!.title, product.seller);
+    expect(context.productTitle, product.title);
+    expect(context.productId, product.canonicalId);
+    expect(context.skuId, product.id);
+    expect(context.brand, product.brand);
+    expect(context.variant, product.variant);
+    expect(context.pack, product.pack);
+    expect(context.quantity, '4');
+    expect(context.minimumOrder, '${product.minimumOrder}');
+    expect(context.delivery, product.deliveryPromise);
+    expect(
+      context.productAppRoute,
+      '/app/buy?sub=wholesale&view=product&product=${product.id}',
+    );
+    final facts = {
+      for (final fact in context.decisionFacts) fact.label: fact.value,
+    };
+    expect(facts['Product'], product.title);
+    expect(facts['SKU'], product.id);
+    expect(facts['Pack'], product.pack);
+    expect(facts['Quantity'], '4');
+    expect(facts['Delivery'], product.deliveryPromise);
   });
 
   for (final entry
@@ -653,43 +692,55 @@ void main() {
         const Key('chat-info-voice-availability'),
       );
       await tester.ensureVisible(voiceAvailability);
-      await tester.tap(voiceAvailability);
-      await tester.pump();
       expect(chat.voiceCallsAvailableForSession('home-basket'), isFalse);
-      expect(find.byKey(const Key('chat-info-local-feedback')), findsOneWidget);
       expect(
-        find.text('Voice calls are paused until you close the app.'),
+        tester.widget<SwitchListTile>(voiceAvailability).onChanged,
+        isNull,
+      );
+      expect(
+        find.text(
+          'Voice calling is not available yet. Messages remain available.',
+        ),
         findsOneWidget,
       );
-      await tester.tap(find.byKey(const Key('chat-info-video-availability')));
-      await tester.pump();
+      final videoAvailability = find.byKey(
+        const Key('chat-info-video-availability'),
+      );
+      expect(
+        tester.widget<SwitchListTile>(videoAvailability).onChanged,
+        isNull,
+      );
       expect(chat.videoCallsAvailableForSession('home-basket'), isFalse);
-
-      final voiceChat = find.byKey(const Key('chat-info-voice-chat'));
-      await tester.ensureVisible(voiceChat);
-      await tester.tap(voiceChat);
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('chat-voice-chat-recovery')), findsOneWidget);
-      expect(find.text('Voice chat unavailable'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('chat-capability-continue')));
-      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-info-voice-chat')), findsNothing);
 
       final lastSeen = find.byKey(const Key('chat-info-last-seen'));
-      await tester.ensureVisible(lastSeen);
+      final infoScroll = find.descendant(
+        of: find.byKey(const Key('chat-conversation-info-list')),
+        matching: find.byType(Scrollable),
+      );
+      await tester.scrollUntilVisible(lastSeen, 240, scrollable: infoScroll);
       await tester.tap(lastSeen);
       await tester.pumpAndSettle();
       expect(chat.privacySettings.shareLastSeen, isFalse);
       expect(find.text('Last seen sharing turned off.'), findsWidgets);
 
       final readReceipts = find.byKey(const Key('chat-info-read-receipts'));
-      await tester.ensureVisible(readReceipts);
+      await tester.drag(
+        find.byKey(const Key('chat-conversation-info-list')),
+        const Offset(0, -240),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(readReceipts);
       await tester.pumpAndSettle();
       expect(chat.privacySettings.readReceipts, isFalse);
       expect(tester.widget<SwitchListTile>(readReceipts).value, isFalse);
 
       final blockUser = find.byKey(const Key('chat-info-block-user'));
-      await tester.ensureVisible(blockUser);
+      await tester.drag(
+        find.byKey(const Key('chat-conversation-info-list')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(blockUser);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('chat-block-user-recovery')), findsOneWidget);
@@ -717,7 +768,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('chat-thread-call')));
       await tester.pumpAndSettle();
-      expect(find.text('Voice calls paused'), findsOneWidget);
+      expect(find.text('Voice calling unavailable'), findsOneWidget);
       await tester.tap(find.byKey(const Key('chat-capability-continue')));
       await tester.pumpAndSettle();
 
@@ -1115,6 +1166,277 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'Buy product Chat shows supplier facts honest empty state and exact product link',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      final product = BuyV2Catalogue.products.firstWhere(
+        (value) => value.destination == BuyV2Destination.wholesale,
+      );
+      final route = const BuyV2ChatRouteAdapter().productQuestionLocationFor(
+        product: product,
+        quantity: 4,
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: route,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<Text>(find.byKey(const Key('chat-page-title'))).data,
+        product.seller,
+      );
+      expect(find.text('Conversation'), findsNothing);
+      expect(find.text('Loading messages'), findsNothing);
+      expect(
+        find.byKey(const Key('chat-commerce-context-card')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('chat-thread-empty-state')), findsOneWidget);
+      expect(
+        find.text('No messages with ${product.seller} yet'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<IconButton>(find.byKey(const Key('chat-thread-call')))
+            .tooltip,
+        'Voice calling unavailable',
+      );
+      expect(
+        tester
+            .widget<IconButton>(find.byKey(const Key('chat-thread-video')))
+            .tooltip,
+        'Video calling unavailable',
+      );
+
+      await tester.tap(find.byKey(const Key('chat-thread-video')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-video-recovery')), findsOneWidget);
+      expect(
+        find.text(
+          'Video calling is not available yet. You can continue with messages.',
+        ),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('chat-page-title')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('chat-conversation-info-screen')),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<Text>(find.byKey(const Key('chat-page-title'))).data,
+        product.seller,
+      );
+      expect(
+        find.byKey(const Key('chat-commerce-context-card')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.byKey(const Key('chat-info-voice-availability')),
+            )
+            .onChanged,
+        isNull,
+      );
+      expect(find.byKey(const Key('chat-info-voice-chat')), findsNothing);
+      await tester.tap(find.byKey(const Key('chat-conversation-info-back')));
+      await tester.pumpAndSettle();
+
+      final contextExpander = find.byKey(
+        const Key('chat-commerce-context-expand'),
+      );
+      await tester.ensureVisible(contextExpander);
+      await tester.tap(contextExpander);
+      await tester.pumpAndSettle();
+      expect(find.text(product.id), findsOneWidget);
+      expect(find.text(product.pack), findsWidgets);
+      expect(find.text(product.deliveryPromise), findsWidgets);
+      final viewProduct = find.byKey(const Key('chat-commerce-open-product'));
+      await tester.drag(
+        find.byKey(const Key('chat-message-list')),
+        const Offset(0, -600),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getCenter(viewProduct).dy, lessThan(700));
+      await tester.tap(viewProduct);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(PageStorageKey('buy-product-${product.id}')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Buy product Chat Back restores the exact originating product', (
+    tester,
+  ) async {
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    final product = BuyV2Catalogue.products.firstWhere(
+      (value) => value.destination == BuyV2Destination.wholesale,
+    );
+    final route = const BuyV2ChatRouteAdapter().productQuestionLocationFor(
+      product: product,
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: route,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('chat-back')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(PageStorageKey('buy-product-${product.id}')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shared content uses customer-facing empty copy and returns', (
+    tester,
+  ) async {
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    final route = Uri(
+      path: '/app/chat/thread/shop-partner-shop-empty-store',
+      queryParameters: {
+        'return': '/app/buy?sub=shop',
+        'directReturn': 'true',
+        'context': 'supplier-store',
+        'supplier': 'Empty Store',
+        'supplierType': 'Retail partner',
+      },
+    ).toString();
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: route,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-page-title')));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const Key('chat-conversation-info-list')),
+      const Offset(0, -320),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-info-shared-content')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('chat-shared-content-screen')), findsOneWidget);
+    expect(find.text('No shared content yet'), findsOneWidget);
+    expect(
+      find.text(
+        'Photos, videos, files and links shared in this conversation will appear here.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Content shared in this conversation appears here.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('chat-shared-content-back')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('chat-conversation-info-screen')),
+      findsOneWidget,
+    );
+    expect(find.text('Empty Store'), findsWidgets);
+    await tester.tap(find.byKey(const Key('chat-conversation-info-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(find.text('Empty Store'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Chat settings never present unavailable calling as ready', (
+    tester,
+  ) async {
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/chat/thread/home-basket?return=/app/social',
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-conversation-info')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-info-open-global-settings')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('chat-settings-screen')), findsOneWidget);
+    final voice = tester.widget<SwitchListTile>(
+      find.byKey(const Key('chat-settings-voice-availability')),
+    );
+    final video = tester.widget<SwitchListTile>(
+      find.byKey(const Key('chat-settings-video-availability')),
+    );
+    expect(voice.value, isFalse);
+    expect(video.value, isFalse);
+    expect(voice.onChanged, isNull);
+    expect(video.onChanged, isNull);
+    expect(
+      find.text(
+        'Voice calling is not available yet. Messages remain available.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Video calling is not available yet. Messages remain available.',
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'Assist draft keeps full-width text above fixed controls and Back restores the composer',

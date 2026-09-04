@@ -42,7 +42,16 @@
         "apps/mobile/test/ui_v2/work/work_main_v2_test.dart",
         "apps/mobile/test/work_workspace_layout_safety_test.dart",
         "apps/mobile/test/work_vertical_slice_test.dart",
-        "apps/mobile/test/work_production_gateway_test.dart"
+        "apps/mobile/test/work_production_gateway_test.dart",
+        "apps/mobile/lib/features/chat/chat_entry_context.dart",
+        "apps/mobile/lib/features/chat/chat_session.dart",
+        "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart",
+        "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart",
+        "apps/mobile/lib/features/chat/screens/chat_shared_content_screen.dart",
+        "apps/mobile/test/chat_flow_test.dart",
+        "apps/mobile/test/chat_settings_hub_test.dart",
+        "apps/mobile/test/global_contextual_chat_shell_test.dart",
+        "config/codex-subagent-coordination-policy.json"
       ]
     },
     {
@@ -50,7 +59,6 @@
       "role": "primary",
       "owners": [
         "config/codex-development-regression-registry.json",
-        "config/codex-subagent-coordination-policy.json",
         "docs/quality/STORE-BUY-V3-PRE-INTEGRATION-RECONCILIATION-20260904.md",
         "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
         "scripts/check-codex-development-regression-memory.ps1",
@@ -2281,6 +2289,26 @@
         "integrationRequiredBeforeSuccessorApk": true
       },
       {
+        "id": "codex_buy_contextual_chat_v1_20260904",
+        "state": "founder_authorized_2026_09_04",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "buy-contextual-chat-v1-20260904",
+        "ticketId": "UAW-CODEX-BUY-CONTEXTUAL-CHAT-V1-20260904",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-buy-contextual-chat-v1-20260904",
+        "branch": "work/codex-ui/buy-contextual-chat-v1-20260904",
+        "baselineHead": "f94cfd4752dd73b58a69568475803d6cf25cb8d0",
+        "bootstrapCommitSubject": "coordination(buy-contextual-chat-v1-20260904): bind shared Chat owners",
+        "bootstrapOwners": [
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CODEX-BUY-CONTEXTUAL-CHAT-V1-20260904.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
         "id": "integration_repair_store_buy_conflict_v3_20260904",
         "state": "founder_authorized_2026_09_04",
         "lane": "integration_repair",
@@ -2439,7 +2467,16 @@
           "apps/mobile/test/ui_v2/work/",
           "apps/mobile/test/work_workspace_layout_safety_test.dart",
           "apps/mobile/test/work_vertical_slice_test.dart",
-          "apps/mobile/test/work_production_gateway_test.dart"
+          "apps/mobile/test/work_production_gateway_test.dart",
+          "apps/mobile/lib/features/chat/chat_entry_context.dart",
+          "apps/mobile/lib/features/chat/chat_session.dart",
+          "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart",
+          "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart",
+          "apps/mobile/lib/features/chat/screens/chat_shared_content_screen.dart",
+          "apps/mobile/test/chat_flow_test.dart",
+          "apps/mobile/test/chat_settings_hub_test.dart",
+          "apps/mobile/test/global_contextual_chat_shell_test.dart",
+          "config/codex-subagent-coordination-policy.json"
         ],
         "forbiddenOwnerRoots": [
           "apps/mobile/lib/core/auth/",

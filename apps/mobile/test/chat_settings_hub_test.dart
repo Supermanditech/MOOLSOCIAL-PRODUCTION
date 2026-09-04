@@ -93,8 +93,9 @@ void main() {
     chat.setGlobalReviewBeforeSendingForSession(enabled: false);
 
     expect(chat.chatAvailableForSession('rasoi'), isTrue);
-    expect(chat.voiceCallsAvailableForSession('rasoi'), isTrue);
-    expect(chat.videoCallsAvailableForSession('rasoi'), isTrue);
+    expect(chat.callServiceAvailable, isFalse);
+    expect(chat.voiceCallsAvailableForSession('rasoi'), isFalse);
+    expect(chat.videoCallsAvailableForSession('rasoi'), isFalse);
     expect(chat.reviewBeforeSendingForSession('rasoi'), isFalse);
     expect(chat.chatAvailableForSession('home-basket'), isFalse);
     expect(chat.voiceCallsAvailableForSession('home-basket'), isFalse);
@@ -166,25 +167,39 @@ void main() {
       await openSettings(tester);
       expect(chat.callPreferencesBackedByService, isFalse);
       expect(
-        find.text('Show or hide voice calling on this device.'),
+        find.text(
+          'Voice calling is not available yet. Messages remain available.',
+        ),
         findsOneWidget,
       );
       expect(
-        find.text('Show or hide video calling on this device.'),
+        find.text(
+          'Video calling is not available yet. Messages remain available.',
+        ),
         findsOneWidget,
       );
       expect(find.textContaining('saved to your account'), findsNothing);
-      expect(find.textContaining('needs the calling service'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'Calling controls will appear when calling is available.',
+        ),
+        findsOneWidget,
+      );
       expect(find.textContaining('UI review'), findsNothing);
 
+      await revealSetting(tester, const Key('chat-settings-chat-availability'));
+      await tester.tap(
+        find.byKey(const Key('chat-settings-chat-availability')),
+      );
+      await tester.pump();
       for (final key in const [
-        Key('chat-settings-chat-availability'),
         Key('chat-settings-voice-availability'),
         Key('chat-settings-video-availability'),
       ]) {
         await revealSetting(tester, key);
-        await tester.tap(find.byKey(key));
-        await tester.pump();
+        final setting = tester.widget<SwitchListTile>(find.byKey(key));
+        expect(setting.value, isFalse);
+        expect(setting.onChanged, isNull);
       }
       for (final key in const [
         Key('chat-settings-review-before-send'),
@@ -214,7 +229,13 @@ void main() {
       expect(find.byKey(const Key('chat-suggested-prompts')), findsNothing);
       await tester.tap(find.byKey(const Key('chat-thread-call')));
       await tester.pumpAndSettle();
-      expect(find.text('Voice calls paused'), findsOneWidget);
+      expect(find.text('Voice calling unavailable'), findsOneWidget);
+      expect(
+        find.text(
+          'Voice calling is not available yet. You can continue with messages.',
+        ),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('chat-capability-continue')));
       await tester.pumpAndSettle();
 
@@ -364,8 +385,8 @@ void main() {
     );
 
     expect(chat.globalChatAvailableForSession, isTrue);
-    expect(chat.globalVoiceCallsAvailableForSession, isTrue);
-    expect(chat.globalVideoCallsAvailableForSession, isTrue);
+    expect(chat.globalVoiceCallsAvailableForSession, isFalse);
+    expect(chat.globalVideoCallsAvailableForSession, isFalse);
     expect(tester.takeException(), isNull);
   });
 }

@@ -141,7 +141,7 @@ class _ChatSharedContentScreenState extends State<ChatSharedContentScreen> {
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(16, 5, 16, 10),
                   child: Text(
-                    'Shows content currently loaded in this conversation.',
+                    'Content shared in this conversation appears here.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: MoolColors.muted, fontSize: 11.5),
                   ),
@@ -256,7 +256,9 @@ class _SharedContentEmpty extends StatelessWidget {
             const Icon(Icons.inbox_outlined, size: 46, color: MoolColors.muted),
             const SizedBox(height: 10),
             Text(
-              'No ${_filterLabel(filter).toLowerCase()} here yet',
+              filter == _SharedContentFilter.all
+                  ? 'No shared content yet'
+                  : 'No ${_filterLabel(filter).toLowerCase()} shared yet',
               key: const Key('chat-shared-content-empty'),
               textAlign: TextAlign.center,
               style: const TextStyle(
@@ -267,7 +269,7 @@ class _SharedContentEmpty extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             const Text(
-              'New loaded conversation content will appear here.',
+              'Photos, videos, files and links shared in this conversation will appear here.',
               textAlign: TextAlign.center,
               style: TextStyle(color: MoolColors.muted),
             ),
