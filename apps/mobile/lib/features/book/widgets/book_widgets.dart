@@ -374,7 +374,7 @@ class BookPageScaffold extends StatelessWidget {
                       label: 'Medicine',
                       icon: Icons.medication_outlined,
                       onPressed: () =>
-                          switchGlobalDestination('/app/buy?sub=medicine'),
+                          switchGlobalDestination('/app/book/medicine'),
                     ),
                     MoolLocalNavigationAction(
                       keyName: 'care-local-salon',
@@ -399,7 +399,7 @@ class BookPageScaffold extends StatelessWidget {
                   ]
                 : const [
                     '/app/book/doctor',
-                    '/app/buy?sub=medicine',
+                    '/app/book/medicine',
                     '/app/book/salon',
                   ];
             final current = travelNavigation
@@ -421,7 +421,7 @@ class BookPageScaffold extends StatelessWidget {
                   ]
                 : const [
                     '/app/book/doctor',
-                    '/app/buy?sub=medicine',
+                    '/app/book/medicine',
                     '/app/book/salon',
                   ];
             final current = travelNavigation

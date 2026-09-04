@@ -2137,7 +2137,7 @@ class _SocialUniversalV2State extends State<SocialUniversalV2>
     final route = switch (choice) {
       'shop' => '/app/buy?sub=shop',
       'wholesale' => '/app/buy?sub=wholesale',
-      'medicine' => '/app/buy?sub=medicine',
+      'medicine' => '/app/book/medicine',
       'orders' => '/app/buy?sub=orders',
       'order-food' => '/app/eat/home',
       'book-table' => '/app/eat/table',

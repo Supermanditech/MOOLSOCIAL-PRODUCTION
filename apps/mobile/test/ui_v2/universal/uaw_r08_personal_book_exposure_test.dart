@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/book/book_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -118,7 +119,7 @@ void main() {
     ),
     (
       id: 'medicine',
-      route: '/app/buy?sub=medicine',
+      route: '/app/book/medicine',
       ownerKey: ValueKey('buy-v2-screen'),
       localNavigationKey: ValueKey('care-local-destination-tabs'),
     ),
@@ -154,6 +155,67 @@ void main() {
       },
     );
   }
+
+  for (final legacy in const [
+    (route: '/app/buy/medicine', expected: '/app/book/medicine'),
+    (
+      route: '/app/buy?sub=medicine&view=product&product=m-paracetamol-500',
+      expected: '/app/book/medicine?view=product&product=m-paracetamol-500',
+    ),
+    (
+      route: '/app/buy?context=rx&scope=medicine&view=cart',
+      expected: '/app/book/medicine?view=cart',
+    ),
+    (
+      route: '/app/buy?sub=medicine&view=tracking&order=RX-240784',
+      expected: '/app/book/medicine?view=tracking&order=RX-240784',
+    ),
+  ]) {
+    testWidgets(
+      'historical Medicine link returns through Care: ${legacy.route}',
+      (tester) async {
+        final journey = signedInSession();
+        addTearDown(journey.dispose);
+        await journey.start();
+
+        await tester.pumpWidget(
+          MoolSocialApp(session: journey, initialLocation: legacy.route),
+        );
+        await tester.pumpAndSettle();
+
+        final owner = find.byKey(const ValueKey('buy-v2-screen'));
+        expect(owner, findsOneWidget);
+        final uri = GoRouterState.of(tester.element(owner)).uri;
+        expect(uri.toString(), legacy.expected);
+        expect(uri.path, '/app/book/medicine');
+        expect(
+          find.byKey(const Key('care-local-tab-medicine')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('buy-local-tab-medicine')), findsNothing);
+      },
+    );
+  }
+
+  test('stored Buy Medicine routes resume through Care', () async {
+    final journey = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'current',
+          currentAreaLabel: 'Khema-Ka-Kuwa, Jodhpur, Rajasthan',
+          setupComplete: true,
+          lastReadyRoute: '/app/buy?sub=medicine&view=tracking&order=RX-240784',
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+    );
+    addTearDown(journey.dispose);
+
+    await journey.start();
+
+    expect(journey.authenticationCancelFallback, '/app/book/medicine');
+  });
 
   testWidgets('Book chooser Back restores the exact default owner', (
     tester,

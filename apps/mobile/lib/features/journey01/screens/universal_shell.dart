@@ -1237,7 +1237,7 @@ class _IntentEntryCard extends StatelessWidget {
               final productionRoute = switch ((spec.section, spec.id)) {
                 ('buy', 'grocery') ||
                 ('buy', 'categories') => '/app/buy/grocery',
-                ('buy', 'medicine') => '/app/buy/medicine',
+                ('book', 'medicine') => '/app/book/medicine',
                 ('buy', 'basket') => '/app/buy/basket',
                 ('eat', 'order-food') => '/app/eat/order',
                 ('eat', 'book-table') => '/app/eat/table',
@@ -2104,7 +2104,7 @@ Future<void> _showPermissionRecovery(
 String _routeForQuery(String value) {
   final query = value.toLowerCase();
   if (query.contains('medicine') || query.contains('pharmacy')) {
-    return '/app/buy/medicine';
+    return '/app/book/medicine';
   }
   if (query.contains('basket')) return '/app/buy?sub=basket';
   if (query.contains('grocery')) return '/app/buy?sub=grocery';
@@ -3015,7 +3015,7 @@ String _searchActionRoute(String section, String? subAction) {
   if (section == 'buy') {
     return switch (subAction) {
       'grocery' || 'categories' => '/app/buy/grocery',
-      'medicine' => '/app/buy/medicine',
+      'medicine' => '/app/book/medicine',
       'basket' => '/app/buy/basket',
       _ => '/app/buy',
     };

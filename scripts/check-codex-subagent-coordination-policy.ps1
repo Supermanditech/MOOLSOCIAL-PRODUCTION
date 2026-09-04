@@ -1542,8 +1542,11 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/lib/features/journey01/universal_intent_catalog.dart',
           'apps/mobile/lib/ui_v2/social/social_v2_consumer.dart',
           'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart',
+          'apps/mobile/test/ui_v2/universal/mool_domain_action_catalogue_c25b_test.dart',
           'apps/mobile/test/ui_v2/universal/mool_six_domain_route_projection_c25e_test.dart',
-          'apps/mobile/test/ui_v2/universal/uaw_r08_personal_book_exposure_test.dart'
+          'apps/mobile/test/ui_v2/universal/uaw_r08_personal_book_exposure_test.dart',
+          'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1'
         )
       )
       $allowedOwner = $false
