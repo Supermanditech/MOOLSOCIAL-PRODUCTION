@@ -6,6 +6,8 @@ Work ID: `universal-chat-boundary-contract-v1-20260904`
 
 Baseline: `300f4247165a097d82624f4b40c9c2d611c7bc48`
 
+Functional task-start base after exact owner admission: `9ccb302210e6300824e9e5e0ce84f2dd03c1e99c`
+
 ## Exact functional scope
 
 - `apps/mobile/test/universal_intent_completion_test.dart`

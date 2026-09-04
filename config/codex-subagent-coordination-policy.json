@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3926,
-    "sha256": "624C113D04F573EAB1FA6A65E1A7C8174D47BF79A6B68406539BF7A2F9D0D363"
+    "entryCount": 3927,
+    "sha256": "1976B5EEF3869D1CB3D9E6EE501DF42648403A5847D4BFCA23E8C5DC0DB9DF54"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -1428,13 +1428,12 @@
         "ticketId": "UAW-CODEX-UNIVERSAL-CHAT-BOUNDARY-CONTRACT-V1-20260904",
         "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-universal-c20e-test-contract-v2-20260904",
         "branch": "work/codex-ui/universal-chat-boundary-contract-v1-20260904",
-        "baselineHead": "300f4247165a097d82624f4b40c9c2d611c7bc48",
-        "bootstrapCommitSubject": "coordination(universal-chat-boundary-contract-v1-20260904): bind shared Chat test correction",
+        "baselineHead": "9ccb302210e6300824e9e5e0ce84f2dd03c1e99c",
+        "bootstrapCommitSubject": "coordination(universal-chat-boundary-contract-v1-20260904): seal admitted Chat test owner",
         "bootstrapOwners": [
           "config/codex-development-regression-registry.json",
           "config/codex-subagent-coordination-policy.json",
-          "docs/quality/UAW-CODEX-UNIVERSAL-CHAT-BOUNDARY-CONTRACT-V1-20260904.md",
-          "scripts/check-codex-subagent-coordination-policy.ps1"
+          "docs/quality/UAW-CODEX-UNIVERSAL-CHAT-BOUNDARY-CONTRACT-V1-20260904.md"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true

@@ -44823,6 +44823,16 @@
       "prevention": "Seal the exact registry and allowlist correction atomically through pre_commit, restore a clean branch, then rerun task_start before touching the functional test owner.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260904-4472-CHAT-BOUNDARY-CONTINUATION-BASE-STILL-POINTED-BEFORE-OWNER-ADMISSION",
+      "status": "registered-continuation-base-mismatch",
+      "appliesTo": ["primary", "codex_ui", "universal", "test"],
+      "mistake": "After the exact test-owner admission was committed, task_start still resolved its required base to the earlier bootstrap commit and correctly rejected the clean but later HEAD.",
+      "rootCause": "The continuation binding was not advanced to the sealed owner-admission commit before beginning functional work.",
+      "prevention": "Rebind this same ticket once to the clean owner-admission commit, seal that exact three-owner bootstrap, then run task_start at the resulting clean bootstrap HEAD before editing the test.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CODEX-UNIVERSAL-CHAT-BOUNDARY-CONTRACT-V1-20260904.md"]
     }
   ]
 }
