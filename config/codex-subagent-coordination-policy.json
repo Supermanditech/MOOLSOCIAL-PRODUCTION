@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4454,
-    "sha256": "AB95438339A1C131B35CA967B98D2B44EA3D0A0093229D6EC69A9AC8B912CA46"
+    "entryCount": 4456,
+    "sha256": "FD7144A60DF18F4F887879B6BDFD3CCC819716EA7B0F52FC10D34026BF550604"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,6 +34,11 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/UAW-CODEX-WORK-EARN-PAYMENT-FIT-V1-20260905.md",
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
         "apps/mobile/lib/features/work/screens/work_earn_screens.dart",
         "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
         "apps/mobile/lib/features/work/work_models.dart",
@@ -50,12 +55,9 @@
       "task": "/root/repair_store_buy_conflict_v3_20260904",
       "role": "primary",
       "owners": [
-        "config/codex-development-regression-registry.json",
-        "config/codex-subagent-coordination-policy.json",
         "docs/quality/STORE-BUY-V3-PRE-INTEGRATION-RECONCILIATION-20260904.md",
         "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
         "scripts/check-codex-development-regression-memory.ps1",
-        "scripts/check-codex-subagent-coordination-policy.ps1",
         "scripts/test-codex-integration-repair-coordination-policy.ps1"
       ]
     },

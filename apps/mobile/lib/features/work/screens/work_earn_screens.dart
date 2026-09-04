@@ -1130,6 +1130,7 @@ class _OpportunityCard extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
+                                    flex: 3,
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
@@ -1161,16 +1162,19 @@ class _OpportunityCard extends StatelessWidget {
                                     ),
                                   ),
                                   const SizedBox(width: MoolSpacing.xs),
-                                  Text(
-                                    opportunity.paymentAmount,
-                                    key: Key(
-                                      'work-opportunity-pay-amount-${opportunity.id}',
-                                    ),
-                                    textAlign: TextAlign.end,
-                                    style: const TextStyle(
-                                      color: MoolColors.ink,
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w800,
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      opportunity.paymentAmount,
+                                      key: Key(
+                                        'work-opportunity-pay-amount-${opportunity.id}',
+                                      ),
+                                      textAlign: TextAlign.end,
+                                      style: const TextStyle(
+                                        color: MoolColors.ink,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
                                   ),
                                 ],

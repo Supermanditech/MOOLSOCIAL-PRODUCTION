@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_router.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
@@ -15,6 +17,7 @@ void main() {
     Size size = const Size(390, 844),
     double textScale = 1,
     WorkSession? workSession,
+    JourneySnapshot? journeySnapshot,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
@@ -24,12 +27,14 @@ void main() {
 
     final journey = JourneySession(
       store: MemoryJourneyStore(
-        snapshot: const JourneySnapshot(
-          languageCode: 'en',
-          areaMode: 'manual',
-          areaLabel: 'Jodhpur',
-          setupComplete: true,
-        ),
+        snapshot:
+            journeySnapshot ??
+            const JourneySnapshot(
+              languageCode: 'en',
+              areaMode: 'manual',
+              areaLabel: 'Jodhpur',
+              setupComplete: true,
+            ),
       ),
       otpGateway: ReviewOtpGateway(signedIn: true),
     );
@@ -525,4 +530,64 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  for (final (width, scale) in const [
+    (320.0, 1.3),
+    (320.0, 1.4),
+    (390.0, 1.4),
+    (430.0, 1.4),
+  ]) {
+    testWidgets('all payment amounts fit at $width px and $scale text', (
+      tester,
+    ) async {
+      await mountWork(
+        tester,
+        size: Size(width, 700),
+        textScale: scale,
+        journeySnapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'current',
+          currentAreaLabel: 'Khema-Ka-Kuwa, Jodhpur, Rajasthan',
+          setupComplete: true,
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      final scrollable = find
+          .descendant(
+            of: find.byKey(const Key('work-earn-screen')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+
+      for (final opportunity in workOpportunities) {
+        final amount = find.byKey(
+          Key('work-opportunity-pay-amount-${opportunity.id}'),
+        );
+        await tester.scrollUntilVisible(amount, 180, scrollable: scrollable);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: opportunity.id);
+        final text = tester.widget<Text>(amount);
+        expect(text.data, opportunity.paymentAmount);
+        expect(text.maxLines, isNull);
+        final paragraph = tester.renderObject<RenderParagraph>(amount);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final card = tester.getRect(
+          find.byKey(Key('work-opportunity-${opportunity.id}')),
+        );
+        final amountRect = tester.getRect(amount);
+        expect(amountRect.width, greaterThan(0));
+        expect(amountRect.left, greaterThanOrEqualTo(card.left));
+        expect(amountRect.right, lessThanOrEqualTo(card.right));
+        final monthly = find.byKey(
+          Key('work-opportunity-pay-monthly-${opportunity.id}'),
+        );
+        expect(tester.widget<Text>(monthly).data, opportunity.monthlyPayment);
+        expect(tester.getRect(monthly).right, lessThan(amountRect.left));
+        expect(
+          find.byKey(Key('work-opportunity-apply-${opportunity.id}')),
+          findsOneWidget,
+        );
+      }
+    });
+  }
 }

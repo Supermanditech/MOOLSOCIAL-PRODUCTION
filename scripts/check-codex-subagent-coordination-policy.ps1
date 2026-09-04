@@ -1506,6 +1506,25 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (-not $isCoordinationBootstrap) {
     foreach ($effectiveOwner in $effectiveOwners) {
+      $earnPaymentEvidenceSupportOwner = (
+        $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
+        $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and
+        $ProductionWorkId -ceq 'work-earn-payment-fit-v1-20260905' -and
+        $ProductionTicketId -ceq 'UAW-CODEX-WORK-EARN-PAYMENT-FIT-V1-20260905' -and
+        $branch -ceq 'work/codex-ui/work-earn-payment-fit-v1-20260905' -and
+        [string]$selectedContinuationBinding.id -ceq 'codex_work_earn_payment_fit_v1_20260905' -and
+        [string]$selectedContinuationBinding.baselineHead -ceq 'f94cfd4752dd73b58a69568475803d6cf25cb8d0' -and
+        $bootstrapCommit -ceq 'ab8e5c5ca37180c66c3e84fc47a9c12da0815267' -and
+        ($continuationCommits.Count -eq 1 -or
+          ($continuationCommits.Count -eq 2 -and $ProductionPhase -ceq 'handoff')) -and
+        $effectiveOwner -cin @(
+          'docs/quality/UAW-CODEX-WORK-EARN-PAYMENT-FIT-V1-20260905.md',
+          'docs/quality/RETIRED-UI-EVIDENCE-20260905.md',
+          'config/codex-development-regression-registry.json',
+          'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1'
+        )
+      )
       $shopCursorReviewAndroidOwner = (
         $hasContinuationBinding -and
         [string]$selectedContinuationBinding.id -ceq
@@ -1538,7 +1557,8 @@ if ($ProductionLane -ceq 'baseline') {
       }
       if ($shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
-          $retainedBuyGeneratedPackageOwner) {
+          $retainedBuyGeneratedPackageOwner -or
+          $earnPaymentEvidenceSupportOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -1548,6 +1568,7 @@ if ($ProductionLane -ceq 'baseline') {
           $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
+          $earnPaymentEvidenceSupportOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }
