@@ -44683,6 +44683,26 @@
       "prevention": "Keep the Codex UI feature claim limited to Work source/tests and allow the exact continuation bootstrap owner manifest only for the primary coordination bootstrap phase.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260904-4453-C20E-TEST-OWNER-WAS-OUTSIDE-CODEX-UI-LANE-ALLOWLIST",
+      "status": "registered-exact-owner-allowlist-gap",
+      "appliesTo": ["primary", "codex_ui", "universal", "test", "implementation"],
+      "mistake": "The first C20E test-only child bootstrap committed successfully, but task_start rejected because its exact Universal test owner was outside the existing Work-scoped codex_ui allowedOwnerRoots.",
+      "rootCause": "The child was correctly isolated from product source, but the bootstrap omitted the founder-required one-file lane allowlist before sealing its first commit.",
+      "prevention": "Start the fresh v2 child from the same Store tip, add only the exact C20E test file to codex_ui allowedOwnerRoots in the initial bootstrap, retain every other lane restriction and reject all other Universal paths.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json", "docs/quality/UAW-CODEX-UNIVERSAL-C20E-TEST-CONTRACT-V2-20260904.md"]
+    },
+    {
+      "id": "REG-20260904-4454-CODEX-UI-LANE-SLICE-READ-USED-INVALID-NESTED-QUOTES",
+      "status": "registered-tool-invocation-syntax-failure",
+      "appliesTo": ["primary", "codex_ui", "universal", "test", "implementation"],
+      "mistake": "The first codex_ui allowed-root slice command failed JavaScript parsing before PowerShell because it embedded PowerShell doubled quotes in the wrapper string.",
+      "rootCause": "The readback did not use the already established template-safe literal pattern.",
+      "prevention": "Use a JavaScript template string with a PowerShell single-quoted exact token, require one match and read only the bounded codex_ui lane region before insertion.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
     }
   ]
 }

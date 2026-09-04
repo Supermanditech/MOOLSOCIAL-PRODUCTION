@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 3912,
-    "sha256": "CB66BEE5DF9F8234FC08C632327D4AE090EA60F57304D503343B1D5BB9B08D79"
+    "entryCount": 3914,
+    "sha256": "7FF7B0EB4CABE3302C86796062229B4BCE5D053EF71A03E23EA27425519B76DA"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,15 +34,7 @@
       "task": "/root",
       "role": "primary",
       "owners": [
-        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
-        "apps/mobile/lib/features/work/work_models.dart",
-        "apps/mobile/lib/features/work/work_session.dart",
-        "apps/mobile/lib/features/work/work_services.dart",
-        "apps/mobile/lib/features/work/widgets/work_widgets.dart",
-        "apps/mobile/test/ui_v2/work/work_main_v2_test.dart",
-        "apps/mobile/test/work_workspace_layout_safety_test.dart",
-        "apps/mobile/test/work_vertical_slice_test.dart",
-        "apps/mobile/test/work_production_gateway_test.dart"
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart"
       ]
     },
     {
@@ -1459,6 +1451,27 @@
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "codex_universal_c20e_test_contract_v2_20260904",
+        "state": "founder_authorized_2026_09_04",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "universal-c20e-test-contract-v2-20260904",
+        "ticketId": "UAW-CODEX-UNIVERSAL-C20E-TEST-CONTRACT-V2-20260904",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-universal-c20e-test-contract-v2-20260904",
+        "branch": "work/codex-ui/universal-c20e-test-contract-v2-20260904",
+        "baselineHead": "aa335eb1497d77c859e7d34b549716350612c5c8",
+        "bootstrapCommitSubject": "coordination(universal-c20e-test-contract-v2-20260904): bind shared Universal test correction",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CODEX-UNIVERSAL-C20E-TEST-CONTRACT-V2-20260904.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
       }
     ],
     "workspaceIsolation": {
@@ -1595,7 +1608,8 @@
           "apps/mobile/test/ui_v2/work/",
           "apps/mobile/test/work_workspace_layout_safety_test.dart",
           "apps/mobile/test/work_vertical_slice_test.dart",
-          "apps/mobile/test/work_production_gateway_test.dart"
+          "apps/mobile/test/work_production_gateway_test.dart",
+          "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart"
         ],
         "forbiddenOwnerRoots": [
           "apps/mobile/lib/core/auth/",
