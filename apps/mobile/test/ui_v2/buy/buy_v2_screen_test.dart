@@ -252,6 +252,11 @@ void main() {
     );
   });
 
+  test('Cart total supports the full approved Indian amount range', () {
+    expect(buyV2Money(1), '₹1');
+    expect(buyV2Money(10000000), '₹1,00,00,000');
+  });
+
   testWidgets('persistent Buy navigation preserves one destination surface', (
     tester,
   ) async {
@@ -2699,14 +2704,21 @@ void main() {
     );
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
+    final surface = find.byKey(const ValueKey('buy-navigation-overlay-stack'));
+    final surfaceHeight = tester.getSize(surface).height;
 
     session.addProduct(product.id);
     await tester.pump();
 
     final miniCart = find.byKey(const ValueKey('buy-compact-cart-indicator'));
     expect(miniCart, findsOneWidget);
-    expect(tester.getSize(miniCart).height, inInclusiveRange(44, 64));
-    expect(tester.getSize(miniCart).width, lessThanOrEqualTo(64));
+    expect(tester.getSize(surface).height, surfaceHeight);
+    expect(tester.getSize(miniCart).height, 48);
+    expect(tester.getSize(miniCart).width, inInclusiveRange(132, 240));
+    expect(
+      find.byKey(const ValueKey('buy-mini-cart-transparent-overlay')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('buy-mini-cart-added-icon')),
       findsOneWidget,
@@ -2717,7 +2729,15 @@ void main() {
             find.byKey(const ValueKey('buy-cart-acknowledgement')),
           )
           .text,
-      '1',
+      '1 item',
+    );
+    expect(
+      tester
+          .widget<BuyV2FiniteValueTransition>(
+            find.byKey(const ValueKey('buy-cart-total')),
+          )
+          .text,
+      buyV2Money(product.price),
     );
     await tester.pump(const Duration(milliseconds: 2700));
     await tester.pumpAndSettle();
@@ -2728,8 +2748,21 @@ void main() {
             find.byKey(const ValueKey('buy-cart-summary')),
           )
           .text,
-      '1',
+      '1 item',
     );
+
+    final initialRect = tester.getRect(miniCart);
+    await tester.drag(
+      find.byKey(const ValueKey('buy-mini-cart-drag-handle')),
+      const Offset(-100, -120),
+    );
+    await tester.pumpAndSettle();
+    final movedRect = tester.getRect(miniCart);
+    final surfaceRect = tester.getRect(surface);
+    expect(movedRect.left, lessThan(initialRect.left));
+    expect(movedRect.top, lessThan(initialRect.top));
+    expect(surfaceRect.contains(movedRect.topLeft), isTrue);
+    expect(surfaceRect.contains(movedRect.bottomRight), isTrue);
 
     await tester.tap(miniCart);
     await tester.pumpAndSettle();
@@ -2767,7 +2800,8 @@ void main() {
               find.byKey(const ValueKey('buy-cart-summary')),
             )
             .text,
-        '${session.countForDestination(BuyV2Destination.wholesale)}',
+        '${session.countForDestination(BuyV2Destination.wholesale)} '
+        '${session.countForDestination(BuyV2Destination.wholesale) == 1 ? 'item' : 'items'}',
       );
       expect(
         tester
@@ -2805,7 +2839,7 @@ void main() {
               find.byKey(const ValueKey('buy-cart-summary')),
             )
             .text,
-        '${session.itemCount}',
+        '${session.itemCount} ${session.itemCount == 1 ? 'item' : 'items'}',
       );
       expect(
         tester

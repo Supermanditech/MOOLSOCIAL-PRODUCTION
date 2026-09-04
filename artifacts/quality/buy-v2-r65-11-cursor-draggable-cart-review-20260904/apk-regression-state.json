@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "build_passed",
+  "buildAuthorization": "consumed_passed",
+  "preBuildValidation": {"state": "passed", "evidence": "artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/prebuild-validation.md"},
+  "candidate": {"id": "UAW-BUY-V2-R65.11-CURSOR-DRAGGABLE-CART-20260904", "versionName": "1.0.0-r65.11", "versionCode": "2026090327", "buildMode": "debug", "gateProfile": "uaw_cursor_ui_review_debug", "branch": "work/cursor-ui/buy-mvp-ticket14-v1-20260902", "head": "557957471df255e448bf6a8820d3efbf8b598f90"},
+  "source": {"manifestPath": "artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/source-manifest.txt", "manifestSha256": "1C6658338B4550118AA107708192D40657C1E3AE2C3C76D352181625429D3A62", "fileCount": 2},
+  "requiredRuntimeDefines": {"MOOLSOCIAL_UI_REVIEW_ONLY": "true", "MOOLSOCIAL_DEVICE_REVIEW": "true", "MOOLSOCIAL_USE_EMULATORS": "true", "MOOLSOCIAL_CANDIDATE_ID": "UAW-BUY-V2-R65.11-CURSOR-DRAGGABLE-CART-20260904"},
+  "promotion": {"state": "forbidden_non_promotable"},
+  "preBuildGates": [
+    {"id": "branch-head", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/prebuild-validation.md"]},
+    {"id": "source-manifest", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/source-manifest.txt"]},
+    {"id": "format-analysis", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/local-validation.md"]},
+    {"id": "focused-tests", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/local-validation.md"]},
+    {"id": "positive-release-gates", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/prebuild-validation.md"]},
+    {"id": "protected-boundary-disposition", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/candidate-contract.md"]},
+    {"id": "rejected-candidate-preserved", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/device-review.md"]},
+    {"id": "startup-config-regression-registered", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/prebuild-validation.md"]},
+    {"id": "buy-regression-1", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/local-validation.md"]},
+    {"id": "buy-regression-2", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/local-validation.md"]},
+    {"id": "clean-state-regression", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/local-validation.md"]},
+    {"id": "wrapper-self-test", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/prebuild-validation.md"]},
+    {"id": "package-isolation", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/candidate-contract.md"]}
+  ],
+  "premiumMotionPolicy": {"state": "audited_for_r65_11", "policy": "config/buy-premium-motion-policy.json", "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md", "candidateContract": "artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/candidate-contract.md", "disposition": "artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/motion-disposition.md", "applied": ["customer_drag_position"], "reused": ["approved_buy_finite_event_driven_motion", "static_reduced_motion"], "dependencyHeld": ["shared_chat_motion", "shared_shell_motion"], "inapplicable": ["perpetual_decorative_loops"]},
+  "buildResult": {"state": "passed", "wrapper": "scripts/build-buy-device-review.ps1", "apkPath": "artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/uaw-buy-v2-r65.11-cursor-draggable-cart-20260904-device-review-debug.apk", "apkBytes": 208718361, "apkSha256": "F9D131C0A784FA6FE0E1B629A6D5DF9E83D4731C848A03CB73752E5CFC4DA8BD", "head": "557957471df255e448bf6a8820d3efbf8b598f90", "sourceFingerprint": "1C6658338B4550118AA107708192D40657C1E3AE2C3C76D352181625429D3A62"},
+  "installResult": {"state": "passed_checksum_matched", "device": "Redmi TG8HCYTGGQT885OF", "package": "com.moolsocial.app.cursorreview", "versionName": "1.0.0-r65.11-cursorreview", "versionCode": "2026090327", "installedBytes": 208718361, "installedSha256": "F9D131C0A784FA6FE0E1B629A6D5DF9E83D4731C848A03CB73752E5CFC4DA8BD", "evidence": "artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/install-result.json"},
+  "qualificationResult": {"state": "redmi_founder_approved", "evidence": "artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/device-review.md"}
+}
