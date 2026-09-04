@@ -49,7 +49,9 @@
         "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart",
         "apps/mobile/lib/features/chat/screens/chat_shared_content_screen.dart",
         "apps/mobile/test/chat_flow_test.dart",
-        "apps/mobile/test/global_contextual_chat_shell_test.dart"
+        "apps/mobile/test/chat_settings_hub_test.dart",
+        "apps/mobile/test/global_contextual_chat_shell_test.dart",
+        "config/codex-subagent-coordination-policy.json"
       ]
     },
     {
@@ -57,7 +59,6 @@
       "role": "primary",
       "owners": [
         "config/codex-development-regression-registry.json",
-        "config/codex-subagent-coordination-policy.json",
         "docs/quality/STORE-BUY-V3-PRE-INTEGRATION-RECONCILIATION-20260904.md",
         "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
         "scripts/check-codex-development-regression-memory.ps1",
@@ -2473,7 +2474,9 @@
           "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart",
           "apps/mobile/lib/features/chat/screens/chat_shared_content_screen.dart",
           "apps/mobile/test/chat_flow_test.dart",
-          "apps/mobile/test/global_contextual_chat_shell_test.dart"
+          "apps/mobile/test/chat_settings_hub_test.dart",
+          "apps/mobile/test/global_contextual_chat_shell_test.dart",
+          "config/codex-subagent-coordination-policy.json"
         ],
         "forbiddenOwnerRoots": [
           "apps/mobile/lib/core/auth/",

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'chat_entry_context.dart';
 import 'chat_models.dart';
 import 'chat_services.dart';
 
@@ -267,6 +268,7 @@ class ChatSession extends ChangeNotifier {
   final Map<String, String> _messageLoadErrors = {};
   final Map<String, String> _threadActionErrors = {};
   final Map<String, String> _threadActionNotices = {};
+  final Map<String, ChatCommerceContext> _commerceContexts = {};
   final Map<String, Set<String>> _hiddenMessageIdsByThread = {};
   final Map<String, String> _draftTextByThread = {};
   final Set<String> _readThreads = {};
@@ -639,8 +641,19 @@ class ChatSession extends ChangeNotifier {
     );
   }
 
+  void bindCommerceContext(String threadId, ChatCommerceContext? context) {
+    if (context == null) {
+      _commerceContexts.remove(threadId);
+      return;
+    }
+    _commerceContexts[threadId] = context;
+  }
+
+  ChatCommerceContext? commerceContext(String threadId) =>
+      _commerceContexts[threadId];
+
   ChatThread thread(String id) {
-    return _threads.firstWhere(
+    final base = _threads.firstWhere(
       (thread) => thread.id == id,
       orElse: () => ChatThread(
         id: id,
@@ -650,6 +663,30 @@ class ChatSession extends ChangeNotifier {
         timeLabel: '',
         type: ChatThreadType.people,
       ),
+    );
+    final context = _commerceContexts[id];
+    if (context == null) return base;
+    return ChatThread(
+      id: base.id,
+      title: context.title,
+      subtitle: context.subtitle,
+      preview: base.preview.isEmpty ? context.contextLabel : base.preview,
+      timeLabel: base.timeLabel,
+      type: context.isOrderConversation
+          ? ChatThreadType.order
+          : ChatThreadType.business,
+      unreadCount: base.unreadCount,
+      verified: base.verified,
+      safetyTarget: context.isOrderConversation
+          ? ChatSafetyTarget.conversation
+          : ChatSafetyTarget.business,
+      suggestedPrompts: base.suggestedPrompts.isEmpty
+          ? context.suggestedPrompts
+          : base.suggestedPrompts,
+      participants: base.participants,
+      groupDescription: base.groupDescription,
+      targetUserId: base.targetUserId,
+      messageRequestPending: base.messageRequestPending,
     );
   }
 
@@ -735,11 +772,13 @@ class ChatSession extends ChangeNotifier {
 
   bool get globalChatAvailableForSession => _globalChatAvailableForSession;
 
+  bool get callServiceAvailable => _callGateway != null;
+
   bool get globalVoiceCallsAvailableForSession =>
-      _globalVoiceCallsAvailableForSession;
+      callServiceAvailable && _globalVoiceCallsAvailableForSession;
 
   bool get globalVideoCallsAvailableForSession =>
-      _globalVideoCallsAvailableForSession;
+      callServiceAvailable && _globalVideoCallsAvailableForSession;
 
   bool get globalReviewBeforeSendingForSession =>
       _globalReviewBeforeSendingForSession;
@@ -2362,6 +2401,7 @@ class ChatSession extends ChangeNotifier {
     _messageLoadErrors.clear();
     _threadActionErrors.clear();
     _threadActionNotices.clear();
+    _commerceContexts.clear();
     _hiddenMessageIdsByThread.clear();
     _draftTextByThread.clear();
     _readThreads.clear();

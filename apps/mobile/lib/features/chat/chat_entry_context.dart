@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 enum ChatEntryContextId {
@@ -241,4 +243,202 @@ class ChatEntryContext {
     '/app/work/workspace',
     '/app/work/status',
   ];
+}
+
+@immutable
+class ChatCommerceContext {
+  ChatCommerceContext._({required Map<String, String> values})
+    : values = Map.unmodifiable(values),
+      productSnapshot = Map.unmodifiable(
+        _decodeObject(values['productSnapshot']),
+      );
+
+  factory ChatCommerceContext.fromUri(Uri uri) {
+    final values = <String, String>{};
+    for (final entry in uri.queryParameters.entries) {
+      final value = entry.value.trim();
+      if (value.isNotEmpty) values[entry.key] = value;
+    }
+    return ChatCommerceContext._(values: values);
+  }
+
+  final Map<String, String> values;
+  final Map<String, Object?> productSnapshot;
+
+  static ChatCommerceContext? maybeFromUri(Uri uri) {
+    final value = ChatCommerceContext.fromUri(uri);
+    return value.isCommerceConversation ? value : null;
+  }
+
+  bool get isCommerceConversation =>
+      contextName != null ||
+      supplier != null ||
+      productTitle != null ||
+      orderId != null ||
+      conversationKey != null;
+
+  String? get contextName => _value('context');
+  String? get conversationKey => _value('conversationKey');
+  String? get supplier => _value('supplier') ?? _snapshotString('supplier');
+  String? get supplierType =>
+      _value('supplierType') ?? _snapshotString('supplierType');
+  String? get supplierRole =>
+      _value('supplierRole') ?? _snapshotString('supplierRole');
+  String? get productId => _value('productId') ?? _snapshotString('productId');
+  String? get skuId => _value('skuId') ?? _snapshotString('skuId');
+  String? get productTitle =>
+      _value('productTitle') ?? _snapshotString('title');
+  String? get brand => _value('brand') ?? _snapshotString('brand');
+  String? get variant => _value('variant') ?? _snapshotString('variant');
+  String? get pack => _value('pack') ?? _snapshotString('pack');
+  String? get price => _value('price') ?? _snapshotString('price');
+  String? get unitPrice => _value('unitPrice') ?? _snapshotString('unitPrice');
+  String? get mrp => _value('mrp') ?? _snapshotString('mrp');
+  String? get quantity => _value('quantity');
+  String? get minimumOrder =>
+      _value('minimumOrder') ?? _snapshotString('minimumOrder');
+  String? get delivery => _value('delivery') ?? _snapshotString('delivery');
+  String? get paymentMethod => _value('paymentMethod');
+  String? get paymentTerms => _value('paymentTerms');
+  String? get policy => _value('policy') ?? _snapshotString('returnPolicy');
+  String? get productLink => _value('productLink');
+  String? get orderId => _value('orderId');
+  String? get purchaseId => _value('purchaseId');
+  String? get orderTotal => _value('orderTotal');
+  String? get deliveryDestination => _value('deliveryDestination');
+
+  bool get isOrderConversation =>
+      orderId != null || (contextName?.contains('order') ?? false);
+
+  String get title =>
+      supplier ?? productTitle ?? orderId ?? 'MoolSocial conversation';
+
+  String get subtitle {
+    final type = supplierType;
+    final product = productTitle;
+    final order = orderId;
+    final values = <String>[
+      ?type,
+      ?product,
+      if (product == null && order != null) 'Order $order',
+    ];
+    return values.isEmpty
+        ? 'MoolSocial business conversation'
+        : values.take(2).join(' · ');
+  }
+
+  String get contextLabel {
+    if (isOrderConversation) return 'Order conversation';
+    if (productTitle != null) return 'Product conversation';
+    return 'Store conversation';
+  }
+
+  String get emptyMessage {
+    if (productTitle case final value?) {
+      return 'Ask $title about $value or share the details you need.';
+    }
+    if (orderId case final value?) {
+      return 'Message $title about order $value.';
+    }
+    return 'Send your first message to $title.';
+  }
+
+  List<String> get suggestedPrompts => [
+    if (productTitle != null) 'Is this product available?',
+    if (price != null || orderTotal != null) 'Please confirm the price.',
+    if (delivery != null) 'When can this be delivered?',
+  ];
+
+  List<ChatCommerceFact> get decisionFacts {
+    final facts = <ChatCommerceFact>[];
+    void add(String label, String? value) {
+      final clean = value?.trim();
+      if (clean == null || clean.isEmpty) return;
+      if (facts.any((fact) => fact.label == label && fact.value == clean)) {
+        return;
+      }
+      facts.add(ChatCommerceFact(label: label, value: clean));
+    }
+
+    add('Product', productTitle);
+    add('Product ID', productId);
+    add('SKU', skuId);
+    add('Brand', brand);
+    add('Variant', variant);
+    add('Pack', pack);
+    add('Quantity', quantity);
+    add('Minimum order', minimumOrder);
+    add('Price', _money(price));
+    add('Unit price', unitPrice);
+    add('MRP', _money(mrp));
+    add('Delivery', delivery);
+    add('Order', orderId);
+    add('Purchase', purchaseId);
+    add('Order total', _money(orderTotal));
+    add('Deliver to', deliveryDestination);
+    add('Payment', paymentMethod);
+    add('Payment terms', paymentTerms);
+    add('After delivery', policy);
+
+    final compliance = productSnapshot['compliance'];
+    if (compliance is Map) {
+      String? complianceValue(String key) {
+        final value = compliance[key];
+        final clean = value?.toString().trim();
+        return clean == null || clean.isEmpty || clean == 'null' ? null : clean;
+      }
+
+      add('Generic name', complianceValue('genericName'));
+      add('Net quantity', complianceValue('netQuantity'));
+      add('Manufacturer', complianceValue('manufacturer'));
+      add('Country of origin', complianceValue('countryOfOrigin'));
+      add('Best before / use by', complianceValue('bestBeforeOrUseBy'));
+    }
+    return List.unmodifiable(facts);
+  }
+
+  String? get productAppRoute {
+    final uri = Uri.tryParse(productLink ?? '');
+    if (uri == null ||
+        uri.host.toLowerCase() != 'moolsocial.app' ||
+        uri.path != '/app/buy') {
+      return null;
+    }
+    return Uri(path: uri.path, queryParameters: uri.queryParameters).toString();
+  }
+
+  String? _value(String key) {
+    final value = values[key]?.trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  String? _snapshotString(String key) {
+    final value = productSnapshot[key];
+    final clean = value?.toString().trim();
+    return clean == null || clean.isEmpty || clean == 'null' ? null : clean;
+  }
+
+  static Map<String, Object?> _decodeObject(String? source) {
+    if (source == null || source.trim().isEmpty) return const {};
+    try {
+      final decoded = jsonDecode(source);
+      return decoded is Map<String, Object?> ? decoded : const {};
+    } on FormatException {
+      return const {};
+    }
+  }
+
+  static String? _money(String? value) {
+    final clean = value?.trim();
+    if (clean == null || clean.isEmpty) return null;
+    return clean.contains('₹') ? clean : '₹$clean';
+  }
+}
+
+@immutable
+class ChatCommerceFact {
+  const ChatCommerceFact({required this.label, required this.value});
+
+  final String label;
+  final String value;
 }
