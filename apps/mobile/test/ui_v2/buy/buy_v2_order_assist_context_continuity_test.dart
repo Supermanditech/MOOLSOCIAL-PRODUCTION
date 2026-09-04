@@ -15,6 +15,7 @@ void main() {
     BuyV2Session session, {
     double textScale = 1,
     bool reducedMotion = false,
+    VoidCallback? onOpenChat,
   }) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -30,6 +31,7 @@ void main() {
         session: session,
         initialDestination: session.destination,
         initialView: session.view,
+        onOpenChat: onOpenChat,
       ),
     );
   }
@@ -70,7 +72,7 @@ void main() {
     expect(session.assistOrder.id, isNot('PO-240783'));
   });
 
-  testWidgets('Wholesale Help renders and opens its exact order', (
+  testWidgets('retired Wholesale Assist renders exact Tracking and Chat Help', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -79,17 +81,29 @@ void main() {
     addTearDown(session.dispose);
     expect(session.openTracking('PO-240783'), isTrue);
     session.openAssist();
+    var chatOpens = 0;
 
-    await tester.pumpWidget(app(session));
+    await tester.pumpWidget(app(session, onOpenChat: () => chatOpens += 1));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('PO-240783'), findsOneWidget);
     expect(find.textContaining('MS-240782'), findsNothing);
-    final currentOrder = find.byKey(const ValueKey('buy-assist-current-order'));
-    expect(currentOrder, findsOneWidget);
-    await tester.tap(currentOrder);
+    expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
+    expect(
+      find.byKey(const PageStorageKey('buy-tracking-PO-240783')),
+      findsOneWidget,
+    );
+    final help = find.byKey(const ValueKey('buy-tracking-help'));
+    await tester.scrollUntilVisible(
+      help,
+      240,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(help, findsOneWidget);
+    await tester.tap(help);
     await tester.pumpAndSettle();
-    expect(session.view, BuyV2View.tracking);
+    expect(chatOpens, 1);
+    expect(session.view, BuyV2View.assist);
     expect(session.selectedOrder.id, 'PO-240783');
   });
 
@@ -126,7 +140,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('320px 140% reduced-motion Assist remains stable', (
+  testWidgets('320px 140% retired Assist renders stable exact Tracking', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(320, 568));
@@ -139,10 +153,11 @@ void main() {
     await tester.pumpWidget(app(session, textScale: 1.4, reducedMotion: true));
     await tester.pump();
 
-    final currentOrder = find.byKey(const ValueKey('buy-assist-current-order'));
-    expect(currentOrder, findsOneWidget);
+    final tracking = find.byKey(const PageStorageKey('buy-tracking-RX-240784'));
+    expect(tracking, findsOneWidget);
+    expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
     expect(find.textContaining('RX-240784'), findsOneWidget);
-    expect(tester.getSize(currentOrder).width, lessThanOrEqualTo(300));
+    expect(tester.getSize(tracking).width, lessThanOrEqualTo(320));
     expect(tester.takeException(), isNull);
   });
 

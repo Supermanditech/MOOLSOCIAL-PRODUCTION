@@ -313,7 +313,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(copiedText, 'https://moolsocial.com/address/request');
-      expect(find.text('Address request link copied'), findsOne);
+      expect(
+        find.text('Address request link copied. Paste it into a message.'),
+        findsOne,
+      );
       expect(
         find.byKey(const ValueKey('buy-address-request-form-route')),
         findsOne,

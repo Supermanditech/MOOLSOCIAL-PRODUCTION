@@ -64,6 +64,11 @@ void main() {
       ValueKey('buy-promotion-shop-basket'),
       ValueKey('buy-promotion-shop-wholesale'),
     ]);
+    final monthlyBasketTitle = tester.widget<Text>(
+      find.text('Plan the monthly basket'),
+    );
+    expect(monthlyBasketTitle.maxLines, 3);
+    expect(monthlyBasketTitle.overflow, TextOverflow.clip);
 
     session.openDestination(BuyV2Destination.wholesale);
     await tester.pumpAndSettle();

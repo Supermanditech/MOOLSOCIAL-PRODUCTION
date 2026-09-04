@@ -30998,7 +30998,7 @@
       "mistake": "A multi-file v3 contract propagation patch relied on an expected OPPO checker constant layout that did not match the live owner, so patch verification rejected the operation.",
       "rootCause": "Several heterogeneous existing owners were grouped into one patch using remembered context instead of independently reread exact anchors.",
       "prevention": "Inventory literal declarations per owner, patch one owner per bounded operation, parse/read back before advancing, and prohibit broad propagation patches under the coordination policy.",
-      "gates": ["scripts/check-codex-development-regression-memory.ps1", "flutter analyze"],
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "flutter analyze"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/REG-20260818-2916-C34L-FIX3-MULTIFILE-CONTRACT-PROPAGATION-CONTEXT-MISMATCH.md", "config/release-evidence-capture-artifact-contract-c34l.json", "scripts/check-release-oppo-evidence-transaction-c34l.ps1"]
     },
     {
@@ -50181,6 +50181,65 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json"
+      ]
+    },
+    {
+      "id": "REG-20260904-4462-REPAIR-V2-POLICY-UNION-PREFLIGHT-USED-POWERSHELL-HISTORY-ALIAS",
+      "status": "registered-read-only-diagnostic-command-failure",
+      "appliesTo": [
+        "primary",
+        "integration_repair",
+        "coordination"
+      ],
+      "mistake": "A read-only policy-union preflight declared helper function R, which PowerShell resolved to the Invoke-History alias; the comparison stopped before producing a result and changed no repository bytes.",
+      "rootCause": "The diagnostic used a one-character helper name without checking collision with built-in aliases.",
+      "prevention": "Use descriptive helper names in PowerShell diagnostics, preserve ErrorActionPreference Stop, and rerun the same bounded comparison before executing any merge-resolution helper.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json"
+      ]
+    },
+    {
+      "id": "REG-20260904-4463-REPAIR-V2-REGISTRY-ENTRY-LOOKUP-RETURNED-MULTIPLE-EVIDENCE-MATCHES",
+      "status": "registered-bounded-inspection-command-failure",
+      "appliesTo": [
+        "primary",
+        "integration_repair",
+        "coordination"
+      ],
+      "mistake": "After selecting the authorized stage-2 registry resolution, a bounded Select-String lookup searched the full REG-2916 identifier without restricting it to the id field; evidence references returned multiple line numbers and arithmetic on the array failed.",
+      "rootCause": "The lookup pattern was not anchored to the registry entry's exact id property before calculating a line window.",
+      "prevention": "Anchor registry-entry searches to the exact JSON id line, assert one match, and separate authorized conflict selection from subsequent read-only inspection so partial command progress remains explicit.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json"
+      ]
+    },
+    {
+      "id": "REG-20260904-4464-REPAIR-V2-WHOLE-MERGE-DIFF-CHECK-REPORTED-PRESERVED-CURSOR-EVIDENCE-WHITESPACE",
+      "status": "registered-inherited-evidence-format-diagnostic-failure",
+      "appliesTo": [
+        "primary",
+        "integration_repair",
+        "coordination"
+      ],
+      "mistake": "A whole-index git diff --check was run during the repair merge and returned nonzero for pre-existing trailing spaces in automatically merged Cursor evidence Markdown files.",
+      "rootCause": "The formatting check covered preserved second-parent evidence blobs even though the repair contract requires those automatically merged owners to remain byte-identical and permits manual edits only in three coordination conflicts.",
+      "prevention": "During a conflict-limited repair, run diff-check only on the exact manually resolved conflict owners, retain automatic parent blobs unchanged, and prove their byte identity separately before the pre-commit gate.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
       ]
     }
   ]

@@ -276,7 +276,7 @@ void main() {
     await tester.pump();
     expectConnectedOwner(tester, session, BuyV2Destination.shop);
     expect(session.destination, BuyV2Destination.medicine);
-    expect(find.textContaining('Shop fulfilment ·'), findsOneWidget);
+    expect(find.textContaining('Shop delivery ·'), findsOneWidget);
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });

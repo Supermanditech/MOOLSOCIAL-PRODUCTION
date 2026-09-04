@@ -783,7 +783,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Delivered in 5 min'), findsWidgets);
-      expect(find.text('Automatically assigned Mool Partner'), findsOneWidget);
+      expect(find.text('Mool delivery partner'), findsOneWidget);
       expect(find.text('Shree Balaji Fresh'), findsNothing);
       expect(
         find.byKey(const ValueKey('buy-shop-seller-action-s-tomato')),
