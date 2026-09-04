@@ -562,7 +562,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 67) `
+Assert-Coordination ($continuationBindings.Count -eq 68) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -587,7 +587,8 @@ foreach ($continuationBinding in $continuationBindings) {
       'founder_authorized_2026_08_29',
       'founder_authorized_2026_09_02',
       'founder_authorized_2026_09_03',
-      'founder_authorized_2026_09_04'
+      'founder_authorized_2026_09_04',
+      'founder_authorized_2026_09_05'
     ) -and
     [string]$continuationBinding.lane -cin @('cursor_ui','codex_ui','codex_auth','integration_repair') -and
     [string]$continuationBinding.role -cin @('primary','subagent') -and
@@ -1530,8 +1531,10 @@ if ($ProductionLane -ceq 'baseline') {
       )
       $buyExternalShareAndroidOwner = (
         $hasContinuationBinding -and
-        [string]$selectedContinuationBinding.id -ceq
-          'codex_buy_external_share_return_v1_20260904' -and
+        [string]$selectedContinuationBinding.id -cin @(
+          'codex_buy_external_share_return_v1_20260904',
+          'codex_android_share_contract_fix_v1_20260905'
+        ) -and
         $effectiveOwner -cin @(
           'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
           'apps/mobile/test/platform_configuration_test.dart'
