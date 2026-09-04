@@ -2431,29 +2431,59 @@ if ($ProductionLane -ceq 'baseline') {
             }).Count -eq 0
           ) 'Shop Buy regression repair staged owner set changed.'
         } else {
-          $preMergeCoordinationOwnerKeys = @(
-            $integrationRepair.preMergeCoordinationOwners | ForEach-Object {
-              ([string]$_).ToLowerInvariant()
-            }
+          $singleUseEvidenceOwners = @(
+            'config/codex-development-regression-registry.json',
+            'config/codex-subagent-coordination-policy.json',
+            'scripts/check-codex-subagent-coordination-policy.ps1',
+            'scripts/run-store-buy-diagnostic-evidence.ps1'
           )
-          Assert-Coordination (
-            $LASTEXITCODE -eq 0 -and
-            $existingCoordinationCommits.Count -lt
-              [int]$integrationRepair.maximumPreMergeCoordinationCommits -and
-            (
-              $existingCoordinationCommits.Count -eq 0 -or
-              @($existingCoordinationOwners | Where-Object {
+          $singleUseEvidenceCorrection = (
+            [string]$selectedContinuationBinding.id -ceq
+              'integration_repair_store_buy_diagnostic_evidence_v2_20260904' -and
+            $branch -ceq
+              'work/integration-repair/store-buy-diagnostic-evidence-v2-20260904' -and
+            $head -ceq 'e1f5d6f060b9466c9efebec51d1b4e5b6c9932ea' -and
+            $AgentTask -ceq
+              '/root/repair_store_buy_diagnostic_evidence_v2_20260904' -and
+            $ProductionWorkId -ceq
+              'store-buy-diagnostic-evidence-v2-20260904' -and
+            $ProductionTicketId -ceq
+              'UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904' -and
+            [string]$selectedContinuationBinding.baselineHead -ceq
+              'c48e4ecc5c3ccc7a3079d3f64988437599cc78de' -and
+            $existingCoordinationCommits.Count -eq 0 -and
+            $existingRepairMerges.Count -eq 0
+          )
+          if ($singleUseEvidenceCorrection) {
+            Assert-Coordination (
+              (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
+                (@($singleUseEvidenceOwners | Sort-Object) -join '|')
+            ) 'single-use v2 evidence correction owner set changed.'
+          } else {
+            $preMergeCoordinationOwnerKeys = @(
+              $integrationRepair.preMergeCoordinationOwners | ForEach-Object {
+                ([string]$_).ToLowerInvariant()
+              }
+            )
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              $existingCoordinationCommits.Count -lt
+                [int]$integrationRepair.maximumPreMergeCoordinationCommits -and
+              (
+                $existingCoordinationCommits.Count -eq 0 -or
+                @($existingCoordinationOwners | Where-Object {
+                  -not $preMergeCoordinationOwnerKeys.Contains(
+                    ([string]$_).ToLowerInvariant()
+                  )
+                }).Count -eq 0
+              ) -and
+              @($preCommitStagedOwners | Where-Object {
                 -not $preMergeCoordinationOwnerKeys.Contains(
                   ([string]$_).ToLowerInvariant()
                 )
               }).Count -eq 0
-            ) -and
-            @($preCommitStagedOwners | Where-Object {
-              -not $preMergeCoordinationOwnerKeys.Contains(
-                ([string]$_).ToLowerInvariant()
-              )
-            }).Count -eq 0
-          ) 'integration repair coordination correction owner set changed.'
+            ) 'integration repair coordination correction owner set changed.'
+          }
         }
       } else {
         $postMergeClosureOwnerKeys = @(

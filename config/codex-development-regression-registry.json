@@ -49937,6 +49937,26 @@
       "prevention": "Correct only the two literal lines, reread the complete short evidence owner, and require absence of draft and placeholder tokens before bootstrap gating.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"]
+    },
+    {
+      "id": "REG-20260904-4448-V2-DIAGNOSTIC-RUNNER-RETAINED-OBSOLETE-V1-ARTIFACT-DESTINATION",
+      "status": "registered-pretest-runner-path-failure",
+      "appliesTo": ["primary", "integration_repair", "integration", "git", "test"],
+      "mistake": "The first v2 serialized diagnostic invocation stopped before Flutter because the committed runner still resolved the obsolete v1 artifacts/quality evidence directory.",
+      "rootCause": "The mechanical runner copy did not replace the literal single-backslash PowerShell path, even though its attempted JavaScript replacement targeted a differently escaped representation.",
+      "prevention": "Replace only the one evidence destination with docs/quality/store-buy-diagnostic-evidence-v2-20260904, assert it resolves inside the exact v2 worktree, require zero obsolete v1 path matches, and commit through the one-use parent-locked evidence correction gate before retry.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/run-store-buy-diagnostic-evidence.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"]
+    },
+    {
+      "id": "REG-20260904-4449-SINGLE-USE-GATE-LOCATOR-INTERPOLATED-DOLLAR-PREFIXED-TOKEN",
+      "status": "registered-semantically-invalid-source-read",
+      "appliesTo": ["primary", "integration_repair", "integration", "git", "handoff"],
+      "mistake": "The first single-use gate block locator placed `$preMergeCoordinationOwnerKeys` in a double-quoted search string, expanded it to empty and returned the checker start instead of the intended source region.",
+      "rootCause": "The locator repeated the known PowerShell dollar-token interpolation class despite the exact literal-source rule.",
+      "prevention": "Use a single-quoted SimpleMatch token, require exactly one match and only then read the bounded source region before patching.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
     }
   ]
 }
