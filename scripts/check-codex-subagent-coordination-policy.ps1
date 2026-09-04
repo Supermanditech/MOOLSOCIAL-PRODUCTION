@@ -562,7 +562,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 68) `
+Assert-Coordination ($continuationBindings.Count -eq 69) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -1506,6 +1506,46 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (-not $isCoordinationBootstrap) {
     foreach ($effectiveOwner in $effectiveOwners) {
+      $codexOppoReviewOwner = (
+        $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
+        $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and
+        $ProductionWorkId -ceq 'codex-oppo-review-v1-20260905' -and
+        $ProductionTicketId -ceq 'UAW-CODEX-OPPO-REVIEW-V1-20260905' -and
+        $branch -ceq 'work/codex-ui/codex-oppo-review-v1-20260905' -and
+        [string]$selectedContinuationBinding.id -ceq 'codex_oppo_review_v1_20260905' -and
+        [string]$selectedContinuationBinding.baselineHead -ceq '1f3c91d07af1b4487d9b4039f13d3fd5cefeea7d' -and
+        $effectiveOwner -cin @(
+          'config/codex-subagent-coordination-policy.json',
+          'apps/mobile/lib/features/chat/chat_entry_context.dart',
+          'apps/mobile/lib/features/chat/chat_session.dart',
+          'apps/mobile/lib/features/chat/screens/chat_settings_screen.dart',
+          'apps/mobile/lib/features/chat/screens/chat_shared_content_screen.dart',
+          'apps/mobile/lib/features/chat/screens/chat_thread_screen.dart',
+          'apps/mobile/test/chat_flow_test.dart',
+          'apps/mobile/test/chat_settings_hub_test.dart',
+          'apps/mobile/test/global_contextual_chat_shell_test.dart',
+          'apps/mobile/lib/features/book/widgets/book_widgets.dart',
+          'apps/mobile/lib/features/buy/screens/buy_medicine_screen.dart',
+          'apps/mobile/lib/features/journey01/journey_router.dart',
+          'apps/mobile/lib/features/journey01/journey_session.dart',
+          'apps/mobile/lib/features/journey01/screens/universal_shell.dart',
+          'apps/mobile/lib/features/journey01/universal_intent_catalog.dart',
+          'apps/mobile/lib/ui_v2/social/social_v2_consumer.dart',
+          'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart',
+          'apps/mobile/test/ui_v2/universal/mool_domain_action_catalogue_c25b_test.dart',
+          'apps/mobile/test/ui_v2/universal/mool_six_domain_route_projection_c25e_test.dart',
+          'apps/mobile/test/ui_v2/universal/uaw_r08_personal_book_exposure_test.dart',
+          'apps/mobile/test/platform_configuration_test.dart',
+          'artifacts/quality/codex-oppo-r66-1-review-20260905/candidate-contract.md',
+          'artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md',
+          'artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md',
+          'artifacts/quality/codex-oppo-r66-1-review-20260905/source-manifest.txt',
+          'artifacts/quality/codex-oppo-r66-1-review-20260905/apk-regression-state.json',
+          'artifacts/quality/codex-oppo-r66-1-review-20260905/motion-disposition.md',
+          'artifacts/quality/codex-oppo-r66-1-review-20260905/uaw-codex-oppo-r66.1-review-20260905-device-review-debug-manifest.txt',
+          'artifacts/quality/codex-oppo-r66-1-review-20260905/post-install.json'
+        )
+      )
       $workRouteContractOwner = (
         $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
         $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and
@@ -1578,7 +1618,8 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
-          $workRouteContractOwner) {
+          $workRouteContractOwner -or
+          $codexOppoReviewOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -1590,6 +1631,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
+          $codexOppoReviewOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }
