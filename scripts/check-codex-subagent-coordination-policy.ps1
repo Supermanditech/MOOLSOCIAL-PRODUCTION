@@ -562,7 +562,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 66) `
+Assert-Coordination ($continuationBindings.Count -eq 67) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -587,7 +587,8 @@ foreach ($continuationBinding in $continuationBindings) {
       'founder_authorized_2026_08_29',
       'founder_authorized_2026_09_02',
       'founder_authorized_2026_09_03',
-      'founder_authorized_2026_09_04'
+      'founder_authorized_2026_09_04',
+      'founder_authorized_2026_09_05'
     ) -and
     [string]$continuationBinding.lane -cin @('cursor_ui','codex_ui','codex_auth','integration_repair') -and
     [string]$continuationBinding.role -cin @('primary','subagent') -and
@@ -1528,6 +1529,23 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/.flutter-plugins-dependencies'
         )
       )
+      $careMedicineRoutingOwner = (
+        $hasContinuationBinding -and
+        [string]$selectedContinuationBinding.id -ceq
+          'codex_care_medicine_routing_v1_20260905' -and
+        $effectiveOwner -cin @(
+          'apps/mobile/lib/features/book/widgets/book_widgets.dart',
+          'apps/mobile/lib/features/buy/screens/buy_medicine_screen.dart',
+          'apps/mobile/lib/features/journey01/journey_router.dart',
+          'apps/mobile/lib/features/journey01/journey_session.dart',
+          'apps/mobile/lib/features/journey01/screens/universal_shell.dart',
+          'apps/mobile/lib/features/journey01/universal_intent_catalog.dart',
+          'apps/mobile/lib/ui_v2/social/social_v2_consumer.dart',
+          'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart',
+          'apps/mobile/test/ui_v2/universal/mool_six_domain_route_projection_c25e_test.dart',
+          'apps/mobile/test/ui_v2/universal/uaw_r08_personal_book_exposure_test.dart'
+        )
+      )
       $allowedOwner = $false
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
@@ -1537,7 +1555,8 @@ if ($ProductionLane -ceq 'baseline') {
       }
       if ($shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
-          $retainedBuyGeneratedPackageOwner) {
+          $retainedBuyGeneratedPackageOwner -or
+          $careMedicineRoutingOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -1547,6 +1566,7 @@ if ($ProductionLane -ceq 'baseline') {
           $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
+          $careMedicineRoutingOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }

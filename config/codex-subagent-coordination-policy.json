@@ -42,7 +42,17 @@
         "apps/mobile/test/ui_v2/work/work_main_v2_test.dart",
         "apps/mobile/test/work_workspace_layout_safety_test.dart",
         "apps/mobile/test/work_vertical_slice_test.dart",
-        "apps/mobile/test/work_production_gateway_test.dart"
+        "apps/mobile/test/work_production_gateway_test.dart",
+        "apps/mobile/lib/features/book/widgets/book_widgets.dart",
+        "apps/mobile/lib/features/buy/screens/buy_medicine_screen.dart",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/journey01/screens/universal_shell.dart",
+        "apps/mobile/lib/features/journey01/universal_intent_catalog.dart",
+        "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+        "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+        "apps/mobile/test/ui_v2/universal/mool_six_domain_route_projection_c25e_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r08_personal_book_exposure_test.dart"
       ]
     },
     {
@@ -2281,6 +2291,26 @@
         "integrationRequiredBeforeSuccessorApk": true
       },
       {
+        "id": "codex_care_medicine_routing_v1_20260905",
+        "state": "founder_authorized_2026_09_05",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "care-medicine-routing-v1-20260905",
+        "ticketId": "UAW-CODEX-CARE-MEDICINE-ROUTING-V1-20260905",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-care-medicine-routing-v1-20260905",
+        "branch": "work/codex-ui/care-medicine-routing-v1-20260905",
+        "baselineHead": "f94cfd4752dd73b58a69568475803d6cf25cb8d0",
+        "bootstrapCommitSubject": "coordination(care-medicine-routing-v1-20260905): bind Care route owners",
+        "bootstrapOwners": [
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CODEX-CARE-MEDICINE-ROUTING-V1-20260905.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
         "id": "integration_repair_store_buy_conflict_v3_20260904",
         "state": "founder_authorized_2026_09_04",
         "lane": "integration_repair",
@@ -2439,7 +2469,17 @@
           "apps/mobile/test/ui_v2/work/",
           "apps/mobile/test/work_workspace_layout_safety_test.dart",
           "apps/mobile/test/work_vertical_slice_test.dart",
-          "apps/mobile/test/work_production_gateway_test.dart"
+          "apps/mobile/test/work_production_gateway_test.dart",
+          "apps/mobile/lib/features/book/widgets/book_widgets.dart",
+          "apps/mobile/lib/features/buy/screens/buy_medicine_screen.dart",
+          "apps/mobile/lib/features/journey01/journey_router.dart",
+          "apps/mobile/lib/features/journey01/journey_session.dart",
+          "apps/mobile/lib/features/journey01/screens/universal_shell.dart",
+          "apps/mobile/lib/features/journey01/universal_intent_catalog.dart",
+          "apps/mobile/lib/ui_v2/social/social_v2_consumer.dart",
+          "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
+          "apps/mobile/test/ui_v2/universal/mool_six_domain_route_projection_c25e_test.dart",
+          "apps/mobile/test/ui_v2/universal/uaw_r08_personal_book_exposure_test.dart"
         ],
         "forbiddenOwnerRoots": [
           "apps/mobile/lib/core/auth/",
