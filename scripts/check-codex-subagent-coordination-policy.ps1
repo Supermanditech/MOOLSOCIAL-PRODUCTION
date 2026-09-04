@@ -225,7 +225,7 @@ function Assert-IntegrationRepairMerge(
   $expectedRepairConflictKeys = @($expectedRepairConflictOwners |
     ForEach-Object { $_.ToLowerInvariant() })
   $repairOwnerClaim = @($claims | Where-Object {
-    [string]$_.task -ceq '/root/repair_shop_chat_shared_v1_20260829'
+    [string]$_.task -ceq '/root/repair_store_buy_conflict_v1_20260904'
   })
   Assert-Coordination ($repairOwnerClaim.Count -eq 1) `
     'integration repair exact owner claim is missing or ambiguous.'
@@ -260,7 +260,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
   ) 'qualified integration repair tip is unavailable.'
   $repairBinding = @($continuationBindings | Where-Object {
     [string]$_.lane -ceq 'integration_repair' -and
-    [string]$_.task -ceq '/root/repair_shop_chat_shared_v1_20260829'
+    [string]$_.task -ceq '/root/repair_store_buy_conflict_v1_20260904'
   })
   Assert-Coordination ($repairBinding.Count -eq 1) `
     'qualified integration repair continuation is missing or ambiguous.'
@@ -329,7 +329,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
     Assert-Coordination (
       $LASTEXITCODE -eq 0 -and $preMergeSubject.Count -eq 1 -and
       [string]$preMergeSubject[0] -cmatch
-        '^repair\(shop-chat-shared-v1-20260829\): .+' -and
+        '^repair\(store-buy-conflict-repair-v1-20260904\): .+' -and
       @($preMergeCommitOwners | Where-Object {
         -not $preMergeAllowedKeys.Contains(([string]$_).ToLowerInvariant())
       }).Count -eq 0
@@ -341,7 +341,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
   Assert-Coordination (
     $LASTEXITCODE -eq 0 -and $repairMergeSubject.Count -eq 1 -and
     [string]$repairMergeSubject[0] -cmatch
-      '^repair\(shop-chat-shared-v1-20260829\): .+'
+      '^repair\(store-buy-conflict-repair-v1-20260904\): .+'
   ) 'qualified integration repair merge subject changed.'
   $repairMergeTree = (& git -C $root show -s --format='%T' `
       $repairMergeCommit).Trim()
@@ -382,7 +382,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
       Assert-Coordination (
         $LASTEXITCODE -eq 0 -and $postMergeSubject.Count -eq 1 -and
         [string]$postMergeSubject[0] -cmatch
-          '^repair\(shop-chat-shared-v1-20260829\): .+' -and
+          '^repair\(store-buy-conflict-repair-v1-20260904\): .+' -and
         @($postMergeCommitOwners | Where-Object {
           -not $postMergeAllowedKeys.Contains(
             ([string]$_).ToLowerInvariant()
@@ -562,7 +562,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 59) `
+Assert-Coordination ($continuationBindings.Count -eq 60) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -586,7 +586,8 @@ foreach ($continuationBinding in $continuationBindings) {
       'founder_authorized_2026_08_28',
       'founder_authorized_2026_08_29',
       'founder_authorized_2026_09_02',
-      'founder_authorized_2026_09_03'
+      'founder_authorized_2026_09_03',
+      'founder_authorized_2026_09_04'
     ) -and
     [string]$continuationBinding.lane -cin @('cursor_ui','codex_ui','codex_auth','integration_repair') -and
     [string]$continuationBinding.role -cin @('primary','subagent') -and
@@ -892,53 +893,43 @@ Assert-ExactNames $integrationRepair @(
   'freshIntegrationWorktreePath','freshIntegrationMergeSubject'
 ) 'integration repair discipline'
 $expectedRepairConflictOwners = @(
-  'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart',
   'config/codex-development-regression-registry.json',
   'config/codex-subagent-coordination-policy.json',
   'scripts/check-codex-subagent-coordination-policy.ps1'
 )
-$expectedRepairUnmergedOwners = @(
-  'config/codex-development-regression-registry.json',
-  'config/codex-subagent-coordination-policy.json'
-)
-Assert-Coordination (
-  $expectedRepairUnmergedOwners.Count -eq 2 -and
-  @($expectedRepairUnmergedOwners | Where-Object {
-    $expectedRepairConflictOwners -cnotcontains $_
-  }).Count -eq 0
-) 'integration repair unmerged owner contract changed.'
+$expectedRepairUnmergedOwners = @($expectedRepairConflictOwners)
 Assert-Coordination (
   [string]$integrationRepair.lane -ceq 'integration_repair' -and
   [string]$integrationRepair.requiredCodexCommit -ceq
-    '011fd09d1d94fce02d0bbc9c7b94c90f742624e6' -and
+    'aa335eb1497d77c859e7d34b549716350612c5c8' -and
   [string]$integrationRepair.requiredCodexBranch -ceq
-    'work/integration-repair/shop-chat-shared-v1-base-20260829' -and
+    'work/codex-ui/work-store-live-v1-20260903' -and
   [string]$integrationRepair.requiredCursorCommit -ceq
-    '30f4614574aae3c315d586944636a35ba314873d' -and
+    'fd55d1cfffa5ed10f753f2ed24461ef9ac6a9a5d' -and
   [string]$integrationRepair.requiredCursorBranch -ceq
-    'work/cursor-ui/chat-shell-impl-v1-20260829' -and
+    'work/cursor-ui/buy-mvp-ticket14-v1-20260902' -and
   [int]$integrationRepair.maximumMergeCommits -eq 1 -and
   [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 1 -and
   (@($integrationRepair.preMergeCoordinationOwners) -join '|') -ceq
-    'config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md' -and
-  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 9 -and
+    'docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V1-20260904.md' -and
+  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 1 -and
   (@($integrationRepair.postMergeClosureOwners) -join '|') -ceq
-    'apps/mobile/lib/features/chat/chat_entry_context.dart|apps/mobile/lib/features/chat/chat_session.dart|apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart|apps/mobile/test/chat_flow_test.dart|apps/mobile/test/global_contextual_chat_shell_test.dart|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/clean-source-state.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/full-buy-cycle1.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/full-buy-cycle2.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/prebuild-validation.md|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-launch.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-launch.xml|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-shared.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-redmi-shared.xml|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/shop-chat-r61-7-source-manifest.txt|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/source-identity.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/uaw-shop-chat-shared-r61.7-cursor-ui-review-20260829-build-provenance.txt|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-7-20260829/uaw-shop-chat-shared-r61.7-cursor-ui-review-20260829-device-review-debug.apk|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/clean-source-state.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/full-buy-cycle1.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/full-buy-cycle2.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/prebuild-validation.md|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/shop-chat-r61-8-source-manifest.txt|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829/source-identity.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/clean-source-state.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/founder-review.md|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/full-buy-cycle1.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/full-buy-cycle2.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/install-result.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/prebuild-validation.md|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-back.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-chats.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-chats.xml|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-context.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-founder.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-installed-base.apk|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-launch.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-offers-origin.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-offers.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-shared.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-shared.xml|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-redmi-wholesale.png|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-source-manifest.txt|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/source-identity.json|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/uaw-shop-chat-context-r61.9-cursor-ui-review-20260829-build-provenance.txt|artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/uaw-shop-chat-context-r61.9-cursor-ui-review-20260829-device-review-debug.apk|config/apk-regression-gate-state-shop-chat-r61-7.json|config/apk-regression-gate-state-shop-chat-r61-8.json|config/apk-regression-gate-state-shop-chat-r61-9.json|config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md|scripts/check-codex-subagent-coordination-policy.ps1' -and
+    'docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V1-20260904.md' -and
   -not [bool]$integrationRepair.directSourceCommitsAllowed -and
   [bool]$integrationRepair.conflictResolutionAllowed -and
   (@($integrationRepair.exactConflictOwners | Sort-Object) -join '|') -ceq
     (@($expectedRepairConflictOwners | Sort-Object) -join '|') -and
   [bool]$integrationRepair.remoteRepairBranchMustEqualHeadBeforeAdmission -and
   [string]$integrationRepair.freshIntegrationWorkId -ceq
-    'shop-chat-shared-v1-20260829' -and
+    'work-store-buy-v1-20260904' -and
   [string]$integrationRepair.freshIntegrationTicketId -ceq
-    'UAW-INTEGRATION-SHOP-CHAT-SHARED-V1-20260829' -and
+    'UAW-INTEGRATION-WORK-STORE-BUY-V1-20260904' -and
   [string]$integrationRepair.freshIntegrationBranch -ceq
-    'integration/moolsocial/shop-chat-shared-v1-20260829' -and
+    'integration/moolsocial/work-store-buy-v1-20260904' -and
   [string]$integrationRepair.freshIntegrationWorktreePath -ceq
-    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-shop-chat-shared-v1-20260829' -and
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v1-20260904' -and
   [string]$integrationRepair.freshIntegrationMergeSubject -ceq
-    'merge(shop-chat-shared-v1-20260829): integrate shared Chat and Buy context'
+    'merge(work-store-buy-v1-20260904): integrate Store-Live and Buy'
 ) 'integration repair discipline weakened or changed.'
 Assert-ExactNames $gitDiscipline.promotion @(
   'directFeatureToRemediationAllowed','mainFrozen','founderAuthorizationRequired',
@@ -1300,7 +1291,13 @@ if ($ProductionLane -ceq 'baseline') {
     Assert-Coordination (
       $hasContinuationBinding -and
       $AgentRole -ceq 'primary' -and
-      $AgentTask -ceq '/root'
+      (
+        $AgentTask -ceq '/root' -or
+        (
+          $ProductionLane -ceq 'integration_repair' -and
+          $AgentTask -ceq [string]$selectedContinuationBinding.task
+        )
+      )
     ) 'continuation bootstrap requires the primary coordination owner.'
   } else {
     Assert-Coordination (
@@ -2152,7 +2149,7 @@ if ($ProductionLane -ceq 'baseline') {
     }
     if ($approvedBranches.Count -eq 1 -and
         [string]$approvedBranches[0] -ceq
-          'work/integration-repair/shop-chat-shared-v1-20260829') {
+          'work/integration-repair/store-buy-conflict-repair-v1-20260904') {
       $qualifiedRepairCommit = [string]$approvedCommits[0]
       Assert-QualifiedIntegrationRepairTip `
         -RepairCommit $qualifiedRepairCommit
