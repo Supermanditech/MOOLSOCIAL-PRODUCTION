@@ -189,11 +189,43 @@ void main() {
   testWidgets('exact funded Work opportunity route remains owned by Work', (
     tester,
   ) async {
-    await mount(tester, route: '/app/work/opportunity/mool-explainer');
+    final work = WorkSession();
+    await mount(
+      tester,
+      route: '/app/work/opportunity/content-creator',
+      workSession: work,
+    );
 
     expect(find.byKey(const Key('work-opportunity-screen')), findsOneWidget);
-    expect(find.text('Make one MoolSocial explainer video'), findsOneWidget);
+    expect(find.text('Content Creator'), findsOneWidget);
+    expect(work.selectedOpportunity?.id, 'content-creator');
+    expect(find.text('This paid-work link is unavailable'), findsNothing);
+    await tester.tap(find.byKey(const Key('work-apply-opportunity')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'retired Work opportunity has honest recovery without substitution',
+    (tester) async {
+      final work = WorkSession();
+      await mount(
+        tester,
+        route: '/app/work/opportunity/mool-explainer',
+        workSession: work,
+      );
+
+      expect(find.byKey(const Key('work-opportunity-screen')), findsNothing);
+      expect(find.text('This paid-work link is unavailable'), findsOneWidget);
+      expect(find.byKey(const Key('work-apply-opportunity')), findsNothing);
+      expect(work.selectedOpportunity, isNull);
+      await tester.tap(find.text('Open Earn Today'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('canonical Work workspace choose route remains operational', (
     tester,

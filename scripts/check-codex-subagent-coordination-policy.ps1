@@ -1506,6 +1506,25 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (-not $isCoordinationBootstrap) {
     foreach ($effectiveOwner in $effectiveOwners) {
+      $workRouteContractOwner = (
+        $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
+        $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and
+        $ProductionWorkId -ceq 'work-opportunity-route-contract-v1-20260905' -and
+        $ProductionTicketId -ceq 'UAW-CODEX-WORK-OPPORTUNITY-ROUTE-CONTRACT-V1-20260905' -and
+        $branch -ceq 'work/codex-ui/work-opportunity-route-contract-v1-20260905' -and
+        [string]$selectedContinuationBinding.id -ceq 'codex_work_opportunity_route_contract_v1_20260905' -and
+        [string]$selectedContinuationBinding.baselineHead -ceq 'f4658311d6a8000d680205b1a6043ee4e723cca5' -and
+        $bootstrapCommit -ceq '2d259879301eeb4267af9e2cb02f60a94d0ed98a' -and
+        ($continuationCommits.Count -eq 1 -or
+          ($continuationCommits.Count -eq 2 -and $ProductionPhase -ceq 'handoff')) -and
+        $effectiveOwner -cin @(
+          'apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart',
+          'config/codex-development-regression-registry.json',
+          'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1',
+          'docs/quality/UAW-CODEX-WORK-OPPORTUNITY-ROUTE-CONTRACT-V1-20260905.md'
+        )
+      )
       $earnPaymentEvidenceSupportOwner = (
         $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
         $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and
@@ -1558,7 +1577,8 @@ if ($ProductionLane -ceq 'baseline') {
       if ($shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
-          $earnPaymentEvidenceSupportOwner) {
+          $earnPaymentEvidenceSupportOwner -or
+          $workRouteContractOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -1569,6 +1589,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
+          $workRouteContractOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }

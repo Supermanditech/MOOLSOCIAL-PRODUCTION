@@ -10,6 +10,16 @@
   },
   "entries": [
     {
+      "id": "REG-20260905-4490-WORK-TEST-CONTINUED-AFTER-OWNER-GATE-REJECTION",
+      "status": "invalid_qualification_run_preserved_corrected_gate_and_rerun_required",
+      "appliesTo": ["primary", "implementation", "testing", "coordination"],
+      "mistake": "The inherited codex_ui allowlist excluded the claimed R12 Universal test. A multi-call orchestration did not inspect that gate's nonzero exit before applying the test-only correction and starting its tests. The run completed 34 tests successfully, but is not accepted as qualification because its prerequisite gate failed.",
+      "rootCause": "The new primary claim was added without the exact existing lane allowance, and the orchestration only printed subprocess results rather than stopping on the failed prerequisite.",
+      "prevention": "Check every prerequisite exit before any dependent mutation or test. Preserve the invalid attempt log. Permit only the exact R12 test and required support at the current child bootstrap, with branch/task/ticket/baseline and one-source-commit bounds; keep all other lane restrictions unchanged. Run the passing implementation gate and memory check, then repeat tests and analysis before commit.",
+      "gates": ["scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["docs/quality/UAW-CODEX-WORK-OPPORTUNITY-ROUTE-CONTRACT-V1-20260905.md"]
+    },
+    {
       "id": "REG-20260905-4489-WORK-RETIRED-OPPORTUNITY-TEST-CONTRACT",
       "status": "inherited_test_contract_correction_required",
       "appliesTo": ["primary", "implementation", "testing", "work", "navigation"],
