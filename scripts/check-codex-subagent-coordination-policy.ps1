@@ -1506,6 +1506,24 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (-not $isCoordinationBootstrap) {
     foreach ($effectiveOwner in $effectiveOwners) {
+      $shareEvidenceSupportOwner = (
+        $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
+        $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and
+        $ProductionWorkId -ceq 'android-share-contract-fix-v1-20260905' -and
+        $ProductionTicketId -ceq 'UAW-CODEX-ANDROID-SHARE-CONTRACT-FIX-V1-20260905' -and
+        $branch -ceq 'work/codex-ui/android-share-contract-fix-v1-20260905' -and
+        [string]$selectedContinuationBinding.id -ceq 'codex_android_share_contract_fix_v1_20260905' -and
+        [string]$selectedContinuationBinding.baselineHead -ceq '477a0084f1264231e69cb54a4eaab6358f6bdd14' -and
+        $bootstrapCommit -ceq 'bb59f63dcc0b96a7dcb2ea795af3c2a9dfbebc32' -and
+        ($continuationCommits.Count -eq 1 -or
+          ($continuationCommits.Count -eq 2 -and $ProductionPhase -ceq 'handoff')) -and
+        $effectiveOwner -cin @(
+          'config/codex-development-regression-registry.json',
+          'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1',
+          'docs/quality/UAW-CODEX-ANDROID-SHARE-CONTRACT-FIX-V1-20260905.md'
+        )
+      )
       $shopCursorReviewAndroidOwner = (
         $hasContinuationBinding -and
         [string]$selectedContinuationBinding.id -ceq
@@ -1550,7 +1568,8 @@ if ($ProductionLane -ceq 'baseline') {
       if ($shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
-          $buyExternalShareAndroidOwner) {
+          $buyExternalShareAndroidOwner -or
+          $shareEvidenceSupportOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -1561,6 +1580,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $buyExternalShareAndroidOwner -or
+          $shareEvidenceSupportOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }

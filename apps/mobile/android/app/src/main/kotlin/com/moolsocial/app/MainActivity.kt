@@ -5,7 +5,6 @@ package com.moolsocial.app
 
 import android.Manifest
 import android.app.Activity
-import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -21,7 +20,6 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
-import androidx.core.content.FileProvider
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
@@ -33,7 +31,6 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -44,7 +41,6 @@ class MainActivity : FlutterActivity() {
     private val createInvoiceRequestCode = 6108
     private val googleIdentityChannel = "com.moolsocial.app/google_identity_fallback"
     private val googleIdentityRequestCode = 6110
-    private val externalShareChannel = "dev.fluttercommunity.plus/share"
     // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_STATE_BEGIN
     // Google identity state is owned by the registered google_sign_in plugin.
     // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_STATE_END
@@ -53,20 +49,9 @@ class MainActivity : FlutterActivity() {
     private var pendingInvoiceResult: MethodChannel.Result? = null
     private var pendingInvoiceBytes: ByteArray? = null
     private var pendingGoogleIdentityResult: MethodChannel.Result? = null
-    private var pendingExternalShareResult: MethodChannel.Result? = null
-    private var externalShareLeftActivity = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            externalShareChannel,
-        ).setMethodCallHandler { call, result ->
-            when (call.method) {
-                "share" -> shareInSeparateTask(call.arguments, result)
-                else -> result.notImplemented()
-            }
-        }
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             areaChannel,
@@ -114,132 +99,6 @@ class MainActivity : FlutterActivity() {
         // Credential Manager remains primary; the Play Services bridge handles
         // only devices that falsely return cancellation before showing identity UI.
         // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_REGISTRATION_END
-    }
-
-    @Suppress("DEPRECATION")
-    private fun shareInSeparateTask(
-        arguments: Any?,
-        result: MethodChannel.Result,
-    ) {
-        val values = arguments as? Map<*, *>
-        if (values == null) {
-            result.error("Share failed", "Share content is invalid.", null)
-            return
-        }
-
-        pendingExternalShareResult?.success(
-            "dev.fluttercommunity.plus/share/unavailable",
-        )
-        pendingExternalShareResult = null
-        externalShareLeftActivity = false
-
-        try {
-            val text = (values["uri"] as? String) ?: (values["text"] as? String)
-            val subject = values["subject"] as? String
-            val title = values["title"] as? String
-            val rawPaths = values["paths"] as? List<*>
-            val paths = rawPaths?.mapNotNull { it as? String }
-            val rawMimeTypes = values["mimeTypes"] as? List<*>
-            val mimeTypes = rawMimeTypes?.mapNotNull { it as? String }
-
-            if (
-                (text.isNullOrBlank() && paths.isNullOrEmpty()) ||
-                (rawPaths != null && paths?.size != rawPaths.size) ||
-                (rawMimeTypes != null && mimeTypes?.size != rawMimeTypes.size)
-            ) {
-                result.error("Share failed", "Share content is invalid.", null)
-                return
-            }
-
-            val sendIntent = Intent().apply {
-                action = if ((paths?.size ?: 0) > 1) {
-                    Intent.ACTION_SEND_MULTIPLE
-                } else {
-                    Intent.ACTION_SEND
-                }
-                type = shareMimeType(mimeTypes)
-                if (!text.isNullOrBlank()) putExtra(Intent.EXTRA_TEXT, text)
-                if (!subject.isNullOrBlank()) putExtra(Intent.EXTRA_SUBJECT, subject)
-                if (!title.isNullOrBlank()) putExtra(Intent.EXTRA_TITLE, title)
-            }
-
-            if (!paths.isNullOrEmpty()) {
-                val authority = "$packageName.flutter.share_provider"
-                val fileUris = ArrayList(
-                    paths.map { path ->
-                        FileProvider.getUriForFile(this, authority, File(path))
-                    },
-                )
-                sendIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                sendIntent.clipData = ClipData.newRawUri(
-                    "MoolSocial shared content",
-                    fileUris.first(),
-                ).apply {
-                    fileUris.drop(1).forEach { uri -> addItem(ClipData.Item(uri)) }
-                }
-                if (fileUris.size == 1) {
-                    sendIntent.putExtra(Intent.EXTRA_STREAM, fileUris.first())
-                } else {
-                    sendIntent.putParcelableArrayListExtra(
-                        Intent.EXTRA_STREAM,
-                        fileUris,
-                    )
-                }
-                packageManager.queryIntentActivities(
-                    sendIntent,
-                    PackageManager.MATCH_DEFAULT_ONLY,
-                ).forEach { target ->
-                    fileUris.forEach { uri ->
-                        grantUriPermission(
-                            target.activityInfo.packageName,
-                            uri,
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                        )
-                    }
-                }
-            }
-
-            val chooserIntent = Intent.createChooser(sendIntent, title).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                if (!paths.isNullOrEmpty()) {
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-            }
-            pendingExternalShareResult = result
-            startActivity(chooserIntent)
-        } catch (_: Exception) {
-            pendingExternalShareResult = null
-            externalShareLeftActivity = false
-            result.error(
-                "Share failed",
-                "Sharing is unavailable right now.",
-                null,
-            )
-        }
-    }
-
-    private fun shareMimeType(mimeTypes: List<String>?): String {
-        val values = mimeTypes?.filter { it.isNotBlank() }.orEmpty()
-        if (values.isEmpty()) return "text/plain"
-        if (values.distinct().size == 1) return values.first()
-        val families = values.map { it.substringBefore('/') }.distinct()
-        return if (families.size == 1) "${families.first()}/*" else "*/*"
-    }
-
-    override fun onPause() {
-        if (pendingExternalShareResult != null) {
-            externalShareLeftActivity = true
-        }
-        super.onPause()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (!externalShareLeftActivity) return
-        val result = pendingExternalShareResult ?: return
-        pendingExternalShareResult = null
-        externalShareLeftActivity = false
-        window.decorView.post { result.success("") }
     }
 
     @Suppress("DEPRECATION")
@@ -613,11 +472,6 @@ class MainActivity : FlutterActivity() {
             null,
         )
         pendingGoogleIdentityResult = null
-        pendingExternalShareResult?.success(
-            "dev.fluttercommunity.plus/share/unavailable",
-        )
-        pendingExternalShareResult = null
-        externalShareLeftActivity = false
         super.onDestroy()
     }
 }
