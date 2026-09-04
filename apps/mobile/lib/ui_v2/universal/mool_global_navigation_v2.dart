@@ -87,9 +87,13 @@ MoolDirectActionSpec moolDefaultActionForFamily(String familyId) {
 /// therefore wins over an implementation's source directory.
 String? moolActionFamilyIdForRoute(String route) {
   final uri = Uri.tryParse(route);
+  final query = uri?.queryParameters;
+  const medicineValues = {'medicine', 'rx'};
   if (uri?.path == '/app/buy/medicine' ||
       (uri?.path == '/app/buy' &&
-          const {'medicine', 'rx'}.contains(uri?.queryParameters['sub']))) {
+          (medicineValues.contains(query?['sub'] ?? query?['view']) ||
+              medicineValues.contains(query?['context']) ||
+              medicineValues.contains(query?['scope'])))) {
     return 'book';
   }
   for (final family in moolActionFamilies) {

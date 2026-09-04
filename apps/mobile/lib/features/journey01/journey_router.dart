@@ -1981,13 +1981,15 @@ String? _careMedicineRedirect(Uri uri) {
       medicineValues.any(
         (value) =>
             uri.queryParameters['sub'] == value ||
+            (uri.queryParameters['sub'] == null &&
+                uri.queryParameters['view'] == value) ||
             uri.queryParameters['context'] == value ||
             uri.queryParameters['scope'] == value,
       );
   if (!isLegacyPath && !isMedicineScopedBuy) return null;
 
   final query = Map<String, String>.from(uri.queryParameters);
-  for (final key in const ['sub', 'context', 'scope']) {
+  for (final key in const ['sub', 'view', 'context', 'scope']) {
     if (medicineValues.contains(query[key])) query.remove(key);
   }
   return Uri(
