@@ -31,7 +31,7 @@ void main() {
         family.label: family.actions.map((action) => action.label).toList(),
     };
     expect(catalogue, const {
-      'Social': ['Shorts', 'Videos', 'Feed', 'Create'],
+      'Social': ['Home', 'Shorts', 'Create', 'Feed'],
       'Shop': ['Wholesale', 'Orders'],
       'Food': ['Order Food', 'Book Table'],
       'Travel': ['Bike', 'Auto', 'Cab', 'Bus'],
@@ -74,7 +74,7 @@ void main() {
       moolActionFamilyById(
         'book',
       ).actions.singleWhere((action) => action.id == 'medicine').route,
-      '/app/buy?sub=medicine',
+      '/app/book/medicine',
     );
     expect(
       moolActionFamilyById(

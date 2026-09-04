@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,11 +15,22 @@ class WorkPageScaffold extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.body,
+    this.headerTitle,
     this.fallbackBackRoute = '/app/work/earn',
     this.showBack = true,
     this.activeLocalAction = 'earn',
+    this.showHeaderChat = true,
+    this.showTrailingAction = true,
+    this.onBack,
     this.trailing,
     this.bottomAction,
+    this.contextualLocalActions,
+    this.contextualActiveId,
+    this.contextualDestinationLabel,
+    this.manageSystemBack = true,
+    this.hideNavigationWhenKeyboardVisible = false,
+    this.navigationOverBody = false,
+    this.resizeToAvoidBottomInset = true,
     super.key,
   });
 
@@ -25,17 +38,32 @@ class WorkPageScaffold extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget body;
+  final Widget? headerTitle;
   final String fallbackBackRoute;
   final bool showBack;
   final String activeLocalAction;
+  final bool showHeaderChat;
+  final bool showTrailingAction;
+  final VoidCallback? onBack;
   final Widget? trailing;
   final Widget? bottomAction;
+  final List<MoolLocalNavigationAction>? contextualLocalActions;
+  final String? contextualActiveId;
+  final String? contextualDestinationLabel;
+  final bool manageSystemBack;
+  final bool hideNavigationWhenKeyboardVisible;
+  final bool navigationOverBody;
+  final bool resizeToAvoidBottomInset;
 
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
     void leaveContentDepth() {
       session.clearMessages();
+      if (onBack != null) {
+        onBack!();
+        return;
+      }
       if (context.canPop()) {
         context.pop();
       } else {
@@ -68,185 +96,270 @@ class WorkPageScaffold extends StatelessWidget {
       openMoolConnectedRoute(context, activeFamilyId: 'work', route: route);
     }
 
+    final localActions =
+        contextualLocalActions ??
+        [
+          MoolLocalNavigationAction(
+            keyName: 'work-local-earn',
+            id: 'earn',
+            label: 'Earn Today',
+            icon: Icons.bolt_rounded,
+            onPressed: activeLocalAction == 'earn'
+                ? null
+                : () => openLocal('/app/work/earn'),
+          ),
+          MoolLocalNavigationAction(
+            keyName: 'work-local-workspace',
+            id: 'workspace',
+            label: 'Workspace',
+            icon: Icons.dashboard_customize_outlined,
+            onPressed: activeLocalAction == 'workspace'
+                ? null
+                : () => openLocal('/app/work/my-work'),
+          ),
+        ];
+    final resolvedActiveId = contextualActiveId ?? activeLocalAction;
+    var selectedLocalIndex = localActions.indexWhere(
+      (action) => action.id == resolvedActiveId,
+    );
+    if (selectedLocalIndex < 0) selectedLocalIndex = 0;
+
+    void moveLocal(int delta) {
+      final target = (selectedLocalIndex + delta) % localActions.length;
+      localActions[target].onPressed?.call();
+    }
+
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final showNavigation =
+        !hideNavigationWhenKeyboardVisible || !keyboardVisible;
+    final navigation = MoolDestinationNavigationV2(
+      activeId: 'work',
+      destinationLabel: contextualDestinationLabel ?? 'Work',
+      showFamilyRootAction: false,
+      selectedLocalIndex: selectedLocalIndex,
+      localActionCount: localActions.length,
+      localNavigation: MoolLocalNavigationRail(
+        key: const Key('work-local-navigation'),
+        familyId: 'work',
+        surfaceTone: MoolLocalNavigationSurfaceTone.light,
+        semanticLabel: contextualLocalActions == null
+            ? 'Work choices: Earn Today and Workspace.'
+            : 'Store choices: Store, Orders, Sell and Stock.',
+        activeId: resolvedActiveId,
+        actions: localActions,
+      ),
+      onOpenMool: () => openGlobal('/app/mool?from=work'),
+      onOpenAction: (action) => switchGlobalDestination(action.route),
+      onPreviousLocalAction: () => moveLocal(-1),
+      onNextLocalAction: () => moveLocal(1),
+      onOpenChat: openChat,
+    );
+    final pageBody = SafeArea(
+      top: false,
+      bottom: true,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: MoolMetrics.maximumContentWidth,
+          ),
+          child: Column(
+            children: [
+              WorkMessageBanner(session: session),
+              Expanded(child: _WorkPageReveal(child: body)),
+              if (bottomAction != null)
+                Material(
+                  key: const Key('work-sticky-action-bar'),
+                  color: Colors.white,
+                  elevation: 8,
+                  shadowColor: const Color(0x22000050),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      MoolSpacing.md,
+                      MoolSpacing.sm,
+                      MoolSpacing.md,
+                      MoolSpacing.xs,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: _WorkActionReveal(child: bottomAction!),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final composedBody = navigationOverBody && showNavigation
+        ? Stack(
+            children: [
+              Positioned.fill(child: pageBody),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: BlockSemantics(child: navigation),
+              ),
+            ],
+          )
+        : pageBody;
+
     return PopScope<Object?>(
-      canPop: canPop,
+      canPop: manageSystemBack ? onBack == null && canPop : true,
       onPopInvokedWithResult: (didPop, _) {
+        if (!manageSystemBack) return;
         if (!didPop) {
           leaveContentDepth();
         }
       },
       child: Scaffold(
-        extendBody: true,
+        resizeToAvoidBottomInset: resizeToAvoidBottomInset,
+        extendBody: false,
         appBar: AppBar(
           backgroundColor: MoolColors.canvas,
           surfaceTintColor: Colors.transparent,
           automaticallyImplyLeading: false,
-          toolbarHeight: 72,
+          toolbarHeight: 88,
           leadingWidth: showBack ? 64 : 16,
           leading: showBack
               ? Padding(
                   padding: const EdgeInsets.only(left: MoolSpacing.sm),
-                  child: IconButton.outlined(
-                    key: const Key('work-back'),
-                    tooltip: 'Go back',
+                  child: MoolNativeBackButton(
+                    keyName: 'work-back',
                     onPressed: leaveContentDepth,
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 19,
-                    ),
                   ),
                 )
               : null,
           titleSpacing: showBack ? 4 : MoolSpacing.md,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -.35,
-                ),
+          title:
+              headerTitle ??
+              MoolServiceHeaderTitle(
+                title: title,
+                subtitle: subtitle,
+                titleKey: const Key('work-page-title'),
+                subtitleKey: const Key('work-page-subtitle'),
               ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.muted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
           actions: [
-            MoolGlobalChatShortcut(
-              keyName: 'work-global-chat',
-              onPressed: openChat,
-            ),
-            const SizedBox(width: 4),
-            Padding(
-              padding: const EdgeInsets.only(right: MoolSpacing.sm),
-              child:
-                  trailing ??
-                  IconButton.outlined(
-                    key: const Key('work-help'),
-                    tooltip: 'Work help',
-                    onPressed: () => context.go(
-                      Uri(
-                        path: '/app/chat',
-                        queryParameters: {
-                          'type': 'support',
-                          'return': GoRouterState.of(context).uri.toString(),
-                        },
-                      ).toString(),
+            if (showHeaderChat) ...[
+              MoolGlobalChatShortcut(
+                keyName: 'work-global-chat',
+                onPressed: openChat,
+              ),
+              const SizedBox(width: 4),
+            ],
+            if (showTrailingAction)
+              Padding(
+                padding: const EdgeInsets.only(right: MoolSpacing.sm),
+                child:
+                    trailing ??
+                    IconButton.outlined(
+                      key: const Key('work-help'),
+                      tooltip: 'Work help',
+                      onPressed: () => context.go(
+                        Uri(
+                          path: '/app/chat',
+                          queryParameters: {
+                            'type': 'support',
+                            'return': GoRouterState.of(context).uri.toString(),
+                          },
+                        ).toString(),
+                      ),
+                      icon: const Icon(Icons.support_agent_outlined),
                     ),
-                    icon: const Icon(Icons.support_agent_outlined),
-                  ),
-            ),
+              ),
           ],
         ),
-        body: SafeArea(
-          top: false,
-          bottom: true,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: MoolMetrics.maximumContentWidth,
-              ),
-              child: Column(
-                children: [
-                  WorkMessageBanner(session: session),
-                  Expanded(child: body),
-                  if (bottomAction != null)
-                    Material(
-                      color: Colors.white,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          MoolSpacing.md,
-                          MoolSpacing.sm,
-                          MoolSpacing.md,
-                          MoolSpacing.xs,
-                        ),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: bottomAction,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        bottomNavigationBar: MoolDestinationNavigationV2(
-          activeId: 'work',
-          destinationLabel: 'Work',
-          selectedLocalIndex: activeLocalAction == 'workspace' ? 1 : 0,
-          localActionCount: 2,
-          localNavigation: MoolLocalNavigationRail(
-            key: const Key('work-local-navigation'),
-            familyId: 'work',
-            surfaceTone: MoolLocalNavigationSurfaceTone.light,
-            semanticLabel: 'Work choices: Earn Today and Workspace.',
-            activeId: activeLocalAction,
-            actions: [
-              MoolLocalNavigationAction(
-                keyName: 'work-local-earn',
-                id: 'earn',
-                label: 'Earn Today',
-                icon: Icons.bolt_rounded,
-                onPressed: activeLocalAction == 'earn'
-                    ? null
-                    : () => openLocal('/app/work/earn'),
-              ),
-              MoolLocalNavigationAction(
-                keyName: 'work-local-workspace',
-                id: 'workspace',
-                label: 'Workspace',
-                icon: Icons.dashboard_customize_outlined,
-                onPressed: activeLocalAction == 'workspace'
-                    ? null
-                    : () => openLocal('/app/work/my-work'),
-              ),
-            ],
-          ),
-          onOpenMool: () => openGlobal('/app/mool?from=work'),
-          onOpenAction: (action) => switchGlobalDestination(action.route),
-          onPreviousLocalAction: () => openLocal(
-            activeLocalAction == 'workspace'
-                ? '/app/work/earn'
-                : '/app/work/my-work',
-          ),
-          onNextLocalAction: () => openLocal(
-            activeLocalAction == 'workspace'
-                ? '/app/work/earn'
-                : '/app/work/my-work',
-          ),
-          onOpenChat: openChat,
-        ),
+        body: composedBody,
+        bottomNavigationBar: navigationOverBody || !showNavigation
+            ? null
+            : navigation,
       ),
     );
   }
 }
 
-class WorkMessageBanner extends StatelessWidget {
+class _WorkPageReveal extends StatelessWidget {
+  const _WorkPageReveal({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: MoolMotion.accessible(context, MoolMotion.standard),
+      curve: MoolMotion.enter,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 10 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _WorkActionReveal extends StatelessWidget {
+  const _WorkActionReveal({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: MoolMotion.accessible(context, MoolMotion.deliberate),
+      curve: MoolMotion.enter,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.scale(
+          scale: .97 + (.03 * value),
+          alignment: Alignment.bottomCenter,
+          child: child,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class WorkMessageBanner extends StatefulWidget {
   const WorkMessageBanner({required this.session, super.key});
 
   final WorkSession session;
 
   @override
+  State<WorkMessageBanner> createState() => _WorkMessageBannerState();
+}
+
+class _WorkMessageBannerState extends State<WorkMessageBanner> {
+  Timer? _dismissTimer;
+  String? _scheduledNotice;
+
+  void _scheduleNoticeDismissal(String? notice) {
+    if (notice == null || notice == _scheduledNotice) return;
+    _dismissTimer?.cancel();
+    _scheduledNotice = notice;
+    _dismissTimer = Timer(const Duration(milliseconds: 1800), () {
+      if (!mounted || widget.session.noticeMessage != notice) return;
+      widget.session.dismissMessages();
+    });
+  }
+
+  @override
+  void dispose() {
+    _dismissTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final error = session.errorMessage;
-    final notice = session.noticeMessage;
+    final error = widget.session.errorMessage;
+    final notice = widget.session.noticeMessage;
+    _scheduleNoticeDismissal(notice);
     if (error == null && notice == null) return const SizedBox.shrink();
     final isError = error != null;
     return Semantics(
@@ -297,7 +410,7 @@ class WorkMessageBanner extends StatelessWidget {
               key: const Key('dismiss-work-message'),
               tooltip: 'Dismiss message',
               visualDensity: VisualDensity.compact,
-              onPressed: session.dismissMessages,
+              onPressed: widget.session.dismissMessages,
               icon: const Icon(Icons.close_rounded, size: 18),
             ),
           ],
@@ -443,12 +556,16 @@ class WorkPill extends StatelessWidget {
             Icon(icon, size: 13, color: color),
             const SizedBox(width: 3),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],

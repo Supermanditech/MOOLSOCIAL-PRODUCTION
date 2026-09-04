@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "prebuild_passed",
+  "buildAuthorization": "approved_for_one_build",
+  "preBuildValidation": {"state":"passed","evidence":"artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/prebuild-validation.md"},
+  "candidate": {
+    "id":"UAW-BUY-V2-R65.3-CURSOR-75-DEFECT-REVIEW-20260903",
+    "versionName":"1.0.0-r65.3",
+    "versionCode":"2026090319",
+    "buildMode":"debug",
+    "gateProfile":"uaw_cursor_ui_review_debug",
+    "branch":"work/cursor-ui/buy-mvp-ticket14-v1-20260902",
+    "head":"fbc39fb4d6bc5ce3fb3ffd33063c273084634dc5"
+  },
+  "source": {
+    "manifestPath":"artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/source-manifest.txt",
+    "manifestSha256":"FEEFDEDF67F75A7EE60A6B5A9E5B9ADE9D195299EFC79E059F3E5F34CE0A70FA",
+    "fileCount":702
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY":"true",
+    "MOOLSOCIAL_DEVICE_REVIEW":"true",
+    "MOOLSOCIAL_USE_EMULATORS":"true",
+    "MOOLSOCIAL_CANDIDATE_ID":"UAW-BUY-V2-R65.3-CURSOR-75-DEFECT-REVIEW-20260903"
+  },
+  "promotion":{"state":"forbidden_non_promotable"},
+  "preBuildGates":[
+    {"id":"branch-head","state":"passed","evidence":["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/prebuild-validation.md"]},
+    {"id":"source-manifest","state":"passed","evidence":["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/source-manifest.txt"]},
+    {"id":"format-analysis","state":"passed","evidence":["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/prebuild-validation.md"]},
+    {"id":"focused-tests","state":"passed","evidence":["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/prebuild-validation.md"]},
+    {"id":"positive-release-gates","state":"passed","evidence":["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/prebuild-validation.md"]},
+    {"id":"protected-boundary-disposition","state":"passed","evidence":["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/candidate-contract.md"]},
+    {"id":"rejected-candidate-preserved","state":"passed","evidence":["artifacts/quality/buy-v2-r65-2-cursor-75-defect-review-20260903/prebuild-validation.md"]},
+    {"id":"startup-config-regression-registered","state":"passed","evidence":["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/prebuild-validation.md"]},
+    {"id":"buy-regression-1","state":"passed","evidence":["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/prebuild-validation.md"]},
+    {"id":"buy-regression-2","state":"passed","evidence":["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/prebuild-validation.md"]},
+    {"id":"clean-state-regression","state":"passed","evidence":["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/prebuild-validation.md"]},
+    {"id":"wrapper-self-test","state":"passed","evidence":["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/prebuild-validation.md"]},
+    {"id":"package-isolation","state":"passed","evidence":["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/prebuild-validation.md"]}
+  ],
+  "premiumMotionPolicy": {
+    "state":"audited_for_r65_3",
+    "policy":"config/buy-premium-motion-policy.json",
+    "coverage":"docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "candidateContract":"artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/candidate-contract.md",
+    "disposition":"artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/motion-disposition.md",
+    "applied":["segmented_control_state_motion","cart_value_transition","payment_and_order_status_transition"],
+    "reused":["approved_buy_finite_event_driven_motion","static_reduced_motion"],
+    "dependencyHeld":["shared_chat_motion","shared_shell_motion"],
+    "inapplicable":["perpetual_decorative_loops"]
+  }
+}

@@ -1,22 +1,72 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../features/buy/buy_v2_cart_contracts.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
+import '../../features/buy/buy_v2_order_resolution_contracts.dart';
+import '../../features/buy/buy_v2_saved_products_store.dart';
 import '../../features/buy/buy_v2_session.dart';
+import '../../features/journey01/journey_services.dart';
 import 'buy_v2_address_form_sheet_motion.dart';
 import 'buy_v2_address_sheet_motion.dart';
 import 'buy_v2_design.dart';
 import 'buy_v2_filter_sheet_motion.dart';
+import 'buy_v2_invoice.dart';
 import 'buy_v2_payment_sheet_motion.dart';
 import 'buy_v2_prescription_sheet_motion.dart';
 import 'buy_v2_product_feedback_sheet_motion.dart';
-import 'buy_v2_supplier_sheet_motion.dart';
+import 'buy_v2_product_video.dart';
+
+typedef BuyV2LiveDeliveryMapBuilder =
+    Widget Function(BuildContext context, BuyV2LiveDeliverySnapshot snapshot);
 
 String _productCountLabel(int count) =>
     '$count ${count == 1 ? 'product' : 'products'}';
+
+String _packCountLabel(int count) => '$count ${count == 1 ? 'pack' : 'packs'}';
+
+String _itemCountLabel(int count) => '$count ${count == 1 ? 'item' : 'items'}';
+
+bool _containsOnlyWholesaleLines(List<BuyV2CartLine> lines) =>
+    lines.isNotEmpty &&
+    lines.every(
+      (line) => line.product.destination == BuyV2Destination.wholesale,
+    );
+
+String _checkoutFulfilmentCountLabel(BuyV2FulfilmentGroup group) =>
+    group.destination == BuyV2Destination.wholesale
+    ? '${_productCountLabel(group.lines.length)} · '
+          '${_packCountLabel(group.itemCount)}'
+    : '${_productCountLabel(group.lines.length)} · '
+          '${_itemCountLabel(group.itemCount)}';
+
+String _checkoutDockCountLabel(BuyV2Session session) =>
+    session.checkoutScope == BuyV2CartScope.wholesale ||
+        _containsOnlyWholesaleLines(session.checkoutLines)
+    ? '${_productCountLabel(session.checkoutLines.length)} · '
+          '${_packCountLabel(session.checkoutItemCount)}'
+    : _itemCountLabel(session.checkoutItemCount);
+
+String _cartHeaderSummary(BuyV2Session session) {
+  final lines = session.cartLines;
+  final destinations = lines.map((line) => line.product.destination).toSet();
+  final quantityLabel =
+      session.cartScope == BuyV2CartScope.wholesale ||
+          _containsOnlyWholesaleLines(lines)
+      ? _packCountLabel(session.scopedItemCount)
+      : '${session.scopedItemCount} '
+            '${session.scopedItemCount == 1 ? 'item' : 'items'}';
+  return '${_productCountLabel(lines.length)} · $quantityLabel · '
+      '${_destinationSummary(destinations)} · '
+      '${buyV2Money(session.scopedCartTotal)}';
+}
 
 String _destinationSummary(Set<BuyV2Destination> destinations) {
   const order = [
@@ -30,10 +80,341 @@ String _destinationSummary(Set<BuyV2Destination> destinations) {
       .join(' + ');
 }
 
+@immutable
+class BuyV2GstInvoiceDetails {
+  const BuyV2GstInvoiceDetails({
+    required this.id,
+    required this.legalName,
+    required this.gstin,
+    required this.billingAddress,
+  });
+
+  final String id;
+  final String legalName;
+  final String gstin;
+  final String billingAddress;
+}
+
+class BuyV2GstInvoiceController extends ChangeNotifier {
+  BuyV2GstInvoiceController({this.store});
+
+  final BuyV2GstInvoiceProfileStore? store;
+  final Map<BuyV2Destination, bool> _requested = {
+    BuyV2Destination.shop: false,
+    BuyV2Destination.wholesale: false,
+  };
+  final Map<BuyV2Destination, BuyV2GstInvoiceDetails> _selected = {};
+  final List<BuyV2GstInvoiceDetails> _savedProfiles = [];
+  int _nextId = 1;
+  int _mutationRevision = 0;
+  String? _ownerScope;
+  bool _restoring = false;
+  bool _busy = false;
+  bool _disposed = false;
+  String? _message;
+
+  bool requestedFor(BuyV2Destination destination) =>
+      _requested[destination] ?? false;
+
+  BuyV2GstInvoiceDetails? detailsFor(BuyV2Destination destination) =>
+      _selected[destination];
+
+  List<BuyV2GstInvoiceDetails> get savedProfiles =>
+      List.unmodifiable(_savedProfiles);
+
+  bool get persistenceAvailable => store?.ownerScope != null;
+
+  bool get sessionPersistenceOnly =>
+      store?.ownerScope?.startsWith('device-review-session:') ?? false;
+
+  bool get restoring => _restoring;
+
+  bool get busy => _busy;
+
+  String? get message => _message;
+
+  void clearMessage() {
+    if (_message == null) return;
+    _message = null;
+    _notify();
+  }
+
+  Future<void> restore() async {
+    final profileStore = store;
+    final ownerScope = profileStore?.ownerScope;
+    if (profileStore == null ||
+        ownerScope == null ||
+        ownerScope == _ownerScope ||
+        _restoring) {
+      return;
+    }
+    _ownerScope = ownerScope;
+    _savedProfiles.clear();
+    _selected.clear();
+    _restoring = true;
+    _message = null;
+    final mutationRevision = _mutationRevision;
+    _notify();
+    try {
+      final snapshot = await profileStore.read();
+      if (_disposed ||
+          profileStore.ownerScope != ownerScope ||
+          mutationRevision != _mutationRevision) {
+        return;
+      }
+      final restored = <BuyV2GstInvoiceDetails>[];
+      final seenIds = <String>{};
+      for (final record in snapshot?.profiles ?? const []) {
+        final id = record.id.trim();
+        final legalName = record.legalName.trim();
+        final gstin = record.gstin.trim().toUpperCase();
+        final billingAddress = record.billingAddress.trim();
+        if (id.isEmpty ||
+            legalName.isEmpty ||
+            gstin.isEmpty ||
+            billingAddress.isEmpty ||
+            !seenIds.add(id)) {
+          continue;
+        }
+        restored.add(
+          BuyV2GstInvoiceDetails(
+            id: id,
+            legalName: legalName,
+            gstin: gstin,
+            billingAddress: billingAddress,
+          ),
+        );
+      }
+      _savedProfiles
+        ..clear()
+        ..addAll(restored);
+      _nextId = _nextProfileNumber(restored);
+    } on Object {
+      if (!_disposed && profileStore.ownerScope == ownerScope) {
+        _ownerScope = null;
+        _message = 'Saved GST details could not be loaded. Try again.';
+      }
+    } finally {
+      if (!_disposed) {
+        if (profileStore.ownerScope != ownerScope) {
+          _ownerScope = null;
+          _savedProfiles.clear();
+          _selected.clear();
+        }
+        _restoring = false;
+        _notify();
+      }
+    }
+  }
+
+  int _nextProfileNumber(List<BuyV2GstInvoiceDetails> profiles) {
+    var next = 1;
+    for (final profile in profiles) {
+      final match = RegExp(r'^gst-profile-(\d+)$').firstMatch(profile.id);
+      final value = int.tryParse(match?.group(1) ?? '');
+      if (value != null && value >= next) next = value + 1;
+    }
+    return next;
+  }
+
+  void setRequested(BuyV2Destination destination, bool requested) {
+    if (destination != BuyV2Destination.shop &&
+        destination != BuyV2Destination.wholesale) {
+      return;
+    }
+    if (_requested[destination] == requested) return;
+    _requested[destination] = requested;
+    _message = null;
+    _notify();
+  }
+
+  void selectSaved(
+    BuyV2Destination destination,
+    BuyV2GstInvoiceDetails details,
+  ) {
+    _requested[destination] = true;
+    _selected[destination] = details;
+    _message = null;
+    _notify();
+  }
+
+  bool applySavedBusinessProfile() {
+    const destination = BuyV2Destination.wholesale;
+    if (_selected[destination] != null || _savedProfiles.isEmpty) {
+      return false;
+    }
+    _requested[destination] = true;
+    _selected[destination] = _savedProfiles.first;
+    _message = null;
+    _notify();
+    return true;
+  }
+
+  Future<bool> save({
+    required BuyV2Destination destination,
+    required String legalName,
+    required String gstin,
+    required String billingAddress,
+    required bool remember,
+  }) async {
+    if (_busy) return false;
+    if (remember && !persistenceAvailable) {
+      _message = 'Saved GST details are unavailable. Try again.';
+      _notify();
+      return false;
+    }
+    final current = _selected[destination];
+    final currentIsSaved =
+        current != null &&
+        _savedProfiles.any((profile) => profile.id == current.id);
+    final shouldRemember = remember && persistenceAvailable;
+    final details = BuyV2GstInvoiceDetails(
+      id: shouldRemember
+          ? currentIsSaved
+                ? current.id
+                : 'gst-profile-${_nextId++}'
+          : 'gst-session-${_nextId++}',
+      legalName: legalName.trim(),
+      gstin: gstin.trim().toUpperCase(),
+      billingAddress: billingAddress.trim(),
+    );
+    if (shouldRemember) {
+      final candidate = [..._savedProfiles];
+      final index = candidate.indexWhere((item) => item.id == details.id);
+      if (index == -1) {
+        candidate.add(details);
+      } else {
+        candidate[index] = details;
+      }
+      if (!await _writeProfiles(candidate)) return false;
+      _savedProfiles
+        ..clear()
+        ..addAll(candidate);
+    }
+    _requested[destination] = true;
+    _selected[destination] = details;
+    _message = shouldRemember
+        ? sessionPersistenceOnly
+              ? 'GST details kept until you close the app.'
+              : 'GST details saved.'
+        : null;
+    _notify();
+    return true;
+  }
+
+  Future<bool> removeSaved(BuyV2GstInvoiceDetails details) async {
+    if (_busy || !persistenceAvailable) return false;
+    final candidate = _savedProfiles
+        .where((profile) => profile.id != details.id)
+        .toList(growable: false);
+    if (candidate.length == _savedProfiles.length) return true;
+    if (!await _writeProfiles(candidate)) return false;
+    _savedProfiles
+      ..clear()
+      ..addAll(candidate);
+    _selected.removeWhere((_, selected) => selected.id == details.id);
+    _message = 'GST details removed.';
+    _notify();
+    return true;
+  }
+
+  Future<bool> _writeProfiles(List<BuyV2GstInvoiceDetails> profiles) async {
+    final profileStore = store;
+    final ownerScope = profileStore?.ownerScope;
+    if (profileStore == null || ownerScope == null) return false;
+    _busy = true;
+    _message = null;
+    _mutationRevision += 1;
+    _notify();
+    try {
+      final saved = await profileStore.write(
+        BuyV2GstInvoiceProfileSnapshot(
+          profiles: [
+            for (final profile in profiles)
+              BuyV2GstInvoiceProfileRecord(
+                id: profile.id,
+                legalName: profile.legalName,
+                gstin: profile.gstin,
+                billingAddress: profile.billingAddress,
+              ),
+          ],
+        ),
+      );
+      if (profileStore.ownerScope != ownerScope || !saved) {
+        _message = 'GST details could not be saved. Try again.';
+        return false;
+      }
+      return true;
+    } on Object {
+      if (profileStore.ownerScope == ownerScope) {
+        _message = 'GST details could not be saved. Try again.';
+      }
+      return false;
+    } finally {
+      if (!_disposed) {
+        if (profileStore.ownerScope != ownerScope) {
+          _message = 'GST details could not be saved. Try again.';
+        }
+        _busy = false;
+        _notify();
+      }
+    }
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}
+
+String _orderPromiseSummary(BuyV2Order order) => buyV2DeliveryPromiseSummary(
+  promise: order.promise,
+  promisedByLabel: order.promisedByLabel,
+);
+
+typedef _BuyV2PurchaseGroup = ({String? purchaseId, List<BuyV2Order> orders});
+
+List<_BuyV2PurchaseGroup> _purchaseGroupsFor(List<BuyV2Order> orders) {
+  final grouped = <String, List<BuyV2Order>>{};
+  for (final order in orders) {
+    final key = order.purchaseId ?? 'order:${order.id}';
+    grouped.putIfAbsent(key, () => []).add(order);
+  }
+  return [
+    for (final entry in grouped.entries)
+      (
+        purchaseId: entry.value.first.purchaseId,
+        orders: List.unmodifiable(entry.value),
+      ),
+  ];
+}
+
+typedef BuyV2PartnerCatalogueHandler =
+    void Function(BuyV2Product product, {bool brandOnly});
+
 class BuyV2ProductView extends StatelessWidget {
-  const BuyV2ProductView({super.key, required this.session});
+  const BuyV2ProductView({
+    super.key,
+    required this.session,
+    this.returnLabel,
+    this.onReturn,
+    this.onAskSeller,
+    this.onOpenPartnerCatalogue,
+    this.wholesaleTradeDecisionAdapter =
+        const BuyV2UnavailableWholesaleTradeDecisionAdapter(),
+  });
 
   final BuyV2Session session;
+  final String? returnLabel;
+  final VoidCallback? onReturn;
+  final ValueChanged<BuyV2Product>? onAskSeller;
+  final BuyV2PartnerCatalogueHandler? onOpenPartnerCatalogue;
+  final BuyV2WholesaleTradeDecisionAdapter wholesaleTradeDecisionAdapter;
 
   @override
   Widget build(BuildContext context) {
@@ -43,35 +424,45 @@ class BuyV2ProductView extends StatelessWidget {
     }
     final quantity = session.quantityFor(product.id);
     final review = session.customerReviewFor(product.id);
-    final partnerProducts = product.destination == BuyV2Destination.wholesale
-        ? session.supplierContinuationsFor(product)
-        : session.sellerContinuationsFor(product);
-    final partnerActionKey = switch (product.destination) {
-      BuyV2Destination.shop => 'buy-shop-seller-action-${product.id}',
-      BuyV2Destination.wholesale =>
-        'buy-wholesale-supplier-action-${product.id}',
-      BuyV2Destination.medicine => 'buy-medicine-pharmacy-action-${product.id}',
-      BuyV2Destination.orders => 'buy-order-partner-action-${product.id}',
-    };
-    final partnerActionDetail = switch (product.destination) {
-      BuyV2Destination.wholesale =>
-        '${partnerProducts.length} other current '
-            '${partnerProducts.length == 1 ? 'pack' : 'packs'}',
-      BuyV2Destination.medicine =>
-        '${partnerProducts.length} other current products · Not medical advice',
-      _ => '${partnerProducts.length} other current products',
-    };
-    final partnerSemanticLabel = switch (product.destination) {
-      BuyV2Destination.wholesale =>
-        'View ${partnerProducts.length} more '
-            '${partnerProducts.length == 1 ? 'product' : 'products'} '
-            'from ${product.seller} in the current Wholesale catalogue',
-      BuyV2Destination.medicine =>
-        'View ${partnerProducts.length} more products from ${product.seller} '
-            'in the current Medicine catalogue. Not medical advice',
-      _ =>
-        'View ${partnerProducts.length} more products from ${product.seller} '
-            'in the current Shop catalogue',
+    final facts = session.productFactsFor(product);
+    final content = session.productContentFor(product);
+    final trust = session.marketplaceTrustFor(product);
+    final productBenefits = session.productBenefitsFor(product);
+    final productBenefitsState = session.productBenefitsStateFor(product);
+    final variants = session.productVariantsFor(product);
+    final purchaseProtection = product.purchaseProtection;
+    final returnSummary =
+        _nonBlankComplianceValue(purchaseProtection?.summary) ??
+        _nonBlankComplianceValue(product.returnPolicy);
+    final protectionRemedies =
+        (purchaseProtection?.remedies ?? const <String>[])
+            .map(_nonBlankComplianceValue)
+            .whereType<String>()
+            .toList(growable: false);
+    final automaticFulfilment =
+        product.destination == BuyV2Destination.shop ||
+        product.destination == BuyV2Destination.wholesale;
+    final wholesale = product.destination == BuyV2Destination.wholesale;
+    final orderability = facts.orderabilityLabel.toLowerCase();
+    final buyerPromise =
+        facts.storeOperatingState == BuyV2StoreOperatingState.closed
+        ? facts.nextOpeningLabel?.trim().isNotEmpty == true
+              ? 'Available when the store opens ${facts.nextOpeningLabel!.trim()}'
+              : 'Available when the store reopens'
+        : orderability.contains('unavailable') ||
+              orderability.contains('out of stock')
+        ? 'Currently unavailable'
+        : automaticFulfilment
+        ? buyV2BuyerDeliveryPromise(facts)
+        : facts.deliveryPromise;
+    final offerDecision = automaticFulfilment
+        ? buyV2ResolveProductOfferDecision(product: product, facts: facts)
+        : null;
+    final partnerProducts = switch (product.destination) {
+      BuyV2Destination.shop ||
+      BuyV2Destination.wholesale => session.partnerCatalogueFor(product),
+      BuyV2Destination.medicine => session.sellerContinuationsFor(product),
+      BuyV2Destination.orders => const <BuyV2Product>[],
     };
     final rxBlocked =
         product.requiresPrescription &&
@@ -89,11 +480,11 @@ class BuyV2ProductView extends StatelessWidget {
         Expanded(
           child: ListView(
             key: PageStorageKey('buy-product-${product.id}'),
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            padding: EdgeInsets.fromLTRB(10, 8, 10, wholesale ? 112 : 104),
             children: [
               _ReturnAffordance(
-                label: product.destination.label,
-                onTap: session.closeProduct,
+                label: returnLabel ?? product.destination.label,
+                onTap: onReturn ?? session.closeProduct,
               ),
               const SizedBox(height: 7),
               BuyV2FiniteDepthReveal(
@@ -102,16 +493,35 @@ class BuyV2ProductView extends StatelessWidget {
                 child: _BuyV2ProductGallery(
                   key: ValueKey('buy-product-packshot-${product.id}'),
                   product: product,
+                  compact: wholesale,
                   media: [
-                    _BuyV2ProductMediaItem(
-                      label: 'Product visual',
-                      child: BuyV2ProductPackshot(
-                        key: const ValueKey('buy-product-gallery-image-0'),
-                        product: product,
-                        borderRadius: 17,
-                        animateFirstFrame: true,
+                    for (final media
+                        in content.media.isEmpty
+                            ? [
+                                BuyV2ProductMediaAsset(
+                                  id: '${product.id}-packshot-fallback',
+                                  label: 'Product image',
+                                  semanticLabel:
+                                      '${product.title}, ${product.pack}',
+                                  kind: BuyV2ProductContentMediaKind
+                                      .cataloguePackshot,
+                                ),
+                              ]
+                            : content.media)
+                      _BuyV2ProductMediaItem(
+                        label: media.label,
+                        zoomable:
+                            media.kind !=
+                            BuyV2ProductContentMediaKind.networkVideo,
+                        video:
+                            media.kind ==
+                            BuyV2ProductContentMediaKind.networkVideo,
+                        builder: (active) => _ProductContentMediaSurface(
+                          product: product,
+                          media: media,
+                          active: active,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -119,153 +529,288 @@ class BuyV2ProductView extends StatelessWidget {
               BuyV2FiniteIncomingTransition(
                 key: ValueKey('buy-product-title-reveal-${product.id}'),
                 stateKey: 'buy-product-title-${product.id}',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Container(
+                  key: ValueKey('buy-product-purchase-hero-${product.id}'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFF8EE), Color(0xFFF4F7FF)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: BuyV2Colors.line),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${product.brand} · ${_sellerTypeLabel(product.sellerType)}',
+                              style: context.buyEyebrow.copyWith(fontSize: 8),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  facts.orderabilityLabel
+                                      .toLowerCase()
+                                      .contains('available')
+                                  ? BuyV2Colors.softGreen
+                                  : BuyV2Colors.softOrange,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              facts.orderabilityLabel,
+                              style: context.buyMeta.copyWith(
+                                color: BuyV2Colors.green,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        product.title,
+                        key: ValueKey('buy-product-title-${product.id}'),
+                        style: context.buyTitle.copyWith(fontSize: 20),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        product.composition ?? product.variant,
+                        maxLines: 3,
+                        overflow: TextOverflow.clip,
+                        style: context.buyBody.copyWith(fontSize: 10),
+                      ),
+                      const SizedBox(height: 7),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            buyV2Money(facts.price),
+                            key: ValueKey(
+                              'buy-product-hero-price-${product.id}',
+                            ),
+                            style: context.buyTitle.copyWith(
+                              color: BuyV2Colors.navy,
+                              fontSize: 25,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${product.pack} · ${product.unitPrice}',
+                              maxLines: 2,
+                              overflow: TextOverflow.clip,
+                              style: context.buyMeta.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _ProductHeroFact(
+                        key: ValueKey('buy-product-hero-store-${product.id}'),
+                        icon: Icons.storefront_outlined,
+                        value:
+                            '${facts.partner} · ${_sellerTypeLabel(product.sellerType)}',
+                      ),
+                      const SizedBox(height: 5),
+                      _ProductHeroFact(
+                        key: ValueKey(
+                          'buy-product-hero-delivery-${product.id}',
+                        ),
+                        icon: product.destination == BuyV2Destination.wholesale
+                            ? Icons.local_shipping_outlined
+                            : Icons.schedule_rounded,
+                        value: buyerPromise,
+                        color: BuyV2Colors.green,
+                      ),
+                      if (wholesale) ...[
+                        const SizedBox(height: 5),
+                        _ProductHeroFact(
+                          icon: Icons.inventory_2_outlined,
+                          value:
+                              'Minimum order · ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'}',
+                        ),
+                      ],
+                      if (returnSummary case final returnPolicy?) ...[
+                        const SizedBox(height: 5),
+                        _ProductHeroFact(
+                          icon: Icons.assignment_return_outlined,
+                          value: returnPolicy,
+                        ),
+                      ],
+                      if (!automaticFulfilment) ...[
+                        const SizedBox(height: 9),
+                        _ProductOwnedActionPanel(
+                          key: ValueKey(
+                            'buy-product-inline-action-${product.id}',
+                          ),
+                          product: product,
+                          quantity: quantity,
+                          deliveryDecision: buyerPromise,
+                          rxBlocked: rxBlocked,
+                          onAdd: addProduct,
+                          onDecrease: () => session.decrease(product.id),
+                          onIncrease: () => session.increase(product.id),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              if (variants.length > 1) ...[
+                const SizedBox(height: 8),
+                _ProductVariantSelector(
+                  session: session,
+                  product: product,
+                  variants: variants,
+                ),
+              ],
+              if (automaticFulfilment && !wholesale) ...[
+                const SizedBox(height: 7),
+                _ProductDecisionGlance(
+                  product: product,
+                  facts: facts,
+                  decision: offerDecision!,
+                  buyerPromise: buyerPromise,
+                ),
+              ],
+              if (!wholesale) ...[
+                const SizedBox(height: 7),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 5,
                   children: [
-                    Text(
-                      product.brand,
-                      style: context.buyEyebrow.copyWith(fontSize: 8),
+                    _ProductTrustPill(
+                      icon: Icons.star_rounded,
+                      label: trust.productRating == null
+                          ? 'No customer ratings yet'
+                          : '${trust.productRating!.toStringAsFixed(1)} · '
+                                '${trust.productRatingCount ?? 0} ratings',
+                      color: BuyV2Colors.orange,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      product.title,
-                      key: ValueKey('buy-product-title-${product.id}'),
-                      style: context.buyTitle.copyWith(fontSize: 18),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      product.composition ?? product.variant,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.buyBody.copyWith(fontSize: 10),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      product.pack,
-                      style: context.buyMeta.copyWith(fontSize: 9),
-                    ),
-                    const SizedBox(height: 8),
-                    _ProductOwnedActionPanel(
-                      key: ValueKey('buy-product-inline-action-${product.id}'),
+                    if (review != null)
+                      _ProductTrustPill(
+                        icon: Icons.rate_review_outlined,
+                        label: '${review.rating}.0 · Your review',
+                        color: BuyV2Colors.navy,
+                      ),
+                    if (!automaticFulfilment)
+                      const _ProductTrustPill(
+                        icon: Icons.schedule_rounded,
+                        label: 'Delivery promise shown',
+                        color: BuyV2Colors.green,
+                      ),
+                    if (product.regulatoryTrustFact case final fact?)
+                      _ProductTrustPill(
+                        icon: Icons.local_pharmacy_outlined,
+                        label: fact,
+                        color: BuyV2Colors.navy,
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              if (wholesale)
+                Column(
+                  children: [
+                    if (!session.businessVerified) ...[
+                      _WholesaleVerificationCard(
+                        state: session.businessVerificationState,
+                        onOpenWorkspace: () =>
+                            context.push('/app/work/workspace/choose'),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    _WholesaleTradeDecisionPanel(
+                      session: session,
                       product: product,
-                      quantity: quantity,
-                      rxBlocked: rxBlocked,
-                      onAdd: addProduct,
-                      onDecrease: () => session.decrease(product.id),
-                      onIncrease: () => session.increase(product.id),
+                      facts: facts,
+                      decision: offerDecision!,
+                      buyerPromise: buyerPromise,
+                      adapter: wholesaleTradeDecisionAdapter,
+                      onOpenPartnerCatalogue: onOpenPartnerCatalogue,
+                    ),
+                  ],
+                )
+              else if (automaticFulfilment)
+                _ProductOfferDecisionPanel(
+                  session: session,
+                  product: product,
+                  facts: facts,
+                  decision: offerDecision!,
+                  buyerPromise: buyerPromise,
+                  quantity: quantity,
+                  onAdd: addProduct,
+                  onDecrease: () => session.decrease(product.id),
+                  onIncrease: () => session.increase(product.id),
+                )
+              else
+                _DecisionPanel(
+                  title: 'Pack, delivery and pharmacy',
+                  children: [
+                    _DecisionRow(
+                      icon: Icons.inventory_2_outlined,
+                      label: 'Pack',
+                      value: product.pack,
+                    ),
+                    _DecisionRow(
+                      icon: Icons.schedule_rounded,
+                      label: 'Delivery',
+                      value: buyerPromise,
+                      valueColor: BuyV2Colors.green,
+                    ),
+                    if (partnerProducts.isEmpty ||
+                        onOpenPartnerCatalogue == null)
+                      _DecisionRow(
+                        icon: Icons.local_pharmacy_outlined,
+                        label: product.partnerRole,
+                        value: product.seller,
+                      )
+                    else
+                      _DecisionActionRow(
+                        key: ValueKey(
+                          'buy-medicine-pharmacy-action-${product.id}',
+                        ),
+                        icon: Icons.local_pharmacy_outlined,
+                        label: product.partnerRole,
+                        value: product.seller,
+                        detail:
+                            '${partnerProducts.length} other current products · Not medical advice',
+                        semanticLabel:
+                            'View ${partnerProducts.length} more products from ${product.seller} '
+                            'that are available now. Not medical advice',
+                        onTap: () => onOpenPartnerCatalogue!(product),
+                      ),
+                    _DecisionRow(
+                      icon: Icons.route_outlined,
+                      label: 'Delivery path',
+                      value: product.origin,
+                    ),
+                    _DecisionRow(
+                      icon: Icons.event_available_outlined,
+                      label: 'Price checked',
+                      value: product.confirmedOn,
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 7),
-              Wrap(
-                spacing: 6,
-                runSpacing: 5,
-                children: [
-                  _ProductTrustPill(
-                    icon: Icons.star_rounded,
-                    label: review == null
-                        ? 'Be the first to review'
-                        : '${review.rating}.0 · Your review',
-                    color: BuyV2Colors.orange,
-                  ),
-                  _ProductTrustPill(
-                    icon: Icons.schedule_rounded,
-                    label: 'Delivery promise shown',
-                    color: BuyV2Colors.green,
-                  ),
-                  if (product.regulatoryTrustFact case final fact?)
-                    _ProductTrustPill(
-                      icon: Icons.local_pharmacy_outlined,
-                      label: fact,
-                      color: BuyV2Colors.navy,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _DecisionPanel(
-                title: 'Pack, delivery and seller',
-                children: [
-                  _DecisionRow(
-                    icon: Icons.inventory_2_outlined,
-                    label: 'Pack',
-                    value: product.pack,
-                  ),
-                  _DecisionRow(
-                    icon: Icons.schedule_rounded,
-                    label: 'Delivery',
-                    value: product.deliveryPromise,
-                    valueColor: BuyV2Colors.green,
-                  ),
-                  if (partnerProducts.isEmpty)
-                    _DecisionRow(
-                      icon: Icons.storefront_outlined,
-                      label: product.partnerRole,
-                      value: product.seller,
-                    )
-                  else
-                    _DecisionActionRow(
-                      key: ValueKey(partnerActionKey),
-                      icon: Icons.storefront_outlined,
-                      label: product.partnerRole,
-                      value: product.seller,
-                      detail: partnerActionDetail,
-                      semanticLabel: partnerSemanticLabel,
-                      onTap: () => _showPartnerProductsSheet(
-                        context,
-                        session,
-                        product,
-                        partnerProducts,
-                      ),
-                    ),
-                  _DecisionRow(
-                    icon: Icons.route_outlined,
-                    label: 'Delivery path',
-                    value: product.origin,
-                  ),
-                  _DecisionRow(
-                    icon: Icons.event_available_outlined,
-                    label: 'Price checked',
-                    value: product.confirmedOn,
-                  ),
-                  if (product.destination == BuyV2Destination.shop)
-                    _DecisionRow(
-                      icon: Icons.assignment_return_outlined,
-                      label: 'Return or replacement',
-                      value:
-                          product.returnPolicy ??
-                          'Damaged or incorrect packs are reviewed at delivery',
-                    ),
-                ],
-              ),
-              if (product.destination == BuyV2Destination.wholesale) ...[
+              if (product.destination == BuyV2Destination.shop ||
+                  product.destination == BuyV2Destination.wholesale) ...[
                 const SizedBox(height: 10),
-                _DecisionPanel(
-                  title: 'Wholesale terms',
-                  children: [
-                    _DecisionRow(
-                      icon: Icons.layers_outlined,
-                      label: 'Minimum order',
-                      value: 'MOQ ${product.minimumOrder} · case packs',
-                    ),
-                    _DecisionRow(
-                      icon: Icons.local_shipping_outlined,
-                      label: 'Freight',
-                      value: product.freightIncluded
-                          ? 'Included in landed price'
-                          : 'Confirmed before payment',
-                    ),
-                    const _DecisionRow(
-                      icon: Icons.payments_outlined,
-                      label: 'Payment',
-                      value: 'UPI or bank transfer',
-                    ),
-                    const _DecisionRow(
-                      icon: Icons.receipt_long_outlined,
-                      label: 'Tax',
-                      value: 'GST included · invoice provided',
-                    ),
-                  ],
+                _ProductBenefitsPreview(
+                  session: session,
+                  product: product,
+                  benefits: productBenefits,
+                  state: productBenefitsState,
+                  customerMessage: session.productBenefitsMessageFor(product),
                 ),
               ],
               if (product.destination == BuyV2Destination.medicine) ...[
@@ -321,36 +866,1928 @@ class BuyV2ProductView extends StatelessWidget {
                     label: 'Pack size',
                     value: product.pack,
                   ),
-                  _DecisionRow(
-                    icon: Icons.route_outlined,
-                    label: 'Source route',
-                    value: product.origin,
-                  ),
-                  if (product.returnPolicy case final returnPolicy?)
+                  if (automaticFulfilment)
+                    _DecisionRow(
+                      icon: Icons.location_on_outlined,
+                      label: 'Service area',
+                      value:
+                          session.selectedAddressOrNull?.shortLine ??
+                          'Based on your delivery address',
+                    )
+                  else
+                    _DecisionRow(
+                      icon: Icons.route_outlined,
+                      label: 'Where it comes from',
+                      value: product.origin,
+                    ),
+                  if (returnSummary case final returnPolicy?)
                     _DecisionRow(
                       icon: Icons.assignment_return_outlined,
                       label: 'After delivery',
                       value: returnPolicy,
                     ),
+                  if (purchaseProtection case final protection?) ...[
+                    if (protectionRemedies.isNotEmpty)
+                      _DecisionRow(
+                        icon: Icons.rule_rounded,
+                        label: 'Available options',
+                        value: protectionRemedies.join(' · '),
+                      ),
+                    if (_nonBlankComplianceValue(protection.windowLabel)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.schedule_rounded,
+                        label: 'Request window',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.conditionsLabel)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.fact_check_outlined,
+                        label: 'Conditions',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.verificationLabel)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.verified_outlined,
+                        label: 'Verification',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.initiationLabel)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.playlist_add_check_rounded,
+                        label: 'How to request',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.approvalLabel)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.approval_outlined,
+                        label: 'Approval',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.pickupLabel)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.local_shipping_outlined,
+                        label: 'Pickup',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.refundMethodLabel)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.account_balance_wallet_outlined,
+                        label: 'Refund method',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.refundTimelineLabel)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.timelapse_rounded,
+                        label: 'Refund timeline',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.warrantyLabel)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.shield_outlined,
+                        label: 'Warranty',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.nonReturnableReason)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.info_outline_rounded,
+                        label: 'Non-returnable',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.policyVersion)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.description_outlined,
+                        label: 'Policy reference',
+                        value: value,
+                      ),
+                    if (_nonBlankComplianceValue(protection.effectiveFromLabel)
+                        case final value?)
+                      _DecisionRow(
+                        icon: Icons.event_available_outlined,
+                        label: 'Applies from',
+                        value: value,
+                      ),
+                  ],
                 ],
+              ),
+              if (automaticFulfilment) ...[
+                const SizedBox(height: 10),
+                BuyV2ProductCompliancePanel(product: product),
+              ],
+              const SizedBox(height: 10),
+              _ProductContentSections(
+                session: session,
+                product: product,
+                content: content,
+              ),
+              const SizedBox(height: 10),
+              _MarketplaceTrustPanel(
+                session: session,
+                product: product,
+                trust: trust,
+                onViewSeller:
+                    (product.destination == BuyV2Destination.shop ||
+                            product.destination ==
+                                BuyV2Destination.wholesale) &&
+                        onOpenPartnerCatalogue != null
+                    ? () => onOpenPartnerCatalogue!(product)
+                    : null,
+                sellerProductCount: partnerProducts.length,
               ),
               const SizedBox(height: 10),
               _ProductReviewsPanel(
                 product: product,
                 review: review,
-                onReview: () =>
-                    _showProductReviewSheet(context, session, product),
-                onReport: () =>
-                    _showProductReportSheet(context, session, product),
+                onReview: session.canReviewProduct(product.id)
+                    ? () => _showProductReviewSheet(context, session, product)
+                    : null,
+                onReport: session.canReportProduct(product.id)
+                    ? () => _showProductReportSheet(context, session, product)
+                    : null,
                 reported: session.hasReportedProduct(product.id),
               ),
+              if (product.destination == BuyV2Destination.shop ||
+                  product.destination == BuyV2Destination.wholesale) ...[
+                const SizedBox(height: 8),
+                _ProductQuickActions(
+                  session: session,
+                  product: product,
+                  onAskSeller: onAskSeller,
+                ),
+              ],
               const SizedBox(height: 10),
               _ProductContinuationSection(session: session, product: product),
               const SizedBox(height: 8),
             ],
           ),
         ),
+        if (wholesale)
+          _WholesaleTradeActionDock(
+            product: product,
+            facts: facts,
+            decision: offerDecision!,
+            quantity: quantity,
+            onAdd: addProduct,
+            onDecrease: () => session.decrease(product.id),
+            onIncrease: () => session.increase(product.id),
+            onRetryOffer: () => session.refreshProductFacts(product.id),
+            businessVerified: session.businessVerified,
+            onOpenWorkspace: () => context.push('/app/work/workspace/choose'),
+          ),
       ],
+    );
+  }
+}
+
+class BuyV2ProductCompliancePanel extends StatelessWidget {
+  const BuyV2ProductCompliancePanel({required this.product, super.key});
+
+  final BuyV2Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    final compliance = product.compliance;
+    final genericName = _nonBlankComplianceValue(compliance?.genericName);
+    final netQuantity = _nonBlankComplianceValue(compliance?.netQuantity);
+    final manufacturer = _nonBlankComplianceValue(compliance?.manufacturerName);
+    final packer = _nonBlankComplianceValue(compliance?.packerName);
+    final importer = _nonBlankComplianceValue(compliance?.importerName);
+    final countryOfOrigin = _nonBlankComplianceValue(
+      compliance?.countryOfOrigin,
+    );
+    final manufacturedOrPackedOn = _nonBlankComplianceValue(
+      compliance?.manufacturedOrPackedOnLabel,
+    );
+    final bestBeforeOrUseBy = _nonBlankComplianceValue(
+      compliance?.bestBeforeOrUseByLabel,
+    );
+    final fssai = _nonBlankComplianceValue(compliance?.fssaiLicenseNumber);
+    final consumerCare = _nonBlankComplianceValue(compliance?.consumerCare);
+    return _DecisionPanel(
+      key: ValueKey('buy-product-compliance-${product.id}'),
+      title: 'Product and pack information',
+      children: [
+        _DecisionRow(
+          icon: Icons.category_outlined,
+          label: genericName == null ? 'Product' : 'Generic name',
+          value: genericName ?? product.title,
+        ),
+        _DecisionRow(
+          icon: Icons.scale_outlined,
+          label: netQuantity == null ? 'Pack' : 'Net quantity',
+          value: netQuantity ?? product.pack,
+        ),
+        if (product.mrp case final mrp?)
+          _DecisionRow(
+            icon: Icons.currency_rupee_rounded,
+            label: 'MRP (incl. taxes)',
+            value: buyV2Money(mrp),
+          ),
+        _DecisionRow(
+          icon: Icons.price_check_outlined,
+          label: 'Unit price',
+          value: product.unitPrice,
+        ),
+        if (manufacturer case final value?)
+          _DecisionRow(
+            icon: Icons.factory_outlined,
+            label: 'Manufacturer',
+            value: value,
+          ),
+        if (packer case final value?)
+          _DecisionRow(
+            icon: Icons.inventory_2_outlined,
+            label: 'Packer',
+            value: value,
+          ),
+        if (importer case final value?)
+          _DecisionRow(
+            icon: Icons.public_outlined,
+            label: 'Importer',
+            value: value,
+          ),
+        if (countryOfOrigin case final value?)
+          _DecisionRow(
+            icon: Icons.flag_outlined,
+            label: 'Country of origin',
+            value: value,
+          ),
+        if (manufacturedOrPackedOn case final value?)
+          _DecisionRow(
+            icon: Icons.event_outlined,
+            label: 'Manufactured or packed',
+            value: value,
+          ),
+        if (bestBeforeOrUseBy case final value?)
+          _DecisionRow(
+            icon: Icons.event_available_outlined,
+            label: 'Best before / use by',
+            value: value,
+          ),
+        if (fssai case final value?)
+          _DecisionRow(
+            icon: Icons.verified_outlined,
+            label: 'FSSAI licence',
+            value: value,
+          ),
+        if (consumerCare case final value?)
+          _DecisionRow(
+            icon: Icons.support_agent_outlined,
+            label: 'Consumer care',
+            value: value,
+          ),
+      ],
+    );
+  }
+}
+
+String? _nonBlankComplianceValue(String? value) {
+  final normalized = value?.trim();
+  return normalized == null || normalized.isEmpty ? null : normalized;
+}
+
+class _ProductHeroFact extends StatelessWidget {
+  const _ProductHeroFact({
+    required this.icon,
+    required this.value,
+    this.color = BuyV2Colors.ink,
+    super.key,
+  });
+
+  final IconData icon;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 17, color: color),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            value,
+            style: context.buyBody.copyWith(
+              color: color,
+              fontSize: 10,
+              height: 1.25,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProductQuickActions extends StatelessWidget {
+  const _ProductQuickActions({
+    required this.session,
+    required this.product,
+    required this.onAskSeller,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final ValueChanged<BuyV2Product>? onAskSeller;
+
+  @override
+  Widget build(BuildContext context) {
+    final saved = session.isSaved(product.id);
+    final sellerType = product.sellerType.toLowerCase();
+    final supplierQuestionLabel = sellerType.contains('manufacturer')
+        ? 'Ask manufacturer'
+        : product.destination == BuyV2Destination.wholesale
+        ? 'Ask supplier'
+        : 'Ask seller';
+    final accessibleActions = MediaQuery.textScalerOf(context).scale(10) > 14;
+    final compareProducts = <BuyV2Product>[
+      product,
+      ...session
+          .productVariantsFor(product)
+          .where((candidate) => candidate.id != product.id),
+      ...session.productContinuationsFor(product, limit: 4),
+    ];
+    final uniqueCompareProducts = <BuyV2Product>[];
+    final seenIds = <String>{};
+    for (final candidate in compareProducts) {
+      if (seenIds.add(candidate.id)) uniqueCompareProducts.add(candidate);
+      if (uniqueCompareProducts.length == 4) break;
+    }
+    final actions = <({IconData icon, String label, VoidCallback onPressed})>[
+      (
+        icon: saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+        label: saved ? 'Saved' : 'Save',
+        onPressed: () => session.toggleSaved(product.id),
+      ),
+      (
+        icon: Icons.ios_share_outlined,
+        label: 'Share',
+        onPressed: () => unawaited(
+          _shareBuyV2Product(context, session: session, product: product),
+        ),
+      ),
+      if (uniqueCompareProducts.length > 1)
+        (
+          icon: Icons.compare_arrows_rounded,
+          label: 'Compare',
+          onPressed: () => unawaited(
+            _showBuyV2ProductComparison(
+              context,
+              session: session,
+              current: product,
+              products: uniqueCompareProducts,
+            ),
+          ),
+        ),
+      if (onAskSeller != null)
+        (
+          icon: Icons.chat_bubble_outline_rounded,
+          label: supplierQuestionLabel,
+          onPressed: () => onAskSeller!(product),
+        ),
+    ];
+    return Semantics(
+      key: ValueKey('buy-product-quick-actions-${product.id}'),
+      container: true,
+      label: 'Product actions for ${product.title}',
+      child: Container(
+        height: accessibleActions ? 72 : 56,
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softBlue.withValues(alpha: .42),
+          radius: 15,
+        ),
+        child: Row(
+          children: [
+            for (final action in actions)
+              Expanded(
+                child: _ProductQuickActionButton(
+                  key: ValueKey(
+                    'buy-product-action-${action.label.toLowerCase().replaceAll(' ', '-')}-${product.id}',
+                  ),
+                  icon: action.icon,
+                  label: action.label,
+                  onPressed: action.onPressed,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductQuickActionButton extends StatelessWidget {
+  const _ProductQuickActionButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      onTap: onPressed,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(13),
+        child: SizedBox.expand(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 18, color: BuyV2Colors.navy),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: context.buyMeta.copyWith(
+                    color: BuyV2Colors.navy,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _shareBuyV2Product(
+  BuildContext context, {
+  required BuyV2Session session,
+  required BuyV2Product product,
+}) async {
+  final facts = session.productFactsFor(product);
+  final renderBox = context.findRenderObject() as RenderBox?;
+  final origin = renderBox == null
+      ? const Rect.fromLTWH(0, 0, 1, 1)
+      : renderBox.localToGlobal(Offset.zero) & renderBox.size;
+  final productLink = Uri.https('moolsocial.app', '/app/buy', {
+    'sub': product.destination.name,
+    'view': 'product',
+    'product': product.id,
+  });
+  try {
+    await SharePlus.instance.share(
+      ShareParams(
+        title: product.title,
+        subject: '${product.title} on MoolSocial',
+        text:
+            '${product.title} · ${product.pack}\n'
+            '${buyV2Money(facts.price)} · ${buyV2BuyerDeliveryPromise(facts)}\n'
+            'Available from ${facts.partner} on MoolSocial.\n'
+            '$productLink',
+        sharePositionOrigin: origin,
+        downloadFallbackEnabled: false,
+        mailToFallbackEnabled: false,
+      ),
+    );
+  } on Object {
+    session.showNotice('Sharing is unavailable right now. Try again.');
+  }
+}
+
+Future<void> _showBuyV2ProductComparison(
+  BuildContext context, {
+  required BuyV2Session session,
+  required BuyV2Product current,
+  required List<BuyV2Product> products,
+}) async {
+  final selectedId = await showModalBottomSheet<String>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          14,
+          0,
+          14,
+          18 + MediaQuery.viewPaddingOf(sheetContext).bottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Compare products',
+              style: sheetContext.buyTitle.copyWith(fontSize: 18),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Review pack, price, delivery and seller details side by side.',
+              style: sheetContext.buyMeta,
+            ),
+            const SizedBox(height: 10),
+            for (final product in products) ...[
+              _ProductComparisonCard(
+                session: session,
+                product: product,
+                selected: product.id == current.id,
+                onView: () => Navigator.of(sheetContext).pop(product.id),
+              ),
+              if (product != products.last) const SizedBox(height: 8),
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
+  if (selectedId != null && selectedId != current.id && context.mounted) {
+    session.openProduct(selectedId);
+  }
+}
+
+class _ProductComparisonCard extends StatelessWidget {
+  const _ProductComparisonCard({
+    required this.session,
+    required this.product,
+    required this.selected,
+    required this.onView,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final bool selected;
+  final VoidCallback onView;
+
+  @override
+  Widget build(BuildContext context) {
+    final facts = session.productFactsFor(product);
+    return Container(
+      key: ValueKey('buy-product-compare-${product.id}'),
+      padding: const EdgeInsets.all(10),
+      decoration: buyV2CardDecoration(
+        color: selected ? BuyV2Colors.softBlue : Colors.white,
+        radius: 15,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox.square(
+            dimension: 76,
+            child: BuyV2ProductPackshot(product: product, borderRadius: 12),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+                ),
+                Text(product.pack, style: context.buyMeta),
+                const SizedBox(height: 4),
+                Text(
+                  '${buyV2Money(facts.price)} · ${buyV2BuyerDeliveryPromise(facts)}',
+                  style: context.buyMeta.copyWith(
+                    color: BuyV2Colors.green,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(facts.partner, style: context.buyMeta),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            height: BuyV2Metrics.minimumTap,
+            child: TextButton(
+              key: ValueKey('buy-product-compare-view-${product.id}'),
+              onPressed: selected ? null : onView,
+              child: Text(selected ? 'Viewing' : 'View'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductVariantSelector extends StatelessWidget {
+  const _ProductVariantSelector({
+    required this.session,
+    required this.product,
+    required this.variants,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final List<BuyV2Product> variants;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: ValueKey('buy-product-variants-${product.canonicalId}'),
+      padding: const EdgeInsets.all(10),
+      decoration: buyV2CardDecoration(radius: 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Choose an option',
+            style: context.buyTitle.copyWith(fontSize: 14),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Choose the pack that fits your order. Price, availability and delivery update with your choice.',
+            style: context.buyMeta.copyWith(fontSize: 8),
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = (constraints.maxWidth - 8) / 2;
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final option in variants)
+                    _ProductVariantOption(
+                      session: session,
+                      option: option,
+                      selected: option.id == product.id,
+                      width: width,
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductVariantOption extends StatelessWidget {
+  const _ProductVariantOption({
+    required this.session,
+    required this.option,
+    required this.selected,
+    required this.width,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product option;
+  final bool selected;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final facts = session.productFactsFor(option);
+    final decision = buyV2ResolveProductOfferDecision(
+      product: option,
+      facts: facts,
+    );
+    final statusColor = decision.canAdd
+        ? BuyV2Colors.green
+        : BuyV2Colors.orange;
+    void select() {
+      HapticFeedback.selectionClick();
+      session.selectProductVariant(option.id);
+    }
+
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      label:
+          '${option.pack}, ${buyV2Money(facts.price)}, ${decision.statusLabel}',
+      onTap: select,
+      excludeSemantics: true,
+      child: SizedBox(
+        width: width,
+        child: Material(
+          color: selected ? BuyV2Colors.softGreen : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(13),
+            side: BorderSide(
+              color: selected ? BuyV2Colors.green : BuyV2Colors.line,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: ValueKey('buy-product-variant-${option.id}'),
+            onTap: select,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 76),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      option.pack,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyBody.copyWith(fontSize: 10),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      buyV2Money(facts.price),
+                      style: const TextStyle(
+                        color: BuyV2Colors.navy,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      decision.statusLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyMeta.copyWith(
+                        color: statusColor,
+                        fontSize: 7.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductDecisionGlance extends StatelessWidget {
+  const _ProductDecisionGlance({
+    required this.product,
+    required this.facts,
+    required this.decision,
+    required this.buyerPromise,
+  });
+
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2ProductOfferDecision decision;
+  final String buyerPromise;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = decision.canAdd
+        ? BuyV2Colors.green
+        : BuyV2Colors.orange;
+    final surfaceColor = decision.canAdd
+        ? BuyV2Colors.softGreen
+        : BuyV2Colors.softOrange;
+    return Semantics(
+      key: ValueKey('buy-product-decision-glance-${product.id}'),
+      container: true,
+      label:
+          '${buyV2Money(facts.price)} delivered price. '
+          '${product.pack}. ${decision.statusLabel}. $buyerPromise. '
+          '${buyV2AutomaticFulfilmentLabel(product.destination)}.',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(11, 9, 11, 10),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(BuyV2Metrics.radius),
+          border: Border.all(color: statusColor.withValues(alpha: .28)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'DELIVERED PRICE',
+                        style: context.buyEyebrow.copyWith(
+                          color: BuyV2Colors.navy,
+                          fontSize: 8,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        buyV2Money(facts.price),
+                        style: const TextStyle(
+                          color: BuyV2Colors.navy,
+                          fontSize: 22,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  constraints: const BoxConstraints(maxWidth: 150),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .9),
+                    borderRadius: BorderRadius.circular(
+                      BuyV2Metrics.compactRadius,
+                    ),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: .34),
+                    ),
+                  ),
+                  child: Text(
+                    decision.statusLabel,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: context.buyMeta.copyWith(
+                      color: statusColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                const Icon(
+                  Icons.inventory_2_outlined,
+                  size: 16,
+                  color: BuyV2Colors.navy,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${product.pack} · $buyerPromise',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyBody.copyWith(fontSize: 10),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 5),
+            Row(
+              children: [
+                const Icon(
+                  Icons.storefront_outlined,
+                  size: 16,
+                  color: BuyV2Colors.navy,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Fulfilment arranged by MoolSocial',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.ink,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WholesaleVerificationCard extends StatelessWidget {
+  const _WholesaleVerificationCard({
+    required this.state,
+    required this.onOpenWorkspace,
+  });
+
+  final BuyV2BusinessVerificationState state;
+  final VoidCallback onOpenWorkspace;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = switch (state) {
+      BuyV2BusinessVerificationState.pending =>
+        'Business verification is in progress',
+      BuyV2BusinessVerificationState.rejected =>
+        'Business details need attention',
+      BuyV2BusinessVerificationState.unavailable =>
+        'Verify your business to order wholesale',
+      BuyV2BusinessVerificationState.verified => 'Business verified',
+    };
+    final detail = switch (state) {
+      BuyV2BusinessVerificationState.pending =>
+        'You can browse trade packs now. Ordering opens after verification.',
+      BuyV2BusinessVerificationState.rejected =>
+        'Open your business profile to review the requested details.',
+      BuyV2BusinessVerificationState.unavailable =>
+        'Use your business account for trade pricing, invoices and eligible payment methods.',
+      BuyV2BusinessVerificationState.verified =>
+        'Wholesale ordering is available for this business account.',
+    };
+    return Container(
+      key: ValueKey('buy-wholesale-verification-${state.name}'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(
+        color: BuyV2Colors.softOrange,
+        border: BuyV2Colors.orange,
+        radius: 15,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: context.buyBody),
+          const SizedBox(height: 3),
+          Text(detail, style: context.buyMeta),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: BuyV2Metrics.minimumTap,
+            child: FilledButton.icon(
+              key: const ValueKey('buy-wholesale-open-workspace'),
+              onPressed: onOpenWorkspace,
+              icon: const Icon(Icons.storefront_outlined, size: 18),
+              label: const Text('Open business profile'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WholesaleTradeDecisionPanel extends StatefulWidget {
+  const _WholesaleTradeDecisionPanel({
+    required this.session,
+    required this.product,
+    required this.facts,
+    required this.decision,
+    required this.buyerPromise,
+    required this.adapter,
+    required this.onOpenPartnerCatalogue,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2ProductOfferDecision decision;
+  final String buyerPromise;
+  final BuyV2WholesaleTradeDecisionAdapter adapter;
+  final BuyV2PartnerCatalogueHandler? onOpenPartnerCatalogue;
+
+  @override
+  State<_WholesaleTradeDecisionPanel> createState() =>
+      _WholesaleTradeDecisionPanelState();
+}
+
+class _WholesaleTradeDecisionPanelState
+    extends State<_WholesaleTradeDecisionPanel> {
+  BuyV2WholesaleTradeSignal? _signal;
+  Object? _failure;
+  String? _loadedDeliveryLocality;
+  var _loading = true;
+  var _requestSequence = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSignal();
+  }
+
+  @override
+  void didUpdateWidget(covariant _WholesaleTradeDecisionPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.product.id != widget.product.id ||
+        oldWidget.adapter != widget.adapter ||
+        _loadedDeliveryLocality !=
+            widget.session.selectedAddressOrNull?.shortLine) {
+      _loadSignal();
+    }
+  }
+
+  Future<void> _loadSignal() async {
+    final request = ++_requestSequence;
+    final deliveryLocality = widget.session.selectedAddressOrNull?.shortLine;
+    setState(() {
+      _loading = true;
+      _failure = null;
+      _signal = null;
+      _loadedDeliveryLocality = deliveryLocality;
+    });
+    try {
+      final signal = await widget.adapter.load(
+        productId: widget.product.id,
+        canonicalProductId: widget.product.canonicalId,
+        deliveryLocality: deliveryLocality,
+      );
+      if (!mounted || request != _requestSequence) return;
+      if (signal.productId != widget.product.id) {
+        setState(() {
+          _loading = false;
+          _failure = StateError('Trade signal product identity differs.');
+        });
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _signal = signal;
+      });
+    } catch (error) {
+      if (!mounted || request != _requestSequence) return;
+      setState(() {
+        _loading = false;
+        _failure = error;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.product;
+    final facts = widget.facts;
+    final decision = widget.decision;
+    final fulfilmentMode =
+        facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
+    final statusColor = decision.canAdd
+        ? BuyV2Colors.green
+        : BuyV2Colors.orange;
+    final minimumTotal = facts.price * product.minimumOrder;
+    final showSignal =
+        _loading ||
+        _failure != null ||
+        _signal?.state != BuyV2WholesaleTradeSignalState.unavailable;
+    final signalSummary = !showSignal
+        ? ''
+        : _loading
+        ? 'Checking local market insight.'
+        : _failure != null
+        ? 'Local market insight could not be loaded.'
+        : '${_signal!.headline}. ${_signal!.detail}';
+
+    return Semantics(
+      key: ValueKey('buy-wholesale-trade-decision-${product.id}'),
+      container: true,
+      label:
+          '${product.title}. ${product.pack}. Minimum order '
+          '${product.minimumOrder} packs. ${buyV2Money(facts.price)} per pack. '
+          '${buyV2Money(minimumTotal)} minimum order total. '
+          '${facts.orderabilityLabel}. ${widget.buyerPromise}. '
+          '${buyV2AutomaticFulfilmentLabel(product.destination)}. '
+          '${decision.statusLabel}. $signalSummary',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _WholesaleTradePriceSummary(
+            product: product,
+            facts: facts,
+            decision: decision,
+          ),
+          if (showSignal) ...[
+            const SizedBox(height: 8),
+            _WholesaleTradeSignalCard(
+              loading: _loading,
+              signal: _signal,
+              failed: _failure != null,
+              onRetry: _loadSignal,
+            ),
+          ],
+          const SizedBox(height: 8),
+          _DecisionPanel(
+            key: ValueKey('buy-automatic-fulfilment-${product.id}'),
+            title: 'Order details',
+            children: [
+              _DecisionRow(
+                icon: decision.canAdd
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.info_outline_rounded,
+                label: 'Availability',
+                value: decision.statusLabel,
+                valueColor: statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.inventory_2_outlined,
+                label: 'Trade pack',
+                value: '${product.pack} · MOQ ${product.minimumOrder} packs',
+              ),
+              _DecisionRow(
+                icon: Icons.calculate_outlined,
+                label: 'Minimum total',
+                value:
+                    '${product.minimumOrder} × ${buyV2Money(facts.price)} = '
+                    '${buyV2Money(minimumTotal)}',
+              ),
+              _DecisionRow(
+                icon: Icons.straighten_rounded,
+                label: 'Unit economics',
+                value: product.unitPrice,
+              ),
+              _DecisionRow(
+                icon: Icons.inventory_outlined,
+                label: 'Stock',
+                value: facts.orderabilityLabel,
+                valueColor: statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.schedule_rounded,
+                label: 'Delivery',
+                value: widget.buyerPromise,
+                valueColor: decision.canAdd ? BuyV2Colors.green : statusColor,
+              ),
+              if (facts.dispatchPromise case final dispatchPromise?)
+                _DecisionRow(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Dispatch',
+                  value: dispatchPromise,
+                ),
+              if (facts.deliveryProviderName case final provider?)
+                _DecisionRow(
+                  icon: Icons.local_shipping_outlined,
+                  label: 'Delivery provider',
+                  value: provider,
+                ),
+              if (facts.deliveryServiceLevel case final serviceLevel?)
+                _DecisionRow(
+                  icon: Icons.route_outlined,
+                  label: 'Delivery service',
+                  value: serviceLevel,
+                ),
+              _DecisionRow(
+                icon: Icons.local_shipping_outlined,
+                label: 'Delivery mode',
+                value: buyV2FulfilmentModeLabel(fulfilmentMode),
+              ),
+              _DecisionRow(
+                icon: Icons.storefront_outlined,
+                label: 'Seller',
+                value:
+                    '${facts.partner} · ${_sellerTypeLabel(product.sellerType)}',
+              ),
+              _DecisionRow(
+                icon: Icons.local_shipping_outlined,
+                label: 'Freight',
+                value: product.freightIncluded
+                    ? 'Included in landed price'
+                    : 'Confirmed before payment',
+              ),
+              const _DecisionRow(
+                icon: Icons.receipt_long_outlined,
+                label: 'Tax invoice',
+                value: 'GST included · invoice provided',
+              ),
+              _DecisionRow(
+                icon: Icons.event_available_outlined,
+                label: 'Price checked',
+                value: _signal?.hasCurrentSignal == true
+                    ? _signal?.priceValidUntilLabel ?? product.confirmedOn
+                    : product.confirmedOn,
+              ),
+            ],
+          ),
+          if (!decision.canAdd) ...[
+            const SizedBox(height: 8),
+            Container(
+              key: ValueKey('buy-product-offer-recovery-${product.id}'),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softOrange,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: BuyV2Colors.orange.withValues(alpha: .34),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    decision.statusLabel,
+                    style: context.buyBody.copyWith(
+                      color: BuyV2Colors.ink,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(decision.detail, style: context.buyMeta),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        key: ValueKey('buy-offer-retry-${product.id}'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          widget.session.refreshProductFacts(product.id);
+                          _loadSignal();
+                        },
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Check availability'),
+                      ),
+                      FilledButton.icon(
+                        key: ValueKey('buy-offer-change-product-${product.id}'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: widget.session.closeProduct,
+                        icon: const Icon(Icons.swap_horiz_rounded),
+                        label: const Text('Change product'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _WholesaleTradePriceSummary extends StatelessWidget {
+  const _WholesaleTradePriceSummary({
+    required this.product,
+    required this.facts,
+    required this.decision,
+  });
+
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2ProductOfferDecision decision;
+
+  @override
+  Widget build(BuildContext context) {
+    final minimumTotal = facts.price * product.minimumOrder;
+    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
+    return Container(
+      key: ValueKey('buy-wholesale-price-summary-${product.id}'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF070773), BuyV2Colors.royal],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000080),
+            blurRadius: 18,
+            offset: Offset(0, 7),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked = largeText || constraints.maxWidth < 300;
+          final price = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'WHOLESALE PRICE',
+                style: TextStyle(
+                  color: Color(0xFFBFC3FF),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: .8,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                buyV2Money(facts.price),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${product.pack} · ${product.unitPrice} · ${facts.partner}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          );
+          final order = Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: Colors.white.withValues(alpha: .18)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'MOQ ${product.minimumOrder} packs',
+                  style: const TextStyle(
+                    color: Color(0xFFFFD29F),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${buyV2Money(minimumTotal)} minimum total',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  decision.statusLabel,
+                  style: TextStyle(
+                    color: decision.canAdd
+                        ? const Color(0xFFBDEBB8)
+                        : const Color(0xFFFFD29F),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          );
+          if (stacked) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [price, const SizedBox(height: 10), order],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: price),
+              const SizedBox(width: 10),
+              Flexible(child: order),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WholesaleTradeSignalCard extends StatelessWidget {
+  const _WholesaleTradeSignalCard({
+    required this.loading,
+    required this.signal,
+    required this.failed,
+    required this.onRetry,
+  });
+
+  final bool loading;
+  final BuyV2WholesaleTradeSignal? signal;
+  final bool failed;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = !loading && !failed && signal?.hasCurrentSignal == true;
+    final headline = loading
+        ? 'Checking local market insight'
+        : failed
+        ? 'Local market insight could not be loaded'
+        : signal!.headline;
+    final detail = loading
+        ? 'Current price, stock and delivery remain available while this loads.'
+        : failed
+        ? 'Check again or continue with the current price, stock and delivery details.'
+        : signal!.detail;
+    return Semantics(
+      key: const ValueKey('buy-wholesale-local-trade-signal'),
+      container: true,
+      liveRegion: loading,
+      label: '$headline. $detail',
+      child: Container(
+        padding: const EdgeInsets.all(11),
+        decoration: BoxDecoration(
+          color: ready ? BuyV2Colors.softGreen : BuyV2Colors.softOrange,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: (ready ? BuyV2Colors.green : BuyV2Colors.orange).withValues(
+              alpha: .32,
+            ),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  ready ? Icons.trending_up_rounded : Icons.insights_outlined,
+                  color: ready ? BuyV2Colors.green : BuyV2Colors.orange,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ready && signal!.localityLabel.isNotEmpty
+                            ? '${signal!.localityLabel} market insight'
+                            : 'Local market insight',
+                        style: context.buyMeta.copyWith(
+                          color: BuyV2Colors.muted,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        headline,
+                        style: context.buyBody.copyWith(
+                          color: BuyV2Colors.ink,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (loading)
+                  const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Text(detail, style: context.buyMeta.copyWith(height: 1.35)),
+            if (ready) ...[
+              const SizedBox(height: 7),
+              Text(
+                '${signal!.sourceLabel} · ${signal!.updatedLabel}',
+                key: const ValueKey('buy-wholesale-trade-signal-source'),
+                style: context.buyMeta.copyWith(
+                  color: BuyV2Colors.green,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ] else if (!loading) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const ValueKey('buy-wholesale-trade-signal-retry'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Check local insight again'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WholesaleTradeActionDock extends StatelessWidget {
+  const _WholesaleTradeActionDock({
+    required this.product,
+    required this.facts,
+    required this.decision,
+    required this.quantity,
+    required this.onAdd,
+    required this.onDecrease,
+    required this.onIncrease,
+    required this.onRetryOffer,
+    required this.businessVerified,
+    required this.onOpenWorkspace,
+  });
+
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2ProductOfferDecision decision;
+  final int quantity;
+  final VoidCallback onAdd;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+  final VoidCallback onRetryOffer;
+  final bool businessVerified;
+  final VoidCallback onOpenWorkspace;
+
+  @override
+  Widget build(BuildContext context) {
+    final orderQuantity = quantity > 0 ? quantity : product.minimumOrder;
+    final orderTotal = facts.price * orderQuantity;
+    final fulfilmentMode =
+        facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
+    final deliveryDecision =
+        '${buyV2FulfilmentModeLabel(fulfilmentMode)} · '
+        '${buyV2BuyerDeliveryPromise(facts)}';
+    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
+    final summary = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          quantity > 0
+              ? '$quantity packs in Cart'
+              : 'Minimum ${product.minimumOrder} packs · ${product.pack} each',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: context.buyMeta.copyWith(
+            color: BuyV2Colors.ink,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          buyV2Money(orderTotal),
+          key: const ValueKey('buy-wholesale-dock-total'),
+          style: const TextStyle(
+            color: BuyV2Colors.navy,
+            fontSize: 18,
+            height: 1,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          deliveryDecision,
+          key: ValueKey('buy-wholesale-dock-delivery-${product.id}'),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: context.buyMeta.copyWith(
+            color: BuyV2Colors.green,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+
+    Widget actionGroup;
+    if (!businessVerified) {
+      actionGroup = SizedBox(
+        height: 50,
+        child: FilledButton.icon(
+          key: ValueKey('buy-wholesale-verify-business-${product.id}'),
+          onPressed: onOpenWorkspace,
+          icon: const Icon(Icons.verified_user_outlined),
+          label: const Text('Verify business'),
+        ),
+      );
+    } else if (!decision.canAdd) {
+      actionGroup = SizedBox(
+        height: 50,
+        child: FilledButton.icon(
+          key: ValueKey('buy-wholesale-retry-offer-${product.id}'),
+          onPressed: onRetryOffer,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('Check availability'),
+        ),
+      );
+    } else {
+      actionGroup = _ProductPurchaseActionRow(
+        product: product,
+        quantity: quantity,
+        addSemanticLabel:
+            'Add minimum order of ${product.minimumOrder} packs of '
+            '${product.title} to Cart for ${buyV2Money(orderTotal)}. '
+            '$deliveryDecision',
+        onAdd: onAdd,
+        onDecrease: onDecrease,
+        onIncrease: onIncrease,
+      );
+    }
+
+    return Material(
+      key: ValueKey('buy-wholesale-action-dock-${product.id}'),
+      color: Colors.white,
+      elevation: 10,
+      shadowColor: const Color(0x26000080),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final stacked = largeText || constraints.maxWidth < 330;
+              if (stacked) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [summary, const SizedBox(height: 8), actionGroup],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: summary),
+                  const SizedBox(width: 10),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minWidth: 148,
+                      maxWidth: 190,
+                    ),
+                    child: actionGroup,
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductOfferDecisionPanel extends StatelessWidget {
+  const _ProductOfferDecisionPanel({
+    required this.session,
+    required this.product,
+    required this.facts,
+    required this.decision,
+    required this.buyerPromise,
+    required this.quantity,
+    required this.onAdd,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final BuyV2ProductFactsSnapshot facts;
+  final BuyV2ProductOfferDecision decision;
+  final String buyerPromise;
+  final int quantity;
+  final VoidCallback onAdd;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = decision.canAdd
+        ? BuyV2Colors.green
+        : BuyV2Colors.orange;
+    final orderUnavailable = facts.orderabilityLabel.toLowerCase().contains(
+      'unavailable',
+    );
+    final mrp = product.mrp;
+    final fulfilmentMode =
+        facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
+    final savings = mrp == null || mrp <= facts.price
+        ? null
+        : mrp - facts.price;
+    return Semantics(
+      key: ValueKey('buy-product-offer-decision-${product.id}'),
+      container: true,
+      label:
+          '${product.title}. ${product.variant}. ${product.pack}. '
+          '${buyV2Money(facts.price)} delivered price. '
+          '${facts.orderabilityLabel}. $buyerPromise. '
+          '${buyV2FulfilmentModeLabel(fulfilmentMode)}. '
+          '${buyV2AutomaticFulfilmentLabel(product.destination)}. '
+          '${decision.statusLabel}. ${decision.detail}',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _DecisionPanel(
+            key: ValueKey('buy-automatic-fulfilment-${product.id}'),
+            title: 'Price, pack and delivery',
+            children: [
+              _DecisionRow(
+                icon: decision.canAdd
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.info_outline_rounded,
+                label: 'Availability',
+                value: decision.statusLabel,
+                valueColor: statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.tune_rounded,
+                label: 'Pack and variant',
+                value: '${product.pack} · ${product.variant}',
+              ),
+              _DecisionRow(
+                icon: Icons.currency_rupee_rounded,
+                label: 'Delivered price',
+                value: '${buyV2Money(facts.price)} · ${facts.partner}',
+              ),
+              if (mrp != null && mrp > facts.price)
+                _DecisionRow(
+                  icon: Icons.savings_outlined,
+                  label: 'Price components',
+                  value:
+                      'List price ${buyV2Money(mrp)} · Save ${buyV2Money(savings!)}',
+                )
+              else
+                _DecisionRow(
+                  icon: Icons.calculate_outlined,
+                  label: 'Price components',
+                  value: product.unitPrice,
+                ),
+              _DecisionRow(
+                icon: Icons.inventory_outlined,
+                label: 'Stock',
+                value: facts.orderabilityLabel,
+                valueColor: statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.schedule_rounded,
+                label: 'Delivery',
+                value: buyerPromise,
+                valueColor: decision.canAdd ? BuyV2Colors.green : statusColor,
+              ),
+              _DecisionRow(
+                icon: Icons.local_shipping_outlined,
+                label: 'Delivery mode',
+                value: buyV2FulfilmentModeLabel(fulfilmentMode),
+              ),
+              if (facts.storeOperatingState != BuyV2StoreOperatingState.unknown)
+                _DecisionRow(
+                  icon:
+                      facts.storeOperatingState == BuyV2StoreOperatingState.open
+                      ? Icons.storefront_outlined
+                      : Icons.night_shelter_outlined,
+                  label: 'Partner availability',
+                  value: orderUnavailable
+                      ? 'No products available right now'
+                      : facts.storeOperatingState ==
+                            BuyV2StoreOperatingState.open
+                      ? 'Open for orders'
+                      : 'Closed · ${facts.nextOpeningLabel}',
+                  valueColor: orderUnavailable
+                      ? statusColor
+                      : facts.storeOperatingState ==
+                            BuyV2StoreOperatingState.open
+                      ? BuyV2Colors.green
+                      : statusColor,
+                ),
+              if (facts.orderCutoffLabel case final cutoff?)
+                _DecisionRow(
+                  icon: Icons.timer_outlined,
+                  label: 'Order cutoff',
+                  value: cutoff,
+                ),
+              if (facts.deliveryFeeLabel case final deliveryFee?)
+                _DecisionRow(
+                  icon: Icons.payments_outlined,
+                  label: 'Delivery fee',
+                  value: deliveryFee,
+                ),
+              if (facts.dispatchPromise case final dispatchPromise?)
+                _DecisionRow(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Dispatch',
+                  value: dispatchPromise,
+                ),
+              if (facts.deliveryProviderName case final provider?)
+                _DecisionRow(
+                  icon: Icons.local_shipping_outlined,
+                  label: 'Delivery provider',
+                  value: provider,
+                ),
+              if (facts.deliveryServiceLevel case final serviceLevel?)
+                _DecisionRow(
+                  icon: Icons.route_outlined,
+                  label: 'Delivery service',
+                  value: serviceLevel,
+                ),
+              _DecisionRow(
+                icon: Icons.storefront_outlined,
+                label: 'Seller',
+                value:
+                    '${facts.partner} · ${_sellerTypeLabel(product.sellerType)}',
+              ),
+              _DecisionRow(
+                icon: Icons.location_on_outlined,
+                label: 'Deliver to',
+                value:
+                    session.selectedAddressOrNull?.shortLine ??
+                    'Choose a delivery address',
+              ),
+              if (product.destination == BuyV2Destination.shop)
+                _DecisionRow(
+                  icon: Icons.assignment_return_outlined,
+                  label: 'Return or replacement',
+                  value:
+                      product.returnPolicy ??
+                      'Damaged or incorrect packs are reviewed at delivery',
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (decision.canAdd)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ProductOwnedActionPanel(
+                  key: ValueKey('buy-product-inline-action-${product.id}'),
+                  product: product,
+                  quantity: quantity,
+                  deliveryDecision:
+                      '${buyV2FulfilmentModeLabel(fulfilmentMode)} · $buyerPromise',
+                  rxBlocked: false,
+                  onAdd: onAdd,
+                  onDecrease: onDecrease,
+                  onIncrease: onIncrease,
+                ),
+              ],
+            )
+          else
+            Container(
+              key: ValueKey('buy-product-offer-recovery-${product.id}'),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softOrange,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: BuyV2Colors.orange.withValues(alpha: .34),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    decision.statusLabel,
+                    style: context.buyBody.copyWith(
+                      color: BuyV2Colors.ink,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(decision.detail, style: context.buyMeta),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        key: ValueKey('buy-offer-retry-${product.id}'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          session.refreshProductFacts(product.id);
+                        },
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Check availability'),
+                      ),
+                      FilledButton.icon(
+                        key: ValueKey('buy-offer-change-product-${product.id}'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: session.closeProduct,
+                        icon: const Icon(Icons.swap_horiz_rounded),
+                        label: const Text('Change product'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -372,11 +2809,11 @@ class _ProductContinuationSection extends StatelessWidget {
     final (title, detail) = switch (product.destination) {
       BuyV2Destination.shop => (
         'You may also like',
-        'More from the current Shop catalogue',
+        'Compare related products, prices and delivery',
       ),
       BuyV2Destination.wholesale => (
         'More for business restocking',
-        'Trade packs from the current Wholesale catalogue',
+        'Compare pack sizes, prices and delivery from relevant suppliers',
       ),
       BuyV2Destination.medicine => (
         'More Medicine essentials',
@@ -511,278 +2948,70 @@ class _ProductContinuationCard extends StatelessWidget {
   }
 }
 
-Future<void> _showPartnerProductsSheet(
-  BuildContext context,
-  BuyV2Session session,
-  BuyV2Product current,
-  List<BuyV2Product> products,
-) async {
-  final supportedDestination =
-      current.destination == BuyV2Destination.shop ||
-      current.destination == BuyV2Destination.wholesale ||
-      current.destination == BuyV2Destination.medicine;
-  final exactProducts = products.every(
-    (product) =>
-        product.id != current.id &&
-        product.destination == current.destination &&
-        product.seller == current.seller,
-  );
-  if (!supportedDestination || products.isEmpty || !exactProducts) {
-    return;
-  }
-  final ownerPrefix = switch (current.destination) {
-    BuyV2Destination.shop => 'buy-shop-seller',
-    BuyV2Destination.wholesale => 'buy-wholesale-supplier',
-    BuyV2Destination.medicine => 'buy-medicine-pharmacy',
-    BuyV2Destination.orders => 'buy-order-partner',
-  };
-  final catalogueFactCopy = switch (current.destination) {
-    BuyV2Destination.wholesale =>
-      'Current Wholesale catalogue · listed pack, MOQ and price facts only',
-    BuyV2Destination.medicine =>
-      'Current Medicine catalogue · listed pack and price facts only · '
-          'Not medical advice',
-    _ => 'Current Shop catalogue · listed pack and price facts only',
-  };
-  final closeTooltip = switch (current.destination) {
-    BuyV2Destination.wholesale => 'Close supplier products',
-    BuyV2Destination.medicine => 'Close pharmacy products',
-    _ => 'Close seller products',
-  };
-  final motion = BuyV2SupplierSheetMotion.resolve(context);
-  final transitionController = AnimationController(
-    vsync: Navigator.of(context),
-    duration: motion.duration ?? Duration.zero,
-    reverseDuration: motion.reverseDuration ?? Duration.zero,
-  );
-  try {
-    final selectedProductId = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      backgroundColor: Colors.white,
-      constraints: const BoxConstraints(
-        maxWidth: BuyV2SupplierSheetMotion.maxWidth,
-      ),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      transitionAnimationController: transitionController,
-      builder: (sheetContext) => FractionallySizedBox(
-        heightFactor: BuyV2SupplierSheetMotion.heightFactor,
-        child: SafeArea(
-          top: false,
-          child: Semantics(
-            key: ValueKey('$ownerPrefix-sheet-${current.id}'),
-            container: true,
-            scopesRoute: true,
-            namesRoute: true,
-            explicitChildNodes: true,
-            label: 'More from ${current.seller}',
-            child: ListView(
-              key: ValueKey('$ownerPrefix-sheet-list'),
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: BuyV2Colors.softOrange,
-                        borderRadius: BorderRadius.circular(13),
-                      ),
-                      child: const Icon(
-                        Icons.storefront_outlined,
-                        color: BuyV2Colors.navy,
-                      ),
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'More from ${current.seller}',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: sheetContext.buyTitle.copyWith(fontSize: 17),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(catalogueFactCopy, style: sheetContext.buyMeta),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.outlined(
-                      key: ValueKey('$ownerPrefix-sheet-close'),
-                      onPressed: () => Navigator.of(sheetContext).pop(),
-                      tooltip: closeTooltip,
-                      style: IconButton.styleFrom(
-                        minimumSize: const Size.square(BuyV2Metrics.minimumTap),
-                        side: const BorderSide(color: BuyV2Colors.line),
-                      ),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                for (final product in products) ...[
-                  _PartnerProductAction(
-                    product: product,
-                    ownerPrefix: ownerPrefix,
-                  ),
-                  if (product != products.last) const SizedBox(height: 8),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    if (!transitionController.isDismissed) {
-      await transitionController.reverse();
-    }
-    if (selectedProductId != null) {
-      if (!context.mounted) return;
-      session.openProduct(selectedProductId);
-    }
-  } finally {
-    transitionController.dispose();
-  }
-}
-
-class _PartnerProductAction extends StatelessWidget {
-  const _PartnerProductAction({
+class _ProductContentMediaSurface extends StatelessWidget {
+  const _ProductContentMediaSurface({
     required this.product,
-    required this.ownerPrefix,
+    required this.media,
+    required this.active,
   });
 
   final BuyV2Product product;
-  final String ownerPrefix;
+  final BuyV2ProductMediaAsset media;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
-    void selectProduct() {
-      HapticFeedback.selectionClick();
-      Navigator.of(context).pop(product.id);
+    Widget fallback() => BuyV2ProductPackshot(
+      key: ValueKey('buy-product-gallery-image-${media.id}'),
+      product: product,
+      borderRadius: 17,
+      animateFirstFrame: true,
+    );
+
+    if (media.kind == BuyV2ProductContentMediaKind.networkVideo) {
+      return BuyV2ProductVideo(product: product, media: media, active: active);
     }
-
-    final packFact = switch (product.destination) {
-      BuyV2Destination.wholesale =>
-        '${product.pack} · MOQ ${product.minimumOrder}',
-      BuyV2Destination.medicine =>
-        product.requiresPrescription
-            ? '${product.pack} · Prescription and pharmacist review required'
-            : '${product.pack} · No prescription required for this listed pack',
-      _ => product.pack,
-    };
-    final semanticLabel = switch (product.destination) {
-      BuyV2Destination.wholesale =>
-        'View ${product.title} from ${product.seller}. ${product.pack}. '
-            'MOQ ${product.minimumOrder}. ${buyV2Money(product.price)}. '
-            '${product.unitPrice}. Current Wholesale catalogue.',
-      BuyV2Destination.medicine =>
-        'View ${product.title} from ${product.seller}. $packFact. '
-            '${buyV2Money(product.price)}. ${product.unitPrice}. '
-            'Current Medicine catalogue. Not medical advice.',
-      _ =>
-        'View ${product.title} from ${product.seller}. ${product.pack}. '
-            '${buyV2Money(product.price)}. ${product.unitPrice}. '
-            'Current Shop catalogue.',
-    };
-
-    return BuyV2IntentDepth(
-      key: ValueKey('$ownerPrefix-depth-${product.id}'),
-      child: Semantics(
-        key: ValueKey('$ownerPrefix-product-${product.id}'),
-        container: true,
-        button: true,
-        label: semanticLabel,
-        onTap: selectProduct,
-        child: ExcludeSemantics(
-          child: Material(
-            color: BuyV2Colors.canvas,
-            borderRadius: BorderRadius.circular(14),
-            child: InkWell(
-              onTap: selectProduct,
-              borderRadius: BorderRadius.circular(14),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 68),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(11, 9, 9, 9),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(11),
-                          border: Border.all(color: BuyV2Colors.line),
-                        ),
-                        child: const Icon(
-                          Icons.inventory_2_outlined,
-                          color: BuyV2Colors.navy,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.buyBody.copyWith(
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              packFact,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.buyMeta,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${buyV2Money(product.price)} · '
-                              '${product.unitPrice}',
-                              style: context.buyMeta.copyWith(
-                                color: BuyV2Colors.green,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: BuyV2Colors.navy,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+    return Semantics(
+      image: true,
+      label: media.semanticLabel,
+      excludeSemantics: true,
+      child: switch (media.kind) {
+        BuyV2ProductContentMediaKind.cataloguePackshot => fallback(),
+        BuyV2ProductContentMediaKind.asset => Image.asset(
+          media.source!,
+          key: ValueKey('buy-product-gallery-asset-${media.id}'),
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => fallback(),
         ),
-      ),
+        BuyV2ProductContentMediaKind.network => Image.network(
+          media.source!,
+          key: ValueKey('buy-product-gallery-network-${media.id}'),
+          fit: BoxFit.contain,
+          loadingBuilder: (context, child, progress) => progress == null
+              ? child
+              : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          errorBuilder: (_, _, _) => fallback(),
+        ),
+        BuyV2ProductContentMediaKind.networkVideo => throw StateError(
+          'Video media is handled before the image switch.',
+        ),
+      },
     );
   }
 }
 
 class _BuyV2ProductMediaItem {
-  const _BuyV2ProductMediaItem({required this.label, required this.child});
+  const _BuyV2ProductMediaItem({
+    required this.label,
+    required this.builder,
+    required this.zoomable,
+    required this.video,
+  });
 
   final String label;
-  final Widget child;
+  final Widget Function(bool active) builder;
+  final bool zoomable;
+  final bool video;
 }
 
 class _BuyV2ZoomableMedia extends StatefulWidget {
@@ -928,10 +3157,12 @@ class _BuyV2ProductGallery extends StatefulWidget {
     super.key,
     required this.product,
     required this.media,
+    this.compact = false,
   }) : assert(media.length > 0);
 
   final BuyV2Product product;
   final List<_BuyV2ProductMediaItem> media;
+  final bool compact;
 
   @override
   State<_BuyV2ProductGallery> createState() => _BuyV2ProductGalleryState();
@@ -968,15 +3199,20 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
   Widget build(BuildContext context) {
     final product = widget.product;
     final hasMultipleMedia = widget.media.length > 1;
-    final galleryHeight = (MediaQuery.sizeOf(context).height * .38).clamp(
-      252.0,
-      320.0,
-    );
+    final hasVideo = widget.media.any((media) => media.video);
+    final viewportHeight = MediaQuery.sizeOf(context).height;
+    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
+    final galleryHeight = widget.compact
+        ? viewportHeight < 650 || largeText
+              ? (viewportHeight * .23).clamp(128.0, 160.0)
+              : (viewportHeight * .29).clamp(174.0, 238.0)
+        : (viewportHeight * .38).clamp(252.0, 320.0);
     return Semantics(
       container: true,
       label: hasMultipleMedia
-          ? 'Product image gallery for ${product.title}, '
-                '${widget.media.length} images. Swipe to browse.'
+          ? 'Product ${hasVideo ? 'media' : 'image'} gallery for '
+                '${product.title}, ${widget.media.length} items. '
+                'Swipe to browse.'
           : 'Product media for ${product.title}',
       child: Container(
         height: galleryHeight,
@@ -1005,39 +3241,46 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
                     : const NeverScrollableScrollPhysics(),
                 itemCount: widget.media.length,
                 onPageChanged: (value) => setState(() => _page = value),
-                itemBuilder: (context, index) => Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    8,
-                    9,
-                    8,
-                    hasMultipleMedia ? 35 : 9,
-                  ),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x1D000040),
-                          blurRadius: 20,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
+                itemBuilder: (context, index) {
+                  final media = widget.media[index];
+                  final child = media.builder(index == _page);
+                  return Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      8,
+                      9,
+                      8,
+                      hasMultipleMedia ? 35 : 9,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(3),
-                      child: _BuyV2ZoomableMedia(
-                        key: ValueKey(
-                          'buy-product-media-zoom-owner-'
-                          '${product.id}-$index',
-                        ),
-                        product: product,
-                        label: widget.media[index].label,
-                        child: widget.media[index].child,
+                    child: DecoratedBox(
+                      key: ValueKey('buy-product-gallery-image-$index'),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x1D000040),
+                            blurRadius: 20,
+                            offset: Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(3),
+                        child: media.zoomable
+                            ? _BuyV2ZoomableMedia(
+                                key: ValueKey(
+                                  'buy-product-media-zoom-owner-'
+                                  '${product.id}-$index',
+                                ),
+                                product: product,
+                                label: media.label,
+                                child: child,
+                              )
+                            : child,
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
             Positioned(
@@ -1138,6 +3381,163 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
   }
 }
 
+class _ProductContentSections extends StatelessWidget {
+  const _ProductContentSections({
+    required this.session,
+    required this.product,
+    required this.content,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final BuyV2ProductContentSnapshot content;
+
+  @override
+  Widget build(BuildContext context) {
+    if (content.state != BuyV2ProductContentState.ready) {
+      final loading = content.state == BuyV2ProductContentState.loading;
+      return Container(
+        key: ValueKey(
+          'buy-product-content-${content.state.name}-${product.id}',
+        ),
+        padding: const EdgeInsets.all(12),
+        decoration: buyV2CardDecoration(
+          color: loading ? BuyV2Colors.softBlue : BuyV2Colors.softOrange,
+          radius: 15,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              loading
+                  ? 'Loading product details'
+                  : 'Product details unavailable',
+              style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              content.customerMessage ??
+                  'More product information is unavailable right now. Price, pack and delivery remain available.',
+              style: context.buyMeta,
+            ),
+            if (!loading) ...[
+              const SizedBox(height: 9),
+              OutlinedButton.icon(
+                key: ValueKey('buy-product-content-retry-${product.id}'),
+                onPressed: () => session.refreshProductContent(product.id),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Try again'),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      key: ValueKey('buy-product-content-ready-${product.id}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (content.highlights.isNotEmpty)
+          _ProductContentCard(
+            title: 'Highlights',
+            icon: Icons.auto_awesome_outlined,
+            children: [
+              for (final highlight in content.highlights)
+                _ProductContentLine(value: highlight),
+            ],
+          ),
+        if (content.highlights.isNotEmpty &&
+            (content.specifications.isNotEmpty || content.description != null))
+          const SizedBox(height: 8),
+        if (content.specifications.isNotEmpty)
+          _ProductContentCard(
+            title: 'Specifications',
+            icon: Icons.fact_check_outlined,
+            children: [
+              for (final specification in content.specifications)
+                _DecisionRow(
+                  icon: Icons.circle,
+                  label: specification.label,
+                  value: specification.value,
+                ),
+            ],
+          ),
+        if (content.specifications.isNotEmpty && content.description != null)
+          const SizedBox(height: 8),
+        if (content.description case final description?)
+          _ProductContentCard(
+            title: 'Description',
+            icon: Icons.notes_rounded,
+            children: [
+              Text(description, style: context.buyBody.copyWith(fontSize: 10)),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _ProductContentCard extends StatelessWidget {
+  const _ProductContentCard({
+    required this.title,
+    required this.icon,
+    required this.children,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(11),
+    decoration: buyV2CardDecoration(radius: 15),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: BuyV2Colors.navy, size: 19),
+            const SizedBox(width: 7),
+            Text(title, style: context.buyTitle.copyWith(fontSize: 14)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...children,
+      ],
+    ),
+  );
+}
+
+class _ProductContentLine extends StatelessWidget {
+  const _ProductContentLine({required this.value});
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 3),
+          child: Icon(
+            Icons.check_circle_rounded,
+            size: 15,
+            color: BuyV2Colors.green,
+          ),
+        ),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(value, style: context.buyBody.copyWith(fontSize: 10)),
+        ),
+      ],
+    ),
+  );
+}
+
 class _ProductTrustPill extends StatelessWidget {
   const _ProductTrustPill({
     required this.icon,
@@ -1177,6 +3577,330 @@ class _ProductTrustPill extends StatelessWidget {
   }
 }
 
+class _ProductBenefitsPreview extends StatelessWidget {
+  const _ProductBenefitsPreview({
+    required this.session,
+    required this.product,
+    required this.benefits,
+    required this.state,
+    required this.customerMessage,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final List<BuyV2CartBenefit> benefits;
+  final BuyV2CartBenefitsLoadState state;
+  final String? customerMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleBenefits = benefits.take(3).toList(growable: false);
+    if (state == BuyV2CartBenefitsLoadState.idle ||
+        state == BuyV2CartBenefitsLoadState.loading) {
+      return Container(
+        key: ValueKey('buy-product-benefits-loading-${product.id}'),
+        padding: const EdgeInsets.all(12),
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softBlue,
+          radius: 15,
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 9),
+            Expanded(child: Text('Checking product offers')),
+          ],
+        ),
+      );
+    }
+    if (state == BuyV2CartBenefitsLoadState.offline ||
+        state == BuyV2CartBenefitsLoadState.unavailable) {
+      return Container(
+        key: ValueKey('buy-product-benefits-unavailable-${product.id}'),
+        padding: const EdgeInsets.all(12),
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softOrange,
+          radius: 15,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Product offers unavailable',
+              style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              customerMessage ?? 'Offers could not be checked right now.',
+              style: context.buyMeta,
+            ),
+            const SizedBox(height: 9),
+            OutlinedButton.icon(
+              key: ValueKey('buy-product-benefits-retry-${product.id}'),
+              onPressed: () => session.refreshProductBenefits(product.id),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      key: ValueKey('buy-product-benefits-ready-${product.id}'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.local_offer_outlined,
+                color: BuyV2Colors.navy,
+                size: 19,
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  'Offers for this product',
+                  style: context.buyTitle.copyWith(fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Eligibility is checked again at Checkout.',
+            style: context.buyMeta.copyWith(fontSize: 8),
+          ),
+          const SizedBox(height: 8),
+          if (visibleBenefits.isEmpty)
+            Text('No product offers right now.', style: context.buyBody)
+          else
+            for (final (index, benefit) in visibleBenefits.indexed) ...[
+              _ProductBenefitPreviewTile(benefit: benefit),
+              if (index != visibleBenefits.length - 1)
+                const SizedBox(height: 7),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductBenefitPreviewTile extends StatelessWidget {
+  const _ProductBenefitPreviewTile({required this.benefit});
+
+  final BuyV2CartBenefit benefit;
+
+  @override
+  Widget build(BuildContext context) {
+    final validUntil = benefit.validUntil;
+    final paymentMethods = benefit.eligiblePaymentMethods.toList()..sort();
+    final sponsor = switch (benefit.sponsor) {
+      BuyV2CartBenefitSponsor.retailer => 'Retail partner',
+      BuyV2CartBenefitSponsor.wholesaler => 'Wholesale partner',
+      BuyV2CartBenefitSponsor.manufacturer => 'Manufacturer',
+      BuyV2CartBenefitSponsor.bank => 'Bank offer',
+      BuyV2CartBenefitSponsor.financialPartner => 'Payment partner',
+      BuyV2CartBenefitSponsor.moolSocial => 'MoolSocial',
+    };
+    return Container(
+      key: ValueKey('buy-product-benefit-${benefit.id}'),
+      padding: const EdgeInsets.all(9),
+      decoration: BoxDecoration(
+        color: BuyV2Colors.softBlue.withValues(alpha: .58),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: const Color(0x22000080)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  benefit.title,
+                  style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+                ),
+              ),
+              if (benefit.savingAmount > 0)
+                Text(
+                  'Save ${buyV2Money(benefit.savingAmount)}',
+                  style: context.buyBody.copyWith(
+                    color: BuyV2Colors.green,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(benefit.detail, style: context.buyMeta),
+          const SizedBox(height: 4),
+          Text(
+            [
+              '$sponsor · ${benefit.sponsorName}',
+              if (benefit.freeDelivery) 'Free delivery',
+              if (paymentMethods.isNotEmpty)
+                'With ${paymentMethods.join(' or ')}',
+              if (validUntil != null)
+                'Until ${MaterialLocalizations.of(context).formatShortDate(validUntil)}',
+            ].join(' · '),
+            style: context.buyMeta.copyWith(
+              color: BuyV2Colors.navy,
+              fontSize: 8,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MarketplaceTrustPanel extends StatelessWidget {
+  const _MarketplaceTrustPanel({
+    required this.session,
+    required this.product,
+    required this.trust,
+    required this.onViewSeller,
+    required this.sellerProductCount,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final BuyV2MarketplaceTrustSnapshot trust;
+  final VoidCallback? onViewSeller;
+  final int sellerProductCount;
+
+  @override
+  Widget build(BuildContext context) {
+    if (trust.state != BuyV2MarketplaceTrustState.ready) {
+      final loading = trust.state == BuyV2MarketplaceTrustState.loading;
+      return Container(
+        key: ValueKey(
+          'buy-marketplace-trust-${trust.state.name}-${product.id}',
+        ),
+        padding: const EdgeInsets.all(12),
+        decoration: buyV2CardDecoration(
+          color: loading ? BuyV2Colors.softBlue : BuyV2Colors.softOrange,
+          radius: 15,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              loading ? 'Loading ratings and seller' : 'Ratings unavailable',
+              style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              trust.customerMessage ??
+                  'Ratings and seller performance are unavailable right now.',
+              style: context.buyMeta,
+            ),
+            if (!loading) ...[
+              const SizedBox(height: 9),
+              OutlinedButton.icon(
+                key: ValueKey('buy-marketplace-trust-retry-${product.id}'),
+                onPressed: () => session.refreshMarketplaceTrust(product.id),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Try again'),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    final productRating = trust.productRating;
+    final partnerRating = trust.partnerRating;
+    return _DecisionPanel(
+      key: ValueKey('buy-marketplace-trust-ready-${product.id}'),
+      title: 'Ratings and seller',
+      children: [
+        _DecisionRow(
+          icon: Icons.star_rounded,
+          label: 'Customer rating',
+          value: productRating == null
+              ? 'No customer ratings yet'
+              : '${productRating.toStringAsFixed(1)} from '
+                    '${trust.productRatingCount ?? 0} ratings',
+          valueColor: productRating == null
+              ? BuyV2Colors.muted
+              : BuyV2Colors.green,
+        ),
+        if (trust.verifiedBuyerRatingCount case final count?)
+          _DecisionRow(
+            icon: Icons.verified_outlined,
+            label: 'Verified buyer ratings',
+            value: '$count',
+          ),
+        _DecisionRow(
+          icon: Icons.storefront_outlined,
+          label: 'Seller',
+          value:
+              '${trust.partnerName} · ${_sellerTypeLabel(product.sellerType)}',
+        ),
+        if (onViewSeller != null)
+          _DecisionActionRow(
+            key: ValueKey(
+              '${product.destination == BuyV2Destination.wholesale ? 'buy-wholesale-store-action' : 'buy-shop-seller-action'}-${product.id}',
+            ),
+            icon: Icons.storefront_outlined,
+            label: product.destination == BuyV2Destination.wholesale
+                ? 'Visit supplier'
+                : 'Visit store',
+            value: trust.partnerName,
+            detail:
+                '$sellerProductCount available ${sellerProductCount == 1 ? 'product' : 'products'} from this ${product.destination == BuyV2Destination.wholesale ? 'supplier' : 'store'}',
+            semanticLabel:
+                'Visit ${trust.partnerName} for $sellerProductCount available ${sellerProductCount == 1 ? 'product' : 'products'}',
+            emphasized: true,
+            onTap: onViewSeller!,
+          ),
+        if (partnerRating case final rating?)
+          _DecisionRow(
+            icon: Icons.workspace_premium_outlined,
+            label: 'Store rating',
+            value: rating.toStringAsFixed(1),
+            valueColor: BuyV2Colors.green,
+          ),
+        if (trust.partnerLocation case final location?)
+          _DecisionRow(
+            icon: Icons.location_on_outlined,
+            label: 'Store location',
+            value: location,
+          ),
+        if (trust.partnerOrderCount case final orderCount?)
+          _DecisionRow(
+            icon: Icons.inventory_2_outlined,
+            label: 'Orders fulfilled',
+            value: '$orderCount',
+          ),
+        if (trust.serviceReliabilityLabel case final reliability?)
+          _DecisionRow(
+            icon: Icons.local_shipping_outlined,
+            label: 'Delivery record',
+            value: reliability,
+          ),
+        if (trust.returnSummary case final returnSummary?)
+          _DecisionRow(
+            icon: Icons.assignment_return_outlined,
+            label: 'Return or replacement',
+            value: returnSummary,
+          ),
+      ],
+    );
+  }
+}
+
 class _ProductReviewsPanel extends StatelessWidget {
   const _ProductReviewsPanel({
     required this.product,
@@ -1188,8 +3912,8 @@ class _ProductReviewsPanel extends StatelessWidget {
 
   final BuyV2Product product;
   final BuyV2CustomerReview? review;
-  final VoidCallback onReview;
-  final VoidCallback onReport;
+  final VoidCallback? onReview;
+  final VoidCallback? onReport;
   final bool reported;
 
   @override
@@ -1260,32 +3984,40 @@ class _ProductReviewsPanel extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  key: ValueKey('buy-review-product-${product.id}'),
-                  onPressed: onReview,
-                  icon: const Icon(Icons.rate_review_outlined, size: 17),
-                  label: Text(review == null ? 'Write review' : 'Edit review'),
-                ),
-              ),
-              const SizedBox(width: 7),
-              Expanded(
-                child: TextButton.icon(
-                  key: ValueKey('buy-report-product-${product.id}'),
-                  onPressed: reported ? null : onReport,
-                  icon: Icon(
-                    reported
-                        ? Icons.check_circle_outline_rounded
-                        : Icons.flag_outlined,
-                    size: 17,
+          if (onReview != null || onReport != null)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: ValueKey('buy-review-product-${product.id}'),
+                    onPressed: onReview,
+                    icon: const Icon(Icons.rate_review_outlined, size: 17),
+                    label: Text(
+                      review == null ? 'Write review' : 'Edit review',
+                    ),
                   ),
-                  label: Text(reported ? 'Reported' : 'Report issue'),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: TextButton.icon(
+                    key: ValueKey('buy-report-product-${product.id}'),
+                    onPressed: reported ? null : onReport,
+                    icon: Icon(
+                      reported
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.flag_outlined,
+                      size: 17,
+                    ),
+                    label: Text(reported ? 'Reported' : 'Report issue'),
+                  ),
+                ),
+              ],
+            )
+          else
+            Text(
+              'Reviews and product reports will be available after Shop reconnects.',
+              style: context.buyMeta.copyWith(fontSize: 9),
+            ),
         ],
       ),
     );
@@ -1298,6 +4030,11 @@ Future<void> _showProductReviewSheet(
   BuyV2Product product,
 ) async {
   final existing = session.customerReviewFor(product.id);
+  final callerViewPadding = MediaQuery.viewPaddingOf(context);
+  final exportedBottomClearance =
+      defaultTargetPlatform == TargetPlatform.android
+      ? callerViewPadding.top
+      : callerViewPadding.bottom;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -1315,7 +4052,9 @@ Future<void> _showProductReviewSheet(
       ),
       curve: Curves.easeOut,
       padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+        bottom:
+            MediaQuery.viewInsetsOf(sheetContext).bottom +
+            exportedBottomClearance,
       ),
       child: _ProductReviewSheet(
         session: session,
@@ -1337,6 +4076,11 @@ Future<void> _showProductReportSheet(
     'Product image does not match',
     'Partner information needs attention',
   ];
+  final callerViewPadding = MediaQuery.viewPaddingOf(context);
+  final exportedBottomClearance =
+      defaultTargetPlatform == TargetPlatform.android
+      ? callerViewPadding.top
+      : callerViewPadding.bottom;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -1348,10 +4092,21 @@ Future<void> _showProductReportSheet(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     sheetAnimationStyle: BuyV2ProductFeedbackSheetMotion.resolve(context),
-    builder: (sheetContext) => _ProductReportSheet(
-      session: session,
-      product: product,
-      reasons: reasons,
+    builder: (sheetContext) => AnimatedPadding(
+      duration: BuyV2ProductFeedbackSheetMotion.resolveKeyboardInsetDuration(
+        sheetContext,
+      ),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(
+        bottom:
+            MediaQuery.viewInsetsOf(sheetContext).bottom +
+            exportedBottomClearance,
+      ),
+      child: _ProductReportSheet(
+        session: session,
+        product: product,
+        reasons: reasons,
+      ),
     ),
   );
 }
@@ -1391,7 +4146,7 @@ class _ProductFeedbackSheetHeader extends StatelessWidget {
               Text(
                 title,
                 maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                overflow: TextOverflow.clip,
                 style: context.buyTitle.copyWith(fontSize: 17),
               ),
               const SizedBox(height: 2),
@@ -1415,6 +4170,70 @@ class _ProductFeedbackSheetHeader extends StatelessWidget {
   }
 }
 
+class _ProductFeedbackIdentity extends StatelessWidget {
+  const _ProductFeedbackIdentity({required this.product});
+
+  final BuyV2Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: ValueKey('buy-feedback-product-${product.id}'),
+      container: true,
+      label:
+          '${product.title}, ${product.pack}, ${product.seller}, product ${product.id}',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: BuyV2Colors.softBlue,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: BuyV2Colors.line),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.inventory_2_outlined,
+              color: BuyV2Colors.navy,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.clip,
+                    style: context.buyBody.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    '${product.pack} · ${product.seller}',
+                    maxLines: 2,
+                    overflow: TextOverflow.clip,
+                    style: context.buyMeta,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+double _productFeedbackSheetHeight(BuildContext context) {
+  final media = MediaQuery.of(context);
+  return (media.size.height -
+          media.viewInsets.bottom -
+          media.viewPadding.vertical -
+          56)
+      .clamp(300.0, 460.0);
+}
+
 class _ProductReviewSheet extends StatefulWidget {
   const _ProductReviewSheet({
     required this.session,
@@ -1435,6 +4254,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
   late final FocusNode _commentFocus;
   late int _rating;
   bool _submissionRejected = false;
+  bool _submitting = false;
 
   bool get _isValid =>
       _rating >= 1 && _rating <= 5 && _commentController.text.trim().isNotEmpty;
@@ -1453,17 +4273,25 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
     if (mounted) setState(() {});
   }
 
-  void _submit() {
-    if (!_isValid) return;
-    final saved = widget.session.submitProductReview(
+  Future<void> _submit() async {
+    if (!_isValid || _submitting) return;
+    setState(() {
+      _submitting = true;
+      _submissionRejected = false;
+    });
+    final saved = await widget.session.submitProductReviewOnline(
       productId: widget.product.id,
       rating: _rating,
       comment: _commentController.text,
     );
+    if (!mounted) return;
     if (saved) {
       Navigator.of(context).pop();
     } else {
-      setState(() => _submissionRejected = true);
+      setState(() {
+        _submitting = false;
+        _submissionRejected = true;
+      });
     }
   }
 
@@ -1480,7 +4308,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
   Widget build(BuildContext context) {
     final stateDuration =
         BuyV2ProductFeedbackSheetMotion.resolveFormStateDuration(context);
-    final title = 'Review ${widget.product.title}';
+    final routeTitle = 'Review ${widget.product.title}';
     return PopScope<void>(
       canPop: !_commentFocus.hasFocus,
       onPopInvokedWithResult: (didPop, _) {
@@ -1491,24 +4319,28 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
         scopesRoute: true,
         namesRoute: true,
         explicitChildNodes: true,
-        label: '$title form',
+        label: '$routeTitle form',
         child: ConstrainedBox(
           key: const ValueKey('buy-product-review-sheet'),
-          constraints: const BoxConstraints(maxHeight: 620),
-          child: SingleChildScrollView(
+          constraints: BoxConstraints.tightFor(
+            height: _productFeedbackSheetHeight(context),
+          ),
+          child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _ProductFeedbackSheetHeader(
                   icon: Icons.rate_review_outlined,
-                  title: title,
+                  title: 'Write a review',
                   detail:
                       'Rate what you received. Keep personal or medical information out.',
                   closeKey: const ValueKey('buy-close-product-review'),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+                _ProductFeedbackIdentity(product: widget.product),
+                const SizedBox(height: 8),
                 Semantics(
                   label: _rating == 0
                       ? 'No rating selected'
@@ -1532,16 +4364,18 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                               'buy-review-rating-${widget.product.id}-$value',
                             ),
                             tooltip: '$value ${value == 1 ? 'star' : 'stars'}',
-                            onPressed: () => setState(() {
-                              _rating = value;
-                              _submissionRejected = false;
-                            }),
+                            onPressed: _submitting
+                                ? null
+                                : () => setState(() {
+                                    _rating = value;
+                                    _submissionRejected = false;
+                                  }),
                             icon: Icon(
                               value <= _rating
                                   ? Icons.star_rounded
                                   : Icons.star_border_rounded,
                               color: BuyV2Colors.orange,
-                              size: 28,
+                              size: 24,
                             ),
                           ),
                         ),
@@ -1549,104 +4383,129 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                   ),
                 ),
                 const SizedBox(height: 9),
-                Semantics(
-                  container: true,
-                  excludeSemantics: true,
-                  textField: true,
-                  multiline: true,
-                  focusable: true,
-                  focused: _commentFocus.hasFocus,
-                  isRequired: true,
-                  maxValueLength: 500,
-                  currentValueLength: _commentController.text.characters.length,
-                  label: 'Your review',
-                  value: _commentController.text,
-                  hint: 'Required. Up to 500 characters.',
-                  onTap: _commentFocus.requestFocus,
-                  onFocus: _commentFocus.requestFocus,
-                  onSetText: (value) {
-                    final nextValue =
-                        LengthLimitingTextInputFormatter(
-                          500,
-                          maxLengthEnforcement: MaxLengthEnforcement.enforced,
-                        ).formatEditUpdate(
-                          _commentController.value,
-                          TextEditingValue(
-                            text: value,
-                            selection: TextSelection.collapsed(
-                              offset: value.length,
+                Flexible(
+                  child: SingleChildScrollView(
+                    key: const ValueKey('buy-product-review-fields-scroll'),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Semantics(
+                          container: true,
+                          excludeSemantics: true,
+                          textField: true,
+                          multiline: true,
+                          focusable: true,
+                          focused: _commentFocus.hasFocus,
+                          isRequired: true,
+                          maxValueLength: 500,
+                          currentValueLength:
+                              _commentController.text.characters.length,
+                          label: 'Your review',
+                          value: _commentController.text,
+                          hint: 'Required. Up to 500 characters.',
+                          onTap: _commentFocus.requestFocus,
+                          onFocus: _commentFocus.requestFocus,
+                          onSetText: (value) {
+                            final nextValue =
+                                LengthLimitingTextInputFormatter(
+                                  500,
+                                  maxLengthEnforcement:
+                                      MaxLengthEnforcement.enforced,
+                                ).formatEditUpdate(
+                                  _commentController.value,
+                                  TextEditingValue(
+                                    text: value,
+                                    selection: TextSelection.collapsed(
+                                      offset: value.length,
+                                    ),
+                                  ),
+                                );
+                            _commentFocus.requestFocus();
+                            _commentController.value = nextValue;
+                            setState(() => _submissionRejected = false);
+                          },
+                          child: TextFormField(
+                            key: ValueKey(
+                              'buy-review-comment-${widget.product.id}',
+                            ),
+                            controller: _commentController,
+                            focusNode: _commentFocus,
+                            autofocus: false,
+                            onChanged: (_) => setState(() {
+                              _submissionRejected = false;
+                            }),
+                            enabled: !_submitting,
+                            minLines: 2,
+                            maxLines: 4,
+                            maxLength: 500,
+                            scrollPadding: EdgeInsets.only(
+                              bottom:
+                                  MediaQuery.viewInsetsOf(context).bottom + 132,
+                            ),
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: const InputDecoration(
+                              labelText: 'Your review',
+                              hintText:
+                                  'What was useful, good or needs improvement?',
+                              counterText: '',
+                              border: OutlineInputBorder(),
                             ),
                           ),
-                        );
-                    _commentFocus.requestFocus();
-                    _commentController.value = nextValue;
-                    setState(() => _submissionRejected = false);
-                  },
-                  child: TextFormField(
-                    key: ValueKey('buy-review-comment-${widget.product.id}'),
-                    controller: _commentController,
-                    focusNode: _commentFocus,
-                    autofocus: false,
-                    onChanged: (_) => setState(() {
-                      _submissionRejected = false;
-                    }),
-                    minLines: 3,
-                    maxLines: 5,
-                    maxLength: 500,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      labelText: 'Your review',
-                      hintText: 'What was useful, good or needs improvement?',
-                      counterText: '',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Required · up to 500 characters',
-                          style: context.buyMeta.copyWith(fontSize: 9),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_commentController.text.characters.length}/500',
-                        style: context.buyMeta.copyWith(fontSize: 9),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 5),
-                AnimatedSwitcher(
-                  duration: stateDuration,
-                  child: Semantics(
-                    key: ValueKey(
-                      _submissionRejected
-                          ? 'review-submit-rejected'
-                          : _isValid
-                          ? 'review-ready'
-                          : 'review-incomplete',
-                    ),
-                    liveRegion: true,
-                    child: Text(
-                      _submissionRejected
-                          ? (widget.session.notice ??
-                                'This review could not be saved.')
-                          : _isValid
-                          ? 'Ready to save to this product.'
-                          : 'Choose a rating and write a review to enable Save.',
-                      style: context.buyMeta.copyWith(
-                        color: _submissionRejected
-                            ? BuyV2Colors.orange
-                            : _isValid
-                            ? BuyV2Colors.green
-                            : BuyV2Colors.muted,
-                        fontWeight: FontWeight.w800,
-                      ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Required · up to 500 characters',
+                                  style: context.buyMeta.copyWith(fontSize: 9),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${_commentController.text.characters.length}/500',
+                                style: context.buyMeta.copyWith(fontSize: 9),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        AnimatedSwitcher(
+                          duration: stateDuration,
+                          child: Semantics(
+                            key: ValueKey(
+                              _submissionRejected
+                                  ? 'review-submit-rejected'
+                                  : _submitting
+                                  ? 'review-submitting'
+                                  : _isValid
+                                  ? 'review-ready'
+                                  : 'review-incomplete',
+                            ),
+                            liveRegion: true,
+                            child: Text(
+                              _submissionRejected
+                                  ? (widget.session.notice ??
+                                        'This review could not be saved.')
+                                  : _submitting
+                                  ? 'Saving your review…'
+                                  : _isValid
+                                  ? 'Ready to save to this product.'
+                                  : 'Choose a rating and write a review to enable Save.',
+                              style: context.buyMeta.copyWith(
+                                color: _submissionRejected
+                                    ? BuyV2Colors.orange
+                                    : _isValid
+                                    ? BuyV2Colors.green
+                                    : BuyV2Colors.muted,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1656,7 +4515,9 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                     Expanded(
                       child: TextButton(
                         key: const ValueKey('buy-cancel-product-review'),
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: _submitting
+                            ? null
+                            : () => Navigator.of(context).pop(),
                         child: const Text('Cancel'),
                       ),
                     ),
@@ -1669,9 +4530,16 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                           key: ValueKey(
                             'buy-submit-review-${widget.product.id}',
                           ),
-                          onPressed: _isValid ? _submit : null,
-                          icon: const Icon(Icons.check_rounded, size: 18),
-                          label: const Text('Save review'),
+                          onPressed: _isValid && !_submitting ? _submit : null,
+                          icon: _submitting
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.check_rounded, size: 18),
+                          label: Text(_submitting ? 'Saving…' : 'Save review'),
                         ),
                       ),
                     ),
@@ -1704,18 +4572,27 @@ class _ProductReportSheet extends StatefulWidget {
 class _ProductReportSheetState extends State<_ProductReportSheet> {
   String? _selectedReason;
   bool _submissionRejected = false;
+  bool _submitting = false;
 
-  void _submit() {
+  Future<void> _submit() async {
     final reason = _selectedReason;
-    if (reason == null) return;
-    final reported = widget.session.reportProduct(
+    if (reason == null || _submitting) return;
+    setState(() {
+      _submitting = true;
+      _submissionRejected = false;
+    });
+    final reported = await widget.session.reportProductOnline(
       productId: widget.product.id,
       reason: reason,
     );
+    if (!mounted) return;
     if (reported) {
       Navigator.of(context).pop();
     } else {
-      setState(() => _submissionRejected = true);
+      setState(() {
+        _submitting = false;
+        _submissionRejected = true;
+      });
     }
   }
 
@@ -1732,11 +4609,13 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
       label: '$title form',
       child: ConstrainedBox(
         key: const ValueKey('buy-product-report-sheet'),
-        constraints: const BoxConstraints(maxHeight: 620),
-        child: SingleChildScrollView(
+        constraints: BoxConstraints.tightFor(
+          height: _productFeedbackSheetHeight(context),
+        ),
+        child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const _ProductFeedbackSheetHeader(
@@ -1745,97 +4624,124 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
                 detail: 'Choose the one listing detail that needs attention.',
                 closeKey: ValueKey('buy-close-product-report'),
               ),
-              const SizedBox(height: 11),
-              for (var index = 0; index < widget.reasons.length; index++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Semantics(
-                    button: true,
-                    selected: _selectedReason == widget.reasons[index],
-                    label: widget.reasons[index],
-                    child: AnimatedContainer(
-                      duration: stateDuration,
-                      curve: Curves.easeOut,
-                      decoration: BoxDecoration(
-                        color: _selectedReason == widget.reasons[index]
-                            ? BuyV2Colors.softOrange
-                            : BuyV2Colors.canvas,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: _selectedReason == widget.reasons[index]
-                              ? BuyV2Colors.orange
-                              : Colors.transparent,
-                        ),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          key: ValueKey('buy-report-reason-$index'),
-                          borderRadius: BorderRadius.circular(14),
-                          onTap: () => setState(() {
-                            _selectedReason = widget.reasons[index];
-                            _submissionRejected = false;
-                          }),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    widget.reasons[index],
-                                    style: context.buyBody.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(
-                                  _selectedReason == widget.reasons[index]
-                                      ? Icons.check_circle_rounded
-                                      : Icons.circle_outlined,
+              const SizedBox(height: 8),
+              _ProductFeedbackIdentity(product: widget.product),
+              const SizedBox(height: 8),
+              Flexible(
+                child: SingleChildScrollView(
+                  key: const ValueKey('buy-product-report-reasons-scroll'),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (
+                        var index = 0;
+                        index < widget.reasons.length;
+                        index++
+                      )
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Semantics(
+                            button: true,
+                            selected: _selectedReason == widget.reasons[index],
+                            label: widget.reasons[index],
+                            child: AnimatedContainer(
+                              duration: stateDuration,
+                              curve: Curves.easeOut,
+                              decoration: BoxDecoration(
+                                color: _selectedReason == widget.reasons[index]
+                                    ? BuyV2Colors.softOrange
+                                    : BuyV2Colors.canvas,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
                                   color:
                                       _selectedReason == widget.reasons[index]
                                       ? BuyV2Colors.orange
-                                      : BuyV2Colors.muted,
-                                  size: 20,
+                                      : Colors.transparent,
                                 ),
-                              ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  key: ValueKey('buy-report-reason-$index'),
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: _submitting
+                                      ? null
+                                      : () => setState(() {
+                                          _selectedReason =
+                                              widget.reasons[index];
+                                          _submissionRejected = false;
+                                        }),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            widget.reasons[index],
+                                            style: context.buyBody.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Icon(
+                                          _selectedReason ==
+                                                  widget.reasons[index]
+                                              ? Icons.check_circle_rounded
+                                              : Icons.circle_outlined,
+                                          color:
+                                              _selectedReason ==
+                                                  widget.reasons[index]
+                                              ? BuyV2Colors.orange
+                                              : BuyV2Colors.muted,
+                                          size: 20,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      AnimatedSwitcher(
+                        duration: stateDuration,
+                        child: Semantics(
+                          key: ValueKey(
+                            _submissionRejected
+                                ? 'report-submit-rejected'
+                                : _submitting
+                                ? 'report-submitting'
+                                : _selectedReason == null
+                                ? 'report-incomplete'
+                                : 'report-ready',
+                          ),
+                          liveRegion: true,
+                          child: Text(
+                            _submissionRejected
+                                ? (widget.session.notice ??
+                                      'This report could not be sent.')
+                                : _submitting
+                                ? 'Sending your report…'
+                                : _selectedReason == null
+                                ? 'Choose one reason to enable Send.'
+                                : 'Ready to send this listing issue.',
+                            style: context.buyMeta.copyWith(
+                              color: _submissionRejected
+                                  ? BuyV2Colors.orange
+                                  : _selectedReason == null
+                                  ? BuyV2Colors.muted
+                                  : BuyV2Colors.green,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-              AnimatedSwitcher(
-                duration: stateDuration,
-                child: Semantics(
-                  key: ValueKey(
-                    _submissionRejected
-                        ? 'report-submit-rejected'
-                        : _selectedReason == null
-                        ? 'report-incomplete'
-                        : 'report-ready',
-                  ),
-                  liveRegion: true,
-                  child: Text(
-                    _submissionRejected
-                        ? (widget.session.notice ??
-                              'This report could not be sent.')
-                        : _selectedReason == null
-                        ? 'Choose one reason to enable Send.'
-                        : 'Ready to send this listing issue.',
-                    style: context.buyMeta.copyWith(
-                      color: _submissionRejected
-                          ? BuyV2Colors.orange
-                          : _selectedReason == null
-                          ? BuyV2Colors.muted
-                          : BuyV2Colors.green,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -1845,7 +4751,9 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
                   Expanded(
                     child: TextButton(
                       key: const ValueKey('buy-cancel-product-report'),
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _submitting
+                          ? null
+                          : () => Navigator.of(context).pop(),
                       child: const Text('Cancel'),
                     ),
                   ),
@@ -1856,9 +4764,18 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
                       height: 48,
                       child: FilledButton.icon(
                         key: ValueKey('buy-submit-report-${widget.product.id}'),
-                        onPressed: _selectedReason == null ? null : _submit,
-                        icon: const Icon(Icons.send_outlined, size: 18),
-                        label: const Text('Send report'),
+                        onPressed: _selectedReason == null || _submitting
+                            ? null
+                            : _submit,
+                        icon: _submitting
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.send_outlined, size: 18),
+                        label: Text(_submitting ? 'Sending…' : 'Send report'),
                       ),
                     ),
                   ),
@@ -1986,9 +4903,18 @@ class _MissingOrderSelection extends StatelessWidget {
 }
 
 class BuyV2CartView extends StatefulWidget {
-  const BuyV2CartView({super.key, required this.session});
+  const BuyV2CartView({
+    super.key,
+    required this.session,
+    required this.onBrowseMore,
+    this.onBrowseStore,
+    this.storeLabel,
+  });
 
   final BuyV2Session session;
+  final VoidCallback onBrowseMore;
+  final VoidCallback? onBrowseStore;
+  final String? storeLabel;
 
   @override
   State<BuyV2CartView> createState() => _BuyV2CartViewState();
@@ -2087,10 +5013,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                       ),
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          final summary =
-                              '${_productCountLabel(session.itemCount)} · '
-                              '${_destinationSummary(session.cartDestinations)} · '
-                              '${buyV2Money(session.cartTotal)}';
+                          final summary = _cartHeaderSummary(session);
                           return BuyV2FiniteValueTransition(
                             key: const ValueKey('buy-cart-header-value-motion'),
                             stateKey: summary,
@@ -2104,11 +5027,16 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                     ],
                   ),
                 ),
-                TextButton(
-                  onPressed: session.clearCart,
-                  child: const Text(
-                    'Clear',
-                    style: TextStyle(color: Color(0xFFB42318), fontSize: 10),
+                IconButton(
+                  key: const ValueKey('buy-cart-empty'),
+                  tooltip: 'Empty cart',
+                  onPressed: lines.isEmpty
+                      ? null
+                      : () =>
+                            unawaited(_confirmBuyV2CartClear(context, session)),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFB42318),
                   ),
                 ),
               ],
@@ -2119,12 +5047,99 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
         const SizedBox(height: 7),
         Expanded(
           child: lines.isEmpty
-              ? const SizedBox.shrink()
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.shopping_cart_outlined,
+                          color: BuyV2Colors.navy,
+                          size: 34,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Your ${session.cartScope.label} cart is empty',
+                          textAlign: TextAlign.center,
+                          style: context.buyTitle.copyWith(fontSize: 17),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Browse ${session.cartScope.label} products to start this order.',
+                          textAlign: TextAlign.center,
+                          style: context.buyMeta,
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               : ListView(
                   controller: _scrollController,
                   key: PageStorageKey('buy-cart-${session.cartScope.name}'),
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 72),
                   children: [
+                    if (widget.onBrowseStore != null &&
+                        widget.storeLabel?.trim().isNotEmpty == true) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: FilledButton.tonal(
+                          key: const ValueKey('buy-cart-continue-store'),
+                          onPressed: widget.onBrowseStore,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.storefront_outlined, size: 20),
+                              const SizedBox(width: 10),
+                              Flexible(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Continue browsing',
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        height: 1,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      widget.storeLabel!,
+                                      key: const ValueKey(
+                                        'buy-cart-continue-store-name',
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.clip,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        height: 1.05,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('buy-cart-browse-more'),
+                        onPressed: widget.onBrowseMore,
+                        icon: const Icon(Icons.add_shopping_cart_outlined),
+                        label: const Text('Browse more products'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     for (final line in lines)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 7),
@@ -2162,10 +5177,82 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
+              if (lines.isEmpty) {
+                return SizedBox(
+                  width: double.infinity,
+                  height: BuyV2Metrics.minimumTap,
+                  child: FilledButton.icon(
+                    key: const ValueKey('buy-empty-cart-browse'),
+                    onPressed: widget.onBrowseMore,
+                    icon: const Icon(Icons.storefront_outlined, size: 18),
+                    label: Text('Browse ${session.cartScope.label}'),
+                  ),
+                );
+              }
+              final textScale = MediaQuery.textScalerOf(context).scale(1);
+              final compactAccessible =
+                  constraints.maxWidth < 350 && textScale > 1.2;
               final actionWidth = (constraints.maxWidth * .54).clamp(
                 150.0,
                 190.0,
               );
+
+              void openCheckout() {
+                if (!session.openCheckout() &&
+                    session.selectedAddressOrNull == null) {
+                  showBuyV2AddressSheet(
+                    context,
+                    session,
+                    continueToCheckoutAfterSelection: true,
+                  );
+                }
+              }
+
+              if (compactAccessible) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                session.cartScope == BuyV2CartScope.wholesale
+                                    ? 'Landed cart total'
+                                    : 'Cart total',
+                                style: context.buyMeta,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        BuyV2FiniteValueTransition(
+                          key: const ValueKey('buy-cart-payable-total-motion'),
+                          stateKey: session.scopedPayableTotal,
+                          text: buyV2Money(session.scopedPayableTotal),
+                          ownerSize: const Size(150, 38),
+                          textAlign: TextAlign.end,
+                          style: const TextStyle(
+                            color: BuyV2Colors.navy,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 7),
+                    SizedBox(
+                      height: BuyV2Metrics.minimumTap,
+                      child: FilledButton(
+                        onPressed: openCheckout,
+                        child: const Text('Review order'),
+                      ),
+                    ),
+                  ],
+                );
+              }
               return Row(
                 children: [
                   Expanded(
@@ -2173,7 +5260,11 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          session.scopedTipTotal > 0
+                          session.cartScope == BuyV2CartScope.wholesale
+                              ? session.scopedTipTotal > 0
+                                    ? 'Landed total + delivery tip'
+                                    : 'Landed cart total'
+                              : session.scopedTipTotal > 0
                               ? 'Items + delivery tip'
                               : 'Cart total',
                           style: context.buyMeta,
@@ -2190,6 +5281,13 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                             fontWeight: FontWeight.w900,
                           ),
                         ),
+                        if (session.cartScope == BuyV2CartScope.wholesale)
+                          Text(
+                            'Freight included · GST invoice at checkout',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.buyMeta.copyWith(fontSize: 7.5),
+                          ),
                       ],
                     ),
                   ),
@@ -2197,12 +5295,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                   SizedBox(
                     width: actionWidth,
                     child: FilledButton(
-                      onPressed: () {
-                        if (!session.openCheckout() &&
-                            session.selectedAddressOrNull == null) {
-                          showBuyV2AddressSheet(context, session);
-                        }
-                      },
+                      onPressed: openCheckout,
                       child: const Text('Review order'),
                     ),
                   ),
@@ -2216,133 +5309,1971 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
   }
 }
 
-class BuyV2CheckoutView extends StatelessWidget {
-  const BuyV2CheckoutView({super.key, required this.session});
+Future<void> _confirmBuyV2CartClear(
+  BuildContext context,
+  BuyV2Session session,
+) async {
+  if (session.checkoutRequiresResolution) {
+    session.clearCart();
+    return;
+  }
+  final scope = session.cartScope;
+  final removeCount = session.scopedItemCount;
+  if (removeCount == 0) return;
+  final remainingCount = session.itemCount - removeCount;
+  final clearEverything = scope == BuyV2CartScope.all;
+  final title = clearEverything
+      ? 'Empty entire Cart?'
+      : 'Remove ${scope.label} ${removeCount == 1 ? 'item' : 'items'}?';
+  final detail = clearEverything
+      ? '$removeCount ${removeCount == 1 ? 'item' : 'items'} will be removed from your Cart.'
+      : remainingCount > 0
+      ? '$removeCount ${scope.label} ${removeCount == 1 ? 'item' : 'items'} will be removed. '
+            '$remainingCount other ${remainingCount == 1 ? 'item will' : 'items will'} stay in your Cart.'
+      : '$removeCount ${scope.label} ${removeCount == 1 ? 'item' : 'items'} will be removed. '
+            'You’ll return to ${scope.label}.';
+  final confirmed = await showModalBottomSheet<bool>(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      top: false,
+      child: Semantics(
+        container: true,
+        scopesRoute: true,
+        namesRoute: true,
+        explicitChildNodes: true,
+        label: title,
+        child: Padding(
+          key: const ValueKey('buy-cart-clear-sheet'),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEBEA),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFB42318),
+                    ),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: sheetContext.buyTitle.copyWith(fontSize: 18),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(detail, style: sheetContext.buyMeta),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final keepCart = OutlinedButton(
+                    key: const ValueKey('buy-cart-clear-cancel'),
+                    onPressed: () => Navigator.of(sheetContext).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                    ),
+                    child: const Text('Keep Cart'),
+                  );
+                  final removeItems = FilledButton(
+                    key: const ValueKey('buy-cart-clear-confirm'),
+                    onPressed: () => Navigator.of(sheetContext).pop(true),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      backgroundColor: const Color(0xFFB42318),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Text(
+                      clearEverything ? 'Empty Cart' : 'Remove ${scope.label}',
+                    ),
+                  );
+                  final stackActions =
+                      constraints.maxWidth < 320 ||
+                      MediaQuery.textScalerOf(context).scale(14) > 20;
+                  if (stackActions) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        keepCart,
+                        const SizedBox(height: 8),
+                        removeItems,
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: keepCart),
+                      const SizedBox(width: 10),
+                      Expanded(child: removeItems),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  if (confirmed == true && context.mounted) {
+    session.clearCartScope(scope);
+  }
+}
+
+class _GstInvoiceCard extends StatelessWidget {
+  const _GstInvoiceCard({required this.destination, required this.controller});
+
+  final BuyV2Destination destination;
+  final BuyV2GstInvoiceController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final requested = controller.requestedFor(destination);
+    final details = controller.detailsFor(destination);
+    final gstAdded = details != null;
+    return Container(
+      key: ValueKey('buy-gst-invoice-${destination.name}'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            container: true,
+            button: true,
+            toggled: requested,
+            label: requested ? 'Remove GST details' : 'Add GST details',
+            onTap: () => controller.setRequested(destination, !requested),
+            child: ExcludeSemantics(
+              child: GestureDetector(
+                key: ValueKey('buy-gst-request-${destination.name}'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => controller.setRequested(destination, !requested),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 58),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: BuyV2Colors.softBlue,
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: const Icon(
+                          Icons.receipt_long_outlined,
+                          color: BuyV2Colors.navy,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              gstAdded ? 'GST added' : 'Add GST details',
+                              style: context.buyBody,
+                            ),
+                            Text(
+                              gstAdded &&
+                                      destination == BuyV2Destination.wholesale
+                                  ? 'Used automatically for this business order and future Wholesale checkout.'
+                                  : 'GST applies as required. Add GSTIN only for recipient details on the invoice.',
+                              style: context.buyMeta.copyWith(fontSize: 8),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      IgnorePointer(
+                        child: Switch.adaptive(
+                          value: requested,
+                          onChanged: (_) {},
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (requested) ...[
+            const SizedBox(height: 9),
+            if (controller.restoring) ...[
+              const LinearProgressIndicator(
+                key: ValueKey('buy-gst-profiles-loading'),
+                minHeight: 2,
+              ),
+              const SizedBox(height: 7),
+            ],
+            if (controller.savedProfiles.isNotEmpty) ...[
+              Text('Saved GST details', style: context.buyMeta),
+              const SizedBox(height: 5),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final profile in controller.savedProfiles)
+                    InputChip(
+                      key: ValueKey('buy-gst-profile-${profile.id}'),
+                      label: Text(profile.legalName),
+                      selected: details?.id == profile.id,
+                      onSelected: controller.busy
+                          ? null
+                          : (_) => controller.selectSaved(destination, profile),
+                      onDeleted:
+                          controller.persistenceAvailable && !controller.busy
+                          ? () => _confirmRemoveGstProfile(
+                              context,
+                              controller: controller,
+                              profile: profile,
+                            )
+                          : null,
+                      deleteButtonTooltipMessage: 'Remove GST details',
+                    ),
+                ],
+              ),
+              const SizedBox(height: 7),
+            ],
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: details == null
+                    ? BuyV2Colors.softOrange
+                    : BuyV2Colors.softGreen,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          details?.legalName ?? 'GST invoice details required',
+                          style: context.buyBody.copyWith(fontSize: 10),
+                        ),
+                        Text(
+                          details == null
+                              ? 'Add GSTIN, legal name and billing address.'
+                              : '${details.gstin} · ${details.billingAddress}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyMeta.copyWith(fontSize: 8),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    key: ValueKey(
+                      'buy-gst-${details == null ? 'add' : 'edit'}-'
+                      '${destination.name}',
+                    ),
+                    onPressed: () => showBuyV2GstInvoiceSheet(
+                      context,
+                      controller: controller,
+                      destination: destination,
+                    ),
+                    child: Text(details == null ? 'Add' : 'Edit'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Recipient and delivery details are recorded where GST invoice rules require them.',
+              style: context.buyMeta.copyWith(fontSize: 8),
+            ),
+            if (controller.message case final message?) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      message,
+                      key: const ValueKey('buy-gst-profile-message'),
+                      style: context.buyMeta.copyWith(
+                        fontSize: 9,
+                        color:
+                            message == 'GST details saved.' ||
+                                message ==
+                                    'GST details kept until you close the app.' ||
+                                message == 'GST details removed.'
+                            ? BuyV2Colors.navy
+                            : const Color(0xFFB42318),
+                      ),
+                    ),
+                  ),
+                  if (message ==
+                          'Saved GST details could not be loaded. Try again.' &&
+                      !controller.restoring)
+                    TextButton(
+                      key: const ValueKey('buy-gst-profiles-retry'),
+                      onPressed: controller.restore,
+                      child: const Text('Retry'),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _confirmRemoveGstProfile(
+  BuildContext context, {
+  required BuyV2GstInvoiceController controller,
+  required BuyV2GstInvoiceDetails profile,
+}) async {
+  final remove = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Remove GST details?'),
+      content: Text(
+        '${profile.legalName} will no longer appear in your saved GST details.',
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('buy-gst-remove-cancel'),
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Keep'),
+        ),
+        FilledButton(
+          key: const ValueKey('buy-gst-remove-confirm'),
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('Remove'),
+        ),
+      ],
+    ),
+  );
+  if (remove == true && context.mounted) {
+    await controller.removeSaved(profile);
+  }
+}
+
+Future<void> showBuyV2GstInvoiceSheet(
+  BuildContext context, {
+  required BuyV2GstInvoiceController controller,
+  required BuyV2Destination destination,
+}) {
+  final bottomSafeInset =
+      BuyV2AddressSheetMotion.resolveModalActionBottomInset(context) + 12.0;
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    routeSettings: const RouteSettings(name: 'buy-gst-invoice-details'),
+    builder: (context) => _BuyV2GstInvoiceSheet(
+      controller: controller,
+      destination: destination,
+      bottomSafeInset: bottomSafeInset,
+    ),
+  );
+}
+
+class _BuyV2GstInvoiceSheet extends StatefulWidget {
+  const _BuyV2GstInvoiceSheet({
+    required this.controller,
+    required this.destination,
+    required this.bottomSafeInset,
+  });
+
+  final BuyV2GstInvoiceController controller;
+  final BuyV2Destination destination;
+  final double bottomSafeInset;
+
+  @override
+  State<_BuyV2GstInvoiceSheet> createState() => _BuyV2GstInvoiceSheetState();
+}
+
+class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
+  late final TextEditingController _legalName;
+  late final TextEditingController _gstin;
+  late final TextEditingController _billingAddress;
+  late final FocusNode _legalNameFocus;
+  late final FocusNode _gstinFocus;
+  late final FocusNode _billingAddressFocus;
+  late bool _remember;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final current = widget.controller.detailsFor(widget.destination);
+    _legalName = TextEditingController(text: current?.legalName);
+    _gstin = TextEditingController(text: current?.gstin);
+    _billingAddress = TextEditingController(text: current?.billingAddress);
+    _remember = widget.controller.persistenceAvailable;
+    _legalNameFocus = FocusNode(debugLabel: 'GST legal name');
+    _gstinFocus = FocusNode(debugLabel: 'GSTIN');
+    _billingAddressFocus = FocusNode(debugLabel: 'GST billing address');
+  }
+
+  @override
+  void dispose() {
+    _legalName.dispose();
+    _gstin.dispose();
+    _billingAddress.dispose();
+    _legalNameFocus.dispose();
+    _gstinFocus.dispose();
+    _billingAddressFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final legalName = _legalName.text.trim();
+    final gstin = _gstin.text.trim().toUpperCase();
+    final address = _billingAddress.text.trim();
+    final gstinPattern = RegExp(
+      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$',
+    );
+    if (legalName.length < 3) {
+      _legalNameFocus.requestFocus();
+      setState(() => _error = 'Enter a legal name with at least 3 characters.');
+      return;
+    }
+    if (!gstinPattern.hasMatch(gstin)) {
+      _gstinFocus.requestFocus();
+      setState(() => _error = 'Check the 15-character GSTIN format.');
+      return;
+    }
+    if (address.length < 8) {
+      _billingAddressFocus.requestFocus();
+      setState(() => _error = 'Enter the complete billing address.');
+      return;
+    }
+    setState(() => _error = null);
+    final saved = await widget.controller.save(
+      destination: widget.destination,
+      legalName: legalName,
+      gstin: gstin,
+      billingAddress: address,
+      remember: _remember,
+    );
+    if (!mounted) return;
+    if (saved) {
+      Navigator.pop(context);
+    } else {
+      final message =
+          widget.controller.message ??
+          'GST details could not be saved. Try again.';
+      widget.controller.clearMessage();
+      setState(() => _error = message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final modalBottomInset = media.viewInsets.bottom > 0
+        ? 30.0
+        : widget.bottomSafeInset;
+    return AnimatedPadding(
+      key: const ValueKey('buy-gst-invoice-sheet'),
+      duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+      child: SafeArea(
+        top: false,
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: modalBottomInset),
+          child: FocusTraversalGroup(
+            policy: OrderedTraversalPolicy(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: media.size.height * .9),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: SingleChildScrollView(
+                      key: const ValueKey('buy-gst-form-scroll'),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'GST invoice details',
+                            style: context.buyTitle.copyWith(fontSize: 20),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'These details affect the invoice only. GST applies as required.',
+                            style: context.buyMeta,
+                          ),
+                          const SizedBox(height: 12),
+                          MergeSemantics(
+                            child: Semantics(
+                              label: 'Legal name',
+                              child: FocusTraversalOrder(
+                                order: const NumericFocusOrder(1),
+                                child: TextField(
+                                  key: const ValueKey('buy-gst-legal-name'),
+                                  controller: _legalName,
+                                  focusNode: _legalNameFocus,
+                                  textInputAction: TextInputAction.next,
+                                  onSubmitted: (_) =>
+                                      _gstinFocus.requestFocus(),
+                                  decoration: const InputDecoration(
+                                    label: Text('Legal name'),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          MergeSemantics(
+                            child: Semantics(
+                              label: 'GSTIN',
+                              child: FocusTraversalOrder(
+                                order: const NumericFocusOrder(2),
+                                child: TextField(
+                                  key: const ValueKey('buy-gst-gstin'),
+                                  controller: _gstin,
+                                  focusNode: _gstinFocus,
+                                  maxLength: 15,
+                                  autocorrect: false,
+                                  enableSuggestions: false,
+                                  textCapitalization:
+                                      TextCapitalization.characters,
+                                  textInputAction: TextInputAction.next,
+                                  onSubmitted: (_) =>
+                                      _billingAddressFocus.requestFocus(),
+                                  decoration: const InputDecoration(
+                                    label: Text('GSTIN'),
+                                    semanticCounterText:
+                                        '15 characters maximum',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          MergeSemantics(
+                            child: Semantics(
+                              label: 'Billing address',
+                              child: FocusTraversalOrder(
+                                order: const NumericFocusOrder(3),
+                                child: TextField(
+                                  key: const ValueKey(
+                                    'buy-gst-billing-address',
+                                  ),
+                                  controller: _billingAddress,
+                                  focusNode: _billingAddressFocus,
+                                  minLines: 2,
+                                  maxLines: 3,
+                                  textInputAction: TextInputAction.done,
+                                  onSubmitted: (_) =>
+                                      _billingAddressFocus.unfocus(),
+                                  decoration: const InputDecoration(
+                                    label: Text('Billing address'),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (widget.controller.persistenceAvailable)
+                            FocusTraversalOrder(
+                              order: const NumericFocusOrder(4),
+                              child: SwitchListTile.adaptive(
+                                key: const ValueKey('buy-gst-remember'),
+                                contentPadding: EdgeInsets.zero,
+                                value: _remember,
+                                onChanged: widget.controller.busy
+                                    ? null
+                                    : (value) =>
+                                          setState(() => _remember = value),
+                                title: Text(
+                                  widget.controller.sessionPersistenceOnly
+                                      ? 'Use again until you close the app'
+                                      : 'Remember these GST details',
+                                ),
+                                subtitle: Text(
+                                  widget.controller.sessionPersistenceOnly
+                                      ? 'These details are cleared when you close the app.'
+                                      : 'Reuse them on a later invoice.',
+                                ),
+                              ),
+                            )
+                          else
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Text(
+                                'These details will be used for this order only.',
+                                key: const ValueKey('buy-gst-session-only'),
+                                style: context.buyMeta,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  DecoratedBox(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(top: BorderSide(color: BuyV2Colors.line)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_error case final error?) ...[
+                            Semantics(
+                              liveRegion: true,
+                              label: error,
+                              child: Text(
+                                error,
+                                key: const ValueKey('buy-gst-error'),
+                                style: const TextStyle(
+                                  color: Color(0xFFB42318),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                          ],
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: FocusTraversalOrder(
+                              order: const NumericFocusOrder(5),
+                              child: FilledButton(
+                                key: const ValueKey('buy-gst-save'),
+                                onPressed: widget.controller.busy
+                                    ? null
+                                    : _save,
+                                child: widget.controller.busy
+                                    ? const SizedBox.square(
+                                        dimension: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Use GST details'),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _commercialPaymentTermTitle(BuyV2CommercialPaymentTerm term) =>
+    switch (term.kind) {
+      BuyV2CommercialPaymentTermKind.retailAdvance ||
+      BuyV2CommercialPaymentTermKind.wholesaleAdvance => 'Full advance',
+      BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch =>
+        'Booking amount · balance before dispatch',
+      BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery =>
+        'Booking amount · balance at delivery',
+      BuyV2CommercialPaymentTermKind.supplierCredit =>
+        'Supplier credit · ${term.netDays} days',
+      BuyV2CommercialPaymentTermKind.regulatedCredit =>
+        '${term.financierName} credit · ${term.netDays} days',
+    };
+
+String _commercialPaymentTermDetail(BuyV2CommercialPaymentTerm term) {
+  final amounts = term.balanceDue == 0
+      ? '${buyV2Money(term.amountDueNow)} payable now'
+      : '${buyV2Money(term.amountDueNow)} now · '
+            '${buyV2Money(term.balanceDue)} ${term.balanceDueLabel}';
+  if (term.kind == BuyV2CommercialPaymentTermKind.regulatedCredit) {
+    return '$amounts · APR ${term.annualPercentageRate!.toStringAsFixed(2)}% · '
+        'Key facts from ${term.financierName}';
+  }
+  if (term.kind == BuyV2CommercialPaymentTermKind.supplierCredit) {
+    return '$amounts · Published directly by ${term.supplierName}';
+  }
+  return amounts;
+}
+
+class _CheckoutQuoteCard extends StatelessWidget {
+  const _CheckoutQuoteCard({required this.session});
 
   final BuyV2Session session;
 
   @override
   Widget build(BuildContext context) {
-    final address = session.selectedAddressOrNull;
-    if (address == null) {
-      return _AddressSelectionRequired(
-        session: session,
-        title: 'Choose a delivery address',
-        detail:
-            'Your Cart is unchanged. Select or add an address before placing the order.',
+    if (!session.checkoutQuoteEnabled) return const SizedBox.shrink();
+    final quote = session.checkoutQuote;
+    if (session.checkoutQuoteLoadState != BuyV2CommerceLoadState.ready ||
+        quote == null ||
+        session.checkoutQuoteReviewRequired) {
+      final loading = session.checkoutQuoteBusy;
+      return Container(
+        key: ValueKey(
+          'buy-checkout-quote-${session.checkoutQuoteLoadState.name}',
+        ),
+        padding: const EdgeInsets.all(11),
+        decoration: buyV2CardDecoration(radius: 15),
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 38,
+              child: loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(
+                      Icons.receipt_long_outlined,
+                      color: BuyV2Colors.navy,
+                    ),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    loading
+                        ? 'Checking the current total'
+                        : 'Checkout total needs a refresh',
+                    style: context.buyTitle.copyWith(fontSize: 13),
+                  ),
+                  Text(
+                    loading
+                        ? 'Confirming tax, freight, delivery and savings.'
+                        : session.checkoutQuoteMessage ??
+                              'The previous total has expired. Try again.',
+                    style: context.buyMeta.copyWith(fontSize: 9),
+                  ),
+                ],
+              ),
+            ),
+            if (!loading)
+              TextButton(
+                key: const ValueKey('buy-checkout-quote-retry'),
+                onPressed: session.refreshCheckoutQuote,
+                child: const Text('Retry'),
+              ),
+          ],
+        ),
       );
     }
-    final destinations = session.checkoutDestinations;
-    return Column(
-      children: [
-        Expanded(
-          child: ListView(
-            key: const PageStorageKey('buy-checkout'),
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+    final itemSubtotal = quote.lines.fold<int>(
+      0,
+      (total, line) => total + line.itemSubtotal,
+    );
+    final couponSaving = quote.lines.fold<int>(
+      0,
+      (total, line) => total + line.couponSaving,
+    );
+    final tip = quote.lines.fold<int>(0, (total, line) => total + line.tip);
+    return Container(
+      key: const ValueKey('buy-checkout-live-quote'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              _ReturnAffordance(
-                label: 'Cart',
-                onTap: () => session.openCart(scope: session.checkoutScope),
-                tightHitOwner: true,
-                hitOwnerKey: const ValueKey('buy-checkout-return-cart'),
-                minimumHeight: 44,
+              Expanded(
+                child: Text(
+                  'Current Checkout total',
+                  style: context.buyTitle.copyWith(fontSize: 16),
+                ),
+              ),
+              Text(
+                'Checked now',
+                style: context.buyMeta.copyWith(
+                  color: BuyV2Colors.green,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          _CartAmountRow(label: 'Products', value: buyV2Money(itemSubtotal)),
+          if (couponSaving > 0)
+            _CartAmountRow(
+              label: 'Coupon saving',
+              value: '−${buyV2Money(couponSaving)}',
+              valueColor: BuyV2Colors.green,
+            ),
+          if (session.checkoutQuotedTax > 0)
+            _CartAmountRow(
+              label: 'GST and taxes',
+              value: buyV2Money(session.checkoutQuotedTax),
+            ),
+          if (session.checkoutQuotedFreight > 0)
+            _CartAmountRow(
+              label: 'Freight',
+              value: buyV2Money(session.checkoutQuotedFreight),
+            ),
+          if (session.checkoutQuotedDeliveryFee > 0)
+            _CartAmountRow(
+              label: 'Delivery fee',
+              value: buyV2Money(session.checkoutQuotedDeliveryFee),
+            ),
+          if (tip > 0)
+            _CartAmountRow(
+              label: 'Optional delivery tips',
+              value: buyV2Money(tip),
+            ),
+          if (session.checkoutQuotedPaymentCharge > 0)
+            _CartAmountRow(
+              label: 'Payment charge',
+              value: buyV2Money(session.checkoutQuotedPaymentCharge),
+            ),
+          const Divider(height: 16),
+          _CartAmountRow(
+            label: 'Order total',
+            value: buyV2Money(quote.total),
+            strong: true,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Quote ${quote.id} · valid until '
+            '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(quote.validUntil))}',
+            key: const ValueKey('buy-checkout-quote-validity'),
+            style: context.buyMeta.copyWith(fontSize: 8),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckoutCommercialPaymentTerms extends StatelessWidget {
+  const _CheckoutCommercialPaymentTerms({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!session.commercialPaymentTermsEnabled) {
+      return const SizedBox.shrink();
+    }
+    if (session.commercialPaymentTermsLoadState !=
+        BuyV2CommerceLoadState.ready) {
+      final loading = session.commercialPaymentTermsBusy;
+      return Container(
+        key: ValueKey(
+          'buy-checkout-payment-terms-'
+          '${session.commercialPaymentTermsLoadState.name}',
+        ),
+        padding: const EdgeInsets.all(11),
+        decoration: buyV2CardDecoration(radius: 15),
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 38,
+              child: loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(
+                      Icons.account_balance_wallet_outlined,
+                      color: BuyV2Colors.navy,
+                    ),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    loading
+                        ? 'Checking payment terms'
+                        : 'Payment terms need a refresh',
+                    style: context.buyTitle.copyWith(fontSize: 13),
+                  ),
+                  Text(
+                    loading
+                        ? 'Matching each delivery with its published terms.'
+                        : session.commercialPaymentTermsMessage ??
+                              'Reconnect and try again.',
+                    style: context.buyMeta.copyWith(fontSize: 9),
+                  ),
+                ],
+              ),
+            ),
+            if (!loading)
+              TextButton(
+                key: const ValueKey('buy-checkout-payment-terms-retry'),
+                onPressed: session.refreshCommercialPaymentTerms,
+                child: const Text('Retry'),
+              ),
+          ],
+        ),
+      );
+    }
+
+    final groups = session.checkoutFulfilmentGroups;
+    return Container(
+      key: const ValueKey('buy-checkout-payment-terms'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Payment terms', style: context.buyTitle.copyWith(fontSize: 16)),
+          const SizedBox(height: 2),
+          Text(
+            'Retail is paid in full. Wholesale terms are published by each supplier.',
+            style: context.buyMeta.copyWith(fontSize: 8.5),
+          ),
+          const SizedBox(height: 8),
+          for (
+            var groupIndex = 0;
+            groupIndex < groups.length;
+            groupIndex++
+          ) ...[
+            _CommercialPaymentTermGroup(
+              session: session,
+              group: groups[groupIndex],
+            ),
+            if (groupIndex < groups.length - 1) const Divider(height: 18),
+          ],
+          const Divider(height: 18),
+          Row(
+            children: [
+              Expanded(child: Text('Pay now', style: context.buyBody)),
+              Text(
+                buyV2Money(session.checkoutAmountDueNow),
+                key: const ValueKey('buy-checkout-amount-due-now'),
+                style: context.buyTitle.copyWith(fontSize: 15),
+              ),
+            ],
+          ),
+          if (session.checkoutBalanceDue > 0) ...[
+            const SizedBox(height: 3),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Balance due later', style: context.buyMeta),
+                ),
+                Text(
+                  buyV2Money(session.checkoutBalanceDue),
+                  key: const ValueKey('buy-checkout-balance-due'),
+                  style: context.buyBody,
+                ),
+              ],
+            ),
+          ],
+          if (session.commercialPaymentTermsMessage case final message?) ...[
+            const SizedBox(height: 6),
+            Text(
+              message,
+              key: const ValueKey('buy-checkout-payment-terms-message'),
+              style: context.buyMeta.copyWith(
+                color: BuyV2Colors.orange,
+                fontSize: 8.5,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CommercialPaymentTermGroup extends StatelessWidget {
+  const _CommercialPaymentTermGroup({
+    required this.session,
+    required this.group,
+  });
+
+  final BuyV2Session session;
+  final BuyV2FulfilmentGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    final terms = session.commercialPaymentTermsFor(group.key);
+    final selected = session.selectedCommercialPaymentTermFor(group.key);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${group.destination.label} · ${group.partner}',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: context.buyBody.copyWith(fontSize: 10.5),
+        ),
+        const SizedBox(height: 4),
+        if (terms.isEmpty)
+          Text(
+            'No payment term is available for this delivery.',
+            key: ValueKey('buy-payment-terms-empty-${group.key}'),
+            style: context.buyMeta.copyWith(
+              color: BuyV2Colors.orange,
+              fontSize: 9,
+            ),
+          )
+        else
+          RadioGroup<String>(
+            groupValue: selected?.id,
+            onChanged: (termId) {
+              final term = terms
+                  .where((candidate) => candidate.id == termId)
+                  .firstOrNull;
+              if (term != null) session.chooseCommercialPaymentTerm(term);
+            },
+            child: Column(
+              children: [
+                for (final term in terms)
+                  Semantics(
+                    selected: selected?.id == term.id,
+                    button: true,
+                    label:
+                        '${_commercialPaymentTermTitle(term)}. '
+                        '${_commercialPaymentTermDetail(term)}',
+                    child: Material(
+                      color: Colors.transparent,
+                      child: RadioListTile<String>(
+                        key: ValueKey('buy-payment-term-${term.id}'),
+                        value: term.id,
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        title: Text(
+                          _commercialPaymentTermTitle(term),
+                          style: context.buyBody.copyWith(fontSize: 10),
+                        ),
+                        subtitle: Text(
+                          _commercialPaymentTermDetail(term),
+                          style: context.buyMeta.copyWith(fontSize: 8.5),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class BuyV2CheckoutView extends StatelessWidget {
+  const BuyV2CheckoutView({
+    super.key,
+    required this.session,
+    required this.gstInvoiceController,
+    this.keyboardVisible = false,
+    this.paymentHandoff,
+  });
+
+  final BuyV2Session session;
+  final BuyV2GstInvoiceController gstInvoiceController;
+  final bool keyboardVisible;
+  final BuyV2PaymentHandoff? paymentHandoff;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([session, gstInvoiceController]),
+      builder: (context, _) {
+        final destinations = session.checkoutDestinations;
+        final wholesaleReceiving =
+            destinations.isNotEmpty &&
+            destinations.every(
+              (destination) => destination == BuyV2Destination.wholesale,
+            );
+        final invoiceDestinations = destinations
+            .where(
+              (destination) =>
+                  destination == BuyV2Destination.shop ||
+                  destination == BuyV2Destination.wholesale,
+            )
+            .toList(growable: false);
+        final missingDetails = invoiceDestinations
+            .where(
+              (destination) =>
+                  gstInvoiceController.requestedFor(destination) &&
+                  gstInvoiceController.detailsFor(destination) == null,
+            )
+            .toList(growable: false);
+        final step = session.checkoutStep;
+        final keyboardObscured =
+            keyboardVisible || MediaQuery.viewInsetsOf(context).bottom > 0;
+        final action = _checkoutPrimaryAction(
+          context,
+          session: session,
+          step: step,
+          missingDetails: missingDetails,
+          gstInvoiceController: gstInvoiceController,
+          paymentHandoff: paymentHandoff,
+        );
+        return Column(
+          children: [
+            Expanded(
+              child: ListView(
+                key: PageStorageKey('buy-checkout-${step.name}'),
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
+                children: [
+                  _ReturnAffordance(
+                    label: switch (step) {
+                      BuyV2CheckoutStep.address => 'Cart',
+                      BuyV2CheckoutStep.payment => 'Address',
+                      BuyV2CheckoutStep.confirm => 'Payment',
+                    },
+                    onTap: session.checkoutBusy
+                        ? () => session.showNotice(
+                            'Please wait while your payment status is checked.',
+                          )
+                        : session.goBack,
+                    tightHitOwner: true,
+                    hitOwnerKey: ValueKey(
+                      step == BuyV2CheckoutStep.address
+                          ? 'buy-checkout-return-cart'
+                          : 'buy-checkout-back',
+                    ),
+                    minimumHeight: 44,
+                  ),
+                  const SizedBox(height: 4),
+                  _CheckoutProgressHeader(activeStep: step),
+                  const SizedBox(height: 12),
+                  AnimatedSwitcher(
+                    duration: BuyV2Motion.resolved(
+                      context,
+                      BuyV2Motion.contentChange,
+                    ),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(.035, 0),
+                          end: Offset.zero,
+                        ).animate(animation),
+                        child: child,
+                      ),
+                    ),
+                    child: switch (step) {
+                      BuyV2CheckoutStep.address => _CheckoutAddressStage(
+                        key: const ValueKey('buy-checkout-address-stage'),
+                        session: session,
+                        wholesaleReceiving: wholesaleReceiving,
+                      ),
+                      BuyV2CheckoutStep.payment => _CheckoutPaymentStage(
+                        key: const ValueKey('buy-checkout-payment-stage'),
+                        session: session,
+                      ),
+                      BuyV2CheckoutStep.confirm => _CheckoutConfirmStage(
+                        key: const ValueKey('buy-checkout-confirm-stage'),
+                        session: session,
+                        gstInvoiceController: gstInvoiceController,
+                        invoiceDestinations: invoiceDestinations,
+                        wholesaleReceiving: wholesaleReceiving,
+                      ),
+                    },
+                  ),
+                ],
+              ),
+            ),
+            if (!keyboardObscured)
+              _CheckoutPrimaryActionBar(
+                session: session,
+                label: action.$1,
+                onPressed: action.$2,
+                busy: session.checkoutBusy,
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+(String, VoidCallback?) _checkoutPrimaryAction(
+  BuildContext context, {
+  required BuyV2Session session,
+  required BuyV2CheckoutStep step,
+  required List<BuyV2Destination> missingDetails,
+  required BuyV2GstInvoiceController gstInvoiceController,
+  required BuyV2PaymentHandoff? paymentHandoff,
+}) {
+  if (session.checkoutBusy) return ('Checking payment…', null);
+  final selectedPaymentAvailable = _buyV2CustomerPaymentChoices(
+    session,
+  ).any((choice) => choice.$1 == session.selectedPayment);
+  switch (step) {
+    case BuyV2CheckoutStep.address:
+      return ('Continue to payment', session.continueCheckoutFromAddress);
+    case BuyV2CheckoutStep.payment:
+      return switch (session.checkoutSubmissionState) {
+        BuyV2CheckoutSubmissionState.idle when !selectedPaymentAvailable => (
+          'Choose payment method',
+          null,
+        ),
+        BuyV2CheckoutSubmissionState.idle => (
+          'Review order',
+          session.continueCheckoutFromPayment,
+        ),
+        BuyV2CheckoutSubmissionState.paymentActionRequired => (
+          'Pay ${buyV2Money(session.checkoutAmountDueNow)}',
+          paymentHandoff == null
+              ? () => session.showNotice(
+                  'Payment is unavailable right now. Try again shortly.',
+                )
+              : () => session.continuePayment(paymentHandoff),
+        ),
+        BuyV2CheckoutSubmissionState.paymentPending ||
+        BuyV2CheckoutSubmissionState.paymentUnknown => (
+          'Check payment',
+          session.reconcilePayment,
+        ),
+        BuyV2CheckoutSubmissionState.cancelled => (
+          'Choose again',
+          session.retryCheckoutPayment,
+        ),
+        BuyV2CheckoutSubmissionState.failed ||
+        BuyV2CheckoutSubmissionState.unavailable => (
+          'Try payment again',
+          session.retryCheckoutPayment,
+        ),
+        BuyV2CheckoutSubmissionState.submitting => ('Checking payment…', null),
+        BuyV2CheckoutSubmissionState.confirmed => ('Order confirmed', null),
+      };
+    case BuyV2CheckoutStep.confirm:
+      if (missingDetails.isNotEmpty) {
+        return (
+          'Add GST details',
+          () => showBuyV2GstInvoiceSheet(
+            context,
+            controller: gstInvoiceController,
+            destination: missingDetails.first,
+          ),
+        );
+      }
+      final reviewBlocked =
+          session.checkoutQuoteReviewRequired ||
+          session.checkoutPaymentTermsReviewRequired ||
+          session.checkoutBenefitReviewRequired ||
+          session.checkoutPriceReviewRequired ||
+          session.checkoutPromiseReviewRequired;
+      return ('Place order', reviewBlocked ? null : session.submitOrder);
+  }
+}
+
+class _CheckoutProgressHeader extends StatelessWidget {
+  const _CheckoutProgressHeader({required this.activeStep});
+
+  final BuyV2CheckoutStep activeStep;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeIndex = BuyV2CheckoutStep.values.indexOf(activeStep);
+    const labels = ['Address', 'Payment', 'Confirm order'];
+    return Semantics(
+      key: ValueKey('buy-checkout-progress-${activeStep.name}'),
+      container: true,
+      label: '${labels[activeIndex]}, step ${activeIndex + 1} of 3',
+      child: ExcludeSemantics(
+        child: Row(
+          children: [
+            for (var index = 0; index < labels.length; index++) ...[
+              Expanded(
+                child: AnimatedContainer(
+                  duration: BuyV2Motion.resolved(
+                    context,
+                    BuyV2Motion.stateChange,
+                  ),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: index == activeIndex
+                        ? BuyV2Colors.navy
+                        : index < activeIndex
+                        ? BuyV2Colors.softBlue
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(
+                      color: index <= activeIndex
+                          ? BuyV2Colors.navy
+                          : BuyV2Colors.line,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        index < activeIndex
+                            ? Icons.check_rounded
+                            : switch (index) {
+                                0 => Icons.location_on_outlined,
+                                1 => Icons.account_balance_wallet_outlined,
+                                _ => Icons.verified_outlined,
+                              },
+                        size: 15,
+                        color: index == activeIndex
+                            ? Colors.white
+                            : BuyV2Colors.navy,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          labels[index],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: index == activeIndex
+                                ? Colors.white
+                                : BuyV2Colors.navy,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (index != labels.length - 1) const SizedBox(width: 5),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckoutAddressStage extends StatelessWidget {
+  const _CheckoutAddressStage({
+    super.key,
+    required this.session,
+    required this.wholesaleReceiving,
+  });
+
+  final BuyV2Session session;
+  final bool wholesaleReceiving;
+
+  @override
+  Widget build(BuildContext context) {
+    final addresses = session.addresses;
+    final selectedId = session.selectedAddressId;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          wholesaleReceiving ? 'Receiving address' : 'Delivery address',
+          style: context.buyTitle.copyWith(fontSize: 21),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          wholesaleReceiving
+              ? 'Choose where this Wholesale or Bulk purchase will be received.'
+              : 'Choose where this order should be delivered.',
+          style: context.buyMeta,
+        ),
+        const SizedBox(height: 11),
+        if (addresses.isEmpty)
+          Container(
+            key: const ValueKey('buy-checkout-address-empty'),
+            padding: const EdgeInsets.all(14),
+            decoration: buyV2CardDecoration(
+              color: BuyV2Colors.softBlue,
+              radius: 16,
+            ),
+            child: Text(
+              'Add an address to continue.',
+              textAlign: TextAlign.center,
+              style: context.buyBody,
+            ),
+          )
+        else
+          for (final address in addresses) ...[
+            _CheckoutAddressChoice(
+              address: address,
+              selected: selectedId == address.id,
+              onSelect: () => session.chooseAddress(address.id),
+              onEdit: () => _showAddAddressSheet(
+                context,
+                session,
+                existingAddress: address,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        SizedBox(
+          height: BuyV2Metrics.minimumTap,
+          child: OutlinedButton.icon(
+            key: const ValueKey('buy-checkout-add-address'),
+            onPressed: () => _showAddAddressSheet(context, session),
+            icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+            label: const Text('Add another address'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CheckoutAddressChoice extends StatelessWidget {
+  const _CheckoutAddressChoice({
+    required this.address,
+    required this.selected,
+    required this.onSelect,
+    required this.onEdit,
+  });
+
+  final BuyV2Address address;
+  final bool selected;
+  final VoidCallback onSelect;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: ValueKey('buy-checkout-address-${address.id}'),
+      container: true,
+      selected: selected,
+      button: true,
+      label:
+          '${address.label}. ${address.recipient}. ${address.line}, ${address.shortLine}.',
+      onTap: onSelect,
+      child: ExcludeSemantics(
+        child: Material(
+          color: selected ? BuyV2Colors.softBlue : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: selected ? BuyV2Colors.navy : BuyV2Colors.line,
+              width: selected ? 1.4 : 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onSelect,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 11, 5, 11),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    selected
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_off_rounded,
+                    color: BuyV2Colors.navy,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(address.label, style: context.buyBody),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${address.recipient} · ${address.phone}',
+                          style: context.buyMeta.copyWith(
+                            color: BuyV2Colors.ink,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${address.line}, ${address.shortLine}',
+                          style: context.buyMeta,
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    key: ValueKey('buy-checkout-address-edit-${address.id}'),
+                    onPressed: onEdit,
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(58, 44),
+                    ),
+                    child: const Text('Edit'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+List<(String, IconData, String)> _buyV2CustomerPaymentChoices(
+  BuyV2Session session,
+) =>
+    [
+          (
+            'PhonePe',
+            Icons.phone_android_rounded,
+            'Secure payment collected by MoolSocial',
+          ),
+          (
+            'Paytm',
+            Icons.account_balance_wallet_rounded,
+            'Secure payment collected by MoolSocial',
+          ),
+          (
+            'Pine Labs',
+            Icons.credit_card_rounded,
+            'Secure card or UPI collection by MoolSocial',
+          ),
+          if (session.cashOnDeliveryEligibleForCheckout)
+            (
+              'Cash on Delivery',
+              Icons.payments_outlined,
+              'Pay when this eligible Shop order arrives',
+            ),
+          if (session.purchaseOrderEligibleForCheckout)
+            (
+              'Purchase order',
+              Icons.receipt_long_outlined,
+              'Available for this eligible Wholesale or Bulk purchase',
+            ),
+        ]
+        .where((choice) => session.availablePaymentMethods.contains(choice.$1))
+        .toList(growable: false);
+
+class _CheckoutPaymentStage extends StatelessWidget {
+  const _CheckoutPaymentStage({super.key, required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final choices = _buyV2CustomerPaymentChoices(session);
+    final state = session.checkoutSubmissionState;
+    final selecting = state == BuyV2CheckoutSubmissionState.idle;
+    final paymentOffer = session
+        .selectedCartBenefitsFor(session.checkoutDestinations)
+        .where((benefit) => benefit.kind == BuyV2CartBenefitKind.paymentOffer)
+        .firstOrNull;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Payment', style: context.buyTitle.copyWith(fontSize: 21)),
+        const SizedBox(height: 3),
+        Text('Choose how you want to pay MoolSocial.', style: context.buyMeta),
+        const SizedBox(height: 10),
+        Container(
+          key: const ValueKey('buy-checkout-payment-summary'),
+          padding: const EdgeInsets.all(12),
+          decoration: buyV2CardDecoration(
+            color: BuyV2Colors.softBlue,
+            border: BuyV2Colors.navy,
+            radius: 16,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Amount to MoolSocial', style: context.buyMeta),
+              const SizedBox(height: 1),
+              Text(
+                buyV2Money(session.checkoutAmountDueNow),
+                style: context.buyTitle.copyWith(fontSize: 25),
               ),
               const SizedBox(height: 7),
-              Text(
-                'Review order',
-                style: context.buyTitle.copyWith(fontSize: 19),
+              _CheckoutPaymentFact(
+                label: 'Provider charge',
+                value: session.checkoutQuotedPaymentCharge > 0
+                    ? buyV2Money(session.checkoutQuotedPaymentCharge)
+                    : 'No extra provider charge',
               ),
-              const SizedBox(height: 8),
-              _SavedAddressReminder(
-                address: address,
-                onEdit: () => showBuyV2AddressSheet(context, session),
+              _CheckoutPaymentFact(
+                label: 'Payment offer',
+                value: paymentOffer == null
+                    ? 'No offer selected'
+                    : '${paymentOffer.title} · ${_cartBenefitSponsorLabel(paymentOffer)}',
               ),
-              const SizedBox(height: 9),
-              for (final group in session.checkoutFulfilmentGroups) ...[
-                _CheckoutCard(
-                  icon: switch (group.destination) {
-                    BuyV2Destination.shop => Icons.storefront_outlined,
-                    BuyV2Destination.wholesale => Icons.inventory_2_outlined,
-                    BuyV2Destination.medicine => Icons.medication_outlined,
-                    BuyV2Destination.orders => Icons.receipt_long_outlined,
-                  },
-                  title:
-                      '${group.destination.label} fulfilment · ${group.partner}',
-                  detail: [
-                    '${group.partnerType} · ${_productCountLabel(group.itemCount)} · ${buyV2Money(group.total)}',
-                    group.promise,
-                    if (session.selectedDeliveryInstructionFor(
-                          group.destination,
-                        )
-                        case final instruction?)
-                      '${_deliveryInstructionOwner(group.destination)} · ${instruction.label}',
-                    if (session.tipForGroup(group) > 0)
-                      'Optional delivery tip · ${buyV2Money(session.tipForGroup(group))}',
-                  ].join('\n'),
-                ),
-                const SizedBox(height: 7),
-              ],
-              for (final benefit in session.selectedCartBenefitsFor(
-                destinations,
-              )) ...[
-                _CheckoutCard(
-                  key: ValueKey(
-                    'buy-checkout-benefit-${benefit.destination.name}-'
-                    '${benefit.kind.name}',
-                  ),
-                  icon: benefit.kind == BuyV2CartBenefitKind.coupon
-                      ? Icons.local_offer_outlined
-                      : Icons.account_balance_wallet_outlined,
-                  title:
-                      '${benefit.destination.label} '
-                      '${benefit.kind == BuyV2CartBenefitKind.coupon ? 'coupon' : 'payment offer'} selected',
-                  detail:
-                      '${benefit.title}\nEligibility and any saving will be '
-                      'confirmed before payment. No amount has been deducted '
-                      'from this review total.',
-                  action: 'Review',
-                  onTap: () => _openCartBenefitsPage(
-                    context,
-                    session: session,
-                    kind: benefit.kind,
-                    destination: benefit.destination,
-                  ),
-                ),
-                const SizedBox(height: 7),
-              ],
-              const SizedBox(height: 11),
-              _CheckoutCard(
-                icon: Icons.account_balance_wallet_outlined,
-                title: 'Payment · ${session.selectedPayment}',
-                detail: destinations.contains(BuyV2Destination.wholesale)
-                    ? 'UPI, bank transfer or purchase order. Each order keeps its own payment record.'
-                    : 'Selected payment method for this order.',
-                action: 'Change',
-                onTap: () => showBuyV2PaymentSheet(context, session),
-              ),
-              const SizedBox(height: 8),
             ],
           ),
         ),
-        Container(
-          key: const ValueKey('buy-checkout-action-bar'),
-          padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: BuyV2Colors.line)),
+        if (!selecting) ...[
+          const SizedBox(height: 9),
+          _CheckoutPaymentStateRow(session: session),
+        ],
+        const SizedBox(height: 12),
+        Text('Payment method', style: context.buyBody),
+        const SizedBox(height: 7),
+        if (choices.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: buyV2CardDecoration(
+              color: BuyV2Colors.softOrange,
+              radius: 14,
+            ),
+            child: Text(
+              'Payment methods are unavailable right now. Try again shortly.',
+              style: context.buyMeta,
+            ),
+          )
+        else
+          for (final choice in choices) ...[
+            _BuyV2PaymentChoice(
+              choice: choice,
+              selected: session.selectedPayment == choice.$1,
+              onTap: selecting
+                  ? () {
+                      HapticFeedback.selectionClick();
+                      session.choosePayment(choice.$1);
+                    }
+                  : () => session.showNotice(
+                      'Complete the current payment before changing the method.',
+                    ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        if (session.selectedPayment == 'Purchase order')
+          Container(
+            key: const ValueKey('buy-purchase-order-details'),
+            margin: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsets.all(11),
+            decoration: buyV2CardDecoration(
+              color: BuyV2Colors.softBlue.withValues(alpha: .45),
+              radius: 14,
+            ),
+            child: Semantics(
+              textField: true,
+              label: 'Purchase order reference',
+              child: TextFormField(
+                key: const ValueKey('buy-purchase-order-reference'),
+                initialValue: session.purchaseOrderReference,
+                enabled: selecting,
+                textInputAction: TextInputAction.done,
+                textCapitalization: TextCapitalization.characters,
+                maxLength: 40,
+                onChanged: session.updatePurchaseOrderReference,
+                decoration: const InputDecoration(
+                  labelText: 'Purchase order reference',
+                  hintText: 'For example, PO-2026-184',
+                  helperText:
+                      'Use the reference approved in your procurement record.',
+                  counterText: '',
+                ),
+              ),
+            ),
           ),
+      ],
+    );
+  }
+}
+
+class _CheckoutPaymentFact extends StatelessWidget {
+  const _CheckoutPaymentFact({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 92, child: Text(label, style: context.buyMeta)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: context.buyMeta.copyWith(
+                color: BuyV2Colors.navy,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckoutPaymentStateRow extends StatelessWidget {
+  const _CheckoutPaymentStateRow({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = session.checkoutSubmissionState;
+    final content = switch (state) {
+      BuyV2CheckoutSubmissionState.submitting => (
+        Icons.autorenew_rounded,
+        'Checking payment',
+        'Please wait. Do not start another payment.',
+      ),
+      BuyV2CheckoutSubmissionState.paymentActionRequired => (
+        Icons.lock_outline_rounded,
+        'Ready for secure payment',
+        'Pay ${buyV2Money(session.checkoutAmountDueNow)} to MoolSocial with ${session.selectedPayment}.',
+      ),
+      BuyV2CheckoutSubmissionState.paymentPending => (
+        Icons.schedule_rounded,
+        'Payment confirmation pending',
+        'Do not pay again. Check the same payment for an update.',
+      ),
+      BuyV2CheckoutSubmissionState.paymentUnknown => (
+        Icons.help_outline_rounded,
+        'Payment status needs checking',
+        'Do not pay again until this payment has been checked.',
+      ),
+      BuyV2CheckoutSubmissionState.cancelled => (
+        Icons.cancel_outlined,
+        'Payment cancelled',
+        'No order was placed. Your Cart is unchanged.',
+      ),
+      BuyV2CheckoutSubmissionState.failed => (
+        Icons.error_outline_rounded,
+        'Payment not completed',
+        'No order was placed. Your Cart is unchanged.',
+      ),
+      BuyV2CheckoutSubmissionState.unavailable => (
+        Icons.cloud_off_outlined,
+        'Payment unavailable right now',
+        'No order was placed. Try again shortly.',
+      ),
+      BuyV2CheckoutSubmissionState.idle ||
+      BuyV2CheckoutSubmissionState.confirmed => (
+        Icons.check_circle_outline_rounded,
+        '',
+        '',
+      ),
+    };
+    final attention =
+        state == BuyV2CheckoutSubmissionState.paymentPending ||
+        state == BuyV2CheckoutSubmissionState.paymentUnknown ||
+        state == BuyV2CheckoutSubmissionState.failed ||
+        state == BuyV2CheckoutSubmissionState.unavailable;
+    return Semantics(
+      key: ValueKey('buy-checkout-payment-state-${state.name}'),
+      container: true,
+      liveRegion: true,
+      label: '${content.$2}. ${content.$3}',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        decoration: buyV2CardDecoration(
+          color: attention ? BuyV2Colors.softOrange : BuyV2Colors.softBlue,
+          border: attention ? BuyV2Colors.orange : BuyV2Colors.navy,
+          radius: 13,
+        ),
+        child: Row(
+          children: [
+            if (state == BuyV2CheckoutSubmissionState.submitting)
+              const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.2),
+              )
+            else
+              Icon(content.$1, color: BuyV2Colors.navy, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(content.$2, style: context.buyBody),
+                  Text(content.$3, style: context.buyMeta),
+                ],
+              ),
+            ),
+            if (state == BuyV2CheckoutSubmissionState.paymentActionRequired)
+              TextButton(
+                key: const ValueKey('buy-checkout-cancel-payment'),
+                onPressed: session.cancelPaymentAttempt,
+                style: TextButton.styleFrom(minimumSize: const Size(62, 44)),
+                child: const Text('Cancel'),
+              ),
+            if (state == BuyV2CheckoutSubmissionState.paymentPending)
+              TextButton(
+                key: const ValueKey('buy-checkout-payment-not-shown'),
+                onPressed: session.markPaymentStatusNeedsChecking,
+                style: TextButton.styleFrom(minimumSize: const Size(76, 44)),
+                child: const Text('Not shown?'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckoutConfirmStage extends StatelessWidget {
+  const _CheckoutConfirmStage({
+    super.key,
+    required this.session,
+    required this.gstInvoiceController,
+    required this.invoiceDestinations,
+    required this.wholesaleReceiving,
+  });
+
+  final BuyV2Session session;
+  final BuyV2GstInvoiceController gstInvoiceController;
+  final List<BuyV2Destination> invoiceDestinations;
+  final bool wholesaleReceiving;
+
+  @override
+  Widget build(BuildContext context) {
+    final address = session.selectedAddressOrNull;
+    final groups = session.checkoutFulfilmentGroups;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Confirm order', style: context.buyTitle.copyWith(fontSize: 21)),
+        const SizedBox(height: 3),
+        Text(
+          'Check the address, deliveries and payment before placing the order.',
+          style: context.buyMeta,
+        ),
+        const SizedBox(height: 10),
+        _CheckoutCard(
+          key: const ValueKey('buy-checkout-confirm-address'),
+          icon: Icons.location_on_outlined,
+          title: wholesaleReceiving ? 'Receiving address' : 'Delivery address',
+          detail: address == null
+              ? 'Choose an address to continue.'
+              : '${address.recipient} · ${address.phone}\n${address.line}, ${address.shortLine}',
+          action: 'Change',
+          onTap: () => session.showCheckoutStep(BuyV2CheckoutStep.address),
+        ),
+        const SizedBox(height: 8),
+        for (final destination in invoiceDestinations) ...[
+          _GstInvoiceCard(
+            destination: destination,
+            controller: gstInvoiceController,
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (session.checkoutQuoteEnabled) ...[
+          _CheckoutQuoteCard(session: session),
+          const SizedBox(height: 8),
+        ],
+        if (session.commercialPaymentTermsEnabled) ...[
+          _CheckoutCommercialPaymentTerms(session: session),
+          const SizedBox(height: 8),
+        ],
+        if (session.checkoutBenefitReviewRequired) ...[
+          _CartBenefitEligibilityState(session: session),
+          const SizedBox(height: 8),
+        ],
+        if (session.checkoutPriceReviewRequired) ...[
+          _CheckoutPriceChangeReview(session: session),
+          const SizedBox(height: 8),
+        ],
+        if (session.checkoutPromiseReviewRequired) ...[
+          _CheckoutPromiseChangeReview(session: session),
+          const SizedBox(height: 8),
+        ],
+        Text('Deliveries', style: context.buyBody),
+        const SizedBox(height: 7),
+        for (var index = 0; index < groups.length; index++) ...[
+          _CheckoutDeliverySummaryCard(
+            key: ValueKey('buy-checkout-confirm-delivery-${groups[index].key}'),
+            group: groups[index],
+            shipmentNumber: index + 1,
+          ),
+          if (groups[index].destination == BuyV2Destination.wholesale) ...[
+            const SizedBox(height: 5),
+            _WholesaleCheckoutReceivingLines(group: groups[index]),
+          ],
+          const SizedBox(height: 8),
+        ],
+        _CheckoutCard(
+          key: const ValueKey('buy-checkout-confirm-payment'),
+          icon: Icons.account_balance_wallet_outlined,
+          title: 'Payment · ${session.selectedPayment}',
+          detail: switch (session.selectedPayment) {
+            'Purchase order' =>
+              'Amount · ${buyV2Money(session.checkoutAmountDueNow)}\nPurchase order · ${session.purchaseOrderReference.trim()}',
+            'Cash on Delivery' =>
+              'Amount due on delivery · ${buyV2Money(session.checkoutAmountDueNow)}',
+            _ =>
+              'Amount to MoolSocial · ${buyV2Money(session.checkoutAmountDueNow)}\nYour order is placed after payment is confirmed.',
+          },
+          action: 'Change',
+          onTap: () => session.showCheckoutStep(BuyV2CheckoutStep.payment),
+        ),
+      ],
+    );
+  }
+}
+
+class _CheckoutPrimaryActionBar extends StatelessWidget {
+  const _CheckoutPrimaryActionBar({
+    required this.session,
+    required this.label,
+    required this.onPressed,
+    required this.busy,
+  });
+
+  final BuyV2Session session;
+  final String label;
+  final VoidCallback? onPressed;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey('buy-checkout-action-bar'),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: BuyV2Colors.line)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
           child: Row(
             children: [
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _productCountLabel(session.checkoutItemCount),
+                      _checkoutDockCountLabel(session),
                       style: context.buyMeta.copyWith(fontSize: 8),
                     ),
                     Text(
-                      buyV2Money(session.checkoutPayableTotal),
+                      buyV2Money(session.checkoutAmountDueNow),
                       style: const TextStyle(
                         color: BuyV2Colors.navy,
                         fontSize: 19,
@@ -2353,57 +7284,384 @@ class BuyV2CheckoutView extends StatelessWidget {
                   ],
                 ),
               ),
-              SizedBox(
-                width: 176,
-                height: 44,
-                child: FilledButton(
-                  onPressed: session.confirmOrder,
-                  child: const Text('Place order'),
+              const SizedBox(width: 10),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 164, maxWidth: 210),
+                child: SizedBox(
+                  height: BuyV2Metrics.minimumTap,
+                  child: FilledButton(
+                    key: ValueKey(
+                      'buy-checkout-primary-${session.checkoutStep.name}',
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: BuyV2Colors.navy,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: BuyV2Colors.line,
+                      disabledForegroundColor: BuyV2Colors.muted,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: onPressed,
+                    child: busy
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.2,
+                            ),
+                          )
+                        : Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                  ),
                 ),
               ),
             ],
           ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _WholesaleCheckoutReceivingLines extends StatelessWidget {
+  const _WholesaleCheckoutReceivingLines({required this.group});
+
+  final BuyV2FulfilmentGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: ValueKey('buy-wholesale-checkout-receiving-lines-${group.key}'),
+      container: true,
+      explicitChildNodes: true,
+      label:
+          'Products in this Wholesale delivery. '
+          '${_productCountLabel(group.lines.length)}. '
+          '${_packCountLabel(group.itemCount)}.',
+      child: Container(
+        padding: const EdgeInsets.all(9),
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softBlue.withValues(alpha: .55),
+          border: const Color(0x24000080),
+          radius: 14,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Products and trade packs',
+              style: context.buyBody.copyWith(
+                color: BuyV2Colors.navy,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            for (var index = 0; index < group.lines.length; index++) ...[
+              _WholesaleCheckoutReceivingLine(line: group.lines[index]),
+              if (index != group.lines.length - 1)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Divider(height: 1, color: BuyV2Colors.line),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WholesaleCheckoutReceivingLine extends StatelessWidget {
+  const _WholesaleCheckoutReceivingLine({required this.line});
+
+  final BuyV2CartLine line;
+
+  @override
+  Widget build(BuildContext context) {
+    final product = line.product;
+    final quantityLabel = _packCountLabel(line.quantity);
+    final semanticLabel =
+        '${product.title}. $quantityLabel. ${product.pack}. '
+        'Minimum order ${product.minimumOrder} packs. '
+        '${buyV2Money(product.price)} per pack. ${product.unitPrice}. '
+        'Line subtotal ${buyV2Money(line.total)}.';
+    return Semantics(
+      key: ValueKey('buy-wholesale-checkout-receiving-line-${product.id}'),
+      container: true,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked =
+              constraints.maxWidth < 290 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.2;
+          final details = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                product.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: context.buyBody.copyWith(fontSize: 10),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$quantityLabel · ${product.pack}',
+                style: context.buyMeta.copyWith(
+                  color: BuyV2Colors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'MOQ ${product.minimumOrder} · '
+                '${buyV2Money(product.price)} per pack · ${product.unitPrice}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: context.buyMeta.copyWith(fontSize: 8),
+              ),
+            ],
+          );
+          final subtotal = Column(
+            crossAxisAlignment: stacked
+                ? CrossAxisAlignment.start
+                : CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Line subtotal',
+                style: context.buyMeta.copyWith(fontSize: 8),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                buyV2Money(line.total),
+                style: const TextStyle(
+                  color: BuyV2Colors.navy,
+                  fontSize: 14,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          );
+          if (stacked) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [details, const SizedBox(height: 6), subtotal],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: details),
+              const SizedBox(width: 10),
+              subtotal,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CheckoutPriceChangeReview extends StatelessWidget {
+  const _CheckoutPriceChangeReview({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final changes = session.checkoutPriceChanges;
+    return Semantics(
+      key: const ValueKey('buy-checkout-price-change-review'),
+      container: true,
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(11),
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softOrange,
+          border: BuyV2Colors.orange,
+          radius: 15,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Prices changed',
+              style: context.buyTitle.copyWith(fontSize: 15),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Review the updated prices and total before placing this order.',
+              style: context.buyMeta,
+            ),
+            const SizedBox(height: 8),
+            for (final change in changes) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      change.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyBody,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${buyV2Money(change.previousPrice)} → '
+                    '${buyV2Money(change.currentPrice)}',
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.navy,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
+            SizedBox(
+              width: double.infinity,
+              height: BuyV2Metrics.minimumTap,
+              child: FilledButton(
+                key: const ValueKey('buy-checkout-accept-prices'),
+                onPressed: session.acceptCheckoutPriceChanges,
+                child: const Text('Accept updated prices'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckoutPromiseChangeReview extends StatelessWidget {
+  const _CheckoutPromiseChangeReview({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final changes = session.checkoutDeliveryPromiseChanges;
+    return Container(
+      key: const ValueKey('buy-checkout-promise-change-review'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(
+        color: BuyV2Colors.softOrange,
+        border: const Color(0x44FF9933),
+        radius: 16,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Delivery times changed',
+            style: context.buyTitle.copyWith(fontSize: 15),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Nothing has been placed. Review the new promises before continuing.',
+            style: context.buyMeta.copyWith(fontSize: 8.5),
+          ),
+          for (final change in changes) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Previous · ${buyV2DeliveryPromiseSummary(promise: change.previousPromise, promisedByLabel: change.previousPromisedByLabel)}',
+              style: context.buyMeta.copyWith(fontSize: 8.5),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Updated · ${buyV2DeliveryPromiseSummary(promise: change.currentPromise, promisedByLabel: change.currentPromisedByLabel)}',
+              style: context.buyBody.copyWith(
+                color: BuyV2Colors.navy,
+                fontSize: 10,
+              ),
+            ),
+          ],
+          const SizedBox(height: 9),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: FilledButton(
+              key: const ValueKey('buy-accept-updated-delivery-times'),
+              onPressed: session.acceptCheckoutPromiseChanges,
+              child: const Text('Accept updated times'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class BuyV2ConfirmationView extends StatelessWidget {
-  const BuyV2ConfirmationView({super.key, required this.session});
+  const BuyV2ConfirmationView({
+    super.key,
+    required this.session,
+    this.invoiceDownloader,
+  });
 
   final BuyV2Session session;
+  final BuyV2InvoiceDownloader? invoiceDownloader;
 
   @override
   Widget build(BuildContext context) {
     final address = session.selectedAddressOrNull;
     return ListView(
       key: const ValueKey('buy-confirmation'),
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
       children: [
         Container(
-          padding: const EdgeInsets.all(10),
+          key: const ValueKey('buy-confirmation-success'),
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
           decoration: buyV2CardDecoration(
             color: BuyV2Colors.softGreen,
             border: const Color(0x33138808),
+            radius: 18,
           ),
           child: Column(
             children: [
-              const Icon(
-                Icons.check_circle_rounded,
-                color: BuyV2Colors.green,
-                size: 32,
+              _OrderPlacedSuccessMark(
+                key: ValueKey(
+                  'buy-order-success-${session.confirmedPurchaseId}',
+                ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 7),
               Text(
                 'Order placed',
-                style: context.buyTitle.copyWith(fontSize: 20),
+                style: context.buyTitle.copyWith(fontSize: 22),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
-                '${_productCountLabel(session.confirmedItemCount)} · ${buyV2Money(session.confirmedTotal)}',
+                '${_productCountLabel(session.confirmedProductCount)} · ${buyV2Money(session.confirmedTotal)}',
                 style: context.buyBody,
               ),
+              if (session.confirmedBalanceDue > 0) ...[
+                const SizedBox(height: 3),
+                Text(
+                  'Paid now ${buyV2Money(session.confirmedAmountPaidNow)} · '
+                  'Balance ${buyV2Money(session.confirmedBalanceDue)}',
+                  key: const ValueKey('buy-confirmation-payment-schedule'),
+                  style: context.buyMeta.copyWith(
+                    color: BuyV2Colors.navy,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+              if (session.confirmedPurchaseId case final purchaseId?) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Order reference · $purchaseId',
+                  style: context.buyMeta.copyWith(fontSize: 8.5),
+                ),
+              ],
               const SizedBox(height: 3),
               Text(
                 address == null
@@ -2416,32 +7674,51 @@ class BuyV2ConfirmationView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        for (final order in session.confirmedOrders) ...[
-          _CheckoutCard(
-            icon: switch (order.destination) {
-              BuyV2Destination.shop => Icons.shopping_bag_outlined,
-              BuyV2Destination.wholesale => Icons.inventory_2_outlined,
-              BuyV2Destination.medicine => Icons.medication_outlined,
-              BuyV2Destination.orders => Icons.receipt_long_outlined,
-            },
-            title: '${order.destination.label} order confirmed',
-            detail: [
-              '${order.id} · ${order.partner}',
-              order.promise,
-              if (order.deliveryInstruction != null)
-                '${_deliveryInstructionOwner(order.destination)} · ${order.deliveryInstruction}',
-              if (order.tip > 0) 'Delivery tip · ${buyV2Money(order.tip)}',
-            ].join('\n'),
+        Semantics(
+          header: true,
+          child: Text(
+            'Your deliveries',
+            style: context.buyTitle.copyWith(fontSize: 16),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          session.confirmedOrders.length == 1
+              ? 'Your delivery has its own status and order details.'
+              : 'This purchase is split into ${session.confirmedOrders.length} deliveries, each with its own status.',
+          style: context.buyMeta.copyWith(fontSize: 8.5),
+        ),
+        const SizedBox(height: 7),
+        for (final (index, order) in session.confirmedOrders.indexed) ...[
+          _PlacedOrderCard(
+            order: order,
+            deliveryIndex: index,
+            deliveryCount: session.confirmedOrders.length,
+            onViewInvoice: () => showBuyV2InvoicePage(
+              context,
+              order: order,
+              downloader: invoiceDownloader,
+            ),
           ),
           const SizedBox(height: 8),
         ],
-        FilledButton(
-          key: const ValueKey('buy-confirmation-orders'),
-          onPressed: session.openOrders,
-          child: const Text('View orders'),
+        SizedBox(
+          height: BuyV2Metrics.minimumTap,
+          child: FilledButton(
+            key: const ValueKey('buy-confirmation-order-details'),
+            onPressed: () {
+              if (session.confirmedOrders.length == 1) {
+                session.openTracking(session.confirmedOrders.single.id);
+              } else {
+                session.openOrders();
+              }
+            },
+            child: const Text('View order details'),
+          ),
         ),
-        const SizedBox(height: 8),
-        OutlinedButton(
+        const SizedBox(height: 4),
+        TextButton(
+          key: const ValueKey('buy-confirmation-continue-shopping'),
           onPressed: () => session.openDestination(BuyV2Destination.shop),
           child: const Text('Continue shopping'),
         ),
@@ -2450,14 +7727,315 @@ class BuyV2ConfirmationView extends StatelessWidget {
   }
 }
 
+class _PlacedOrderCard extends StatelessWidget {
+  const _PlacedOrderCard({
+    required this.order,
+    required this.deliveryIndex,
+    required this.deliveryCount,
+    required this.onViewInvoice,
+  });
+
+  final BuyV2Order order;
+  final int deliveryIndex;
+  final int deliveryCount;
+  final VoidCallback onViewInvoice;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (order.destination) {
+      BuyV2Destination.shop => Icons.shopping_bag_outlined,
+      BuyV2Destination.wholesale => Icons.inventory_2_outlined,
+      BuyV2Destination.medicine => Icons.medication_outlined,
+      BuyV2Destination.orders => Icons.receipt_long_outlined,
+    };
+    return Container(
+      key: ValueKey('buy-placed-order-${order.id}'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: order.destination == BuyV2Destination.wholesale
+                      ? BuyV2Colors.softBlue
+                      : BuyV2Colors.softOrange,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: BuyV2Colors.navy, size: 21),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Delivery ${deliveryIndex + 1} of $deliveryCount',
+                      style: context.buyBody.copyWith(fontSize: 12),
+                    ),
+                    Text(
+                      '${order.destination.label} · ${order.id}',
+                      style: context.buyMeta.copyWith(fontSize: 8),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                buyV2Money(order.total),
+                style: const TextStyle(
+                  color: BuyV2Colors.navy,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+            decoration: BoxDecoration(
+              color: BuyV2Colors.canvas,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: order.lines.isEmpty
+                ? Text(order.itemSummary, style: context.buyBody)
+                : Column(
+                    children: [
+                      for (var index = 0; index < order.lines.length; index++)
+                        Padding(
+                          padding: EdgeInsets.only(
+                            bottom: index == order.lines.length - 1 ? 0 : 6,
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 25,
+                                child: Text(
+                                  '${order.lines[index].quantity}×',
+                                  style: context.buyMeta.copyWith(
+                                    color: BuyV2Colors.navy,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  order.lines[index].product.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: context.buyBody.copyWith(fontSize: 10),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                buyV2Money(order.lines[index].total),
+                                style: context.buyBody.copyWith(fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            '${order.partner} · ${order.partnerType}',
+            style: context.buyMeta.copyWith(fontSize: 8.5),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Arrives · ${_orderPromiseSummary(order)}',
+            style: context.buyBody.copyWith(fontSize: 10),
+          ),
+          if (order.updatedDeliveryEstimate case final estimate?) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Delayed · new estimate $estimate',
+              style: context.buyMeta.copyWith(
+                color: BuyV2Colors.orange,
+                fontSize: 8.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+          if (order.deliveryInstruction case final instruction?) ...[
+            const SizedBox(height: 2),
+            Text(
+              '${_deliveryInstructionOwner(order.destination)} · $instruction',
+              style: context.buyMeta.copyWith(fontSize: 8.5),
+            ),
+          ],
+          const SizedBox(height: 5),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: ValueKey('buy-confirmation-invoice-${order.id}'),
+              onPressed: onViewInvoice,
+              style: TextButton.styleFrom(minimumSize: const Size(112, 44)),
+              icon: const Icon(Icons.receipt_long_outlined, size: 17),
+              label: const Text('View invoice'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrderPlacedSuccessMark extends StatefulWidget {
+  const _OrderPlacedSuccessMark({super.key});
+
+  @override
+  State<_OrderPlacedSuccessMark> createState() =>
+      _OrderPlacedSuccessMarkState();
+}
+
+class _OrderPlacedSuccessMarkState extends State<_OrderPlacedSuccessMark>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 820),
+  );
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = 1;
+    } else {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: .86,
+          end: 1.07,
+        ).chain(CurveTween(curve: Curves.easeOutBack)),
+        weight: 72,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 1.07,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeOutCubic)),
+        weight: 28,
+      ),
+    ]).animate(_controller);
+    return Semantics(
+      label: 'Order placed successfully',
+      child: ExcludeSemantics(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) => Transform.scale(
+            scale: scale.value,
+            child: CustomPaint(
+              painter: _OrderPlacedSuccessPainter(_controller.value),
+              size: const Size.square(62),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OrderPlacedSuccessPainter extends CustomPainter {
+  const _OrderPlacedSuccessPainter(this.progress);
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide / 2 - 3;
+    canvas.drawCircle(center, radius, Paint()..color = Colors.white);
+    final ringProgress = (progress / .46).clamp(0.0, 1.0);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -math.pi / 2,
+      math.pi * 2 * ringProgress,
+      false,
+      Paint()
+        ..color = BuyV2Colors.green
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round,
+    );
+    final tickProgress = ((progress - .28) / .42).clamp(0.0, 1.0);
+    if (tickProgress <= 0) return;
+    final start = Offset(size.width * .28, size.height * .52);
+    final middle = Offset(size.width * .44, size.height * .67);
+    final end = Offset(size.width * .73, size.height * .36);
+    final path = Path()..moveTo(start.dx, start.dy);
+    if (tickProgress < .45) {
+      final local = tickProgress / .45;
+      path.lineTo(
+        start.dx + (middle.dx - start.dx) * local,
+        start.dy + (middle.dy - start.dy) * local,
+      );
+    } else {
+      path.lineTo(middle.dx, middle.dy);
+      final local = (tickProgress - .45) / .55;
+      path.lineTo(
+        middle.dx + (end.dx - middle.dx) * local,
+        middle.dy + (end.dy - middle.dy) * local,
+      );
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = BuyV2Colors.green
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _OrderPlacedSuccessPainter oldDelegate) =>
+      oldDelegate.progress != progress;
+}
+
 class BuyV2RecoveryView extends StatelessWidget {
-  const BuyV2RecoveryView({super.key, required this.session});
+  const BuyV2RecoveryView({
+    super.key,
+    required this.session,
+    required this.onOpenOrderHelp,
+  });
 
   final BuyV2Session session;
+  final ValueChanged<BuyV2Order> onOpenOrderHelp;
 
   @override
   Widget build(BuildContext context) {
     final kind = session.recoveryKind ?? BuyV2RecoveryKind.networkInterruption;
+    final availabilityIssue = session.checkoutAvailabilityIssue;
+    final resolvesCartProduct =
+        kind == BuyV2RecoveryKind.stockUnavailable && availabilityIssue != null;
+    final resolvesAddress =
+        kind == BuyV2RecoveryKind.serviceAreaUnavailable &&
+        session.canResolveCheckoutAddress;
     final content = switch (kind) {
       BuyV2RecoveryKind.priceUpdate => (
         Icons.price_change_outlined,
@@ -2520,21 +8098,127 @@ class BuyV2RecoveryView extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: context.buyBody,
               ),
+              if (resolvesCartProduct) ...[
+                const SizedBox(height: 12),
+                Container(
+                  key: const ValueKey('buy-recovery-affected-product'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(11),
+                  decoration: buyV2CardDecoration(
+                    color: BuyV2Colors.softOrange,
+                    radius: 14,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(availabilityIssue.title, style: context.buyBody),
+                      const SizedBox(height: 2),
+                      Text(
+                        availabilityIssue.orderabilityLabel,
+                        style: context.buyMeta,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (resolvesAddress) ...[
+                const SizedBox(height: 12),
+                Container(
+                  key: const ValueKey('buy-recovery-affected-address'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(11),
+                  decoration: buyV2CardDecoration(
+                    color: BuyV2Colors.softBlue,
+                    radius: 14,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        session.selectedAddress.label,
+                        style: context.buyBody,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        session.selectedAddress.shortLine,
+                        style: context.buyMeta,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  key: const ValueKey('buy-recovery-primary'),
+              if (resolvesCartProduct) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    key: const ValueKey('buy-recovery-retry-availability'),
+                    onPressed: session.retryCheckoutAvailability,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Retry availability'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    key: const ValueKey('buy-recovery-remove-product'),
+                    onPressed: session.removeCheckoutIssueProduct,
+                    child: const Text('Remove from Cart'),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextButton(
+                  key: const ValueKey('buy-recovery-view-product'),
+                  onPressed: session.openCheckoutIssueProduct,
+                  child: const Text('View product'),
+                ),
+                TextButton(
+                  key: const ValueKey('buy-recovery-return-checkout'),
                   onPressed: session.retryRecovery,
                   child: Text(session.recoveryReturnLabel),
                 ),
-              ),
+              ] else if (resolvesAddress) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    key: const ValueKey('buy-recovery-change-address'),
+                    onPressed: () {
+                      session.retryRecovery();
+                      showBuyV2AddressSheet(context, session);
+                    },
+                    icon: const Icon(Icons.location_on_outlined),
+                    label: const Text('Change address'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    key: const ValueKey('buy-recovery-return-checkout'),
+                    onPressed: session.retryRecovery,
+                    child: Text(session.recoveryReturnLabel),
+                  ),
+                ),
+              ] else
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    key: const ValueKey('buy-recovery-primary'),
+                    onPressed: session.retryRecovery,
+                    child: Text(session.recoveryReturnLabel),
+                  ),
+                ),
               if (session.canOpenRecoveryOrderHelp) ...[
                 const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: session.openRecoveryOrderHelp,
+                    onPressed: () {
+                      if (session.openRecoveryOrderHelp()) {
+                        onOpenOrderHelp(session.selectedOrder);
+                      }
+                    },
                     child: const Text('Get help'),
                   ),
                 ),
@@ -2547,13 +8231,33 @@ class BuyV2RecoveryView extends StatelessWidget {
   }
 }
 
+String buyV2OrderRowKey({
+  required int groupIndex,
+  required String? purchaseId,
+  required int orderIndex,
+  required String orderId,
+}) =>
+    'buy-order-row-${purchaseId ?? 'ungrouped-$groupIndex'}-'
+    '$orderIndex-$orderId';
+
 class BuyV2OrdersView extends StatelessWidget {
-  const BuyV2OrdersView({super.key, required this.session});
+  const BuyV2OrdersView({
+    super.key,
+    required this.session,
+    required this.onOpenOrderHelp,
+    this.invoiceDownloader,
+    this.browseProducts,
+  });
 
   final BuyV2Session session;
+  final ValueChanged<BuyV2Order> onOpenOrderHelp;
+  final BuyV2InvoiceDownloader? invoiceDownloader;
+  final Widget? browseProducts;
 
   @override
   Widget build(BuildContext context) {
+    final visibleOrders = session.visibleOrders;
+    final purchaseGroups = _purchaseGroupsFor(visibleOrders);
     return ListView(
       key: const PageStorageKey('buy-orders'),
       padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
@@ -2592,8 +8296,7 @@ class BuyV2OrdersView extends StatelessWidget {
                         Flexible(
                           child: Text(
                             '${session.activeOrderCount} active · '
-                            '${session.deliveredOrderCount} delivered · '
-                            'next Wed, 29 Jul',
+                            '${session.deliveredOrderCount} delivered',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: context.buyMeta.copyWith(fontSize: 8),
@@ -2603,20 +8306,6 @@ class BuyV2OrdersView extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-              IconButton(
-                key: const ValueKey('buy-orders-assist'),
-                tooltip: 'MoolSocial Assist',
-                onPressed: session.openAssist,
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(44, 44),
-                  backgroundColor: BuyV2Colors.softBlue,
-                  foregroundColor: BuyV2Colors.navy,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                ),
-                icon: const Icon(Icons.chat_outlined, size: 20),
               ),
             ],
           ),
@@ -2645,17 +8334,76 @@ class BuyV2OrdersView extends StatelessWidget {
         const SizedBox(height: 7),
         BuyV2FiniteIncomingTransition(
           stateKey: session.ordersTab,
-          child: session.visibleOrders.isEmpty
+          child: !session.catalogueAvailable
+              ? _OrdersAvailabilityState(session: session)
+              : visibleOrders.isEmpty
               ? _OrdersEmptyState(query: session.query, tab: session.ordersTab)
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final order in session.visibleOrders)
-                      Padding(
-                        key: ValueKey('buy-order-row-${order.id}'),
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: _OrderCard(session: session, order: order),
-                      ),
+                    for (final (groupIndex, group)
+                        in purchaseGroups.indexed) ...[
+                      if (group.purchaseId case final purchaseId?) ...[
+                        Container(
+                          key: ValueKey('buy-purchase-group-$purchaseId'),
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          decoration: buyV2CardDecoration(
+                            color: BuyV2Colors.softBlue,
+                            radius: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.receipt_long_outlined,
+                                color: BuyV2Colors.navy,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 7),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Purchase $purchaseId',
+                                      style: context.buyBody.copyWith(
+                                        fontSize: 10.5,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${group.orders.length} ${group.orders.length == 1 ? 'delivery' : 'deliveries'} · ${buyV2Money(group.orders.fold<int>(0, (total, order) => total + order.total))}',
+                                      style: context.buyMeta.copyWith(
+                                        fontSize: 8,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      for (final (orderIndex, order) in group.orders.indexed)
+                        Padding(
+                          key: ValueKey(
+                            buyV2OrderRowKey(
+                              groupIndex: groupIndex,
+                              purchaseId: group.purchaseId,
+                              orderIndex: orderIndex,
+                              orderId: order.id,
+                            ),
+                          ),
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _OrderCard(
+                            session: session,
+                            order: order,
+                            invoiceDownloader: invoiceDownloader,
+                          ),
+                        ),
+                    ],
                   ],
                 ),
         ),
@@ -2664,6 +8412,23 @@ class BuyV2OrdersView extends StatelessWidget {
             BuyV2SponsoredPlacement.ordersAfterHistory,
           ),
         ),
+        if (browseProducts case final productGrid?) ...[
+          const SizedBox(height: 8),
+          Semantics(
+            header: true,
+            child: Text(
+              'Browse more products',
+              style: context.buyTitle.copyWith(fontSize: 15),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Add products now without leaving your purchase history behind.',
+            style: context.buyMeta.copyWith(fontSize: 8),
+          ),
+          const SizedBox(height: 4),
+          productGrid,
+        ],
         const SizedBox(height: 2),
         _OrdersContinuationRail(session: session),
       ],
@@ -2808,6 +8573,21 @@ class BuyV2OrderItemsView extends StatelessWidget {
                                 '${product.pack} · ${buyV2Money(product.price)}',
                                 style: context.buyMeta,
                               ),
+                              if (_purchaseProtectionLines(product)
+                                  case final policyLines
+                                  when policyLines.isNotEmpty) ...[
+                                const SizedBox(height: 3),
+                                Text(
+                                  'After delivery · ${policyLines.join(' · ')}',
+                                  key: ValueKey(
+                                    'buy-order-item-policy-${product.id}',
+                                  ),
+                                  style: context.buyMeta.copyWith(
+                                    color: BuyV2Colors.green,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 4),
                               Text(
                                 'View product details',
@@ -2830,6 +8610,62 @@ class BuyV2OrderItemsView extends StatelessWidget {
               ),
             ),
       ],
+    );
+  }
+}
+
+class _OrdersAvailabilityState extends StatelessWidget {
+  const _OrdersAvailabilityState({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final loading = session.commerceLoadState == BuyV2CommerceLoadState.loading;
+    return Container(
+      key: ValueKey('buy-orders-${session.commerceLoadState.name}'),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      decoration: buyV2CardDecoration(radius: 15),
+      child: Column(
+        children: [
+          if (loading)
+            const SizedBox.square(
+              dimension: 28,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            )
+          else
+            const Icon(
+              Icons.receipt_long_outlined,
+              color: BuyV2Colors.navy,
+              size: 28,
+            ),
+          const SizedBox(height: 8),
+          Text(
+            loading ? 'Opening Orders' : 'Orders could not refresh',
+            textAlign: TextAlign.center,
+            style: context.buyTitle.copyWith(fontSize: 14),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            session.commerceMessage ??
+                'Try again shortly. Existing order details remain unchanged.',
+            textAlign: TextAlign.center,
+            style: context.buyMeta,
+          ),
+          if (!loading) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: BuyV2Metrics.minimumTap,
+              child: FilledButton.icon(
+                key: const ValueKey('buy-orders-retry'),
+                onPressed: session.retryCommerce,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Try again'),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -2885,6 +8721,7 @@ class _OrdersContinuationRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accessibleText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
     final cards = [
       BuyV2PromotionCard(
         key: const ValueKey('buy-promotion-orders-shop'),
@@ -2915,7 +8752,7 @@ class _OrdersContinuationRail extends StatelessWidget {
     ];
     return SizedBox(
       key: const ValueKey('buy-orders-promotions'),
-      height: 90,
+      height: accessibleText ? 108 : 90,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: cards.length,
@@ -2951,6 +8788,7 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
   BuildContext context,
   BuyV2Session session,
   BuyV2Order order,
+  ValueChanged<BuyV2Order> onOpenOrderHelp,
 ) async {
   final destination = session.destination;
   final view = session.view;
@@ -3061,8 +8899,19 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
                     _OrderDeliveryFact(
                       icon: Icons.schedule_outlined,
                       label: 'Delivery window',
-                      value: order.promise,
+                      value: _orderPromiseSummary(order),
                     ),
+                    _OrderDeliveryFact(
+                      icon: Icons.local_shipping_outlined,
+                      label: 'Delivery partner',
+                      value: order.deliveryPartnerName ?? 'Not assigned yet',
+                    ),
+                    if (order.trackingReference case final trackingReference?)
+                      _OrderDeliveryFact(
+                        icon: Icons.pin_outlined,
+                        label: 'Tracking reference',
+                        value: trackingReference,
+                      ),
                     _OrderDeliveryFact(
                       icon: Icons.assignment_turned_in_outlined,
                       label: 'Recorded instruction',
@@ -3127,11 +8976,12 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
                 key: const ValueKey('buy-order-delivery-help'),
                 icon: Icons.chat_outlined,
                 title: 'Get help with this order',
-                detail: '$orderId stays attached to Assist',
+                detail: '$orderId stays attached in Shop Chat',
                 primary: true,
-                onTap: () => continueAfterReverse(sheetContext, () async {
-                  session.openAssist();
-                }),
+                onTap: () => continueAfterReverse(
+                  sheetContext,
+                  () async => onOpenOrderHelp(order),
+                ),
               ),
             ],
           ),
@@ -3141,10 +8991,580 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
   );
 }
 
-class BuyV2TrackingView extends StatelessWidget {
-  const BuyV2TrackingView({super.key, required this.session});
+class _DeliveryExceptionCard extends StatelessWidget {
+  const _DeliveryExceptionCard({required this.session, required this.order});
 
   final BuyV2Session session;
+  final BuyV2Order order;
+
+  @override
+  Widget build(BuildContext context) {
+    if (session.deliveryExceptionAdapter == null) {
+      return const SizedBox.shrink();
+    }
+    final snapshot = session.deliveryExceptionFor(order.id);
+    final busy = session.deliveryExceptionBusy(order.id);
+    if (snapshot == null) {
+      return busy
+          ? Container(
+              key: const ValueKey('buy-delivery-exception-loading'),
+              padding: const EdgeInsets.all(12),
+              decoration: buyV2CardDecoration(radius: 15),
+              child: const Row(
+                children: [
+                  SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 9),
+                  Expanded(child: Text('Checking delivery updates…')),
+                ],
+              ),
+            )
+          : const SizedBox.shrink();
+    }
+    if (snapshot.state != BuyV2CommerceLoadState.ready) {
+      return Container(
+        key: ValueKey('buy-delivery-exception-${snapshot.state.name}'),
+        padding: const EdgeInsets.all(12),
+        decoration: buyV2CardDecoration(
+          color: BuyV2Colors.softOrange,
+          radius: 15,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.cloud_off_outlined, color: BuyV2Colors.navy),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(snapshot.customerMessage, style: context.buyMeta),
+            ),
+            TextButton(
+              key: const ValueKey('buy-delivery-exception-retry'),
+              onPressed: busy
+                  ? null
+                  : () => session.restoreDeliveryException(order.id),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+    final kind = snapshot.kind;
+    if (kind == null) return const SizedBox.shrink();
+    final selectedSlot = session.selectedDeliveryRescheduleSlot(order.id);
+    final accent = switch (kind) {
+      BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable ||
+      BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed =>
+        BuyV2Colors.softBlue,
+      _ => BuyV2Colors.softOrange,
+    };
+    return Container(
+      key: ValueKey('buy-delivery-exception-${kind.name}'),
+      padding: const EdgeInsets.all(12),
+      decoration: buyV2CardDecoration(color: accent, radius: 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                kind == BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable ||
+                        kind ==
+                            BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed
+                    ? Icons.verified_outlined
+                    : Icons.warning_amber_rounded,
+                color: BuyV2Colors.navy,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      snapshot.headline!,
+                      style: context.buyTitle.copyWith(fontSize: 14),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(snapshot.detail!, style: context.buyMeta),
+                  ],
+                ),
+              ),
+              if (busy)
+                const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          if (snapshot.proofReference case final proofReference?) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Proof reference · $proofReference',
+              key: const ValueKey('buy-delivery-proof-reference'),
+              style: context.buyBody.copyWith(fontSize: 9.5),
+            ),
+          ],
+          if (snapshot.rescheduleSlots.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Choose a new delivery time', style: context.buyBody),
+            const SizedBox(height: 5),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final slot in snapshot.rescheduleSlots)
+                  ChoiceChip(
+                    key: ValueKey('buy-delivery-slot-$slot'),
+                    label: Text(slot),
+                    selected: selectedSlot == slot,
+                    onSelected: busy
+                        ? null
+                        : (_) => session.chooseDeliveryRescheduleSlot(
+                            order.id,
+                            slot,
+                          ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: BuyV2Metrics.minimumTap,
+              child: FilledButton(
+                key: const ValueKey('buy-delivery-confirm-reschedule'),
+                onPressed: busy || selectedSlot == null
+                    ? null
+                    : () => session.confirmDeliveryReschedule(order.id),
+                child: const Text('Confirm new time'),
+              ),
+            ),
+          ],
+          if (kind == BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: BuyV2Metrics.minimumTap,
+              child: OutlinedButton(
+                key: const ValueKey('buy-delivery-dispute-proof'),
+                onPressed: busy
+                    ? null
+                    : () => session.disputeProofOfDelivery(order.id),
+                child: const Text('Report a delivery problem'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 5),
+          Text(snapshot.customerMessage, style: context.buyMeta),
+        ],
+      ),
+    );
+  }
+}
+
+class _BalancePaymentCard extends StatelessWidget {
+  const _BalancePaymentCard({
+    required this.session,
+    required this.order,
+    this.paymentHandoff,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Order order;
+  final BuyV2PaymentHandoff? paymentHandoff;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = session.balancePaymentFor(order.id);
+    final busy = session.balancePaymentBusy(order.id);
+    if (order.balanceDue <= 0 &&
+        result?.state != BuyV2BalancePaymentState.paid) {
+      return const SizedBox.shrink();
+    }
+    final state = result?.state ?? BuyV2BalancePaymentState.upcoming;
+    final amountDue = result?.amountDue ?? order.balanceDue;
+    final dueLabel = result?.dueLabel ?? order.balanceDueLabel ?? 'Due later';
+    final statusLabel = switch (state) {
+      BuyV2BalancePaymentState.upcoming => 'Upcoming balance',
+      BuyV2BalancePaymentState.due => 'Balance due',
+      BuyV2BalancePaymentState.overdue => 'Balance overdue',
+      BuyV2BalancePaymentState.paymentActionRequired => 'Ready for payment',
+      BuyV2BalancePaymentState.paymentPending => 'Payment pending',
+      BuyV2BalancePaymentState.paid => 'Balance paid',
+      BuyV2BalancePaymentState.unknown => 'Payment needs checking',
+      BuyV2BalancePaymentState.offline => 'Balance status offline',
+      BuyV2BalancePaymentState.unavailable => 'Balance payment unavailable',
+    };
+    VoidCallback? action;
+    String? actionLabel;
+    switch (state) {
+      case BuyV2BalancePaymentState.due || BuyV2BalancePaymentState.overdue:
+        action = () => session.startBalancePayment(order.id);
+        actionLabel = 'Pay balance';
+      case BuyV2BalancePaymentState.paymentActionRequired:
+        final handoff = paymentHandoff;
+        if (handoff != null) {
+          action = () => session.continueBalancePayment(order.id, handoff);
+          actionLabel = 'Continue payment';
+        }
+      case BuyV2BalancePaymentState.paymentPending ||
+          BuyV2BalancePaymentState.unknown:
+        action = () => session.reconcileBalancePayment(order.id);
+        actionLabel = 'Check payment';
+      case BuyV2BalancePaymentState.offline ||
+          BuyV2BalancePaymentState.unavailable:
+        action = () => session.restoreBalancePayment(order.id);
+        actionLabel = 'Retry';
+      case BuyV2BalancePaymentState.upcoming || BuyV2BalancePaymentState.paid:
+        break;
+    }
+    return Container(
+      key: const ValueKey('buy-tracking-balance-payment'),
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(
+        color: state == BuyV2BalancePaymentState.paid
+            ? BuyV2Colors.softGreen
+            : BuyV2Colors.softBlue,
+        radius: 15,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.account_balance_wallet_outlined,
+                color: BuyV2Colors.navy,
+                size: 21,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  statusLabel,
+                  style: context.buyTitle.copyWith(fontSize: 14),
+                ),
+              ),
+              if (busy)
+                const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(
+            state == BuyV2BalancePaymentState.paid
+                ? 'No balance remains.'
+                : '${buyV2Money(amountDue)} · $dueLabel',
+            key: const ValueKey('buy-tracking-balance-amount'),
+            style: context.buyBody,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            result?.customerMessage ??
+                'Payment becomes available when the supplier confirms it is due.',
+            style: context.buyMeta.copyWith(fontSize: 8.5),
+          ),
+          if (action != null && actionLabel != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: BuyV2Metrics.minimumTap,
+              child: FilledButton(
+                key: ValueKey(
+                  'buy-tracking-balance-${actionLabel.toLowerCase().replaceAll(' ', '-')}',
+                ),
+                onPressed: busy ? null : action,
+                child: Text(actionLabel),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class BuyV2LiveDeliveryPanel extends StatefulWidget {
+  const BuyV2LiveDeliveryPanel({
+    required this.session,
+    required this.order,
+    this.mapBuilder,
+    this.pollInterval = const Duration(seconds: 15),
+    super.key,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Order order;
+  final BuyV2LiveDeliveryMapBuilder? mapBuilder;
+  final Duration pollInterval;
+
+  @override
+  State<BuyV2LiveDeliveryPanel> createState() => _BuyV2LiveDeliveryPanelState();
+}
+
+class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel>
+    with WidgetsBindingObserver {
+  Timer? _timer;
+
+  bool get _isForeground {
+    final state = WidgetsBinding.instance.lifecycleState;
+    return state == null || state == AppLifecycleState.resumed;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _start();
+  }
+
+  @override
+  void didUpdateWidget(covariant BuyV2LiveDeliveryPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, widget.session) ||
+        oldWidget.order.id != widget.order.id ||
+        oldWidget.order.status != widget.order.status ||
+        oldWidget.pollInterval != widget.pollInterval) {
+      _timer?.cancel();
+      _start();
+    }
+  }
+
+  void _start() {
+    _timer?.cancel();
+    if (!_isForeground) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _isForeground) {
+        unawaited(widget.session.refreshLiveDelivery(widget.order.id));
+      }
+    });
+    if (!widget.session.liveDeliveryAvailable ||
+        widget.order.status == BuyV2OrderStatus.delivered ||
+        widget.pollInterval <= Duration.zero) {
+      return;
+    }
+    _timer = Timer.periodic(widget.pollInterval, (_) {
+      if (mounted && !widget.session.liveDeliveryBusy(widget.order.id)) {
+        unawaited(widget.session.refreshLiveDelivery(widget.order.id));
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _start();
+    } else {
+      _timer?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final snapshot = widget.session.liveDeliveryFor(widget.order.id);
+    final busy = widget.session.liveDeliveryBusy(widget.order.id);
+    final refreshMessage = widget.session.liveDeliveryRefreshMessage(
+      widget.order.id,
+    );
+    final ready = snapshot?.state == BuyV2LiveDeliveryState.ready;
+    final delivered = snapshot?.state == BuyV2LiveDeliveryState.delivered;
+    final updatedAt = snapshot?.lastUpdatedAt;
+    final stale =
+        ready &&
+        updatedAt != null &&
+        DateTime.now().difference(updatedAt) > const Duration(minutes: 2);
+    final accessibleMap = MediaQuery.textScalerOf(context).scale(10) > 14;
+    return Container(
+      key: ValueKey('buy-live-delivery-${widget.order.id}'),
+      padding: const EdgeInsets.all(10),
+      decoration: buyV2CardDecoration(color: BuyV2Colors.softBlue, radius: 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                color: BuyV2Colors.navy,
+                size: 21,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  delivered ? 'Delivery completed' : 'Live delivery',
+                  style: context.buyTitle.copyWith(fontSize: 14),
+                ),
+              ),
+              if (busy)
+                Semantics(
+                  label: 'Refreshing delivery location',
+                  child: const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (snapshot == null)
+            Text('Checking the latest delivery update…', style: context.buyBody)
+          else if (!ready) ...[
+            Text(snapshot.customerMessage, style: context.buyBody),
+            if (widget.session.liveDeliveryAvailable && !delivered) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                height: BuyV2Metrics.minimumTap,
+                child: OutlinedButton.icon(
+                  key: ValueKey('buy-live-delivery-retry-${widget.order.id}'),
+                  onPressed: busy
+                      ? null
+                      : () =>
+                            widget.session.refreshLiveDelivery(widget.order.id),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Try again'),
+                ),
+              ),
+            ],
+          ] else ...[
+            Semantics(
+              label: widget.mapBuilder == null
+                  ? 'Delivery map unavailable. ${snapshot.etaLabel}. Delivery details follow.'
+                  : 'Delivery partner location map. ${snapshot.etaLabel}.',
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(13),
+                child: SizedBox(
+                  key: ValueKey('buy-live-delivery-map-${widget.order.id}'),
+                  height: accessibleMap ? 210 : 158,
+                  child:
+                      widget.mapBuilder?.call(context, snapshot) ??
+                      ColoredBox(
+                        color: const Color(0xFFE7EAF4),
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.map_outlined,
+                                  color: BuyV2Colors.navy,
+                                  size: 30,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Map view is not available right now.',
+                                  textAlign: TextAlign.center,
+                                  style: context.buyBody,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'The latest delivery details are shown below.',
+                                  textAlign: TextAlign.center,
+                                  style: context.buyMeta,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _DecisionRow(
+              icon: Icons.schedule_outlined,
+              label: 'Arriving',
+              value: snapshot.etaLabel!,
+            ),
+            _DecisionRow(
+              icon: Icons.delivery_dining_outlined,
+              label: 'Delivery partner',
+              value: switch (_nonBlankComplianceValue(snapshot.vehicleLabel)) {
+                final vehicle? => '${snapshot.driverName!} · $vehicle',
+                null => snapshot.driverName!,
+              },
+            ),
+            if (_nonBlankComplianceValue(snapshot.trackingReference)
+                case final tracking?)
+              _DecisionRow(
+                icon: Icons.pin_outlined,
+                label: 'Tracking reference',
+                value: tracking,
+              ),
+            _DecisionRow(
+              icon: Icons.update_rounded,
+              label: 'Last updated',
+              value: _liveDeliveryUpdatedLabel(updatedAt!),
+            ),
+            if (stale || refreshMessage != null) ...[
+              const SizedBox(height: 6),
+              Container(
+                key: ValueKey('buy-live-delivery-update-${widget.order.id}'),
+                padding: const EdgeInsets.all(9),
+                decoration: buyV2CardDecoration(
+                  color: BuyV2Colors.softOrange,
+                  radius: 12,
+                ),
+                child: Text(
+                  refreshMessage ??
+                      'The courier location has not updated recently. Try again for the latest position.',
+                  style: context.buyMeta,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: BuyV2Metrics.minimumTap,
+                child: OutlinedButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () =>
+                            widget.session.refreshLiveDelivery(widget.order.id),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Refresh location'),
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+String _liveDeliveryUpdatedLabel(DateTime updatedAt) {
+  final elapsed = DateTime.now().difference(updatedAt);
+  if (elapsed <= const Duration(seconds: 45)) return 'Just now';
+  if (elapsed < const Duration(hours: 1)) {
+    final minutes = elapsed.inMinutes.clamp(1, 59);
+    return '$minutes min ago';
+  }
+  final hours = elapsed.inHours;
+  return '$hours ${hours == 1 ? 'hour' : 'hours'} ago';
+}
+
+class BuyV2TrackingView extends StatelessWidget {
+  const BuyV2TrackingView({
+    super.key,
+    required this.session,
+    required this.onOpenOrderHelp,
+    this.invoiceDownloader,
+    this.paymentHandoff,
+    this.liveDeliveryMapBuilder,
+  });
+
+  final BuyV2Session session;
+  final ValueChanged<BuyV2Order> onOpenOrderHelp;
+  final BuyV2InvoiceDownloader? invoiceDownloader;
+  final BuyV2PaymentHandoff? paymentHandoff;
+  final BuyV2LiveDeliveryMapBuilder? liveDeliveryMapBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -3152,67 +9572,144 @@ class BuyV2TrackingView extends StatelessWidget {
     if (order == null) {
       return _MissingOrderSelection(session: session);
     }
-    return ListView(
-      key: PageStorageKey('buy-tracking-${order.id}'),
-      padding: const EdgeInsets.fromLTRB(8, 7, 8, 10),
+    final returnToOrders = IntrinsicWidth(
+      child: _ReturnAffordance(
+        key: const ValueKey('buy-tracking-return-orders'),
+        label: 'Orders',
+        onTap: session.returnToOrders,
+      ),
+    );
+    final orderHeading = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Text(
+          order.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: context.buyTitle.copyWith(fontSize: 16),
+        ),
+        Text(order.id, style: context.buyMeta.copyWith(fontSize: 8)),
+      ],
+    );
+    final refreshOrder = IconButton(
+      key: ValueKey('buy-tracking-refresh-${order.id}'),
+      tooltip: 'Refresh order',
+      onPressed: session.orderRefreshBusy(order.id)
+          ? null
+          : () => session.refreshOrder(order.id),
+      constraints: const BoxConstraints.tightFor(
+        width: BuyV2Metrics.minimumTap,
+        height: BuyV2Metrics.minimumTap,
+      ),
+      icon: session.orderRefreshBusy(order.id)
+          ? const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.refresh_rounded, size: 20),
+    );
+    final currentStatus = Semantics(
+      label: 'Current order status: ${_trackingStatusLabel(order.status)}',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: BuyV2Colors.softGreen,
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _ReturnAffordance(
-              key: const ValueKey('buy-tracking-return-orders'),
-              label: 'Orders',
-              onTap: session.returnToOrders,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    order.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.buyTitle.copyWith(fontSize: 16),
-                  ),
-                  Text(order.id, style: context.buyMeta.copyWith(fontSize: 8)),
-                ],
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: BuyV2Colors.green,
+                shape: BoxShape.circle,
               ),
+              child: SizedBox(width: 8, height: 8),
             ),
-            Semantics(
-              label:
-                  'Current order status: ${_trackingStatusLabel(order.status)}',
-              excludeSemantics: true,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: BuyV2Colors.softGreen,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: BuyV2Colors.green,
-                        shape: BoxShape.circle,
-                      ),
-                      child: SizedBox(width: 8, height: 8),
-                    ),
-                    SizedBox(width: 5),
-                    Text(
-                      'CURRENT',
-                      style: TextStyle(
-                        color: BuyV2Colors.green,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
+            SizedBox(width: 5),
+            Text(
+              'CURRENT',
+              style: TextStyle(
+                color: BuyV2Colors.green,
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ],
         ),
+      ),
+    );
+    return ListView(
+      key: PageStorageKey('buy-tracking-${order.id}'),
+      padding: const EdgeInsets.fromLTRB(8, 7, 8, 110),
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compactHeader =
+                constraints.maxWidth < 360 ||
+                MediaQuery.textScalerOf(context).scale(10) > 12;
+            if (compactHeader) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      returnToOrders,
+                      const Spacer(),
+                      refreshOrder,
+                      const SizedBox(width: 4),
+                      currentStatus,
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  orderHeading,
+                ],
+              );
+            }
+            return Row(
+              children: [
+                returnToOrders,
+                const SizedBox(width: 8),
+                Expanded(child: orderHeading),
+                refreshOrder,
+                const SizedBox(width: 4),
+                currentStatus,
+              ],
+            );
+          },
+        ),
+        if (session.orderRefreshState(order.id) case final refreshState?
+            when refreshState != BuyV2CommerceLoadState.ready &&
+                refreshState != BuyV2CommerceLoadState.loading) ...[
+          const SizedBox(height: 6),
+          Container(
+            key: ValueKey('buy-tracking-refresh-${refreshState.name}'),
+            padding: const EdgeInsets.all(10),
+            decoration: buyV2CardDecoration(
+              color: BuyV2Colors.softOrange,
+              border: BuyV2Colors.orange,
+              radius: 13,
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.cloud_off_outlined,
+                  color: BuyV2Colors.navy,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    session.orderRefreshMessage(order.id) ??
+                        'Order could not refresh. Last known details are still shown.',
+                    style: context.buyMeta,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.all(10),
@@ -3251,13 +9748,24 @@ class BuyV2TrackingView extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                order.promise,
+                _orderPromiseSummary(order),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                 ),
               ),
+              if (order.updatedDeliveryEstimate case final estimate?) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Delayed · new estimate $estimate',
+                  style: const TextStyle(
+                    color: BuyV2Colors.orange,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
               const SizedBox(height: 7),
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
@@ -3285,14 +9793,70 @@ class BuyV2TrackingView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
+        if (order.status != BuyV2OrderStatus.delivered) ...[
+          BuyV2LiveDeliveryPanel(
+            session: session,
+            order: order,
+            mapBuilder: liveDeliveryMapBuilder,
+          ),
+          const SizedBox(height: 6),
+        ],
+        if (session.deliveryExceptionAdapter != null) ...[
+          _DeliveryExceptionCard(session: session, order: order),
+          const SizedBox(height: 6),
+        ],
         _DecisionPanel(
-          title: 'Fulfilment',
+          title: 'Delivery details',
           children: [
             _DecisionRow(
               icon: Icons.storefront_outlined,
-              label: order.partnerType,
-              value: order.partner,
+              label: switch (order.destination) {
+                BuyV2Destination.wholesale => 'Supplier',
+                BuyV2Destination.medicine => 'Pharmacy',
+                _ => 'Store',
+              },
+              value: '${order.partner} · ${order.partnerType}',
             ),
+            if (order.buyerName case final buyer?)
+              _DecisionRow(
+                icon: Icons.business_outlined,
+                label: order.buyerType ?? 'Buyer',
+                value: buyer,
+              ),
+            _DecisionRow(
+              icon: Icons.local_shipping_outlined,
+              label: order.deliveryPartnerType ?? 'Delivery partner',
+              value:
+                  order.deliveryPartnerName ??
+                  (order.status == BuyV2OrderStatus.preparing ||
+                          order.status == BuyV2OrderStatus.confirmed
+                      ? 'Not assigned yet'
+                      : 'Details unavailable · Refresh order'),
+            ),
+            if (order.dispatchPromise case final dispatchPromise?)
+              _DecisionRow(
+                icon: Icons.inventory_2_outlined,
+                label: 'Dispatch promise',
+                value: dispatchPromise,
+              ),
+            if (order.deliveryServiceLevel case final serviceLevel?)
+              _DecisionRow(
+                icon: Icons.route_outlined,
+                label: 'Delivery service',
+                value: serviceLevel,
+              ),
+            if (order.trackingReference case final trackingReference?)
+              _DecisionRow(
+                icon: Icons.pin_outlined,
+                label: 'Tracking reference',
+                value: trackingReference,
+              ),
+            if (order.proofOfDeliveryStatus case final proofStatus?)
+              _DecisionRow(
+                icon: Icons.verified_outlined,
+                label: 'Proof of delivery',
+                value: proofStatus,
+              ),
             _DecisionRow(
               icon: Icons.location_on_outlined,
               label: 'Delivering to',
@@ -3315,8 +9879,56 @@ class BuyV2TrackingView extends StatelessWidget {
                 label: 'Delivery tip',
                 value: buyV2Money(order.tip),
               ),
+            if (order.paymentMethod case final paymentMethod?)
+              _DecisionRow(
+                icon: Icons.account_balance_wallet_outlined,
+                label: 'Payment method',
+                value: paymentMethod,
+              ),
+            if (order.purchaseOrderReference case final reference?)
+              _DecisionRow(
+                icon: Icons.receipt_long_outlined,
+                label: 'Purchase order',
+                value: reference,
+              ),
+            if (order.paymentTermLabel case final paymentTerm?)
+              _DecisionRow(
+                icon: Icons.account_balance_wallet_outlined,
+                label: 'Payment term',
+                value: paymentTerm,
+              ),
+            if (order.amountPaidNow case final paidNow?)
+              _DecisionRow(
+                icon: Icons.payments_outlined,
+                label: 'Paid now',
+                value: buyV2Money(paidNow),
+              ),
+            if (order.paymentStatusLabel case final paymentStatus?)
+              _DecisionRow(
+                icon: Icons.verified_outlined,
+                label: 'Payment status',
+                value: paymentStatus,
+              ),
+            if (order.balanceDue > 0)
+              _DecisionRow(
+                icon: Icons.event_available_outlined,
+                label: 'Balance due',
+                value:
+                    '${buyV2Money(order.balanceDue)} · '
+                    '${order.balanceDueLabel ?? 'Due later'}',
+              ),
           ],
         ),
+        if (order.balanceDue > 0 ||
+            session.balancePaymentFor(order.id)?.state ==
+                BuyV2BalancePaymentState.paid) ...[
+          const SizedBox(height: 6),
+          _BalancePaymentCard(
+            session: session,
+            order: order,
+            paymentHandoff: paymentHandoff,
+          ),
+        ],
         const SizedBox(height: 6),
         _TrackingRoute(order: order),
         const SizedBox(height: 6),
@@ -3394,7 +10006,11 @@ class BuyV2TrackingView extends StatelessWidget {
                   children: [
                     Text('Order updates', style: context.buyBody),
                     Text(
-                      session.trackingAlertsEnabled
+                      session.trackingAlertsBusy
+                          ? 'Saving alert preference…'
+                          : !session.trackingAlertsAvailable
+                          ? 'Order alerts are unavailable'
+                          : session.trackingAlertsEnabled
                           ? 'Order alerts are on'
                           : 'Order alerts are paused',
                       style: context.buyMeta.copyWith(fontSize: 8),
@@ -3402,13 +10018,25 @@ class BuyV2TrackingView extends StatelessWidget {
                   ],
                 ),
               ),
+              if (!session.trackingAlertsAvailable &&
+                  !session.trackingAlertsBusy)
+                IconButton(
+                  key: const ValueKey('buy-tracking-alerts-retry'),
+                  tooltip: 'Retry order alerts',
+                  onPressed: session.restoreOrderAlerts,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
               Switch.adaptive(
                 key: const ValueKey('buy-tracking-alerts-toggle'),
                 value: session.trackingAlertsEnabled,
-                onChanged: (_) {
-                  HapticFeedback.selectionClick();
-                  session.toggleTrackingAlerts();
-                },
+                onChanged:
+                    session.trackingAlertsBusy ||
+                        !session.trackingAlertsAvailable
+                    ? null
+                    : (enabled) {
+                        HapticFeedback.selectionClick();
+                        session.setTrackingAlerts(enabled);
+                      },
                 activeTrackColor: BuyV2Colors.green,
               ),
             ],
@@ -3424,6 +10052,7 @@ class BuyV2TrackingView extends StatelessWidget {
                   context,
                   session,
                   order,
+                  onOpenOrderHelp,
                 ),
                 icon: Icons.location_on_outlined,
                 label: 'Address',
@@ -3447,7 +10076,7 @@ class BuyV2TrackingView extends StatelessWidget {
                 ),
                 onPressed: order.status == BuyV2OrderStatus.delivered
                     ? () => session.reorder(order)
-                    : session.openAssist,
+                    : () => onOpenOrderHelp(order),
                 icon: order.status == BuyV2OrderStatus.delivered
                     ? Icons.replay_rounded
                     : Icons.chat_outlined,
@@ -3459,6 +10088,65 @@ class BuyV2TrackingView extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: BuyV2Metrics.minimumTap,
+          child: OutlinedButton.icon(
+            key: ValueKey('buy-tracking-manage-order-${order.id}'),
+            onPressed: () => showBuyV2OrderResolutionSheet(
+              context,
+              session: session,
+              order: order,
+              onOpenSupport: () => onOpenOrderHelp(order),
+            ),
+            icon: const Icon(Icons.assignment_return_outlined, size: 18),
+            label: Text(
+              order.status == BuyV2OrderStatus.delivered
+                  ? 'Return, replace or refund'
+                  : 'Manage order',
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        if (order.invoiceAvailable)
+          SizedBox(
+            height: 44,
+            child: OutlinedButton.icon(
+              key: ValueKey('buy-tracking-invoice-${order.id}'),
+              onPressed: () => showBuyV2InvoicePage(
+                context,
+                order: order,
+                downloader: invoiceDownloader,
+              ),
+              icon: const Icon(Icons.receipt_long_outlined, size: 18),
+              label: const Text('View invoice'),
+            ),
+          )
+        else
+          Container(
+            key: ValueKey('buy-tracking-invoice-pending-${order.id}'),
+            padding: const EdgeInsets.all(10),
+            decoration: buyV2CardDecoration(
+              color: BuyV2Colors.softBlue,
+              radius: 13,
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.receipt_long_outlined,
+                  color: BuyV2Colors.navy,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Invoice is being prepared. Refresh this order for the latest update.',
+                    style: context.buyMeta,
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (order.status == BuyV2OrderStatus.delivered) ...[
           const SizedBox(height: 6),
           _OrderDeliveryContinuation(
@@ -3466,7 +10154,7 @@ class BuyV2TrackingView extends StatelessWidget {
             icon: Icons.support_agent_outlined,
             title: 'Get help with this order',
             detail: 'Prepare a return, replacement or refund question',
-            onTap: session.openAssist,
+            onTap: () => onOpenOrderHelp(order),
           ),
         ],
       ],
@@ -3474,10 +10162,443 @@ class BuyV2TrackingView extends StatelessWidget {
   }
 }
 
-class BuyV2AssistView extends StatefulWidget {
-  const BuyV2AssistView({super.key, required this.session});
+Future<void> showBuyV2OrderResolutionSheet(
+  BuildContext context, {
+  required BuyV2Session session,
+  required BuyV2Order order,
+  required VoidCallback onOpenSupport,
+}) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetContext) => _BuyV2OrderResolutionSheet(
+      session: session,
+      order: order,
+      onOpenSupport: onOpenSupport,
+    ),
+  );
+}
+
+class _BuyV2OrderResolutionSheet extends StatefulWidget {
+  const _BuyV2OrderResolutionSheet({
+    required this.session,
+    required this.order,
+    required this.onOpenSupport,
+  });
 
   final BuyV2Session session;
+  final BuyV2Order order;
+  final VoidCallback onOpenSupport;
+
+  @override
+  State<_BuyV2OrderResolutionSheet> createState() =>
+      _BuyV2OrderResolutionSheetState();
+}
+
+class _BuyV2OrderResolutionSheetState
+    extends State<_BuyV2OrderResolutionSheet> {
+  BuyV2OrderResolutionKind? selectedKind;
+  String? selectedReason;
+  final Map<String, int> selectedItemQuantities = {};
+  String? selectionError;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.session.orderResolutionFor(widget.order.id) == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(widget.session.refreshOrderResolution(widget.order.id));
+        }
+      });
+    }
+  }
+
+  void openSupport() {
+    final action = widget.onOpenSupport;
+    Navigator.of(context).pop();
+    Future<void>.microtask(action);
+  }
+
+  Future<void> submit() async {
+    final kind = selectedKind;
+    final reason = selectedReason;
+    if (kind == null || reason == null) return;
+    if (kind != BuyV2OrderResolutionKind.cancel &&
+        selectedItemQuantities.isEmpty) {
+      setState(() => selectionError = 'Choose at least one product.');
+      return;
+    }
+    final accepted = await widget.session.submitOrderResolution(
+      orderId: widget.order.id,
+      kind: kind,
+      reason: reason,
+      itemQuantities: selectedItemQuantities,
+    );
+    if (accepted && mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.session,
+      builder: (context, _) {
+        final snapshot = widget.session.orderResolutionFor(widget.order.id);
+        final busy = widget.session.orderResolutionBusy(widget.order.id);
+        final result = widget.session.orderResolutionResultFor(widget.order.id);
+        final ready = snapshot?.state == BuyV2OrderResolutionState.ready;
+        final options = ready
+            ? snapshot!.options
+            : const <BuyV2OrderResolutionOption>[];
+        final selectedOption = options
+            .where((option) => option.kind == selectedKind)
+            .firstOrNull;
+        final orderProducts = widget.session.productsForOrder(widget.order);
+        return SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            key: const ValueKey('buy-order-resolution-sheet'),
+            padding: EdgeInsets.fromLTRB(
+              14,
+              0,
+              14,
+              18 +
+                  MediaQuery.viewPaddingOf(context).bottom +
+                  MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  widget.order.status == BuyV2OrderStatus.delivered
+                      ? 'Return, replace or refund'
+                      : 'Manage order',
+                  style: context.buyTitle.copyWith(fontSize: 19),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Order ${widget.order.id} · ${widget.order.itemSummary}',
+                  style: context.buyMeta,
+                ),
+                const SizedBox(height: 12),
+                if (snapshot == null ||
+                    snapshot.state == BuyV2OrderResolutionState.loading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: CircularProgressIndicator(strokeWidth: 3),
+                    ),
+                  )
+                else if (!ready) ...[
+                  Container(
+                    key: const ValueKey('buy-order-resolution-unavailable'),
+                    padding: const EdgeInsets.all(12),
+                    decoration: buyV2CardDecoration(
+                      color: BuyV2Colors.softOrange,
+                      radius: 15,
+                    ),
+                    child: Text(
+                      snapshot.customerMessage ??
+                          'Order changes are unavailable right now.',
+                      style: context.buyBody,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    key: const ValueKey('buy-order-resolution-retry'),
+                    onPressed: busy
+                        ? null
+                        : () => widget.session.refreshOrderResolution(
+                            widget.order.id,
+                          ),
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Try again'),
+                  ),
+                  const SizedBox(height: 7),
+                  FilledButton.icon(
+                    key: const ValueKey('buy-order-resolution-support'),
+                    onPressed: openSupport,
+                    icon: const Icon(Icons.chat_outlined),
+                    label: const Text('Contact support'),
+                  ),
+                ] else ...[
+                  Text('Choose what you need', style: context.buyBody),
+                  const SizedBox(height: 7),
+                  for (final option in options) ...[
+                    _OrderResolutionOptionTile(
+                      option: option,
+                      selected: option.kind == selectedKind,
+                      onTap: () => setState(() {
+                        selectedKind = option.kind;
+                        selectedReason = null;
+                        selectedItemQuantities.clear();
+                        selectionError = null;
+                      }),
+                    ),
+                    const SizedBox(height: 7),
+                  ],
+                  if (selectedOption != null) ...[
+                    const SizedBox(height: 3),
+                    if (selectedOption.kind !=
+                        BuyV2OrderResolutionKind.cancel) ...[
+                      Text('Choose products', style: context.buyBody),
+                      const SizedBox(height: 6),
+                      for (final product in orderProducts) ...[
+                        _OrderResolutionItemTile(
+                          product: product,
+                          selectedQuantity:
+                              selectedItemQuantities[product.id] ?? 0,
+                          maximumQuantity:
+                              widget.order.lines
+                                  .where(
+                                    (line) => line.product.id == product.id,
+                                  )
+                                  .firstOrNull
+                                  ?.quantity ??
+                              1,
+                          onChanged: (quantity) => setState(() {
+                            if (quantity <= 0) {
+                              selectedItemQuantities.remove(product.id);
+                            } else {
+                              selectedItemQuantities[product.id] = quantity;
+                            }
+                            selectionError = null;
+                          }),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                      if (selectionError case final message?) ...[
+                        Text(
+                          message,
+                          key: const ValueKey(
+                            'buy-order-resolution-item-error',
+                          ),
+                          style: context.buyMeta.copyWith(
+                            color: BuyV2Colors.orange,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                    ],
+                    DropdownButtonFormField<String>(
+                      key: ValueKey(
+                        'buy-order-resolution-reason-${selectedOption.kind.name}',
+                      ),
+                      initialValue: selectedReason,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Reason',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        for (final reason in selectedOption.reasons)
+                          DropdownMenuItem(
+                            value: reason,
+                            child: Text(
+                              reason,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: busy
+                          ? null
+                          : (value) => setState(() => selectedReason = value),
+                    ),
+                    const SizedBox(height: 10),
+                    FilledButton(
+                      key: const ValueKey('buy-order-resolution-submit'),
+                      onPressed: busy || selectedReason == null ? null : submit,
+                      child: Text(busy ? 'Sending…' : 'Submit request'),
+                    ),
+                  ],
+                  if (result != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      result.customerMessage,
+                      key: const ValueKey('buy-order-resolution-result'),
+                      style: context.buyMeta.copyWith(
+                        color: result.accepted
+                            ? BuyV2Colors.green
+                            : BuyV2Colors.orange,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: openSupport,
+                    icon: const Icon(Icons.chat_outlined),
+                    label: const Text('Contact support instead'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _OrderResolutionItemTile extends StatelessWidget {
+  const _OrderResolutionItemTile({
+    required this.product,
+    required this.selectedQuantity,
+    required this.maximumQuantity,
+    required this.onChanged,
+  });
+
+  final BuyV2Product product;
+  final int selectedQuantity;
+  final int maximumQuantity;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = selectedQuantity > 0;
+    return Semantics(
+      container: true,
+      label:
+          '${product.title}, ${product.pack}. ${selected ? '$selectedQuantity selected' : 'Not selected'}.',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(9, 7, 7, 7),
+        decoration: buyV2CardDecoration(
+          color: selected ? BuyV2Colors.softBlue : Colors.white,
+          radius: 13,
+        ),
+        child: Row(
+          children: [
+            Checkbox(
+              key: ValueKey('buy-order-resolution-item-${product.id}'),
+              value: selected,
+              onChanged: (value) => onChanged(value == true ? 1 : 0),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.buyBody.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(product.pack, style: context.buyMeta),
+                ],
+              ),
+            ),
+            if (selected) ...[
+              IconButton(
+                key: ValueKey(
+                  'buy-order-resolution-item-${product.id}-decrease',
+                ),
+                tooltip: 'Decrease ${product.title} quantity',
+                onPressed: () => onChanged(selectedQuantity - 1),
+                icon: const Icon(Icons.remove_rounded, size: 18),
+              ),
+              Text(
+                '$selectedQuantity',
+                style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+              ),
+              IconButton(
+                key: ValueKey(
+                  'buy-order-resolution-item-${product.id}-increase',
+                ),
+                tooltip: 'Increase ${product.title} quantity',
+                onPressed: selectedQuantity >= maximumQuantity
+                    ? null
+                    : () => onChanged(selectedQuantity + 1),
+                icon: const Icon(Icons.add_rounded, size: 18),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OrderResolutionOptionTile extends StatelessWidget {
+  const _OrderResolutionOptionTile({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final BuyV2OrderResolutionOption option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    selected: selected,
+    label: '${option.title}. ${option.detail}',
+    child: InkWell(
+      key: ValueKey('buy-order-resolution-${option.kind.name}'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 58),
+        padding: const EdgeInsets.all(10),
+        decoration: buyV2CardDecoration(
+          color: selected ? BuyV2Colors.softBlue : Colors.white,
+          radius: 14,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color: BuyV2Colors.navy,
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    option.title,
+                    style: context.buyBody.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(option.detail, style: context.buyMeta),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+typedef BuyV2AssistChatHandler =
+    void Function({String? intent, String? details});
+
+class BuyV2AssistView extends StatefulWidget {
+  const BuyV2AssistView({
+    super.key,
+    required this.session,
+    required this.onOpenChat,
+  });
+
+  final BuyV2Session session;
+  final BuyV2AssistChatHandler onOpenChat;
 
   @override
   State<BuyV2AssistView> createState() => _BuyV2AssistViewState();
@@ -3512,7 +10633,7 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
     HapticFeedback.selectionClick();
     FocusScope.of(context).unfocus();
     widget.session.showNotice(
-      'Question ready. Choose Chat in app to continue securely.',
+      'Question ready. Choose Chat to select a conversation and continue.',
     );
   }
 
@@ -3669,7 +10790,7 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
                               style: context.buyBody.copyWith(fontSize: 11),
                             ),
                             Text(
-                              '${order.id} · ${order.promise}',
+                              '${order.id} · ${_orderPromiseSummary(order)}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: context.buyMeta.copyWith(fontSize: 8),
@@ -3882,36 +11003,16 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
           style: context.buyTitle.copyWith(fontSize: 14),
         ),
         const SizedBox(height: 6),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final vertical = accessibleText || constraints.maxWidth < 330;
-            final chat = _AssistChannel(
-              icon: Icons.chat_outlined,
-              title: 'Chat in app',
-              detail: 'Continue with support',
-              onTap: () {
-                HapticFeedback.selectionClick();
-                session.showNotice('In-app support chat selected.');
-              },
-            );
-            final call = _AssistChannel(
-              icon: Icons.phone_outlined,
-              title: 'Call in app',
-              detail: 'Speak securely here',
-              onTap: () {
-                HapticFeedback.selectionClick();
-                session.showNotice('In-app support call selected.');
-              },
-            );
-            if (vertical) {
-              return Column(children: [chat, const SizedBox(height: 7), call]);
-            }
-            return Row(
-              children: [
-                Expanded(child: chat),
-                const SizedBox(width: 8),
-                Expanded(child: call),
-              ],
+        _AssistChannel(
+          icon: Icons.chat_outlined,
+          title: 'Chat in app',
+          detail: 'Continue with support',
+          onTap: () {
+            HapticFeedback.selectionClick();
+            FocusScope.of(context).unfocus();
+            widget.onOpenChat(
+              intent: _selectedIntent,
+              details: _composerController.text,
             );
           },
         ),
@@ -3940,9 +11041,16 @@ class _BuyV2AssistViewState extends State<BuyV2AssistView> {
 }
 
 class BuyV2AccountView extends StatelessWidget {
-  const BuyV2AccountView({super.key, required this.session});
+  const BuyV2AccountView({
+    super.key,
+    required this.session,
+    this.accountIdentity,
+    this.accountAuthenticated = false,
+  });
 
   final BuyV2Session session;
+  final AuthenticatedAccountIdentity? accountIdentity;
+  final bool accountAuthenticated;
 
   @override
   Widget build(BuildContext context) {
@@ -3973,9 +11081,14 @@ class BuyV2AccountView extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: BuyV2Colors.orange, width: 2),
                 ),
-                child: const Text(
-                  'DC',
-                  style: TextStyle(
+                child: Text(
+                  _buyAccountViewInitials(
+                    accountIdentity?.primaryLabel ??
+                        (accountAuthenticated
+                            ? 'MoolSocial member'
+                            : 'MoolSocial guest'),
+                  ),
+                  style: const TextStyle(
                     color: BuyV2Colors.navy,
                     fontWeight: FontWeight.w900,
                   ),
@@ -3986,8 +11099,11 @@ class BuyV2AccountView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Dharmendra Choudhary',
+                    Text(
+                      accountIdentity?.primaryLabel ??
+                          (accountAuthenticated
+                              ? 'MoolSocial member'
+                              : 'MoolSocial guest'),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -3998,9 +11114,10 @@ class BuyV2AccountView extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      address == null
-                          ? 'Choose a delivery contact'
-                          : '${address.phone} · Account contact',
+                      accountIdentity?.detailLabel ??
+                          (accountAuthenticated
+                              ? 'Signed in to MoolSocial'
+                              : 'Sign in to keep your activity with you'),
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 9,
@@ -4054,7 +11171,7 @@ class BuyV2AccountView extends StatelessWidget {
         _AccountActionRow(
           key: const ValueKey('buy-account-workspace'),
           icon: Icons.storefront_outlined,
-          title: 'Wholesale workspace',
+          title: 'Wholesale business profile',
           detail: session.businessVerified
               ? 'Shree Balaji Retail · Business profile complete'
               : 'Business profile required',
@@ -4070,13 +11187,34 @@ class BuyV2AccountView extends StatelessWidget {
         _AccountActionRow(
           key: const ValueKey('buy-account-security'),
           icon: Icons.security_outlined,
-          title: 'Security',
-          detail: 'Sign-in and account protection',
+          title: accountAuthenticated
+              ? 'Sign out or switch account'
+              : 'Sign in to MoolSocial',
+          detail: accountAuthenticated
+              ? 'Account security and connected services'
+              : 'Use one identity across MoolSocial',
           onTap: () => context.push('/app/account/security'),
         ),
       ],
     );
   }
+}
+
+String _buyAccountViewInitials(String label) {
+  final words = label
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .toList(growable: false);
+  if (words.isEmpty) return 'MS';
+  if (words.length > 1) {
+    return words
+        .take(2)
+        .map((word) => String.fromCharCode(word.runes.first))
+        .join()
+        .toUpperCase();
+  }
+  return String.fromCharCodes(words.single.runes.take(2)).toUpperCase();
 }
 
 class _AccountActionRow extends StatelessWidget {
@@ -4172,22 +11310,38 @@ Future<void> showBuyV2FilterSheet(
 }) async {
   final destination = session.destination;
   final selectedFilter = session.selectedFilter;
-  final routeLabel = actions.isEmpty
+  final hasRefinement = destination != BuyV2Destination.orders;
+  final routeLabel = actions.isEmpty && !hasRefinement
       ? '${destination.label} filters'
       : '${destination.label} tools and filters';
   final options = switch (destination) {
     BuyV2Destination.shop => const [
       ('any', 'Any delivery time', 'Show every available product'),
-      ('fast', 'Fast delivery', 'Nearby fulfilment first'),
+      ('fast', 'Fast delivery', 'Nearby delivery first'),
       ('today', 'Delivered today', 'Confirmed same-day listings'),
+      (
+        'quick-local',
+        'Quick local delivery',
+        'Nearby delivery with a confirmed short delivery window',
+      ),
+      (
+        'standard-courier',
+        'Standard/courier delivery',
+        'Scheduled local or remote delivery with a confirmed date or window',
+      ),
       ('lowest', 'Lowest delivered price', 'Price including delivery'),
-      ('nearby', 'Nearby sellers', 'Local Mool fulfilment partners'),
+      ('nearby', 'Nearby sellers', 'Nearby Mool partners'),
       ('returns', 'Easy returns', 'Listings with a clear return option'),
     ],
     BuyV2Destination.wholesale => const [
       ('any', 'Any delivery schedule', 'Show every confirmed trade listing'),
       ('fast', 'Fastest delivery', 'Earliest confirmed dispatch first'),
       ('two-days', 'Within two days', 'Nearby and priority supply'),
+      (
+        'bulk-freight',
+        'Bulk freight',
+        'Tracked Wholesale delivery for MOQ and bulk loads',
+      ),
       ('lowest', 'Lowest landed price', 'Product and freight together'),
       ('freight', 'Freight included', 'Delivered price without hidden freight'),
       ('moq', 'Flexible MOQ', 'Lower minimum-order listings'),
@@ -4199,7 +11353,7 @@ Future<void> showBuyV2FilterSheet(
       ('today', 'Delivered today', 'Confirmed same-day medicine supply'),
       ('lowest', 'Lowest delivered price', 'Price including delivery'),
       ('otc', 'No prescription required', 'Listed non-prescription products'),
-      ('nearby', 'Nearby pharmacy', 'Licensed local fulfilment partners'),
+      ('nearby', 'Nearby pharmacy', 'Licensed local pharmacies'),
       (
         'manufacturer',
         'Manufacturer sealed packs',
@@ -4256,7 +11410,7 @@ Future<void> showBuyV2FilterSheet(
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            actions.isEmpty
+                            actions.isEmpty && !hasRefinement
                                 ? 'Choose one filter for this catalogue.'
                                 : 'Use one tool or choose one catalogue filter.',
                             style: sheetContext.buyMeta,
@@ -4280,9 +11434,40 @@ Future<void> showBuyV2FilterSheet(
                   ],
                 ),
                 const SizedBox(height: 12),
-                if (actions.isNotEmpty) ...[
+                if (actions.isNotEmpty || hasRefinement) ...[
                   Text('Tools', style: sheetContext.buyEyebrow),
                   const SizedBox(height: 8),
+                  if (hasRefinement)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _BuyV2FilterToolAction(
+                        action: BuyV2FilterSheetAction(
+                          keyName: 'buy-discovery-refinement',
+                          icon: Icons.tune_rounded,
+                          title: 'Sort and refine',
+                          detail: session.activeDiscoveryRefinementCount == 0
+                              ? 'Brand, price, pack, availability and delivery'
+                              : '${session.activeDiscoveryRefinementCount} selected',
+                          onTap: () {},
+                        ),
+                        onTap: () async {
+                          final routeCompleted = ModalRoute.of(
+                            sheetContext,
+                          )?.completed;
+                          Navigator.of(sheetContext).pop();
+                          if (routeCompleted != null) await routeCompleted;
+                          if (session.destination != destination ||
+                              !context.mounted) {
+                            return;
+                          }
+                          await _showBuyV2DiscoveryRefinementSheet(
+                            context,
+                            session,
+                            destination,
+                          );
+                        },
+                      ),
+                    ),
                   for (final action in actions)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -4334,6 +11519,294 @@ Future<void> showBuyV2FilterSheet(
     ),
   );
 }
+
+Future<void> _showBuyV2DiscoveryRefinementSheet(
+  BuildContext context,
+  BuyV2Session session,
+  BuyV2Destination destination,
+) async {
+  if (session.destination != destination ||
+      destination == BuyV2Destination.orders) {
+    return;
+  }
+  final deliveryModes = switch (destination) {
+    BuyV2Destination.shop => const [
+      BuyV2FulfilmentMode.quickLocal,
+      BuyV2FulfilmentMode.standardCourier,
+    ],
+    BuyV2Destination.wholesale => const [BuyV2FulfilmentMode.bulkFreight],
+    BuyV2Destination.medicine => const [BuyV2FulfilmentMode.standardCourier],
+    BuyV2Destination.orders => const <BuyV2FulfilmentMode>[],
+  };
+  final packFilters = switch (destination) {
+    BuyV2Destination.shop || BuyV2Destination.medicine => const [
+      BuyV2PackFilter.standard,
+      BuyV2PackFilter.multipack,
+    ],
+    BuyV2Destination.wholesale => const [BuyV2PackFilter.bulk],
+    BuyV2Destination.orders => const <BuyV2PackFilter>[],
+  };
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(
+      maxWidth: BuyV2FilterSheetMotion.maxWidth,
+    ),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    sheetAnimationStyle: BuyV2FilterSheetMotion.resolve(context),
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (sheetContext, setSheetState) {
+        void update(VoidCallback action) {
+          action();
+          setSheetState(() {});
+        }
+
+        return FractionallySizedBox(
+          heightFactor: .92,
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Sort and refine',
+                              key: const ValueKey(
+                                'buy-discovery-refinement-title',
+                              ),
+                              style: sheetContext.buyTitle,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${_productCountLabel(session.catalogueSaleTypeProducts.length)} '
+                              '${session.catalogueSaleTypeProducts.length == 1 ? 'matches' : 'match'} your choices',
+                              style: sheetContext.buyMeta,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        key: const ValueKey('buy-discovery-refinement-close'),
+                        tooltip: 'Close sort and filters',
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: BuyV2Colors.line),
+                Expanded(
+                  child: ListView(
+                    key: const ValueKey('buy-discovery-refinement-list'),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                    children: [
+                      _DiscoveryRefinementSection(
+                        title: 'Sort by',
+                        children: [
+                          for (final sort in BuyV2ProductSort.values)
+                            ChoiceChip(
+                              key: ValueKey('buy-sort-${sort.name}'),
+                              label: Text(_buyV2ProductSortLabel(sort)),
+                              selected: session.productSort == sort,
+                              onSelected: (_) =>
+                                  update(() => session.chooseProductSort(sort)),
+                            ),
+                        ],
+                      ),
+                      _DiscoveryRefinementSection(
+                        title: 'Delivery',
+                        children: [
+                          ChoiceChip(
+                            key: const ValueKey('buy-refine-delivery-any'),
+                            label: const Text('Any delivery'),
+                            selected: session.selectedFulfilmentMode == null,
+                            onSelected: (_) => update(
+                              () => session.chooseFulfilmentMode(null),
+                            ),
+                          ),
+                          for (final mode in deliveryModes)
+                            ChoiceChip(
+                              key: ValueKey('buy-refine-delivery-${mode.name}'),
+                              label: Text(buyV2FulfilmentModeLabel(mode)),
+                              selected: session.selectedFulfilmentMode == mode,
+                              onSelected: (_) => update(
+                                () => session.chooseFulfilmentMode(mode),
+                              ),
+                            ),
+                        ],
+                      ),
+                      _DiscoveryRefinementSection(
+                        title: 'Price',
+                        children: [
+                          ChoiceChip(
+                            key: const ValueKey('buy-refine-price-any'),
+                            label: const Text('Any price'),
+                            selected: session.maximumProductPrice == null,
+                            onSelected: (_) => update(
+                              () => session.chooseMaximumProductPrice(null),
+                            ),
+                          ),
+                          for (final limit in session.discoveryPriceLimits)
+                            ChoiceChip(
+                              key: ValueKey('buy-refine-price-$limit'),
+                              label: Text('Up to ${buyV2Money(limit)}'),
+                              selected: session.maximumProductPrice == limit,
+                              onSelected: (_) => update(
+                                () => session.chooseMaximumProductPrice(limit),
+                              ),
+                            ),
+                        ],
+                      ),
+                      _DiscoveryRefinementSection(
+                        title: 'Pack',
+                        children: [
+                          ChoiceChip(
+                            key: const ValueKey('buy-refine-pack-any'),
+                            label: const Text('Any pack'),
+                            selected: session.selectedPackFilter == null,
+                            onSelected: (_) =>
+                                update(() => session.choosePackFilter(null)),
+                          ),
+                          for (final filter in packFilters)
+                            ChoiceChip(
+                              key: ValueKey('buy-refine-pack-${filter.name}'),
+                              label: Text(_buyV2PackFilterLabel(filter)),
+                              selected: session.selectedPackFilter == filter,
+                              onSelected: (_) => update(
+                                () => session.choosePackFilter(filter),
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (session.discoveryBrands.isNotEmpty)
+                        _DiscoveryRefinementSection(
+                          title: 'Brand',
+                          children: [
+                            for (final brand in session.discoveryBrands)
+                              FilterChip(
+                                key: ValueKey(
+                                  'buy-refine-brand-${brand.toLowerCase().replaceAll(' ', '-')}',
+                                ),
+                                label: Text(brand),
+                                selected: session.selectedBrands.contains(
+                                  brand,
+                                ),
+                                onSelected: (_) => update(
+                                  () => session.toggleDiscoveryBrand(brand),
+                                ),
+                              ),
+                          ],
+                        ),
+                      Material(
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          side: const BorderSide(color: BuyV2Colors.line),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: SwitchListTile.adaptive(
+                          key: const ValueKey('buy-refine-available-products'),
+                          title: const Text('Available products only'),
+                          subtitle: const Text(
+                            'Hide products that cannot be added right now',
+                          ),
+                          value: session.availableProductsOnly,
+                          onChanged: (value) => update(
+                            () => session.setAvailableProductsOnly(value),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    border: Border(top: BorderSide(color: BuyV2Colors.line)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          key: const ValueKey('buy-discovery-refinement-clear'),
+                          onPressed: session.activeDiscoveryRefinementCount == 0
+                              ? null
+                              : () => update(session.clearDiscoveryRefinements),
+                          child: const Text('Clear'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton(
+                          key: const ValueKey('buy-discovery-refinement-done'),
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                          child: Text(
+                            'Show ${_productCountLabel(session.catalogueSaleTypeProducts.length)}',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+class _DiscoveryRefinementSection extends StatelessWidget {
+  const _DiscoveryRefinementSection({
+    required this.title,
+    required this.children,
+  });
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: context.buyEyebrow),
+        const SizedBox(height: 8),
+        Wrap(spacing: 7, runSpacing: 7, children: children),
+      ],
+    ),
+  );
+}
+
+String _buyV2ProductSortLabel(BuyV2ProductSort value) => switch (value) {
+  BuyV2ProductSort.relevance => 'Relevance',
+  BuyV2ProductSort.priceLowToHigh => 'Price: low to high',
+  BuyV2ProductSort.priceHighToLow => 'Price: high to low',
+  BuyV2ProductSort.deliveryFastest => 'Fastest delivery',
+};
+
+String _buyV2PackFilterLabel(BuyV2PackFilter value) => switch (value) {
+  BuyV2PackFilter.standard => 'Standard pack',
+  BuyV2PackFilter.multipack => 'Multipack',
+  BuyV2PackFilter.bulk => 'Bulk pack',
+};
 
 class _BuyV2FilterToolAction extends StatelessWidget {
   const _BuyV2FilterToolAction({required this.action, required this.onTap});
@@ -4495,23 +11968,7 @@ Future<void> showBuyV2PaymentSheet(
   final destination = session.destination;
   final view = session.view;
   final selectedPayment = session.selectedPayment;
-  const choices = [
-    (
-      'UPI',
-      Icons.qr_code_rounded,
-      'Use your preferred UPI app when you are ready to pay',
-    ),
-    (
-      'Bank transfer',
-      Icons.account_balance_outlined,
-      'View transfer details during payment',
-    ),
-    (
-      'Purchase order',
-      Icons.receipt_long_outlined,
-      'Choose for an eligible business workspace',
-    ),
-  ];
+  final choices = _buyV2CustomerPaymentChoices(session);
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -4544,7 +12001,15 @@ Future<void> showBuyV2PaymentSheet(
           child: ListView(
             key: const ValueKey('buy-payment-sheet-list'),
             shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              18 +
+                  BuyV2AddressSheetMotion.resolveModalActionBottomInset(
+                    sheetContext,
+                  ),
+            ),
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -4560,7 +12025,7 @@ Future<void> showBuyV2PaymentSheet(
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          'Choose how you want to pay. No payment is started here.',
+                          'Choose how you want to pay MoolSocial for this purchase.',
                           style: sheetContext.buyMeta,
                         ),
                       ],
@@ -4582,6 +12047,20 @@ Future<void> showBuyV2PaymentSheet(
                 ],
               ),
               const SizedBox(height: 12),
+              if (choices.isEmpty)
+                Container(
+                  key: const ValueKey('buy-payment-unavailable'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: buyV2CardDecoration(
+                    color: BuyV2Colors.softOrange,
+                    border: BuyV2Colors.orange,
+                    radius: 14,
+                  ),
+                  child: Text(
+                    'Payment methods are unavailable right now. Return to Checkout and try again.',
+                    style: sheetContext.buyMeta,
+                  ),
+                ),
               for (final choice in choices)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -4692,9 +12171,9 @@ class _BuyV2PaymentChoice extends StatelessWidget {
                     const SizedBox(width: 8),
                     Icon(
                       selected
-                          ? Icons.check_circle_rounded
-                          : Icons.chevron_right_rounded,
-                      color: selected ? BuyV2Colors.green : BuyV2Colors.navy,
+                          ? Icons.radio_button_checked_rounded
+                          : Icons.radio_button_off_rounded,
+                      color: selected ? BuyV2Colors.navy : BuyV2Colors.muted,
                     ),
                   ],
                 ),
@@ -4714,6 +12193,8 @@ Future<void> showBuyV2PrescriptionSheet(
   final destination = session.destination;
   final view = session.view;
   final pendingProductId = session.pendingPrescriptionProductId;
+  final bottomViewPadding =
+      BuyV2AddressSheetMotion.resolveModalActionBottomInset(context);
 
   Future<void> finishAfterReverse(
     BuildContext sheetContext,
@@ -4763,7 +12244,7 @@ Future<void> showBuyV2PrescriptionSheet(
           child: ListView(
             key: const ValueKey('buy-prescription-sheet-list'),
             shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 18 + bottomViewPadding),
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -4837,8 +12318,9 @@ Future<void> showBuyV2PrescriptionSheet(
 
 Future<void> showBuyV2AddressSheet(
   BuildContext context,
-  BuyV2Session session,
-) async {
+  BuyV2Session session, {
+  bool continueToCheckoutAfterSelection = false,
+}) async {
   final destination = session.destination;
   final view = session.view;
   final selectedAddressId = session.selectedAddressId;
@@ -4861,7 +12343,25 @@ Future<void> showBuyV2AddressSheet(
         !session.addresses.any((address) => address.id == addressId)) {
       return;
     }
-    session.chooseAddress(addressId);
+    if (session.chooseAddress(addressId) && continueToCheckoutAfterSelection) {
+      session.openCheckout();
+    }
+  }
+
+  Future<void> addAndContinue(BuildContext sheetContext) async {
+    final previousAddressId = session.selectedAddressId;
+    await _showAddAddressSheet(sheetContext, session);
+    if (!continueToCheckoutAfterSelection ||
+        session.selectedAddressId == previousAddressId ||
+        !sheetContext.mounted) {
+      return;
+    }
+    final routeCompleted = ModalRoute.of(sheetContext)?.completed;
+    Navigator.of(sheetContext).pop();
+    if (routeCompleted != null) await routeCompleted;
+    if (session.destination == destination && session.view == view) {
+      session.openCheckout();
+    }
   }
 
   await showModalBottomSheet<void>(
@@ -4906,13 +12406,13 @@ Future<void> showBuyV2AddressSheet(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Delivery address',
+                          'Choose delivery address',
                           key: const ValueKey('buy-address-sheet-title'),
                           style: sheetContext.buyTitle,
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          'Choose a saved address, request one, or add it yourself.',
+                          'Select a saved address or add another place.',
                           style: sheetContext.buyMeta,
                         ),
                       ],
@@ -4972,6 +12472,44 @@ Future<void> showBuyV2AddressSheet(
                       address: address,
                       selected: selectedAddressId == address.id,
                       onTap: () => chooseAfterReverse(sheetContext, address.id),
+                      onEdit: () => _showAddAddressSheet(
+                        sheetContext,
+                        session,
+                        existingAddress: address,
+                      ),
+                      onDelete: () async {
+                        final remove = await showDialog<bool>(
+                          context: sheetContext,
+                          builder: (dialogContext) => AlertDialog(
+                            title: Text('Remove ${address.label} address?'),
+                            content: const Text(
+                              'Existing orders stay unchanged. You can add this address again later.',
+                            ),
+                            actions: [
+                              TextButton(
+                                key: const ValueKey(
+                                  'buy-address-delete-cancel',
+                                ),
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(false),
+                                child: const Text('Keep address'),
+                              ),
+                              FilledButton(
+                                key: const ValueKey(
+                                  'buy-address-delete-confirm',
+                                ),
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(true),
+                                child: const Text('Remove'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (remove != true || !sheetContext.mounted) return;
+                        if (session.removeAddress(address.id)) {
+                          Navigator.of(sheetContext).pop();
+                        }
+                      },
                     ),
                   ),
               const SizedBox(height: 4),
@@ -4983,7 +12521,7 @@ Future<void> showBuyV2AddressSheet(
                   onPressed: () =>
                       _showAddressRequestSheet(sheetContext, session),
                   icon: const Icon(Icons.ios_share_outlined, size: 18),
-                  label: const Text('Request address'),
+                  label: const Text('Request an address'),
                 ),
               ),
               const SizedBox(height: 8),
@@ -4992,9 +12530,9 @@ Future<void> showBuyV2AddressSheet(
                 height: BuyV2Metrics.minimumTap,
                 child: FilledButton.icon(
                   key: const ValueKey('buy-address-add'),
-                  onPressed: () => _showAddAddressSheet(sheetContext, session),
+                  onPressed: () => addAndContinue(sheetContext),
                   icon: const Icon(Icons.add_location_alt_outlined, size: 18),
-                  label: const Text('Add address'),
+                  label: const Text('Add new address'),
                 ),
               ),
             ],
@@ -5010,11 +12548,15 @@ class _BuyV2AddressChoice extends StatelessWidget {
     required this.address,
     required this.selected,
     required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   final BuyV2Address address;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -5030,93 +12572,179 @@ class _BuyV2AddressChoice extends StatelessWidget {
       BuyV2AddressKind.thirdParty => Icons.group_outlined,
       BuyV2AddressKind.other => Icons.location_on_outlined,
     };
-    return Semantics(
-      key: ValueKey('buy-address-semantics-${address.id}'),
-      container: true,
-      button: true,
-      selected: selected,
-      label: semanticsLabel,
-      onTap: onTap,
-      child: ExcludeSemantics(
-        child: Material(
-          color: selected ? BuyV2Colors.softBlue : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(
-              color: selected ? BuyV2Colors.navy : BuyV2Colors.line,
-              width: selected ? 1.4 : 1,
-            ),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            key: ValueKey('buy-address-${address.id}'),
-            onTap: onTap,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 76),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? BuyV2Colors.navy
-                            : BuyV2Colors.softBlue,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        icon,
-                        color: selected ? Colors.white : BuyV2Colors.navy,
-                        size: 21,
-                      ),
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+    final actionsKey = GlobalKey<PopupMenuButtonState<String>>();
+    return Material(
+      color: selected ? BuyV2Colors.softBlue : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: selected ? BuyV2Colors.navy : BuyV2Colors.line,
+          width: selected ? 1.4 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 82),
+        child: Row(
+          children: [
+            Expanded(
+              child: Semantics(
+                key: ValueKey('buy-address-semantics-${address.id}'),
+                container: true,
+                button: true,
+                selected: selected,
+                label: semanticsLabel,
+                onTap: onTap,
+                child: ExcludeSemantics(
+                  child: InkWell(
+                    key: ValueKey('buy-address-${address.id}'),
+                    onTap: onTap,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(13, 10, 8, 10),
+                      child: Row(
                         children: [
-                          Text(
-                            address.label,
-                            style: const TextStyle(
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? BuyV2Colors.navy
+                                  : BuyV2Colors.softBlue,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              icon,
+                              color: selected ? Colors.white : BuyV2Colors.navy,
+                              size: 21,
+                            ),
+                          ),
+                          const SizedBox(width: 11),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        address.label,
+                                        style: const TextStyle(
+                                          color: BuyV2Colors.navy,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                    if (selected)
+                                      Container(
+                                        key: ValueKey(
+                                          'buy-address-selected-${address.id}',
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: BuyV2Colors.green,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Selected',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${address.recipient} · ${address.phone}',
+                                  style: context.buyMeta.copyWith(
+                                    color: BuyV2Colors.ink,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${address.line}, ${address.shortLine} · ${address.landmark}',
+                                  maxLines: 4,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: context.buyMeta,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (!selected) ...[
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.chevron_right_rounded,
                               color: BuyV2Colors.navy,
-                              fontWeight: FontWeight.w900,
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${address.recipient} · ${address.phone}',
-                            style: context.buyMeta.copyWith(
-                              color: BuyV2Colors.ink,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${address.line}, ${address.shortLine} · ${address.landmark}',
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: context.buyMeta,
-                          ),
+                          ],
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      selected
-                          ? Icons.check_circle_rounded
-                          : Icons.chevron_right_rounded,
-                      color: selected ? BuyV2Colors.green : BuyV2Colors.navy,
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
+            const SizedBox(
+              height: 54,
+              child: VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: BuyV2Colors.line,
+              ),
+            ),
+            Semantics(
+              key: ValueKey('buy-address-actions-${address.id}'),
+              button: true,
+              label: 'Manage ${address.label} address',
+              onTap: () => actionsKey.currentState?.showButtonMenu(),
+              child: PopupMenuButton<String>(
+                key: actionsKey,
+                tooltip: 'Manage ${address.label} address',
+                constraints: const BoxConstraints(minWidth: 170),
+                onSelected: (action) {
+                  if (action == 'edit') {
+                    onEdit();
+                  } else if (action == 'delete') {
+                    onDelete();
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem<String>(
+                    key: ValueKey('buy-address-edit-${address.id}'),
+                    value: 'edit',
+                    child: const Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 19),
+                        SizedBox(width: 9),
+                        Text('Edit address'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem<String>(
+                    key: ValueKey('buy-address-delete-${address.id}'),
+                    value: 'delete',
+                    child: const Row(
+                      children: [
+                        Icon(Icons.delete_outline_rounded, size: 19),
+                        SizedBox(width: 9),
+                        Text('Remove address'),
+                      ],
+                    ),
+                  ),
+                ],
+                icon: const Icon(Icons.more_vert_rounded, size: 20),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -5146,19 +12774,27 @@ Future<void> _showAddressRequestSheet(
   );
 }
 
-Future<void> _showAddAddressSheet(BuildContext context, BuyV2Session session) {
+Future<void> _showAddAddressSheet(
+  BuildContext context,
+  BuyV2Session session, {
+  BuyV2Address? existingAddress,
+}) {
   final destination = session.destination;
   final view = session.view;
   final selectedAddressId = session.selectedAddressId;
 
-  bool addToExistingOwner(BuyV2Address address) {
+  bool saveToExistingOwner(BuyV2Address address) {
     if (session.destination != destination ||
         session.view != view ||
         session.selectedAddressId != selectedAddressId) {
       return false;
     }
-    session.addAddress(address);
-    return true;
+    if (existingAddress == null) {
+      session.addAddress(address);
+      return true;
+    }
+    if (existingAddress.id != address.id) return false;
+    return session.updateAddress(address);
   }
 
   return showModalBottomSheet<void>(
@@ -5176,8 +12812,10 @@ Future<void> _showAddAddressSheet(BuildContext context, BuyV2Session session) {
     clipBehavior: Clip.antiAlias,
     sheetAnimationStyle: BuyV2AddressFormSheetMotion.resolve(context),
     routeSettings: const RouteSettings(name: 'buy-address-add-form'),
-    builder: (sheetContext) =>
-        _BuyV2AddAddressForm(onSubmit: addToExistingOwner),
+    builder: (sheetContext) => _BuyV2AddAddressForm(
+      existingAddress: existingAddress,
+      onSubmit: saveToExistingOwner,
+    ),
   );
 }
 
@@ -5193,6 +12831,7 @@ class _BuyV2AddressRequestForm extends StatefulWidget {
 
 class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
   final recipientController = TextEditingController();
+  bool requestBusy = false;
 
   @override
   void dispose() {
@@ -5200,12 +12839,60 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
     super.dispose();
   }
 
-  Future<void> copyRequest(String channel) async {
-    await _copyAddressRequest(
-      context,
-      channel,
-      recipient: recipientController.text.trim(),
+  Future<void> requestAddress({required bool copyOnly}) async {
+    if (requestBusy) return;
+    FocusScope.of(context).unfocus();
+    setState(() => requestBusy = true);
+    final result = await widget.session.createAddressRequest(
+      recipient: recipientController.text,
     );
+    if (!mounted) return;
+    final shareUri = result.shareUri;
+    if (shareUri == null) {
+      setState(() => requestBusy = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.customerMessage)));
+      return;
+    }
+    if (copyOnly) {
+      await Clipboard.setData(ClipboardData(text: shareUri.toString()));
+      if (!mounted) return;
+      setState(() => requestBusy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Address request link copied. Paste it into a message.',
+          ),
+        ),
+      );
+      return;
+    }
+    final renderBox = context.findRenderObject() as RenderBox?;
+    final origin = renderBox == null
+        ? const Rect.fromLTWH(0, 0, 1, 1)
+        : renderBox.localToGlobal(Offset.zero) & renderBox.size;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          uri: shareUri,
+          title: 'Send delivery address',
+          subject: 'MoolSocial delivery address request',
+          sharePositionOrigin: origin,
+          downloadFallbackEnabled: false,
+          mailToFallbackEnabled: false,
+        ),
+      );
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sharing is unavailable. Copy the link instead.'),
+          ),
+        );
+      }
+    }
+    if (mounted) setState(() => requestBusy = false);
   }
 
   @override
@@ -5220,7 +12907,7 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
       scopesRoute: true,
       namesRoute: true,
       explicitChildNodes: true,
-      label: 'Request their address',
+      label: 'Request an address',
       child: RepaintBoundary(
         key: const ValueKey('buy-address-request-form-repaint-boundary'),
         child: ConstrainedBox(
@@ -5235,43 +12922,41 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
             padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
             children: [
               _AddressFormHeader(
-                title: 'Request their address',
+                title: 'Request an address',
                 body:
-                    'Copy the MoolSocial request link, then send it with your chosen app.',
+                    'Create a secure request link and send it to the person receiving the order.',
                 closeKey: const ValueKey('buy-address-request-form-close'),
               ),
               const SizedBox(height: 12),
-              TextField(
-                key: const ValueKey('buy-address-request-recipient'),
-                controller: recipientController,
-                textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  labelText: 'Recipient name or phone (optional)',
-                  helperText: 'Kept on this sheet; not added to the link.',
+              Semantics(
+                label: 'Recipient name, optional',
+                textField: true,
+                child: TextField(
+                  key: const ValueKey('buy-address-request-recipient'),
+                  controller: recipientController,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
+                    labelText: 'Recipient name (optional)',
+                    helperText: 'Helps you confirm who the request is for.',
+                    helperMaxLines: 2,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
                   _ShareChoice(
-                    key: const ValueKey('buy-address-request-whatsapp'),
-                    label: 'WhatsApp',
-                    icon: Icons.call_outlined,
-                    onTap: () => copyRequest('WhatsApp'),
-                  ),
-                  const SizedBox(width: 7),
-                  _ShareChoice(
-                    key: const ValueKey('buy-address-request-moolsocial'),
-                    label: 'MoolSocial',
-                    icon: Icons.chat_outlined,
-                    onTap: () => copyRequest('MoolSocial'),
-                  ),
-                  const SizedBox(width: 7),
-                  _ShareChoice(
                     key: const ValueKey('buy-address-request-device-share'),
-                    label: 'Device share',
+                    label: requestBusy ? 'Preparing…' : 'Share request',
                     icon: Icons.ios_share_outlined,
-                    onTap: () => copyRequest('Device share'),
+                    onTap: () => requestAddress(copyOnly: false),
+                  ),
+                  const SizedBox(width: 7),
+                  _ShareChoice(
+                    key: const ValueKey('buy-address-request-copy'),
+                    label: 'Copy link',
+                    icon: Icons.link_rounded,
+                    onTap: () => requestAddress(copyOnly: true),
                   ),
                 ],
               ),
@@ -5283,7 +12968,7 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
                   key: const ValueKey('buy-address-request-enter-manually'),
                   onPressed: () =>
                       _showAddAddressSheet(context, widget.session),
-                  child: const Text('Enter address yourself'),
+                  child: const Text('Add it myself'),
                 ),
               ),
             ],
@@ -5295,26 +12980,38 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
 }
 
 class _BuyV2AddAddressForm extends StatefulWidget {
-  const _BuyV2AddAddressForm({required this.onSubmit});
+  const _BuyV2AddAddressForm({required this.onSubmit, this.existingAddress});
 
   final bool Function(BuyV2Address address) onSubmit;
+  final BuyV2Address? existingAddress;
 
   @override
   State<_BuyV2AddAddressForm> createState() => _BuyV2AddAddressFormState();
 }
 
 class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
-  final recipientController = TextEditingController();
-  final phoneController = TextEditingController();
-  final lineController = TextEditingController();
-  final pinController = TextEditingController();
-  final areaController = TextEditingController();
-  final landmarkController = TextEditingController();
+  late final TextEditingController recipientController;
+  late final TextEditingController phoneController;
+  late final TextEditingController lineController;
+  late final TextEditingController pinController;
+  late final TextEditingController areaController;
+  late final TextEditingController landmarkController;
 
-  BuyV2AddressKind kind = BuyV2AddressKind.home;
-  String? locationChoice;
-  String? locationNotice;
+  late BuyV2AddressKind kind;
   String? validationMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    final address = widget.existingAddress;
+    recipientController = TextEditingController(text: address?.recipient);
+    phoneController = TextEditingController(text: address?.phone);
+    lineController = TextEditingController(text: address?.line);
+    pinController = TextEditingController(text: address?.pinCode);
+    areaController = TextEditingController(text: address?.area);
+    landmarkController = TextEditingController(text: address?.landmark);
+    kind = address?.kind ?? BuyV2AddressKind.home;
+  }
 
   @override
   void dispose() {
@@ -5327,21 +13024,6 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
     super.dispose();
   }
 
-  void chooseLocationIntent(String choice) {
-    FocusScope.of(context).unfocus();
-    setState(() {
-      locationChoice = choice;
-      locationNotice = switch (choice) {
-        'Current' =>
-          'Current-location lookup is not connected in this session. Enter the delivery details manually.',
-        'Map pin' =>
-          'Map-pin lookup is not connected in this session. Enter the delivery details manually.',
-        _ =>
-          'Google address lookup is not connected in this session. Enter the delivery details manually.',
-      };
-    });
-  }
-
   void submit() {
     FocusScope.of(context).unfocus();
     final recipient = recipientController.text.trim();
@@ -5350,13 +13032,18 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
     final pin = pinController.text.trim();
     final area = areaController.text.trim();
     final landmark = landmarkController.text.trim();
-    if (recipient.isEmpty ||
-        phone.isEmpty ||
-        line.isEmpty ||
-        pin.length != 6 ||
-        area.isEmpty ||
-        landmark.isEmpty) {
-      setState(() => validationMessage = 'Complete every delivery detail');
+    if (recipient.isEmpty || line.isEmpty || area.isEmpty) {
+      setState(() {
+        validationMessage = 'Add the recipient, street address and locality.';
+      });
+      return;
+    }
+    if (!RegExp(r'^\d{10}$').hasMatch(phone)) {
+      setState(() => validationMessage = 'Enter a 10-digit phone number.');
+      return;
+    }
+    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
+      setState(() => validationMessage = 'Enter a valid 6-digit PIN code.');
       return;
     }
     final label = switch (kind) {
@@ -5365,9 +13052,12 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
       BuyV2AddressKind.thirdParty => 'Third party',
       BuyV2AddressKind.other => 'Other place',
     };
+    final existingAddress = widget.existingAddress;
     final added = widget.onSubmit(
       BuyV2Address(
-        id: 'saved-${DateTime.now().microsecondsSinceEpoch}',
+        id:
+            existingAddress?.id ??
+            'saved-${DateTime.now().microsecondsSinceEpoch}',
         kind: kind,
         label: label,
         recipient: recipient,
@@ -5375,7 +13065,7 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
         line: line,
         area: area,
         pinCode: pin,
-        landmark: landmark,
+        landmark: landmark.isEmpty ? 'No nearby landmark' : landmark,
       ),
     );
     if (!added) {
@@ -5390,17 +13080,24 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
 
   @override
   Widget build(BuildContext context) {
+    final editingAddress = widget.existingAddress;
+    final title = editingAddress == null
+        ? 'Add delivery address'
+        : 'Edit ${editingAddress.label} address';
     final bottomPadding =
         18 +
         BuyV2AddressFormSheetMotion.resolveBottomSafeInset(context) +
         MediaQuery.viewInsetsOf(context).bottom;
+    final fieldScrollPadding = EdgeInsets.only(
+      bottom: MediaQuery.viewInsetsOf(context).bottom + 140,
+    );
     return Semantics(
       key: const ValueKey('buy-address-add-form-route'),
       container: true,
       scopesRoute: true,
       namesRoute: true,
       explicitChildNodes: true,
-      label: 'Add address',
+      label: title,
       child: RepaintBoundary(
         key: const ValueKey('buy-address-add-form-repaint-boundary'),
         child: ConstrainedBox(
@@ -5414,12 +13111,15 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
             padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
             children: [
               _AddressFormHeader(
-                title: 'Add address',
-                body:
-                    'Enter the delivery details. Availability is confirmed only by the real order flow.',
+                title: title,
+                body: editingAddress == null
+                    ? 'Save where this order should arrive.'
+                    : 'Update the delivery details for this saved place.',
                 closeKey: const ValueKey('buy-address-add-form-close'),
               ),
               const SizedBox(height: 12),
+              Text('Address type', style: context.buyEyebrow),
+              const SizedBox(height: 7),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
@@ -5439,47 +13139,33 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  _LocationChoice(
-                    key: const ValueKey('buy-address-add-current'),
-                    label: 'Current',
-                    icon: Icons.my_location_rounded,
-                    selected: locationChoice == 'Current',
-                    onTap: () => chooseLocationIntent('Current'),
-                  ),
-                  const SizedBox(width: 6),
-                  _LocationChoice(
-                    key: const ValueKey('buy-address-add-map-pin'),
-                    label: 'Map pin',
-                    icon: Icons.map_outlined,
-                    selected: locationChoice == 'Map pin',
-                    onTap: () => chooseLocationIntent('Map pin'),
-                  ),
-                  const SizedBox(width: 6),
-                  _LocationChoice(
-                    key: const ValueKey('buy-address-add-google'),
-                    label: 'Google',
-                    icon: Icons.place_outlined,
-                    selected: locationChoice == 'Google',
-                    onTap: () => chooseLocationIntent('Google'),
-                  ),
-                ],
-              ),
-              if (locationNotice != null) ...[
-                const SizedBox(height: 10),
-                Container(
-                  key: const ValueKey('buy-address-location-notice'),
-                  padding: const EdgeInsets.all(12),
-                  decoration: buyV2CardDecoration(
-                    color: BuyV2Colors.softOrange,
-                    border: BuyV2Colors.orange,
-                    radius: 14,
-                  ),
-                  child: Text(locationNotice!, style: context.buyMeta),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: buyV2CardDecoration(
+                  color: BuyV2Colors.softBlue,
+                  radius: 14,
                 ),
-              ],
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.pin_drop_outlined,
+                      color: BuyV2Colors.navy,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        'Enter the complete address below. You can review it before placing the order.',
+                        style: context.buyMeta.copyWith(color: BuyV2Colors.ink),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 12),
+              Text('Delivery contact', style: context.buyEyebrow),
+              const SizedBox(height: 7),
               TextField(
                 key: const ValueKey('buy-address-add-recipient'),
                 controller: recipientController,
@@ -5492,31 +13178,29 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
                 controller: phoneController,
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'Recipient phone'),
+                decoration: const InputDecoration(
+                  labelText: '10-digit phone number',
+                ),
               ),
-              const SizedBox(height: 9),
+              const SizedBox(height: 14),
+              Text('Address details', style: context.buyEyebrow),
+              const SizedBox(height: 7),
               TextField(
                 key: const ValueKey('buy-address-add-line'),
                 controller: lineController,
+                scrollPadding: fieldScrollPadding,
                 minLines: 2,
                 maxLines: 3,
                 textInputAction: TextInputAction.newline,
                 decoration: const InputDecoration(
-                  labelText: 'House, street and full address',
+                  labelText: 'House, building and street',
                 ),
-              ),
-              const SizedBox(height: 9),
-              TextField(
-                key: const ValueKey('buy-address-add-pin'),
-                controller: pinController,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'PIN code'),
               ),
               const SizedBox(height: 9),
               TextField(
                 key: const ValueKey('buy-address-add-area'),
                 controller: areaController,
+                scrollPadding: fieldScrollPadding,
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   labelText: 'Area or locality',
@@ -5524,10 +13208,24 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
               ),
               const SizedBox(height: 9),
               TextField(
+                key: const ValueKey('buy-address-add-pin'),
+                controller: pinController,
+                scrollPadding: fieldScrollPadding,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: '6-digit PIN code',
+                ),
+              ),
+              const SizedBox(height: 9),
+              TextField(
                 key: const ValueKey('buy-address-add-landmark'),
                 controller: landmarkController,
+                scrollPadding: fieldScrollPadding,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(labelText: 'Landmark'),
+                decoration: const InputDecoration(
+                  labelText: 'Nearby landmark (optional)',
+                ),
               ),
               if (validationMessage != null) ...[
                 const SizedBox(height: 10),
@@ -5549,7 +13247,11 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
                 child: FilledButton(
                   key: const ValueKey('buy-address-add-submit'),
                   onPressed: submit,
-                  child: const Text('Save and deliver here'),
+                  child: Text(
+                    editingAddress == null
+                        ? 'Save and deliver here'
+                        : 'Save changes',
+                  ),
                 ),
               ),
             ],
@@ -5673,7 +13375,11 @@ class _ReturnAffordance extends StatelessWidget {
 }
 
 class _DecisionPanel extends StatelessWidget {
-  const _DecisionPanel({required this.title, required this.children});
+  const _DecisionPanel({
+    super.key,
+    required this.title,
+    required this.children,
+  });
 
   final String title;
   final List<Widget> children;
@@ -5747,6 +13453,7 @@ class _DecisionActionRow extends StatelessWidget {
     required this.detail,
     required this.semanticLabel,
     required this.onTap,
+    this.emphasized = false,
   });
 
   final IconData icon;
@@ -5755,6 +13462,7 @@ class _DecisionActionRow extends StatelessWidget {
   final String detail;
   final String semanticLabel;
   final VoidCallback onTap;
+  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
@@ -5766,16 +13474,19 @@ class _DecisionActionRow extends StatelessWidget {
         onTap: onTap,
         child: ExcludeSemantics(
           child: Material(
-            color: Colors.transparent,
+            color: emphasized ? BuyV2Colors.softBlue : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
             child: InkWell(
               onTap: onTap,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(
                   minHeight: BuyV2Metrics.minimumTap,
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  padding: emphasized
+                      ? const EdgeInsets.all(9)
+                      : const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -5785,7 +13496,15 @@ class _DecisionActionRow extends StatelessWidget {
                         width: 72,
                         child: Text(
                           label,
-                          style: context.buyMeta.copyWith(fontSize: 8),
+                          style: context.buyMeta.copyWith(
+                            color: emphasized
+                                ? BuyV2Colors.navy
+                                : BuyV2Colors.muted,
+                            fontSize: 8,
+                            fontWeight: emphasized
+                                ? FontWeight.w900
+                                : FontWeight.w700,
+                          ),
                         ),
                       ),
                       Expanded(
@@ -5811,8 +13530,10 @@ class _DecisionActionRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 5),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
+                      Icon(
+                        emphasized
+                            ? Icons.storefront_rounded
+                            : Icons.arrow_forward_rounded,
                         color: BuyV2Colors.navy,
                         size: 18,
                       ),
@@ -5828,11 +13549,23 @@ class _DecisionActionRow extends StatelessWidget {
   }
 }
 
+String _sellerTypeLabel(String source) {
+  final value = source.trim().toLowerCase();
+  if (value.contains('manufacturer')) return 'Manufacturer';
+  if (value.contains('wholesaler')) return 'Wholesaler';
+  if (value.contains('distributor')) return 'Distributor';
+  if (value.contains('retailer')) return 'Retailer';
+  if (value.contains('shop')) return 'Dealer';
+  if (value.contains('producer')) return 'Producer';
+  return 'Seller';
+}
+
 class _ProductOwnedActionPanel extends StatelessWidget {
   const _ProductOwnedActionPanel({
     super.key,
     required this.product,
     required this.quantity,
+    this.deliveryDecision,
     required this.rxBlocked,
     required this.onAdd,
     required this.onDecrease,
@@ -5841,6 +13574,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
 
   final BuyV2Product product;
   final int quantity;
+  final String? deliveryDecision;
   final bool rxBlocked;
   final VoidCallback onAdd;
   final VoidCallback onDecrease;
@@ -5960,6 +13694,20 @@ class _ProductOwnedActionPanel extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: context.buyMeta.copyWith(fontSize: 9),
         ),
+        if (deliveryDecision case final delivery?) ...[
+          const SizedBox(height: 3),
+          Text(
+            delivery,
+            key: ValueKey('buy-product-action-delivery-${product.id}'),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: context.buyMeta.copyWith(
+              color: BuyV2Colors.green,
+              fontSize: 8.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ],
     );
 
@@ -6002,22 +13750,93 @@ class _ProductOwnedActionPanel extends StatelessWidget {
   }
 }
 
+class _ProductPurchaseActionRow extends StatelessWidget {
+  const _ProductPurchaseActionRow({
+    required this.product,
+    required this.quantity,
+    this.addSemanticLabel,
+    required this.onAdd,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  final BuyV2Product product;
+  final int quantity;
+  final String? addSemanticLabel;
+  final VoidCallback onAdd;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  @override
+  Widget build(BuildContext context) {
+    final cartAction = AnimatedSwitcher(
+      key: ValueKey('buy-product-action-slot-${product.id}'),
+      duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
+      reverseDuration: Duration.zero,
+      transitionBuilder: (child, animation) => SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(.025, 0),
+          end: Offset.zero,
+        ).animate(animation),
+        transformHitTests: false,
+        textDirection: Directionality.of(context),
+        child: child,
+      ),
+      layoutBuilder: (currentChild, _) =>
+          Align(alignment: Alignment.center, child: currentChild),
+      child: quantity > 0
+          ? _CompactProductStepper(
+              key: ValueKey('buy-product-quantity-${product.id}'),
+              quantity: quantity,
+              expand: true,
+              onDecrease: onDecrease,
+              onIncrease: onIncrease,
+            )
+          : SizedBox.expand(
+              key: ValueKey('buy-product-add-shell-${product.id}'),
+              child: Semantics(
+                label:
+                    addSemanticLabel ??
+                    'Add ${product.minimumOrder == 1 ? product.title : 'minimum order of ${product.minimumOrder} packs of ${product.title}'} to Cart',
+                button: true,
+                onTap: onAdd,
+                excludeSemantics: true,
+                child: OutlinedButton.icon(
+                  key: ValueKey('buy-product-primary-${product.id}'),
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+                  label: const Text('Add to Cart'),
+                ),
+              ),
+            ),
+    );
+    return Semantics(
+      key: ValueKey('buy-product-purchase-actions-${product.id}'),
+      container: true,
+      explicitChildNodes: true,
+      child: SizedBox(height: 50, child: cartAction),
+    );
+  }
+}
+
 class _CompactProductStepper extends StatelessWidget {
   const _CompactProductStepper({
     super.key,
     required this.quantity,
+    this.expand = false,
     required this.onDecrease,
     required this.onIncrease,
   });
 
   final int quantity;
+  final bool expand;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 148,
+      width: expand ? double.infinity : 148,
       height: 44,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -6084,12 +13903,13 @@ class _CartScopeBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scopes = const [
-      BuyV2CartScope.all,
-      BuyV2CartScope.shop,
-      BuyV2CartScope.wholesale,
-      BuyV2CartScope.medicine,
-    ];
+    final scopes = session.cartScope == BuyV2CartScope.medicine
+        ? const [BuyV2CartScope.medicine]
+        : const [
+            BuyV2CartScope.all,
+            BuyV2CartScope.shop,
+            BuyV2CartScope.wholesale,
+          ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Container(
@@ -6179,6 +13999,50 @@ BuyV2Destination? _destinationForCartScope(BuyV2CartScope scope) =>
       BuyV2CartScope.medicine => BuyV2Destination.medicine,
     };
 
+List<String> _purchaseProtectionLines(BuyV2Product product) {
+  final protection = product.purchaseProtection;
+  if (protection == null) {
+    return [?_nonBlankComplianceValue(product.returnPolicy)];
+  }
+  final remedies = protection.remedies
+      .map(_nonBlankComplianceValue)
+      .whereType<String>()
+      .toList(growable: false);
+  return [
+    ?_nonBlankComplianceValue(protection.summary),
+    if (remedies.isNotEmpty) 'Available options: ${remedies.join(', ')}',
+    if (_nonBlankComplianceValue(protection.windowLabel) case final value?)
+      'Request window: $value',
+    if (_nonBlankComplianceValue(protection.conditionsLabel) case final value?)
+      'Conditions: $value',
+    if (_nonBlankComplianceValue(protection.verificationLabel)
+        case final value?)
+      'Verification: $value',
+    if (_nonBlankComplianceValue(protection.initiationLabel) case final value?)
+      'How to request: $value',
+    if (_nonBlankComplianceValue(protection.approvalLabel) case final value?)
+      'Approval: $value',
+    if (_nonBlankComplianceValue(protection.pickupLabel) case final value?)
+      'Pickup: $value',
+    if (_nonBlankComplianceValue(protection.refundMethodLabel)
+        case final value?)
+      'Refund method: $value',
+    if (_nonBlankComplianceValue(protection.refundTimelineLabel)
+        case final value?)
+      'Refund timeline: $value',
+    if (_nonBlankComplianceValue(protection.warrantyLabel) case final value?)
+      'Warranty: $value',
+    if (_nonBlankComplianceValue(protection.nonReturnableReason)
+        case final value?)
+      'Non-returnable: $value',
+    if (_nonBlankComplianceValue(protection.policyVersion) case final value?)
+      'Policy reference: $value',
+    if (_nonBlankComplianceValue(protection.effectiveFromLabel)
+        case final value?)
+      'Applies from: $value',
+  ];
+}
+
 String _cartFamilyLabel(BuyV2Destination destination) => switch (destination) {
   BuyV2Destination.shop => 'Shop basket',
   BuyV2Destination.wholesale => 'Trade order',
@@ -6248,6 +14112,16 @@ class _CartBenefitPanel extends StatelessWidget {
     final selectedPaymentOffers = selectedBenefits
         .where((benefit) => benefit.kind == BuyV2CartBenefitKind.paymentOffer)
         .length;
+    final liveDetail = session.liveCartBenefitsEnabled
+        ? switch (session.cartBenefitsLoadState) {
+            BuyV2CartBenefitsLoadState.idle => 'Check current eligibility',
+            BuyV2CartBenefitsLoadState.loading => 'Checking eligibility…',
+            BuyV2CartBenefitsLoadState.ready => null,
+            BuyV2CartBenefitsLoadState.offline => 'Offline · Retry available',
+            BuyV2CartBenefitsLoadState.unavailable =>
+              'Eligibility unavailable · Retry',
+          }
+        : null;
     return Container(
       key: const ValueKey('buy-cart-benefits'),
       padding: const EdgeInsets.all(9),
@@ -6272,13 +14146,15 @@ class _CartBenefitPanel extends StatelessWidget {
                   key: const ValueKey('buy-cart-coupons'),
                   icon: Icons.local_offer_outlined,
                   title: 'Coupons',
-                  detail: selectedCoupons > 0
-                      ? '$selectedCoupons selected for review'
-                      : coupons.isEmpty
-                      ? destination == null
-                            ? 'Open by Cart segment'
-                            : 'No eligible ${destination.label} coupon'
-                      : '${coupons.length} available',
+                  detail:
+                      liveDetail ??
+                      (selectedCoupons > 0
+                          ? '$selectedCoupons selected for review'
+                          : coupons.isEmpty
+                          ? destination == null
+                                ? 'Open by Cart segment'
+                                : 'No eligible ${destination.label} coupon'
+                          : '${coupons.length} available'),
                   onTap: () => _openCartBenefitsPage(
                     context,
                     session: session,
@@ -6290,13 +14166,15 @@ class _CartBenefitPanel extends StatelessWidget {
                   key: const ValueKey('buy-cart-payment-offers'),
                   icon: Icons.account_balance_wallet_outlined,
                   title: 'Payment offers',
-                  detail: selectedPaymentOffers > 0
-                      ? '$selectedPaymentOffers selected for review'
-                      : paymentOffers.isEmpty
-                      ? destination == null
-                            ? 'Open by Cart segment'
-                            : 'No ${destination.label} payment offer'
-                      : '${paymentOffers.length} available',
+                  detail:
+                      liveDetail ??
+                      (selectedPaymentOffers > 0
+                          ? '$selectedPaymentOffers selected for review'
+                          : paymentOffers.isEmpty
+                          ? destination == null
+                                ? 'Open by Cart segment'
+                                : 'No ${destination.label} payment offer'
+                          : '${paymentOffers.length} available'),
                   onTap: () => _openCartBenefitsPage(
                     context,
                     session: session,
@@ -6435,6 +14313,27 @@ String _cartBenefitContextLabel(BuyV2Destination destination) =>
       BuyV2Destination.orders => 'Orders',
     };
 
+String _cartBenefitStrategyLabel(BuyV2CartBenefitStrategy strategy) =>
+    switch (strategy) {
+      BuyV2CartBenefitStrategy.timedSale => 'Time-bound sale',
+      BuyV2CartBenefitStrategy.publishedOffer => 'Published offer',
+      BuyV2CartBenefitStrategy.minimumOrder => 'MOQ reward',
+      BuyV2CartBenefitStrategy.loadBased => 'Order-load reward',
+      BuyV2CartBenefitStrategy.financialProduct => 'Financial partner offer',
+      BuyV2CartBenefitStrategy.partnerCampaign => 'Partner campaign',
+      BuyV2CartBenefitStrategy.freeDelivery => 'Free delivery',
+    };
+
+String _cartBenefitSponsorLabel(BuyV2CartBenefit benefit) =>
+    '${switch (benefit.sponsor) {
+      BuyV2CartBenefitSponsor.retailer => 'Retailer',
+      BuyV2CartBenefitSponsor.wholesaler => 'Wholesaler',
+      BuyV2CartBenefitSponsor.manufacturer => 'Manufacturer',
+      BuyV2CartBenefitSponsor.bank => 'Bank',
+      BuyV2CartBenefitSponsor.financialPartner => 'Financial partner',
+      BuyV2CartBenefitSponsor.moolSocial => 'MoolSocial',
+    }} · ${benefit.sponsorName}';
+
 String _cartBenefitEmptyTitle(
   BuyV2Destination destination,
   BuyV2CartBenefitKind kind,
@@ -6480,6 +14379,29 @@ class _CartBenefitsPage extends StatefulWidget {
 class _CartBenefitsPageState extends State<_CartBenefitsPage> {
   late BuyV2Destination _destination = widget.initialDestination;
   late BuyV2CartBenefitKind _kind = widget.initialKind;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.session.addListener(_sessionChanged);
+    if (widget.session.liveCartBenefitsEnabled &&
+        widget.session.cartBenefitsLoadState !=
+            BuyV2CartBenefitsLoadState.ready) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(widget.session.refreshCartBenefits());
+      });
+    }
+  }
+
+  void _sessionChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.session.removeListener(_sessionChanged);
+    super.dispose();
+  }
 
   void _completeToCart() {
     HapticFeedback.selectionClick();
@@ -6579,7 +14501,11 @@ class _CartBenefitsPageState extends State<_CartBenefitsPage> {
                           onChanged: _selectKind,
                         ),
                         const SizedBox(height: 9),
-                        if (benefits.isEmpty)
+                        if (widget.session.liveCartBenefitsEnabled &&
+                            widget.session.cartBenefitsLoadState !=
+                                BuyV2CartBenefitsLoadState.ready)
+                          _CartBenefitEligibilityState(session: widget.session)
+                        else if (benefits.isEmpty)
                           BuyV2FiniteIncomingTransition(
                             key: const ValueKey(
                               'buy-cart-benefit-empty-motion',
@@ -6736,7 +14662,8 @@ class _CartBenefitDestinationSelector extends StatelessWidget {
             selected: selected == destination,
             label:
                 '${_cartBenefitContextLabel(destination)} offers, '
-                '${_productCountLabel(session.countForDestination(destination))}, '
+                '${_productCountLabel(session.productCountForDestination(destination))}, '
+                '${session.countForDestination(destination)} ${destination == BuyV2Destination.wholesale ? 'packs' : 'items'}, '
                 '${buyV2Money(session.totalForDestination(destination))}',
             child: Material(
               color: Colors.transparent,
@@ -6905,6 +14832,67 @@ class _CartBenefitKindButton extends StatelessWidget {
   }
 }
 
+class _CartBenefitEligibilityState extends StatelessWidget {
+  const _CartBenefitEligibilityState({required this.session});
+
+  final BuyV2Session session;
+
+  @override
+  Widget build(BuildContext context) {
+    final loading =
+        session.cartBenefitsLoadState == BuyV2CartBenefitsLoadState.idle ||
+        session.cartBenefitsLoadState == BuyV2CartBenefitsLoadState.loading;
+    return Container(
+      key: ValueKey('buy-cart-benefits-${session.cartBenefitsLoadState.name}'),
+      padding: const EdgeInsets.all(12),
+      decoration: buyV2CardDecoration(radius: 14),
+      child: Row(
+        children: [
+          SizedBox.square(
+            dimension: 38,
+            child: loading
+                ? const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.cloud_off_outlined, color: BuyV2Colors.navy),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  loading
+                      ? 'Checking current eligibility'
+                      : 'Coupons and offers need a refresh',
+                  style: context.buyTitle.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  loading
+                      ? 'Matching this Cart with live campaigns.'
+                      : session.cartBenefitsMessage ??
+                            'Reconnect and try again. Your Cart is unchanged.',
+                  style: context.buyMeta.copyWith(fontSize: 9),
+                ),
+              ],
+            ),
+          ),
+          if (!loading) ...[
+            const SizedBox(width: 8),
+            TextButton(
+              key: const ValueKey('buy-cart-benefits-retry'),
+              onPressed: session.refreshCartBenefits,
+              child: const Text('Retry'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _CartBenefitEmptyState extends StatelessWidget {
   const _CartBenefitEmptyState({required this.destination, required this.kind});
 
@@ -6978,6 +14966,18 @@ class _CartBenefitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spec = BuyV2ThemeScope.of(context);
+    final hasCampaignDetails =
+        benefit.strategy != BuyV2CartBenefitStrategy.partnerCampaign ||
+        benefit.sponsor != BuyV2CartBenefitSponsor.moolSocial ||
+        benefit.sponsorName != 'MoolSocial' ||
+        benefit.savingAmount > 0 ||
+        benefit.freeDelivery ||
+        benefit.validFrom != null ||
+        benefit.validUntil != null ||
+        benefit.offerId != null ||
+        benefit.minimumSpend != null ||
+        benefit.minimumQuantity != null ||
+        benefit.eligiblePaymentMethods.isNotEmpty;
     void activate() => selected ? onRemove() : onSelect();
 
     return AnimatedContainer(
@@ -7030,10 +15030,52 @@ class _CartBenefitCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       benefit.detail,
-                      maxLines: 3,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: context.buyMeta.copyWith(fontSize: 8.5),
                     ),
+                    if (hasCampaignDetails) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        '${_cartBenefitStrategyLabel(benefit.strategy)} · '
+                        '${_cartBenefitSponsorLabel(benefit)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.buyMeta.copyWith(
+                          color: BuyV2Colors.navy,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                    if (benefit.savingAmount > 0 ||
+                        benefit.freeDelivery ||
+                        benefit.minimumSpend != null ||
+                        benefit.minimumQuantity != null ||
+                        benefit.validUntil != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          if (benefit.savingAmount > 0)
+                            'Save ${buyV2Money(benefit.savingAmount)} now',
+                          if (benefit.freeDelivery) 'Free delivery',
+                          if (benefit.minimumSpend case final minimumSpend?)
+                            'Minimum order ${buyV2Money(minimumSpend)}',
+                          if (benefit.minimumQuantity
+                              case final minimumQuantity?)
+                            'Minimum quantity $minimumQuantity',
+                          if (benefit.validUntil case final validUntil?)
+                            'Ends ${MaterialLocalizations.of(context).formatMediumDate(validUntil)}',
+                        ].join(' · '),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.buyMeta.copyWith(
+                          color: BuyV2Colors.green,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -7121,7 +15163,10 @@ class _CartBenefitCard extends StatelessWidget {
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  'Selected for Checkout review',
+                                  benefit.kind == BuyV2CartBenefitKind.coupon &&
+                                          benefit.savingAmount > 0
+                                      ? 'Applied to Cart total'
+                                      : 'Selected for Checkout review',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: context.buyMeta.copyWith(
@@ -7139,7 +15184,11 @@ class _CartBenefitCard extends StatelessWidget {
               );
               if (!selected) return ExcludeSemantics(child: visual);
               return Semantics(
-                label: 'Selected for Checkout review',
+                label:
+                    benefit.kind == BuyV2CartBenefitKind.coupon &&
+                        benefit.savingAmount > 0
+                    ? 'Applied to Cart total'
+                    : 'Selected for Checkout review',
                 excludeSemantics: true,
                 child: visual,
               );
@@ -7199,7 +15248,7 @@ class _CartDiscoverySections extends StatelessWidget {
             laneId: 'special',
             title: _cartSpecialTitle(destination),
             detail:
-                'Current catalogue offers for this ${_cartFamilyLabel(destination).toLowerCase()}',
+                'Available offers for this ${_cartFamilyLabel(destination).toLowerCase()}',
             products: special,
           ),
         );
@@ -7262,7 +15311,7 @@ class _CartProductLane extends StatelessWidget {
           Text(detail, style: context.buyMeta.copyWith(fontSize: 8)),
           const SizedBox(height: 7),
           SizedBox(
-            height: 190,
+            height: 174,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: products.length,
@@ -7303,7 +15352,7 @@ class _CartRecommendationCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
-                  height: 82,
+                  height: 68,
                   child: Stack(
                     children: [
                       Positioned.fill(
@@ -7354,7 +15403,7 @@ class _CartRecommendationCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: context.buyMeta.copyWith(fontSize: 7.5),
                 ),
-                const Spacer(),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     Expanded(
@@ -7673,6 +15722,12 @@ class _CartBillSummary extends StatelessWidget {
               value: '−${buyV2Money(session.scopedCartSavings)}',
               valueColor: BuyV2Colors.green,
             ),
+          if (session.scopedCouponSaving > 0)
+            _CartAmountRow(
+              label: 'Coupon saving',
+              value: '−${buyV2Money(session.scopedCouponSaving)}',
+              valueColor: BuyV2Colors.green,
+            ),
           if (session.scopedTipTotal > 0)
             _CartAmountRow(
               label: 'Optional delivery tips',
@@ -7764,7 +15819,7 @@ class _CartSavingsSummary extends StatelessWidget {
                 Text(
                   savings > 0
                       ? 'You save ${buyV2Money(savings)}'
-                      : 'Current catalogue prices',
+                      : 'Latest listed prices',
                   style: context.buyBody.copyWith(fontSize: 10),
                 ),
                 Text(
@@ -7791,171 +15846,264 @@ class _CartLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final product = line.product;
+    final facts = session.productFactsFor(product);
+    final wholesale = product.destination == BuyV2Destination.wholesale;
+    final automaticFulfilment =
+        product.destination == BuyV2Destination.shop ||
+        product.destination == BuyV2Destination.wholesale;
+    final buyerPromise = automaticFulfilment
+        ? buyV2BuyerDeliveryPromise(facts)
+        : product.deliveryPromise;
+    final productDetailsLabel = 'View ${product.title} product details';
     void openProductDetails() {
       HapticFeedback.selectionClick();
       session.openProduct(product.id);
     }
 
+    final productDetails = BuyV2IntentDepth(
+      key: ValueKey('buy-cart-product-depth-${product.id}'),
+      spatial: true,
+      child: Semantics(
+        key: ValueKey('buy-cart-product-summary-${product.id}'),
+        container: true,
+        button: true,
+        label: productDetailsLabel,
+        excludeSemantics: true,
+        onTap: openProductDetails,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+          child: InkWell(
+            key: ValueKey('buy-cart-product-details-${product.id}'),
+            onTap: openProductDetails,
+            borderRadius: BorderRadius.circular(11),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 60),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    key: ValueKey('buy-cart-packshot-${product.id}'),
+                    width: 60,
+                    height: 60,
+                    child: BuyV2ProductPackshot(
+                      product: product,
+                      borderRadius: 11,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyBody,
+                        ),
+                        Text(
+                          '${product.variant} · ${product.pack}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyMeta.copyWith(fontSize: 8),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          automaticFulfilment
+                              ? '$buyerPromise · ${facts.partner}'
+                              : '${product.deliveryPromise} · ${product.seller}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: BuyV2Colors.green,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 20, right: 2),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: BuyV2Colors.navy,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final tradeFacts = wholesale
+        ? Semantics(
+            key: ValueKey('buy-wholesale-cart-line-facts-${product.id}'),
+            container: true,
+            label:
+                'Minimum order ${product.minimumOrder} packs. '
+                '${buyV2Money(product.price)} per pack. ${product.unitPrice}. '
+                '${product.freightIncluded ? 'Freight included in landed price.' : 'Freight confirmed before payment.'}',
+            excludeSemantics: true,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+              decoration: BoxDecoration(
+                color: BuyV2Colors.softBlue,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'MOQ ${product.minimumOrder} packs · '
+                    '${buyV2Money(product.price)} per pack',
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.navy,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${product.unitPrice} · '
+                    '${product.freightIncluded ? 'Freight included' : 'Freight confirmed later'}',
+                    style: context.buyMeta.copyWith(fontSize: 7.5),
+                  ),
+                ],
+              ),
+            ),
+          )
+        : null;
+
+    final productBody = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        productDetails,
+        if (tradeFacts != null) ...[const SizedBox(height: 5), tradeFacts],
+      ],
+    );
+
+    final price = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (wholesale)
+          Text(
+            'Landed subtotal',
+            style: context.buyMeta.copyWith(fontSize: 7.5),
+          ),
+        BuyV2FiniteValueTransition(
+          key: ValueKey('buy-cart-line-total-motion-${product.id}'),
+          stateKey: line.total,
+          text: buyV2Money(line.total),
+          ownerSize: const Size(78, 22),
+          textAlign: TextAlign.end,
+          style: const TextStyle(
+            color: BuyV2Colors.navy,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        if (product.mrp != null && product.mrp! > product.price)
+          Text(
+            buyV2Money(product.mrp! * line.quantity),
+            style: context.buyMeta.copyWith(
+              fontSize: 8,
+              decoration: TextDecoration.lineThrough,
+            ),
+          ),
+      ],
+    );
+
+    final quantityControl = Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: BuyV2Colors.softBlue,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: wholesale
+                ? line.quantity <= product.minimumOrder
+                      ? 'Remove ${product.title} from Cart'
+                      : 'Remove one trade pack'
+                : 'Remove one',
+            onPressed: () => session.decrease(product.id),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            icon: const Icon(Icons.remove, size: 15),
+          ),
+          BuyV2FiniteValueTransition(
+            key: ValueKey('buy-cart-line-quantity-motion-${product.id}'),
+            stateKey: line.quantity,
+            text: '${line.quantity}',
+            ownerSize: const Size(24, 28),
+            style: const TextStyle(
+              color: BuyV2Colors.navy,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          IconButton(
+            tooltip: wholesale ? 'Add one trade pack' : 'Add one',
+            onPressed: () => session.increase(product.id),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            icon: const Icon(Icons.add, size: 15),
+          ),
+        ],
+      ),
+    );
+
     return Container(
       key: ValueKey('buy-cart-line-${product.id}'),
       padding: const EdgeInsets.fromLTRB(10, 9, 9, 9),
       decoration: buyV2CardDecoration(radius: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: BuyV2IntentDepth(
-              key: ValueKey('buy-cart-product-depth-${product.id}'),
-              spatial: true,
-              child: Semantics(
-                container: true,
-                button: true,
-                label: 'View ${product.title} product details',
-                excludeSemantics: true,
-                onTap: openProductDetails,
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(11),
-                  child: InkWell(
-                    key: ValueKey('buy-cart-product-details-${product.id}'),
-                    onTap: openProductDetails,
-                    borderRadius: BorderRadius.circular(11),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 60),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            key: ValueKey('buy-cart-packshot-${product.id}'),
-                            width: 60,
-                            height: 60,
-                            child: BuyV2ProductPackshot(
-                              product: product,
-                              borderRadius: 11,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  product.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.buyBody,
-                                ),
-                                Text(
-                                  '${product.variant} · ${product.pack}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.buyMeta.copyWith(fontSize: 8),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  '${product.deliveryPromise} · ${product.seller}',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: BuyV2Colors.green,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.only(top: 20, right: 2),
-                            child: Icon(
-                              Icons.chevron_right_rounded,
-                              size: 18,
-                              color: BuyV2Colors.navy,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compactWholesale =
+              wholesale &&
+              (constraints.maxWidth < 340 ||
+                  MediaQuery.textScalerOf(context).scale(1) > 1.2);
+          if (compactWholesale) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                productBody,
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.only(top: 8),
+                  decoration: const BoxDecoration(
+                    border: Border(top: BorderSide(color: BuyV2Colors.line)),
+                  ),
+                  child: Row(
+                    children: [price, const Spacer(), quantityControl],
                   ),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              BuyV2FiniteValueTransition(
-                key: ValueKey('buy-cart-line-total-motion-${product.id}'),
-                stateKey: line.total,
-                text: buyV2Money(line.total),
-                ownerSize: const Size(78, 22),
-                textAlign: TextAlign.end,
-                style: const TextStyle(
-                  color: BuyV2Colors.navy,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              if (product.mrp != null && product.mrp! > product.price)
-                Text(
-                  buyV2Money(product.mrp! * line.quantity),
-                  style: context.buyMeta.copyWith(
-                    fontSize: 8,
-                    decoration: TextDecoration.lineThrough,
-                  ),
-                ),
-              const SizedBox(height: 5),
-              Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: BuyV2Colors.softBlue,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'Remove one',
-                      onPressed: () => session.decrease(product.id),
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 44,
-                        minHeight: 44,
-                      ),
-                      icon: const Icon(Icons.remove, size: 15),
-                    ),
-                    BuyV2FiniteValueTransition(
-                      key: ValueKey(
-                        'buy-cart-line-quantity-motion-${product.id}',
-                      ),
-                      stateKey: line.quantity,
-                      text: '${line.quantity}',
-                      ownerSize: const Size(24, 28),
-                      style: const TextStyle(
-                        color: BuyV2Colors.navy,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Add one',
-                      onPressed: () => session.increase(product.id),
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 44,
-                        minHeight: 44,
-                      ),
-                      icon: const Icon(Icons.add, size: 15),
-                    ),
-                  ],
-                ),
+              Expanded(child: productBody),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [price, const SizedBox(height: 5), quantityControl],
               ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -7969,6 +16117,7 @@ class _SavedAddressReminder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final title = 'Delivering to ${address.label}';
     return Container(
       key: const ValueKey('buy-saved-address-reminder'),
       constraints: const BoxConstraints(minHeight: 54),
@@ -7991,9 +16140,14 @@ class _SavedAddressReminder extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  'Delivering to ${address.label}',
-                  style: context.buyBody.copyWith(fontSize: 10),
+                Semantics(
+                  key: const ValueKey('buy-checkout-delivery-location'),
+                  label: title,
+                  excludeSemantics: true,
+                  child: Text(
+                    title,
+                    style: context.buyBody.copyWith(fontSize: 10),
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -8020,6 +16174,138 @@ class _SavedAddressReminder extends StatelessWidget {
                 color: BuyV2Colors.navy,
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckoutDeliverySummaryCard extends StatelessWidget {
+  const _CheckoutDeliverySummaryCard({
+    super.key,
+    required this.group,
+    required this.shipmentNumber,
+  });
+
+  final BuyV2FulfilmentGroup group;
+  final int shipmentNumber;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: buyV2CardDecoration(radius: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.local_shipping_outlined,
+                color: BuyV2Colors.navy,
+                size: 18,
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  'Shipment $shipmentNumber · ${_checkoutFulfilmentCountLabel(group)}',
+                  style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          _CheckoutDeliveryFact(
+            label: 'From',
+            value: '${group.partner} · ${group.partnerType}',
+          ),
+          _CheckoutDeliveryFact(
+            label: 'Arrives',
+            value: buyV2DeliveryPromiseSummary(
+              promise: group.promise,
+              promisedByLabel: group.promisedByLabel,
+            ),
+          ),
+          if (group.dispatchPromise case final dispatch?)
+            _CheckoutDeliveryFact(label: 'Dispatches', value: dispatch),
+          if (group.deliveryProviderName case final provider?)
+            _CheckoutDeliveryFact(label: 'Handled by', value: provider),
+          if (group.deliveryServiceLevel case final service?)
+            _CheckoutDeliveryFact(label: 'Service', value: service),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 5),
+            child: Divider(height: 1),
+          ),
+          for (final line in group.lines) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${line.quantity}× ${line.product.title}',
+                      style: context.buyMeta.copyWith(
+                        color: BuyV2Colors.ink,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    buyV2Money(line.total),
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.navy,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_purchaseProtectionLines(line.product) case final protections
+                when protections.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2, bottom: 3),
+                child: Text(
+                  '${line.product.title} · ${protections.first}',
+                  style: context.buyMeta.copyWith(
+                    color: BuyV2Colors.green,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckoutDeliveryFact extends StatelessWidget {
+  const _CheckoutDeliveryFact({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 70, child: Text(label, style: context.buyMeta)),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              value,
+              style: context.buyMeta.copyWith(
+                color: BuyV2Colors.navy,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -8093,10 +16379,15 @@ class _CheckoutCard extends StatelessWidget {
 }
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.session, required this.order});
+  const _OrderCard({
+    required this.session,
+    required this.order,
+    this.invoiceDownloader,
+  });
 
   final BuyV2Session session;
   final BuyV2Order order;
+  final BuyV2InvoiceDownloader? invoiceDownloader;
 
   @override
   Widget build(BuildContext context) {
@@ -8191,13 +16482,22 @@ class _OrderCard extends StatelessWidget {
                   ],
                 ),
                 Text(
-                  order.promise,
+                  _orderPromiseSummary(order),
                   style: const TextStyle(
                     color: BuyV2Colors.ink,
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                if (order.updatedDeliveryEstimate case final estimate?)
+                  Text(
+                    'Delayed · new estimate $estimate',
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.orange,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 const SizedBox(height: 4),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(5),
@@ -8218,38 +16518,54 @@ class _OrderCard extends StatelessWidget {
                   style: context.buyMeta.copyWith(fontSize: 8),
                 ),
                 const SizedBox(height: 6),
-                SizedBox(
-                  height: 44,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      key: ValueKey('buy-order-primary-${order.id}'),
-                      excludeFromSemantics: true,
-                      onTap: activatePrimaryAction,
-                      borderRadius: BorderRadius.circular(10),
-                      child: Center(
-                        child: Container(
-                          height: 32,
-                          width: double.infinity,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: BuyV2Colors.navy,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            order.status == BuyV2OrderStatus.delivered
-                                ? 'View order'
-                                : 'Track order',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stackActions =
+                        constraints.maxWidth < 270 ||
+                        MediaQuery.textScalerOf(context).scale(10) > 12;
+                    final invoiceAction = SizedBox(
+                      height: 44,
+                      child: OutlinedButton.icon(
+                        key: ValueKey('buy-order-invoice-${order.id}'),
+                        onPressed: () => showBuyV2InvoicePage(
+                          context,
+                          order: order,
+                          downloader: invoiceDownloader,
+                        ),
+                        icon: const Icon(Icons.receipt_long_outlined, size: 17),
+                        label: const Text('Invoice'),
+                      ),
+                    );
+                    final primaryAction = SizedBox(
+                      height: 44,
+                      child: FilledButton(
+                        key: ValueKey('buy-order-primary-${order.id}'),
+                        onPressed: activatePrimaryAction,
+                        child: Text(
+                          order.status == BuyV2OrderStatus.delivered
+                              ? 'View order'
+                              : 'Track order',
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                    if (stackActions) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          invoiceAction,
+                          const SizedBox(height: 6),
+                          primaryAction,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: invoiceAction),
+                        const SizedBox(width: 6),
+                        Expanded(child: primaryAction),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -8527,14 +16843,16 @@ class _TrackingTimeline extends StatelessWidget {
   Widget build(BuildContext context) {
     final completedSteps = switch (order.status) {
       BuyV2OrderStatus.preparing => 1,
-      BuyV2OrderStatus.confirmed => 2,
-      BuyV2OrderStatus.dispatched || BuyV2OrderStatus.arriving => 3,
-      BuyV2OrderStatus.delivered => 4,
+      BuyV2OrderStatus.confirmed => 0,
+      BuyV2OrderStatus.dispatched => 2,
+      BuyV2OrderStatus.arriving => 3,
+      BuyV2OrderStatus.delivered => 5,
     };
     const steps = [
       ('Confirmed', 'Seller accepted every product'),
       ('Packing', 'Items are being checked and packed'),
-      ('Dispatch', 'Partner will hand over the order'),
+      ('Dispatched', 'Partner handed over the order'),
+      ('Arriving', 'Delivery is travelling to the address'),
       ('Delivered', 'Delivery confirmation at the address'),
     ];
     return Container(
@@ -8950,7 +17268,7 @@ class _AddPrescriptionChoice extends StatelessWidget {
   }
 }
 
-class _ShareChoice extends StatelessWidget {
+class _ShareChoice extends StatefulWidget {
   const _ShareChoice({
     super.key,
     required this.label,
@@ -8963,81 +17281,16 @@ class _ShareChoice extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Semantics(
-        container: true,
-        button: true,
-        label: label,
-        onTap: onTap,
-        child: ExcludeSemantics(
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 66),
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              alignment: Alignment.center,
-              decoration: buyV2CardDecoration(radius: 14),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, color: BuyV2Colors.navy),
-                  const SizedBox(height: 3),
-                  Text(
-                    label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: BuyV2Colors.navy,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  State<_ShareChoice> createState() => _ShareChoiceState();
+}
+
+class _ShareChoiceState extends State<_ShareChoice> {
+  bool pressed = false;
+
+  void handleTap() {
+    HapticFeedback.selectionClick();
+    widget.onTap();
   }
-}
-
-Future<void> _copyAddressRequest(
-  BuildContext context,
-  String channel, {
-  String recipient = '',
-}) async {
-  await Clipboard.setData(
-    const ClipboardData(text: 'https://moolsocial.com/address/request'),
-  );
-  if (!context.mounted) return;
-  final navigator = Navigator.of(context);
-  final messenger = ScaffoldMessenger.of(context);
-  final recipientCopy = recipient.isEmpty ? '' : ' for $recipient';
-  navigator.pop();
-  messenger.showSnackBar(
-    SnackBar(
-      content: Text('Address request link copied$recipientCopy via $channel'),
-    ),
-  );
-}
-
-class _LocationChoice extends StatelessWidget {
-  const _LocationChoice({
-    super.key,
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -9045,34 +17298,44 @@ class _LocationChoice extends StatelessWidget {
       child: Semantics(
         container: true,
         button: true,
-        selected: selected,
-        label: label,
-        onTap: onTap,
+        label: widget.label,
+        onTap: handleTap,
         child: ExcludeSemantics(
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              height: 54,
-              alignment: Alignment.center,
-              decoration: buyV2CardDecoration(
-                radius: 14,
-                color: selected ? BuyV2Colors.softOrange : Colors.white,
-                border: selected ? BuyV2Colors.orange : BuyV2Colors.line,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, color: BuyV2Colors.navy, size: 19),
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: BuyV2Colors.navy,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
+          child: AnimatedScale(
+            scale: pressed ? BuyV2Motion.pressScale : 1,
+            duration: BuyV2Motion.resolved(context, BuyV2Motion.press),
+            child: InkWell(
+              onTap: handleTap,
+              onHighlightChanged: (value) {
+                if (mounted) setState(() => pressed = value);
+              },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 66),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                alignment: Alignment.center,
+                decoration: buyV2CardDecoration(
+                  radius: 14,
+                  color: pressed ? BuyV2Colors.softBlue : Colors.white,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(widget.icon, color: BuyV2Colors.navy),
+                    const SizedBox(height: 3),
+                    Text(
+                      widget.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: BuyV2Colors.navy,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

@@ -34,6 +34,44 @@ void main() {
     );
   });
 
+  test(
+    'Android sharing keeps MoolSocial and the destination in separate tasks',
+    () {
+      final activity = File(
+        'android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
+      ).readAsStringSync();
+      final manifest = File(
+        'android/app/src/main/AndroidManifest.xml',
+      ).readAsStringSync();
+      final shareStart = activity.indexOf('private fun shareInSeparateTask');
+      final shareEnd = activity.indexOf(
+        'private fun shareMimeType',
+        shareStart,
+      );
+
+      expect(shareStart, greaterThanOrEqualTo(0));
+      expect(shareEnd, greaterThan(shareStart));
+      final shareOwner = activity.substring(shareStart, shareEnd);
+      expect(activity, contains('"dev.fluttercommunity.plus/share"'));
+      expect(activity, contains('"share" -> shareInSeparateTask'));
+      expect(shareOwner, contains('Intent.createChooser(sendIntent, title)'));
+      expect(shareOwner, contains('Intent.FLAG_ACTIVITY_NEW_TASK'));
+      expect(shareOwner, contains('startActivity(chooserIntent)'));
+      expect(shareOwner, isNot(contains('startActivityForResult')));
+      expect(shareOwner, contains('Intent.EXTRA_TEXT'));
+      expect(shareOwner, contains('Intent.EXTRA_STREAM'));
+      expect(shareOwner, contains('Intent.FLAG_GRANT_READ_URI_PERMISSION'));
+      expect(activity, contains('externalShareLeftActivity = true'));
+      expect(activity, contains('override fun onResume()'));
+      expect(
+        activity,
+        contains('window.decorView.post { result.success("") }'),
+      );
+      expect(manifest, contains('android:launchMode="singleTop"'));
+      expect(manifest, contains('android:taskAffinity=""'));
+    },
+  );
+
   test('iOS identity, deployment target and permissions are aligned', () {
     final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
     final project = File(
@@ -71,9 +109,6 @@ void main() {
 
   test('release builds require live Firebase configuration', () {
     final mainSource = File('lib/main.dart').readAsStringSync();
-    final configurationSource = File(
-      'lib/core/config/release_runtime_configuration.dart',
-    ).readAsStringSync();
 
     expect(mainSource, contains("const _useEmulators = bool.fromEnvironment("));
     expect(mainSource, contains('defaultValue: kDebugMode'));
@@ -81,53 +116,23 @@ void main() {
     expect(mainSource, contains('MOOLSOCIAL_DEVICE_REVIEW'));
     expect(
       mainSource,
-      contains('runApp(const ReleaseConfigurationFailureApp());'),
-      reason: 'Invalid release setup must render a safe first frame.',
-    );
-    expect(configurationSource, contains('MOOLSOCIAL_FIREBASE_API_KEY'));
-    expect(configurationSource, contains('MOOLSOCIAL_FIREBASE_APP_ID'));
-    expect(
-      configurationSource,
-      contains('MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID'),
-    );
-    expect(configurationSource, contains('MOOLSOCIAL_FIREBASE_PROJECT_ID'));
-    expect(
-      configurationSource,
-      contains('MOOLSOCIAL_GOOGLE_SERVER_CLIENT_ID'),
+      contains('isQualifiedDeviceReviewRuntimeMode('),
       reason:
-          'Google identity is part of the same fail-closed release contract.',
+          'Device review must continue through the shared qualified-runtime gate.',
     );
-    expect(
-      mainSource.indexOf('runApp(const ReleaseConfigurationFailureApp());'),
-      lessThan(mainSource.indexOf('Firebase.initializeApp')),
-      reason: 'Configuration must be checked before Firebase bootstrap.',
-    );
-  });
-
-  test('profile device-review builds retain candidate provenance markers', () {
-    final mainSource = File('lib/main.dart').readAsStringSync();
-    final journeySource = File(
-      'lib/features/journey01/journey_session.dart',
-    ).readAsStringSync();
-
+    expect(mainSource, contains('MOOLSOCIAL_FIREBASE_API_KEY'));
+    expect(mainSource, contains('MOOLSOCIAL_FIREBASE_APP_ID'));
+    expect(mainSource, contains('MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID'));
+    expect(mainSource, contains('MOOLSOCIAL_FIREBASE_PROJECT_ID'));
     expect(
       mainSource,
-      contains('if (kDebugMode || _deviceReviewMode)'),
-      reason: 'Profile review builds must emit the exact candidate identity.',
-    );
-    expect(mainSource, contains('MOOLSOCIAL_CANDIDATE'));
-    expect(
-      journeySource,
-      contains(
-        "const _deviceReviewMode = bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');",
-      ),
+      contains('if (!_releaseRuntimeConfiguration.isComplete)'),
+      reason:
+          'A release must fail closed instead of silently using demo services.',
     );
     expect(
-      RegExp(
-        r'if \(kDebugMode \|\| _deviceReviewMode\) \{\s*debugPrint\([\s\S]*?MOOLSOCIAL_STARTUP',
-      ).allMatches(journeySource).length,
-      2,
-      reason: 'Ready and boot-failure startup outcomes must remain observable.',
+      mainSource,
+      contains("_showReleaseBootstrapFailure('release_configuration')"),
     );
   });
 

@@ -139,11 +139,15 @@ void main() {
       route: '/app/work/opportunity/delivery',
       rootKey: Key('work-earn-screen'),
     ),
-    (id: 'onboard', route: '/app/work/choose', rootKey: Key('my-work-screen')),
+    (
+      id: 'onboard',
+      route: '/app/work/choose',
+      rootKey: Key('work-choose-screen'),
+    ),
     (
       id: 'verify',
       route: '/app/social?world=work&sub=verify',
-      rootKey: Key('my-work-screen'),
+      rootKey: Key('work-choose-screen'),
     ),
   ]) {
     testWidgets('${legacy.id} old link reaches truthful shared recovery', (

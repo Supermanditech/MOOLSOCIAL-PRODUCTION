@@ -126,6 +126,52 @@ void main() {
     165: '/app/account/workspaces/preferences',
   };
 
+  testWidgets('Security exposes confirmed sign-out and returns to Sign in', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(412, 915));
+    final otp = ReviewOtpGateway(signedIn: true);
+    final journey = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'manual',
+          areaLabel: 'Jodhpur',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: otp,
+    );
+    final shared = SharedSession();
+    await journey.start();
+    addTearDown(() {
+      tester.binding.setSurfaceSize(null);
+      journey.dispose();
+      shared.dispose();
+    });
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        sharedSession: shared,
+        initialLocation: '/app/account/security',
+      ),
+    );
+    await settle(tester);
+
+    await tap(tester, const Key('shared-161-sign-out'));
+    expect(find.text('Sign out of MoolSocial?'), findsOneWidget);
+    expect(
+      find.textContaining('language and serviceable area'),
+      findsOneWidget,
+    );
+    await tap(tester, const Key('shared-161-confirm-sign-out'));
+
+    expect(otp.signOutCount, 1);
+    expect(journey.stage, JourneyStage.signIn);
+    expect(find.byKey(const Key('screen03-login-v5')), findsOneWidget);
+    expect(location(tester), '/sign-in');
+  });
+
   for (final entry in routes.entries) {
     testWidgets(
       'screen ${entry.key} covers every filter, empty recovery and detail',

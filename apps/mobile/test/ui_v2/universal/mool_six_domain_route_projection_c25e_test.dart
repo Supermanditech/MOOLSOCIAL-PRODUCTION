@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
@@ -52,7 +53,7 @@ void main() {
       find.byKey(const ValueKey('moolsocial-local-shop-selection')),
       findsNothing,
     );
-    expect(find.byKey(const Key('buy-global-chat')), findsOneWidget);
+    expect(find.byKey(const Key('mool-global-chat')), findsOneWidget);
     expect(find.byKey(const Key('buy-local-tab-medicine')), findsNothing);
 
     await _openDomain(tester, 'eat');
@@ -74,10 +75,15 @@ void main() {
     expect(find.byKey(const Key('care-global-chat')), findsOneWidget);
     await tester.tap(find.byKey(const Key('care-local-medicine')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
+    final medicineOwner = find.byKey(const ValueKey('buy-v2-screen'));
+    expect(medicineOwner, findsOneWidget);
+    expect(
+      GoRouterState.of(tester.element(medicineOwner)).uri.path,
+      '/app/book/medicine',
+    );
     _expectLocalActions(const ['doctor', 'medicine', 'salon']);
     expect(find.byKey(const Key('care-local-tab-medicine')), findsOneWidget);
-    expect(find.byKey(const Key('buy-global-chat')), findsOneWidget);
+    expect(find.byKey(const Key('mool-global-chat')), findsOneWidget);
 
     await _openDomain(tester, 'work');
     _expectLocalActions(const ['earn', 'workspace']);
@@ -85,7 +91,7 @@ void main() {
     expect(find.byKey(const Key('work-local-workspace')), findsOneWidget);
     expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('work-global-chat')));
+    await tester.tap(find.byKey(const Key('mool-global-chat')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
     await tester.binding.handlePopRoute();
