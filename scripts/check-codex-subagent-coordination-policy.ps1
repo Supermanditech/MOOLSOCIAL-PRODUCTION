@@ -2437,6 +2437,16 @@ if ($ProductionLane -ceq 'baseline') {
             'scripts/check-codex-subagent-coordination-policy.ps1',
             'scripts/run-store-buy-diagnostic-evidence.ps1'
           )
+          $singleUseDiagnosticEvidenceOwners = @(
+            'config/codex-development-regression-registry.json',
+            'config/codex-subagent-coordination-policy.json',
+            'docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.result.json',
+            'docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.stderr.log',
+            'docs/quality/store-buy-diagnostic-evidence-v2-20260904/serialized-repair-expanded-attempt1.stdout.log',
+            'docs/quality/store-buy-diagnostic-evidence-v2-20260904/toolchain-and-dependency-hashes.json',
+            'scripts/check-codex-subagent-coordination-policy.ps1',
+            'scripts/run-store-buy-diagnostic-evidence.ps1'
+          )
           $singleUseEvidenceCorrection = (
             [string]$selectedContinuationBinding.id -ceq
               'integration_repair_store_buy_diagnostic_evidence_v2_20260904' -and
@@ -2454,7 +2464,72 @@ if ($ProductionLane -ceq 'baseline') {
             $existingCoordinationCommits.Count -eq 0 -and
             $existingRepairMerges.Count -eq 0
           )
-          if ($singleUseEvidenceCorrection) {
+          $singleUseDiagnosticEvidenceCapture = (
+            [string]$selectedContinuationBinding.id -ceq
+              'integration_repair_store_buy_diagnostic_evidence_v2_20260904' -and
+            $branch -ceq
+              'work/integration-repair/store-buy-diagnostic-evidence-v2-20260904' -and
+            $head -ceq 'd9d8fa3fe43c75330a834a598f691aeab52f88ac' -and
+            $AgentTask -ceq
+              '/root/repair_store_buy_diagnostic_evidence_v2_20260904' -and
+            $ProductionWorkId -ceq
+              'store-buy-diagnostic-evidence-v2-20260904' -and
+            $ProductionTicketId -ceq
+              'UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904' -and
+            [string]$selectedContinuationBinding.baselineHead -ceq
+              'c48e4ecc5c3ccc7a3079d3f64988437599cc78de' -and
+            $existingCoordinationCommits.Count -eq 1 -and
+            $existingRepairMerges.Count -eq 0 -and
+            -not $repairMergeActive
+          )
+          if ($singleUseDiagnosticEvidenceCapture) {
+            $bootstrapParentOutput = @(& git -C $root show -s --format='%P' `
+                'e1f5d6f060b9466c9efebec51d1b4e5b6c9932ea')
+            $bootstrapParentExit = $LASTEXITCODE
+            $bootstrapSubjectOutput = @(& git -C $root show -s --format='%s' `
+                'e1f5d6f060b9466c9efebec51d1b4e5b6c9932ea')
+            $bootstrapSubjectExit = $LASTEXITCODE
+            $bootstrapOwnerOutput = @(& git -C $root diff-tree --no-commit-id `
+                --name-only -r 'e1f5d6f060b9466c9efebec51d1b4e5b6c9932ea')
+            $bootstrapOwnerExit = $LASTEXITCODE
+            $correctionParentOutput = @(& git -C $root show -s --format='%P' `
+                'd9d8fa3fe43c75330a834a598f691aeab52f88ac')
+            $correctionParentExit = $LASTEXITCODE
+            $correctionSubjectOutput = @(& git -C $root show -s --format='%s' `
+                'd9d8fa3fe43c75330a834a598f691aeab52f88ac')
+            $correctionSubjectExit = $LASTEXITCODE
+            $correctionOwnerOutput = @(& git -C $root diff-tree --no-commit-id `
+                --name-only -r 'd9d8fa3fe43c75330a834a598f691aeab52f88ac')
+            $correctionOwnerExit = $LASTEXITCODE
+            Assert-Coordination (
+              $bootstrapParentExit -eq 0 -and
+              $bootstrapSubjectExit -eq 0 -and
+              $bootstrapOwnerExit -eq 0 -and
+              $correctionParentExit -eq 0 -and
+              $correctionSubjectExit -eq 0 -and
+              $correctionOwnerExit -eq 0 -and
+              $bootstrapParentOutput.Count -eq 1 -and
+              [string]$bootstrapParentOutput[0] -ceq
+                'c48e4ecc5c3ccc7a3079d3f64988437599cc78de' -and
+              $bootstrapSubjectOutput.Count -eq 1 -and
+              [string]$bootstrapSubjectOutput[0] -ceq
+                'coordination(store-buy-diagnostic-evidence-v2-20260904): bind serialized regression evidence' -and
+              (@($bootstrapOwnerOutput | Sort-Object) -join '|') -ceq
+                (@($selectedContinuationBinding.bootstrapOwners | Sort-Object) -join '|') -and
+              $correctionParentOutput.Count -eq 1 -and
+              [string]$correctionParentOutput[0] -ceq
+                'e1f5d6f060b9466c9efebec51d1b4e5b6c9932ea' -and
+              $correctionSubjectOutput.Count -eq 1 -and
+              [string]$correctionSubjectOutput[0] -ceq
+                'repair(store-buy-diagnostic-evidence-v2-20260904): correct serialized evidence path' -and
+              (@($correctionOwnerOutput | Sort-Object) -join '|') -ceq
+                (@($singleUseEvidenceOwners | Sort-Object) -join '|')
+            ) 'single-use v2 evidence lineage changed.'
+            Assert-Coordination (
+              (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
+                (@($singleUseDiagnosticEvidenceOwners | Sort-Object) -join '|')
+            ) 'single-use v2 diagnostic evidence owner set changed.'
+          } elseif ($singleUseEvidenceCorrection) {
             Assert-Coordination (
               (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
                 (@($singleUseEvidenceOwners | Sort-Object) -join '|')

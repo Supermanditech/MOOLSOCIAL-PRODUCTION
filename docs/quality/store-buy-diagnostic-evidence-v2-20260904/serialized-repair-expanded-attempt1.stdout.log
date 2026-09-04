@@ -1,1 +1,481 @@
-PENDING: generated after evidence-lane bootstrap closure.
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_store_atomic_operations_test.dart
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_store_atomic_operations_test.dart: orders reserve stock once and cancellation restores it
+00:00 +1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_store_atomic_operations_test.dart: delivery needs an address and completes only after customer OTP
+00:00 +2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_store_atomic_operations_test.dart: settlement uses only the eligible completed-sale balance
+00:00 +3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_store_atomic_operations_test.dart: pickup never requests delivery and creates an invoice at handover
+00:00 +4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_store_atomic_operations_test.dart: counter sale posts stock money and customer invoice together
+00:00 +5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_store_atomic_operations_test.dart: Store configuration persists delivery staff and counter controls
+00:00 +6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_store_atomic_operations_test.dart: funded Store requirement preserves candidate and payment facts
+00:00 +7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_store_atomic_operations_test.dart: Group Bulk Buying preserves every decision and payment field
+00:00 +8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_store_atomic_operations_test.dart: catalogue import updates by SKU and retirement removes public sale
+00:00 +9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_store_atomic_operations_test.dart: workspace switch keeps both verified businesses available
+00:00 +10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_store_atomic_operations_test.dart: repeat basket reconstructs an available legacy purchase summary
+00:00 +11: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart
+00:17 +11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: selected Workspace profile keeps contact clear of sticky Continue
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:19 +12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: contact OTP action stays on one line on a narrow device
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:20 +13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Workspace request sheet clears Android and keyboard insets without losing input
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:21 +14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: proof source and review declaration clear system and sticky actions
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:22 +15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: review status keeps Action available above Check review update
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:22 +16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: ready and shop setup content remain scrollable above stable action
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:22 +17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence profile dashboard remains usable on compact large-text layout
+00:22 +17 ~1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence retail dashboard exposes the four connected control surfaces
+00:22 +17 ~2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence approved store rail is contextual and opens actions directly
+00:22 +17 ~3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence retail dashboard Profile opens globally and returns in place
+00:22 +17 ~4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence store search keeps text stable with keyboard and native Back
+00:22 +17 ~5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence availability saves customer-facing state and Back discards draft
+00:22 +17 ~6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence attention queue is truthful and returns to dashboard
+00:22 +17 ~7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence daily actions use existing retailer owners and native Back restores Store
+00:22 +17 ~8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence Stock opens the authoritative retailer catalogue owner
+00:22 +17 ~9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence store state and customer preview complete within two taps
+00:22 +17 ~10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence first-tap store actions open exact operational destinations
+00:22 +17 ~11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence paid Group Buy pins to Today with complete decision facts
+00:22 +17 ~12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence first-use dashboard shows priorities without fake zero metrics
+00:22 +17 ~13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence public visibility remains separate from Open Paused and Off
+00:22 +17 ~14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence Grow is customer growth and business support, not Wholesale
+00:22 +17 ~15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence Buy Together cannot be published by a self-declared payment
+00:22 +17 ~16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence saved offline activity exposes a truthful refresh transition
+00:22 +17 ~17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence founder review capture - setup dashboard
+00:22 +17 ~18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence founder review capture - live operations dashboard
+00:22 +17 ~19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence founder review capture - saved offline dashboard
+00:22 +17 ~20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence founder review capture - real store search
+00:22 +17 ~21: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence founder review capture - Grow hub
+00:22 +17 ~22: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: local Store 1-40 review evidence founder review capture - public storefront preview
+00:22 +17 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: phone order keeps customer product payment and Mool delivery truth in one flow
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:23 +18 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: counter order changes source and quantity without losing the draft
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:23 +19 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Activity Deck replaces rejected dashboard bands
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:24 +20 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live first view keeps pulse commands and status operable at large text
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:24 +21 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live pulse opens exact operational destinations
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:24 +22 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live Orders is a compact counted queue at large text
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:25 +23 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Preparing Orders exposes the packing checklist before Mark ready
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:25 +24 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: leaving an operation clears its action error
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:25 +25 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live order decision keeps one clear action row
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:25 +26 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store hosts Wholesale and Bulk with one Store navigation owner
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:27 +27 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: in-Store Wholesale search keeps one coherent keyboard and rail owner
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:28 +28 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Android Back closes Wholesale detail before returning to Store
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:30 +29 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: incoming order swipes right into Packing
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:30 +30 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Packing moves to the live delivery object in one tap
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:30 +31 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Packing counts units and keeps customer help visible
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:30 +32 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Orders requests a rider before opening the delivery desk
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:31 +33 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Delivery keeps call Chat map and handover actions visible
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:31 +34 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: customer OTP completes delivery without a sheet lifecycle error
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:31 +35 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Settings owns configuration and excludes SKU commercial data
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:31 +36 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Workspace catalogue maps exactly into Buy public SKU facts
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:32 +37 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Group Bulk Buying opens the live payment-backed deal
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:32 +38 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Group Bulk keeps the full decision and next action visible
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:32 +39 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Workspace switcher keeps the approval action above Android
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:32 +40 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: order completion action clears Android navigation and is tappable
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:32 +41 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store settings destinations match their labels
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:33 +42 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: pickup order becomes customer pickup and produces invoice
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:34 +43 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: live App order appears in customer statement
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:34 +44 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Customer Book fits four customers with direct daily actions
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:34 +45 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Customer filters and repeat basket keep exact customer stock
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:35 +46 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: settlement requires review before gateway mutation
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:35 +47 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Money keeps net payout and receiving account in first action
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:35 +48 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Group Bulk product discovery searches beyond Store catalogue
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:35 +49 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: product editor keeps Save and Cancel above keyboard
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:36 +50 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: catalogue keeps daily product actions direct and compact
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:36 +51 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: stock statement returns from exact Wholesale recommendation
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:37 +52 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: five catalogue rows remain visible in the normal Store viewport
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:37 +53 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store stock changes require a reason and balance reservations
+00:37 +54 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Work inputs expose merged accessibility names
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:38 +55 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Grow keeps offers and funded work inside Store ownership
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:38 +56 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Grow shows live Store outcomes before its first actions
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:38 +57 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store offer preview requires an available product and permission
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:39 +58 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: funded Store work reviews candidate-facing facts before publish
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:39 +59 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store settings save editable hours capacity and alerts
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:40 +60 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: active Store business record never shows pending onboarding
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:40 +61 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: packing keeps every product above its ready action on OPPO
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:40 +62 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: nested Store operations return to their exact parent
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:41 +63 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: drafted sale has explicit keep or discard recovery
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:41 +64 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store header and contextual tabs keep full customer labels
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:41 +65 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: finishing Store search clears its inactive term
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:42 +66 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Workspace product opens exact public Buy product details
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:42 +67 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Storefront Buy Back returns directly to Storefront
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:42 +68 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: funded work uses compact named customer fields
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:42 +69 ~23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - quiet store
+00:42 +69 ~24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - incoming order
+00:42 +69 ~25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - packing
+00:42 +69 ~26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - delivery
+00:42 +69 ~27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - Orders destination
+00:42 +69 ~28: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - pickup ready
+00:42 +69 ~29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - pickup code
+00:42 +69 ~30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - assigned delivery
+00:42 +69 ~31: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - customer delivery composer
+00:42 +69 ~32: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - customer delivery review
+00:42 +69 ~33: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - premium product catalogue
+00:42 +69 ~34: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - fast product editor
+00:42 +69 ~35: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - stock statement
+00:42 +69 ~36: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - live Group Bulk Buying
+00:42 +69 ~37: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - Customer Book
+00:42 +69 ~38: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - customer actions
+00:42 +69 ~39: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - Money
+00:42 +69 ~40: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - Growth
+00:42 +69 ~41: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - Store settings
+00:42 +69 ~42: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Store Live v1 capture - Business record
+00:42 +69 ~43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder Activity Deck capture - idle live store
+00:42 +69 ~44: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder Activity Deck capture - incoming order
+00:42 +69 ~45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder Activity Deck capture - packing
+00:42 +69 ~46: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder Activity Deck capture - delivery
+00:42 +69 ~47: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder Activity Deck capture - Settings
+00:42 +69 ~48: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder Activity Deck capture - public SKU catalogue
+00:42 +69 ~49: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder Activity Deck capture - Group Bulk Buying
+00:42 +69 ~50: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder destination capture - customer storefront preview
+00:42 +69 ~51: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder destination capture - comprehensive product editor
+00:42 +69 ~52: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder correction capture - exact Workspace product in Buy
+00:42 +69 ~53: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder destination capture - compact reject decision
+00:42 +69 ~54: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder correction capture - Workspace switcher
+00:42 +69 ~55: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder correction capture - order completion sheet
+00:42 +69 ~56: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder correction capture - pickup ready
+00:42 +69 ~57: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder correction capture - invoice handoff
+00:42 +69 ~58: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder correction capture - Store offers
+00:42 +69 ~59: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder correction capture - funded Store work
+00:42 +69 ~60: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder correction capture - approved business record
+00:42 +69 ~61: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: first-tap commands open the intended Store destinations
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:43 +70 ~61: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Mool delivery composer fits a 360x800 Store viewport
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:43 +71 ~61: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: Business drawer opens Customers Money and Grow destinations
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:43 +72 ~61: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder destination capture - Orders
+00:43 +72 ~62: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder destination capture - New Sale
+00:43 +72 ~63: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder destination capture - Deliver Order
+00:43 +72 ~64: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder destination capture - Buy Stock
+00:43 +72 ~65: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder destination capture - Customers
+00:43 +72 ~66: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder destination capture - Money
+00:43 +72 ~67: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_workspace_layout_safety_test.dart: founder destination capture - Grow
+00:43 +72 ~68: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart
+00:45 +72 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: new user completes saved opportunity through verified live retailer setup
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:52 +73 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: Apply Now enters Workspace onboarding with the exact opportunity
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:52 +74 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: feed filters, search empty and failed refresh recover safely
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:53 +75 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: alternate work number handles invalid, gateway failure and exact OTP
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:55 +76 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: Google email is shown alone and missing phone is confirmed in place
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:55 +77 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: unsupported profile request validates and creates no workspace
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:56 +78 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: selected role opens its complete document requirements and Back restores roles
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:57 +79 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: Workspace submits without documents and keeps review status in the same screen
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:57 +80 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: rejected Workspace explains the reason inside Complete your Workspace
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:57 +81 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: proof and submission failures preserve fields then submit exactly once
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:58 +82 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: GST and review failures keep one case then reach approved workspace
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:59 +83 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: retailer setup rejects incomplete inputs and exact failure retry goes live
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:00 +84 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: existing Workspaces remain inside the direct chooser
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:00 +85 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: status Chat returns to the exact review screen
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:01 +86 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: review step animates and offers direct detail and document corrections
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:01 +87 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: clarification corrections update the existing review reference
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:02 +88 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: rejected Workspace preserves edits and creates one resubmission
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:02 +89 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: approved review opens the selected Workspace dashboard
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:02 +90 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: restored live retailer opens operations without setup downgrade
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:03 +91 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: every approved profile receives a purposeful dashboard
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:04 +92 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_vertical_slice_test.dart: Work remains usable on compact width with larger text
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:05 +93 ~68: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart
+01:06 +93 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: release app defaults to the fail-closed production Work session
+01:06 +94 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: freelance fixtures expose complete funded role and poster data
+01:06 +95 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: Workspace chooser covers the current business and work choices
+01:06 +96 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: opportunity filters combine city, area and exact six-digit PIN
+01:06 +97 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: application and withdrawal remain bound to the exact opportunity
+01:06 +98 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: failed withdrawal remains active and gives a retryable truth
+01:06 +99 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: authenticated Workspace operations use exact bodies and App Check modes
+01:06 +100 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: production correction fails closed until backend support exists
+01:06 +101 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: authenticated withdrawal sends both exact identities as a mutation
+01:06 +102 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: store operations use exact authenticated mutation contracts
+01:06 +103 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: proof document is privately uploaded and confirmed before acceptance
+01:06 +104 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: pending review never invents a verified Workspace
+01:06 +105 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: rejected review preserves details for an exact resubmission
+01:06 +106 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: authoritative Workspace state is restored after a fresh app session
+01:06 +107 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/work_production_gateway_test.dart: missing production endpoint fails truthfully
+01:06 +108 ~68: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart
+01:08 +108 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: Work opens Earn Today as its stable default action
+01:08 +109 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: review-only guests retain the existing Work Chat boundary
+01:08 +110 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: retired Work Home redirects to a four-cell Earn rail
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:10 +111 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: Earn uses inline Search, Filter and Profile with no old UI
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:10 +112 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: inline search matches position, requirements and poster
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:11 +113 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: Earn assistance opens the shared Workspace profile chooser
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:12 +114 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: compact Profile opens from the inline header without overflow
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:12 +115 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: searchable filter page remains usable with compact large text
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:13 +116 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: payment table remains aligned with compact large text
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:13 +117 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: searchable city area and pincode filters combine exactly
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:14 +118 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: a city with no exact listing keeps nationwide discovery open
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:15 +119 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: opportunity detail is role-specific and complete
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:15 +120 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: Apply Now opens exact Workspace onboarding without applying
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:16 +121 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: Workspace and Chat return to the exact filtered Earn state
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:17 +122 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_main_v2_test.dart: compact large-text card remains reachable without overflow
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:17 +123 ~68: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart
+01:18 +123 ~68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart: C24G Earn Today candidate capture at OPPO-class viewport
+01:18 +123 ~69: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart: C24G Workspace candidate capture at OPPO-class viewport
+01:18 +123 ~70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart: C24G Earn Today adapts at 320x568 text 1.4
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:20 +124 ~70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart: C24G Earn Today adapts at 390x844 text 1.0
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:20 +125 ~70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart: C24G Earn Today adapts at 430x932 text 1.3
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:20 +126 ~70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart: C24G work search and visible terms lead directly to opportunity review
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:21 +127 ~70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart: C24G Workspace opens the professional chooser directly
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:22 +128 ~70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart: C24G Workspace separates Travel Partners and Delivery roles with one affordance
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:23 +129 ~70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart: C24G shared Work motion settles immediately when reduced
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:23 +130 ~70: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/mool_care_work_navigation_conformance_c26f_test.dart
+01:25 +130 ~70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/mool_care_work_navigation_conformance_c26f_test.dart: C26F Care Medicine and Work share one neutral fixed rail
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:30 +131 ~70: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart
+01:32 +131 ~70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: adaptive inventory owns four real families and nine selected states
+01:32 +132 ~70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: eat keeps 2 compact leading destination actions across widths and scales
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <152.0>
+  Actual: <320.0>
+
+When the exception was thrown, this was the stack:
+#4      _expectAdaptiveFamily (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart:225:3)
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart:69:15)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart line 225
+The test description was:
+  eat keeps 2 compact leading destination actions across widths and scales
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:32 +132 ~70 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: eat keeps 2 compact leading destination actions across widths and scales [E]
+  Test failed. See exception logs above.
+  The test description was: eat keeps 2 compact leading destination actions across widths and scales
+  
+01:32 +132 ~70 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: ride keeps 3 compact leading destination actions across widths and scales
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <232.0>
+  Actual: <320.0>
+
+When the exception was thrown, this was the stack:
+#4      _expectAdaptiveFamily (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart:225:3)
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart:69:15)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart line 225
+The test description was:
+  ride keeps 3 compact leading destination actions across widths and scales
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:33 +132 ~70 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: ride keeps 3 compact leading destination actions across widths and scales [E]
+  Test failed. See exception logs above.
+  The test description was: ride keeps 3 compact leading destination actions across widths and scales
+  
+01:33 +132 ~70 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: book keeps 2 compact leading destination actions across widths and scales
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <152.0>
+  Actual: <320.0>
+
+When the exception was thrown, this was the stack:
+#4      _expectAdaptiveFamily (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart:225:3)
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart:69:15)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart line 225
+The test description was:
+  book keeps 2 compact leading destination actions across widths and scales
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:33 +132 ~70 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: book keeps 2 compact leading destination actions across widths and scales [E]
+  Test failed. See exception logs above.
+  The test description was: book keeps 2 compact leading destination actions across widths and scales
+  
+01:33 +132 ~70 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: work keeps 2 compact leading destination actions across widths and scales
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <152.0>
+  Actual: <320.0>
+
+When the exception was thrown, this was the stack:
+#4      _expectAdaptiveFamily (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart:225:3)
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart:69:15)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart line 225
+The test description was:
+  work keeps 2 compact leading destination actions across widths and scales
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:33 +132 ~70 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: work keeps 2 compact leading destination actions across widths and scales [E]
+  Test failed. See exception logs above.
+  The test description was: work keeps 2 compact leading destination actions across widths and scales
+  
+01:33 +132 ~70 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: all four families keep inert selection one-tap outcomes and immediate reduced motion
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following _TypeError was thrown running a test:
+type 'AnimatedContainer' is not a subtype of type 'SizedBox' in type cast
+
+When the exception was thrown, this was the stack:
+#0      WidgetController.widget (package:flutter_test/src/controller.dart:828:44)
+#1      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart:128:18)
+<asynchronous suspension>
+#2      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  all four families keep inert selection one-tap outcomes and immediate reduced motion
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:33 +132 ~70 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: all four families keep inert selection one-tap outcomes and immediate reduced motion [E]
+  Test failed. See exception logs above.
+  The test description was: all four families keep inert selection one-tap outcomes and immediate reduced motion
+  
+01:33 +132 ~70 -5: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_social_work_route_compatibility_test.dart
+01:34 +132 ~70 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_social_work_route_compatibility_test.dart: Social Work opens the exact canonical Earn owner
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:36 +133 ~70 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_social_work_route_compatibility_test.dart: Social Work Workspace opens its existing exact owner
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:37 +134 ~70 -5: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_r10_personal_work_exposure_test.dart
+01:38 +134 ~70 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_r10_personal_work_exposure_test.dart: runtime Work choices match the versioned R10 contract
+01:38 +135 ~70 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_r10_personal_work_exposure_test.dart: production Work root reaches Earn Today in one connected tap
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:40 +136 ~70 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_r10_personal_work_exposure_test.dart: production Work root reaches Workspace in one connected tap
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:41 +137 ~70 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_r10_personal_work_exposure_test.dart: direct /app/work/earn exposes its owner and connected launcher
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:41 +138 ~70 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_r10_personal_work_exposure_test.dart: direct /app/work/my-work exposes its owner and connected launcher
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:41 +139 ~70 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_r10_personal_work_exposure_test.dart: Work chooser Back restores the exact unchanged owner
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:42 +140 ~70 -5: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: all four families keep inert selection one-tap outcomes and immediate reduced motion
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: book keeps 2 compact leading destination actions across widths and scales
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: eat keeps 2 compact leading destination actions across widths and scales
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: ride keeps 3 compact leading destination actions across widths and scales
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-diagnostic-evidence-v2-20260904/apps/mobile/test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart: work keeps 2 compact leading destination actions across widths and scales

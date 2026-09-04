@@ -43,8 +43,23 @@ function Invoke-CapturedProcess(
   [string[]]$Arguments,
   [string]$WorkingDirectory
 ) {
+  $resolvedCommand = Get-Command $FileName -CommandType Application `
+    -ErrorAction Stop | Select-Object -First 1
+  $commandPath = [IO.Path]::GetFullPath([string]$resolvedCommand.Source)
+  $isBatch = [IO.Path]::GetExtension($commandPath) -cin @('.bat', '.cmd')
   $info = [Diagnostics.ProcessStartInfo]::new()
-  $info.FileName = $FileName
+  if ($isBatch) {
+    $commandHost = $env:ComSpec
+    if ([string]::IsNullOrWhiteSpace($commandHost)) {
+      $commandHost = 'cmd.exe'
+    }
+    $info.FileName = $commandHost
+    $info.ArgumentList.Add('/d')
+    $info.ArgumentList.Add('/c')
+    $info.ArgumentList.Add($commandPath)
+  } else {
+    $info.FileName = $commandPath
+  }
   $info.WorkingDirectory = $WorkingDirectory
   $info.UseShellExecute = $false
   $info.RedirectStandardOutput = $true

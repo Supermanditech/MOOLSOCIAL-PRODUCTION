@@ -1,5 +1,41 @@
 {
   "schema": "moolsocial_store_buy_serialized_diagnostic_v2",
-  "state": "pending_after_bootstrap",
-  "failedRepair": "c48e4ecc5c3ccc7a3079d3f64988437599cc78de"
+  "failedRepair": "c48e4ecc5c3ccc7a3079d3f64988437599cc78de",
+  "command": [
+    "flutter",
+    "test",
+    "--no-pub",
+    "--reporter",
+    "expanded",
+    "--concurrency=1",
+    "test/work_store_atomic_operations_test.dart",
+    "test/work_workspace_layout_safety_test.dart",
+    "test/work_vertical_slice_test.dart",
+    "test/work_production_gateway_test.dart",
+    "test/ui_v2/work/work_main_v2_test.dart",
+    "test/ui_v2/work/work_opportunity_home_c24g_test.dart",
+    "test/ui_v2/universal/mool_care_work_navigation_conformance_c26f_test.dart",
+    "test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart",
+    "test/ui_v2/universal/uaw_personal_social_work_route_compatibility_test.dart",
+    "test/ui_v2/universal/uaw_r10_personal_work_exposure_test.dart"
+  ],
+  "testFiles": [
+    "test/work_store_atomic_operations_test.dart",
+    "test/work_workspace_layout_safety_test.dart",
+    "test/work_vertical_slice_test.dart",
+    "test/work_production_gateway_test.dart",
+    "test/ui_v2/work/work_main_v2_test.dart",
+    "test/ui_v2/work/work_opportunity_home_c24g_test.dart",
+    "test/ui_v2/universal/mool_care_work_navigation_conformance_c26f_test.dart",
+    "test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart",
+    "test/ui_v2/universal/uaw_personal_social_work_route_compatibility_test.dart",
+    "test/ui_v2/universal/uaw_r10_personal_work_exposure_test.dart"
+  ],
+  "startedAt": "2026-09-04T16:53:47.4312846+05:30",
+  "finishedAt": "2026-09-04T16:55:54.2830413+05:30",
+  "exitCode": 1,
+  "stdoutBytes": 82017,
+  "stderrBytes": 0,
+  "stdoutSha256": "049487766C714F51E24D8C9B1F2F8ED30D5A78572398EC8D46FD6A6E4C1F1D22",
+  "stderrSha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
 }

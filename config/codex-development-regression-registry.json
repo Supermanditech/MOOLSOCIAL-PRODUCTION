@@ -49957,6 +49957,36 @@
       "prevention": "Use a single-quoted SimpleMatch token, require exactly one match and only then read the bounded source region before patching.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "scripts/check-codex-subagent-coordination-policy.ps1"]
+    },
+    {
+      "id": "REG-20260904-4450-V2-DIAGNOSTIC-EVIDENCE-HAD-NO-POST-CORRECTION-PRECOMMIT-PATH",
+      "status": "registered-evidence-lifecycle-gate-dead-end",
+      "appliesTo": ["primary", "integration_repair", "integration", "git", "test"],
+      "mistake": "After the single-use runner correction was committed at d9d8fa3f, the generic integration_repair task-start and pre-commit paths could not admit the four generated diagnostic evidence owners from that exact continuation HEAD.",
+      "rootCause": "The first exception intentionally became unusable after its correction commit, but no equally bounded evidence-capture commit path was defined for the already-authorized output files.",
+      "prevention": "Permit one final pre-commit only at exact HEAD d9d8fa3f, verify the immutable bootstrap and correction commit lineage, require no active merge and exactly the seven authorized control/evidence owners, then fail closed after that one commit.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"]
+    },
+    {
+      "id": "REG-20260904-4451-V2-RUNNER-PROCESSSTARTINFO-COULD-NOT-RESOLVE-FLUTTER-BATCH-LAUNCHER",
+      "status": "registered-pretest-executable-resolution-failure",
+      "appliesTo": ["primary", "integration_repair", "integration", "git", "test"],
+      "mistake": "The corrected v2 runner reached its first toolchain probe but ProcessStartInfo could not start `flutter` by command name, so zero diagnostic tests and zero evidence writes occurred.",
+      "rootCause": "The interactive PowerShell command resolver can find Flutter's Windows batch launcher, while ProcessStartInfo with UseShellExecute false requires an exact executable or an explicit cmd.exe batch boundary.",
+      "prevention": "Resolve flutter and dart through Get-Command, launch .bat or .cmd owners through the existing ComSpec with ArgumentList, leave executable owners direct, then retain the same command arguments, working directory and evidence outputs.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/run-store-buy-diagnostic-evidence.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"]
+    },
+    {
+      "id": "REG-20260904-4452-RUNNER-BATCH-HOST-PATCH-USED-INLINE-IF-AS-ASSIGNMENT",
+      "status": "registered-pre-execution-powershell-source-finding",
+      "appliesTo": ["primary", "integration_repair", "integration", "git", "test"],
+      "mistake": "The first executable-resolution patch assigned an inline PowerShell `if` statement directly to ProcessStartInfo.FileName; static review caught it before parser or runner execution.",
+      "rootCause": "The patch used expression-style syntax despite the permanent rule requiring conditional values to be resolved into named scalars first.",
+      "prevention": "Resolve ComSpec into a dedicated commandHost scalar, apply the fallback in a separate if statement, then assign FileName and require parser success before retry.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/run-store-buy-diagnostic-evidence.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "scripts/run-store-buy-diagnostic-evidence.ps1"]
     }
   ]
 }
