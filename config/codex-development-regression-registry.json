@@ -10,6 +10,46 @@
   },
   "entries": [
     {
+      "id": "REG-20260905-4489-WORK-RETIRED-OPPORTUNITY-TEST-CONTRACT",
+      "status": "inherited_test_contract_correction_required",
+      "appliesTo": ["primary", "implementation", "testing", "work", "navigation"],
+      "mistake": "The connected router batch expects the retired mool-explainer fixture to open a live opportunity. Current approved Work catalogue no longer contains that record and the correct UI presents unavailable with Earn Today recovery.",
+      "rootCause": "The historical containment test retained an obsolete catalogue identifier and headline. It fails identically on untouched Care parent 55df304f951b770c45b197a02f0918c41b34497e and the corrected child; source inspection confirms explicit missing-record recovery instead of substitution.",
+      "prevention": "Use an existing exact opportunity for the live route/Apply-to-Workspace test. Independently assert that retired identifiers are not replaced by another position, show truthful unavailable state and recover to Earn Today. Preserve all existing legacy route containment checks. Do not restore obsolete product content or weaken assertions.",
+      "gates": ["apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart"],
+      "evidence": ["docs/quality/UAW-CODEX-WORK-OPPORTUNITY-ROUTE-CONTRACT-V1-20260905.md"]
+    },
+    {
+      "id": "REG-20260905-4488-ANDROID-SHARE-PLUGIN-CONTRACT-INTERCEPTION",
+      "status": "source_correction_tested_native_return_still_device_dependent",
+      "appliesTo": ["primary", "implementation", "testing", "build", "device", "android"],
+      "mistake": "The prior Android share-return implementation replaced the registered share_plus handler, returned an empty result on every resume and passed arbitrary attachment paths without plugin cache preparation. This falsely classified successful target selection as dismissal and could break file sharing.",
+      "rootCause": "An app-level channel interceptor duplicated the plugin lifecycle and bypassed its file-provider preparation. The tested correction then remained unsealed because archived historical image references needed the already authorized truthful retirement correction.",
+      "prevention": "Delegate to the registered share_plus implementation; retain exact result, dismissal, unavailable, error and attachment contracts. Do not assert Gmail discard task-stack recovery from mocked channel tests. Carry forward only the sealed historical evidence references and exact single-ticket support needed for atomic source sealing; never fabricate old screenshots or broaden platform ownership.",
+      "gates": ["apps/mobile/test/platform_configuration_test.dart", "scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["docs/quality/UAW-CODEX-ANDROID-SHARE-CONTRACT-FIX-V1-20260905.md"]
+    },
+    {
+      "id": "REG-20260905-4487-CARE-MEDICINE-VIEW-ALIAS-ROUTE-GAP",
+      "status": "confirmed_source_audit_child_correction_required",
+      "appliesTo": ["primary", "implementation", "navigation", "care", "testing"],
+      "mistake": "The existing Buy view=medicine and view=rx aliases bypass the Care canonical redirect. The global domain resolver also misses context/scope aliases, leaving inconsistent Medicine ownership.",
+      "rootCause": "The redirect handles sub/context/scope but omits the view selector already supported by the Buy router; the domain classifier recognizes only sub. During child bootstrap, the existing gate correctly rejected the registry owner omitted from the inherited primary claim; an earlier checker patch also failed harmlessly because its expected line omitted the continuation character. Neither attempt modified product source. Add only this child's exact registry/evidence owners to the primary claim before retry.",
+      "prevention": "Canonicalize existing Medicine aliases into Care while preserving explicit Buy sub precedence and product/cart/order/return queries. Test the real top-level redirect and domain classification for all aliases and non-Medicine controls. Do not change Cursor catalogue rendering to mask its separately assigned overflow.",
+      "gates": ["apps/mobile/test/ui_v2/universal/mool_domain_action_catalogue_c25b_test.dart", "apps/mobile/test/ui_v2/universal/mool_six_domain_route_projection_c25e_test.dart"],
+      "evidence": ["docs/quality/UAW-CODEX-CARE-MEDICINE-ALIAS-FIX-V1-20260905.md"]
+    },
+    {
+      "id": "REG-20260905-4486-CHAT-CONTEXT-MUST-NOT-RELABEL-LOADED-IDENTITY",
+      "status": "confirmed_source_audit_child_correction_required",
+      "appliesTo": ["primary", "implementation", "chat", "identity", "testing"],
+      "mistake": "The shared commerce-context projection replaces a loaded conversation's title and type with route-supplied supplier metadata while retaining the loaded verification badge, recipient and participants.",
+      "rootCause": "ChatSession.thread applies URI context equally to a fallback conversation and an already authoritative loaded thread.",
+      "prevention": "Return the authoritative loaded thread unchanged. Use commerce metadata only for an unknown unverified fallback, while retaining the separate complete product context. Test context before and after production-gateway loading, refresh failure, recipient/type/verification preservation, conversation info, exact product link and Back continuity. Do not change Buy-owned code or claim backend identity verification from route text.",
+      "gates": ["apps/mobile/test/global_contextual_chat_shell_test.dart", "apps/mobile/test/chat_production_gateway_test.dart"],
+      "evidence": ["docs/quality/UAW-CODEX-CHAT-COMMERCE-IDENTITY-FIX-V1-20260905.md"]
+    },
+    {
       "id": "REG-20260905-4484-EARN-COMPACT-PAYMENT-ROW-OVERFLOW",
       "status": "confirmed_pre_apk_defect_correction_and_regression_required",
       "appliesTo": ["primary", "implementation", "work", "testing", "accessibility"],

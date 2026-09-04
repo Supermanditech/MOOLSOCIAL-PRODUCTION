@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4456,
-    "sha256": "FD7144A60DF18F4F887879B6BDFD3CCC819716EA7B0F52FC10D34026BF550604"
+    "entryCount": 4460,
+    "sha256": "E51310837F92BDF934152800DCD30B39CA0D008D7F39BD745042FF05D9A821CE"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,6 +34,8 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+        "docs/quality/UAW-CODEX-WORK-OPPORTUNITY-ROUTE-CONTRACT-V1-20260905.md",
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json",
         "docs/quality/UAW-CODEX-WORK-EARN-PAYMENT-FIT-V1-20260905.md",
@@ -885,6 +887,27 @@
       "featureBranchesMustStartAtTag": true
     },
     "continuationBindings": [
+      {
+        "id": "codex_work_opportunity_route_contract_v1_20260905",
+        "state": "founder_authorized_2026_09_05",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "work-opportunity-route-contract-v1-20260905",
+        "ticketId": "UAW-CODEX-WORK-OPPORTUNITY-ROUTE-CONTRACT-V1-20260905",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905",
+        "branch": "work/codex-ui/work-opportunity-route-contract-v1-20260905",
+        "baselineHead": "f4658311d6a8000d680205b1a6043ee4e723cca5",
+        "bootstrapCommitSubject": "coordination(work-opportunity-route-contract-v1-20260905): bind current Work route tests",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CODEX-WORK-OPPORTUNITY-ROUTE-CONTRACT-V1-20260905.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
       {
         "id": "codex_work_earn_payment_fit_v1_20260905",
         "state": "founder_authorized_2026_09_05",
