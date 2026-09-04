@@ -31,6 +31,190 @@ void main() {
     return session;
   }
 
+  test('commerce context cannot relabel a loaded review conversation', () {
+    final chat = ChatSession();
+    addTearDown(chat.dispose);
+    final authoritative = chat.thread('mahadev');
+    final context = ChatCommerceContext.fromUri(
+      Uri.parse(
+        '/app/chat/thread/mahadev?supplier=Unrelated%20Store&context=order&orderId=OTHER',
+      ),
+    );
+    chat.bindCommerceContext('mahadev', context);
+
+    expect(authoritative.verified, isTrue);
+    expect(chat.thread('mahadev'), same(authoritative));
+    expect(chat.commerceContext('mahadev'), same(context));
+    chat.bindCommerceContext('mahadev', null);
+    expect(chat.thread('mahadev'), same(authoritative));
+  });
+
+  for (final verified in [false, true]) {
+    test(
+      'production commerce identity is gateway-owned when verified=$verified',
+      () async {
+        final authoritative = ChatThread(
+          id: 'supplier-thread',
+          title: 'Loaded account',
+          subtitle: 'Loaded identity details',
+          preview: 'Existing message',
+          timeLabel: 'Today',
+          type: ChatThreadType.people,
+          safetyTarget: ChatSafetyTarget.person,
+          verified: verified,
+          unreadCount: 3,
+          targetUserId: 'authenticated-recipient',
+          messageRequestPending: true,
+        );
+        final gateway = _IdentityChatGateway(authoritative);
+        final chat = ChatSession.production(gateway: gateway);
+        addTearDown(chat.dispose);
+        final context = ChatCommerceContext.fromUri(
+          Uri.parse(
+            '/app/chat/thread/supplier-thread?supplier=Unrelated%20Store&context=order&orderId=OTHER&productTitle=Rice&skuId=rice-pack&quantity=2',
+          ),
+        );
+        chat.bindCommerceContext(authoritative.id, context);
+
+        final fallback = chat.thread(authoritative.id);
+        expect(fallback.title, 'Unrelated Store');
+        expect(fallback.verified, isFalse);
+        expect(fallback.targetUserId, isNull);
+        expect(await chat.loadThreads(), isTrue);
+        expect(chat.thread(authoritative.id), same(authoritative));
+        expect(chat.commerceContext(authoritative.id), same(context));
+        expect(chat.commerceContext(authoritative.id)!.skuId, 'rice-pack');
+        expect(chat.commerceContext(authoritative.id)!.quantity, '2');
+
+        chat.bindCommerceContext(
+          authoritative.id,
+          ChatCommerceContext.fromUri(
+            Uri.parse(
+              '/app/chat/thread/supplier-thread?supplier=Another%20name&context=product',
+            ),
+          ),
+        );
+        expect(chat.thread(authoritative.id), same(authoritative));
+      },
+    );
+  }
+
+  test(
+    'failed identity refresh retains authority and successful refresh replaces it',
+    () async {
+      const first = ChatThread(
+        id: 'supplier-thread',
+        title: 'First account name',
+        subtitle: 'Account',
+        preview: '',
+        timeLabel: '',
+        type: ChatThreadType.business,
+        verified: true,
+        targetUserId: 'recipient-id',
+      );
+      const updated = ChatThread(
+        id: 'supplier-thread',
+        title: 'Updated account name',
+        subtitle: 'Account',
+        preview: '',
+        timeLabel: '',
+        type: ChatThreadType.business,
+        verified: true,
+        targetUserId: 'recipient-id',
+      );
+      final gateway = _IdentityChatGateway(first);
+      final chat = ChatSession.production(gateway: gateway);
+      addTearDown(chat.dispose);
+      expect(await chat.loadThreads(), isTrue);
+      chat.bindCommerceContext(
+        first.id,
+        ChatCommerceContext.fromUri(
+          Uri.parse(
+            '/app/chat/thread/supplier-thread?supplier=Unrelated%20Store&context=product',
+          ),
+        ),
+      );
+      gateway.failLoad = true;
+      expect(await chat.loadThreads(refresh: true), isFalse);
+      expect(chat.thread(first.id), same(first));
+      gateway.failLoad = false;
+      gateway.authoritative = updated;
+      expect(await chat.loadThreads(refresh: true), isTrue);
+      expect(chat.thread(first.id), same(updated));
+    },
+  );
+
+  testWidgets(
+    'production conversation and info preserve loaded identity with product context',
+    (tester) async {
+      final journey = await readyJourney();
+      addTearDown(journey.dispose);
+      final product = BuyV2Catalogue.products.firstWhere(
+        (value) => value.destination == BuyV2Destination.wholesale,
+      );
+      final route = Uri.parse(
+        const BuyV2ChatRouteAdapter().productQuestionLocationFor(
+          product: product,
+          quantity: 4,
+        ),
+      );
+      final threadId = route.pathSegments.last;
+      final authoritative = ChatThread(
+        id: threadId,
+        title: 'Loaded supplier identity',
+        subtitle: 'Account',
+        preview: '',
+        timeLabel: '',
+        type: ChatThreadType.business,
+        verified: true,
+        targetUserId: 'supplier-account',
+      );
+      final chat = ChatSession.production(
+        gateway: _IdentityChatGateway(authoritative),
+      );
+      addTearDown(chat.dispose);
+      expect(await chat.loadThreads(), isTrue);
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: route.toString(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final title = find.byKey(const Key('chat-page-title'));
+      expect(tester.widget<Text>(title).data, authoritative.title);
+      expect(chat.thread(threadId), same(authoritative));
+      expect(
+        find.byKey(const Key('chat-commerce-context-card')),
+        findsOneWidget,
+      );
+      final context = chat.commerceContext(threadId)!;
+      expect(context.productId, product.canonicalId);
+      expect(context.skuId, product.id);
+      expect(context.quantity, '4');
+      expect(
+        context.productAppRoute,
+        '/app/buy?sub=wholesale&view=product&product=${product.id}',
+      );
+      await tester.tap(find.byKey(const Key('chat-conversation-info')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('chat-conversation-info-screen')),
+        findsOneWidget,
+      );
+      expect(tester.widget<Text>(title).data, authoritative.title);
+      await tester.tap(find.byKey(const Key('chat-conversation-info-back')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(title).data, authoritative.title);
+      expect(
+        chat.commerceContext(threadId)!.productAppRoute,
+        context.productAppRoute,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test('one resolver classifies every shared Chat origin', () {
     const cases = <(String, ChatEntryContextId, String)>[
       ('/app/mool', ChatEntryContextId.mool, 'Chat'),
@@ -1586,4 +1770,28 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+}
+
+class _IdentityChatGateway extends UnavailableChatGateway {
+  _IdentityChatGateway(this.authoritative);
+
+  ChatThread authoritative;
+  bool failLoad = false;
+
+  @override
+  Future<List<ChatThread>> listThreads({int limit = 30}) async {
+    if (failLoad) {
+      throw const ChatServiceException('Please retry.', code: 'unavailable');
+    }
+    return [authoritative];
+  }
+
+  @override
+  Future<List<ChatMessage>> listMessages({
+    required String threadId,
+    int limit = 50,
+  }) async => [];
+
+  @override
+  Future<void> markThreadRead({required String threadId}) async {}
 }

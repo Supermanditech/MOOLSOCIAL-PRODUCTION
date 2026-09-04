@@ -653,16 +653,15 @@ class ChatSession extends ChangeNotifier {
       _commerceContexts[threadId];
 
   ChatThread thread(String id) {
-    final base = _threads.firstWhere(
-      (thread) => thread.id == id,
-      orElse: () => ChatThread(
-        id: id,
-        title: 'Conversation',
-        subtitle: 'Loading messages',
-        preview: '',
-        timeLabel: '',
-        type: ChatThreadType.people,
-      ),
+    final loaded = _threads.where((thread) => thread.id == id).firstOrNull;
+    if (loaded != null) return loaded;
+    final base = ChatThread(
+      id: id,
+      title: 'Conversation',
+      subtitle: 'Loading messages',
+      preview: '',
+      timeLabel: '',
+      type: ChatThreadType.people,
     );
     final context = _commerceContexts[id];
     if (context == null) return base;
