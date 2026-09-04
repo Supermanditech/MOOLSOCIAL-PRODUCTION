@@ -49774,6 +49774,26 @@
       "prevention": "Generate the policy union from parsed stage objects, emit only counts and missing binding identifiers, and validate the resulting claim with hashes and cardinalities rather than path floods.",
       "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260904-4440-STORE-BUY-COMBINED-TEN-FILE-REGRESSION-RETURNED-FIVE-FAILURES",
+      "status": "registered-combined-regression-failure",
+      "appliesTo": ["primary", "integration_repair", "integration", "work", "store", "test"],
+      "mistake": "The first post-repair combined ten-file Work and Store regression returned exit code 1 with 140 passed, 70 skipped and 5 failed tests.",
+      "rootCause": "The complete deterministic failure identities are not yet known because the original concurrent compact-report run did not retain a complete transcript.",
+      "prevention": "Run the exact ten-file set once with deterministic concurrency 1 and expanded reporting in the isolated evidence lane, retain the complete generated log and classify each failure against Store, Cursor and the failed repair before any fix ticket.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/run-store-buy-diagnostic-evidence.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V1-20260904.md"]
+    },
+    {
+      "id": "REG-20260904-4441-ORIGINAL-TEN-FILE-REGRESSION-OUTPUT-WAS-TRUNCATED-AND-NOT-RETAINED",
+      "status": "registered-unrecoverable-test-output-truncation",
+      "appliesTo": ["primary", "integration_repair", "integration", "work", "store", "test"],
+      "mistake": "The original combined regression output was truncated in the tool channel and no complete raw log was written, preventing truthful reconstruction of the five failing test names, assertions and stacks.",
+      "rootCause": "The large compact reporter and application debug stream were sent directly to the bounded tool output instead of a unique retained evidence log.",
+      "prevention": "Never fabricate the missing original transcript. Preserve the exact command, file list, known totals and truncation fact, then capture the serialized expanded rerun to a unique generated log and emit only its checksum and bounded summary.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/run-store-buy-diagnostic-evidence.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V1-20260904.md"]
     }
   ]
 }
