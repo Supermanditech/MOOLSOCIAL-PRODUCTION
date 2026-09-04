@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 
@@ -8,9 +9,14 @@ void main() {
     BuyV2Session createSession() => BuyV2Session(core: BuySession());
 
     test('all unrestricted offers preserve quantity and total floors', () {
-      final products = BuyV2Catalogue.products.where(
-        (product) => !product.requiresPrescription,
-      );
+      final availability = createSession();
+      addTearDown(availability.dispose);
+      final products = BuyV2Catalogue.products.where((product) {
+        final facts = availability.productFactsFor(product);
+        return !product.requiresPrescription &&
+            facts.storeOperatingState != BuyV2StoreOperatingState.closed &&
+            !facts.orderabilityLabel.toLowerCase().contains('unavailable');
+      });
 
       for (final product in products) {
         final session = createSession();

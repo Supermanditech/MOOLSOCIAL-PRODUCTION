@@ -100273,6 +100273,45 @@
       "evidence": [
         "config/codex-development-regression-registry.json"
       ]
+    },
+    {
+      "id": "REG-20260904-4481-REPAIR-V3-STAGE3-REGISTRY-READ-AFTER-CONFLICT-STAGING",
+      "status": "registered-merge-stage-inspection-order-failure",
+      "appliesTo": [
+        "primary",
+        "integration_repair",
+        "coordination"
+      ],
+      "mistake": "A post-resolution verification attempted to read the registry's stage-3 index entry after all three conflicts had already been staged, so Git correctly reported that only stage 0 remained.",
+      "rootCause": "The stage-3 subset check was ordered after git add instead of before conflict-stage collapse.",
+      "prevention": "Capture stage-2 and stage-3 identities before staging conflict resolutions; after staging, verify the resolved registry against the locked Cursor commit object and the union inventory instead of unavailable index stages.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json"
+      ]
+    },
+    {
+      "id": "REG-20260904-4482-REPAIR-V3-POLICY-HASH-PATCH-USED-PRE-MERGE-LINE-ENDING-HASH",
+      "status": "registered-exact-edit-context-failure",
+      "appliesTo": [
+        "primary",
+        "integration_repair",
+        "coordination"
+      ],
+      "mistake": "The first policy-binding patch after conflict resolution expected the registry's pre-merge worktree hash, but the resolved file had been materialized with the repository line-ending convention and the policy already held its post-checkout hash; the patch failed without changing policy bytes.",
+      "rootCause": "The patch anchor reused an earlier hash instead of reading the literal current policy binding after Git materialized the conflict resolution.",
+      "prevention": "After conflict selection and staging, reread the exact policy binding and current registry bytes before every hash patch; update from the literal current value and then reparse both owners.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ]
     }
   ]
 }

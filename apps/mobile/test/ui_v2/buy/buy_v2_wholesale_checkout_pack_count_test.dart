@@ -46,6 +46,8 @@ void main() {
     }
     session.openCart(scope: scope);
     expect(session.openCheckout(), isTrue);
+    expect(session.continueCheckoutFromAddress(), isTrue);
+    expect(session.continueCheckoutFromPayment(), isTrue);
     return session;
   }
 
@@ -65,7 +67,7 @@ void main() {
       buyV2WholesaleCheckoutPackCountContractVersion,
       'buy-wholesale-checkout-pack-count-v1',
     );
-    expect(find.text('Delivery 1 · 1 product · 2 packs'), findsOneWidget);
+    expect(find.text('Shipment 1 · 1 product · 2 packs'), findsOneWidget);
     expect(find.text('1 product · 2 packs'), findsOneWidget);
     expect(find.textContaining('2 products'), findsNothing);
     expect(find.text('Place order'), findsOneWidget);
@@ -84,10 +86,25 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
-    expect(find.text('Delivery 1 · 2 products · 4 packs'), findsOneWidget);
+    final groups = session.checkoutFulfilmentGroups;
+    expect(groups, isNotEmpty);
+    for (var index = 0; index < groups.length; index += 1) {
+      final group = groups[index];
+      final products =
+          '${group.lines.length} '
+          '${group.lines.length == 1 ? 'product' : 'products'}';
+      final packs =
+          '${group.itemCount} '
+          '${group.itemCount == 1 ? 'pack' : 'packs'}';
+      expect(
+        find.text('Shipment ${index + 1} · $products · $packs'),
+        findsOneWidget,
+      );
+    }
     expect(find.text('2 products · 4 packs'), findsOneWidget);
     expect(session.checkoutLines, hasLength(2));
     expect(session.checkoutItemCount, 4);
+    expect(groups.fold<int>(0, (total, group) => total + group.itemCount), 4);
     expect(tester.takeException(), isNull);
   });
 
@@ -105,13 +122,13 @@ void main() {
 
     expect(session.checkoutScope, BuyV2CartScope.wholesale);
     expect(session.checkoutLines, hasLength(1));
-    expect(find.text('Delivery 1 · 1 product · 2 packs'), findsOneWidget);
+    expect(find.text('Shipment 1 · 1 product · 2 packs'), findsOneWidget);
     expect(find.text('1 product · 2 packs'), findsOneWidget);
     expect(find.textContaining('3 packs'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('non-Wholesale Checkout keeps established product wording', (
+  testWidgets('non-Wholesale Checkout distinguishes item quantity', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -126,8 +143,8 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
-    expect(find.text('Delivery 1 · 1 product'), findsOneWidget);
-    expect(find.text('1 product'), findsOneWidget);
+    expect(find.text('Shipment 1 · 1 product · 1 item'), findsOneWidget);
+    expect(find.text('1 item'), findsOneWidget);
     expect(find.textContaining('packs'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -153,8 +170,11 @@ void main() {
 
     await tester.tap(find.text('Review order'));
     await tester.pumpAndSettle();
+    expect(session.continueCheckoutFromAddress(), isTrue);
+    expect(session.continueCheckoutFromPayment(), isTrue);
+    await tester.pumpAndSettle();
     expect(session.checkoutScope, BuyV2CartScope.all);
-    expect(find.text('Delivery 1 · 1 product · 2 packs'), findsOneWidget);
+    expect(find.text('Shipment 1 · 1 product · 2 packs'), findsOneWidget);
     expect(find.text('1 product · 2 packs'), findsOneWidget);
     expect(find.textContaining('2 products'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -211,7 +231,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Delivery 1 · 1 product · 2 packs'), findsOneWidget);
+      expect(find.text('Shipment 1 · 1 product · 2 packs'), findsOneWidget);
       final actionBar = find.byKey(const ValueKey('buy-checkout-action-bar'));
       expect(actionBar, findsOneWidget);
       expect(
@@ -220,6 +240,12 @@ void main() {
       );
       expect(tester.takeException(), isNull);
 
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.checkoutStep, BuyV2CheckoutStep.payment);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.checkoutStep, BuyV2CheckoutStep.address);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.cart);

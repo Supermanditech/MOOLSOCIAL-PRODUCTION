@@ -54,10 +54,11 @@ void main() {
     expect(
       find.descendant(
         of: glance,
-        matching: find.text('Automatic Mool Partner assignment'),
+        matching: find.text('Fulfilment arranged by MoolSocial'),
       ),
       findsOneWidget,
     );
+    expect(find.text('Automatic Mool Partner assignment'), findsNothing);
     expect(tester.getRect(glance).bottom, lessThan(800));
     expect(tester.takeException(), isNull);
   });
