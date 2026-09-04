@@ -51,7 +51,9 @@
         "apps/mobile/test/chat_flow_test.dart",
         "apps/mobile/test/chat_settings_hub_test.dart",
         "apps/mobile/test/global_contextual_chat_shell_test.dart",
-        "config/codex-subagent-coordination-policy.json"
+        "config/codex-subagent-coordination-policy.json",
+        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
+        "apps/mobile/test/platform_configuration_test.dart"
       ]
     },
     {
@@ -2309,6 +2311,26 @@
         "integrationRequiredBeforeSuccessorApk": true
       },
       {
+        "id": "codex_buy_external_share_return_v1_20260904",
+        "state": "founder_authorized_2026_09_04",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "buy-external-share-return-v1-20260904",
+        "ticketId": "UAW-CODEX-BUY-EXTERNAL-SHARE-RETURN-V1-20260904",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-buy-external-share-return-v1-20260904",
+        "branch": "work/codex-ui/buy-external-share-return-v1-20260904",
+        "baselineHead": "f94cfd4752dd73b58a69568475803d6cf25cb8d0",
+        "bootstrapCommitSubject": "coordination(buy-external-share-return-v1-20260904): bind Android share-task owners",
+        "bootstrapOwners": [
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CODEX-BUY-EXTERNAL-SHARE-RETURN-V1-20260904.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
         "id": "integration_repair_store_buy_conflict_v3_20260904",
         "state": "founder_authorized_2026_09_04",
         "lane": "integration_repair",
@@ -2476,7 +2498,9 @@
           "apps/mobile/test/chat_flow_test.dart",
           "apps/mobile/test/chat_settings_hub_test.dart",
           "apps/mobile/test/global_contextual_chat_shell_test.dart",
-          "config/codex-subagent-coordination-policy.json"
+          "config/codex-subagent-coordination-policy.json",
+          "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
+          "apps/mobile/test/platform_configuration_test.dart"
         ],
         "forbiddenOwnerRoots": [
           "apps/mobile/lib/core/auth/",

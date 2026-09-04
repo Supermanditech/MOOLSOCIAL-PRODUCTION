@@ -562,7 +562,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 67) `
+Assert-Coordination ($continuationBindings.Count -eq 68) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -1528,6 +1528,15 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/.flutter-plugins-dependencies'
         )
       )
+      $buyExternalShareAndroidOwner = (
+        $hasContinuationBinding -and
+        [string]$selectedContinuationBinding.id -ceq
+          'codex_buy_external_share_return_v1_20260904' -and
+        $effectiveOwner -cin @(
+          'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
+          'apps/mobile/test/platform_configuration_test.dart'
+        )
+      )
       $allowedOwner = $false
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
@@ -1537,7 +1546,8 @@ if ($ProductionLane -ceq 'baseline') {
       }
       if ($shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
-          $retainedBuyGeneratedPackageOwner) {
+          $retainedBuyGeneratedPackageOwner -or
+          $buyExternalShareAndroidOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -1547,6 +1557,7 @@ if ($ProductionLane -ceq 'baseline') {
           $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
+          $buyExternalShareAndroidOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }
