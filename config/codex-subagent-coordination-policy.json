@@ -59,6 +59,13 @@
       ]
     },
     {
+      "task": "/root/integration_work_store_buy_v4_20260904",
+      "role": "primary",
+      "owners": [
+        "docs/quality/CODEX-SUBAGENT-MANDATORY-COORDINATION-POLICY-20260818.md"
+      ]
+    },
+    {
       "task": "/root/cursor_shop_mvp_go_live_v1_20260829",
       "role": "subagent",
       "owners": [
@@ -2607,7 +2614,7 @@
         "preMergeCoordinationOwners": [
           "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md"
         ],
-      "maximumPostMergeClosureCommits": 2,
+      "maximumPostMergeClosureCommits": 3,
       "postMergeClosureOwners": [
         "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
         "config/codex-development-regression-registry.json",
@@ -2624,11 +2631,11 @@
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "remoteRepairBranchMustEqualHeadBeforeAdmission": true,
-        "freshIntegrationWorkId": "work-store-buy-v3-20260904",
-        "freshIntegrationTicketId": "UAW-INTEGRATION-WORK-STORE-BUY-V3-20260904",
-        "freshIntegrationBranch": "integration/moolsocial/work-store-buy-v3-20260904",
-        "freshIntegrationWorktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v3-20260904",
-        "freshIntegrationMergeSubject": "merge(work-store-buy-v3-20260904): integrate corrected Store Chat and Buy"
+      "freshIntegrationWorkId": "work-store-buy-v4-20260904",
+      "freshIntegrationTicketId": "UAW-INTEGRATION-WORK-STORE-BUY-V4-20260904",
+      "freshIntegrationBranch": "integration/moolsocial/work-store-buy-v4-20260904",
+      "freshIntegrationWorktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v4-20260904",
+      "freshIntegrationMergeSubject": "merge(work-store-buy-v4-20260904): integrate corrected Store Chat and Buy"
       }
     },
     "promotion": {

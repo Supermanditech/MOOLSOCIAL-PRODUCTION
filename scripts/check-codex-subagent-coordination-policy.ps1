@@ -912,7 +912,7 @@ Assert-Coordination (
   [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 1 -and
   (@($integrationRepair.preMergeCoordinationOwners) -join '|') -ceq
     'docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md' -and
-  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 2 -and
+  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 3 -and
   (@($integrationRepair.postMergeClosureOwners) -join '|') -ceq
     'docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md|config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|scripts/check-codex-development-regression-memory.ps1|scripts/check-codex-subagent-coordination-policy.ps1|scripts/test-codex-integration-repair-coordination-policy.ps1' -and
   -not [bool]$integrationRepair.directSourceCommitsAllowed -and
@@ -921,15 +921,15 @@ Assert-Coordination (
     (@($expectedRepairConflictOwners | Sort-Object) -join '|') -and
   [bool]$integrationRepair.remoteRepairBranchMustEqualHeadBeforeAdmission -and
   [string]$integrationRepair.freshIntegrationWorkId -ceq
-    'work-store-buy-v3-20260904' -and
+    'work-store-buy-v4-20260904' -and
   [string]$integrationRepair.freshIntegrationTicketId -ceq
-    'UAW-INTEGRATION-WORK-STORE-BUY-V3-20260904' -and
+    'UAW-INTEGRATION-WORK-STORE-BUY-V4-20260904' -and
   [string]$integrationRepair.freshIntegrationBranch -ceq
-    'integration/moolsocial/work-store-buy-v3-20260904' -and
+    'integration/moolsocial/work-store-buy-v4-20260904' -and
   [string]$integrationRepair.freshIntegrationWorktreePath -ceq
-    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v3-20260904' -and
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v4-20260904' -and
   [string]$integrationRepair.freshIntegrationMergeSubject -ceq
-    'merge(work-store-buy-v3-20260904): integrate corrected Store Chat and Buy'
+    'merge(work-store-buy-v4-20260904): integrate corrected Store Chat and Buy'
 ) 'integration repair discipline weakened or changed.'
 Assert-ExactNames $gitDiscipline.promotion @(
   'directFeatureToRemediationAllowed','mainFrozen','founderAuthorizationRequired',
