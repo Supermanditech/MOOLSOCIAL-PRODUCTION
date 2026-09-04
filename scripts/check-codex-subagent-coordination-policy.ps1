@@ -562,7 +562,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 67) `
+Assert-Coordination ($continuationBindings.Count -eq 68) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -1529,7 +1529,18 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/.flutter-plugins-dependencies'
         )
       )
-      $careMedicineRoutingOwner = (
+      $careMedicineAliasOwner = (
+        $hasContinuationBinding -and
+        [string]$selectedContinuationBinding.id -ceq
+          'codex_care_medicine_alias_fix_v1_20260905' -and
+        $effectiveOwner -cin @(
+          'apps/mobile/lib/features/journey01/journey_router.dart',
+          'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart',
+          'apps/mobile/test/ui_v2/universal/mool_domain_action_catalogue_c25b_test.dart',
+          'apps/mobile/test/ui_v2/universal/mool_six_domain_route_projection_c25e_test.dart'
+        )
+      )
+      $careMedicineRoutingOwner = $careMedicineAliasOwner -or (
         $hasContinuationBinding -and
         [string]$selectedContinuationBinding.id -ceq
           'codex_care_medicine_routing_v1_20260905' -and

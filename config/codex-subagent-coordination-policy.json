@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4454,
-    "sha256": "AB95438339A1C131B35CA967B98D2B44EA3D0A0093229D6EC69A9AC8B912CA46"
+    "entryCount": 4458,
+    "sha256": "DD179C363944FFF6CE6C21FE427C13CC5F68EA912922A33A0E9BAC9FEF76402E"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,6 +34,8 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "config/codex-development-regression-registry.json",
+        "docs/quality/UAW-CODEX-CARE-MEDICINE-ALIAS-FIX-V1-20260905.md",
         "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
         "apps/mobile/lib/features/work/work_models.dart",
         "apps/mobile/lib/features/work/work_session.dart",
@@ -62,7 +64,6 @@
       "task": "/root/repair_store_buy_conflict_v3_20260904",
       "role": "primary",
       "owners": [
-        "config/codex-development-regression-registry.json",
         "docs/quality/STORE-BUY-V3-PRE-INTEGRATION-RECONCILIATION-20260904.md",
         "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
         "scripts/check-codex-development-regression-memory.ps1",
@@ -893,6 +894,27 @@
       "featureBranchesMustStartAtTag": true
     },
     "continuationBindings": [
+      {
+        "id": "codex_care_medicine_alias_fix_v1_20260905",
+        "state": "founder_authorized_2026_09_05",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "care-medicine-alias-fix-v1-20260905",
+        "ticketId": "UAW-CODEX-CARE-MEDICINE-ALIAS-FIX-V1-20260905",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-care-medicine-alias-fix-v1-20260905",
+        "branch": "work/codex-ui/care-medicine-alias-fix-v1-20260905",
+        "baselineHead": "55df304f951b770c45b197a02f0918c41b34497e",
+        "bootstrapCommitSubject": "coordination(care-medicine-alias-fix-v1-20260905): bind Care alias correction",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CODEX-CARE-MEDICINE-ALIAS-FIX-V1-20260905.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
       {
         "id": "codex_social_runtime_core_20260825",
         "state": "founder_authorized_2026_08_25",
