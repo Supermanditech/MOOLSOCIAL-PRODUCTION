@@ -10,6 +10,36 @@
   },
   "entries": [
     {
+      "id": "REG-20260905-4486-CHAT-CONTEXT-MUST-NOT-RELABEL-LOADED-IDENTITY",
+      "status": "confirmed_source_audit_child_correction_required",
+      "appliesTo": ["primary", "implementation", "chat", "identity", "testing"],
+      "mistake": "The shared commerce-context projection replaces a loaded conversation's title and type with route-supplied supplier metadata while retaining the loaded verification badge, recipient and participants.",
+      "rootCause": "ChatSession.thread applies URI context equally to a fallback conversation and an already authoritative loaded thread.",
+      "prevention": "Return the authoritative loaded thread unchanged. Use commerce metadata only for an unknown unverified fallback, while retaining the separate complete product context. Test context before and after production-gateway loading, refresh failure, recipient/type/verification preservation, conversation info, exact product link and Back continuity. Do not change Buy-owned code or claim backend identity verification from route text.",
+      "gates": ["apps/mobile/test/global_contextual_chat_shell_test.dart", "apps/mobile/test/chat_production_gateway_test.dart"],
+      "evidence": ["docs/quality/UAW-CODEX-CHAT-COMMERCE-IDENTITY-FIX-V1-20260905.md"]
+    },
+    {
+      "id": "REG-20260905-4484-EARN-COMPACT-PAYMENT-ROW-OVERFLOW",
+      "status": "confirmed_pre_apk_defect_correction_and_regression_required",
+      "appliesTo": ["primary", "implementation", "work", "testing", "accessibility"],
+      "mistake": "The post-integration audit reproduced a 70-pixel horizontal overflow in an Earn Today opportunity payment row at 320 logical pixels and 130% text. Connected Profile return tests also surfaced this Work defect.",
+      "rootCause": "The trailing payment-amount Text is unconstrained inside a Row while only the monthly payment column flexes. Earlier compact tests exercised the first visible opportunity without verifying longer payment descriptions throughout the list.",
+      "prevention": "Constrain both payment columns, preserve all payment facts and typography, and verify long shift and assignment amounts across the opportunity list at compact and large-text sizes. Re-run connected Profile returns; do not patch Profile for this Work-owned overflow or suppress Flutter layout errors.",
+      "gates": ["apps/mobile/test/ui_v2/work/work_main_v2_test.dart"],
+      "evidence": ["docs/quality/UAW-CODEX-WORK-EARN-PAYMENT-FIT-V1-20260905.md"]
+    },
+    {
+      "id": "REG-20260905-4485-RETIRED-UI-EVIDENCE-REFERENCE-RECOVERY",
+      "status": "founder_retired_original_images_provenance_preserved_fresh_device_evidence_pending",
+      "appliesTo": ["primary", "implementation", "testing", "build", "device", "evidence"],
+      "mistake": "The existing memory gate encountered references to UI screenshots and superseded APKs removed by the earlier authorized cleanup, plus historical text owners whose worktrees were removed. Missing originals cannot be represented as restored evidence or current passing tests. During bounded reconstruction, one read returned asynchronously and one patch omitted its closing comma; neither mutated evidence or product source. A line-ending-only registry status also required index refresh after proving identical Git content.",
+      "rootCause": "Historical file-existence references outlived the retained worktree/binary lifecycle. The records and original hashes remained available in immutable commits and cleanup manifests.",
+      "prevention": "Retain all original incident content and point only the confirmed unavailable references to the exact provenance record with original paths, binary SHA-256 values and retained Git text-blob identities. Do not fabricate files, restore obsolete binaries unnecessarily, weaken checker behavior or count future OPPO images as historical originals. Capture fresh candidate-bound device evidence after source qualification. Preserve tool session IDs before parsing and verify complete patch context before edits.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["docs/quality/RETIRED-UI-EVIDENCE-20260905.md"]
+    },
+    {
       "id": "REG-20260806-001-MOOL-ROOT-NONINTERACTIVE",
       "status": "resolved_gate_active",
       "appliesTo": [
@@ -91552,7 +91582,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-payment-mvp-r64-11-review-20260902/redmi-r64-11-payment-confirmed.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -91574,7 +91604,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-payment-mvp-r64-11-review-20260902/redmi-r64-11-payment-confirmed.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -91596,7 +91626,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-payment-mvp-r64-11-review-20260902/redmi-r64-11-payment-confirmed.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -92184,7 +92214,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-payment-replacement-r64-12-review-20260903/redmi-r64-12-payment.png",
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md",
         "artifacts/quality/buy-payment-replacement-r64-12-review-20260903/redmi-r64-12-payment.xml"
       ]
     },
@@ -92207,7 +92237,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-payment-replacement-r64-12-review-20260903/redmi-r64-12-payment-cancelled.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -92447,7 +92477,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/uaw-buy-cursor-compact-storefront-r64.14-review-20260903-device-review-debug.apk",
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md",
         "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/uaw-buy-cursor-compact-storefront-r64.14-review-20260903-build-provenance.txt"
       ]
     },
@@ -92470,7 +92500,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -92492,7 +92522,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -92514,7 +92544,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -92536,7 +92566,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -92558,7 +92588,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -92620,7 +92650,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -92702,7 +92732,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-storefront-density-r64-15-review-20260903/uaw-buy-cursor-storefront-density-r64.15-review-20260903-device-review-debug.apk",
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md",
         "artifacts/quality/buy-storefront-density-r64-15-review-20260903/uaw-buy-cursor-storefront-density-r64.15-review-20260903-build-provenance.txt"
       ]
     },
@@ -92726,8 +92756,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-storefront-density-r64-15-review-20260903/redmi-r64-15-ask-store-chat.png",
-        "artifacts/quality/buy-storefront-density-r64-15-review-20260903/redmi-r64-15-chat-back-store.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -92771,7 +92800,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-store-chat-return-r64-17-review-20260903/redmi-r64-17-bulk-scoped-cart.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -92811,7 +92840,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-11-product-share-whatsapp-recipient.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -92912,7 +92941,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-31-invoice-download-result.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -93163,7 +93192,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-91-global-chat.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -93184,7 +93213,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-91-global-chat.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -93226,7 +93255,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-97-monthly-basket-added.png"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -93248,7 +93277,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-102-gst-form.png",
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md",
         "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-102-gst-form.xml"
       ]
     },
@@ -99279,7 +99308,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V1-20260904.md"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -99364,7 +99393,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V1-20260904.md"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -99409,7 +99438,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -99432,7 +99461,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -99454,7 +99483,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -99476,7 +99505,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -99561,7 +99590,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -99584,7 +99613,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -99628,7 +99657,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -99651,7 +99680,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {
@@ -99674,7 +99703,7 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "scripts/run-store-buy-diagnostic-evidence.ps1"
+        "docs/quality/RETIRED-UI-EVIDENCE-20260905.md"
       ]
     },
     {

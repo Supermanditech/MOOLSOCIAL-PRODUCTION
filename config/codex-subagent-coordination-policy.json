@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4454,
-    "sha256": "AB95438339A1C131B35CA967B98D2B44EA3D0A0093229D6EC69A9AC8B912CA46"
+    "entryCount": 4457,
+    "sha256": "EF27CB7D1096B40545FAE1B352680F58A2A5B3CEB234D4683D0C9519F6E21188"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -890,6 +890,27 @@
       "featureBranchesMustStartAtTag": true
     },
     "continuationBindings": [
+      {
+        "id": "codex_chat_commerce_identity_fix_v1_20260905",
+        "state": "founder_authorized_2026_09_05",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "chat-commerce-identity-fix-v1-20260905",
+        "ticketId": "UAW-CODEX-CHAT-COMMERCE-IDENTITY-FIX-V1-20260905",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-chat-commerce-identity-fix-v1-20260905",
+        "branch": "work/codex-ui/chat-commerce-identity-fix-v1-20260905",
+        "baselineHead": "30b9b8c7eb92b7ee688a40550a438175bb522e08",
+        "bootstrapCommitSubject": "coordination(chat-commerce-identity-fix-v1-20260905): bind authoritative Chat identity correction",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/UAW-CODEX-CHAT-COMMERCE-IDENTITY-FIX-V1-20260905.md",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
       {
         "id": "codex_social_runtime_core_20260825",
         "state": "founder_authorized_2026_08_25",
