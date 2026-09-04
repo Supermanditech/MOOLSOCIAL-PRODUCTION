@@ -124,10 +124,7 @@ void main() {
               '${benefit.title} ${benefit.detail}',
               isNot(
                 matches(
-                  RegExp(
-                    r'(₹|%|\bcode\b|\bunlock|\bredeem)',
-                    caseSensitive: false,
-                  ),
+                  RegExp(r'(\bcode\b|\bunlock|\bredeem)', caseSensitive: false),
                 ),
               ),
             );
@@ -156,7 +153,11 @@ void main() {
         hasLength(6),
       );
       expect(session.cartTotal, originalTotal);
-      expect(session.scopedPayableTotal, originalTotal);
+      expect(session.scopedCouponSaving, greaterThan(0));
+      expect(
+        session.scopedPayableTotal,
+        originalTotal - session.scopedCouponSaving,
+      );
       expect(
         adapter.benefitsFor(
           kind: BuyV2CartBenefitKind.coupon,
@@ -605,9 +606,21 @@ void main() {
         expect(session.chooseCartBenefit(coupon), isTrue);
         session.openCart(scope: BuyV2CartScope.shop);
         expect(session.openCheckout(), isTrue);
+        expect(session.continueCheckoutFromAddress(), isTrue);
+        expect(session.choosePayment('Cash on Delivery'), isTrue);
+        expect(session.continueCheckoutFromPayment(), isTrue);
         final expectedTotal = session.checkoutTotal - coupon.savingAmount;
 
-        expect(await session.submitOrder(), isTrue);
+        final submitted = await session.submitOrder();
+        expect(
+          submitted,
+          isTrue,
+          reason:
+              'notice=${session.notice}; '
+              'submission=${session.checkoutSubmissionState}; '
+              'promiseReview=${session.checkoutPromiseReviewRequired}; '
+              'benefits=${session.cartBenefitsLoadState}',
+        );
         expect(session.confirmedTotal, expectedTotal);
         expect(session.confirmedOrders.single.discount, coupon.savingAmount);
         expect(session.confirmedOrders.single.total, expectedTotal);

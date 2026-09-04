@@ -185,12 +185,11 @@ List<BuyV2CartBenefit> _deviceReviewBenefits(
       'Orders cannot own cart benefits.',
     ),
   };
-  final detail = switch (kind) {
-    BuyV2CartBenefitKind.coupon =>
-      'Eligibility and any saving are confirmed before payment.',
-    BuyV2CartBenefitKind.paymentOffer =>
-      'Choose a payment method at Checkout to check available benefits.',
-  };
+  final minimumSpend = destination == BuyV2Destination.wholesale ? 2500 : 499;
+  final savings = destination == BuyV2Destination.wholesale
+      ? const [150, 225, 300]
+      : const [40, 60, 75];
+  const paymentPartners = ['PhonePe', 'Paytm', 'Pine Labs'];
   return List.unmodifiable([
     for (var index = 0; index < titles.length; index++)
       BuyV2CartBenefit(
@@ -200,8 +199,29 @@ List<BuyV2CartBenefit> _deviceReviewBenefits(
         kind: kind,
         destination: destination,
         title: titles[index],
-        detail: detail,
+        detail: kind == BuyV2CartBenefitKind.coupon
+            ? 'Save ₹${savings[index]} on an eligible order of ₹$minimumSpend or more.'
+            : 'Save ₹${savings[index]} when you pay with ${paymentPartners[index]} on an order of ₹$minimumSpend or more.',
         sourceId: 'device-seed-v2',
+        strategy: kind == BuyV2CartBenefitKind.coupon
+            ? BuyV2CartBenefitStrategy.minimumOrder
+            : BuyV2CartBenefitStrategy.partnerCampaign,
+        sponsor: kind == BuyV2CartBenefitKind.coupon
+            ? destination == BuyV2Destination.wholesale
+                  ? BuyV2CartBenefitSponsor.wholesaler
+                  : BuyV2CartBenefitSponsor.retailer
+            : BuyV2CartBenefitSponsor.financialPartner,
+        sponsorName: kind == BuyV2CartBenefitKind.coupon
+            ? destination == BuyV2Destination.wholesale
+                  ? 'Participating wholesale suppliers'
+                  : 'Participating retail stores'
+            : paymentPartners[index],
+        savingAmount: savings[index],
+        validUntil: DateTime(2026, 9, 30),
+        minimumSpend: minimumSpend,
+        eligiblePaymentMethods: kind == BuyV2CartBenefitKind.paymentOffer
+            ? {paymentPartners[index]}
+            : const {},
       ),
   ]);
 }

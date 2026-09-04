@@ -253,13 +253,13 @@ class BuyV2Product {
 String buyV2PartnerRoleFor(BuyV2Destination destination, String sourceRole) {
   final normalized = sourceRole.toLowerCase();
   if (normalized.contains('manufacturer')) {
-    return 'Mool Manufacturer Partner';
+    return 'MoolSocial Fulfilment Partner';
   }
   return switch (destination) {
-    BuyV2Destination.shop => 'Mool Retail Partner',
-    BuyV2Destination.wholesale => 'Mool Trade Partner',
+    BuyV2Destination.shop => 'MoolSocial Fulfilment Store',
+    BuyV2Destination.wholesale => 'MoolSocial Fulfilment Partner',
     BuyV2Destination.medicine => 'Mool Pharmacy Partner',
-    BuyV2Destination.orders => 'Mool delivery partner',
+    BuyV2Destination.orders => 'MoolSocial Delivery Partner',
   };
 }
 
@@ -294,6 +294,7 @@ class BuyV2CartLine {
 
 class BuyV2FulfilmentGroup {
   const BuyV2FulfilmentGroup({
+    required this.groupKey,
     required this.destination,
     required this.partner,
     required this.partnerType,
@@ -305,6 +306,7 @@ class BuyV2FulfilmentGroup {
     this.deliveryServiceLevel,
   });
 
+  final String groupKey;
   final BuyV2Destination destination;
   final String partner;
   final String partnerType;
@@ -319,7 +321,7 @@ class BuyV2FulfilmentGroup {
 
   int get total => lines.fold(0, (total, line) => total + line.total);
 
-  String get key => '${destination.name}|$partner';
+  String get key => groupKey;
 
   List<String> get productIds =>
       lines.map((line) => line.product.id).toList(growable: false);
@@ -452,6 +454,7 @@ class BuyV2Order {
     this.productIds = const [],
     this.lines = const [],
     this.paymentMethod,
+    this.purchaseOrderReference,
     this.recipient,
     this.addressLine,
     this.deliveryInstruction,
@@ -498,6 +501,7 @@ class BuyV2Order {
   final List<String> productIds;
   final List<BuyV2CartLine> lines;
   final String? paymentMethod;
+  final String? purchaseOrderReference;
   final String? recipient;
   final String? addressLine;
   final String? deliveryInstruction;
@@ -910,9 +914,7 @@ abstract final class BuyV2Catalogue {
         wholesale ? seed.wholesaleCategory : seed.shopCategory,
       ),
       minimumOrder: wholesale ? _minimumOrder(seed.id) : 1,
-      returnPolicy: wholesale
-          ? seed.wholesaleReturnPolicy
-          : seed.shopReturnPolicy,
+      returnPolicy: _returnPolicy(seed, wholesale: wholesale),
       freightIncluded: wholesale,
       manufacturerVerified:
           wholesale && sellerType.toLowerCase().contains('manufacturer'),
@@ -938,6 +940,28 @@ abstract final class BuyV2Catalogue {
   }
 
   static String _wholesalePromise(String source) => source.trim();
+
+  static String _returnPolicy(
+    _BuyV2CommerceSeed seed, {
+    required bool wholesale,
+  }) {
+    if (wholesale) return seed.wholesaleReturnPolicy.trim();
+    final policy = seed.shopReturnPolicy.trim();
+    if (policy != 'Eligibility and return window shown before payment') {
+      return policy;
+    }
+    const perishableCategories = {
+      'fruits-vegetables',
+      'dairy-bakery',
+      'eggs-poultry',
+      'meat-seafood',
+      'frozen-foods',
+      'icecream-cheese',
+    };
+    return perishableCategories.contains(seed.shopCategory)
+        ? 'Refund or replacement within 24 hours for spoiled, damaged or incorrect unopened packs'
+        : 'Replacement within 7 days for damaged, defective or incorrect unopened packs';
+  }
 
   static String _supplierOrigin(String seller, String sellerType) {
     final name = seller.toLowerCase();

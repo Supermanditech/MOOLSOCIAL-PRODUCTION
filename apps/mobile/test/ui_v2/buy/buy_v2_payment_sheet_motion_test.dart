@@ -448,6 +448,15 @@ void main() {
       await tester.tap(
         find.byKey(const ValueKey('buy-checkout-primary-payment')),
       );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        find.byKey(const ValueKey('buy-payment-handoff-completed')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-payment-handoff-completed')),
+      );
       await tester.pumpAndSettle();
       expect(
         session.checkoutSubmissionState,

@@ -20,6 +20,28 @@ import 'buy_v2_invoice_downloader.dart';
 import 'buy_v2_scanner.dart';
 import 'buy_v2_views.dart';
 
+String buyV2CustomerPaymentProviderLabel(
+  String providerSlug, {
+  required String fallback,
+}) {
+  final normalized = providerSlug.trim().toLowerCase();
+  return switch (normalized) {
+    'phonepe' => 'PhonePe',
+    'paytm' => 'Paytm',
+    'pine-labs' || 'pinelabs' => 'Pine Labs',
+    _ when normalized.isNotEmpty =>
+      normalized
+          .split('-')
+          .map(
+            (part) => part.isEmpty
+                ? part
+                : '${part[0].toUpperCase()}${part.substring(1)}',
+          )
+          .join(' '),
+    _ => fallback,
+  };
+}
+
 class BuyV2Screen extends StatefulWidget {
   const BuyV2Screen({
     super.key,
@@ -81,8 +103,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   bool _scannerBusy = false;
   bool _searchOpen = false;
   bool _offersActive = false;
-  bool _quickTrackerMinimized = false;
+  bool _quickTrackerMinimized = true;
+  bool _quickTrackerHidden = false;
+  bool _quickTrackerSoundOnArrival = false;
   String? _presentedQuickOrderId;
+  BuyV2OrderStatus? _presentedQuickOrderStatus;
   BuyV2Product? _storeBrowseAnchor;
   BuyV2NavigationMotionDirection _surfaceMotionDirection =
       BuyV2NavigationMotionDirection.replace;
@@ -191,11 +216,21 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   void _sessionChanged() {
     if (!mounted) return;
     _surfaceMotionDirection = widget.session.navigationMotionDirection;
-    final quickOrderId = widget.session.activeQuickDeliveryOrder?.id;
+    final quickOrder = widget.session.activeQuickDeliveryOrder;
+    final quickOrderId = quickOrder?.id;
     if (quickOrderId != _presentedQuickOrderId) {
       _presentedQuickOrderId = quickOrderId;
-      _quickTrackerMinimized = false;
+      _presentedQuickOrderStatus = quickOrder?.status;
+      _quickTrackerMinimized = true;
+      _quickTrackerHidden = false;
+    } else if (_quickTrackerSoundOnArrival &&
+        quickOrder != null &&
+        quickOrder.status != _presentedQuickOrderStatus &&
+        (quickOrder.status == BuyV2OrderStatus.arriving ||
+            quickOrder.status == BuyV2OrderStatus.delivered)) {
+      unawaited(SystemSound.play(SystemSoundType.alert));
     }
+    _presentedQuickOrderStatus = quickOrder?.status;
     if (_offersActive &&
         widget.session.view == BuyV2View.catalogue &&
         widget.session.destination != BuyV2Destination.shop) {
@@ -499,13 +534,23 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               session.destination != BuyV2Destination.orders &&
                               session.destination != BuyV2Destination.medicine)
                             BuyV2ShoppingIntentBar(session: session),
-                          if (quickOrder != null)
+                          if (quickOrder != null && !_quickTrackerHidden)
                             _BuyQuickDeliveryStatusBar(
                               order: quickOrder,
                               minimized: _quickTrackerMinimized,
+                              soundOnArrival: _quickTrackerSoundOnArrival,
                               onMinimizedChanged: (value) => setState(
                                 () => _quickTrackerMinimized = value,
                               ),
+                              onHiddenChanged: (value) =>
+                                  setState(() => _quickTrackerHidden = value),
+                              onSoundChanged: (value) => setState(
+                                () => _quickTrackerSoundOnArrival = value,
+                              ),
+                              onKeepOnScreen: () => setState(() {
+                                _quickTrackerHidden = false;
+                                _quickTrackerMinimized = true;
+                              }),
                               onOpen: () => session.openTracking(quickOrder.id),
                             )
                           else if (quietOrder != null)
@@ -541,6 +586,42 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                                     ),
                                   ),
                                 ),
+                                if (quickOrder != null && _quickTrackerHidden)
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 4),
+                                      child: Semantics(
+                                        key: const ValueKey(
+                                          'buy-quick-delivery-status-hidden',
+                                        ),
+                                        label: 'Live delivery hidden',
+                                        button: true,
+                                        child: Material(
+                                          color: Colors.white,
+                                          shape: const CircleBorder(
+                                            side: BorderSide(
+                                              color: BuyV2Colors.royal,
+                                            ),
+                                          ),
+                                          child: IconButton(
+                                            key: const ValueKey(
+                                              'buy-quick-delivery-restore',
+                                            ),
+                                            tooltip: 'Restore live delivery',
+                                            onPressed: () => setState(
+                                              () => _quickTrackerHidden = false,
+                                            ),
+                                            color: BuyV2Colors.royal,
+                                            icon: const Icon(
+                                              Icons.bolt_rounded,
+                                              size: 20,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 if (session.notice case final message?)
                                   Positioned(
                                     right: 8,
@@ -550,8 +631,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               ],
                             ),
                           ),
-                          if (_showsMiniCart(session))
-                            _BuyMiniCartBar(session: session),
+                          if (!keyboardVisible && _showsMiniCart(session))
+                            _BuyMiniCartBar(
+                              session: session,
+                              aggregate: _offersActive,
+                            ),
                         ],
                       ),
                     ),
@@ -728,9 +812,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   bool _showsMiniCart(BuyV2Session session) =>
-      (session.activeDockDestination == BuyV2Destination.medicine
-              ? session.countForDestination(BuyV2Destination.medicine)
-              : session.itemCount) >
+      (_offersActive || session.activeDockDestination == BuyV2Destination.orders
+              ? session.itemCount
+              : session.countForDestination(session.activeDockDestination)) >
           0 &&
       (session.view == BuyV2View.product ||
           session.view == BuyV2View.catalogue);
@@ -878,6 +962,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         product,
         brandOnly: brandOnly,
         onAskStore: _openStoreQuestion,
+        onStoreChanged: (storeProduct) =>
+            setState(() => _storeBrowseAnchor = storeProduct),
         onOpenProduct: _openStoreProduct,
         onOpenCart: () => widget.session.openCart(
           scope: switch (product.destination) {
@@ -893,6 +979,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
 
   Future<bool> _openStoreProduct(BuyV2Product product) async {
     final session = widget.session;
+    if (_storeBrowseAnchor?.seller != product.seller) {
+      setState(() => _storeBrowseAnchor = product);
+    }
     final previousView = session.view;
     final previousDestination = session.destination;
     final previousProductId = session.selectedProductId;
@@ -918,14 +1007,17 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                           'Back to ${_storeBrowseAnchor?.seller ?? product.seller}',
                       onReturn: () => Navigator.of(routeContext).pop(false),
                       onAskSeller: _openProductQuestion,
+                      onOpenPartnerCatalogue: _openPartnerCatalogue,
                       wholesaleTradeDecisionAdapter:
                           widget.wholesaleTradeDecisionAdapter,
                     ),
                   ),
-                  BuyV2StoreCartBar(
-                    session: session,
-                    onOpenCart: () => Navigator.of(routeContext).pop(true),
-                  ),
+                  if (session.countForDestination(product.destination) > 0)
+                    BuyV2StoreCartBar(
+                      session: session,
+                      destination: product.destination,
+                      onOpenCart: () => Navigator.of(routeContext).pop(true),
+                    ),
                 ],
               ),
             ),
@@ -989,7 +1081,77 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   Future<bool> _openPaymentCollection(Uri uri) async {
     if (!uri.hasScheme || uri.host.isEmpty) return false;
     HapticFeedback.mediumImpact();
-    return true;
+    final providerSlug = uri.queryParameters['provider']?.trim() ?? '';
+    final provider = buyV2CustomerPaymentProviderLabel(
+      providerSlug,
+      fallback: widget.session.selectedPayment,
+    );
+    final reference = uri.queryParameters['reference'];
+    final completed = await showModalBottomSheet<bool>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(
+                Icons.lock_outline_rounded,
+                color: BuyV2Colors.navy,
+                size: 30,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Pay MoolSocial',
+                textAlign: TextAlign.center,
+                style: sheetContext.buyTitle.copyWith(fontSize: 20),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$provider · ${buyV2Money(widget.session.checkoutAmountDueNow)}',
+                textAlign: TextAlign.center,
+                style: sheetContext.buyBody.copyWith(
+                  color: BuyV2Colors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              if (reference?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 3),
+                Text(
+                  'Payment reference $reference',
+                  textAlign: TextAlign.center,
+                  style: sheetContext.buyMeta,
+                ),
+              ],
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                key: const ValueKey('buy-payment-handoff-completed'),
+                onPressed: () => Navigator.of(sheetContext).pop(true),
+                icon: const Icon(Icons.check_circle_outline_rounded),
+                label: const Text('Payment completed'),
+              ),
+              const SizedBox(height: 7),
+              OutlinedButton(
+                key: const ValueKey('buy-payment-handoff-not-completed'),
+                onPressed: () => Navigator.of(sheetContext).pop(false),
+                child: const Text('Payment not completed'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return completed ?? false;
   }
 
   Widget _currentView(BuyV2Session session) {
@@ -1090,145 +1252,202 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
   const _BuyQuickDeliveryStatusBar({
     required this.order,
     required this.minimized,
+    required this.soundOnArrival,
     required this.onMinimizedChanged,
+    required this.onHiddenChanged,
+    required this.onSoundChanged,
+    required this.onKeepOnScreen,
     required this.onOpen,
   });
 
   final BuyV2Order order;
   final bool minimized;
+  final bool soundOnArrival;
   final ValueChanged<bool> onMinimizedChanged;
+  final ValueChanged<bool> onHiddenChanged;
+  final ValueChanged<bool> onSoundChanged;
+  final VoidCallback onKeepOnScreen;
   final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final statusBar = Container(
-      key: ValueKey(
-        minimized
-            ? 'buy-quick-delivery-status-minimized'
-            : 'buy-quick-delivery-status-expanded',
-      ),
-      margin: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: BuyV2Colors.navy, width: 1.2),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000080),
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: minimized
-          ? Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    key: const ValueKey('buy-quick-delivery-open-minimized'),
-                    borderRadius: BorderRadius.circular(15),
-                    onTap: onOpen,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.bolt_rounded,
-                            color: BuyV2Colors.navy,
-                            size: 19,
-                          ),
-                          const SizedBox(width: 7),
-                          Expanded(
-                            child: Text(
-                              'Quick delivery · ${_buyOrderStatusLabel(order.status)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.buyBody.copyWith(fontSize: 10),
+    final collapsedWidth = (MediaQuery.sizeOf(context).width - 16)
+        .clamp(0.0, 236.0)
+        .toDouble();
+    final statusBar = minimized
+        ? Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              key: const ValueKey('buy-quick-delivery-status-minimized'),
+              width: collapsedWidth,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 34,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            key: const ValueKey(
+                              'buy-quick-delivery-open-minimized',
+                            ),
+                            onTap: onOpen,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.bolt_rounded,
+                                    color: BuyV2Colors.royal,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      '${_buyOrderStatusLabel(order.status)} · ${order.promise}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: BuyV2Colors.navy,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  key: const ValueKey('buy-quick-delivery-expand'),
-                  tooltip: 'Show delivery status',
-                  onPressed: () => onMinimizedChanged(false),
-                  icon: const Icon(Icons.expand_more_rounded),
-                  style: IconButton.styleFrom(minimumSize: const Size(44, 44)),
-                ),
-              ],
-            )
-          : Padding(
-              padding: const EdgeInsets.fromLTRB(11, 8, 4, 9),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: BuyV2Colors.softBlue,
-                          borderRadius: BorderRadius.circular(11),
                         ),
-                        child: const Icon(
-                          Icons.bolt_rounded,
-                          color: BuyV2Colors.navy,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: InkWell(
-                          key: const ValueKey('buy-quick-delivery-open'),
-                          onTap: onOpen,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Quick delivery',
-                                style: context.buyBody.copyWith(fontSize: 11),
-                              ),
-                              Text(
-                                '${_buyOrderStatusLabel(order.status)} · ${order.promise}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: context.buyMeta,
-                              ),
-                            ],
+                        IconButton(
+                          key: const ValueKey('buy-quick-delivery-expand'),
+                          tooltip: 'Show delivery choices',
+                          onPressed: () => onMinimizedChanged(false),
+                          icon: const Icon(Icons.expand_more_rounded, size: 18),
+                          color: BuyV2Colors.royal,
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(44, 34),
+                            padding: EdgeInsets.zero,
                           ),
                         ),
-                      ),
-                      IconButton(
-                        key: const ValueKey('buy-quick-delivery-minimize'),
-                        tooltip: 'Minimize delivery status',
-                        onPressed: () => onMinimizedChanged(true),
-                        icon: const Icon(Icons.remove_rounded),
-                        style: IconButton.styleFrom(
-                          minimumSize: const Size(44, 44),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 7),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 7),
-                    child: BuyV2HonestProgressIndicator(
-                      ownerId: order.id,
-                      progress: order.progress,
-                      statusLabel: _buyOrderStatusLabel(order.status),
-                      backgroundColor: BuyV2Colors.softBlue,
-                      valueColor: BuyV2Colors.navy,
-                      minHeight: 5,
+                      ],
                     ),
+                  ),
+                  BuyV2HonestProgressIndicator(
+                    ownerId: order.id,
+                    progress: order.progress,
+                    statusLabel: _buyOrderStatusLabel(order.status),
+                    backgroundColor: BuyV2Colors.softBlue,
+                    valueColor: BuyV2Colors.royal,
+                    minHeight: 2,
                   ),
                 ],
               ),
             ),
-    );
+          )
+        : Padding(
+            key: const ValueKey('buy-quick-delivery-status-expanded'),
+            padding: const EdgeInsets.fromLTRB(10, 5, 6, 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.bolt_rounded,
+                      color: BuyV2Colors.navy,
+                      size: 19,
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: InkWell(
+                        key: const ValueKey('buy-quick-delivery-open'),
+                        onTap: onOpen,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Quick delivery',
+                              style: context.buyBody.copyWith(fontSize: 10.5),
+                            ),
+                            Text(
+                              '${_buyOrderStatusLabel(order.status)} · ${order.promise}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.buyMeta,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      key: const ValueKey('buy-quick-delivery-minimize'),
+                      tooltip: 'Minimize delivery status',
+                      onPressed: () => onMinimizedChanged(true),
+                      icon: const Icon(Icons.expand_less_rounded, size: 18),
+                      color: BuyV2Colors.navy,
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(44, 44),
+                      ),
+                    ),
+                  ],
+                ),
+                BuyV2HonestProgressIndicator(
+                  ownerId: order.id,
+                  progress: order.progress,
+                  statusLabel: _buyOrderStatusLabel(order.status),
+                  backgroundColor: BuyV2Colors.softBlue,
+                  valueColor: BuyV2Colors.navy,
+                  minHeight: 4,
+                ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      key: const ValueKey('buy-quick-delivery-keep'),
+                      onPressed: onKeepOnScreen,
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                      ),
+                      icon: const Icon(Icons.push_pin_outlined, size: 15),
+                      label: const Text('Keep'),
+                    ),
+                    FilterChip(
+                      key: const ValueKey('buy-quick-delivery-sound'),
+                      selected: soundOnArrival,
+                      onSelected: onSoundChanged,
+                      selectedColor: BuyV2Colors.navy,
+                      backgroundColor: Colors.white,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.padded,
+                      side: const BorderSide(color: BuyV2Colors.navy),
+                      labelStyle: TextStyle(
+                        color: soundOnArrival ? Colors.white : BuyV2Colors.navy,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      label: const Text('Arrival sound'),
+                    ),
+                    TextButton.icon(
+                      key: const ValueKey('buy-quick-delivery-hide'),
+                      onPressed: () => onHiddenChanged(true),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                      ),
+                      icon: const Icon(Icons.visibility_off_outlined, size: 15),
+                      label: const Text('Hide'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
     if (MediaQuery.disableAnimationsOf(context)) return statusBar;
     return AnimatedSize(
       duration: BuyV2Motion.expandCollapse,
@@ -1264,6 +1483,7 @@ class _BuyQuietDeliveryStatusBar extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(
                     Icons.local_shipping_outlined,
@@ -1274,8 +1494,8 @@ class _BuyQuietDeliveryStatusBar extends StatelessWidget {
                   Expanded(
                     child: Text(
                       '${_buyOrderStatusLabel(order.status)} · ${order.promise}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                      overflow: TextOverflow.clip,
                       style: context.buyMeta.copyWith(
                         color: BuyV2Colors.navy,
                         fontWeight: FontWeight.w800,
@@ -1667,163 +1887,104 @@ class _BuySearchBand extends StatelessWidget {
 }
 
 class _BuyMiniCartBar extends StatelessWidget {
-  const _BuyMiniCartBar({required this.session});
+  const _BuyMiniCartBar({required this.session, this.aggregate = false});
 
   final BuyV2Session session;
+  final bool aggregate;
 
   @override
   Widget build(BuildContext context) {
-    final medicineScoped =
-        session.activeDockDestination == BuyV2Destination.medicine;
-    final itemCount = medicineScoped
-        ? session.countForDestination(BuyV2Destination.medicine)
-        : session.itemCount;
-    final total = medicineScoped
-        ? session.totalForDestination(BuyV2Destination.medicine)
-        : session.cartTotal;
+    final destination = session.activeDockDestination;
+    final scope = aggregate
+        ? BuyV2CartScope.all
+        : switch (destination) {
+            BuyV2Destination.shop => BuyV2CartScope.shop,
+            BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+            BuyV2Destination.medicine => BuyV2CartScope.medicine,
+            BuyV2Destination.orders => BuyV2CartScope.all,
+          };
+    final itemCount = aggregate || destination == BuyV2Destination.orders
+        ? session.itemCount
+        : session.countForDestination(destination);
+    final total = aggregate || destination == BuyV2Destination.orders
+        ? session.cartTotal
+        : session.totalForDestination(destination);
     final itemLabel = itemCount == 1 ? 'item' : 'items';
-    final cartMessage = medicineScoped
-        ? '$itemCount $itemLabel ready'
-        : session.cartAcknowledgement ?? '$itemCount $itemLabel ready';
+    final cartMessage =
+        session.cartAcknowledgement ?? '$itemCount $itemLabel ready';
     const title = 'Cart';
     void activate() {
       HapticFeedback.selectionClick();
-      session.openCart(
-        scope: medicineScoped ? BuyV2CartScope.medicine : BuyV2CartScope.all,
-      );
+      session.openCart(scope: scope);
     }
 
-    return Semantics(
-      key: const ValueKey('buy-compact-cart-indicator'),
-      label: '$title, $cartMessage, ${buyV2Money(total)}. View cart',
-      button: true,
-      liveRegion: true,
-      excludeSemantics: true,
-      onTap: activate,
-      child: Material(
-        color: Colors.white,
-        child: InkWell(
-          onTap: activate,
-          child: Container(
-            height: 64,
-            margin: const EdgeInsets.fromLTRB(10, 5, 10, 5),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF111A36), BuyV2Colors.navy],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 3, 8, 3),
+        child: SizedBox(
+          width: 64,
+          height: 44,
+          child: Semantics(
+            key: const ValueKey('buy-compact-cart-indicator'),
+            container: true,
+            label: '$title, $cartMessage, ${buyV2Money(total)}. View cart',
+            button: true,
+            liveRegion: true,
+            onTap: activate,
+            child: Material(
+              color: BuyV2Colors.navy,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: BuyV2Colors.royal),
               ),
-              borderRadius: BorderRadius.circular(19),
-              border: Border.all(color: Colors.white24),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x2B000050),
-                  blurRadius: 14,
-                  offset: Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .13),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white24),
-                  ),
-                  child: const Icon(
-                    Icons.shopping_cart_outlined,
-                    color: BuyV2Colors.orange,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Column(
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: activate,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      AnimatedSwitcher(
+                        duration: BuyV2Motion.resolved(
+                          context,
+                          BuyV2Motion.stateChange,
+                        ),
+                        child: Icon(
+                          session.cartAcknowledgement == null
+                              ? Icons.shopping_cart_outlined
+                              : Icons.check_circle_rounded,
+                          key: ValueKey(
+                            session.cartAcknowledgement == null
+                                ? 'buy-mini-cart-icon'
+                                : 'buy-mini-cart-added-icon',
+                          ),
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      BuyV2FiniteValueTransition(
+                        key: ValueKey(
+                          session.cartAcknowledgement == null
+                              ? 'buy-cart-summary'
+                              : 'buy-cart-acknowledgement',
+                        ),
+                        stateKey: '$cartMessage|$itemCount|$total',
+                        text: '$itemCount',
+                        ownerSize: const Size(20, 20),
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          return BuyV2FiniteValueTransition(
-                            key: ValueKey(
-                              session.cartAcknowledgement == null
-                                  ? 'buy-cart-summary'
-                                  : 'buy-cart-acknowledgement',
-                            ),
-                            stateKey: '$cartMessage|$itemCount|$total',
-                            text: cartMessage,
-                            ownerSize: Size(constraints.maxWidth, 14),
-                            textAlign: TextAlign.start,
-                            duration: BuyV2Motion.contentChange,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          );
-                        },
-                      ),
                     ],
                   ),
                 ),
-                BuyV2FiniteValueTransition(
-                  key: const ValueKey('buy-mini-cart-total-motion'),
-                  stateKey: total,
-                  text: buyV2Money(total),
-                  ownerSize: const Size(74, 24),
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(width: 9),
-                Container(
-                  height: 38,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: BuyV2Colors.orange,
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'View cart',
-                        style: TextStyle(
-                          color: BuyV2Colors.navy,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      SizedBox(width: 1),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: BuyV2Colors.navy,
-                        size: 18,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),

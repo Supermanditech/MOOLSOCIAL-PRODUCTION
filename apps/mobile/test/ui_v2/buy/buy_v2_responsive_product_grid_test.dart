@@ -76,7 +76,7 @@ void main() {
             reason: '$size product $index fully visible',
           );
         }
-        expect(firstRect.height, inInclusiveRange(254, 256));
+        expect(firstRect.height, inInclusiveRange(235, 239));
 
         final title = tester.widget<Text>(
           find
@@ -171,7 +171,7 @@ void main() {
       findsOneWidget,
     );
     final firstCard = find.byKey(ValueKey('buy-product-${products[0].id}'));
-    expect(tester.getSize(firstCard).height, inInclusiveRange(318, 320));
+    expect(tester.getSize(firstCard).height, inInclusiveRange(295, 299));
     final add = find.descendant(
       of: firstCard,
       matching: find.byKey(ValueKey('buy-add-shell-${products[0].id}')),
@@ -228,7 +228,7 @@ void main() {
       final card = find.byKey(ValueKey('buy-product-${products[index].id}'));
       expect(card, findsOneWidget);
       expect(tester.getSize(card).width, greaterThanOrEqualTo(160));
-      expect(tester.getSize(card).height, inInclusiveRange(254, 256));
+      expect(tester.getSize(card).height, inInclusiveRange(235, 239));
     }
     expect(tester.takeException(), isNull);
   });
@@ -260,7 +260,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: card, matching: find.text(product.sellerType)),
+        find.descendant(of: card, matching: find.text('Retailer')),
         findsOneWidget,
       );
       expect(
@@ -311,7 +311,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: card, matching: find.text(product.sellerType)),
+        find.descendant(of: card, matching: find.text('Retailer')),
         findsOneWidget,
       );
       expect(

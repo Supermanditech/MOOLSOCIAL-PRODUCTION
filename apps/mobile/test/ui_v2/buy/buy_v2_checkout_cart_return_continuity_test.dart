@@ -792,11 +792,10 @@ void main() {
       expect(session.openCheckout(), isTrue);
       advanceCheckoutToConfirm(session);
       await tester.pumpAndSettle();
-      expect(find.textContaining('Dispatch · Dispatch within'), findsOneWidget);
-      expect(
-        find.textContaining('Delivery provider · Rajasthan Freight Network'),
-        findsOneWidget,
-      );
+      expect(find.text('Dispatches'), findsOneWidget);
+      expect(find.text('Dispatch within one business day'), findsOneWidget);
+      expect(find.text('Handled by'), findsOneWidget);
+      expect(find.text('Rajasthan Freight Network'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       expect(await _submitAndCompleteReviewPayment(session), isTrue);

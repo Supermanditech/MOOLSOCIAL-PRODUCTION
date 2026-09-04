@@ -289,7 +289,7 @@ void main() {
       expect(BuyV2Catalogue.medicineCategories.length, 14);
       expect(
         sha256.convert(utf8.encode(buyV2CommerceSeedRows.trim())).toString(),
-        'bc099e5a1f27fc033259b94ccd0f4be5d40fedcca96bdc14be38b792ce16c0e0',
+        'b591438729cd4d0eb2a44101ffd6701c7892abd6e53596f9d1019b322e7e30ac',
       );
 
       const approvedCommerceIds = <String>[
@@ -464,7 +464,7 @@ void main() {
 
     test('maps every Buy offer to a customer-facing partner role', () {
       for (final product in BuyV2Catalogue.products) {
-        expect(product.partnerRole, startsWith('Mool '), reason: product.id);
+        expect(product.partnerRole, startsWith('Mool'), reason: product.id);
         expect(
           product.partnerRole.toLowerCase(),
           isNot(contains('verified')),
@@ -1015,11 +1015,13 @@ void main() {
       expect(confirmed.id, startsWith('MS-NEW-'));
       expect(confirmed.productIds, {shop.id, secondShop.id});
       expect(session.orders.first.id, confirmed.id);
+      session.rememberCartScrollOffset(BuyV2CartScope.shop, 640);
 
       session.reorder(confirmed);
 
       expect(session.view, BuyV2View.cart);
       expect(session.cartScope, BuyV2CartScope.shop);
+      expect(session.cartScrollOffsetFor(BuyV2CartScope.shop), 0);
       expect(session.cartLines.map((line) => line.product.id).toSet(), {
         shop.id,
         secondShop.id,
@@ -1490,6 +1492,7 @@ void main() {
         'PhonePe',
         'Paytm',
         'Pine Labs',
+        'Cash on Delivery',
         'Purchase order',
       });
     });
@@ -1707,6 +1710,70 @@ void main() {
         expect(restored.availableProductsOnly, isTrue);
       },
     );
+
+    test('confirmed order survives a customer-session restart', () async {
+      final store = _MemoryCustomerStateStore('account-orders');
+      final first = BuyV2Session(core: BuySession(), customerStateStore: store);
+      addTearDown(first.dispose);
+      final product = first.product('s-tomato');
+
+      expect(first.addProduct(product.id), isTrue);
+      first.openCart(scope: BuyV2CartScope.shop);
+      expect(first.openCheckout(), isTrue);
+      expect(first.continueCheckoutFromAddress(), isTrue);
+      expect(first.choosePayment('Cash on Delivery'), isTrue);
+      expect(first.continueCheckoutFromPayment(), isTrue);
+      expect(await first.submitOrder(), isTrue);
+      expect(first.confirmedOrders, isNotEmpty);
+      final orderId = first.confirmedOrders.first.id;
+      await Future<void>.delayed(Duration.zero);
+
+      final restored = BuyV2Session(
+        core: BuySession(),
+        customerStateStore: store,
+      );
+      addTearDown(restored.dispose);
+      await restored.restoreCustomerState();
+
+      expect(restored.orders.any((order) => order.id == orderId), isTrue);
+      expect(
+        restored.productsForOrder(
+          restored.orders.firstWhere((order) => order.id == orderId),
+        ),
+        isNotEmpty,
+      );
+    });
+
+    test('delivery refinement keeps the visible Shop segment truthful', () {
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+
+      session.chooseShopSaleType(BuyV2ShopSaleType.courier);
+      session.chooseFulfilmentMode(BuyV2FulfilmentMode.quickLocal);
+
+      expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
+      expect(
+        session.catalogueSaleTypeProducts.every(
+          (product) =>
+              session.fulfilmentModeFor(product) ==
+              BuyV2FulfilmentMode.quickLocal,
+        ),
+        isTrue,
+      );
+    });
+
+    test('closed and no-products stores cannot add unavailable products', () {
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      final closedProduct = session.product('s-dog-food');
+      final unavailableProduct = session.product('s-shampoo');
+
+      expect(session.addProduct(closedProduct.id), isFalse);
+      expect(session.notice, contains('closed'));
+      expect(session.partnerCatalogueFor(unavailableProduct), isEmpty);
+      expect(session.addProduct(unavailableProduct.id), isFalse);
+      expect(session.notice, 'This product is unavailable right now.');
+    });
 
     test(
       'payment handoff locks one attempt and reconciliation confirms once',
@@ -2099,6 +2166,7 @@ void main() {
           fixture.session.orderRefreshMessage(fixture.order.id),
           'Order identity could not be verified.',
         );
+        expect(fixture.session.notice, isNull);
       },
     );
 
@@ -2131,13 +2199,13 @@ void main() {
     test(
       'stock recovery identifies one product and revalidates without ordering',
       () async {
-        final facts = _MutableCommerceFactsAdapter()
-          ..orderabilityLabel = 'Out of stock';
+        final facts = _MutableCommerceFactsAdapter();
         final fixture = await _openProductionCheckout(
           outcome: BuyV2OrderPlacementOutcome.failed,
           factsAdapter: facts,
         );
         addTearDown(fixture.session.dispose);
+        facts.orderabilityLabel = 'Out of stock';
 
         expect(await fixture.session.submitOrder(), isFalse);
         expect(fixture.adapter.placementCalls, 0);
@@ -2264,6 +2332,25 @@ void main() {
         isTrue,
       );
       expect(session.itemCount, itemCount);
+    });
+
+    test('placed Shop order distinguishes products from item quantity', () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+
+      expect(session.addProduct('s-tomato'), isTrue);
+      session.increase('s-tomato');
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.confirmOrder(), isTrue);
+
+      expect(session.confirmedOrders, hasLength(1));
+      expect(
+        session.confirmedOrders.single.itemSummary,
+        startsWith('1 product · 2 items ·'),
+      );
     });
   });
 }

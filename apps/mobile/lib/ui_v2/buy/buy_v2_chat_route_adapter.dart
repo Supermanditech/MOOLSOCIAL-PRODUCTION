@@ -193,6 +193,7 @@ class BuyV2ChatRouteAdapter {
         'minimumOrder': product.minimumOrder.toString(),
         'delivery': product.deliveryPromise,
         'origin': product.origin,
+        'productLink': _productLink(product),
         'productSnapshot': jsonEncode(_productSnapshot(product)),
         'policy':
             ?(_clean(protection?.summary) ?? _clean(product.returnPolicy)),
@@ -297,6 +298,7 @@ class BuyV2ChatRouteAdapter {
       'Unit price: ${product.unitPrice}',
       if (product.mrp case final mrp?) 'MRP: ${buyV2Money(mrp)}',
       'Delivery: ${product.deliveryPromise}',
+      'Product link: ${_productLink(product)}',
       if (_clean(compliance?.genericName) case final value?)
         'Generic name: $value',
       if (_clean(compliance?.netQuantity) case final value?)
@@ -315,6 +317,12 @@ class BuyV2ChatRouteAdapter {
         'Warranty: $value',
     ].join('\n');
   }
+
+  String _productLink(BuyV2Product product) => Uri.https(
+    'moolsocial.app',
+    '/app/buy',
+    {'sub': product.destination.name, 'view': 'product', 'product': product.id},
+  ).toString();
 
   String _orderHelpDraft(BuyV2Order order) {
     return [

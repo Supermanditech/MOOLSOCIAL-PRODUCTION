@@ -765,12 +765,18 @@ final class BuyV2CatalogueProductFactsAdapter
 
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final closedForReview = product.seller == 'Pet Family Store';
+    final noProductsForReview = product.seller == 'Beauty Supply';
     return BuyV2ProductFactsSnapshot(
       productId: product.id,
       price: product.price,
       deliveryPromise: product.deliveryPromise,
       partner: product.seller,
-      orderabilityLabel: product.requiresPrescription
+      orderabilityLabel: closedForReview
+          ? 'Store closed'
+          : noProductsForReview
+          ? 'Products unavailable'
+          : product.requiresPrescription
           ? 'Prescription required'
           : 'Available to add',
       sourceId: 'approved-buy-catalogue',
@@ -778,8 +784,11 @@ final class BuyV2CatalogueProductFactsAdapter
       storeOperatingState:
           product.destination == BuyV2Destination.shop ||
               product.destination == BuyV2Destination.wholesale
-          ? BuyV2StoreOperatingState.open
+          ? closedForReview
+                ? BuyV2StoreOperatingState.closed
+                : BuyV2StoreOperatingState.open
           : BuyV2StoreOperatingState.unknown,
+      nextOpeningLabel: closedForReview ? 'tomorrow at 8:00 am' : null,
     );
   }
 }

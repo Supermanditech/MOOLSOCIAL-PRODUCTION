@@ -113,7 +113,22 @@ void main() {
       expect(find.text(product.title), findsOneWidget);
       expect(find.text(buyV2Money(product.price * 2)), findsWidgets);
     }
-    expect(find.text('Delivery 1 · 2 products · 4 packs'), findsOneWidget);
+    final groups = session.checkoutFulfilmentGroups;
+    expect(groups, isNotEmpty);
+    for (var index = 0; index < groups.length; index += 1) {
+      final group = groups[index];
+      final products =
+          '${group.lines.length} '
+          '${group.lines.length == 1 ? 'product' : 'products'}';
+      final packs =
+          '${group.itemCount} '
+          '${group.itemCount == 1 ? 'pack' : 'packs'}';
+      expect(
+        find.text('Shipment ${index + 1} · $products · $packs'),
+        findsOneWidget,
+      );
+    }
+    expect(groups.fold<int>(0, (total, group) => total + group.itemCount), 4);
     expect(tester.takeException(), isNull);
   });
 

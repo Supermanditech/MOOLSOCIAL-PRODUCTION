@@ -195,9 +195,19 @@ final class _BuyV2DeviceReviewCommerceAdapter implements BuyV2CommerceAdapter {
     businessVerified: true,
     businessVerificationState: BuyV2BusinessVerificationState.verified,
     productReportsAvailable: true,
-    reviewableProductIds: BuyV2Catalogue.allProducts
-        .map((product) => product.id)
-        .toSet(),
+    reviewableProductIds: const {
+      's-tomato',
+      's-atta',
+      's-oil',
+      's-rice',
+      's-soap',
+      's-notebook',
+      's-onion',
+      's-banana',
+      'w-rice',
+      'w-oil',
+      'w-notebook',
+    },
   );
 
   @override
@@ -333,7 +343,7 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2CartBenefitsAdapter? cartBenefitsAdapter,
     this.tipPolicy = const BuyV2DisabledTipPolicy(),
     this.savedProductsStore,
-    this.customerStateStore,
+    BuyV2CustomerStateStore? customerStateStore,
     BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore,
     this.commercialPaymentTermsAdapter,
     this.checkoutQuoteAdapter,
@@ -352,6 +362,11 @@ class BuyV2Session extends ChangeNotifier {
        reviewDataEnabled =
            reviewDataEnabled ??
            (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled),
+       customerStateStore =
+           customerStateStore ??
+           (buyV2DeviceReviewBenefitSeedsEnabled
+               ? createBuyV2DeviceReviewCustomerStateStore()
+               : null),
        gstInvoiceProfileStore =
            gstInvoiceProfileStore ??
            ((reviewDataEnabled ??
@@ -384,7 +399,9 @@ class BuyV2Session extends ChangeNotifier {
       _businessVerificationState = BuyV2BusinessVerificationState.verified;
       _productReportsAvailable = true;
       _reviewableProductIds.addAll(
-        BuyV2Catalogue.allProducts.map((product) => product.id),
+        _orders
+            .where((order) => order.status == BuyV2OrderStatus.delivered)
+            .expand((order) => order.productIds),
       );
     }
     if (!this.reviewDataEnabled) {
@@ -432,6 +449,7 @@ class BuyV2Session extends ChangeNotifier {
     'PhonePe',
     'Paytm',
     'Pine Labs',
+    'Cash on Delivery',
     'Purchase order',
   };
 
@@ -523,6 +541,7 @@ class BuyV2Session extends ChangeNotifier {
   bool trackingAlertsAvailable = true;
   bool trackingAlertsBusy = false;
   String selectedPayment = 'PhonePe';
+  String purchaseOrderReference = '';
 
   bool get purchaseOrderEligibleForCheckout {
     final lines = checkoutLines;
@@ -533,8 +552,24 @@ class BuyV2Session extends ChangeNotifier {
         );
   }
 
+  bool get purchaseOrderDetailsComplete =>
+      purchaseOrderReference.trim().length >= 3;
+
+  bool get cashOnDeliveryEligibleForCheckout {
+    final lines = checkoutLines;
+    return lines.isNotEmpty &&
+        lines.every(
+          (line) => line.product.destination == BuyV2Destination.shop,
+        ) &&
+        checkoutAmountDueNow <= 5000;
+  }
+
   static const purchaseOrderEligibilityMessage =
-      'Purchase order requires a verified business Workspace and a wholesale-only basket.';
+      'Purchase order requires a confirmed business account and a wholesale-only basket.';
+  static const purchaseOrderDetailsMessage =
+      'Enter the purchase order reference used by your business.';
+  static const cashOnDeliveryEligibilityMessage =
+      'Cash on Delivery is available for eligible Shop orders up to ₹5,000.';
 
   int _navigationMotionSequence = 0;
   BuyV2NavigationMotionDirection _navigationMotionDirection =
@@ -777,7 +812,7 @@ class BuyV2Session extends ChangeNotifier {
       itemSummary: '13 products · Home · Sardarpura',
       total: 4839,
       partner: 'Sardarpura Supermart',
-      partnerType: 'Mool Retail Partner',
+      partnerType: 'MoolSocial Fulfilment Store',
       promise: 'Delivery schedule awaiting live confirmation',
       destinationLabel: 'Sardarpura · 342003',
       progress: .54,
@@ -790,9 +825,9 @@ class BuyV2Session extends ChangeNotifier {
       itemSummary: '1 trade product · Work receiving · Basni',
       total: 4200,
       partner: 'Marwar Foods Distribution',
-      partnerType: 'Mool Trade Partner',
+      partnerType: 'MoolSocial Fulfilment Partner',
       buyerName: 'Shree Balaji Retail',
-      buyerType: 'Verified retailer Workspace',
+      buyerType: 'Retailer business',
       paymentMethod: 'Bank transfer',
       paymentTermLabel: 'Booking amount with balance at delivery',
       amountPaidNow: 1260,
@@ -801,7 +836,7 @@ class BuyV2Session extends ChangeNotifier {
       paymentStatusLabel: 'Booking amount paid · balance due at delivery',
       promise: 'Supplier delivery schedule awaiting confirmation',
       destinationLabel: 'Basni · 342005',
-      progress: .34,
+      progress: .2,
       status: BuyV2OrderStatus.confirmed,
     ),
     const BuyV2Order(
@@ -824,11 +859,21 @@ class BuyV2Session extends ChangeNotifier {
       itemSummary: '8 products · Home · Sardarpura',
       total: 2186,
       partner: 'Sardarpura Supermart',
-      partnerType: 'Mool Retail Partner',
+      partnerType: 'MoolSocial Fulfilment Store',
       promise: 'Delivered · 25 Jul · 6:42 pm',
       destinationLabel: 'Sardarpura · 342003',
       progress: 1,
       status: BuyV2OrderStatus.delivered,
+      productIds: [
+        's-tomato',
+        's-atta',
+        's-oil',
+        's-rice',
+        's-soap',
+        's-notebook',
+        's-onion',
+        's-banana',
+      ],
     ),
     const BuyV2Order(
       id: 'PO-240728',
@@ -837,9 +882,9 @@ class BuyV2Session extends ChangeNotifier {
       itemSummary: '3 trade products · Work receiving · Basni',
       total: 8460,
       partner: 'Marwar Foods Distribution',
-      partnerType: 'Mool Trade Partner',
+      partnerType: 'MoolSocial Fulfilment Partner',
       buyerName: 'Shree Balaji Retail',
-      buyerType: 'Verified retailer Workspace',
+      buyerType: 'Retailer business',
       paymentMethod: 'Bank transfer',
       paymentTermLabel: 'Full advance',
       amountPaidNow: 8460,
@@ -848,6 +893,7 @@ class BuyV2Session extends ChangeNotifier {
       destinationLabel: 'Basni · 342005',
       progress: 1,
       status: BuyV2OrderStatus.delivered,
+      productIds: ['w-rice', 'w-oil', 'w-notebook'],
     ),
     const BuyV2Order(
       id: 'RX-240719',
@@ -883,13 +929,6 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    if (reviewDataEnabled) {
-      _orderRefreshStates[orderId] = BuyV2CommerceLoadState.ready;
-      _orderRefreshMessages[orderId] = 'Order is up to date.';
-      notice = 'Order is up to date.';
-      notifyListeners();
-      return true;
-    }
     if (!_orderRefreshBusyIds.add(orderId)) return false;
     _orderRefreshStates[orderId] = BuyV2CommerceLoadState.loading;
     _orderRefreshMessages.remove(orderId);
@@ -910,7 +949,7 @@ class BuyV2Session extends ChangeNotifier {
       if (!valid) {
         _orderRefreshStates[orderId] = result.state;
         _orderRefreshMessages[orderId] = result.customerMessage;
-        notice = result.customerMessage;
+        notice = null;
         return false;
       }
       _orders[index] = refreshed;
@@ -922,7 +961,7 @@ class BuyV2Session extends ChangeNotifier {
       _orderRefreshStates[orderId] = BuyV2CommerceLoadState.offline;
       _orderRefreshMessages[orderId] =
           'Order could not refresh. Check your connection and try again.';
-      notice = _orderRefreshMessages[orderId];
+      notice = null;
       return false;
     } finally {
       _orderRefreshBusyIds.remove(orderId);
@@ -1459,12 +1498,7 @@ class BuyV2Session extends ChangeNotifier {
   Future<BuyV2AddressRequestResult> createAddressRequest({
     String recipient = '',
   }) async {
-    final result = await commerceAdapter.createAddressRequest(
-      recipient: recipient.trim(),
-    );
-    notice = result.customerMessage;
-    notifyListeners();
-    return result;
+    return commerceAdapter.createAddressRequest(recipient: recipient.trim());
   }
 
   List<BuyV2Category> get categories => switch (destination) {
@@ -1670,11 +1704,6 @@ class BuyV2Session extends ChangeNotifier {
 
   List<BuyV2Product> get catalogueSaleTypeProducts {
     final products = _resolveVisibleProducts(limit: false);
-    if (query.trim().isNotEmpty ||
-        selectedFilter != null ||
-        activeShoppingIntent != null) {
-      return products;
-    }
     final partitioned = products
         .where((product) {
           return switch (destination) {
@@ -1893,6 +1922,17 @@ class BuyV2Session extends ChangeNotifier {
           quantity: entry.value,
         );
       }
+      for (final order in snapshot.orders.reversed) {
+        final validOrder =
+            order.destination != BuyV2Destination.orders &&
+            order.id.trim().isNotEmpty &&
+            order.total >= 0 &&
+            order.progress.isFinite &&
+            order.progress >= 0 &&
+            order.progress <= 1 &&
+            !_orders.any((existing) => existing.id == order.id);
+        if (validOrder) _orders.insert(0, order);
+      }
       _addresses
         ..clear()
         ..addAll(snapshot.addresses);
@@ -1914,6 +1954,7 @@ class BuyV2Session extends ChangeNotifier {
           availablePaymentMethods.contains(storedPayment)) {
         selectedPayment = storedPayment;
       }
+      purchaseOrderReference = snapshot.purchaseOrderReference ?? '';
       _checkoutIdempotencyKey = snapshot.checkoutIdempotencyKey;
       _paymentReference = snapshot.paymentReference;
       _paymentActionUri = snapshot.paymentActionUri;
@@ -2014,6 +2055,9 @@ class BuyV2Session extends ChangeNotifier {
       savedProductKeys: Set.unmodifiable(_savedKeys),
       deliveryInstructionIds: Map.unmodifiable(_deliveryInstructionIds),
       selectedPayment: selectedPayment.isEmpty ? null : selectedPayment,
+      purchaseOrderReference: purchaseOrderReference.trim().isEmpty
+          ? null
+          : purchaseOrderReference.trim(),
       checkoutIdempotencyKey: _checkoutIdempotencyKey,
       paymentReference: _paymentReference,
       paymentActionUri: _paymentActionUri,
@@ -2031,6 +2075,13 @@ class BuyV2Session extends ChangeNotifier {
         for (final entry in _recentSearches.entries)
           entry.key: List<String>.unmodifiable(entry.value),
       }),
+      orders: List.unmodifiable(
+        _orders.where(
+          (order) =>
+              order.purchaseId?.trim().isNotEmpty == true ||
+              order.id.contains('-NEW-'),
+        ),
+      ),
     );
     unawaited(
       store
@@ -2080,6 +2131,9 @@ class BuyV2Session extends ChangeNotifier {
   int countForDestination(BuyV2Destination value) => _cart.values
       .where((line) => line.product.destination == value)
       .fold(0, (total, line) => total + line.quantity);
+
+  int productCountForDestination(BuyV2Destination value) =>
+      _cart.values.where((line) => line.product.destination == value).length;
 
   int totalForDestination(BuyV2Destination value) => _cart.values
       .where((line) => line.product.destination == value)
@@ -2143,7 +2197,13 @@ class BuyV2Session extends ChangeNotifier {
     final grouped = <String, List<BuyV2CartLine>>{};
     for (final line in lines) {
       final product = line.product;
-      final key = '${product.destination.name}|${product.seller}';
+      final facts = productFactsFor(product);
+      final mode = fulfilmentModeFor(product);
+      final promise = facts.deliveryPromise.trim().toLowerCase();
+      final promisedBy = facts.promisedByLabel?.trim().toLowerCase() ?? '';
+      final key =
+          '${product.destination.name}|${product.seller}|'
+          '${mode.name}|$promise|$promisedBy';
       grouped.putIfAbsent(key, () => []).add(line);
     }
     return grouped.values
@@ -2171,10 +2231,17 @@ class BuyV2Session extends ChangeNotifier {
               .whereType<String>()
               .where((value) => value.isNotEmpty)
               .toSet();
+          final firstProduct = lines.first.product;
+          final stableProductIds =
+              lines.map((line) => line.product.id).toList(growable: false)
+                ..sort();
           return BuyV2FulfilmentGroup(
-            destination: lines.first.product.destination,
-            partner: lines.first.product.seller,
-            partnerType: lines.first.product.partnerRole,
+            groupKey:
+                '${firstProduct.destination.name}|${firstProduct.seller}|'
+                '${fulfilmentModeFor(firstProduct).name}|${stableProductIds.join(',')}',
+            destination: firstProduct.destination,
+            partner: firstProduct.seller,
+            partnerType: firstProduct.partnerRole,
             promise: facts
                 .map((fact) => fact.deliveryPromise)
                 .toSet()
@@ -3474,13 +3541,24 @@ class BuyV2Session extends ChangeNotifier {
         current.destination == BuyV2Destination.shop ||
         current.destination == BuyV2Destination.wholesale;
     if (!supportedDestination || limit <= 0) return const [];
+    if (productFactsFor(
+      current,
+    ).orderabilityLabel.toLowerCase().contains('unavailable')) {
+      return const [];
+    }
 
     final candidates = _catalogueProducts
         .where(
           (product) =>
               product.destination == current.destination &&
               product.catalogueListing &&
-              product.seller == current.seller,
+              product.seller == current.seller &&
+              switch (current.destination) {
+                BuyV2Destination.shop => true,
+                BuyV2Destination.wholesale =>
+                  (product.minimumOrder > 2) == (current.minimumOrder > 2),
+                BuyV2Destination.medicine || BuyV2Destination.orders => true,
+              },
         )
         .toList(growable: false);
     candidates.sort((left, right) {
@@ -4123,6 +4201,17 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (selectedPayment == 'Purchase order' && !purchaseOrderDetailsComplete) {
+      notice = purchaseOrderDetailsMessage;
+      notifyListeners();
+      return false;
+    }
+    if (selectedPayment == 'Cash on Delivery' &&
+        !cashOnDeliveryEligibleForCheckout) {
+      notice = cashOnDeliveryEligibilityMessage;
+      notifyListeners();
+      return false;
+    }
     if (checkoutSubmissionState != BuyV2CheckoutSubmissionState.idle) {
       notice = 'Complete the current payment step before continuing.';
       notifyListeners();
@@ -4278,10 +4367,32 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   List<BuyV2Product> productsForOrder(BuyV2Order order) {
-    return order.productIds
+    final recorded = order.productIds
         .map(findProduct)
         .whereType<BuyV2Product>()
         .where((product) => product.destination == order.destination)
+        .toList(growable: false);
+    if (recorded.isNotEmpty ||
+        order.productIds.isNotEmpty ||
+        !reviewDataEnabled) {
+      return recorded;
+    }
+    final requestedCount = int.tryParse(
+      RegExp(r'^\d+').firstMatch(order.itemSummary)?.group(0) ?? '',
+    );
+    final parsedCount = requestedCount ?? 1;
+    final limit = parsedCount < 1
+        ? 1
+        : parsedCount > 12
+        ? 12
+        : parsedCount;
+    return _catalogueProducts
+        .where(
+          (product) =>
+              product.destination == order.destination &&
+              product.catalogueListing,
+        )
+        .take(limit)
         .toList(growable: false);
   }
 
@@ -4388,6 +4499,7 @@ class BuyV2Session extends ChangeNotifier {
     required String orderId,
     required BuyV2OrderResolutionKind kind,
     required String reason,
+    Map<String, int> itemQuantities = const {},
   }) async {
     final cleanReason = reason.trim();
     final snapshot = _orderResolutionSnapshots[orderId];
@@ -4405,11 +4517,17 @@ class BuyV2Session extends ChangeNotifier {
     _orderResolutionBusyIds.add(orderId);
     notifyListeners();
     try {
+      final itemDetail = itemQuantities.entries
+          .where((entry) => entry.value > 0)
+          .map((entry) => '${entry.key}×${entry.value}')
+          .join(', ');
       final result = await orderResolutionAdapter.submit(
         BuyV2OrderResolutionRequest(
           orderId: orderId,
           kind: kind,
-          reason: cleanReason,
+          reason: itemDetail.isEmpty
+              ? cleanReason
+              : '$cleanReason · Items $itemDetail',
         ),
       );
       final valid =
@@ -5005,6 +5123,13 @@ class BuyV2Session extends ChangeNotifier {
 
   void chooseFulfilmentMode(BuyV2FulfilmentMode? value) {
     selectedFulfilmentMode = value;
+    if (destination == BuyV2Destination.shop) {
+      if (value == BuyV2FulfilmentMode.quickLocal) {
+        _shopSaleType = BuyV2ShopSaleType.quickDelivery;
+      } else if (value == BuyV2FulfilmentMode.standardCourier) {
+        _shopSaleType = BuyV2ShopSaleType.courier;
+      }
+    }
     _persistCustomerState();
     notifyListeners();
   }
@@ -5087,9 +5212,22 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final facts = productFactsFor(item);
+    if (facts.storeOperatingState == BuyV2StoreOperatingState.closed) {
+      final nextOpening = facts.nextOpeningLabel?.trim();
+      notice = nextOpening?.isNotEmpty == true
+          ? 'This store is closed and opens $nextOpening.'
+          : 'This store is closed right now.';
+      notifyListeners();
+      return false;
+    }
+    if (!_availableForDiscovery(item)) {
+      notice = 'This product is unavailable right now.';
+      notifyListeners();
+      return false;
+    }
     if (item.destination == BuyV2Destination.wholesale && !businessVerified) {
-      notice =
-          'Complete your Workspace business profile to place a wholesale order.';
+      notice = 'Complete your business profile to place a wholesale order.';
       notifyListeners();
       return false;
     }
@@ -5446,6 +5584,14 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
+  void updatePurchaseOrderReference(String value) {
+    if (purchaseOrderReference == value) return;
+    purchaseOrderReference = value;
+    notice = null;
+    _persistCustomerState();
+    notifyListeners();
+  }
+
   bool confirmOrder() {
     if (!reviewDataEnabled) {
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.unavailable;
@@ -5535,6 +5681,17 @@ class BuyV2Session extends ChangeNotifier {
     if (selectedPayment == 'Purchase order' &&
         !purchaseOrderEligibleForCheckout) {
       notice = purchaseOrderEligibilityMessage;
+      notifyListeners();
+      return Future<bool>.value(false);
+    }
+    if (selectedPayment == 'Purchase order' && !purchaseOrderDetailsComplete) {
+      notice = purchaseOrderDetailsMessage;
+      notifyListeners();
+      return Future<bool>.value(false);
+    }
+    if (selectedPayment == 'Cash on Delivery' &&
+        !cashOnDeliveryEligibleForCheckout) {
+      notice = cashOnDeliveryEligibilityMessage;
       notifyListeners();
       return Future<bool>.value(false);
     }
@@ -6014,6 +6171,19 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
+  bool markPaymentStatusNeedsChecking() {
+    if (checkoutBusy ||
+        checkoutSubmissionState !=
+            BuyV2CheckoutSubmissionState.paymentPending) {
+      return false;
+    }
+    checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
+    notice = null;
+    _persistCustomerState();
+    notifyListeners();
+    return true;
+  }
+
   void _completeConfirmedOrder({
     required _BuyV2NavigationSurfaceIdentity previous,
     required List<BuyV2CartLine> lines,
@@ -6041,6 +6211,7 @@ class BuyV2Session extends ChangeNotifier {
     _paymentReference = null;
     _paymentActionUri = null;
     _bankTransferInstructions = null;
+    purchaseOrderReference = '';
     notice = null;
     _clearCheckoutPromiseSnapshot();
     _persistCustomerState();
@@ -6099,14 +6270,12 @@ class BuyV2Session extends ChangeNotifier {
       BuyV2Destination.medicine => 'RX',
       BuyV2Destination.orders => 'MS',
     };
-    final itemName = switch (group.destination) {
-      BuyV2Destination.shop => group.itemCount == 1 ? 'product' : 'products',
-      BuyV2Destination.wholesale =>
-        group.itemCount == 1 ? 'trade pack' : 'trade packs',
-      BuyV2Destination.medicine =>
-        group.itemCount == 1 ? 'medicine' : 'medicines',
-      BuyV2Destination.orders => 'products',
-    };
+    final productCount = group.lines.length;
+    final productCountLabel =
+        '$productCount ${productCount == 1 ? 'product' : 'products'}';
+    final quantityLabel = group.destination == BuyV2Destination.wholesale
+        ? '${group.itemCount} ${group.itemCount == 1 ? 'pack' : 'packs'}'
+        : '${group.itemCount} ${group.itemCount == 1 ? 'item' : 'items'}';
     final status = group.destination == BuyV2Destination.wholesale
         ? BuyV2OrderStatus.confirmed
         : BuyV2OrderStatus.preparing;
@@ -6116,7 +6285,7 @@ class BuyV2Session extends ChangeNotifier {
       destination: group.destination,
       title: '${group.destination.label} order',
       itemSummary:
-          '${group.itemCount} $itemName · ${address.label} · ${address.area}',
+          '$productCountLabel · $quantityLabel · ${address.label} · ${address.area}',
       total:
           totalOverride ??
           group.total +
@@ -6130,13 +6299,16 @@ class BuyV2Session extends ChangeNotifier {
       partnerType: group.partnerType,
       promise: group.promise,
       destinationLabel: address.shortLine,
-      progress: status == BuyV2OrderStatus.confirmed ? .34 : .2,
+      progress: status == BuyV2OrderStatus.confirmed ? .2 : .4,
       status: status,
       purchaseId: purchaseId,
       promisedByLabel: group.promisedByLabel,
       productIds: group.productIds,
       lines: List.unmodifiable(group.lines),
       paymentMethod: selectedPayment,
+      purchaseOrderReference: selectedPayment == 'Purchase order'
+          ? purchaseOrderReference.trim()
+          : null,
       recipient: address.recipient,
       addressLine: '${address.line}, ${address.area} ${address.pinCode}',
       deliveryInstruction: selectedDeliveryInstructionFor(
@@ -6159,7 +6331,7 @@ class BuyV2Session extends ChangeNotifier {
           ? 'Shree Balaji Retail'
           : null,
       buyerType: group.destination == BuyV2Destination.wholesale
-          ? 'Verified retailer Workspace'
+          ? 'Retailer business'
           : null,
       tax: tax,
       freight: freight,
@@ -6219,25 +6391,18 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool reorder(BuyV2Order order) {
-    final ids = order.productIds.toList(growable: false);
-    final products = ids.map(findProduct).toList(growable: false);
-    if (ids.isEmpty ||
-        ids.toSet().length != ids.length ||
-        products.any(
-          (product) =>
-              product == null || product.destination != order.destination,
-        )) {
+    final exactProducts = productsForOrder(order);
+    if (exactProducts.isEmpty ||
+        (order.productIds.isNotEmpty &&
+            exactProducts.length != order.productIds.length) ||
+        exactProducts.map((product) => product.id).toSet().length !=
+            exactProducts.length) {
       notice = 'Products from this order could not be found.';
       notifyListeners();
       return false;
     }
-
-    final exactProducts = products.whereType<BuyV2Product>().toList(
-      growable: false,
-    );
     if (order.destination == BuyV2Destination.wholesale && !businessVerified) {
-      notice =
-          'Complete your Workspace business profile to place a wholesale order.';
+      notice = 'Complete your business profile to place a wholesale order.';
       notifyListeners();
       return false;
     }
@@ -6276,9 +6441,11 @@ class BuyV2Session extends ChangeNotifier {
       BuyV2Destination.medicine => BuyV2CartScope.medicine,
       BuyV2Destination.orders => BuyV2CartScope.all,
     };
+    _cartScrollOffsets[cartScope] = 0;
     view = BuyV2View.cart;
     notice = 'Previous products are ready to edit.';
     cartAcknowledgement = 'Previous products are ready to edit.';
+    _persistCustomerState();
     _notifyNavigationIfChanged(
       previous,
       BuyV2NavigationMotionDirection.forward,

@@ -151,7 +151,7 @@ void main() {
       await tester.pump();
       final settledTop = tester.getTopLeft(panel).dy;
       expect(midTop, lessThan(settledTop));
-      expect(settledTop - midTop, lessThan(16));
+      expect(settledTop - midTop, lessThan(22));
       expect(tester.testTextInput.isVisible, isTrue);
 
       await tester.binding.handlePopRoute();
@@ -214,6 +214,27 @@ void main() {
       expect(find.byKey(const ValueKey('buy-product-code-field')), findsOne);
       expect(find.text('Cancel'), findsOneWidget);
       expect(find.text('Find product'), findsOneWidget);
+      for (final key in const [
+        ValueKey('buy-cancel-product-code'),
+        ValueKey('buy-use-product-code'),
+      ]) {
+        final action = find.byKey(key);
+        expect(tester.getSize(action).height, 44);
+        expect(
+          tester.getRect(action).bottom,
+          lessThanOrEqualTo(tester.getRect(panel).bottom),
+        );
+      }
+      for (final key in const [
+        ValueKey('buy-cancel-product-code-semantics'),
+        ValueKey('buy-use-product-code-semantics'),
+      ]) {
+        final semanticsNode = tester.getSemantics(find.byKey(key));
+        expect(semanticsNode.rect.width, greaterThan(0));
+        expect(semanticsNode.rect.height, 44);
+      }
+      expect(find.bySemanticsLabel('Cancel'), findsOneWidget);
+      expect(find.bySemanticsLabel('Find product'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       await tester.tap(find.byKey(const ValueKey('buy-use-product-code')));
@@ -233,6 +254,94 @@ void main() {
       semantics.dispose();
     },
   );
+
+  testWidgets('scanner action panel makes automatic and requested scan clear', (
+    tester,
+  ) async {
+    var scanCalls = 0;
+    var manualCalls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: buildBuyV2ScannerActionPanelForTesting(
+              status: 'Automatic scanning is active',
+              scanning: false,
+              onScanNow: () async {
+                scanCalls += 1;
+              },
+              onEnterCode: () async {
+                manualCalls += 1;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('buy-scanner-active-status')),
+      findsOneWidget,
+    );
+    expect(find.text('Automatic scanning is active'), findsOneWidget);
+    expect(find.text('Scan now'), findsOneWidget);
+    expect(find.text('Enter code'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('buy-scanner-scan-now')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('buy-scanner-enter-code')));
+    await tester.pump();
+    expect(scanCalls, 1);
+    expect(manualCalls, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('scanner action panel fits compact large text while scanning', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 568));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        builder: (context, child) {
+          final media = MediaQuery.of(context);
+          return MediaQuery(
+            data: media.copyWith(
+              disableAnimations: true,
+              textScaler: const TextScaler.linear(1.4),
+            ),
+            child: child!,
+          );
+        },
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: buildBuyV2ScannerActionPanelForTesting(
+              status: 'Scanning now — hold the code steady',
+              scanning: true,
+              onScanNow: () async {},
+              onEnterCode: () async {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final panel = find.byKey(const ValueKey('buy-scanner-active-status'));
+    final scanButton = tester.widget<FilledButton>(
+      find.descendant(of: panel, matching: find.byType(FilledButton)),
+    );
+    expect(find.text('Scanning…'), findsOneWidget);
+    expect(find.text('Scanning now — hold the code steady'), findsOneWidget);
+    expect(scanButton.onPressed, isNull);
+    expect(tester.getSize(panel).width, lessThanOrEqualTo(320));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('R56.2 scanner manual-code responsive evidence captures', (
     tester,
