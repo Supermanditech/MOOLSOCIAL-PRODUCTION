@@ -6,7 +6,9 @@ param(
   [ValidateSet('none', 'debug', 'profile', 'release')]
   [string]$BuildMode = 'none',
 
-  [string]$RepositoryRoot
+  [string]$RepositoryRoot,
+
+  [string]$EvidenceArchiveRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -62,6 +64,29 @@ foreach ($line in $worktreeLines) {
   if ((Test-Path -LiteralPath $candidateRoot -PathType Container) -and
       -not $evidenceRoots.Contains($candidateRoot)) {
     $evidenceRoots.Add($candidateRoot)
+  }
+}
+if (-not [string]::IsNullOrWhiteSpace($EvidenceArchiveRoot)) {
+  $resolvedArchiveRoot = [IO.Path]::GetFullPath($EvidenceArchiveRoot).TrimEnd(
+    [char[]]@('\', '/'))
+  if (-not $resolvedArchiveRoot.StartsWith(
+      $workspaceRoot + [IO.Path]::DirectorySeparatorChar + 'MOOLSOCIAL-ARCHIVE-',
+      [StringComparison]::OrdinalIgnoreCase
+    ) -or -not (Test-Path -LiteralPath $resolvedArchiveRoot -PathType Container)) {
+    throw 'Regression evidence archive root is invalid or unavailable.'
+  }
+  foreach ($archiveWorktree in @(Get-ChildItem -LiteralPath $resolvedArchiveRoot -Directory)) {
+    $archivedUntrackedRoot = Join-Path $archiveWorktree.FullName 'untracked'
+    $archiveMetadataPath = Join-Path $archiveWorktree.FullName 'archive-metadata.json'
+    $archiveManifestPath = Join-Path $archiveWorktree.FullName 'untracked-sha256.csv'
+    if ((Test-Path -LiteralPath $archivedUntrackedRoot -PathType Container) -and
+        (Test-Path -LiteralPath $archiveMetadataPath -PathType Leaf) -and
+        (Test-Path -LiteralPath $archiveManifestPath -PathType Leaf)) {
+      $resolvedEvidenceRoot = [IO.Path]::GetFullPath($archivedUntrackedRoot)
+      if (-not $evidenceRoots.Contains($resolvedEvidenceRoot)) {
+        $evidenceRoots.Add($resolvedEvidenceRoot)
+      }
+    }
   }
 }
 

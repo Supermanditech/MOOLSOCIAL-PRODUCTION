@@ -100312,6 +100312,220 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json"
       ]
+    },
+    {
+      "id": "REG-20260904-4483-YOUTUBE-FULL-VERIFY-SHARED-CATALOGUE-DURABILITY-ASSERTION-FAILED",
+      "status": "registered_direct_corresponding_test_owner_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "backend",
+        "youtube"
+      ],
+      "mistake": "The focused repair typecheck and 26 focused tests passed; full npm verify then ran 585 tests with 584 passed and one shared_catalogue.test durability assertion reporting accepted, rejected and localReservations as undefined instead of one.",
+      "rootCause": "The test expects a youtubeProviderQuotaMeasurements operation-counter feature that does not exist in FirestoreYouTubeQuotaStore; the actual durable contract is one youtubeProviderQuotaUsage document per search/upload/general bucket with used and hardCap fields.",
+      "prevention": "Add only shared_catalogue.test.ts as the directly required tenth owner, assert the actual durable search/upload/general quota-usage documents and corrupt-used fail-closed behavior, then rerun focused catalogue tests and full verify/export without adding a measurement feature.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "backend/functions/src/youtube/shared_catalogue.test.ts"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "backend/functions/src/youtube/shared_catalogue.ts",
+        "backend/functions/src/youtube/shared_catalogue.test.ts"
+      ]
+    },
+    {
+      "id": "REG-20260826-3777-B01-T01-COORDINATION-PRODUCTION-HEAD-DRIFT",
+      "status": "registered_coordination_head_drift_no_feature_action",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "git_discipline"
+      ],
+      "mistake": "The B01-T01 claim-replacement preflight invoked the mandatory coordination gate from the clean production checkout, and the gate rejected because production HEAD 6192baec29eebb23ca374c5213bc1ef22396a5d6 is neither the accepted runtime identity nor the recorded governance-tag identity; no claim, worktree, feature source, test, screenshot, backend, build, device or external action followed.",
+      "rootCause": "The live coordination policy enforces the older accepted-runtime/work-start identity set while the clean production checkout has advanced to a different HEAD that is not admitted by that set, so a new Cursor UI claim cannot lawfully start until the exact lineage and policy identity are reconciled.",
+      "prevention": "Do not bypass the gate or touch B01-T01 source. Reconstruct the exact production HEAD ancestry, tag and remote state with bounded scalar reads, reconcile only the founder-authorized Cursor claim and lawful baseline identity, then replay regression memory and coordination before creating the isolated worktree or running any test.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "AGENTS.md",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3778-B01-T01-WORKSTART-TAG-LINEAGE-PROBE-UNRESOLVABLE",
+      "status": "registered_read_only_tag_probe_rejected_no_feature_action",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "The first bounded B01-T01 lineage reconstruction grouped several scalar reads, and the work-start-tag rev-parse leg rejected because moolsocial-parallel-production-discipline-20260824-v88 was not resolvable in the current checkout; the wrapper returned no trustworthy sibling results and no claim, worktree, source, test or screenshot action followed.",
+      "rootCause": "The diagnostic assumed the policy-recorded work-start tag was locally resolvable before independently proving local and remote tag existence, and fail-fast parallel orchestration discarded otherwise independent scalar outputs when that assumption failed.",
+      "prevention": "Do not retry the grouped probe. Read production HEAD, parent/subject, exact local tag count and exact remote tag count in separate commands with declared absence handling; only resolve and test ancestry after one authoritative tag object is proven, then refresh registry bindings and replay the mandatory gates before B01-T01 action.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3779-B01-T01-REGISTRY-ID-ALLOCATED-FROM-STALE-PRODUCTION-GENERATION",
+      "status": "registered_cross_worktree_registry_collision_corrected_before_feature_action",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "git_discipline",
+        "tooling"
+      ],
+      "mistake": "REG3729 and REG3730 were allocated from the stale production-checkout registry generation even though the founder-authorized a7cf925 integration baseline already contained different entries with both numeric prefixes; the collision was discovered before feature source, tests, screenshots, commits or integration.",
+      "rootCause": "Registry allocation used the locally clean coordination checkout as if it were the newest registry authority without comparing the authorized integration baseline's entry count, last ID and candidate numeric prefixes.",
+      "prevention": "For work starting from an authorized integration baseline, project registry count, SHA, last ID and candidate numeric-prefix absence from that exact baseline before allocating. Correct the two unmerged incident IDs to REG3777 and REG3778, retain this collision entry permanently, and never merge a registry generation until duplicate full IDs and numeric prefixes are both zero.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3780-B01-T01-FEATURE-WORKTREE-STARTED-FROM-INTEGRATION-HEAD-INSTEAD-OF-GOVERNANCE-TAG",
+      "status": "registered_clean_worktree_topology_rejected_no_feature_action",
+      "appliesTo": [
+        "primary",
+        "coordination",
+        "implementation",
+        "git_discipline"
+      ],
+      "mistake": "The isolated B01-T01 worktree was created clean at founder-named integration HEAD a7cf925, but the mandatory Cursor task-start gate rejected because every post-governance integration owner, beginning with AGENTS.md, appeared outside the Cursor claim; no feature source, test or screenshot action followed.",
+      "rootCause": "The founder's integration target was incorrectly used as the feature-branch starting commit. The repository topology requires the focused Cursor feature branch to start from the recorded governance tag and only later enter the current integration head through the separately reviewed integration merge.",
+      "prevention": "Preserve the clean rejection, remove only the empty B01-T01 worktree/branch after exact path and cleanliness verification, recreate it from the exact recorded governance tag, pass task_start before source reads or tests, and merge only the accepted focused commit into a separate integration worktree based on a7cf925.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "AGENTS.md",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ]
+    },
+    {
+      "id": "REG-20260826-3781-B01-T01-BROAD-BUY-CONSTRUCTOR-SEARCH-TIMED-OUT",
+      "status": "registered_read_only_search_timeout_exact_owner_reads_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "tooling",
+        "buy"
+      ],
+      "mistake": "A read-only search for BuyV2CheckoutView consumers targeted the broad mobile lib and test roots and timed out before returning a complete result; it changed no claim, source, test, screenshot, backend, build, device or external state.",
+      "rootCause": "The constructor inventory used broad roots even though the declaring Buy view, composing Buy screen and focused checkout test owners were already known, allowing the evidence-heavy mobile tree to exceed the bounded diagnostic window.",
+      "prevention": "Do not retry the broad search. Inspect only the exact claimed buy_v2_views.dart, buy_v2_screen.dart, buy_v2_checkout_cart_return_continuity_test.dart and buy_v2_candidate_capture_test.dart owners in bounded ranges, then run focused analysis and tests before the complete non-golden Buy suite.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+      ]
+    },
+    {
+      "id": "REG-20260826-3782-B01-T01-FOCUSED-FILE-RUN-ENTERED-ABSENT-PROTECTED-GOLDEN",
+      "status": "registered_new_test_passed_protected_reference_not_regenerated",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "buy"
+      ],
+      "mistake": "The first checkout-continuity file run passed the new B01-T01 interaction and three preceding cases, then entered the unrelated protected-reference capture case and failed because its historical 320x568 golden is absent from the governance-tag worktree; no golden was generated, updated or accepted.",
+      "rootCause": "The command selected the complete mixed-purpose test file instead of the exact new authored test, even though the same owner contains protected-reference capture cases that require a separate explicit golden workflow.",
+      "prevention": "Qualify the new B01-T01 behavior by its exact plain name, keep protected-reference generation excluded, run non-golden Buy owners separately, and create only the ticket-specific laptop founder-review capture without altering historical goldens.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+      ]
+    },
+    {
+      "id": "REG-20260826-3783-B01-T01-SHOP-NAVIGATION-STILL-EXPOSED-MEDICINE",
+      "status": "registered_founder_visible_runtime_defect_correction_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "buy",
+        "navigation"
+      ],
+      "mistake": "The B01-T01 Shop Cart scope correctly excluded Medicine lines, but the focused widget journey still found a visible Medicine action in Shop navigation, contradicting the founder's exact Care-owned Medicine requirement.",
+      "rootCause": "The governance-tag Buy destination rail still includes Medicine as a Shop-local destination even though the current installed-app product hierarchy owns Medicine under Care beside Doctor and Salon.",
+      "prevention": "Remove only the Medicine action from Shop-local navigation and its Shop cycling order, preserve the existing Care-owned Medicine route and state, and require a focused Shop journey proving zero Medicine text plus a separate Care route test before candidate capture or integration.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+      ]
+    },
+    {
+      "id": "REG-20260826-3784-B01-T01-INTEGRATED-BUY-SUITE-LOST-OFFERS-CART-RETURN",
+      "status": "registered_current_head_continuity_correction_required",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "buy",
+        "integration"
+      ],
+      "mistake": "After merging the focused B01-T01 commit into current integration head cecb64c, analysis and both new tests passed, but the current Buy screen suite reached 70 passes with two failures; the visible retained failure showed the Offers-origin Cart missing key buy-cart-browse-more.",
+      "rootCause": "The B01-T01 destination-scoped Cart adaptation was integrated across a newer Offers-aware BuyV2CartView contract, and the Offers return action was not preserved in the resulting visible Cart state.",
+      "prevention": "Preserve current-head Offers ownership, read the exact failing test and Cart action region, restore the browse-more callback/action without reintroducing Medicine into Shop, then rerun the exact failures, both B01 tests and the complete current Buy screen suite with bounded terminal evidence.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+      ],
+      "evidence": [
+        "config/codex-development-regression-registry.json",
+        "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"
+      ]
     }
   ]
 }

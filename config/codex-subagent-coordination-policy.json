@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4445,
-    "sha256": "2FDED0361E6C3F534A2EE1EB0D84BD82A6EA0E352FF2F9ADDB31B26B0065A03A"
+    "entryCount": 4454,
+    "sha256": "AB95438339A1C131B35CA967B98D2B44EA3D0A0093229D6EC69A9AC8B912CA46"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -2607,10 +2607,15 @@
         "preMergeCoordinationOwners": [
           "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md"
         ],
-        "maximumPostMergeClosureCommits": 1,
-        "postMergeClosureOwners": [
-          "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md"
-        ],
+      "maximumPostMergeClosureCommits": 2,
+      "postMergeClosureOwners": [
+        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json",
+        "scripts/check-codex-development-regression-memory.ps1",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/test-codex-integration-repair-coordination-policy.ps1"
+      ],
         "directSourceCommitsAllowed": false,
         "conflictResolutionAllowed": true,
         "exactConflictOwners": [

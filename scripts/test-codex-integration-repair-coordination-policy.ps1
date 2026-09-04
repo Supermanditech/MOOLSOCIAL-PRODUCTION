@@ -52,7 +52,7 @@ Assert-RepairContract (
     [string]$repair.requiredCodexCommit -and
   [int]$repair.maximumMergeCommits -eq 1 -and
   [int]$repair.maximumPreMergeCoordinationCommits -eq 1 -and
-  [int]$repair.maximumPostMergeClosureCommits -eq 1 -and
+  [int]$repair.maximumPostMergeClosureCommits -eq 2 -and
   -not [bool]$repair.directSourceCommitsAllowed -and
   [bool]$repair.conflictResolutionAllowed
 ) 'sealed parents or one-merge boundary changed.'

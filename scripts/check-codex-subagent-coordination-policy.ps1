@@ -912,9 +912,9 @@ Assert-Coordination (
   [int]$integrationRepair.maximumPreMergeCoordinationCommits -eq 1 -and
   (@($integrationRepair.preMergeCoordinationOwners) -join '|') -ceq
     'docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md' -and
-  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 1 -and
+  [int]$integrationRepair.maximumPostMergeClosureCommits -eq 2 -and
   (@($integrationRepair.postMergeClosureOwners) -join '|') -ceq
-    'docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md' -and
+    'docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md|config/codex-development-regression-registry.json|config/codex-subagent-coordination-policy.json|scripts/check-codex-development-regression-memory.ps1|scripts/check-codex-subagent-coordination-policy.ps1|scripts/test-codex-integration-repair-coordination-policy.ps1' -and
   -not [bool]$integrationRepair.directSourceCommitsAllowed -and
   [bool]$integrationRepair.conflictResolutionAllowed -and
   (@($integrationRepair.exactConflictOwners | Sort-Object) -join '|') -ceq
