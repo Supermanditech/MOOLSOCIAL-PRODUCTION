@@ -1813,6 +1813,102 @@ if ($ProductionLane -ceq 'baseline') {
           $r66FreezeOwners = $r66RepairOwners
           $r66CoordinationOwners = $r66RepairOwners
         }
+        $r66ReviewAdmissionParent = '3437dc9591256aabfd9c3fc6b3fb22cd0c6ccdba'
+        & git -C $root merge-base --is-ancestor $r66ReviewAdmissionParent $head
+        if ($LASTEXITCODE -eq 0) {
+          $r66ReviewGates = @(
+            'scripts/check-buy-protected-baseline.ps1',
+            'scripts/check-buy-backend-contract-boundary.ps1',
+            'scripts/check-buy-data-egress-boundary.ps1',
+            'scripts/check-brand-integrity.ps1'
+          )
+          $r66ReviewAdmissionOwners = @(
+            'config/codex-subagent-coordination-policy.json',
+            'docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md',
+            'docs/quality/cursor-buy-redmi-fixes-v1-20260905/scope-state.json',
+            'scripts/check-codex-subagent-coordination-policy.ps1'
+          )
+          $r66ReviewAdmissionSubject =
+            'ui(buy-redmi-fixes-v1-20260905): admit bounded Redmi preflight checker repair'
+          & git -C $root diff --quiet $r66FreezeCommit $r66ReviewAdmissionParent -- @r66FreezeOwners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Redmi admission changed earlier frozen blobs.'
+          $r66PriorReviewHistory = @(& git -C $root log --format=%H `
+              "${r66FreezeCommit}..$r66ReviewAdmissionParent" -- @r66FreezeOwners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66PriorReviewHistory.Count -eq 0) `
+            'Redmi admission cannot rewrite earlier coordination history.'
+          $r66ReviewPolicyBefore = Get-R66Utf8GitJson `
+            $r66ReviewAdmissionParent $r66ReviewAdmissionOwners[0]
+          $r66ReviewPolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
+            (Join-Path $root $r66ReviewAdmissionOwners[0]) | ConvertFrom-Json
+          $r66ReviewPrimaryClaims = @($r66ReviewPolicyAfter.activeClaims | Where-Object {
+            $_.task -ceq '/root'
+          })
+          Assert-Coordination ($r66ReviewPrimaryClaims.Count -eq 1) 'Redmi primary claim is ambiguous.'
+          $r66ReviewPrimary = $r66ReviewPrimaryClaims[0]
+          Assert-Coordination (
+            $r66ReviewPrimary.owners.Count -eq 10 -and
+            @($r66ReviewPrimary.owners | Where-Object { $_ -cin $r66ReviewGates }).Count -eq 4
+          ) 'Redmi admission must add exactly its four existing checkers.'
+          $r66ReviewPrimary.owners = @($r66ReviewPrimary.owners | Where-Object {
+            $_ -cnotin $r66ReviewGates
+          })
+          Assert-Coordination (
+            ($r66ReviewPolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+            ($r66ReviewPolicyAfter | ConvertTo-Json -Depth 100 -Compress)
+          ) 'Redmi admission changed another claim or policy field.'
+          $r66ReviewManifestHash = 'C23DD7B871D174DCF50A9200C80382FE8D24C067CD1C4CC1CF7E7AAADF14EF89'
+          Assert-Coordination (
+            (Get-Sha256 (Join-Path $root $r66ReviewAdmissionOwners[1])) -ceq $r66ReviewManifestHash
+          ) 'Redmi review admission manifest changed.'
+          $r66ReviewScopeBefore = Get-R66Utf8GitJson `
+            $r66ReviewAdmissionParent $r66ReviewAdmissionOwners[2]
+          $r66ReviewScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
+            (Join-Path $root $r66ReviewAdmissionOwners[2]) | ConvertFrom-Json
+          Assert-Coordination (
+            $r66ReviewScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq
+            $r66ReviewManifestHash
+          ) 'Redmi review scope is not bound to its admission.'
+          $r66ReviewScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 =
+            $r66ReviewScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+          Assert-Coordination (
+            ($r66ReviewScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+            ($r66ReviewScopeAfter | ConvertTo-Json -Depth 100 -Compress)
+          ) 'Redmi admission changed execution authority beyond its manifest hash.'
+          if ($head -ceq $r66ReviewAdmissionParent) {
+            Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) `
+              'Pending Redmi admission is not handoff or acceptance.'
+            $r66ReviewAdmissionDirty = @(& git -C $root diff HEAD --name-only)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r66ReviewAdmissionDirty | Sort-Object) -join '|') -ceq
+              (@($r66ReviewAdmissionOwners | Sort-Object) -join '|')
+            ) 'Pending Redmi admission must change exactly four coordination owners.'
+            $r66FreezeCommit = $null
+          } else {
+            $r66ReviewFollowing = @(& git -C $root rev-list --reverse --ancestry-path `
+                "${r66ReviewAdmissionParent}..$head")
+            Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66ReviewFollowing.Count -gt 0) `
+              'Redmi admission ancestry lookup failed.'
+            $r66FreezeCommit = [string]$r66ReviewFollowing[0]
+            $r66ReviewParents = @(& git -C $root show -s --format=%P $r66FreezeCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $r66ReviewParents.Count -eq 1 -and
+              [string]$r66ReviewParents[0] -ceq $r66ReviewAdmissionParent
+            ) 'Redmi admission must have its exact single parent.'
+            $r66ReviewSubject = @(& git -C $root show -s --format=%s $r66FreezeCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $r66ReviewSubject.Count -eq 1 -and
+              [string]$r66ReviewSubject[0] -ceq $r66ReviewAdmissionSubject
+            ) 'Redmi admission subject changed.'
+            $r66ReviewCommitted = @(& git -C $root diff-tree --no-commit-id --name-only -r $r66FreezeCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r66ReviewCommitted | Sort-Object) -join '|') -ceq
+              (@($r66ReviewAdmissionOwners | Sort-Object) -join '|')
+            ) 'Redmi admission included a source, test, gate implementation or evidence owner.'
+          }
+          $r66CoordinationOwners = @($r66FreezeOwners) + $r66ReviewGates
+        }
         if ($null -ne $r66FreezeCommit) {
           & git -C $root diff --quiet $r66FreezeCommit -- @r66FreezeOwners
           Assert-Coordination ($LASTEXITCODE -eq 0) 'R66 coordination blobs changed after admission.'
