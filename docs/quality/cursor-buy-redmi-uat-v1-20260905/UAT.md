@@ -6,20 +6,20 @@ Every row below started Not tested. It is a planned coverage group, not a defect
 
 | ID | Journey and nested actions | Current result |
 |---|---|---|
-| U01 | Cold launch, Buy entry, Quick/Scheduled/Wholesale/Bulk, back to shell | In progress: launch/Quick observed; landscape failure; other modes pending |
-| U02 | Search type/clear/no match/retry, category/filter/sort, close/back/reset | Not tested |
+| U01 | Cold launch, Buy entry, Quick/Scheduled/Wholesale/Bulk, back to shell | In progress: all four sale modes and global return observed; landscape failure; relaunch pending |
+| U02 | Search type/clear/no match/retry, category/filter/sort, close/back/reset | In progress: query/clear/finish/category/sort/delivery/pack/reset observed; sparse layout and recovery-label failures |
 | U03 | Main grid ownership, title/pack/price/availability, product details, quantity, policies | In progress: tomato/wheat subsets; detail density and Add obstruction failed |
 | U04 | Visit store, store identity/locality/status/fulfilment, expand details, all products | In progress: two retail stores and expanded status observed; all-products and other modes pending |
 | U05 | Store SKU/detail/cart/back/related stores and exact browsing continuation | In progress: related store and explicit continuation pass; nested Cart Back fails |
-| U06 | Save/unsave, saved search/empty/product/add/remove, return | Not tested |
-| U07 | Scanner active/capture feedback/torch/switch/manual/permission/error/back | Not tested |
+| U06 | Save/unsave, saved search/empty/product/add/remove, return | In progress: save/remove/empty pass; product Back loses Saved; clear-confirmation buttons hidden |
+| U07 | Scanner active/capture feedback/torch/switch/manual/permission/error/back | In progress: active/Scan now/manual known/unknown/Cancel/cameras/torch observed; state/empty validation/large-text findings; physical decode and permission cases unverified |
 | U08 | Ask store/product/order Chat context and exact return, composer/keyboard | In progress: store/order Help returns pass; settled keyboard/typing pass; shared loading/context dependency |
 | U09 | External share sheet and cancel/return | Not tested; WhatsApp specifically blocked by founder |
 | U10 | Add feedback, compact floating cart, count/amount/drag/insets, store visibility | In progress: obstructed action, count semantics and drag findings; high amounts pending |
-| U11 | Cart edit/remove/clear/recover, min/max quantity, high Wholesale amounts | Not tested |
+| U11 | Cart edit/remove/clear/recover, min/max quantity, high Wholesale amounts | In progress: Bulk MOQ/variant/add/decrement/line removal passes; original cart restored; maximum amount/clear/recovery pending |
 | U12 | Split by store, line identity, Shop vs Wholesale/Bulk cart context | In progress: two-store split ₹353 correct at confirmation; retained purchase grouping fails |
 | U13 | Address create/edit/validation/keyboard/back, eligibility and service area | In progress: empty/phone/PIN rejection and cancel pass; real serviceability/persistence pending |
-| U14 | Delivery choices/scheduling/pickup and contextual purchase order | Not tested |
+| U14 | Delivery choices/scheduling/pickup and contextual purchase order | In progress: contextual PO only Wholesale, reference validation/keyboard/review pass; no PO submitted; serviceability/scheduling/pickup adapter states unverified |
 | U15 | Payment methods, eligible/ineligible COD, pending/failed/cancelled/unknown/retry | In progress: four methods select; eligible review COD visible; remaining outcomes pending; real charges prohibited |
 | U16 | Payment success/confirmation, duplicate submit, cart/order continuity | In progress: local COD confirmation/split observed; identity failure; no backend payment proof |
 | U17 | Supplier accept/decline/timeout/partial availability consumer projection | Not tested; live provider adapter availability to be audited |
@@ -107,3 +107,63 @@ Current fresh register: 13 product/UI observations, separately distinguished fro
 | Per-item resolution | Typed order-line/SKU quantities and reasons, policy snapshot/eligible-until/disabled reason, idempotent request/reference, accepted/rejected/pending and refund/replacement progress | UI has selectors/quantities; `BuyV2OrderResolutionRequest` only has orderId/kind/reason and session appends `Items id×qty` into free text. Snapshot has no item eligibility/window fields. Review submit always unavailable; no real acceptance proof |
 
 This table is a minimum handoff contract inventory, not authorization to copy supplier Workspace code into Buy or invent policy. Codex remains the Workspace/shared/backend implementation owner; Cursor will fix Buy-side presentation and qualified typed boundaries after collection with exact file claims. Current fresh register: 15 observations; collection continues.
+
+### Search/Saved continuation, captures 106–120
+
+- Evidence-only checkpoint `a423b88b70cdc106f8a860dd727899453a5d15f7` committed four claimed documents, pre-commit gate passed, pushed and remote-equal. No runtime owner changed; review installed code remains HEAD 49d6d413 / source e2dd3bc7.
+- 106–109: Shop entry, Search, synthetic no-match `zzr66nomatch`, Clear search and valid `tomato` results work with keyboard. Existing recent searches not cleared. Two-result layout wastes rows/space: R66-UAT-016.
+- 110–112: bookmark saves tomato, notice/count update, Finish search closes keyboard while retaining result query; Saved opens with one product. Saved product open/Back (113/114) loses saved-only view, while data remains (115): R66-UAT-017.
+- 116–119: Clear list opens confirmation but its buttons are hidden in normal portrait and cannot be revealed by swipe. Settled repeated evidence rules out animation timing: R66-UAT-018. X closes without removing the saved item.
+- 120: individual Remove action removes only this newly saved review item, updates count to zero and shows No saved products yet / Show all products. Original zero-saved state restored. Empty-state `from this grid` wording is misleading when no grid is shown; include in R66-UAT-014 consumer-copy sweep. Repeated notice semantics are observed but TalkBack spoken output has not been recorded.
+
+Current fresh register: 19 observations. Remaining coverage continues; no claim of complete UAT or implemented fixes for these new observations.
+
+### Filters/scanner/Wholesale continuation, captures 121–164
+
+- 121–127: empty Saved recovery returns to Shop; Fruits category and price-ascending refinement work. Sparse two-lane allocation persists with three fruit results (extends 016); visual row-major price order needs diagnosis, not an unsupported claim that the underlying sort fails.
+- 128–132: Scheduled shows the matching potato with its date. Choosing Quick local in refinement correctly synchronizes the top Quick segment on apply. 133 was a premature scroll, not an app failure; settled 134 reveals pack/brand choices.
+- 135–140: Multipack + Fruits gives zero results. Show all products retains additional refinements (020); explicit Clear then apply restores eighteen products and zero additional filters.
+- 141–146: automatic scanning state and Scan now no-code feedback observed. Rear torch changes illumination and can be turned off; camera switch shows front view, then rear was restored. Secondary-control availability/state issue 021. Eight-second real Redmi screenrecord retained as `r66-1-scanner-scan-feedback.mp4`, SHA `821033F1B8B8DE257498C7438F489B44EC1F6CDFCE86BCC9A6782F4F130F2F71`, 1,770,778 bytes; no full video/audio qualification claimed yet.
+- 147–150: empty Find product is silent (022); unknown code yields no-match and Clear search recovers. Capture 150 was fully written with PNG/XML/JSON despite a truncated tool response; exact file readback recovered the result without repeating or overwriting it.
+- 151–154: scanner re-entry works; manually entering known catalogue code `s-tomato` opens Fresh tomatoes. Android Back returns to its one-result code search. This is manual lookup proof, not physical camera decoding.
+- 155–158: Wholesale entry retains its original notebook cart ₹3,480. Continue browsing incorrectly opens the last retail store (023); Back preserves the Wholesale cart and quantity.
+- 159–164: receiving-address step retains existing addresses. Wholesale payment offers PhonePe, Paytm, Pine Labs and contextual Purchase order, without COD. Empty PO reference blocks Review with a message; scrolling reveals its field. Synthetic `R66-PO-LOCAL` entered; keyboard leaves the focused field visible. No Wholesale order or payment submitted. Further PO/online/Bulk coverage continues.
+
+Fresh observations: 23, not 23 implemented fixes. No old UAT count is reused. Camera was closed by successful manual lookup; WhatsApp and OPPO remain untouched. Temporary portrait lock remains to be restored at handback.
+
+### Wholesale/Bulk/payment/offer continuation, captures 165–206
+
+- 165–168: PO reference persists through keyboard dismissal and appears correctly in confirmation. Change payment returns to methods and selecting PhonePe updates the review; no PO was submitted.
+- 169–172: local payment attempt reaches Ready, then the default local completion chooser (024). Only Payment not completed was tapped; cart remains unchanged. Try payment again resets to method/review selection, not automatic success. No external provider/real charge occurred.
+- 173–180: Bulk remains selected after checkout exit. Rice 25 kg minimum four packs adds ₹6,760; choosing 50 kg changes pack/unit price/MOQ without mutating the existing line. Adding the 50 kg option gives three separate product lines/six packs/₹13,440 including the preserved notebook. Distinct variants verified in Cart.
+- 181–184: repeated detail/price/policy fields extend 003 to Bulk. Visit store is several scrolls below the seller header. Cart also covers the Report issue action at this scroll position (004). Copy includes `1 packs` / `Minimum 1 packs`; include singular/plural correction in the Buy copy pass without changing quantities.
+- 185–188: supplier store and View all both omit the available origin rice (025). Tapping blank lower-left area opens the visually lower-right cart (026). Android Back loses the full-store view and returns to root rice details (extends 007).
+- 189–193: add one trade pack gives five rice packs/₹8,450; decrement returns to four/₹6,760. Remove at MOQ removes the whole four-pack line, not invalid quantity three. Removing only the newly added 50 kg line restores the original notebook cart, one pack/₹3,480. No retained line/order was deleted.
+- 194–201: coupon selection applies ₹300 saving and checkout shows ₹3,180. Separate Pine Labs offer remains merely named with no result/reason, even after choosing its matching method (027). Confirmation retains the correct notebook and amount. No order submitted.
+- 202–206: Bulk mode survives global return. Removed only the coupon/payment-offer selections introduced in this audit; independent tabs remain usable and original subtotal/payable ₹3,480 is restored. Floating dock shows pre-discount subtotal during the selected-coupon state while checkout shows payable—amount labels/projection should be reviewed with 027.
+
+At capture 206, device settings readback: font_scale=1.0, physical density=320. Next matrix temporarily changes only Redmi font scale, with mandatory restore to 1.0; rotation remains temporarily locked portrait. Fresh register has 27 observations, not completed implementations. Failed read-only guessed-path searches were recovered by directory/text discovery; no result from a nonexistent owner is treated as evidence. Implementation must use discovered exact paths only.
+
+### Real-device display/keyboard matrix, captures 207–222
+
+- 207–211: verified system font_scale=2.0 at physical density 320. Monetary digits clip vertically in Cart (028), checkout amount wraps mid-number, and fixed actions/step labels truncate (029). Payment methods remain available by scrolling; no price arithmetic failure inferred from display clipping.
+- 212–213: Recently viewed has a visible 19-pixel RenderFlex overflow (030). Main featured tomato/rice cards below it retain readable pack/price/supplier/actions without an observed overflow in that frame. Promo word-fragmentation and segment truncation extend 029.
+- 214–216: scanner stacks its two actions, but expanded panel overlaps scan-frame lower corners. Manual-code keyboard sheet clips Cancel/Find labels (031); Cancel works and restores the active scanner. No physical barcode decode tested.
+- 217: scanner closed and system font_scale restored/read back as 1.0.
+- 218–221: temporary density override 360 makes the 720px device 320dp wide, font 1.0. Main featured card fits in the observed frame. Newly saved tomato opens Saved; Clear confirmation again hides both bottom actions (extends 018). Top X/Keep closes correctly.
+- 222: removed only that newly saved item, restored `wm density reset`; readback is physical density 320 with no override, font_scale=1.0. Saved is back to zero. Rotation remains the original audit's temporary portrait lock, to restore at handback.
+
+Fresh register: 31 observations. These are real Redmi screenshots and actions, not iOS/other-device qualification; local responsive matrices and retest after fixes remain required.
+
+### Monthly basket/settings/alerts, captures 223–247
+
+- 223–230: tools launch Monthly basket. See twelve shows six Quick and six Scheduled in separate selections, with no full price in the Add preview (032). Opening tomato and Android Back preserves the monthly collection. Dismiss banner returns to normal scope.
+- 231–232: Add basket adds twelve distinct Shop products/twenty-one packs at ₹5,145; original Wholesale notebook remains ₹3,480 (global ₹8,625). The acknowledgement uses last-added ghee and global 22 versus visible scoped 21 (extends 005); Shop Continue browsing wrongly names Thar Wholesale (023 in reverse).
+- 233–236: basket above the existing ₹5,000 review COD threshold shows three online methods, no COD or retail PO. Payment → Address → Cart Android Back passes. No purchase/payment submitted.
+- 237–240: read-only source confirms scoped clear before action. Dialog explicitly states 21 Shop items removed/one other retained. Both actions are visible; Keep Cart preserves all lines, subsequent Remove Shop removes only audit-added basket and restores original Wholesale notebook. Unlike Saved clear, this confirmation fits normal Android portrait. Monthly banner remains above Wholesale Cart (032).
+- 241–244: monthly banner dismissed; Shopping settings opens. Preferred delivery changes No preference → Quick local delivery and returns to the same settings sheet. This temporary preference remains to be restored to No preference after lifecycle testing.
+- 245–247: four seeded shopping alerts appear. Delivery update opens existing PO-NEW-01 with supplier-confirmed status and unavailable live updates. Back loses alerts/settings and returns to Orders/previous Delivered filter (033). This is not cross-device supplier delivery proof.
+
+Runtime evidence: `r66-1-runtime-through-247.log`, current review PID 31750, native exit 0, 996,317 bytes, SHA `452BCA6D7DD7BD0D19AA51F65A5F9FD8A1A72472BE7CBFD2FB445DD77B1588C2`, stderr empty. This is a current-process ring-buffer snapshot, not a complete session log; it contains zero text matches for RenderFlex/overflowed and does not negate the earlier visible screenshot overflows. No unrelated process log collected.
+
+Fresh register: 33 observations. Remaining work includes lifecycle, remaining settings/offer/share boundaries, unavailable operational states, exact source diagnosis and scoped atomic implementation/retest. No all-taps or production-ready claim.

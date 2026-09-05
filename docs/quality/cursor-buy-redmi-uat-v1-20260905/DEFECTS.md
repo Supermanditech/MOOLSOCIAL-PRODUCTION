@@ -87,6 +87,78 @@ P2 consumer-facing language. Fresh Orders catalogue (092) announces `Showing 8 o
 
 P2 purchase-resolution clarity / provider-contract dependency. A delivered seed order dated 25 Jul exposes all return/replacement/refund options and selectable products (093, 096–103) without an item-specific window, eligible-until date, excluded-item reason or applicable policy alongside selection. Fresh tomato detail elsewhere says quality refund within 24 hours; the resolution screen does not explain which policy applies. This is a review-data observation, not proof of unlawful acceptance or a real expired return: the review adapter rejects every submit. Expected: render authoritative per-order-line eligibility/window/reason and retain support when unavailable; no invented policy deadlines or accepted refund state. Existing snapshot carries only order-level options/sourceId; the API boundary must support these facts before production. Buy UI/contract owner with Codex Workspace/backend dependency.
 
+### R66-UAT-016 — Sparse search results waste most of the product viewport
+
+P2 visual density/fit. Search `tomato` produces two matches. With keyboard open (109) and after Finish search (111), each match occupies its own independently scrollable row with one narrow card, leaving roughly two-thirds of each row empty. The second product drops below the keyboard while it could fit alongside the first. Expected: adapt row/column allocation to the actual small result count, retaining all product information, readable text and minimum targets; preserve normal multi-item browsing and motion. No global card redesign or font shrink. Source grid owner requires focused 1/2/few-result and large-text regressions.
+
+### R66-UAT-017 — Saved product Back drops the saved collection
+
+P1 navigation context. Search save → Saved in Shop (112) → Fresh tomatoes (113) → Android Back (114). Actual: general Quick Shop feed, not Saved in Shop; opening Saved again (115) still finds the saved item, so this is lost view/filter context, not lost saved data. Expected: return to the exact saved collection/filter/scroll, consistent with store and order entry contexts. Capture 114's prospective filename says preserved, but its actual XML/screenshot prove the failure. Do not use the label as the verdict.
+
+### R66-UAT-018 — Clear Saved confirmation buttons hidden under Android navigation
+
+P1 Android action fit. From one-item Saved list, tap Clear list. Stable confirmation at normal 360dp / font 1.0 starts near y1252; Keep saved and Clear list bottom buttons are visually cut below y1506, with hierarchy bounds `[0,0][0,0]`. 116 and independently settled 117 match; an upward content swipe (118) cannot reveal them. Close X remains accessible and correctly preserves the item (119). Expected: content-adaptive safe-area sheet with both complete, reachable 44dp actions in normal/large-text and compact-height modes; no suppressed overflow or invisible tappable workaround. This is not a keyboard-transition frame.
+
+### R66-UAT-019 — Quick 10m heading conflicts with visible delivery estimates
+
+P2 promise truth / provider eligibility contract. Quick 10m is selected while recent quick products explicitly show 12 minutes (tomatoes) and 18 minutes (noodles), and tomato's store/status is Quick 10m while its actual detail/checkout/tracking promise is 12 minutes (003/004/020/070/106). Expected: category promise and provider-supplied eligibility/ETA are consistent; never replace real 12/18-minute values with invented 10-minute data. Determine the minimal truthful eligibility/label behaviour with the existing fulfilment contract and retain the accepted blue segmented design. Recent cross-category items alone are not a filtering defect; the specific contradiction is the same quick product/store promise.
+
+### R66-UAT-020 — Show all products retains additional refinements
+
+P2 recovery/copy consistency. Multipack plus Fruits produces no results (135–136). Show all products clears the category but retains Quick local and two additional refinements (137–138), yielding ten matching products rather than the full eighteen. Explicit Clear in Sort and refine resets them and exposes eighteen (139–140). Expected: the recovery action and resulting scope agree—either clear the limiting refinements or name the narrower action truthfully. Quick-local refinement correctly synchronizes the top Quick segment (131–132); that synchronization is not a defect.
+
+### R66-UAT-021 — Scanner secondary actions lack clear availability/state
+
+P2 visual/state feedback. Enter code is enabled and opens correctly (147) but appears white-on-grey like a disabled action (141). Torch illuminates the rear view and turns off (143–144), yet its icon/accessible label does not expose the changed on/off state. After switching to the front camera (145), Torch remains tappable and the tap has no availability explanation (146). Expected: readable manual fallback and truthful torch on/off/unavailable state using the actual camera capability; do not claim hardware failure or fabricate support. Rear camera was restored before manual entry. Numeric contrast and controller diagnosis remain pending.
+
+### R66-UAT-022 — Empty manual barcode submission is silent
+
+P2 validation. Manual code sheet shows enabled Find product with an empty field (147); tapping it yields neither validation feedback nor a state change (148). Unknown nonempty code correctly returns to a no-match result with Clear search recovery (149–150). Expected: disable an empty submission or explain the required input; preserve known-code lookup, unknown-code recovery, keyboard and Back. Real optical decoding has not been verified because no physical barcode is in the camera view.
+
+### R66-UAT-023 — Wholesale cart reuses the last retail store return
+
+P1 cross-scope navigation. After earlier retail-store browsing, open Wholesale from the global rail (155), then its retained notebook cart (156). The only line is A4 ruled notebooks from Rajasthan Paper Products, but Continue browsing names Sardarpura Supermart. Tapping it opens that retail store's ₹279 wheat catalogue (157), not a Wholesale destination. Back correctly returns to the unchanged Wholesale cart (158). Expected: preserve store return context per shopping scope/entry; never silently reuse a retail store for a Wholesale cart. Use the existing scoped navigation contract rather than duplicate cart/store routes. No retained cart item was removed.
+
+### R66-UAT-024 — Default payment handoff is a local completion chooser
+
+P1 launch boundary / truthful payment interaction. Wholesale PhonePe review (168) advances to Ready for secure payment (169); Pay opens an in-app sheet with Payment completed / Payment not completed (170), not a provider collection UI. Read-only source confirms `_openPaymentCollection` only returns a local boolean; the review adapter then supplies a seeded reconciliation result. Not completed correctly preserves the cart and shows retry (171); retry resets to method/review step (172), not a confirmed payment. Expected: an injected, approved collection handoff plus authoritative payment reconciliation; unavailable integration must fail closed with truthful recovery, not offer a production completion simulator. This is not evidence of a real unauthorized charge or backend accepting a forged payment. Cursor owns safe Buy fallback/interaction and tests; Codex owns provider/backend integration. No external payment site/app or real money action occurred, and Payment completed was not tapped.
+
+### R66-UAT-025 — Supplier catalogue omits the available product used to enter it
+
+P1 catalogue/store continuity. Open available Premium basmati rice 50 kg, seller Thar Grains Wholesale (178/184), then Visit store (185). Supplier catalogue lists only sugar and toor dal; View all still reports two available products and omits both rice variants (186). The rice is available and can be added to Cart, so it is not an observed unavailable-product exclusion. Expected: the authoritative supplier catalogue includes the eligible origin SKU/variant with matching owner identity and sale-mode rules. Diagnose supplier identity/filter joins; do not add a duplicate catalogue or silently substitute a different owner.
+
+### R66-UAT-026 — Visually compact store cart retains an invisible full-width hit area
+
+P1 tap interception / compact-cart contract. In the full supplier catalogue (186), Cart is visibly a compact lower-right pill but exposes clickable bounds `[0,1404][720,1438]`. Tapping the empty lower-left area `(120,1420)`, outside the pill, opens Cart (187). Expected: only the visible cart and its accessible minimum target respond; transparent surrounding product space must remain available. Retain compact amount/count and drag behaviour. This is a separately reproduced invisible-hit-area child related to 004, not a claim that a white visual strip is still present.
+
+### R66-UAT-027 — Selected payment offer lacks applied/pending/ineligible explanation
+
+P2 payment-price transparency. Supplier coupon ₹300 reduces ₹3,480 to ₹3,180 (194–198). Selecting the separate Pine Labs payment offer advertised as Save ₹300 now keeps ₹3,180 both with PhonePe and after selecting Pine Labs; checkout simply names the offer, and confirmation gives no qualification/result explanation (199–201). Source confirms ordinary fallback pricing deducts coupons only; payment savings require a quote/eligibility contract. Expected: distinguish selected from applied/pending/ineligible, show the authoritative saving or reason and keep the final amount consistent. Do not invent a second discount or stacking policy. Buy UI/quote-state projection is Cursor-owned; actual provider offer eligibility and funding are Codex/backend dependencies.
+
+### R66-UAT-028 — Large text clips monetary digits in Cart
+
+P1 price readability/accessibility. Redmi physical 720×1600, density 320, system font_scale readback 2.0. Cart scope total, line subtotal and bottom payable amount are vertically clipped (207 and independently settled 208). The footer still semantically announces ₹3,480 but only part of the rendered digits is visible, so semantics-only checks falsely miss the visual failure. Expected: measured adaptive price height/width for scaled text and large Indian amounts, including animated/static states, without disabling scaling or hiding overflow assertions. Preserve amount arithmetic and touch targets.
+
+### R66-UAT-029 — Fixed-height Cart actions truncate enlarged labels
+
+P2 large-text action fit. Under the same verified 2.0 scale, Browse more products wraps but its lower line is clipped by its fixed container; scope tabs also cut the lower numeric line (208). Expected: content-adaptive action and scope-tab height with readable labels/counts, intact safe areas and minimum targets. Cart's product description itself wraps; do not shrink all text or replace the established layout. Check shared Buy button usages during diagnosis and retain exact owner boundaries.
+
+### R66-UAT-030 — Recently viewed cards overflow at enlarged text
+
+P1 responsive layout child of the paused catalogue correction. At verified font_scale=2.0, Recently viewed Fresh tomatoes shows a yellow/black RenderFlex stripe and `BOTTOM OVERFLOWED BY 19 PIXELS`; noodles also overflows (212–213). Main featured tomato/rice cards below it fit their price/pack/supplier/actions in the same capture, so this is an uncovered recent-card component, not proof the completed featured-card fix failed. Promo cards break words into fragments and truncate descriptive text; top Quick/Scheduled labels lose their endings (extend 029 for segment fit). Expected: fit recent-card content adaptively while retaining real fields, legible scale, compact layout and motion. Add exact recent-card regressions; do not suppress framework overflow reporting or regenerate goldens blindly.
+
+### R66-UAT-031 — Manual-code keyboard sheet clips enlarged action labels
+
+P2 scanner keyboard/large-text fit. With font_scale=2.0, Enter code opens with the focused field above Gboard, but Cancel wraps as `Cance` plus a clipped final character and Find product loses its second line (215). Cancel remains tappable and restores the active scanner (216), so this is not a failed Cancel route. Scanner's enlarged instruction panel also overlaps the lower scan-frame corners (214). Expected: adaptive action layout/height and scan-frame bounds for actual available space, preserving readable scaling, fallback, camera lifecycle and minimum targets. Link 021/022 for one narrow scanner correction with focused regressions.
+
+### R66-UAT-032 — Monthly basket preview hides full price and selected-mode scope
+
+P2 purchase-decision/context clarity. Preview advertises 12 products/21 packs/Save ₹415 and Add basket without the basket total (224/230). See 12 products shows six Quick products; Scheduled reveals the other six, with no explicit six-of-twelve scope explanation (225/228). Add correctly adds all twelve/21 packs at ₹5,145 and preserves Wholesale (231–232). Expected: expose the current basket price, quantities and basis of savings before Add, and clearly present all included fulfilment groups or label the filtered subset. Do not fabricate discounts or change the bundle contents. Monthly-product Back passes (226–227). After scoped Shop removal, the Monthly basket banner remains above the remaining Wholesale notebook Cart (240); align contextual banners with the actual cart scope. Add acknowledgement says only the last product and global 22 while visible scoped count is 21 (extends 005).
+
+### R66-UAT-033 — Shopping-alert Back loses the alerts/settings context
+
+P2 return continuity. Shopping settings → Shopping alerts → Delivery update opens retained Wholesale order PO-NEW-01 (245–246). Android Back returns to Orders with the previously selected Delivered filter, not to the alerts list/settings entry (247). Expected: restore the actual origin and its selection/scroll so customers can inspect the next alert without rebuilding the path. Preserve the correct order target and existing direct Orders flow. Link Saved/store return corrections where a shared Buy return-context owner can be reused; do not copy shared Chat navigation.
+
 ## Additional evidence and ownership boundaries
 
 - E02 evidence-helper correction: capture 061 is Android DocumentsUI opened by this review invoice download, not the review app itself. Its original JSON incorrectly names the originating package because the helper read an older `mResumedActivity` rather than `topResumedActivity`. Preserve 061 unchanged with this correction. Helper now requires exactly one top-resumed activity, validates it again after hierarchy capture, records the actual package, and permits DocumentsUI only with explicit `-AllowInvoicePicker`. Fresh 062 verifies that system save step; no WhatsApp or unrelated file was opened. Existing captures 001–060 show the review flow; 061 is not an app-screen proof.
