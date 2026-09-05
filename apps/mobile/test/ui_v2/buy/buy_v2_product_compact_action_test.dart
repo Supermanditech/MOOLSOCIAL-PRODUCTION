@@ -148,7 +148,7 @@ void main() {
         expect(tester.getSize(primary).height, greaterThanOrEqualTo(44));
         expect(find.descendant(of: panel, matching: shell), findsOneWidget);
         final actionOwner = destination == BuyV2Destination.shop
-            ? find.byKey(ValueKey('buy-product-offer-decision-${product.id}'))
+            ? find.byKey(ValueKey('buy-product-purchase-hero-${product.id}'))
             : find.byKey(ValueKey('buy-product-title-reveal-${product.id}'));
         expect(
           find.descendant(of: actionOwner, matching: panel),
@@ -156,7 +156,7 @@ void main() {
         );
         expect(
           find.descendant(
-            of: panel,
+            of: destination == BuyV2Destination.shop ? actionOwner : panel,
             matching: find.text(buyV2Money(product.price)),
           ),
           findsOneWidget,

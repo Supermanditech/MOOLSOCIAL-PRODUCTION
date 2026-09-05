@@ -79,7 +79,7 @@ void main() {
     await tester.ensureVisible(add);
     await tester.pumpAndSettle();
     expect(
-      find.byKey(const ValueKey('buy-product-action-delivery-s-milk-500ml')),
+      find.byKey(const ValueKey('buy-product-hero-delivery-s-milk-500ml')),
       findsOneWidget,
     );
     expect(find.textContaining('Standard/courier delivery'), findsWidgets);
