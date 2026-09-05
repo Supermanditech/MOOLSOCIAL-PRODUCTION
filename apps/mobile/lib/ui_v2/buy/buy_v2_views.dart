@@ -8945,6 +8945,9 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
   final destination = session.destination;
   final view = session.view;
   final orderId = order.id;
+  final recipient = order.recipient?.trim();
+  final addressLine = order.addressLine?.trim();
+  final hasFullAddress = addressLine != null && addressLine.isNotEmpty;
   final bottomViewPadding = BuyV2AddressSheetMotion.resolveBottomSafeInset(
     context,
   );
@@ -9044,10 +9047,24 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
                 child: Column(
                   children: [
                     _OrderDeliveryFact(
+                      icon: Icons.person_outline_rounded,
+                      label: 'Recipient',
+                      value: recipient != null && recipient.isNotEmpty
+                          ? recipient
+                          : 'Not available for this order',
+                    ),
+                    _OrderDeliveryFact(
                       icon: Icons.location_on_outlined,
                       label: 'Delivering to',
-                      value: order.destinationLabel,
+                      value: hasFullAddress
+                          ? addressLine
+                          : order.destinationLabel,
                     ),
+                    if (!hasFullAddress)
+                      Text(
+                        'Full address unavailable for this order.',
+                        style: sheetContext.buyMeta,
+                      ),
                     _OrderDeliveryFact(
                       icon: Icons.schedule_outlined,
                       label: 'Delivery window',
@@ -17059,30 +17076,49 @@ class _OrderDeliveryFact extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final labelWidth = 72 * MediaQuery.textScalerOf(context).scale(8) / 8;
+    final labelText = Text(label, style: context.buyMeta.copyWith(fontSize: 8));
+    final valueText = Text(
+      value,
+      style: const TextStyle(
+        color: BuyV2Colors.ink,
+        fontSize: 9,
+        height: 1.2,
+        fontWeight: FontWeight.w700,
+      ),
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: BuyV2Colors.navy, size: 16),
-          const SizedBox(width: 7),
-          SizedBox(
-            width: 72,
-            child: Text(label, style: context.buyMeta.copyWith(fontSize: 8)),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: BuyV2Colors.ink,
-                fontSize: 9,
-                height: 1.2,
-                fontWeight: FontWeight.w700,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked = constraints.maxWidth - labelWidth - 29 < 140;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: BuyV2Colors.navy, size: 16),
+              const SizedBox(width: 7),
+              Expanded(
+                child: stacked
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          labelText,
+                          const SizedBox(height: 2),
+                          valueText,
+                        ],
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(width: labelWidth, child: labelText),
+                          const SizedBox(width: 6),
+                          Expanded(child: valueText),
+                        ],
+                      ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

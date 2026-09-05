@@ -1,5 +1,8 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -20,23 +23,26 @@ void main() {
     EdgeInsets safeArea = EdgeInsets.zero,
     VoidCallback? onOpenChat,
   }) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: MoolTheme.light(),
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(
-          padding: safeArea,
-          viewPadding: safeArea,
-          textScaler: TextScaler.linear(textScale),
-          disableAnimations: reducedMotion,
+    return RepaintBoundary(
+      key: const ValueKey('r66-order-address-app-capture'),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: MoolTheme.light(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            padding: safeArea,
+            viewPadding: safeArea,
+            textScaler: TextScaler.linear(textScale),
+            disableAnimations: reducedMotion,
+          ),
+          child: child!,
         ),
-        child: child!,
-      ),
-      home: BuyV2Screen(
-        session: session,
-        initialDestination: session.destination,
-        initialView: session.view,
-        onOpenChat: onOpenChat,
+        home: BuyV2Screen(
+          session: session,
+          initialDestination: session.destination,
+          initialView: session.view,
+          onOpenChat: onOpenChat,
+        ),
       ),
     );
   }
@@ -45,8 +51,17 @@ void main() {
     WidgetTester tester,
     BuyV2Session session, {
     VoidCallback? onOpenChat,
+    double textScale = 1,
+    EdgeInsets safeArea = EdgeInsets.zero,
   }) async {
-    await tester.pumpWidget(app(session, onOpenChat: onOpenChat));
+    await tester.pumpWidget(
+      app(
+        session,
+        onOpenChat: onOpenChat,
+        textScale: textScale,
+        safeArea: safeArea,
+      ),
+    );
     await tester.pumpAndSettle();
     final address = find.byKey(const ValueKey('buy-tracking-address'));
     await tester.scrollUntilVisible(
@@ -61,6 +76,140 @@ void main() {
       find.byKey(const ValueKey('buy-order-delivery-sheet')),
       findsOneWidget,
     );
+  }
+
+  for (final width in [320.0, 390.0, 430.0]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R66 order address remains complete at $width / $scale', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(Size(width, 844));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        for (final wholesale in [false, true]) {
+          const captureFamily = String.fromEnvironment(
+            'BUY_R66_ADDRESS_FAMILY',
+          );
+          if (captureFamily.isNotEmpty &&
+              captureFamily != (wholesale ? 'wholesale' : 'retail')) {
+            continue;
+          }
+          final core = BuySession();
+          final session = BuyV2Session(core: core)..chooseAddress('work');
+          final address = session.selectedAddress;
+          expect(
+            session.addProduct(wholesale ? 'w-notebook' : 's-tomato'),
+            isTrue,
+          );
+          session.openCart(
+            scope: wholesale ? BuyV2CartScope.wholesale : BuyV2CartScope.shop,
+          );
+          expect(session.openCheckout(), isTrue);
+          expect(session.confirmOrder(), isTrue);
+          final order = session.confirmedOrders.single;
+          expect(
+            order.addressLine,
+            '${address.line}, ${address.area} ${address.pinCode}',
+          );
+          session.chooseAddress('home');
+          expect(session.openTracking(order.id), isTrue);
+          await openDeliverySheet(
+            tester,
+            session,
+            textScale: scale,
+            safeArea: const EdgeInsets.only(top: 24, bottom: 34),
+          );
+          final facts = find.byKey(const ValueKey('buy-order-delivery-facts'));
+          for (final label in [
+            'Recipient',
+            'Delivering to',
+            'Delivery window',
+            'Delivery partner',
+            'Recorded instruction',
+          ]) {
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: facts, matching: find.text(label)),
+            );
+            for (final word in label.split(' ')) {
+              final painter = TextPainter(
+                text: TextSpan(text: word, style: paragraph.text.style),
+                textDirection: paragraph.textDirection,
+                textScaler: paragraph.textScaler,
+              )..layout();
+              expect(
+                paragraph.size.width + 0.01,
+                greaterThanOrEqualTo(painter.width),
+              );
+              painter.dispose();
+            }
+          }
+          for (final value in [order.recipient!, order.addressLine!]) {
+            final text = find.descendant(of: facts, matching: find.text(value));
+            expect(text, findsOneWidget);
+            final paragraph = tester.renderObject<RenderParagraph>(text);
+            expect(paragraph.didExceedMaxLines, isFalse);
+            expect(paragraph.size.width, lessThan(width));
+          }
+          expect(
+            find.descendant(
+              of: facts,
+              matching: find.textContaining(session.selectedAddress.line),
+            ),
+            findsNothing,
+          );
+          if (const bool.fromEnvironment('BUY_R66_ADDRESS_CAPTURE')) {
+            final boundary = tester.renderObject<RenderRepaintBoundary>(
+              find.byKey(const ValueKey('r66-order-address-app-capture')),
+            );
+            boundary.markNeedsPaint();
+            await tester.pump();
+            await tester.runAsync(() async {
+              final directory = Directory(
+                'build/r66-order-address-v3-20260905',
+              );
+              await directory.create(recursive: true);
+              final file = File(
+                '${directory.path}/address-$width-$scale-${wholesale ? 'wholesale' : 'retail'}.png',
+              );
+              if (await file.exists()) {
+                throw StateError('Capture already exists');
+              }
+              final image = await boundary.toImage(pixelRatio: 1);
+              try {
+                final bytes = await image.toByteData(
+                  format: ui.ImageByteFormat.png,
+                );
+                await file.writeAsBytes(bytes!.buffer.asUint8List());
+              } finally {
+                image.dispose();
+              }
+            });
+          }
+          final help = find.byKey(const ValueKey('buy-order-delivery-help'));
+          await tester.scrollUntilVisible(
+            help,
+            160,
+            scrollable: find.descendant(
+              of: find.byKey(const ValueKey('buy-order-delivery-list')),
+              matching: find.byType(Scrollable),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.getSize(help).height, greaterThanOrEqualTo(44));
+          expect(tester.getRect(help).bottom, lessThanOrEqualTo(844 - 34));
+          expect(tester.takeException(), isNull);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.tracking);
+          expect(session.selectedOrderId, order.id);
+          expect(session.selectedOrder.addressLine, order.addressLine);
+          expect(session.selectedAddressId, 'home');
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pump();
+          session.dispose();
+          core.dispose();
+        }
+      });
+    }
   }
 
   testWidgets('three order families expose exact immutable delivery facts', (
@@ -78,6 +227,22 @@ void main() {
       await openDeliverySheet(tester, session);
 
       expect(find.textContaining(id), findsWidgets);
+      if (order.addressLine == null) {
+        expect(
+          find.text('Full address unavailable for this order.'),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('buy-order-delivery-facts')),
+            matching: find.textContaining(session.selectedAddress.line),
+          ),
+          findsNothing,
+        );
+      }
+      if (order.recipient == null) {
+        expect(find.text('Not available for this order'), findsOneWidget);
+      }
       expect(find.text(order.destinationLabel), findsWidgets);
       expect(
         find.text(
