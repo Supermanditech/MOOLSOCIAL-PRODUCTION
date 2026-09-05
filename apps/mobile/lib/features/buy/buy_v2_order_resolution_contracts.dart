@@ -22,12 +22,46 @@ class BuyV2OrderResolutionOption {
 }
 
 @immutable
+class BuyV2OrderResolutionItemEligibility {
+  const BuyV2OrderResolutionItemEligibility({
+    required this.productId,
+    required this.kind,
+    required this.eligibleQuantity,
+    required this.policyWindow,
+    this.eligibleUntil,
+    this.exclusionReason,
+  });
+
+  final String productId;
+  final BuyV2OrderResolutionKind kind;
+  final int eligibleQuantity;
+
+  /// Policy recorded for this purchased item, supplied by the order service.
+  final String policyWindow;
+  final DateTime? eligibleUntil;
+  final String? exclusionReason;
+
+  String? unavailableReasonAt(DateTime now) {
+    if (exclusionReason?.trim().isNotEmpty ?? false) return exclusionReason;
+    if (eligibleQuantity == 0) return 'This item is not eligible.';
+    if (policyWindow.trim().isEmpty || eligibleUntil == null) {
+      return 'Eligibility could not be confirmed. Contact support for help.';
+    }
+    if (!now.isBefore(eligibleUntil!)) {
+      return 'The request window has ended. Contact support for help.';
+    }
+    return null;
+  }
+}
+
+@immutable
 class BuyV2OrderResolutionSnapshot {
   const BuyV2OrderResolutionSnapshot({
     required this.orderId,
     required this.state,
     required this.sourceId,
     this.options = const [],
+    this.itemEligibility = const [],
     this.customerMessage,
   });
 
@@ -35,6 +69,7 @@ class BuyV2OrderResolutionSnapshot {
   final BuyV2OrderResolutionState state;
   final String sourceId;
   final List<BuyV2OrderResolutionOption> options;
+  final List<BuyV2OrderResolutionItemEligibility> itemEligibility;
   final String? customerMessage;
 }
 
@@ -44,11 +79,15 @@ class BuyV2OrderResolutionRequest {
     required this.orderId,
     required this.kind,
     required this.reason,
+    this.itemQuantities = const {},
+    this.eligibilitySourceId,
   });
 
   final String orderId;
   final BuyV2OrderResolutionKind kind;
   final String reason;
+  final Map<String, int> itemQuantities;
+  final String? eligibilitySourceId;
 }
 
 @immutable
@@ -69,6 +108,7 @@ abstract interface class BuyV2OrderResolutionAdapter {
 
   Future<BuyV2OrderResolutionSnapshot> load(BuyV2Order order);
 
+  /// The order service must revalidate item eligibility and quantities atomically.
   Future<BuyV2OrderResolutionResult> submit(
     BuyV2OrderResolutionRequest request,
   );

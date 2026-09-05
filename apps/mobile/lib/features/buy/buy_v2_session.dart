@@ -4471,6 +4471,56 @@ class BuyV2Session extends ChangeNotifier {
   bool orderResolutionBusy(String orderId) =>
       _orderResolutionBusyIds.contains(orderId);
 
+  BuyV2OrderResolutionItemEligibility? orderResolutionEligibilityFor(
+    String orderId,
+    BuyV2OrderResolutionKind kind,
+    String productId,
+  ) {
+    final order = _orders.where((value) => value.id == orderId).firstOrNull;
+    final snapshot = _orderResolutionSnapshots[orderId];
+    if (order?.status != BuyV2OrderStatus.delivered ||
+        snapshot?.state != BuyV2OrderResolutionState.ready ||
+        !snapshot!.options.any((option) => option.kind == kind)) {
+      return null;
+    }
+    final lines = order!.lines.where((line) => line.product.id == productId);
+    final facts = snapshot.itemEligibility.where(
+      (item) => item.productId == productId && item.kind == kind,
+    );
+    if (lines.length != 1 || facts.length != 1) return null;
+    final line = lines.single;
+    final fact = facts.single;
+    if (line.quantity <= 0 ||
+        line.product.destination != order.destination ||
+        fact.eligibleQuantity < 0 ||
+        fact.eligibleQuantity > line.quantity) {
+      return null;
+    }
+    return fact;
+  }
+
+  bool orderResolutionItemsAllowed({
+    required String orderId,
+    required BuyV2OrderResolutionKind kind,
+    required Map<String, int> itemQuantities,
+  }) {
+    final order = _orders.where((value) => value.id == orderId).firstOrNull;
+    if (kind == BuyV2OrderResolutionKind.cancel) {
+      return itemQuantities.isEmpty &&
+          (order?.status == BuyV2OrderStatus.confirmed ||
+              order?.status == BuyV2OrderStatus.preparing);
+    }
+    if (itemQuantities.isEmpty) return false;
+    final now = DateTime.now();
+    return itemQuantities.entries.every((entry) {
+      final fact = orderResolutionEligibilityFor(orderId, kind, entry.key);
+      return fact != null &&
+          fact.unavailableReasonAt(now) == null &&
+          entry.value > 0 &&
+          entry.value <= fact.eligibleQuantity;
+    });
+  }
+
   Future<bool> refreshOrderResolution(String orderId) async {
     final order = _orders
         .where((candidate) => candidate.id == orderId)
@@ -4479,6 +4529,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     _orderResolutionBusyIds.add(orderId);
+    _orderResolutionResults.remove(orderId);
     _orderResolutionSnapshots[orderId] = BuyV2OrderResolutionSnapshot(
       orderId: orderId,
       state: BuyV2OrderResolutionState.loading,
@@ -4557,6 +4608,7 @@ class BuyV2Session extends ChangeNotifier {
       state: BuyV2OrderResolutionState.ready,
       sourceId: snapshot.sourceId,
       options: List.unmodifiable(options),
+      itemEligibility: List.unmodifiable(snapshot.itemEligibility),
       customerMessage: snapshot.customerMessage,
     );
   }
@@ -4580,20 +4632,26 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (!orderResolutionItemsAllowed(
+      orderId: orderId,
+      kind: kind,
+      itemQuantities: itemQuantities,
+    )) {
+      notice =
+          'Choose eligible purchased quantities. Check eligibility again or contact support.';
+      notifyListeners();
+      return false;
+    }
     _orderResolutionBusyIds.add(orderId);
     notifyListeners();
     try {
-      final itemDetail = itemQuantities.entries
-          .where((entry) => entry.value > 0)
-          .map((entry) => '${entry.key}×${entry.value}')
-          .join(', ');
       final result = await orderResolutionAdapter.submit(
         BuyV2OrderResolutionRequest(
           orderId: orderId,
           kind: kind,
-          reason: itemDetail.isEmpty
-              ? cleanReason
-              : '$cleanReason · Items $itemDetail',
+          reason: cleanReason,
+          itemQuantities: Map.unmodifiable(itemQuantities),
+          eligibilitySourceId: snapshot!.sourceId,
         ),
       );
       final valid =

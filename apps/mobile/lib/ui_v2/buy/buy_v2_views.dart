@@ -10301,13 +10301,11 @@ class _BuyV2OrderResolutionSheetState
   @override
   void initState() {
     super.initState();
-    if (widget.session.orderResolutionFor(widget.order.id) == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          unawaited(widget.session.refreshOrderResolution(widget.order.id));
-        }
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(widget.session.refreshOrderResolution(widget.order.id));
+      }
+    });
   }
 
   void openSupport() {
@@ -10331,7 +10329,12 @@ class _BuyV2OrderResolutionSheetState
       reason: reason,
       itemQuantities: selectedItemQuantities,
     );
-    if (accepted && mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    if (accepted) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() => selectionError = widget.session.notice);
+    }
   }
 
   @override
@@ -10349,7 +10352,26 @@ class _BuyV2OrderResolutionSheetState
         final selectedOption = options
             .where((option) => option.kind == selectedKind)
             .firstOrNull;
-        final orderProducts = widget.session.productsForOrder(widget.order);
+        final orderProducts = widget.order.lines.isNotEmpty
+            ? {
+                for (final line in widget.order.lines)
+                  line.product.id: line.product,
+              }.values.toList(growable: false)
+            : widget.order.productIds.isNotEmpty
+            ? widget.session.productsForOrder(widget.order)
+            : const <BuyV2Product>[];
+        final canChooseReason =
+            selectedOption != null &&
+            (selectedOption.kind == BuyV2OrderResolutionKind.cancel ||
+                orderProducts.any((product) {
+                  final fact = widget.session.orderResolutionEligibilityFor(
+                    widget.order.id,
+                    selectedOption.kind,
+                    product.id,
+                  );
+                  return fact != null &&
+                      fact.unavailableReasonAt(DateTime.now()) == null;
+                }));
         return SafeArea(
           top: false,
           child: SingleChildScrollView(
@@ -10437,29 +10459,43 @@ class _BuyV2OrderResolutionSheetState
                     const SizedBox(height: 3),
                     if (selectedOption.kind !=
                         BuyV2OrderResolutionKind.cancel) ...[
-                      Text('Choose products', style: context.buyBody),
+                      Text(
+                        'Purchased-item eligibility',
+                        style: context.buyBody,
+                      ),
                       const SizedBox(height: 6),
+                      if (!canChooseReason) ...[
+                        Text(
+                          'No items are confirmed eligible for this request. Check again or contact support.',
+                          key: const ValueKey(
+                            'buy-order-resolution-no-eligible-items',
+                          ),
+                          style: context.buyBody,
+                        ),
+                        const SizedBox(height: 6),
+                      ],
                       for (final product in orderProducts) ...[
                         _OrderResolutionItemTile(
                           product: product,
                           selectedQuantity:
                               selectedItemQuantities[product.id] ?? 0,
-                          maximumQuantity:
-                              widget.order.lines
-                                  .where(
-                                    (line) => line.product.id == product.id,
-                                  )
-                                  .firstOrNull
-                                  ?.quantity ??
-                              1,
-                          onChanged: (quantity) => setState(() {
-                            if (quantity <= 0) {
-                              selectedItemQuantities.remove(product.id);
-                            } else {
-                              selectedItemQuantities[product.id] = quantity;
-                            }
-                            selectionError = null;
-                          }),
+                          eligibility: widget.session
+                              .orderResolutionEligibilityFor(
+                                widget.order.id,
+                                selectedOption.kind,
+                                product.id,
+                              ),
+                          onChanged: busy
+                              ? null
+                              : (quantity) => setState(() {
+                                  if (quantity <= 0) {
+                                    selectedItemQuantities.remove(product.id);
+                                  } else {
+                                    selectedItemQuantities[product.id] =
+                                        quantity;
+                                  }
+                                  selectionError = null;
+                                }),
                         ),
                         const SizedBox(height: 6),
                       ],
@@ -10476,38 +10512,74 @@ class _BuyV2OrderResolutionSheetState
                         ),
                         const SizedBox(height: 6),
                       ],
+                      OutlinedButton.icon(
+                        key: const ValueKey(
+                          'buy-order-resolution-check-eligibility',
+                        ),
+                        onPressed: busy
+                            ? null
+                            : () {
+                                setState(() {
+                                  selectedItemQuantities.clear();
+                                  selectedReason = null;
+                                  selectionError = null;
+                                });
+                                unawaited(
+                                  widget.session.refreshOrderResolution(
+                                    widget.order.id,
+                                  ),
+                                );
+                              },
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Check eligibility again'),
+                      ),
+                      const SizedBox(height: 10),
                     ],
-                    DropdownButtonFormField<String>(
-                      key: ValueKey(
-                        'buy-order-resolution-reason-${selectedOption.kind.name}',
-                      ),
-                      initialValue: selectedReason,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Reason',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: [
-                        for (final reason in selectedOption.reasons)
-                          DropdownMenuItem(
-                            value: reason,
-                            child: Text(
-                              reason,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                    if (canChooseReason) ...[
+                      DropdownButtonFormField<String>(
+                        key: ValueKey(
+                          'buy-order-resolution-reason-${selectedOption.kind.name}',
+                        ),
+                        initialValue: selectedReason,
+                        isExpanded: true,
+                        isDense: false,
+                        itemHeight: null,
+                        decoration: const InputDecoration(
+                          labelText: 'Reason',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: [
+                          for (final reason in selectedOption.reasons)
+                            DropdownMenuItem(
+                              value: reason,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                child: Text(reason),
+                              ),
                             ),
-                          ),
-                      ],
-                      onChanged: busy
-                          ? null
-                          : (value) => setState(() => selectedReason = value),
-                    ),
-                    const SizedBox(height: 10),
-                    FilledButton(
-                      key: const ValueKey('buy-order-resolution-submit'),
-                      onPressed: busy || selectedReason == null ? null : submit,
-                      child: Text(busy ? 'Sending…' : 'Submit request'),
-                    ),
+                        ],
+                        onChanged: busy
+                            ? null
+                            : (value) => setState(() => selectedReason = value),
+                      ),
+                      const SizedBox(height: 10),
+                      FilledButton(
+                        key: const ValueKey('buy-order-resolution-submit'),
+                        onPressed:
+                            busy ||
+                                selectedReason == null ||
+                                !widget.session.orderResolutionItemsAllowed(
+                                  orderId: widget.order.id,
+                                  kind: selectedOption.kind,
+                                  itemQuantities: selectedItemQuantities,
+                                )
+                            ? null
+                            : submit,
+                        child: Text(busy ? 'Sending…' : 'Submit request'),
+                      ),
+                    ],
                   ],
                   if (result != null) ...[
                     const SizedBox(height: 8),
@@ -10524,6 +10596,7 @@ class _BuyV2OrderResolutionSheetState
                   ],
                   const SizedBox(height: 8),
                   TextButton.icon(
+                    key: const ValueKey('buy-order-resolution-support-instead'),
                     onPressed: openSupport,
                     icon: const Icon(Icons.chat_outlined),
                     label: const Text('Contact support instead'),
@@ -10542,18 +10615,25 @@ class _OrderResolutionItemTile extends StatelessWidget {
   const _OrderResolutionItemTile({
     required this.product,
     required this.selectedQuantity,
-    required this.maximumQuantity,
+    required this.eligibility,
     required this.onChanged,
   });
 
   final BuyV2Product product;
   final int selectedQuantity;
-  final int maximumQuantity;
-  final ValueChanged<int> onChanged;
+  final BuyV2OrderResolutionItemEligibility? eligibility;
+  final ValueChanged<int>? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final selected = selectedQuantity > 0;
+    final fact = eligibility;
+    final issue = fact == null
+        ? 'Eligibility could not be confirmed. Contact support for help.'
+        : fact.unavailableReasonAt(DateTime.now());
+    final available = issue == null;
+    final selected = available && selectedQuantity > 0;
+    final deadline = fact?.eligibleUntil?.toLocal();
+    final localizations = MaterialLocalizations.of(context);
     return Semantics(
       container: true,
       label:
@@ -10564,51 +10644,99 @@ class _OrderResolutionItemTile extends StatelessWidget {
           color: selected ? BuyV2Colors.softBlue : Colors.white,
           radius: 13,
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Checkbox(
-              key: ValueKey('buy-order-resolution-item-${product.id}'),
-              value: selected,
-              onChanged: (value) => onChanged(value == true ? 1 : 0),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Checkbox(
+                  key: ValueKey('buy-order-resolution-item-${product.id}'),
+                  value: selected,
+                  onChanged: !available || onChanged == null
+                      ? null
+                      : (value) => onChanged!(value == true ? 1 : 0),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.title,
+                        style: context.buyBody.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(product.pack, style: context.buyMeta),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            if (fact != null && fact.policyWindow.trim().isNotEmpty) ...[
+              const SizedBox(height: 5),
+              Text(
+                'Policy window: ${fact.policyWindow}',
+                style: context.buyMeta,
+              ),
+            ],
+            if (deadline != null) ...[
+              const SizedBox(height: 5),
+              Text(
+                'Eligible until ${localizations.formatFullDate(deadline)}, '
+                '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(deadline))} (local time)',
+                style: context.buyMeta,
+              ),
+            ],
+            const SizedBox(height: 5),
+            Text(
+              issue ?? 'Eligible quantity: ${fact!.eligibleQuantity}',
+              key: ValueKey('buy-order-resolution-eligibility-${product.id}'),
+              style: context.buyMeta,
+            ),
+            if (selected) ...[
+              const SizedBox(height: 5),
+              Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
+                  IconButton(
+                    key: ValueKey(
+                      'buy-order-resolution-item-${product.id}-decrease',
+                    ),
+                    tooltip: 'Decrease ${product.title} quantity',
+                    onPressed: onChanged == null
+                        ? null
+                        : () => onChanged!(selectedQuantity - 1),
+                    constraints: const BoxConstraints(
+                      minWidth: 44,
+                      minHeight: 44,
+                    ),
+                    icon: const Icon(Icons.remove_rounded, size: 18),
+                  ),
                   Text(
-                    product.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    '$selectedQuantity',
                     style: context.buyBody.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  Text(product.pack, style: context.buyMeta),
+                  IconButton(
+                    key: ValueKey(
+                      'buy-order-resolution-item-${product.id}-increase',
+                    ),
+                    tooltip: 'Increase ${product.title} quantity',
+                    onPressed:
+                        onChanged == null ||
+                            selectedQuantity >= fact!.eligibleQuantity
+                        ? null
+                        : () => onChanged!(selectedQuantity + 1),
+                    constraints: const BoxConstraints(
+                      minWidth: 44,
+                      minHeight: 44,
+                    ),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                  ),
                 ],
-              ),
-            ),
-            if (selected) ...[
-              IconButton(
-                key: ValueKey(
-                  'buy-order-resolution-item-${product.id}-decrease',
-                ),
-                tooltip: 'Decrease ${product.title} quantity',
-                onPressed: () => onChanged(selectedQuantity - 1),
-                icon: const Icon(Icons.remove_rounded, size: 18),
-              ),
-              Text(
-                '$selectedQuantity',
-                style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
-              ),
-              IconButton(
-                key: ValueKey(
-                  'buy-order-resolution-item-${product.id}-increase',
-                ),
-                tooltip: 'Increase ${product.title} quantity',
-                onPressed: selectedQuantity >= maximumQuantity
-                    ? null
-                    : () => onChanged(selectedQuantity + 1),
-                icon: const Icon(Icons.add_rounded, size: 18),
               ),
             ],
           ],
