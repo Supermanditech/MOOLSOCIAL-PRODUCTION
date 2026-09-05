@@ -16,6 +16,176 @@ final NumberFormat _buyV2Currency = NumberFormat.currency(
 
 String buyV2Money(num value) => _buyV2Currency.format(value);
 
+/// Layout-only exclusions for the default floating cart, scoped to one surface.
+class BuyV2CartAvoidanceScope extends StatefulWidget {
+  const BuyV2CartAvoidanceScope({super.key, required this.child});
+  final Widget child;
+
+  static BuyV2CartAvoidanceLayout? of(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<_BuyV2CartAvoidanceOwner>()
+      ?.layout;
+
+  @override
+  State<BuyV2CartAvoidanceScope> createState() =>
+      _BuyV2CartAvoidanceScopeState();
+}
+
+class _BuyV2CartAvoidanceScopeState extends State<BuyV2CartAvoidanceScope> {
+  final layout = BuyV2CartAvoidanceLayout();
+
+  @override
+  void dispose() {
+    layout.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _BuyV2CartAvoidanceOwner(
+    layout: layout,
+    child: NotificationListener<ScrollNotification>(
+      onNotification: (_) {
+        layout.schedule();
+        return false;
+      },
+      child: NotificationListener<SizeChangedLayoutNotification>(
+        onNotification: (_) {
+          layout.schedule();
+          return false;
+        },
+        child: widget.child,
+      ),
+    ),
+  );
+}
+
+class _BuyV2CartAvoidanceOwner extends InheritedWidget {
+  const _BuyV2CartAvoidanceOwner({required this.layout, required super.child});
+  final BuyV2CartAvoidanceLayout layout;
+  @override
+  bool updateShouldNotify(_BuyV2CartAvoidanceOwner oldWidget) =>
+      oldWidget.layout != layout;
+}
+
+class BuyV2CartAvoidanceRegion extends StatefulWidget {
+  const BuyV2CartAvoidanceRegion({super.key, required this.child});
+  final Widget child;
+  @override
+  State<BuyV2CartAvoidanceRegion> createState() =>
+      _BuyV2CartAvoidanceRegionState();
+}
+
+class _BuyV2CartAvoidanceRegionState extends State<BuyV2CartAvoidanceRegion> {
+  BuyV2CartAvoidanceLayout? _layout;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = BuyV2CartAvoidanceScope.of(context);
+    if (next != _layout) {
+      _layout?._regions.remove(context);
+      _layout?.schedule();
+      _layout = next;
+      next?._regions.add(context);
+    }
+    _layout?.schedule();
+  }
+
+  @override
+  void deactivate() {
+    _layout?._regions.remove(context);
+    _layout?.schedule();
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    _layout?._regions.remove(context);
+    _layout?.schedule();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _layout?._regions.add(context);
+    _layout?.schedule();
+    return SizeChangedLayoutNotifier(child: widget.child);
+  }
+}
+
+class BuyV2CartAvoidanceLayout extends ChangeNotifier {
+  final _regions = <BuildContext>{};
+  bool _pending = false;
+  bool _disposed = false;
+
+  void schedule() {
+    if (_pending || _disposed) return;
+    _pending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pending = false;
+      if (!_disposed) notifyListeners();
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  Offset place(Offset preferred, Size cart, Size available, RenderBox owner) {
+    const edge = 8.0;
+    final viewport = Offset.zero & available;
+    final obstacles = <Rect>[];
+    for (final region in _regions) {
+      if (!region.mounted) continue;
+      final box = region.findRenderObject();
+      if (box is! RenderBox || !box.attached || !box.hasSize) continue;
+      RenderObject? ancestor = box;
+      while (ancestor != null && ancestor != owner) {
+        if (ancestor is RenderBox && !ancestor.hasSize) break;
+        ancestor = ancestor.parent;
+      }
+      if (ancestor != owner) continue;
+      final bounds = MatrixUtils.transformRect(
+        box.getTransformTo(owner),
+        Offset.zero & box.size,
+      ).inflate(6);
+      if (bounds.overlaps(viewport)) obstacles.add(bounds);
+    }
+    bool clear(Offset position) =>
+        !obstacles.any((rect) => rect.overlaps(position & cart));
+    if (clear(preferred)) return preferred;
+    final maxX = (available.width - cart.width - edge).clamp(
+      edge,
+      double.infinity,
+    );
+    final maxY = (available.height - cart.height - edge).clamp(
+      edge,
+      double.infinity,
+    );
+    final xs = <double>{preferred.dx, edge, maxX};
+    final ys = <double>{preferred.dy, edge, maxY};
+    for (final obstacle in obstacles) {
+      xs.addAll([obstacle.left - cart.width, obstacle.right]);
+      ys.addAll([obstacle.top - cart.height, obstacle.bottom]);
+    }
+    Offset? best;
+    var distance = double.infinity;
+    for (final x in xs) {
+      for (final y in ys) {
+        final candidate = Offset(x.clamp(edge, maxX), y.clamp(edge, maxY));
+        final nextDistance = (candidate - preferred).distanceSquared;
+        if (nextDistance < distance && clear(candidate)) {
+          best = candidate;
+          distance = nextDistance;
+        }
+      }
+    }
+    return best ?? preferred;
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _regions.clear();
+    super.dispose();
+  }
+}
+
 /// Natural bounds for a current value using the same inherited font and scaler
 /// as its Text. Callers still own available width, placement and tap targets.
 Size buyV2ValueTextSize(

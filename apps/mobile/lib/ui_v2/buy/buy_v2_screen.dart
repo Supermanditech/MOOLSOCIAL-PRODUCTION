@@ -541,58 +541,63 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                             BuyV2ShoppingIntentBar(session: session),
                           _buildDeliveryStatus(session, setState),
                           Expanded(
-                            child: Stack(
-                              key: const ValueKey(
-                                'buy-navigation-overlay-stack',
-                              ),
-                              children: [
-                                Positioned.fill(
-                                  child: _BuyNavigationSurfaceOwner(
-                                    key: ObjectKey(session),
-                                    stateKey: session.navigationMotionSequence,
-                                    direction: _surfaceMotionDirection,
-                                    child: _BuyExpandCollapseOwner(
-                                      key: ValueKey(
-                                        _searchOpen &&
-                                                session.destination !=
-                                                    BuyV2Destination.orders
-                                            ? 'buy-search-owner-motion-search'
-                                            : 'buy-search-owner-motion-primary',
-                                      ),
-                                      child:
-                                          _storeProductRouteDepth > 0 &&
-                                              session.view != BuyV2View.product
-                                          ? const SizedBox.expand()
-                                          : _searchOpen &&
-                                                !_offersActive &&
-                                                session.destination !=
-                                                    BuyV2Destination.orders
-                                          ? BuyV2SearchResultsView(
-                                              session: session,
-                                            )
-                                          : _currentView(session),
-                                    ),
-                                  ),
+                            child: BuyV2CartAvoidanceScope(
+                              child: Stack(
+                                key: const ValueKey(
+                                  'buy-navigation-overlay-stack',
                                 ),
-                                ?_buildDeliveryRestore(session, setState),
-                                if (!keyboardVisible && _showsMiniCart(session))
+                                children: [
                                   Positioned.fill(
-                                    child: _BuyMiniCartBar(
-                                      session: session,
-                                      aggregate: _offersActive,
-                                      initialPosition: _miniCartPosition,
-                                      onPositionChanged: (position) {
-                                        _miniCartPosition = position;
-                                      },
+                                    child: _BuyNavigationSurfaceOwner(
+                                      key: ObjectKey(session),
+                                      stateKey:
+                                          session.navigationMotionSequence,
+                                      direction: _surfaceMotionDirection,
+                                      child: _BuyExpandCollapseOwner(
+                                        key: ValueKey(
+                                          _searchOpen &&
+                                                  session.destination !=
+                                                      BuyV2Destination.orders
+                                              ? 'buy-search-owner-motion-search'
+                                              : 'buy-search-owner-motion-primary',
+                                        ),
+                                        child:
+                                            _storeProductRouteDepth > 0 &&
+                                                session.view !=
+                                                    BuyV2View.product
+                                            ? const SizedBox.expand()
+                                            : _searchOpen &&
+                                                  !_offersActive &&
+                                                  session.destination !=
+                                                      BuyV2Destination.orders
+                                            ? BuyV2SearchResultsView(
+                                                session: session,
+                                              )
+                                            : _currentView(session),
+                                      ),
                                     ),
                                   ),
-                                if (session.notice case final message?)
-                                  Positioned(
-                                    right: 8,
-                                    top: 8,
-                                    child: _BuyNotice(message: message),
-                                  ),
-                              ],
+                                  ?_buildDeliveryRestore(session, setState),
+                                  if (!keyboardVisible &&
+                                      _showsMiniCart(session))
+                                    Positioned.fill(
+                                      child: _BuyMiniCartBar(
+                                        session: session,
+                                        aggregate: _offersActive,
+                                        initialPosition: _miniCartPosition,
+                                        onPositionChanged: (position) {
+                                          _miniCartPosition = position;
+                                        },
+                                      ),
+                                    ),
+                                  if (session.notice case final message?)
+                                    Positioned(
+                                      right: 8,
+                                      top: 8,
+                                      child: _BuyNotice(message: message),
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -2081,136 +2086,155 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
       session.openCart(scope: scope);
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final available = constraints.biggest;
-        final maximumWidth = (available.width - (_edgeInset * 2)).clamp(
-          88.0,
-          double.infinity,
-        );
-        final textWidth = itemSize.width > totalSize.width
-            ? itemSize.width
-            : totalSize.width;
-        final cartWidth = (textWidth + 40).clamp(88.0, maximumWidth).toDouble();
-        final cartHeight = (itemSize.height + totalSize.height + 18)
-            .clamp(48.0, double.infinity)
-            .toDouble();
-        final cartSize = Size(cartWidth, cartHeight);
-        final currentPosition = _clampPosition(
-          _position ?? _defaultPosition(available, cartSize),
-          available,
-          cartSize,
-        );
-        final valueWidth = cartWidth - 40;
-
-        void move(DragUpdateDetails details) {
-          setState(() {
-            _position = _clampPosition(
-              (_position ?? currentPosition) + details.delta,
-              available,
+    final avoidance = BuyV2CartAvoidanceScope.of(context);
+    return ListenableBuilder(
+      listenable: avoidance ?? const AlwaysStoppedAnimation<int>(0),
+      builder: (context, _) => LayoutBuilder(
+        builder: (context, constraints) {
+          final available = constraints.biggest;
+          final maximumWidth = (available.width - (_edgeInset * 2)).clamp(
+            88.0,
+            double.infinity,
+          );
+          final textWidth = itemSize.width > totalSize.width
+              ? itemSize.width
+              : totalSize.width;
+          final cartWidth = (textWidth + 40)
+              .clamp(88.0, maximumWidth)
+              .toDouble();
+          final cartHeight = (itemSize.height + totalSize.height + 18)
+              .clamp(48.0, double.infinity)
+              .toDouble();
+          final cartSize = Size(cartWidth, cartHeight);
+          var currentPosition = _clampPosition(
+            _position ?? _defaultPosition(available, cartSize),
+            available,
+            cartSize,
+          );
+          final owner = context.findAncestorRenderObjectOfType<RenderBox>();
+          if (_position == null &&
+              avoidance != null &&
+              owner is RenderBox &&
+              owner.hasSize) {
+            currentPosition = avoidance.place(
+              currentPosition,
               cartSize,
+              available,
+              owner,
             );
-          });
-        }
+          }
+          final valueWidth = cartWidth - 40;
 
-        void finishMove() {
-          final position = _position ?? currentPosition;
-          widget.onPositionChanged(position);
-          HapticFeedback.selectionClick();
-        }
+          void move(DragUpdateDetails details) {
+            setState(() {
+              _position = _clampPosition(
+                (_position ?? currentPosition) + details.delta,
+                available,
+                cartSize,
+              );
+            });
+          }
 
-        return Stack(
-          key: const ValueKey('buy-mini-cart-transparent-overlay'),
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              left: currentPosition.dx,
-              top: currentPosition.dy,
-              child: Semantics(
-                key: const ValueKey('buy-compact-cart-indicator'),
-                container: true,
-                label: 'Cart, $cartMessage, $totalText. View cart',
-                hint: 'Drag to move. Double tap to view cart.',
-                button: true,
-                liveRegion: true,
-                onTap: activate,
-                child: GestureDetector(
-                  key: const ValueKey('buy-mini-cart-drag-handle'),
-                  behavior: HitTestBehavior.opaque,
-                  onPanUpdate: move,
-                  onPanEnd: (_) => finishMove(),
-                  onPanCancel: finishMove,
-                  child: SizedBox(
-                    width: cartWidth,
-                    height: cartHeight,
-                    child: Material(
-                      color: BuyV2Colors.navy,
-                      elevation: 3,
-                      shadowColor: BuyV2Colors.navy.withValues(alpha: .2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        side: const BorderSide(color: BuyV2Colors.royal),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: activate,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Row(
-                            children: [
-                              AnimatedSwitcher(
-                                duration: BuyV2Motion.resolved(
-                                  context,
-                                  BuyV2Motion.stateChange,
-                                ),
-                                child: Icon(
-                                  acknowledgement == null
-                                      ? Icons.shopping_cart_outlined
-                                      : Icons.check_circle_rounded,
-                                  key: ValueKey(
-                                    acknowledgement == null
-                                        ? 'buy-mini-cart-icon'
-                                        : 'buy-mini-cart-added-icon',
+          void finishMove() {
+            final position = _position ?? currentPosition;
+            widget.onPositionChanged(position);
+            HapticFeedback.selectionClick();
+          }
+
+          return Stack(
+            key: const ValueKey('buy-mini-cart-transparent-overlay'),
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: currentPosition.dx,
+                top: currentPosition.dy,
+                child: Semantics(
+                  key: const ValueKey('buy-compact-cart-indicator'),
+                  container: true,
+                  label: 'Cart, $cartMessage, $totalText. View cart',
+                  hint: 'Drag to move. Double tap to view cart.',
+                  button: true,
+                  liveRegion: true,
+                  onTap: activate,
+                  child: GestureDetector(
+                    key: const ValueKey('buy-mini-cart-drag-handle'),
+                    behavior: HitTestBehavior.opaque,
+                    onPanUpdate: move,
+                    onPanEnd: (_) => finishMove(),
+                    onPanCancel: finishMove,
+                    child: SizedBox(
+                      width: cartWidth,
+                      height: cartHeight,
+                      child: Material(
+                        color: BuyV2Colors.navy,
+                        elevation: 3,
+                        shadowColor: BuyV2Colors.navy.withValues(alpha: .2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: const BorderSide(color: BuyV2Colors.royal),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: activate,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Row(
+                              children: [
+                                AnimatedSwitcher(
+                                  duration: BuyV2Motion.resolved(
+                                    context,
+                                    BuyV2Motion.stateChange,
                                   ),
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  BuyV2FiniteValueTransition(
+                                  child: Icon(
+                                    acknowledgement == null
+                                        ? Icons.shopping_cart_outlined
+                                        : Icons.check_circle_rounded,
                                     key: ValueKey(
                                       acknowledgement == null
-                                          ? 'buy-cart-summary'
-                                          : 'buy-cart-acknowledgement',
+                                          ? 'buy-mini-cart-icon'
+                                          : 'buy-mini-cart-added-icon',
                                     ),
-                                    stateKey: '$cartMessage|$itemCount|$total',
-                                    text: itemText,
-                                    ownerSize: Size(
-                                      valueWidth,
-                                      itemSize.height,
-                                    ),
-                                    textAlign: TextAlign.start,
-                                    style: itemStyle,
+                                    color: Colors.white,
+                                    size: 18,
                                   ),
-                                  const SizedBox(height: 2),
-                                  BuyV2FiniteValueTransition(
-                                    key: const ValueKey('buy-cart-total'),
-                                    stateKey: '$total|$totalText',
-                                    text: totalText,
-                                    ownerSize: Size(
-                                      valueWidth,
-                                      totalSize.height,
+                                ),
+                                const SizedBox(width: 6),
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    BuyV2FiniteValueTransition(
+                                      key: ValueKey(
+                                        acknowledgement == null
+                                            ? 'buy-cart-summary'
+                                            : 'buy-cart-acknowledgement',
+                                      ),
+                                      stateKey:
+                                          '$cartMessage|$itemCount|$total',
+                                      text: itemText,
+                                      ownerSize: Size(
+                                        valueWidth,
+                                        itemSize.height,
+                                      ),
+                                      textAlign: TextAlign.start,
+                                      style: itemStyle,
                                     ),
-                                    textAlign: TextAlign.start,
-                                    style: totalStyle,
-                                  ),
-                                ],
-                              ),
-                            ],
+                                    const SizedBox(height: 2),
+                                    BuyV2FiniteValueTransition(
+                                      key: const ValueKey('buy-cart-total'),
+                                      stateKey: '$total|$totalText',
+                                      text: totalText,
+                                      ownerSize: Size(
+                                        valueWidth,
+                                        totalSize.height,
+                                      ),
+                                      textAlign: TextAlign.start,
+                                      style: totalStyle,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -2218,10 +2242,10 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
                   ),
                 ),
               ),
-            ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     );
   }
 }

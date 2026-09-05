@@ -1518,42 +1518,44 @@ class _ProductVariantSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      key: ValueKey('buy-product-variants-${product.canonicalId}'),
-      padding: const EdgeInsets.all(10),
-      decoration: buyV2CardDecoration(radius: 15),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Choose an option',
-            style: context.buyTitle.copyWith(fontSize: 14),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Choose the pack that fits your order. Price, availability and delivery update with your choice.',
-            style: context.buyMeta.copyWith(fontSize: 8),
-          ),
-          const SizedBox(height: 8),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final width = (constraints.maxWidth - 8) / 2;
-              return Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final option in variants)
-                    _ProductVariantOption(
-                      session: session,
-                      option: option,
-                      selected: option.id == product.id,
-                      width: width,
-                    ),
-                ],
-              );
-            },
-          ),
-        ],
+    return BuyV2CartAvoidanceRegion(
+      child: Container(
+        key: ValueKey('buy-product-variants-${product.canonicalId}'),
+        padding: const EdgeInsets.all(10),
+        decoration: buyV2CardDecoration(radius: 15),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Choose an option',
+              style: context.buyTitle.copyWith(fontSize: 14),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Choose the pack that fits your order. Price, availability and delivery update with your choice.',
+              style: context.buyMeta.copyWith(fontSize: 8),
+            ),
+            const SizedBox(height: 8),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = (constraints.maxWidth - 8) / 2;
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final option in variants)
+                      _ProductVariantOption(
+                        session: session,
+                        option: option,
+                        selected: option.id == product.id,
+                        width: width,
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2504,39 +2506,41 @@ class _WholesaleTradeActionDock extends StatelessWidget {
       );
     }
 
-    return Material(
-      key: ValueKey('buy-wholesale-action-dock-${product.id}'),
-      color: Colors.white,
-      elevation: 10,
-      shadowColor: const Color(0x26000080),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final stacked = largeText || constraints.maxWidth < 330;
-              if (stacked) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [summary, const SizedBox(height: 8), actionGroup],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(child: summary),
-                  const SizedBox(width: 10),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      minWidth: 148,
-                      maxWidth: 190,
+    return BuyV2CartAvoidanceRegion(
+      child: Material(
+        key: ValueKey('buy-wholesale-action-dock-${product.id}'),
+        color: Colors.white,
+        elevation: 10,
+        shadowColor: const Color(0x26000080),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = largeText || constraints.maxWidth < 330;
+                if (stacked) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [summary, const SizedBox(height: 8), actionGroup],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(child: summary),
+                    const SizedBox(width: 10),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 148,
+                        maxWidth: 190,
+                      ),
+                      child: actionGroup,
                     ),
-                    child: actionGroup,
-                  ),
-                ],
-              );
-            },
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -13922,39 +13926,41 @@ class _ProductOwnedActionPanel extends StatelessWidget {
       ],
     );
 
-    return Semantics(
-      container: true,
-      explicitChildNodes: true,
-      child: Container(
-        padding: const EdgeInsets.all(9),
-        decoration: BoxDecoration(
-          color: BuyV2Colors.softBlue.withValues(alpha: .42),
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: const Color(0x24000080)),
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
-            final stack = largeText || constraints.maxWidth < 276;
-            if (stack) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    return BuyV2CartAvoidanceRegion(
+      child: Semantics(
+        container: true,
+        explicitChildNodes: true,
+        child: Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: BuyV2Colors.softBlue.withValues(alpha: .42),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: const Color(0x24000080)),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
+              final stack = largeText || constraints.maxWidth < 276;
+              if (stack) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    price,
+                    const SizedBox(height: 8),
+                    Align(alignment: Alignment.centerRight, child: action),
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  price,
-                  const SizedBox(height: 8),
-                  Align(alignment: Alignment.centerRight, child: action),
+                  Expanded(child: price),
+                  const SizedBox(width: 8),
+                  action,
                 ],
               );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(child: price),
-                const SizedBox(width: 8),
-                action,
-              ],
-            );
-          },
+            },
+          ),
         ),
       ),
     );

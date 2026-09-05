@@ -80,8 +80,11 @@ void main() {
     WidgetTester tester,
     String name, {
     bool store = false,
+    bool obstruction = false,
   }) async {
-    if (!(store
+    if (!(obstruction
+        ? const bool.fromEnvironment('BUY_R66_CART_OBSTRUCTION_CAPTURE')
+        : store
         ? const bool.fromEnvironment('BUY_R66_STORE_RETURN_CAPTURE')
         : const bool.fromEnvironment('BUY_R66_CART_FEEDBACK_CAPTURE'))) {
       return;
@@ -93,7 +96,9 @@ void main() {
     await tester.pump();
     await tester.runAsync(() async {
       final directory = Directory(
-        store
+        obstruction
+            ? 'build/r66-cart-obstruction-v3-20260905'
+            : store
             ? 'build/r66-store-return-v2-20260905'
             : 'build/r66-cart-feedback-v1-20260905',
       );
@@ -115,6 +120,175 @@ void main() {
         (product) =>
             product.destination == destination && !product.requiresPrescription,
       );
+
+  for (final mixed in [false, true]) {
+    for (final id in ['s-tomato', 's-atta', 'w-tomato', 'w-rice']) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'R66 floating Cart avoids product controls $id at $scale mixed=$mixed',
+          (tester) async {
+            final size = Size(scale == 1 ? 360 : 320, 800);
+            tester.view.physicalSize = size;
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.reset);
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            final product = session.product(id);
+            final retainedId = product.destination == BuyV2Destination.shop
+                ? 'w-tomato'
+                : 's-tomato';
+            if (mixed) expect(session.addProduct(retainedId), isTrue);
+            final retained = session.quantityFor(retainedId);
+            session.openDestination(product.destination);
+            if (product.destination == BuyV2Destination.shop) {
+              session.chooseShopSaleType(
+                id == 's-tomato'
+                    ? BuyV2ShopSaleType.quickDelivery
+                    : BuyV2ShopSaleType.courier,
+              );
+            } else {
+              session.chooseWholesaleSaleType(
+                id == 'w-rice'
+                    ? BuyV2WholesaleSaleType.bulk
+                    : BuyV2WholesaleSaleType.wholesale,
+              );
+            }
+            session.openProduct(id);
+            await tester.pumpWidget(app(session, size: size, textScale: scale));
+            await tester.pumpAndSettle();
+            final allActions = find.byKey(
+              ValueKey('buy-product-action-slot-$id'),
+            );
+            final productScroll = find
+                .descendant(
+                  of: find.byType(BuyV2ProductView),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            for (
+              var attempt = 0;
+              attempt < 30 && allActions.evaluate().isEmpty;
+              attempt++
+            ) {
+              await tester.drag(productScroll, const Offset(0, -240));
+              await tester.pumpAndSettle();
+            }
+            expect(allActions, findsWidgets);
+            final actions = allActions.first;
+            await tester.ensureVisible(actions);
+            await tester.pumpAndSettle();
+            final scroll = tester.state<ScrollableState>(
+              find
+                  .descendant(
+                    of: find.byType(BuyV2ProductView),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            final overlay = find.byKey(
+              const ValueKey('buy-navigation-overlay-stack'),
+            );
+            final targetBottom = tester.getRect(overlay).bottom - 16;
+            scroll.position.jumpTo(
+              (scroll.position.pixels +
+                      tester.getRect(actions).bottom -
+                      targetBottom)
+                  .clamp(0.0, scroll.position.maxScrollExtent),
+            );
+            await tester.pumpAndSettle();
+            final add = find.descendant(
+              of: actions,
+              matching: find.byKey(ValueKey('buy-product-primary-$id')),
+            );
+            await tester.tap(add);
+            await tester.pump();
+            expect(session.quantityFor(id), product.minimumOrder);
+            final cart = find.byKey(
+              const ValueKey('buy-mini-cart-drag-handle'),
+            );
+            expect(cart, findsOneWidget);
+            final increase = find.descendant(
+              of: actions,
+              matching: find.byTooltip('Add one'),
+            );
+            expect(increase, findsOneWidget);
+            expect(
+              tester.getRect(cart).overlaps(tester.getRect(increase)),
+              isFalse,
+            );
+            await tester.pumpAndSettle();
+            void expectRegionsClear() {
+              for (final region
+                  in find.byType(BuyV2CartAvoidanceRegion).evaluate()) {
+                final rect = tester.getRect(
+                  find.byElementPredicate((element) => element == region),
+                );
+                if (rect.overlaps(tester.getRect(overlay))) {
+                  expect(tester.getRect(cart).overlaps(rect), isFalse);
+                }
+              }
+            }
+
+            expectRegionsClear();
+            await capture(
+              tester,
+              '$id-$scale-$mixed-default',
+              obstruction: true,
+            );
+            await tester.tapAt(tester.getCenter(increase));
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.product);
+            expect(session.quantityFor(id), product.minimumOrder + 1);
+            expect(session.quantityFor(retainedId), retained);
+            for (final delta in [32.0, -64.0, 32.0]) {
+              scroll.position.jumpTo(
+                (scroll.position.pixels + delta).clamp(
+                  0.0,
+                  scroll.position.maxScrollExtent,
+                ),
+              );
+              await tester.pumpAndSettle();
+              expect(
+                tester.getRect(cart).overlaps(tester.getRect(increase)),
+                isFalse,
+              );
+              expectRegionsClear();
+            }
+            final beforeDrag = tester.getTopLeft(cart);
+            await tester.drag(cart, const Offset(-48, -110));
+            await tester.pumpAndSettle();
+            final dragged = tester.getTopLeft(cart);
+            expect(dragged.dx, lessThan(beforeDrag.dx - 25));
+            expect(dragged.dy, lessThan(beforeDrag.dy - 75));
+            final productOffset = scroll.position.pixels;
+            await tester.tap(cart);
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.cart);
+            expect(session.activeDockDestination, product.destination);
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.product);
+            expect(session.selectedProduct?.id, id);
+            expect(tester.getTopLeft(cart), dragged);
+            final restoredScroll = tester.state<ScrollableState>(
+              find
+                  .descendant(
+                    of: find.byType(BuyV2ProductView),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            expect(restoredScroll.position.pixels, closeTo(productOffset, .01));
+            expect(session.quantityFor(id), product.minimumOrder + 1);
+            expect(session.quantityFor(retainedId), retained);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
 
   BuyV2Session mixedSession() {
     final session = BuyV2Session(core: BuySession());
