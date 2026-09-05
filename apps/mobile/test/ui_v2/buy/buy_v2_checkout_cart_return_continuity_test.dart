@@ -412,6 +412,112 @@ void main() {
     expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
   }
 
+  Future<BuyV2Session> mountPaymentAction(
+    WidgetTester tester,
+    String provider, {
+    BuyV2PaymentHandoff? handoff,
+  }) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    expect(session.addProduct('w-notebook'), isTrue);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    await tester.pumpWidget(app(session, paymentHandoff: handoff));
+    await tester.pumpAndSettle();
+    expect(session.openCheckout(), isTrue);
+    expect(session.choosePayment(provider), isTrue);
+    advanceCheckoutToConfirm(session);
+    expect(await session.submitOrder(), isFalse);
+    await tester.pumpAndSettle();
+    expect(
+      session.checkoutSubmissionState,
+      BuyV2CheckoutSubmissionState.paymentActionRequired,
+    );
+    return session;
+  }
+
+  for (final provider in ['PhonePe', 'Paytm', 'Pine Labs']) {
+    testWidgets('R66 missing $provider handoff cannot simulate payment', (
+      tester,
+    ) async {
+      final session = await mountPaymentAction(tester, provider);
+      final reference = session.paymentReference;
+      final attempt = session.checkoutIdempotencyKey;
+      expect(find.text('Payment unavailable right now'), findsOneWidget);
+      expect(find.text('Ready for secure payment'), findsNothing);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-payment')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-payment-handoff-completed')),
+        findsNothing,
+      );
+      expect(find.text('Payment completed'), findsNothing);
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentActionRequired,
+      );
+      expect(session.paymentReference, reference);
+      expect(session.checkoutIdempotencyKey, attempt);
+      expect(session.confirmedOrders, isEmpty);
+      expect(session.quantityFor('w-notebook'), 1);
+      final cancel = find.byKey(const ValueKey('buy-checkout-cancel-payment'));
+      await tester.ensureVisible(cancel);
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.cancelled,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-payment')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.idle,
+      );
+      expect(session.quantityFor('w-notebook'), 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('R66 injected handoff launches once and remains unconfirmed', (
+    tester,
+  ) async {
+    final opened = <Uri>[];
+    final session = await mountPaymentAction(
+      tester,
+      'PhonePe',
+      handoff: (uri) async {
+        opened.add(uri);
+        return true;
+      },
+    );
+    expect(find.text('Ready for secure payment'), findsOneWidget);
+    final expectedUri = session.paymentActionUri;
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-payment')),
+    );
+    await tester.pumpAndSettle();
+    expect(opened, [expectedUri]);
+    expect(
+      session.checkoutSubmissionState,
+      BuyV2CheckoutSubmissionState.paymentPending,
+    );
+    expect(session.confirmedOrders, isEmpty);
+    expect(
+      find.byKey(const ValueKey('buy-payment-handoff-completed')),
+      findsNothing,
+    );
+    expect(session.quantityFor('w-notebook'), 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('visible Checkout return restores every exact Cart scope', (
     tester,
   ) async {
@@ -810,6 +916,62 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('R66 missing balance handoff preserves the unpaid balance', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final balanceAdapter = _BalancePaymentAdapter();
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+      balancePaymentAdapter: balanceAdapter,
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    expect(
+      session.addProduct(productFor(BuyV2Destination.wholesale).id),
+      isTrue,
+    );
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    expect(session.openCheckout(), isTrue);
+    await session.refreshCommercialPaymentTerms();
+    final group = session.checkoutFulfilmentGroups.single;
+    final booking = session
+        .commercialPaymentTermsFor(group.key)
+        .firstWhere(
+          (term) =>
+              term.kind ==
+              BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+        );
+    expect(session.chooseCommercialPaymentTerm(booking), isTrue);
+    expect(await _submitAndCompleteReviewPayment(session), isTrue);
+    final order = session.confirmedOrders.single;
+    balanceAdapter.amountDue = order.balanceDue;
+    expect(session.openTracking(order.id), isTrue);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-tracking-balance-pay-balance')),
+    );
+    await tester.pumpAndSettle();
+    expect(balanceAdapter.startCalls, 1);
+    expect(find.text('Balance payment unavailable'), findsOneWidget);
+    expect(find.text('Ready for payment'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('buy-tracking-balance-continue-payment')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-payment-handoff-completed')),
+      findsNothing,
+    );
+    expect(balanceAdapter.reconcileCalls, 0);
+    expect(order.balanceDue, greaterThan(0));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'later balance pays once and reconciles without duplicate payment',

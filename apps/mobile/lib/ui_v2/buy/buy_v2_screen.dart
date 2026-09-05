@@ -1097,82 +1097,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     );
   }
 
-  Future<bool> _openPaymentCollection(Uri uri) async {
-    if (!uri.hasScheme || uri.host.isEmpty) return false;
-    HapticFeedback.mediumImpact();
-    final providerSlug = uri.queryParameters['provider']?.trim() ?? '';
-    final provider = buyV2CustomerPaymentProviderLabel(
-      providerSlug,
-      fallback: widget.session.selectedPayment,
-    );
-    final reference = uri.queryParameters['reference'];
-    final completed = await showModalBottomSheet<bool>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: Colors.white,
-      constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Icon(
-                Icons.lock_outline_rounded,
-                color: BuyV2Colors.navy,
-                size: 30,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Pay MoolSocial',
-                textAlign: TextAlign.center,
-                style: sheetContext.buyTitle.copyWith(fontSize: 20),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '$provider · ${buyV2Money(widget.session.checkoutAmountDueNow)}',
-                textAlign: TextAlign.center,
-                style: sheetContext.buyBody.copyWith(
-                  color: BuyV2Colors.navy,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              if (reference?.trim().isNotEmpty == true) ...[
-                const SizedBox(height: 3),
-                Text(
-                  'Payment reference $reference',
-                  textAlign: TextAlign.center,
-                  style: sheetContext.buyMeta,
-                ),
-              ],
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                key: const ValueKey('buy-payment-handoff-completed'),
-                onPressed: () => Navigator.of(sheetContext).pop(true),
-                icon: const Icon(Icons.check_circle_outline_rounded),
-                label: const Text('Payment completed'),
-              ),
-              const SizedBox(height: 7),
-              OutlinedButton(
-                key: const ValueKey('buy-payment-handoff-not-completed'),
-                onPressed: () => Navigator.of(sheetContext).pop(false),
-                child: const Text('Payment not completed'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    return completed ?? false;
-  }
-
   Widget _currentView(BuyV2Session session) {
     final cartStoreAnchor = switch (session.cartScope) {
       BuyV2CartScope.all => _storeBrowseAnchor,
@@ -1232,7 +1156,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         session: session,
         gstInvoiceController: _gstInvoiceController,
         keyboardVisible: MediaQuery.viewInsetsOf(context).bottom > 0,
-        paymentHandoff: widget.paymentHandoff ?? _openPaymentCollection,
+        paymentHandoff: widget.paymentHandoff,
       ),
       BuyV2View.confirmation => BuyV2ConfirmationView(
         session: session,
@@ -1242,7 +1166,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         session: session,
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
-        paymentHandoff: widget.paymentHandoff ?? _openPaymentCollection,
+        paymentHandoff: widget.paymentHandoff,
         liveDeliveryMapBuilder: widget.liveDeliveryMapBuilder,
       ),
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
@@ -1250,7 +1174,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         session: session,
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
-        paymentHandoff: widget.paymentHandoff ?? _openPaymentCollection,
+        paymentHandoff: widget.paymentHandoff,
         liveDeliveryMapBuilder: widget.liveDeliveryMapBuilder,
       ),
       BuyV2View.account => BuyV2AccountView(

@@ -6541,6 +6541,7 @@ class BuyV2CheckoutView extends StatelessWidget {
                       BuyV2CheckoutStep.payment => _CheckoutPaymentStage(
                         key: const ValueKey('buy-checkout-payment-stage'),
                         session: session,
+                        hasPaymentHandoff: paymentHandoff != null,
                       ),
                       BuyV2CheckoutStep.confirm => _CheckoutConfirmStage(
                         key: const ValueKey('buy-checkout-confirm-stage'),
@@ -6594,7 +6595,9 @@ class BuyV2CheckoutView extends StatelessWidget {
           session.continueCheckoutFromPayment,
         ),
         BuyV2CheckoutSubmissionState.paymentActionRequired => (
-          'Pay ${buyV2Money(session.checkoutAmountDueNow)}',
+          paymentHandoff == null
+              ? 'Unavailable'
+              : 'Pay ${buyV2Money(session.checkoutAmountDueNow)}',
           paymentHandoff == null
               ? () => session.showNotice(
                   'Payment is unavailable right now. Try again shortly.',
@@ -6919,9 +6922,14 @@ List<(String, IconData, String)> _buyV2CustomerPaymentChoices(
         .toList(growable: false);
 
 class _CheckoutPaymentStage extends StatelessWidget {
-  const _CheckoutPaymentStage({super.key, required this.session});
+  const _CheckoutPaymentStage({
+    super.key,
+    required this.session,
+    required this.hasPaymentHandoff,
+  });
 
   final BuyV2Session session;
+  final bool hasPaymentHandoff;
 
   @override
   Widget build(BuildContext context) {
@@ -6974,7 +6982,10 @@ class _CheckoutPaymentStage extends StatelessWidget {
         ),
         if (!selecting) ...[
           const SizedBox(height: 9),
-          _CheckoutPaymentStateRow(session: session),
+          _CheckoutPaymentStateRow(
+            session: session,
+            hasPaymentHandoff: hasPaymentHandoff,
+          ),
         ],
         const SizedBox(height: 12),
         Text('Payment method', style: context.buyBody),
@@ -7074,19 +7085,34 @@ class _CheckoutPaymentFact extends StatelessWidget {
 }
 
 class _CheckoutPaymentStateRow extends StatelessWidget {
-  const _CheckoutPaymentStateRow({required this.session});
+  const _CheckoutPaymentStateRow({
+    required this.session,
+    required this.hasPaymentHandoff,
+  });
 
   final BuyV2Session session;
+  final bool hasPaymentHandoff;
 
   @override
   Widget build(BuildContext context) {
     final state = session.checkoutSubmissionState;
+    final handoffUnavailable =
+        state == BuyV2CheckoutSubmissionState.paymentActionRequired &&
+        session.paymentActionUri != null &&
+        !hasPaymentHandoff;
     final content = switch (state) {
       BuyV2CheckoutSubmissionState.submitting => (
         Icons.autorenew_rounded,
         'Checking payment',
         'Please wait. Do not start another payment.',
       ),
+      BuyV2CheckoutSubmissionState.paymentActionRequired
+          when handoffUnavailable =>
+        (
+          Icons.cloud_off_outlined,
+          'Payment unavailable right now',
+          'Try again later, or cancel to choose another method.',
+        ),
       BuyV2CheckoutSubmissionState.paymentActionRequired => (
         Icons.lock_outline_rounded,
         'Ready for secure payment',
@@ -7125,6 +7151,7 @@ class _CheckoutPaymentStateRow extends StatelessWidget {
       ),
     };
     final attention =
+        handoffUnavailable ||
         state == BuyV2CheckoutSubmissionState.paymentPending ||
         state == BuyV2CheckoutSubmissionState.paymentUnknown ||
         state == BuyV2CheckoutSubmissionState.failed ||
@@ -9227,13 +9254,19 @@ class _BalancePaymentCard extends StatelessWidget {
       return const SizedBox.shrink();
     }
     final state = result?.state ?? BuyV2BalancePaymentState.upcoming;
+    final handoffUnavailable =
+        state == BuyV2BalancePaymentState.paymentActionRequired &&
+        paymentHandoff == null;
     final amountDue = result?.amountDue ?? order.balanceDue;
     final dueLabel = result?.dueLabel ?? order.balanceDueLabel ?? 'Due later';
     final statusLabel = switch (state) {
       BuyV2BalancePaymentState.upcoming => 'Upcoming balance',
       BuyV2BalancePaymentState.due => 'Balance due',
       BuyV2BalancePaymentState.overdue => 'Balance overdue',
-      BuyV2BalancePaymentState.paymentActionRequired => 'Ready for payment',
+      BuyV2BalancePaymentState.paymentActionRequired =>
+        handoffUnavailable
+            ? 'Balance payment unavailable'
+            : 'Ready for payment',
       BuyV2BalancePaymentState.paymentPending => 'Payment pending',
       BuyV2BalancePaymentState.paid => 'Balance paid',
       BuyV2BalancePaymentState.unknown => 'Payment needs checking',
@@ -9306,8 +9339,10 @@ class _BalancePaymentCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            result?.customerMessage ??
-                'Payment becomes available when the supplier confirms it is due.',
+            handoffUnavailable
+                ? 'Payment cannot open right now. No payment is confirmed. Try again later.'
+                : result?.customerMessage ??
+                      'Payment becomes available when the supplier confirms it is due.',
             style: context.buyMeta.copyWith(fontSize: 8.5),
           ),
           if (action != null && actionLabel != null) ...[
