@@ -5682,8 +5682,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    final purchaseId =
-        'BUY-NEW-${(_purchaseSequence++).toString().padLeft(2, '0')}';
+    final purchaseId = _nextLocalPurchaseId();
     _confirmedPurchaseId = purchaseId;
     _confirmedOrders = _createOrdersForGroups(groups, address, purchaseId);
     _completeConfirmedOrder(previous: previous, lines: lines);
@@ -6008,9 +6007,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    final purchaseId =
-        placement.purchaseReference ??
-        'BUY-NEW-${(_purchaseSequence++).toString().padLeft(2, '0')}';
+    final purchaseId = placement.purchaseReference ?? _nextLocalPurchaseId();
     _confirmedPurchaseId = purchaseId;
     _confirmedOrders = placement.orders.isNotEmpty
         ? List.unmodifiable(placement.orders)
@@ -6265,6 +6262,25 @@ class BuyV2Session extends ChangeNotifier {
     ]);
   }
 
+  String _nextLocalPurchaseId() {
+    final retained = _orders.map((order) => order.purchaseId).toSet();
+    String candidate;
+    do {
+      candidate = 'BUY-NEW-${(_purchaseSequence++).toString().padLeft(2, '0')}';
+    } while (retained.contains(candidate));
+    return candidate;
+  }
+
+  String _nextLocalOrderId(String prefix) {
+    final retained = _orders.map((order) => order.id).toSet();
+    String candidate;
+    do {
+      candidate =
+          '$prefix-NEW-${(_orderSequence++).toString().padLeft(2, '0')}';
+    } while (retained.contains(candidate));
+    return candidate;
+  }
+
   BuyV2Order _createOrderForGroup(
     BuyV2FulfilmentGroup group,
     BuyV2Address address,
@@ -6276,7 +6292,6 @@ class BuyV2Session extends ChangeNotifier {
     int paymentCharge = 0,
     int? totalOverride,
   }) {
-    final sequence = _orderSequence++;
     final prefix = switch (group.destination) {
       BuyV2Destination.shop => 'MS',
       BuyV2Destination.wholesale => 'PO',
@@ -6294,7 +6309,7 @@ class BuyV2Session extends ChangeNotifier {
         : BuyV2OrderStatus.preparing;
     final paymentTerm = selectedCommercialPaymentTermFor(group.key);
     return BuyV2Order(
-      id: '$prefix-NEW-${sequence.toString().padLeft(2, '0')}',
+      id: _nextLocalOrderId(prefix),
       destination: group.destination,
       title: '${group.destination.label} order',
       itemSummary:

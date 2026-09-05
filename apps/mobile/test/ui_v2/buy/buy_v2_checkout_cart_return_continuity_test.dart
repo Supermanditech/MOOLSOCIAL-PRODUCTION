@@ -16,6 +16,22 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
+class _R66OrderCustomerStore implements BuyV2CustomerStateStore {
+  @override
+  String get ownerScope => 'r66-order-group-customer';
+
+  BuyV2CustomerStateSnapshot? snapshot;
+
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => snapshot;
+
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot value) async {
+    snapshot = value;
+    return true;
+  }
+}
+
 class _MemoryGstInvoiceProfileStore implements BuyV2GstInvoiceProfileStore {
   @override
   String? ownerScope = 'account-a';
@@ -781,6 +797,114 @@ void main() {
       findsNothing,
     );
     expect(session.quantityFor('w-notebook'), 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('R66 confirmed purchase opens only its own retained deliveries', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final store = _R66OrderCustomerStore();
+    final earlierCore = BuySession();
+    final earlier = BuyV2Session(core: earlierCore, customerStateStore: store);
+    expect(earlier.addProduct('w-notebook'), isTrue);
+    earlier.openCart(scope: BuyV2CartScope.wholesale);
+    expect(earlier.openCheckout(), isTrue);
+    expect(earlier.choosePayment('Purchase order'), isTrue);
+    earlier.purchaseOrderReference = 'R66-LOCAL-PO';
+    advanceCheckoutToConfirm(earlier);
+    expect(await earlier.submitOrder(), isTrue);
+    final previousPurchase = earlier.confirmedPurchaseId!;
+    final previousOrder = earlier.confirmedOrders.single;
+    await tester.pump();
+    earlier.dispose();
+    earlierCore.dispose();
+
+    final core = BuySession();
+    final session = BuyV2Session(core: core, customerStateStore: store);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await session.restoreCustomerState();
+    final retail = session.product('s-tomato');
+    final anotherStore = BuyV2Catalogue.products.firstWhere(
+      (product) =>
+          product.destination == BuyV2Destination.shop &&
+          product.seller != retail.seller &&
+          !product.requiresPrescription,
+    );
+    expect(session.addProduct(retail.id), isTrue);
+    expect(session.addProduct(anotherStore.id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(session.choosePayment('Cash on Delivery'), isTrue);
+    advanceCheckoutToConfirm(session);
+    final total = session.checkoutPayableTotal;
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-confirm')),
+    );
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.confirmation);
+    expect(session.confirmedOrders, hasLength(2));
+    final purchase = session.confirmedPurchaseId!;
+    expect(purchase, isNot(previousPurchase));
+    final details = find.byKey(
+      const ValueKey('buy-confirmation-order-details'),
+    );
+    await tester.scrollUntilVisible(
+      details,
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(BuyV2ConfirmationView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(details);
+    await tester.pumpAndSettle();
+    expect(session.destination, BuyV2Destination.orders);
+    expect(session.view, BuyV2View.catalogue);
+    final group = find.byKey(ValueKey('buy-purchase-group-$purchase'));
+    expect(group, findsOneWidget);
+    expect(
+      find.descendant(
+        of: group,
+        matching: find.text('2 deliveries · ${buyV2Money(total)}'),
+      ),
+      findsOneWidget,
+    );
+    final oldGroup = find.byKey(
+      ValueKey('buy-purchase-group-$previousPurchase'),
+    );
+    expect(
+      find.descendant(
+        of: oldGroup,
+        matching: find.text('1 delivery · ${buyV2Money(previousOrder.total)}'),
+      ),
+      findsOneWidget,
+    );
+    final delivery = session.confirmedOrders.first;
+    final track = find.byKey(ValueKey('buy-order-primary-${delivery.id}'));
+    await tester.scrollUntilVisible(
+      track,
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(BuyV2OrdersView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(track);
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.tracking);
+    expect(session.selectedOrderId, delivery.id);
+    expect(session.selectedOrderOrNull!.purchaseId, purchase);
+    expect(session.selectedOrderOrNull!.total, delivery.total);
+    expect(session.selectedOrderOrNull!.partner, delivery.partner);
     expect(tester.takeException(), isNull);
   });
 

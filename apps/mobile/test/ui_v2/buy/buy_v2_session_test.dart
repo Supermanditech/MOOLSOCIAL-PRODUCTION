@@ -1744,6 +1744,110 @@ void main() {
       );
     });
 
+    test(
+      'R66 new review purchases stay isolated across customer restarts',
+      () async {
+        final store = _MemoryCustomerStateStore('account-r66-order-identity');
+        final purchases = <String, List<BuyV2Order>>{};
+        final deliveryIds = <String>{};
+        for (final wholesale in [true, false, true, false]) {
+          final core = BuySession();
+          final session = BuyV2Session(core: core, customerStateStore: store);
+          try {
+            await session.restoreCustomerState();
+            for (final entry in purchases.entries) {
+              final retained = session.orders
+                  .where((order) => order.purchaseId == entry.key)
+                  .toList();
+              expect(
+                retained.map((order) => order.id),
+                unorderedEquals(entry.value.map((order) => order.id)),
+              );
+            }
+            if (wholesale) {
+              expect(session.addProduct('w-notebook'), isTrue);
+              session.openCart(scope: BuyV2CartScope.wholesale);
+            } else {
+              final retail = session.product('s-tomato');
+              final anotherStore = BuyV2Catalogue.products.firstWhere(
+                (product) =>
+                    product.destination == BuyV2Destination.shop &&
+                    product.seller != retail.seller &&
+                    !product.requiresPrescription,
+              );
+              expect(session.addProduct(retail.id), isTrue);
+              expect(session.addProduct(anotherStore.id), isTrue);
+              session.openCart(scope: BuyV2CartScope.shop);
+            }
+            expect(session.openCheckout(), isTrue);
+            expect(session.continueCheckoutFromAddress(), isTrue);
+            expect(
+              session.choosePayment(
+                wholesale ? 'Purchase order' : 'Cash on Delivery',
+              ),
+              isTrue,
+            );
+            if (wholesale) session.purchaseOrderReference = 'R66-LOCAL-PO';
+            expect(session.continueCheckoutFromPayment(), isTrue);
+            final groups = session.checkoutFulfilmentGroups;
+            expect(groups, hasLength(wholesale ? 1 : 2));
+            final total = session.checkoutPayableTotal;
+            expect(await session.submitOrder(), isTrue);
+            final purchaseId = session.confirmedPurchaseId!;
+            expect(
+              purchases.containsKey(purchaseId),
+              isFalse,
+              reason: 'A new purchase must not join retained deliveries',
+            );
+            expect(session.confirmedOrders, hasLength(groups.length));
+            for (final order in session.confirmedOrders) {
+              expect(
+                deliveryIds.add(order.id),
+                isTrue,
+                reason: 'Delivery identity reused: ${order.id}',
+              );
+            }
+            final actualGroup = session.orders
+                .where((order) => order.purchaseId == purchaseId)
+                .toList();
+            expect(
+              actualGroup.map((order) => order.id),
+              unorderedEquals(session.confirmedOrders.map((order) => order.id)),
+            );
+            expect(
+              actualGroup.fold<int>(0, (sum, order) => sum + order.total),
+              total,
+            );
+            expect(
+              actualGroup.map((order) => order.partner),
+              unorderedEquals(groups.map((group) => group.partner)),
+            );
+            purchases[purchaseId] = List.of(session.confirmedOrders);
+            for (final entry in purchases.entries) {
+              for (final previous in entry.value) {
+                final retained = session.orders
+                    .where((order) => order.id == previous.id)
+                    .single;
+                expect(retained.purchaseId, entry.key);
+                expect(retained.total, previous.total);
+                expect(retained.productIds, previous.productIds);
+              }
+            }
+            await Future<void>.delayed(Duration.zero);
+          } finally {
+            session.dispose();
+            core.dispose();
+          }
+        }
+        expect(purchases, hasLength(4));
+        expect(deliveryIds, hasLength(6));
+        expect(
+          store.snapshot!.orders.map((order) => order.id).toSet(),
+          containsAll(deliveryIds),
+        );
+      },
+    );
+
     test('delivery refinement keeps the visible Shop segment truthful', () {
       final session = BuyV2Session(core: BuySession());
       addTearDown(session.dispose);
