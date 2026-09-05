@@ -5701,14 +5701,17 @@ class _ProductGrid extends StatelessWidget {
                     session.updateQuery('');
                     session.chooseFilter(null);
                     session.chooseCategory('all');
+                    session.clearDiscoveryRefinements();
                   }
                 },
                 child: Text(
                   savedOnly
                       ? 'Show all products'
                       : session.query.trim().isNotEmpty
-                      ? 'Clear search'
-                      : 'Show all products',
+                      ? session.hasNarrowedProductSearchScope
+                            ? 'Clear search and filters'
+                            : 'Clear search'
+                      : 'Clear filters',
                 ),
               ),
             ],

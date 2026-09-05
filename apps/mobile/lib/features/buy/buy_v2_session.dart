@@ -5075,6 +5075,8 @@ class BuyV2Session extends ChangeNotifier {
     selectedFilter = null;
     activeShoppingIntent = null;
     notice = null;
+    _clearDiscoveryRefinements();
+    _persistCustomerState();
     notifyListeners();
     return true;
   }
