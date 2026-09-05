@@ -7047,7 +7047,8 @@ class _CheckoutPaymentStage extends StatelessWidget {
                 label: 'Payment offer',
                 value: paymentOffer == null
                     ? 'No offer selected'
-                    : '${paymentOffer.title} · ${_cartBenefitSponsorLabel(paymentOffer)}',
+                    : '${paymentOffer.title} · ${_cartBenefitSponsorLabel(paymentOffer)}\n'
+                          '${_paymentOfferStatus(session, paymentOffer)}',
               ),
             ],
           ),
@@ -14357,6 +14358,34 @@ String _deliveryInstructionOwner(BuyV2Destination destination) =>
       BuyV2Destination.orders => 'Delivery instruction',
     };
 
+String _paymentOfferStatus(BuyV2Session session, BuyV2CartBenefit offer) {
+  final now = DateTime.now();
+  final String reason;
+  if (offer.validUntil != null && !now.isBefore(offer.validUntil!)) {
+    reason = 'Not eligible. This offer has expired.';
+  } else if (offer.validFrom != null && now.isBefore(offer.validFrom!)) {
+    reason = 'Not eligible yet. This offer has not started.';
+  } else if (offer.minimumSpend != null &&
+      session.totalForDestination(offer.destination) < offer.minimumSpend!) {
+    reason =
+        'Not eligible. Minimum ${offer.destination.label} product subtotal '
+        '${buyV2Money(offer.minimumSpend!)}.';
+  } else if (offer.minimumQuantity != null &&
+      session.countForDestination(offer.destination) < offer.minimumQuantity!) {
+    reason =
+        'Not eligible. Minimum ${offer.minimumQuantity} packs '
+        'in ${offer.destination.label}.';
+  } else if (offer.eligiblePaymentMethods.isNotEmpty &&
+      !offer.eligiblePaymentMethods.contains(session.selectedPayment)) {
+    reason =
+        'Not eligible with ${session.selectedPayment}. Choose '
+        '${offer.eligiblePaymentMethods.join(' or ')} to review this offer.';
+  } else {
+    reason = 'Pending confirmation of payment eligibility and savings.';
+  }
+  return '$reason Payment savings are not included in this total.';
+}
+
 class _CartBenefitPanel extends StatelessWidget {
   const _CartBenefitPanel({required this.session});
 
@@ -14471,6 +14500,17 @@ class _CartBenefitPanel extends StatelessWidget {
               );
             },
           ),
+          for (final offer in selectedBenefits.where(
+            (benefit) => benefit.kind == BuyV2CartBenefitKind.paymentOffer,
+          )) ...[
+            const SizedBox(height: 8),
+            Text(
+              '${offer.title} · ${offer.sponsorName}\n'
+              '${_paymentOfferStatus(session, offer)}',
+              key: ValueKey('buy-cart-payment-offer-status-${offer.id}'),
+              style: context.buyMeta.copyWith(fontSize: 10),
+            ),
+          ],
         ],
       ),
     );
@@ -14833,6 +14873,14 @@ class _CartBenefitsPageState extends State<_CartBenefitsPage> {
                                     '${benefit.id}',
                                 child: _CartBenefitCard(
                                   benefit: benefit,
+                                  paymentStatus:
+                                      benefit.kind ==
+                                          BuyV2CartBenefitKind.paymentOffer
+                                      ? _paymentOfferStatus(
+                                          widget.session,
+                                          benefit,
+                                        )
+                                      : null,
                                   selected:
                                       selected?.id == benefit.id &&
                                       selected?.sourceId == benefit.sourceId,
@@ -15235,12 +15283,14 @@ class _CartBenefitCard extends StatelessWidget {
     required this.selected,
     required this.onSelect,
     required this.onRemove,
+    this.paymentStatus,
   });
 
   final BuyV2CartBenefit benefit;
   final bool selected;
   final VoidCallback onSelect;
   final VoidCallback onRemove;
+  final String? paymentStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -15336,7 +15386,9 @@ class _CartBenefitCard extends StatelessWidget {
                       Text(
                         [
                           if (benefit.savingAmount > 0)
-                            'Save ${buyV2Money(benefit.savingAmount)} now',
+                            benefit.kind == BuyV2CartBenefitKind.paymentOffer
+                                ? 'Potential saving ${buyV2Money(benefit.savingAmount)}'
+                                : 'Save ${buyV2Money(benefit.savingAmount)} now',
                           if (benefit.freeDelivery) 'Free delivery',
                           if (benefit.minimumSpend case final minimumSpend?)
                             'Minimum order ${buyV2Money(minimumSpend)}',
@@ -15420,6 +15472,14 @@ class _CartBenefitCard extends StatelessWidget {
               ),
             ],
           ),
+          if (selected && paymentStatus != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              paymentStatus!,
+              key: ValueKey('buy-payment-offer-selection-status-${benefit.id}'),
+              style: context.buyMeta.copyWith(fontSize: 10),
+            ),
+          ],
           const SizedBox(height: 5),
           LayoutBuilder(
             builder: (context, constraints) {

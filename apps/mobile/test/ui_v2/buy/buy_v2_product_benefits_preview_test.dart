@@ -64,7 +64,19 @@ void main() {
               strategy: BuyV2CartBenefitStrategy.financialProduct,
               sponsor: BuyV2CartBenefitSponsor.bank,
               sponsorName: 'HDFC Bank',
-              eligiblePaymentMethods: {'UPI'},
+              eligiblePaymentMethods: {'PhonePe'},
+            ),
+            const BuyV2CartBenefit(
+              id: 'other-method-offer',
+              kind: BuyV2CartBenefitKind.paymentOffer,
+              destination: BuyV2Destination.shop,
+              title: 'Other payment method offer',
+              detail: 'Available only with the listed payment method.',
+              sourceId: 'other-method-campaign',
+              strategy: BuyV2CartBenefitStrategy.financialProduct,
+              sponsor: BuyV2CartBenefitSponsor.bank,
+              sponsorName: 'Other bank',
+              eligiblePaymentMethods: {'Paytm'},
             ),
           ],
         ),
@@ -99,7 +111,8 @@ void main() {
       expect(find.text('Save ₹20'), findsOneWidget);
       expect(find.textContaining('Family Dairy & Bake'), findsWidgets);
       expect(find.textContaining('HDFC Bank'), findsOneWidget);
-      expect(find.textContaining('With UPI'), findsOneWidget);
+      expect(find.textContaining('With PhonePe'), findsOneWidget);
+      expect(find.textContaining('Other bank'), findsNothing);
       expect(find.textContaining('Until'), findsOneWidget);
       expect(session.cartLines, isEmpty);
       expect(session.selectedCartBenefitsFor({BuyV2Destination.shop}), isEmpty);
