@@ -1589,6 +1589,123 @@ if ($ProductionLane -ceq 'baseline') {
   if ($ProductionLane -cne 'integration') {
     $changedOwners = @(Get-ProductionChangedOwners $baseCommit $head)
     $primaryEvidenceCoordinationOwnerKeys = @()
+    $r66OwnerAmendmentPending = $false
+    if (
+      $ProductionLane -ceq 'cursor_ui' -and
+      $ProductionWorkId -ceq 'buy-redmi-fixes-v1-20260905' -and
+      $ProductionTicketId -ceq 'UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905'
+    ) {
+      # Founder-authorized primary correction: one added Buy test, not a
+      # general permission for Cursor to edit coordination or preserve dirt.
+      $r66AmendmentParent = 'c6ffece62a6e4dea0810b88eb7fc98775c832fe6'
+      $r66AmendmentSubject =
+        'ui(buy-redmi-fixes-v1-20260905): register honest order motion test ownership'
+      $r66AddedTest =
+        'apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart'
+      $r66CoordinationOwners = @(
+        'config/codex-subagent-coordination-policy.json',
+        'docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md',
+        'docs/quality/cursor-buy-redmi-fixes-v1-20260905/scope-state.json',
+        'scripts/check-codex-subagent-coordination-policy.ps1'
+      )
+      & git -C $root merge-base --is-ancestor $r66AmendmentParent $head
+      Assert-Coordination ($LASTEXITCODE -eq 0) `
+        'R66 owner amendment requires its exact preserved implementation parent.'
+      if ($head -ceq $r66AmendmentParent) {
+        $r66OwnerAmendmentPending = $true
+        Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) `
+          'pending R66 owner amendment is not a handoff or acceptance.'
+        $r66PolicyBeforeText = @(& git -C $root show `
+            "${r66AmendmentParent}:config/codex-subagent-coordination-policy.json")
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'R66 prior policy read failed.'
+        $r66PolicyBefore = ($r66PolicyBeforeText -join "`n") | ConvertFrom-Json
+        $r66PolicyAfter = Get-Content -Raw -LiteralPath `
+          (Join-Path $root $r66CoordinationOwners[0]) | ConvertFrom-Json
+        $r66Claim = @($r66PolicyAfter.activeClaims | Where-Object {
+          $_.task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905'
+        })[0]
+        Assert-Coordination (
+          $r66Claim.owners.Count -eq 41 -and
+          @($r66Claim.owners | Where-Object { $_ -ceq $r66AddedTest }).Count -eq 1
+        ) 'R66 amendment must add exactly the existing honest-order-motion test.'
+        $r66Claim.owners = @($r66Claim.owners | Where-Object { $_ -cne $r66AddedTest })
+        Assert-Coordination (
+          ($r66PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r66PolicyAfter | ConvertTo-Json -Depth 100 -Compress)
+        ) 'R66 amendment changed policy beyond the single test claim.'
+        $r66ManifestHash = '42334144C2611CDAF24CCB7F3E1FC60EA55DBE609E7A5CFC1B618F963328D3C8'
+        Assert-Coordination (
+          (Get-Sha256 (Join-Path $root $r66CoordinationOwners[1])) -ceq $r66ManifestHash
+        ) 'R66 founder-authorized owner amendment manifest changed.'
+        $r66ScopeBeforeText = @(& git -C $root show `
+            "${r66AmendmentParent}:$($r66CoordinationOwners[2])")
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'R66 prior scope binding read failed.'
+        $r66ScopeBefore = ($r66ScopeBeforeText -join "`n") | ConvertFrom-Json
+        $r66ScopeAfter = Get-Content -Raw -LiteralPath `
+          (Join-Path $root $r66CoordinationOwners[2]) | ConvertFrom-Json
+        Assert-Coordination (
+          $r66ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq
+          $r66ManifestHash
+        ) 'R66 amended manifest is not bound to the current scope.'
+        $r66ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 =
+          $r66ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+        Assert-Coordination (
+          ($r66ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r66ScopeAfter | ConvertTo-Json -Depth 100 -Compress)
+        ) 'R66 amendment changed execution authority beyond the manifest hash.'
+        $r66PreservedDrafts = @{
+          'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart' = 'F447A4E815DC94B33BAE953FCC8B8AD794080B28CDC6963F38F38ABFB2ACBBF0'
+          'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart' = '4B47A393C5593991D576629C27675E50E8B04E36EBA65B950D56CACC881BF9B1'
+          'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart' = '3B8E49FFED925794633A622932D69AC49B9C4BBB2ACF27DB2722E6D678BEEC75'
+          'apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart' = 'D6A05F1F3FD957486702B074DA27EA6BB47967D8DE68FFEACDEC269C824B54BD'
+          'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart' = 'FEFDBF3095E8A776C3ABA47F95C619D83440499F6D51F252B587965C40622E13'
+          'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart' = '237ABD4CA564793B6D4C767B893B8BE81D16D10CA02881DBDC56EB57B00ABCC0'
+          'docs/quality/cursor-buy-redmi-fixes-v1-20260905/RESULTS.md' = 'C12B5E5E4770C2D52061EA7D5E54DD62D5934B00531EF6246C5F52642D2FA82C'
+        }
+        foreach ($r66Draft in $r66PreservedDrafts.Keys) {
+          Assert-Coordination (
+            (Get-Sha256 (Join-Path $root $r66Draft)) -ceq $r66PreservedDrafts[$r66Draft]
+          ) "R66 unfinished draft changed during coordination: $r66Draft"
+        }
+        $r66Dirty = @(& git -C $root diff HEAD --name-only)
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'R66 preservation inventory failed.'
+        Assert-Coordination (
+          (@($r66Dirty | Sort-Object) -join '|') -ceq
+          (@(@($r66PreservedDrafts.Keys) + $r66CoordinationOwners | Sort-Object) -join '|')
+        ) 'R66 coordination changed or lost an unexpected owner.'
+      } else {
+        $r66Following = @(& git -C $root rev-list --reverse --ancestry-path `
+            "${r66AmendmentParent}..$head")
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66Following.Count -gt 0) `
+          'R66 owner amendment ancestry read failed.'
+        $r66CoordinationCommit = [string]$r66Following[0]
+        $r66Parents = @(& git -C $root show -s --format=%P $r66CoordinationCommit)
+        Assert-Coordination (
+          $LASTEXITCODE -eq 0 -and $r66Parents.Count -eq 1 -and
+          [string]$r66Parents[0] -ceq $r66AmendmentParent
+        ) 'R66 owner amendment must have exactly its authorized parent.'
+        $r66Subject = @(& git -C $root show -s --format=%s $r66CoordinationCommit)
+        Assert-Coordination (
+          $LASTEXITCODE -eq 0 -and $r66Subject.Count -eq 1 -and
+          [string]$r66Subject[0] -ceq $r66AmendmentSubject
+        ) 'R66 owner amendment subject changed.'
+        $r66CommittedOwners = @(& git -C $root diff-tree --no-commit-id --name-only -r $r66CoordinationCommit)
+        Assert-Coordination (
+          $LASTEXITCODE -eq 0 -and
+          (@($r66CommittedOwners | Sort-Object) -join '|') -ceq
+          (@($r66CoordinationOwners | Sort-Object) -join '|')
+        ) 'R66 owner amendment included source, evidence or another owner.'
+        & git -C $root diff --quiet $r66CoordinationCommit -- @r66CoordinationOwners
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'R66 coordination blobs changed after admission.'
+        $r66LaterCoordination = @(& git -C $root log --format=%H `
+            "${r66CoordinationCommit}..$head" -- @r66CoordinationOwners)
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66LaterCoordination.Count -eq 0) `
+          'R66 owner amendment cannot be replayed or revised by later feature commits.'
+      }
+      $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
+        $_.ToLowerInvariant()
+      })
+    }
     if (
       $ProductionLane -ceq 'cursor_ui' -and
       $ProductionWorkId -ceq 'buy-mvp-ticket14-v1-20260902' -and
@@ -2277,9 +2394,17 @@ if ($ProductionLane -ceq 'baseline') {
         --exclude-standard)
     Assert-Coordination ($LASTEXITCODE -eq 0) `
       'production pre-commit untracked-owner inventory failed.'
+    if ($r66OwnerAmendmentPending) {
+      Assert-Coordination (
+        (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
+        (@($r66CoordinationOwners | Sort-Object) -join '|') -and
+        (@($preCommitUnstagedOwners | Sort-Object) -join '|') -ceq
+        (@($r66PreservedDrafts.Keys | Sort-Object) -join '|')
+      ) 'R66 coordination must stage only four owners and leave all seven drafts unstaged.'
+    }
     Assert-Coordination (
       $preCommitStagedOwners.Count -gt 0 -and
-      $preCommitUnstagedOwners.Count -eq 0 -and
+      ($preCommitUnstagedOwners.Count -eq 0 -or $r66OwnerAmendmentPending) -and
       $preCommitUntrackedOwners.Count -eq 0
     ) 'production pre-commit requires one fully staged atomic change set.'
     Assert-ProductionSecretSafe -BaseCommit $baseCommit -HeadCommit $head `

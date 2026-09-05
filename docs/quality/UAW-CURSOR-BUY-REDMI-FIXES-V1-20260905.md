@@ -59,6 +59,7 @@ Focused existing tests (no historical golden replacement):
 - apps/mobile/test/ui_v2/buy/buy_v2_product_decision_glance_test.dart
 - apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart
 - apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart
+- apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart
 - apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart
 - apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart
 - apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart
@@ -85,3 +86,8 @@ Redmi TG8HCYTGGQT885OF only. No OPPO, WhatsApp, real payment/order/refund/suppli
 
 Commit source/test/results atomically per slice, run mandatory gates, push and verify exact remote SHA equality. Register new shared-owner findings for Codex; do not integrate now. Founder final review remains required; neither this bootstrap nor a host-test pass is acceptance.
 
+## Founder-authorized dependent-test ownership amendment
+
+On 5 September the founder authorized Cursor to register the existing honest-order-motion test for R66-UAT-002/011, and confirmed that Codex received the coordination message. The claim grows from40 to41 owners, with no additional product, shared, native, backend or integration owner. The founder's morning resumption limits execution to the35 fresh Redmi observations and necessary children; the earlier no-GM statement above is historical, not current sequencing. Existing source and evidence commits remain intact.
+
+One coordination-only checkpoint must have parent c6ffece62a6e4dea0810b88eb7fc98775c832fe6 and change exactly the coordination policy, this manifest, its local scope-state hash binding and the coordination gate. Its sole purpose is the exact test owner and safe admission while seven checksum-bound drafts remain unstaged. Do not commit those drafts in the ownership checkpoint; afterward the normal fully-staged atomic implementation and clean-handoff gates apply. Freeze all four coordination blobs after that checkpoint. Do not waive tests, alter the global registry, create a new worktree, touch Codex files or integrate. Run positive and fail-closed gate checks before the checkpoint; correct and qualify the dependent test afterward.

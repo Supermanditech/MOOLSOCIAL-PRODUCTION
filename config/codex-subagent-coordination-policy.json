@@ -70,6 +70,7 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_product_decision_glance_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_honest_order_motion_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart",
