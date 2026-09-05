@@ -1501,6 +1501,7 @@ class _SearchProductResults extends StatelessWidget {
         final layout = _resolveCompactProductGridLayout(
           constraints: constraints,
           accessibleText: accessibleText,
+          textScale: textScale,
         );
         return CustomScrollView(
           key: PageStorageKey('buy-search-${session.destination.name}-$query'),
@@ -5641,6 +5642,7 @@ class _ProductGrid extends StatelessWidget {
         final layout = _resolveCompactProductGridLayout(
           constraints: constraints,
           accessibleText: accessibleText,
+          textScale: textScale,
           savedOnly: savedOnly,
         );
         final featuredProducts = showPromotions
@@ -6131,6 +6133,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
         final layout = _resolveCompactProductGridLayout(
           constraints: constraints,
           accessibleText: accessibleText,
+          textScale: textScale,
           denseStore: storeContext,
         );
         return _HorizontalProductGrid(
@@ -6155,6 +6158,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
 _resolveCompactProductGridLayout({
   required BoxConstraints constraints,
   required bool accessibleText,
+  required double textScale,
   bool savedOnly = false,
   bool denseStore = false,
 }) {
@@ -6196,7 +6200,13 @@ _resolveCompactProductGridLayout({
       : columns == 3
       ? 240.0
       : 238.0;
-  return (columns: columns, cardWidth: cardWidth, tileHeight: tileHeight);
+  final enlargedTextHeight =
+      (textScale - 1.4).clamp(0.0, double.infinity) * 160;
+  return (
+    columns: columns,
+    cardWidth: cardWidth,
+    tileHeight: tileHeight + enlargedTextHeight,
+  );
 }
 
 class _HorizontalProductGrid extends StatefulWidget {
@@ -6373,7 +6383,8 @@ class _CataloguePromotionRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accessibleText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final accessibleText = textScale > 1.25;
     final cards = switch (session.destination) {
       BuyV2Destination.shop => [
         BuyV2PromotionCard(
@@ -6440,7 +6451,9 @@ class _CataloguePromotionRail extends StatelessWidget {
     };
     return SizedBox(
       key: const ValueKey('buy-catalogue-promotions'),
-      height: accessibleText ? 164 : 148,
+      height:
+          (accessibleText ? 164.0 : 148.0) +
+          (textScale - 1.4).clamp(0.0, double.infinity) * 120,
       child: Padding(
         key: PageStorageKey(
           'buy-catalogue-promotions-${session.destination.name}',
@@ -6966,7 +6979,6 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
   Widget build(BuildContext context) {
     final session = widget.session;
     final product = widget.product;
-    final accessibleText = MediaQuery.textScalerOf(context).scale(10) > 13;
     final facts = session.productFactsFor(product);
     final fulfilmentMode =
         facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
@@ -7027,7 +7039,6 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      flex: accessibleText ? 12 : 13,
                       child: Stack(
                         children: [
                           Positioned.fill(
@@ -7055,100 +7066,98 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                         ],
                       ),
                     ),
-                    Expanded(
-                      flex: accessibleText ? 10 : 9,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.clip,
-                              style: const TextStyle(
-                                color: BuyV2Colors.ink,
-                                fontSize: 11,
-                                height: 1.05,
-                                fontWeight: FontWeight.w900,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.clip,
+                            style: const TextStyle(
+                              color: BuyV2Colors.ink,
+                              fontSize: 11,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            product.pack,
+                            maxLines: 2,
+                            overflow: TextOverflow.clip,
+                            style: context.buyMeta.copyWith(fontSize: 8),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                buyV2Money(facts.price),
+                                style: const TextStyle(
+                                  color: BuyV2Colors.navy,
+                                  fontSize: 14,
+                                  height: 1,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              product.pack,
-                              maxLines: 2,
-                              overflow: TextOverflow.clip,
-                              style: context.buyMeta.copyWith(fontSize: 8),
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  buyV2Money(facts.price),
-                                  style: const TextStyle(
-                                    color: BuyV2Colors.navy,
-                                    fontSize: 14,
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  product.unitPrice,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.clip,
+                                  style: context.buyMeta.copyWith(
+                                    fontSize: 7.5,
                                     height: 1,
-                                    fontWeight: FontWeight.w900,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    product.unitPrice,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.clip,
-                                    style: context.buyMeta.copyWith(
-                                      fontSize: 7.5,
-                                      height: 1,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            facts.partner,
+                            maxLines: 2,
+                            overflow: TextOverflow.clip,
+                            style: const TextStyle(
+                              color: BuyV2Colors.navy,
+                              fontSize: 7.5,
+                              height: 1.05,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            _sellerTypeLabel(product.sellerType),
+                            maxLines: 1,
+                            overflow: TextOverflow.clip,
+                            style: const TextStyle(
+                              color: BuyV2Colors.muted,
+                              fontSize: 7,
+                              height: 1,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            automaticFulfilment
+                                ? '${buyV2CompactFulfilmentModeLabel(fulfilmentMode)} · ${_compactDeliveryPromise(cataloguePromise)}'
+                                : _compactDeliveryPromise(
+                                    facts.deliveryPromise,
                                   ),
-                                ),
-                              ],
+                            maxLines: 2,
+                            overflow: TextOverflow.clip,
+                            style: const TextStyle(
+                              color: BuyV2Colors.green,
+                              fontSize: 7.5,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              facts.partner,
-                              maxLines: 2,
-                              overflow: TextOverflow.clip,
-                              style: const TextStyle(
-                                color: BuyV2Colors.navy,
-                                fontSize: 7.5,
-                                height: 1.05,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            Text(
-                              _sellerTypeLabel(product.sellerType),
-                              maxLines: 1,
-                              overflow: TextOverflow.clip,
-                              style: const TextStyle(
-                                color: BuyV2Colors.muted,
-                                fontSize: 7,
-                                height: 1,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              automaticFulfilment
-                                  ? '${buyV2CompactFulfilmentModeLabel(fulfilmentMode)} · ${_compactDeliveryPromise(cataloguePromise)}'
-                                  : _compactDeliveryPromise(
-                                      facts.deliveryPromise,
-                                    ),
-                              maxLines: 2,
-                              overflow: TextOverflow.clip,
-                              style: const TextStyle(
-                                color: BuyV2Colors.green,
-                                fontSize: 7.5,
-                                height: 1.05,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -7420,12 +7429,23 @@ class BuyV2ProductCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _ProductVisual(
-                      product: product,
-                      compact: compact,
-                      reservedActionWidth: savedContext ? 84 : 42,
-                    ),
-                    Expanded(
+                    if (compact)
+                      Expanded(
+                        child: _ProductVisual(
+                          product: product,
+                          compact: true,
+                          reservedActionWidth: savedContext ? 84 : 42,
+                        ),
+                      )
+                    else
+                      _ProductVisual(
+                        product: product,
+                        compact: false,
+                        reservedActionWidth: savedContext ? 84 : 42,
+                      ),
+                    Flexible(
+                      flex: compact ? 0 : 1,
+                      fit: compact ? FlexFit.loose : FlexFit.tight,
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(
                           compact ? 6 : 9,
@@ -7434,6 +7454,9 @@ class BuyV2ProductCard extends StatelessWidget {
                           compact ? 2 : 8,
                         ),
                         child: Column(
+                          mainAxisSize: compact
+                              ? MainAxisSize.min
+                              : MainAxisSize.max,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (!compact) ...[
@@ -7634,10 +7657,7 @@ class BuyV2ProductCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            if (compact)
-                              const Spacer()
-                            else
-                              const SizedBox(height: 6),
+                            if (!compact) const SizedBox(height: 6),
                             AnimatedSwitcher(
                               key: ValueKey(
                                 'buy-product-action-motion-${product.id}',
