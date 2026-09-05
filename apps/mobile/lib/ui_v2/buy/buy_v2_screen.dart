@@ -1035,7 +1035,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     final previousDestination = session.destination;
     final previousProductId = session.selectedProductId;
     final previousCartScope = session.cartScope;
-    if (!session.openProduct(product.id) || !mounted) return false;
+    final previousComparisonOrigin = session.takeProductComparisonOrigin();
+    if (!session.openProduct(product.id) || !mounted) {
+      session.restoreProductComparisonOrigin(previousComparisonOrigin);
+      return false;
+    }
     if (cartEntry) {
       session.openCart(
         scope: switch (product.destination) {
@@ -1069,7 +1073,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                 child: PopScope<bool>(
                   canPop: cartEntry
                       ? session.view == BuyV2View.cart
-                      : showingProduct,
+                      : showingProduct && !session.canReturnToComparedProduct,
                   onPopInvokedWithResult: (didPop, _) {
                     if (didPop) return;
                     if (navigation.isOpen) {
@@ -1226,6 +1230,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     } else if (previousView == BuyV2View.product && previousProductId != null) {
       session.openProduct(previousProductId);
     }
+    session.restoreProductComparisonOrigin(previousComparisonOrigin);
     return openCart ?? false;
   }
 

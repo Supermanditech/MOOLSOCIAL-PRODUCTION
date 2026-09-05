@@ -484,12 +484,15 @@ class BuyV2ProductView extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(10, 8, 10, wholesale ? 112 : 104),
             children: [
               _ReturnAffordance(
-                label:
-                    returnLabel ??
-                    session.productReturnLabel ??
-                    product.destination.label,
+                label: session.canReturnToComparedProduct
+                    ? session.productReturnLabel!
+                    : returnLabel ??
+                          session.productReturnLabel ??
+                          product.destination.label,
                 minimumHeight: 44,
-                onTap: onReturn ?? session.closeProduct,
+                onTap: session.canReturnToComparedProduct
+                    ? session.closeProduct
+                    : onReturn ?? session.closeProduct,
               ),
               const SizedBox(height: 7),
               BuyV2FiniteDepthReveal(
@@ -1432,7 +1435,7 @@ Future<void> _showBuyV2ProductComparison(
     ),
   );
   if (selectedId != null && selectedId != current.id && context.mounted) {
-    session.openProduct(selectedId);
+    session.openProduct(selectedId, preserveComparisonOrigin: true);
   }
 }
 

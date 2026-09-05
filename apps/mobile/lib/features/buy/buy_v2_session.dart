@@ -684,9 +684,12 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2View _assistReturnView = BuyV2View.catalogue;
   BuyV2Destination _productReturnDestination = BuyV2Destination.shop;
   BuyV2View _productReturnView = BuyV2View.catalogue;
+  final List<String> _comparedProductOrigins = [];
   bool _cartProductReturnActive = false;
   BuyV2Destination _cartProductReturnDestination = BuyV2Destination.shop;
   String? _cartProductReturnId;
+  ({BuyV2Destination destination, BuyV2View view, List<String> comparisons})?
+  _cartProductReturnOrigin;
 
   final List<BuyV2Product> _catalogueProducts = [];
   final Map<String, BuyV2CartLine> _cart = {};
@@ -3986,6 +3989,8 @@ class BuyV2Session extends ChangeNotifier {
     _clearRecoveryOriginIfActive();
     _accountChildReturnActive = false;
     _savedCatalogueDestination = null;
+    _comparedProductOrigins.clear();
+    _cartProductReturnOrigin = null;
     destination = value;
     view = value == BuyV2Destination.orders
         ? BuyV2View.catalogue
@@ -4003,7 +4008,7 @@ class BuyV2Session extends ChangeNotifier {
     );
   }
 
-  bool openProduct(String id) {
+  bool openProduct(String id, {bool preserveComparisonOrigin = false}) {
     final item = findProduct(id);
     if (item == null) {
       notice = 'This product could not be found.';
@@ -4014,6 +4019,11 @@ class BuyV2Session extends ChangeNotifier {
     if (view != BuyV2View.product) {
       _productReturnDestination = destination;
       _productReturnView = view;
+      _comparedProductOrigins.clear();
+    } else if (preserveComparisonOrigin &&
+        selectedProductId != null &&
+        selectedProductId != id) {
+      _comparedProductOrigins.add(selectedProductId!);
     }
     final activeSearch = query.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (view == BuyV2View.catalogue && activeSearch.length >= 2) {
@@ -4084,11 +4094,40 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
-  String? get productReturnLabel =>
-      _productReturnView == BuyV2View.orderItems ? 'Order items' : null;
+  bool get canReturnToComparedProduct =>
+      view == BuyV2View.product && _comparedProductOrigins.isNotEmpty;
+
+  List<String> takeProductComparisonOrigin() {
+    final origin = List<String>.unmodifiable(_comparedProductOrigins);
+    _comparedProductOrigins.clear();
+    return origin;
+  }
+
+  void restoreProductComparisonOrigin(List<String> origin) {
+    _comparedProductOrigins
+      ..clear()
+      ..addAll(origin.where((id) => findProduct(id) != null));
+    notifyListeners();
+  }
+
+  String? get productReturnLabel => canReturnToComparedProduct
+      ? findProduct(_comparedProductOrigins.last)?.title ?? 'Previous product'
+      : _productReturnView == BuyV2View.orderItems
+      ? 'Order items'
+      : null;
 
   void closeProduct() {
     final previous = _navigationSurfaceIdentity;
+    while (_comparedProductOrigins.isNotEmpty) {
+      final product = findProduct(_comparedProductOrigins.removeLast());
+      if (product == null) continue;
+      destination = product.destination;
+      selectedProductId = product.id;
+      view = BuyV2View.product;
+      notice = null;
+      _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
+      return;
+    }
     destination = _productReturnDestination;
     view = _productReturnView;
     selectedProductId = null;
@@ -4102,6 +4141,11 @@ class BuyV2Session extends ChangeNotifier {
       _cartProductReturnActive = true;
       _cartProductReturnDestination = destination;
       _cartProductReturnId = selectedProductId;
+      _cartProductReturnOrigin = (
+        destination: _productReturnDestination,
+        view: _productReturnView,
+        comparisons: List<String>.of(_comparedProductOrigins),
+      );
     } else if (view != BuyV2View.checkout && view != BuyV2View.cart) {
       _cartProductReturnActive = false;
       _cartProductReturnId = null;
@@ -4855,6 +4899,8 @@ class BuyV2Session extends ChangeNotifier {
 
   void returnToCatalogue() {
     final previous = _navigationSurfaceIdentity;
+    _comparedProductOrigins.clear();
+    _cartProductReturnOrigin = null;
     if (destination == BuyV2Destination.orders) {
       view = BuyV2View.catalogue;
     } else {
@@ -4869,6 +4915,8 @@ class BuyV2Session extends ChangeNotifier {
 
   void _returnToCartProduct() {
     final previous = _navigationSurfaceIdentity;
+    final origin = _cartProductReturnOrigin;
+    _cartProductReturnOrigin = null;
     final product = _cartProductReturnId == null
         ? null
         : findProduct(_cartProductReturnId!);
@@ -4878,6 +4926,13 @@ class BuyV2Session extends ChangeNotifier {
         product.destination != _cartProductReturnDestination) {
       returnToCatalogue();
       return;
+    }
+    if (origin != null) {
+      _productReturnDestination = origin.destination;
+      _productReturnView = origin.view;
+      _comparedProductOrigins
+        ..clear()
+        ..addAll(origin.comparisons);
     }
     destination = product.destination;
     selectedProductId = product.id;

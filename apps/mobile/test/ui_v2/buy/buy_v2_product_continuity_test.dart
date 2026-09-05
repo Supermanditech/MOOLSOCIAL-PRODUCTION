@@ -43,6 +43,304 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final offers in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'R66 Compare returns through source offers $offers at $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(scale == 2 ? 320 : 390, 844);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          final sourceId = offers ? 'w-oil' : 's-milk';
+          final alternateId = offers ? 'w-oil-10l' : 's-milk-500ml';
+          session.addProduct(sourceId);
+          final quantity = session.quantityFor(sourceId);
+          await tester.pumpWidget(app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          if (offers) {
+            await tester.tap(
+              find.byKey(const ValueKey('buy-local-tab-offers')),
+            );
+            await tester.pumpAndSettle();
+          } else {
+            await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+            await tester.pumpAndSettle();
+            await tester.enterText(
+              find.byKey(const ValueKey('buy-search-field')),
+              'milk',
+            );
+            await tester.pumpAndSettle();
+          }
+          final sourceCard = find.byKey(ValueKey('buy-product-$sourceId'));
+          await tester.ensureVisible(sourceCard);
+          await tester.tap(sourceCard);
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, sourceId);
+          final compare = find.text('Compare');
+          await tester.scrollUntilVisible(
+            compare,
+            180,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-$sourceId')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.tap(compare);
+          await tester.pumpAndSettle();
+          final alternate = find.byKey(
+            ValueKey('buy-product-compare-view-$alternateId'),
+          );
+          await tester.scrollUntilVisible(
+            alternate,
+            180,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await tester.tap(alternate);
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, alternateId);
+          await tester.tap(
+            find.byKey(const ValueKey('buy-compact-cart-indicator')),
+          );
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, alternateId);
+          final comparedBack = find.descendant(
+            of: find.byKey(PageStorageKey('buy-product-$alternateId')),
+            matching: find.widgetWithText(
+              InkWell,
+              session.product(sourceId).title,
+            ),
+          );
+          await tester.scrollUntilVisible(
+            comparedBack,
+            -200,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-$alternateId')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          expect(tester.getSize(comparedBack).height, greaterThanOrEqualTo(44));
+          if (scale == 2) {
+            await tester.tap(comparedBack);
+          } else {
+            await tester.binding.handlePopRoute();
+          }
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.product);
+          expect(session.selectedProductId, sourceId);
+          expect(session.quantityFor(sourceId), quantity);
+          final returnAction = find.descendant(
+            of: find.byKey(PageStorageKey('buy-product-$sourceId')),
+            matching: find.widgetWithText(InkWell, offers ? 'Offers' : 'Shop'),
+          );
+          await tester.scrollUntilVisible(
+            returnAction,
+            -240,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-$sourceId')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.tap(returnAction);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.catalogue);
+          expect(session.destination, BuyV2Destination.shop);
+          if (offers) {
+            final collection = find.byKey(const PageStorageKey('buy-offers'));
+            expect(collection, findsOneWidget);
+            await tester.scrollUntilVisible(
+              find.byKey(const ValueKey('buy-offers-publisher-summary')),
+              -200,
+              scrollable: find
+                  .descendant(of: collection, matching: find.byType(Scrollable))
+                  .first,
+            );
+          }
+          expect(
+            find.byKey(const ValueKey('buy-offers-publisher-summary')),
+            offers ? findsOneWidget : findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final wholesale in [false, true]) {
+    testWidgets('R66 compared product isolates nested Store $wholesale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final sourceId = wholesale ? 'w-oil' : 's-milk';
+      final alternateId = wholesale ? 'w-oil-10l' : 's-milk-500ml';
+      await tester.pumpWidget(app(session, textScale: 2));
+      session.openProduct(sourceId);
+      await tester.pumpAndSettle();
+
+      Future<void> compareTo(String id) async {
+        final currentId = session.selectedProductId!;
+        final page = find.byKey(PageStorageKey('buy-product-$currentId')).last;
+        final compare = find.descendant(
+          of: page,
+          matching: find.text('Compare'),
+        );
+        await tester.scrollUntilVisible(
+          compare,
+          200,
+          scrollable: find
+              .descendant(of: page, matching: find.byType(Scrollable))
+              .first,
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(compare);
+        await tester.pumpAndSettle();
+        expect(compare.hitTestable(), findsOneWidget);
+        await tester.tap(compare);
+        await tester.pumpAndSettle();
+        final option = find.byKey(ValueKey('buy-product-compare-view-$id'));
+        await tester.scrollUntilVisible(
+          option,
+          180,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.tap(option);
+        await tester.pumpAndSettle();
+      }
+
+      await compareTo(alternateId);
+      final store = find.byKey(
+        ValueKey(
+          '${wholesale ? 'buy-wholesale-store-action' : 'buy-shop-seller-action'}-$alternateId',
+        ),
+      );
+      final page = find.byKey(PageStorageKey('buy-product-$alternateId'));
+      await tester.scrollUntilVisible(
+        store,
+        220,
+        scrollable: find
+            .descendant(of: page, matching: find.byType(Scrollable))
+            .first,
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(store);
+      await tester.pumpAndSettle();
+      expect(store.hitTestable(), findsOneWidget);
+      await tester.tap(store);
+      await tester.pumpAndSettle();
+      final prefix = wholesale ? 'buy-wholesale-supplier' : 'buy-shop-seller';
+      final sheet = find.byKey(ValueKey('$prefix-sheet-$alternateId'));
+      final card = find.descendant(
+        of: sheet,
+        matching: find.byKey(ValueKey('buy-product-$alternateId')),
+      );
+      await tester.ensureVisible(card);
+      await tester.tap(card);
+      await tester.pumpAndSettle();
+      expect(
+        session.canReturnToComparedProduct,
+        isFalse,
+        reason: 'A new Store product must not inherit its parent comparison',
+      );
+      await compareTo(sourceId);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.selectedProductId, alternateId);
+      expect(session.canReturnToComparedProduct, isFalse);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(sheet, findsOneWidget);
+      expect(session.selectedProductId, alternateId);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.canReturnToComparedProduct, isTrue);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.selectedProductId, sourceId);
+      expect(session.canReturnToComparedProduct, isFalse);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  test('R66 comparison return survives a nested Cart product', () {
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    session.addProduct('w-oil');
+    session.openProduct('w-oil');
+    session.openProduct('w-oil-10l', preserveComparisonOrigin: true);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    session.openProduct('w-oil');
+    session.goBack();
+    expect(session.view, BuyV2View.cart);
+    session.goBack();
+    expect(session.selectedProductId, 'w-oil-10l');
+    expect(session.canReturnToComparedProduct, isTrue);
+    session.goBack();
+    expect(session.selectedProductId, 'w-oil');
+    session.goBack();
+    expect(session.view, BuyV2View.catalogue);
+    expect(session.destination, BuyV2Destination.shop);
+  });
+
+  test(
+    'R66 comparison validates IDs and keeps ordinary variant navigation',
+    () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      session.openProduct('s-milk');
+      expect(
+        session.openProduct('missing', preserveComparisonOrigin: true),
+        isFalse,
+      );
+      expect(session.selectedProductId, 's-milk');
+      expect(session.canReturnToComparedProduct, isFalse);
+      expect(
+        session.openProduct('s-milk', preserveComparisonOrigin: true),
+        isTrue,
+      );
+      expect(session.canReturnToComparedProduct, isFalse);
+      session.selectProductVariant('s-milk-500ml');
+      expect(session.canReturnToComparedProduct, isFalse);
+      session.openProduct('s-milk', preserveComparisonOrigin: true);
+      expect(session.canReturnToComparedProduct, isTrue);
+      final origin = session.takeProductComparisonOrigin();
+      expect(origin, ['s-milk-500ml']);
+      expect(session.canReturnToComparedProduct, isFalse);
+      session.restoreProductComparisonOrigin([...origin, 'missing']);
+      expect(session.productReturnLabel, session.product('s-milk-500ml').title);
+      session.closeProduct();
+      expect(session.selectedProductId, 's-milk-500ml');
+      session.openProduct('s-milk', preserveComparisonOrigin: true);
+      session.openDestination(BuyV2Destination.wholesale);
+      session.openProduct('w-oil');
+      expect(session.canReturnToComparedProduct, isFalse);
+      session.closeProduct();
+      expect(session.destination, BuyV2Destination.wholesale);
+      expect(session.view, BuyV2View.catalogue);
+    },
+  );
+
   Future<void> pinchOpen(WidgetTester tester, Finder zoomOwner) async {
     final center = tester.getCenter(zoomOwner);
     final left = await tester.startGesture(center - const Offset(24, 0));
