@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -26,11 +28,8 @@ class WorkChooseActivityScreen extends StatefulWidget {
 }
 
 class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
-  late final TextEditingController _alternate = TextEditingController(
-    text: widget.session.alternateMobile,
-  );
-  final TextEditingController _otp = TextEditingController();
   String? _expandedProfileId;
+  String _workspaceQuery = '';
 
   @override
   void initState() {
@@ -38,13 +37,6 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) widget.session.loadInitialWorkspaceState();
     });
-  }
-
-  @override
-  void dispose() {
-    _alternate.dispose();
-    _otp.dispose();
-    super.dispose();
   }
 
   @override
@@ -68,9 +60,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
         }
 
         void chooseWorkspace(WorkProfileOption option) {
-          widget.session.selectFamily(option.familyId);
           widget.session.selectProfile(option.id);
-          setState(() => _expandedProfileId = null);
           context.push('/app/work/workspace/requirements');
         }
 
@@ -93,18 +83,6 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
           activeLocalAction: 'workspace',
           showHeaderChat: false,
           showTrailingAction: false,
-          bottomAction: profile == null
-              ? null
-              : WorkPrimaryButton(
-                  keyName: 'work-continue-proof',
-                  label: 'Continue with ${profile.label}',
-                  busy: widget.session.busy,
-                  onPressed: () {
-                    if (widget.session.continueToProof()) {
-                      context.go('/app/work/workspace/proof');
-                    }
-                  },
-                ),
           body: ListView(
             key: const Key('work-choose-screen'),
             padding: const EdgeInsets.fromLTRB(
@@ -132,32 +110,56 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
               ],
               const SizedBox(height: MoolSpacing.lg),
               if (family == null) ...[
+                TextField(
+                  key: const Key('work-workspace-search'),
+                  decoration: const InputDecoration(
+                    hintText: 'Find your business or profession',
+                    prefixIcon: Icon(Icons.search),
+                    border: UnderlineInputBorder(),
+                  ),
+                  onChanged: (value) => setState(
+                    () => _workspaceQuery = value.trim().toLowerCase(),
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.sm),
                 const WorkSectionTitle(
                   title: 'Choose how you want to grow',
                   detail:
                       'Select the Workspace that best represents your business, profession or service.',
                 ),
                 const SizedBox(height: MoolSpacing.md),
-                for (final familyId in widget.session.familyIds) ...[
-                  WorkSectionTitle(
-                    title: widget.session.familyLabel(familyId),
-                    detail: _workspaceGroupPresentation(familyId).examples,
-                  ),
-                  const SizedBox(height: MoolSpacing.sm),
-                  for (final option in widget.session.profilesForFamily(
-                    familyId,
-                  )) ...[
-                    WorkWorkspaceBenefitCard(
-                      option: option,
-                      content: workWorkspaceBenefitFor(option.id),
-                      expanded: _expandedProfileId == option.id,
-                      onToggle: () => toggleBenefits(option.id),
-                      onChoose: () => chooseWorkspace(option),
+                for (final familyId in widget.session.familyIds)
+                  if (widget.session
+                      .profilesForFamily(familyId)
+                      .any(
+                        (option) => option.label.toLowerCase().contains(
+                          _workspaceQuery,
+                        ),
+                      )) ...[
+                    WorkSectionTitle(
+                      title: widget.session.familyLabel(familyId),
+                      detail: _workspaceGroupPresentation(familyId).examples,
                     ),
                     const SizedBox(height: MoolSpacing.sm),
+                    for (final option
+                        in widget.session
+                            .profilesForFamily(familyId)
+                            .where(
+                              (option) => option.label.toLowerCase().contains(
+                                _workspaceQuery,
+                              ),
+                            )) ...[
+                      WorkWorkspaceBenefitCard(
+                        option: option,
+                        content: workWorkspaceBenefitFor(option.id),
+                        expanded: _expandedProfileId == option.id,
+                        onToggle: () => toggleBenefits(option.id),
+                        onChoose: () => chooseWorkspace(option),
+                      ),
+                      const SizedBox(height: MoolSpacing.sm),
+                    ],
+                    const SizedBox(height: MoolSpacing.xs),
                   ],
-                  const SizedBox(height: MoolSpacing.xs),
-                ],
                 OutlinedButton.icon(
                   key: const Key('work-profile-not-shown'),
                   onPressed: () => _showUnsupportedRequest(context),
@@ -186,99 +188,17 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                   ],
                 ),
                 const SizedBox(height: MoolSpacing.sm),
-                if (profile == null)
-                  for (final option in widget.session.profilesForFamily(
-                    family,
-                  )) ...[
-                    WorkWorkspaceBenefitCard(
-                      option: option,
-                      content: workWorkspaceBenefitFor(option.id),
-                      expanded: _expandedProfileId == option.id,
-                      onToggle: () => toggleBenefits(option.id),
-                      onChoose: () => chooseWorkspace(option),
-                    ),
-                    const SizedBox(height: MoolSpacing.sm),
-                  ]
-                else ...[
-                  _SelectedProfileCard(option: profile),
-                  const SizedBox(height: MoolSpacing.md),
-                  const WorkSectionTitle(
-                    title: 'Workspace contact',
-                    detail:
-                        'Your verified MoolSocial contact is used by default.',
+                for (final option in widget.session.profilesForFamily(
+                  family,
+                )) ...[
+                  WorkWorkspaceBenefitCard(
+                    option: option,
+                    content: workWorkspaceBenefitFor(option.id),
+                    expanded: _expandedProfileId == option.id,
+                    onToggle: () => toggleBenefits(option.id),
+                    onChoose: () => chooseWorkspace(option),
                   ),
                   const SizedBox(height: MoolSpacing.sm),
-                  const WorkCard(
-                    child: _ContactRow(
-                      label: 'Primary contact',
-                      value: '+91 98••• ••321',
-                      state: 'Verified',
-                    ),
-                  ),
-                  const SizedBox(height: MoolSpacing.sm),
-                  TextField(
-                    key: const Key('work-alternate-mobile'),
-                    controller: _alternate,
-                    enabled: !widget.session.alternateVerified,
-                    keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      labelText: 'Alternate work number · optional',
-                      prefixText: '+91 ',
-                      suffixIcon: widget.session.alternateVerified
-                          ? const Icon(
-                              Icons.verified_rounded,
-                              color: MoolColors.success,
-                            )
-                          : null,
-                    ),
-                  ),
-                  if (!widget.session.alternateOtpSent)
-                    TextButton(
-                      key: const Key('work-send-alternate-otp'),
-                      onPressed: widget.session.busy
-                          ? null
-                          : () => widget.session.sendAlternateOtp(
-                              _alternate.text,
-                            ),
-                      child: const Text('Send OTP'),
-                    )
-                  else if (!widget.session.alternateVerified) ...[
-                    const SizedBox(height: MoolSpacing.xs),
-                    TextField(
-                      key: const Key('work-alternate-otp'),
-                      controller: _otp,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      decoration: const InputDecoration(
-                        labelText: '6-digit OTP',
-                        counterText: '',
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            key: const Key('work-change-alternate'),
-                            onPressed: () {
-                              widget.session.removeAlternateMobile();
-                              _alternate.clear();
-                              _otp.clear();
-                            },
-                            child: const Text('Change'),
-                          ),
-                        ),
-                        const SizedBox(width: MoolSpacing.xs),
-                        Expanded(
-                          child: FilledButton(
-                            key: const Key('work-verify-alternate'),
-                            onPressed: () =>
-                                widget.session.verifyAlternateOtp(_otp.text),
-                            child: const Text('Verify'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
                 ],
               ],
             ],
@@ -333,7 +253,22 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
   bool _submitting = false;
 
   @override
+  void initState() {
+    super.initState();
+    _workspace.text = widget.session.unsupportedWorkspace;
+    _area.text = widget.session.unsupportedArea;
+    _otherActivity.text = widget.session.unsupportedOtherActivity;
+    _category = widget.session.unsupportedFamily;
+  }
+
+  @override
   void dispose() {
+    if (!widget.session.unsupportedRequestSent) {
+      widget.session.unsupportedWorkspace = _workspace.text;
+      widget.session.unsupportedArea = _area.text;
+      widget.session.unsupportedOtherActivity = _otherActivity.text;
+      widget.session.unsupportedFamily = _category;
+    }
     _workspace.dispose();
     _area.dispose();
     _otherActivity.dispose();
@@ -393,14 +328,21 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
         ? 24.0
         : reportedBottomInset;
     return SafeArea(
-      top: false,
+      top: true,
       minimum: EdgeInsets.only(bottom: gestureSafeBottom + MoolSpacing.xs),
       child: Padding(
         padding: EdgeInsets.only(bottom: keyboardInset),
         child: Align(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 500),
+            constraints: BoxConstraints(
+              maxHeight:
+                  (MediaQuery.sizeOf(context).height -
+                          keyboardInset -
+                          MediaQuery.paddingOf(context).top -
+                          24)
+                      .clamp(0, 500),
+            ),
             child: Material(
               key: const Key('work-profile-request-sheet'),
               color: Colors.white,
@@ -460,7 +402,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                             ),
                             IconButton(
                               key: const Key('work-profile-request-close'),
-                              tooltip: 'Back to Workspaces',
+                              tooltip: 'Close',
                               onPressed: _close,
                               icon: const Icon(Icons.close_rounded),
                             ),
@@ -598,7 +540,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                             child: OutlinedButton(
                               key: const Key('work-profile-request-back'),
                               onPressed: _submitting ? null : _close,
-                              child: const Text('Back to Workspaces'),
+                              child: const Text('Cancel'),
                             ),
                           ),
                           const SizedBox(width: MoolSpacing.xs),
@@ -607,7 +549,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                               key: const Key('work-send-profile-request'),
                               onPressed: _submitting ? null : _submit,
                               child: Text(
-                                _submitting ? 'Sending…' : 'Send to MoolSocial',
+                                _submitting ? 'Sending…' : 'Send request',
                               ),
                             ),
                           ),
@@ -635,7 +577,7 @@ class WorkDocumentRequirementsScreen extends StatelessWidget {
     final profile = session.selectedProfile;
 
     void returnToRoles() {
-      session.changeFamily();
+      session.clearMessages();
       if (context.canPop()) {
         context.pop();
       } else {
@@ -688,68 +630,18 @@ class WorkDocumentRequirementsScreen extends StatelessWidget {
           MoolSpacing.xl,
         ),
         children: [
-          Container(
-            key: const Key('work-requirements-role-summary'),
-            padding: const EdgeInsets.all(MoolSpacing.sm),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEDEEFF),
-              borderRadius: BorderRadius.circular(MoolRadii.floating),
-              border: Border.all(color: const Color(0xFFCBCBF1)),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: MoolColors.navy,
-                  foregroundColor: Colors.white,
-                  child: Icon(profile.icon),
-                ),
-                const SizedBox(width: MoolSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        profile.label,
-                        style: const TextStyle(
-                          color: MoolColors.navy,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const Text(
-                        'Keep the applicable documents ready for a smooth Workspace verification.',
-                        style: TextStyle(
-                          color: MoolColors.muted,
-                          fontSize: 10.5,
-                          height: 1.3,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+          const Padding(
+            key: Key('work-requirements-role-summary'),
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Keep clear copies ready. You can submit your application before adding documents; MoolSocial will confirm what is needed.',
+              style: TextStyle(
+                color: MoolColors.muted,
+                fontSize: 12,
+                height: 1.4,
+              ),
             ),
           ),
-          const SizedBox(height: MoolSpacing.md),
-          Text(
-            '${profile.verificationDocuments.length} documents and checks',
-            style: const TextStyle(
-              color: MoolColors.navy,
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const Text(
-            'Requirements marked “Required when applicable” depend on how your work is registered and operated.',
-            style: TextStyle(
-              color: MoolColors.muted,
-              fontSize: 10.5,
-              height: 1.3,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
           for (
             var index = 0;
             index < profile.verificationDocuments.length;
@@ -770,93 +662,60 @@ class WorkDocumentRequirementsScreen extends StatelessWidget {
 
 class _DocumentRequirementCard extends StatelessWidget {
   const _DocumentRequirementCard({required this.index, required this.item});
-
   final int index;
   final WorkDocumentChecklistItem item;
 
   @override
-  Widget build(BuildContext context) {
-    final accent = switch (item.importance) {
-      WorkDocumentImportance.required => MoolColors.navy,
-      WorkDocumentImportance.ifApplicable => const Color(0xFFA65A00),
-      WorkDocumentImportance.optional => MoolColors.success,
-    };
-    final tint = switch (item.importance) {
-      WorkDocumentImportance.required => const Color(0xFFEDEEFF),
-      WorkDocumentImportance.ifApplicable => const Color(0xFFFFF4E5),
-      WorkDocumentImportance.optional => const Color(0xFFEAF7E8),
-    };
-    return Container(
-      key: ValueKey('work-requirement-$index'),
-      padding: const EdgeInsets.all(MoolSpacing.sm),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(MoolRadii.floating),
-        border: Border.all(color: accent.withValues(alpha: .28)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            backgroundColor: tint,
-            foregroundColor: accent,
-            child: Icon(item.icon),
-          ),
-          const SizedBox(width: MoolSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: MoolSpacing.xs,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      item.title,
-                      style: const TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: tint,
-                        borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                      ),
-                      child: Text(
-                        item.importance.label,
-                        style: TextStyle(
-                          color: accent,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
+  Widget build(BuildContext context) => Container(
+    key: ValueKey('work-requirement-$index'),
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: Color(0xFFE4E7F0))),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(item.icon, color: MoolColors.navy, size: 22),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.title,
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  item.detail,
-                  style: const TextStyle(
-                    color: MoolColors.muted,
-                    fontSize: 10.5,
-                    height: 1.3,
-                    fontWeight: FontWeight.w600,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                item.detail,
+                style: const TextStyle(
+                  color: MoolColors.muted,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+              if (item.importance == WorkDocumentImportance.ifApplicable)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'When applicable',
+                    style: TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }
 
 class _GstComplianceNotice extends StatelessWidget {
@@ -870,14 +729,14 @@ class _GstComplianceNotice extends StatelessWidget {
       key: const Key('work-gst-compliance-guidance'),
       padding: const EdgeInsets.all(MoolSpacing.sm),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF4E5),
+        color: const Color(0xFFF5F6FD),
         borderRadius: BorderRadius.circular(MoolRadii.control),
-        border: Border.all(color: const Color(0xFFF0C58A)),
+        border: Border.all(color: const Color(0xFFE4E7F0)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.gavel_rounded, color: MoolColors.orange),
+          const Icon(Icons.gavel_rounded, color: MoolColors.navy),
           const SizedBox(width: MoolSpacing.xs),
           Expanded(
             child: Column(
@@ -940,134 +799,24 @@ String _gstComplianceText(WorkGstMatchCategory category) => switch (category) {
     'For service businesses, GST registration depends on annual PAN-wide aggregate turnover, the State or Union Territory of supply, the nature of the service and any compulsory-registration rule.',
 };
 
-class _DocumentsReadyAction extends StatefulWidget {
+class _DocumentsReadyAction extends StatelessWidget {
   const _DocumentsReadyAction({required this.onPressed});
-
   final VoidCallback onPressed;
-
   @override
-  State<_DocumentsReadyAction> createState() => _DocumentsReadyActionState();
-}
-
-class _DocumentsReadyActionState extends State<_DocumentsReadyAction>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 520),
-    value: 1,
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.centerRight,
+    child: FilledButton(
+      key: const Key('work-requirements-ready'),
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: MoolColors.navy,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(0, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      ),
+      child: const Text('Continue setup'),
+    ),
   );
-  bool _started = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_started || MediaQuery.disableAnimationsOf(context)) return;
-    _started = true;
-    _controller.repeat(reverse: true, count: 4).whenComplete(() {
-      if (mounted) _controller.value = 1;
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final motion = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutCubic,
-    );
-    return AnimatedBuilder(
-      animation: motion,
-      builder: (context, child) => Transform.scale(
-        scale: .99 + (.01 * motion.value),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                MoolColors.navy,
-                Color.lerp(
-                  const Color(0xFF3535B8),
-                  const Color(0xFF006D5B),
-                  motion.value,
-                )!,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(MoolRadii.floating),
-            boxShadow: [
-              BoxShadow(
-                color: MoolColors.orange.withValues(
-                  alpha: .12 + (.1 * motion.value),
-                ),
-                blurRadius: 12 + (6 * motion.value),
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: child,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(MoolRadii.floating),
-        child: InkWell(
-          key: const Key('work-requirements-ready'),
-          onTap: widget.onPressed,
-          borderRadius: BorderRadius.circular(MoolRadii.floating),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: MoolSpacing.sm,
-              vertical: 10,
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Color(0x26FFFFFF),
-                  foregroundColor: Colors.white,
-                  child: Icon(Icons.fact_check_outlined),
-                ),
-                SizedBox(width: MoolSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'I have these documents ready',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Continue to secure Workspace setup',
-                        style: TextStyle(
-                          color: Color(0xFFE8E8FF),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: MoolSpacing.xs),
-                CircleAvatar(
-                  radius: 17,
-                  backgroundColor: MoolColors.orange,
-                  foregroundColor: MoolColors.navy,
-                  child: Icon(Icons.arrow_forward_rounded, size: 19),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class WorkWorkspaceContactScreen extends StatefulWidget {
@@ -1228,221 +977,73 @@ class _WorkWorkspaceContactScreenState
   }
 }
 
-class _WorkspaceEntryHero extends StatefulWidget {
+class _WorkspaceEntryHero extends StatelessWidget {
   const _WorkspaceEntryHero();
-
-  @override
-  State<_WorkspaceEntryHero> createState() => _WorkspaceEntryHeroState();
-}
-
-class _WorkspaceEntryHeroState extends State<_WorkspaceEntryHero>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 620),
-  );
-  bool _started = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_started) return;
-    _started = true;
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _controller.value = 1;
-    } else {
-      _controller.repeat(reverse: true, count: 4).whenComplete(() {
-        if (mounted) _controller.value = 1;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final pulse = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutCubic,
-    );
-    return AnimatedBuilder(
-      animation: pulse,
-      builder: (context, child) => Transform.scale(
-        scale: .99 + (.01 * pulse.value),
-        child: Container(
-          key: const Key('workspace-chooser-hero'),
-          padding: const EdgeInsets.all(MoolSpacing.sm),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFF000080),
-                Color.lerp(
-                  const Color(0xFF3535B8),
-                  const Color(0xFF5B21B6),
-                  pulse.value,
-                )!,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(MoolRadii.floating),
-            boxShadow: [
-              BoxShadow(
-                color: MoolColors.orange.withValues(
-                  alpha: .14 + (.10 * pulse.value),
-                ),
-                blurRadius: 18 + (8 * pulse.value),
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: child,
+    const steps = [
+      'Choose Workspace',
+      'Upload documents',
+      'MoolSocial review',
+      'Add your products',
+      'Go live',
+    ];
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: MoolMotion.accessible(context, MoolMotion.standard),
+      builder: (context, value, child) => Opacity(opacity: value, child: child),
+      child: Container(
+        key: const Key('workspace-chooser-hero'),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: MoolColors.navy,
+          borderRadius: BorderRadius.circular(12),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: MoolColors.orange,
-                foregroundColor: MoolColors.navy,
-                child: Icon(Icons.rocket_launch_rounded),
-              ),
-              SizedBox(width: MoolSpacing.sm),
-              Expanded(
-                child: Text(
-                  'MOOLSOCIAL PARTNER JOURNEY',
-                  style: TextStyle(
-                    color: Color(0xFFFFD6AD),
-                    fontSize: 10,
-                    letterSpacing: .6,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              WorkPill(
-                label: 'Signed in',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your business. More customers.',
+              style: TextStyle(
                 color: Colors.white,
-                icon: Icons.login_rounded,
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
               ),
-            ],
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          const Text(
-            'Grow your business with MoolSocial',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              height: 1.08,
-              fontWeight: FontWeight.w900,
             ),
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          const Text(
-            'Join MoolSocial, reach more customers and become a partner in shared success.',
-            style: TextStyle(
-              color: Color(0xFFE8E8FF),
-              fontSize: 11,
-              height: 1.28,
-              fontWeight: FontWeight.w600,
+            const SizedBox(height: 5),
+            const Text(
+              'Reach more customers. Grow repeat sales.',
+              style: TextStyle(color: Colors.white, fontSize: 12),
             ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: MoolSpacing.sm,
-              vertical: 6,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .12),
-              borderRadius: BorderRadius.circular(MoolRadii.control),
-              border: Border.all(color: Colors.white.withValues(alpha: .18)),
-            ),
-            child: const Row(
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
               children: [
-                Expanded(
-                  child: _WorkspaceStep(
-                    icon: Icons.explore_rounded,
-                    label: 'CHOOSE YOUR WORKSPACE',
+                for (var i = 0; i < steps.length; i++)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${i + 1}  ${steps[i]}',
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                ),
-                Icon(Icons.arrow_forward_rounded, color: MoolColors.orange),
-                Expanded(
-                  child: _WorkspaceStep(
-                    icon: Icons.workspace_premium_outlined,
-                    label: 'BUILD TRUST',
-                  ),
-                ),
-                Icon(Icons.arrow_forward_rounded, color: MoolColors.orange),
-                Expanded(
-                  child: _WorkspaceStep(
-                    icon: Icons.trending_up_rounded,
-                    label: 'GROW WITH US',
-                  ),
-                ),
               ],
             ),
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          const Row(
-            children: [
-              Icon(
-                Icons.lock_outline_rounded,
-                color: Color(0xFFFFD6AD),
-                size: 16,
-              ),
-              SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  'Business verification begins after you choose a Workspace and provide its documents.',
-                  style: TextStyle(
-                    color: Color(0xFFE8E8FF),
-                    fontSize: 9.5,
-                    height: 1.2,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WorkspaceStep extends StatelessWidget {
-  const _WorkspaceStep({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: MoolColors.orange, size: 19),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 8.5,
-            height: 1.12,
-            letterSpacing: .2,
-            fontWeight: FontWeight.w900,
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -2017,7 +1618,13 @@ class WorkProfileProofScreen extends StatefulWidget {
   State<WorkProfileProofScreen> createState() => _WorkProfileProofScreenState();
 }
 
-class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
+class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
+    with WidgetsBindingObserver {
+  final ScrollController _scroll = ScrollController();
+  Timer? _reviewTimer;
+  bool _redirectQueued = false;
+  bool _appActive = true;
+  int _reviewPolls = 0;
   int _step = 0;
   bool _correctionMode = false;
   bool _reviewEditMode = false;
@@ -2036,10 +1643,23 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
   void initState() {
     super.initState();
     if (widget.session.reviewCaseId != null) _step = 3;
+    WidgetsBinding.instance.addObserver(this);
+    widget.session.addListener(_onReviewChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _refreshReview();
+    });
+    _reviewTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _refreshReview(),
+    );
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _reviewTimer?.cancel();
+    widget.session.removeListener(_onReviewChanged);
+    _scroll.dispose();
     _name.dispose();
     _area.dispose();
     _activity.dispose();
@@ -2055,6 +1675,9 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
   }
 
   void _goBack() {
+    if (_step == 0) _saveFields();
+    FocusManager.instance.primaryFocus?.unfocus();
+    _resetScroll();
     if (_step >= 3) {
       context.go(
         widget.session.hasVerifiedWorkspace
@@ -2104,6 +1727,72 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
     });
   }
 
+  void _resetScroll() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scroll.hasClients) _scroll.jumpTo(0);
+    });
+  }
+
+  void _refreshReview() {
+    if (!mounted ||
+        !_appActive ||
+        _step != 3 ||
+        widget.session.busy ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    if (_reviewPolls >= 20) {
+      _reviewTimer?.cancel();
+      return;
+    }
+    _onReviewChanged();
+    final status = widget.session.remoteReviewStatus;
+    if (!_redirectQueued &&
+        widget.session.reviewCaseId != null &&
+        status != WorkRemoteReviewStatus.rejected &&
+        status != WorkRemoteReviewStatus.suspended) {
+      _reviewPolls += 1;
+      unawaited(widget.session.checkReview());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appActive = state == AppLifecycleState.resumed;
+    if (_appActive) {
+      _reviewPolls = 0;
+      if (_reviewTimer?.isActive != true) {
+        _reviewTimer = Timer.periodic(
+          const Duration(seconds: 30),
+          (_) => _refreshReview(),
+        );
+      }
+      _refreshReview();
+    }
+  }
+
+  void _onReviewChanged() {
+    if (!mounted ||
+        _step != 3 ||
+        _redirectQueued ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    final session = widget.session;
+    if ((session.remoteReviewStatus == WorkRemoteReviewStatus.approved ||
+            session.remoteReviewStatus == WorkRemoteReviewStatus.live) &&
+        session.hasVerifiedWorkspace &&
+        session.activeWorkspace?.id == session.workspaceId) {
+      _redirectQueued = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+          context.go('/app/work/workspace/dashboard');
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -2126,6 +1815,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
             onPressed: () {
               _saveFields();
               if (widget.session.validateDetails()) {
+                _resetScroll();
                 setState(() {
                   _step = _reviewEditMode ? 2 : 1;
                   _reviewEditMode = false;
@@ -2138,10 +1828,14 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
             label: _reviewEditMode
                 ? 'Save and return to review'
                 : 'Review your information',
-            onPressed: () => setState(() {
-              _step = 2;
-              _reviewEditMode = false;
-            }),
+            onPressed: () {
+              widget.session.clearMessages();
+              _resetScroll();
+              setState(() {
+                _step = 2;
+                _reviewEditMode = false;
+              });
+            },
           ),
           2 => WorkPrimaryButton(
             keyName: 'work-submit-profile',
@@ -2154,11 +1848,13 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
             onPressed: () async {
               final submitted = await widget.session.submitProfile();
               if (submitted && mounted) {
+                _resetScroll();
                 setState(() {
                   _step = 3;
                   _correctionMode = false;
                   _correctionInstruction = null;
                 });
+                _onReviewChanged();
               }
             },
             icon: Icons.send_rounded,
@@ -2170,6 +1866,8 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
         },
         body: ListView(
           key: const Key('work-proof-screen'),
+          controller: _scroll,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(
             MoolSpacing.md,
             MoolSpacing.sm,
@@ -2185,32 +1883,72 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
             ],
             if (_step == 0) ...[
               const WorkSectionTitle(
-                title: 'Work details',
+                title: 'Business details',
                 detail: 'Information needed to verify this Workspace',
               ),
               const SizedBox(height: MoolSpacing.sm),
               TextField(
                 key: const Key('work-name'),
                 controller: _name,
+                textInputAction: TextInputAction.next,
+                textCapitalization: TextCapitalization.words,
+                onChanged: (_) => _saveFields(),
                 decoration: const InputDecoration(
-                  labelText: 'Work or business name',
+                  labelText: 'Business name (as per PAN card)',
+                  helperText:
+                      'Enter the name shown on the PAN used for this business.',
+                  helperMaxLines: 2,
+                  border: UnderlineInputBorder(),
                 ),
               ),
               const SizedBox(height: MoolSpacing.sm),
               TextField(
                 key: const Key('work-area'),
                 controller: _area,
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => _saveFields(),
                 decoration: const InputDecoration(
                   labelText: 'Operating city or PIN code',
+                  border: UnderlineInputBorder(),
                 ),
               ),
               const SizedBox(height: MoolSpacing.sm),
               TextField(
                 key: const Key('work-activity'),
                 controller: _activity,
+                textInputAction: TextInputAction.done,
+                onChanged: (_) => _saveFields(),
                 decoration: const InputDecoration(
                   labelText: 'Primary activity',
+                  border: UnderlineInputBorder(),
                 ),
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              DropdownButtonFormField<String>(
+                key: const Key('work-business-relationship'),
+                initialValue: widget.session.businessRelationship.isEmpty
+                    ? null
+                    : widget.session.businessRelationship,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Your connection to this business',
+                  border: UnderlineInputBorder(),
+                ),
+                items:
+                    const [
+                          'Owner',
+                          'Partner or director',
+                          'Authorized representative',
+                        ]
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+                onChanged: (value) =>
+                    widget.session.saveBusinessRelationship(value ?? ''),
               ),
             ] else if (_step == 1) ...[
               const WorkSectionTitle(
@@ -2227,7 +1965,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                     SizedBox(width: MoolSpacing.sm),
                     Expanded(
                       child: Text(
-                        'Documents are not required to submit your Workspace. Add what you have now; MoolSocial may request missing documents before approval.',
+                        'Add the documents you have. PDF, JPG, JPEG, PNG or WebP · up to 10 MB each. MoolSocial will review what is needed for approval.',
                         style: TextStyle(
                           color: MoolColors.ink,
                           fontSize: 11,
@@ -2241,16 +1979,14 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
               ),
               const SizedBox(height: MoolSpacing.sm),
               for (final proof
-                  in widget.session.selectedWorkspaceDocuments.where(
-                    (proof) => proof.id != 'personal-kyc',
-                  )) ...[
+                  in widget.session.selectedWorkspaceDocuments) ...[
                 _ProofCard(
                   proof: proof,
                   added: widget.session.addedProofs.containsKey(proof.id),
+                  file: widget.session.pickedProofs[proof.id],
                   onAdd: () => _showProofSource(context, proof),
-                  onRemove: proof.id == 'personal-kyc'
-                      ? null
-                      : () => widget.session.removeProof(proof.id),
+                  onView: () => _showDocument(context, proof),
+                  onRemove: () => widget.session.removeProof(proof.id),
                 ),
                 const SizedBox(height: MoolSpacing.xs),
               ],
@@ -2274,9 +2010,31 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                                 'Not selected',
                           ),
                           _ReviewRow(
-                            label: 'Name',
+                            label: 'Business name',
                             value: widget.session.workName,
                           ),
+                          _ReviewRow(
+                            label: 'Your name',
+                            value: widget.session.authorizedPersonName,
+                          ),
+                          _ReviewRow(
+                            label: 'Contact',
+                            value: widget.session.primaryMobile,
+                          ),
+                          _ReviewRow(
+                            label: 'Email',
+                            value: widget.session.contactEmail,
+                          ),
+                          if (widget.session.alternateMobile.isNotEmpty)
+                            _ReviewRow(
+                              label: 'Alternate',
+                              value: widget.session.alternateMobile,
+                            ),
+                          if (widget.session.businessRelationship.isNotEmpty)
+                            _ReviewRow(
+                              label: 'Connection',
+                              value: widget.session.businessRelationship,
+                            ),
                           _ReviewRow(
                             label: 'Area',
                             value: widget.session.workArea,
@@ -2287,132 +2045,87 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
                           ),
                           _ReviewRow(
                             label: 'Documents',
-                            value:
-                                '${widget.session.addedProofs.length - 1} added · more can be added later',
+                            value: '${widget.session.addedProofs.length} added',
                           ),
                           for (final proof
                               in widget.session.selectedWorkspaceDocuments)
-                            if (proof.id != 'personal-kyc' &&
-                                widget.session.addedProofs.containsKey(
-                                  proof.id,
-                                ))
-                              _ReviewRow(label: 'Added', value: proof.label),
+                            if (widget.session.addedProofs.containsKey(
+                              proof.id,
+                            ))
+                              _ReviewRow(
+                                label: proof.label,
+                                value:
+                                    widget
+                                        .session
+                                        .pickedProofs[proof.id]
+                                        ?.fileName ??
+                                    'Document attached',
+                              ),
                         ],
                       ),
                     ),
                     const SizedBox(height: MoolSpacing.sm),
-                    WorkCard(
-                      keyName: 'work-review-corrections',
-                      color: const Color(0xFFEDEEFF),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Need to correct something?',
-                            style: TextStyle(
-                              color: MoolColors.ink,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const Text(
-                            'Update the information or documents before sending this Workspace for review.',
-                            style: TextStyle(
-                              color: MoolColors.muted,
-                              fontSize: 10.5,
-                              height: 1.3,
-                            ),
-                          ),
-                          const SizedBox(height: MoolSpacing.xs),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  key: const Key('work-review-edit-details'),
-                                  onPressed: () {
-                                    widget.session.setDeclaration(false);
-                                    setState(() {
-                                      _step = 0;
-                                      _reviewEditMode = true;
-                                    });
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size(0, 54),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 7,
-                                      vertical: 8,
-                                    ),
-                                    textStyle: const TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  icon: const Icon(
-                                    Icons.edit_outlined,
-                                    size: 18,
-                                  ),
-                                  label: const Text(
-                                    'Edit details',
-                                    maxLines: 2,
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: MoolSpacing.xs),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  key: const Key('work-review-edit-documents'),
-                                  onPressed: () {
-                                    widget.session.setDeclaration(false);
-                                    setState(() {
-                                      _step = 1;
-                                      _reviewEditMode = true;
-                                    });
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size(0, 54),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 7,
-                                      vertical: 8,
-                                    ),
-                                    textStyle: const TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  icon: const Icon(
-                                    Icons.upload_file_outlined,
-                                    size: 18,
-                                  ),
-                                  label: const Text(
-                                    'Edit documents',
-                                    maxLines: 2,
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: MoolSpacing.md),
-                    WorkCard(
-                      color: const Color(0xFFFFF4E5),
-                      child: CheckboxListTile(
-                        key: const Key('work-declaration'),
-                        value: widget.session.declarationAccepted,
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        title: const Text(
-                          'I confirm these Workspace details are correct and any documents added belong to me or I am authorized to use them.',
-                          style: TextStyle(
-                            color: MoolColors.ink,
-                            fontWeight: FontWeight.w700,
-                          ),
+                    Wrap(
+                      key: const Key('work-review-corrections'),
+                      spacing: 12,
+                      children: [
+                        TextButton.icon(
+                          key: const Key('work-review-edit-details'),
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          label: const Text('Edit details'),
+                          onPressed: () {
+                            widget.session.setDeclaration(false);
+                            _resetScroll();
+                            setState(() {
+                              _step = 0;
+                              _reviewEditMode = true;
+                            });
+                          },
                         ),
-                        onChanged: (value) =>
-                            widget.session.setDeclaration(value ?? false),
+                        TextButton.icon(
+                          key: const Key('work-review-edit-documents'),
+                          icon: const Icon(
+                            Icons.upload_file_outlined,
+                            size: 18,
+                          ),
+                          label: const Text('Edit documents'),
+                          onPressed: () {
+                            widget.session.setDeclaration(false);
+                            _resetScroll();
+                            setState(() {
+                              _step = 1;
+                              _reviewEditMode = true;
+                            });
+                          },
+                        ),
+                        TextButton.icon(
+                          key: const Key('work-review-edit-contact'),
+                          icon: const Icon(Icons.person_outline, size: 18),
+                          label: const Text('Edit contact'),
+                          onPressed: () {
+                            widget.session.setDeclaration(false);
+                            context.push(
+                              '/app/work/workspace/contact?return=review',
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    CheckboxListTile(
+                      key: const Key('work-declaration'),
+                      value: widget.session.declarationAccepted,
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: const Text(
+                        'These details are correct and I am authorized to provide them.',
+                        style: TextStyle(
+                          color: MoolColors.ink,
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
                       ),
+                      onChanged: (value) =>
+                          widget.session.setDeclaration(value ?? false),
                     ),
                   ],
                 ),
@@ -2425,6 +2138,80 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showDocument(BuildContext context, WorkProofRequirement proof) {
+    final file = widget.session.pickedProofs[proof.id];
+    final format = file?.contentType == 'application/pdf' ? 'PDF' : 'Image';
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * .75,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  proof.label,
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(file?.fileName ?? 'Document attached'),
+                if (file != null) ...[
+                  Text(
+                    '$format · ${(file.bytes.length / 1024).ceil()} KB',
+                    style: const TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (file.contentType.startsWith('image/'))
+                    Image.memory(
+                      file.bytes,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const Text(
+                        'Preview unavailable. You can choose a replacement.',
+                      ),
+                    )
+                  else
+                    const Text(
+                      'PDF attached. You can check the original file on your device or choose a replacement.',
+                    ),
+                ],
+                const SizedBox(height: 12),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 12,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      child: const Text('Close'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(sheetContext).pop();
+                        _showProofSource(context, proof);
+                      },
+                      child: const Text('Replace'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -2555,7 +2342,7 @@ class _ProofSourceSheetState extends State<_ProofSourceSheet> {
                   ),
                 ),
                 const Text(
-                  'Choose a source. Cloud files open your connected Google Drive, OneDrive or another available provider.',
+                  'PDF, JPG, JPEG, PNG or WebP · up to 10 MB. Cloud files shows the providers available on this device.',
                   style: TextStyle(
                     color: MoolColors.muted,
                     fontSize: 10.5,
@@ -2666,46 +2453,38 @@ class _InlineReviewAction extends StatelessWidget {
     required this.session,
     required this.onUpdateDetails,
   });
-
   final WorkSession session;
   final VoidCallback onUpdateDetails;
-
   @override
   Widget build(BuildContext context) {
     final status = session.remoteReviewStatus;
-    if (status == WorkRemoteReviewStatus.approved ||
-        status == WorkRemoteReviewStatus.live) {
-      return WorkPrimaryButton(
-        keyName: 'work-inline-review-approved',
-        label: 'Open Workspace dashboard',
-        icon: Icons.task_alt_rounded,
-        onPressed: () => context.go('/app/work/workspace/dashboard'),
-      );
-    }
-    if (status == WorkRemoteReviewStatus.suspended) {
+    final needsHelp =
+        status == WorkRemoteReviewStatus.rejected ||
+        status == WorkRemoteReviewStatus.suspended ||
+        (session.reviewReason?.trim().isNotEmpty == true &&
+            session.gateway is! ReviewWorkGateway);
+    if (needsHelp) {
       return WorkPrimaryButton(
         keyName: 'work-inline-review-support',
-        label: 'Open support Chat',
-        icon: Icons.support_agent_rounded,
-        onPressed: () =>
-            context.go('/app/chat/inbox?return=/app/work/workspace/proof'),
+        label: 'Contact MoolSocial',
+        icon: Icons.chat_bubble_outline,
+        onPressed: () => context.push(
+          Uri(
+            path: '/app/chat/inbox',
+            queryParameters: const {'return': '/app/work/workspace/proof'},
+          ).toString(),
+        ),
       );
     }
-    if (status == WorkRemoteReviewStatus.rejected) {
+    if (session.errorMessage != null) {
       return WorkPrimaryButton(
-        keyName: 'work-inline-review-update',
-        label: 'Update Workspace information',
-        icon: Icons.edit_outlined,
-        onPressed: onUpdateDetails,
+        keyName: 'work-inline-review-check',
+        label: 'Retry update',
+        busy: session.busy,
+        onPressed: session.checkReview,
       );
     }
-    return WorkPrimaryButton(
-      keyName: 'work-inline-review-check',
-      label: 'Check review update',
-      busy: session.busy,
-      icon: Icons.refresh_rounded,
-      onPressed: session.checkReview,
-    );
+    return const SizedBox.shrink();
   }
 }
 
@@ -2761,157 +2540,136 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
     required this.onAddDocuments,
     required this.onUpdateDetails,
   });
-
   final WorkSession session;
-  final VoidCallback onAddDocuments;
-  final VoidCallback onUpdateDetails;
-
+  final VoidCallback onAddDocuments, onUpdateDetails;
   @override
   Widget build(BuildContext context) {
-    final availableDocuments = session.selectedWorkspaceDocuments
-        .where((proof) => proof.id != 'personal-kyc')
-        .length;
-    final addedDocuments = session.addedProofs.keys
-        .where((id) => id != 'personal-kyc')
-        .length;
-    final missingDocuments = availableDocuments - addedDocuments;
     final status = session.remoteReviewStatus;
-    final approved =
-        status == WorkRemoteReviewStatus.approved ||
-        status == WorkRemoteReviewStatus.live;
     final rejected = status == WorkRemoteReviewStatus.rejected;
     final suspended = status == WorkRemoteReviewStatus.suspended;
-    final stopped = rejected || suspended;
-    final clarification =
-        !stopped && session.reviewReason?.trim().isNotEmpty == true;
-    final title = approved
-        ? 'Workspace approved'
-        : rejected
-        ? 'Workspace not approved'
+    final reason = session.reviewReason?.trim() ?? '';
+    final clarification = !rejected && !suspended && reason.isNotEmpty;
+    final title = rejected
+        ? 'Application not approved'
         : suspended
         ? 'Workspace unavailable'
         : clarification
-        ? 'Clarification requested'
-        : missingDocuments > 0
-        ? 'Submitted · documents pending'
-        : 'Review in progress';
-    final detail = approved
-        ? 'Your Workspace review is complete.'
-        : rejected || suspended
-        ? session.reviewReason?.trim().isNotEmpty == true
-              ? session.reviewReason!.trim()
-              : 'MoolSocial could not approve this Workspace. Update the information and submit again.'
-        : clarification
-        ? session.reviewReason!.trim()
-        : missingDocuments > 0
-        ? 'Your Workspace is captured. Add documents now or wait for MoolSocial to request the exact items needed for approval.'
-        : 'MoolSocial is reviewing the submitted information.';
-    final accent = approved
-        ? MoolColors.success
-        : stopped
-        ? const Color(0xFFB42318)
-        : MoolColors.orange;
+        ? 'More information needed'
+        : 'Application received';
+    final detail = reason.isNotEmpty
+        ? reason
+        : rejected
+        ? 'Contact MoolSocial for the reason and the available next step.'
+        : suspended
+        ? 'Contact MoolSocial about access to this Workspace.'
+        : 'MoolSocial is reviewing your application. Expect an update within 24 working hours.';
     return _ReviewStepMotion(
       child: Column(
         key: const Key('work-inline-review-status'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          WorkCard(
-            color: accent.withValues(alpha: .09),
-            child: Column(
-              children: [
-                Icon(
-                  approved
-                      ? Icons.verified_rounded
-                      : stopped
-                      ? Icons.report_gmailerrorred_rounded
-                      : Icons.hourglass_top_rounded,
-                  color: accent,
-                  size: 44,
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  detail,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: MoolColors.muted, height: 1.35),
-                ),
-                if (session.reviewCaseId case final caseId?) ...[
-                  const SizedBox(height: MoolSpacing.xs),
-                  WorkPill(label: 'Reference $caseId', color: accent),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.md),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: _ReviewStatusFact(
-                  label: 'DETAILS',
-                  value: 'Submitted',
-                  color: MoolColors.success,
-                ),
+              Icon(
+                rejected || suspended
+                    ? Icons.info_outline
+                    : Icons.fact_check_outlined,
+                color: MoolColors.navy,
+                size: 26,
               ),
-              const SizedBox(width: MoolSpacing.xs),
+              const SizedBox(width: 12),
               Expanded(
-                child: _ReviewStatusFact(
-                  label: 'DOCUMENTS',
-                  value: '$addedDocuments of $availableDocuments',
-                  color: missingDocuments == 0
-                      ? MoolColors.success
-                      : MoolColors.orange,
-                ),
-              ),
-              const SizedBox(width: MoolSpacing.xs),
-              Expanded(
-                child: _ReviewStatusFact(
-                  label: 'DECISION',
-                  value: approved
-                      ? 'Approved'
-                      : rejected
-                      ? 'Not approved'
-                      : suspended
-                      ? 'Unavailable'
-                      : 'Pending',
-                  color: accent,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      detail,
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          if (!approved && !stopped) ...[
-            const SizedBox(height: MoolSpacing.md),
-            Row(
+          if (!rejected && !suspended && !clarification) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'No action needed now. Review updates appear here automatically.',
+              style: TextStyle(color: MoolColors.muted, fontSize: 12),
+            ),
+          ],
+          if (clarification && session.gateway is ReviewWorkGateway) ...[
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 6,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: const Key('work-inline-add-documents'),
-                    onPressed: onAddDocuments,
-                    icon: const Icon(Icons.upload_file_outlined),
-                    label: const Text('Add documents'),
-                  ),
+                TextButton.icon(
+                  key: const Key('work-inline-add-documents'),
+                  onPressed: onAddDocuments,
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Add documents'),
                 ),
-                const SizedBox(width: MoolSpacing.xs),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: const Key('work-inline-update-details'),
-                    onPressed: onUpdateDetails,
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Update details'),
-                  ),
+                TextButton.icon(
+                  key: const Key('work-inline-update-details'),
+                  onPressed: onUpdateDetails,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Update details'),
                 ),
               ],
             ),
           ],
+          const SizedBox(height: 24),
+          if (session.submittedProfile case final submitted?) ...[
+            const Text(
+              'Submitted information',
+              style: TextStyle(
+                color: MoolColors.navy,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const Divider(),
+            _ReviewRow(label: 'Business', value: submitted.name),
+            _ReviewRow(
+              label: 'Your name',
+              value: submitted.authorizedPersonName,
+            ),
+            _ReviewRow(label: 'Contact', value: submitted.primaryMobile),
+            _ReviewRow(label: 'Email', value: submitted.email),
+            _ReviewRow(
+              label: 'Documents',
+              value: '${submitted.proofReferences.length} attached',
+            ),
+          ],
+          if (session.reviewCaseId case final caseId?)
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text(
+                'Application reference',
+                style: TextStyle(fontSize: 13, color: MoolColors.muted),
+              ),
+              children: [
+                SelectableText(caseId),
+                const Text(
+                  'Share this reference if you contact MoolSocial about this application.',
+                  style: TextStyle(fontSize: 12, color: MoolColors.muted),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -2945,163 +2703,59 @@ class _ReviewStepMotion extends StatelessWidget {
   }
 }
 
-class _ReviewStatusFact extends StatelessWidget {
-  const _ReviewStatusFact({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .08),
-        borderRadius: BorderRadius.circular(MoolRadii.control),
-        border: Border.all(color: color.withValues(alpha: .22)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: MoolColors.muted,
-              fontSize: 8,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ProgressHeader extends StatelessWidget {
   const _ProgressHeader({required this.step});
-
   final int step;
-
   @override
   Widget build(BuildContext context) {
-    const steps = <({String label, IconData icon})>[
-      (label: 'Details', icon: Icons.edit_note_rounded),
-      (label: 'Documents upload', icon: Icons.cloud_upload_outlined),
-      (label: 'Review', icon: Icons.fact_check_outlined),
-    ];
-    final activeStep = step.clamp(0, 2);
-    final progress = (activeStep + 1) / steps.length;
+    final labels = step > 2
+        ? const ['Submitted', 'MoolSocial review']
+        : const ['Details', 'Documents', 'Review'];
     return Column(
       key: const Key('work-workspace-progress'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Text(
-              step > 2 ? 'SUBMITTED FOR REVIEW' : 'STEP ${activeStep + 1} OF 3',
-              style: const TextStyle(
-                color: MoolColors.navy,
-                fontSize: 9,
-                letterSpacing: .35,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              '${(progress * 100).round()}%',
-              style: const TextStyle(
-                color: MoolColors.success,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 5),
-        TweenAnimationBuilder<double>(
-          tween: Tween<double>(begin: 0, end: progress),
-          duration: MoolMotion.accessible(context, MoolMotion.standard),
-          curve: MoolMotion.enter,
-          builder: (context, value, _) => ClipRRect(
-            borderRadius: BorderRadius.circular(MoolRadii.capsule),
-            child: LinearProgressIndicator(
-              minHeight: 6,
-              value: value,
-              backgroundColor: const Color(0xFFD8DAE8),
-              valueColor: const AlwaysStoppedAnimation(MoolColors.success),
-            ),
+        Text(
+          step > 2 ? 'Application status' : 'Step ${step + 1} of 3',
+          style: const TextStyle(
+            color: MoolColors.navy,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: MoolSpacing.xs),
+        const SizedBox(height: 8),
         Row(
           children: [
-            for (var index = 0; index < steps.length; index++) ...[
+            for (var i = 0; i < labels.length; i++) ...[
               Expanded(
-                child: AnimatedContainer(
-                  duration: MoolMotion.accessible(context, MoolMotion.quick),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: index <= activeStep
-                        ? const Color(0xFFEAF7E8)
-                        : const Color(0xFFF4F4FA),
-                    borderRadius: BorderRadius.circular(MoolRadii.control),
-                    border: Border.all(
-                      color: index == activeStep
-                          ? MoolColors.success
-                          : const Color(0xFFD8DAE8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AnimatedContainer(
+                      duration: MoolMotion.accessible(
+                        context,
+                        MoolMotion.quick,
+                      ),
+                      height: 3,
+                      color: (step > 2 ? i == 0 : i <= step)
+                          ? MoolColors.navy
+                          : const Color(0xFFE2E4EE),
                     ),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        index < activeStep || step > 2
-                            ? Icons.check_circle_rounded
-                            : steps[index].icon,
-                        size: 17,
-                        color: index <= activeStep
-                            ? MoolColors.success
-                            : MoolColors.muted,
+                    const SizedBox(height: 6),
+                    Text(
+                      labels[i],
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: (step > 2 ? i == 1 : i == step)
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: MoolColors.navy,
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        steps[index].label,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: index <= activeStep
-                              ? MoolColors.navy
-                              : MoolColors.muted,
-                          fontSize: 8.5,
-                          height: 1.05,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-              if (index < steps.length - 1) const SizedBox(width: 5),
+              if (i < labels.length - 1) const SizedBox(width: 10),
             ],
           ],
         ),
@@ -3115,76 +2769,84 @@ class _ProofCard extends StatelessWidget {
     required this.proof,
     required this.added,
     required this.onAdd,
+    this.file,
+    this.onView,
     this.onRemove,
   });
-
   final WorkProofRequirement proof;
   final bool added;
+  final WorkPickedProof? file;
   final VoidCallback onAdd;
-  final VoidCallback? onRemove;
+  final VoidCallback? onView, onRemove;
 
   @override
-  Widget build(BuildContext context) {
-    return WorkCard(
-      color: added ? const Color(0xFFEAF7E8) : Colors.white,
-      child: Row(
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CircleAvatar(
-            backgroundColor: added
-                ? MoolColors.success
-                : const Color(0xFFEDEEFF),
-            foregroundColor: added ? Colors.white : MoolColors.navy,
-            child: Icon(
-              added ? Icons.check_rounded : Icons.cloud_upload_outlined,
-            ),
-          ),
-          const SizedBox(width: MoolSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        proof.label,
-                        style: const TextStyle(
-                          color: MoolColors.ink,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    WorkPill(
-                      label: added ? 'Added' : 'Add when ready',
-                      color: added ? MoolColors.success : MoolColors.orange,
-                    ),
-                  ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.description_outlined,
+                color: MoolColors.navy,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  proof.label,
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                Text(
-                  proof.detail,
-                  style: const TextStyle(color: MoolColors.muted, fontSize: 11),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: MoolSpacing.xs),
-          if (added && onRemove != null)
-            IconButton(
-              key: Key('work-remove-proof-${proof.id}'),
-              tooltip: 'Remove ${proof.label}',
-              onPressed: onRemove,
-              icon: const Icon(Icons.delete_outline_rounded),
-            )
-          else if (!added)
-            TextButton(
-              key: Key('work-add-proof-${proof.id}'),
-              onPressed: onAdd,
-              child: const Text('Add'),
-            ),
+          const SizedBox(height: 5),
+          Text(
+            added ? file?.fileName ?? 'Document attached' : proof.detail,
+            style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+          ),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 10,
+            children: [
+              if (added) ...[
+                TextButton(
+                  key: Key('work-view-proof-${proof.id}'),
+                  onPressed: onView,
+                  child: const Text('View'),
+                ),
+                TextButton(
+                  key: Key('work-replace-proof-${proof.id}'),
+                  onPressed: onAdd,
+                  child: const Text('Replace'),
+                ),
+                IconButton(
+                  key: Key('work-remove-proof-${proof.id}'),
+                  tooltip: 'Remove ${proof.label}',
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                ),
+              ] else
+                TextButton(
+                  key: Key('work-add-proof-${proof.id}'),
+                  onPressed: onAdd,
+                  child: const Text('Add document'),
+                ),
+            ],
+          ),
+          const Divider(height: 1),
         ],
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _ReviewRow extends StatelessWidget {
@@ -3200,23 +2862,29 @@ class _ReviewRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 90,
+          Expanded(
+            flex: 4,
             child: Text(
               label,
               style: const TextStyle(
                 color: MoolColors.muted,
+                fontSize: 12,
+                height: 1.4,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
+          const SizedBox(width: 12),
           Expanded(
+            flex: 6,
             child: Text(
               value,
-              textAlign: TextAlign.end,
+              textAlign: TextAlign.start,
               style: const TextStyle(
                 color: MoolColors.ink,
-                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                height: 1.4,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),

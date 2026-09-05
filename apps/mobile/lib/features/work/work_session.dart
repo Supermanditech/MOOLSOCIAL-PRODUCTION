@@ -8,7 +8,13 @@ import 'work_services.dart';
 class WorkSession extends ChangeNotifier {
   WorkSession({WorkGateway? gateway, WorkProofPicker? proofPicker})
     : gateway = gateway ?? ReviewWorkGateway(),
-      proofPicker = proofPicker ?? ReviewWorkProofPicker();
+      proofPicker =
+          proofPicker ??
+          (kDebugMode &&
+                  const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+                  const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')
+              ? NativeWorkProofPicker()
+              : ReviewWorkProofPicker());
 
   WorkSession.production({WorkGateway? gateway, WorkProofPicker? proofPicker})
     : gateway = gateway ?? buildWorkGateway(),
@@ -37,6 +43,8 @@ class WorkSession extends ChangeNotifier {
   String? selectedFamilyId;
   WorkProfileOption? selectedProfile;
   String accountDisplayName = '';
+  String authorizedPersonName = '';
+  String businessRelationship = '';
   String connectedProviderLabel = '';
   String connectedProviderAccount = '';
   String primaryMobile = '';
@@ -48,13 +56,14 @@ class WorkSession extends ChangeNotifier {
   String alternateMobile = '';
   bool alternateOtpSent = false;
   bool alternateVerified = false;
+  final Map<WorkContactChannel, int> _contactRevisions = {};
 
   String workName = '';
   String workArea = '';
   String primaryActivity = '';
-  final Map<String, String> addedProofs = <String, String>{
-    'personal-kyc': 'ACCOUNT-KYC',
-  };
+  final Map<String, String> addedProofs = <String, String>{};
+  final Map<String, WorkPickedProof> pickedProofs = <String, WorkPickedProof>{};
+  WorkProfileSubmission? submittedProfile;
   bool declarationAccepted = false;
   WorkReviewStage reviewStage = WorkReviewStage.none;
   String? reviewCaseId;
@@ -623,8 +632,9 @@ class WorkSession extends ChangeNotifier {
     final documents = <WorkProofRequirement>[];
     for (var index = 0; index < profile.verificationDocuments.length; index++) {
       final document = profile.verificationDocuments[index];
-      if (document.title == 'GST registration certificate') continue;
-      final id = index == 0
+      final id = document.title == 'GST registration certificate'
+          ? 'gst'
+          : index == 0
           ? 'personal-kyc'
           : document.title == 'Payout bank account proof'
           ? 'payout-bank-account'
@@ -637,8 +647,16 @@ class WorkSession extends ChangeNotifier {
       documents.add(
         WorkProofRequirement(
           id: id,
-          label: document.title,
-          detail: document.detail,
+          label:
+              id == 'owner-authority' &&
+                  businessRelationship == 'Authorized representative'
+              ? 'Authorization letter'
+              : document.title,
+          detail:
+              id == 'owner-authority' &&
+                  businessRelationship == 'Authorized representative'
+              ? 'A letter signed by the owner authorizing you to manage this business.'
+              : document.detail,
           importance: document.importance,
         ),
       );
@@ -1893,6 +1911,11 @@ class WorkSession extends ChangeNotifier {
     super.dispose();
   }
 
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   void clearOpportunityFilters() {
     selectedCity = '';
     selectedArea = '';
@@ -2025,9 +2048,10 @@ class WorkSession extends ChangeNotifier {
     workName = '';
     workArea = '';
     primaryActivity = '';
-    addedProofs
-      ..clear()
-      ..['personal-kyc'] = 'ACCOUNT-KYC';
+    addedProofs.clear();
+    pickedProofs.clear();
+    businessRelationship = '';
+    submittedProfile = null;
     declarationAccepted = false;
     reviewCaseId = null;
     workspaceId = activeWorkspace?.id;
@@ -2074,6 +2098,7 @@ class WorkSession extends ChangeNotifier {
 
   void hydrateAccountSnapshot(WorkAccountSnapshot snapshot) {
     accountDisplayName = snapshot.displayName.trim();
+    if (authorizedPersonName.isEmpty) authorizedPersonName = accountDisplayName;
     connectedProviderLabel = snapshot.providerLabel.trim();
     connectedProviderAccount = snapshot.providerAccount.trim();
     if (primaryMobile.isEmpty) {
@@ -2099,6 +2124,47 @@ class WorkSession extends ChangeNotifier {
       primaryMobileVerified &&
       contactEmailVerified &&
       (alternateMobile.isEmpty || alternateVerified);
+
+  void savePersonName(String value) {
+    if (authorizedPersonName != value.trim()) declarationAccepted = false;
+    authorizedPersonName = value.trim();
+  }
+
+  void saveBusinessRelationship(String value) {
+    if (businessRelationship != value) declarationAccepted = false;
+    businessRelationship = value;
+    notifyListeners();
+  }
+
+  void editWorkspaceContact(WorkContactChannel channel, String value) {
+    final normalized = channel == WorkContactChannel.email
+        ? value.trim().toLowerCase()
+        : value.replaceAll(RegExp(r'\D'), '');
+    final previous = switch (channel) {
+      WorkContactChannel.primaryMobile => primaryMobile,
+      WorkContactChannel.email => contactEmail,
+      WorkContactChannel.alternateMobile => alternateMobile,
+    };
+    if (normalized == previous) return;
+    _contactRevisions[channel] = (_contactRevisions[channel] ?? 0) + 1;
+    declarationAccepted = false;
+    switch (channel) {
+      case WorkContactChannel.primaryMobile:
+        primaryMobile = normalized;
+        primaryMobileOtpSent = false;
+        primaryMobileVerified = false;
+      case WorkContactChannel.email:
+        contactEmail = normalized;
+        contactEmailOtpSent = false;
+        contactEmailVerified = false;
+      case WorkContactChannel.alternateMobile:
+        alternateMobile = normalized;
+        alternateOtpSent = false;
+        alternateVerified = false;
+    }
+    clearMessages();
+    notifyListeners();
+  }
 
   Future<bool> sendPrimaryMobileOtp(String mobile) async {
     final normalized = mobile.replaceAll(RegExp(r'\D'), '');
@@ -2152,6 +2218,9 @@ class WorkSession extends ChangeNotifier {
   );
 
   void changePrimaryMobile() {
+    _contactRevisions[WorkContactChannel.primaryMobile] =
+        (_contactRevisions[WorkContactChannel.primaryMobile] ?? 0) + 1;
+    declarationAccepted = false;
     primaryMobile = '';
     primaryMobileOtpSent = false;
     primaryMobileVerified = false;
@@ -2160,6 +2229,9 @@ class WorkSession extends ChangeNotifier {
   }
 
   void changeContactEmail() {
+    _contactRevisions[WorkContactChannel.email] =
+        (_contactRevisions[WorkContactChannel.email] ?? 0) + 1;
+    declarationAccepted = false;
     contactEmail = '';
     contactEmailOtpSent = false;
     contactEmailVerified = false;
@@ -2201,10 +2273,18 @@ class WorkSession extends ChangeNotifier {
     WorkContactChannel channel,
     String value, {
     required VoidCallback onSent,
-  }) => _runBool(() async {
-    await gateway.sendContactOtp(channel: channel, value: value);
-    onSent();
-  }, success: 'OTP sent. Enter the 6-digit code to confirm this contact.');
+  }) {
+    final revision = _contactRevisions[channel] ?? 0;
+    return _runBool(() async {
+      await gateway.sendContactOtp(channel: channel, value: value);
+      if (_disposed || revision != (_contactRevisions[channel] ?? 0)) {
+        throw const WorkGatewayException(
+          'Contact changed. Request a new code.',
+        );
+      }
+      onSent();
+    }, success: 'Code sent. Enter it to confirm this contact.');
+  }
 
   Future<bool> _verifyWorkspaceContactOtp(
     WorkContactChannel channel,
@@ -2228,17 +2308,26 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final revision = _contactRevisions[channel] ?? 0;
     return _runBool(() async {
       await gateway.verifyContactOtp(
         channel: channel,
         value: value,
         code: normalizedCode,
       );
+      if (_disposed || revision != (_contactRevisions[channel] ?? 0)) {
+        throw const WorkGatewayException(
+          'Contact changed. Request a new code.',
+        );
+      }
       onVerified();
     }, success: 'Contact confirmed for this Workspace.');
   }
 
   void removeAlternateMobile() {
+    declarationAccepted = false;
+    _contactRevisions[WorkContactChannel.alternateMobile] =
+        (_contactRevisions[WorkContactChannel.alternateMobile] ?? 0) + 1;
     alternateMobile = '';
     alternateOtpSent = false;
     alternateVerified = false;
@@ -2306,6 +2395,14 @@ class WorkSession extends ChangeNotifier {
     unsupportedOtherActivity = family.trim() == 'Other'
         ? otherActivity.trim()
         : '';
+    if (gateway is! ReviewWorkGateway) {
+      unsupportedRequestSent = false;
+      errorMessage =
+          'This request cannot be sent yet. Your details remain saved on this device.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
     unsupportedRequestSent = true;
     errorMessage = null;
     noticeMessage =
@@ -2319,6 +2416,11 @@ class WorkSession extends ChangeNotifier {
     required String area,
     required String activity,
   }) {
+    if (workName != name.trim() ||
+        workArea != area.trim() ||
+        primaryActivity != activity.trim()) {
+      declarationAccepted = false;
+    }
     workName = name.trim();
     workArea = area.trim();
     primaryActivity = activity.trim();
@@ -2328,7 +2430,7 @@ class WorkSession extends ChangeNotifier {
 
   bool validateDetails() {
     if (workName.length < 3) {
-      errorMessage = 'Enter the work or business name.';
+      errorMessage = 'Enter the business name shown on its PAN card.';
       notifyListeners();
       return false;
     }
@@ -2356,6 +2458,8 @@ class WorkSession extends ChangeNotifier {
       final proof = await proofPicker.pick(source);
       if (proof == null) return false;
       addedProofs[proofId] = await gateway.saveProof(proofId, proof);
+      pickedProofs[proofId] = proof;
+      declarationAccepted = false;
       noticeMessage = 'Document received. You can review it before submission.';
       return true;
     } on WorkGatewayException catch (error) {
@@ -2368,8 +2472,9 @@ class WorkSession extends ChangeNotifier {
   }
 
   void removeProof(String proofId) {
-    if (proofId == 'personal-kyc') return;
     addedProofs.remove(proofId);
+    pickedProofs.remove(proofId);
+    declarationAccepted = false;
     showNotice('Document removed. You can add a replacement during review.');
   }
 
@@ -2396,12 +2501,26 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     if (remoteReviewStatus == WorkRemoteReviewStatus.rejected) {
-      reviseRejectedProfile();
-      return true;
+      errorMessage =
+          'This application was not approved. Contact MoolSocial about the review decision.';
+      notifyListeners();
+      return false;
     }
     if (reviewCaseId == null) {
       errorMessage = 'Submit the Workspace before sending a correction.';
       noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    if (reviewReason?.trim().isNotEmpty != true) {
+      errorMessage =
+          'MoolSocial is reviewing your application. No changes are needed now.';
+      notifyListeners();
+      return false;
+    }
+    if (gateway is! ReviewWorkGateway) {
+      errorMessage =
+          'Contact MoolSocial in Chat to provide the requested clarification. Your application remains saved.';
       notifyListeners();
       return false;
     }
@@ -2420,6 +2539,8 @@ class WorkSession extends ChangeNotifier {
       familyId: profile.familyId,
       profileId: profile.id,
       name: workName,
+      authorizedPersonName: authorizedPersonName,
+      businessRelationship: businessRelationship,
       area: workArea,
       primaryActivity: primaryActivity,
       proofReferences: Map<String, String>.unmodifiable(addedProofs),
@@ -2450,10 +2571,12 @@ class WorkSession extends ChangeNotifier {
     if (existingCaseId != null && reviewCorrectionDraft) {
       return _runBool(
         () async {
+          final submission = _currentProfileSubmission();
           final result = await gateway.submitCorrection(
             existingCaseId,
-            _currentProfileSubmission(),
+            submission,
           );
+          submittedProfile = submission;
           reviewCaseId = result.caseId;
           subscriptionPlan = result.plan;
           reviewReason = result.reason;
@@ -2474,7 +2597,9 @@ class WorkSession extends ChangeNotifier {
     }
     return _runBool(
       () async {
-        final result = await gateway.submitProfile(_currentProfileSubmission());
+        final submission = _currentProfileSubmission();
+        final result = await gateway.submitProfile(submission);
+        submittedProfile = submission;
         reviewCaseId = result.caseId;
         subscriptionPlan = result.plan;
         reviewReason = result.reason;
@@ -2559,20 +2684,24 @@ class WorkSession extends ChangeNotifier {
     clearMessages();
     notifyListeners();
     try {
-      final result = await gateway.checkReview(reviewCaseId!);
+      final requestedCase = reviewCaseId!;
+      final result = await gateway.checkReview(requestedCase);
+      if (_disposed || reviewCaseId != requestedCase) return false;
+      if (result.caseId != requestedCase) {
+        throw const WorkGatewayException(
+          'The review update could not be matched to this application. Please retry.',
+        );
+      }
       subscriptionPlan = result.plan;
       reviewReason = result.reason;
       remoteReviewStatus = result.status;
       switch (result.status) {
         case WorkRemoteReviewStatus.pending:
           reviewStage = WorkReviewStage.gstPending;
-          noticeMessage =
-              'Review is still in progress. Your personal account remains active.';
+          noticeMessage = null;
           return false;
         case WorkRemoteReviewStatus.rejected:
-          errorMessage = result.reason?.trim().isNotEmpty == true
-              ? result.reason
-              : 'This work profile needs changes before it can be approved.';
+          errorMessage = null;
           return false;
         case WorkRemoteReviewStatus.suspended:
           errorMessage = result.reason?.trim().isNotEmpty == true
@@ -2603,16 +2732,16 @@ class WorkSession extends ChangeNotifier {
           }
           activeWorkspace = WorkWorkspace(
             id: approvedWorkspaceId,
-            name: workName,
+            name: previousWorkspace?.id == approvedWorkspaceId
+                ? previousWorkspace!.name
+                : selectedProfile?.label ?? 'Your Workspace',
             profileLabel: selectedProfile?.label ?? 'Work profile',
             profileId: selectedProfile?.id,
             area: workArea,
             verified: true,
             gstReminder: gstReminder && gstin.isEmpty,
           );
-          noticeMessage = result.status == WorkRemoteReviewStatus.live
-              ? 'Your Workspace is live.'
-              : 'Work profile approved. Finish setup before customers can view your Workspace.';
+          noticeMessage = null;
           return true;
       }
     } on WorkGatewayException catch (error) {
@@ -2633,15 +2762,8 @@ class WorkSession extends ChangeNotifier {
 
   void reviseRejectedProfile() {
     if (remoteReviewStatus != WorkRemoteReviewStatus.rejected) return;
-    reviewCaseId = null;
-    workspaceId = null;
-    reviewReason = null;
-    remoteReviewStatus = null;
-    reviewCorrectionDraft = false;
-    _profileSubmissionKey = null;
-    declarationAccepted = false;
-    reviewStage = WorkReviewStage.drafting;
     clearMessages();
+    noticeMessage = 'Contact MoolSocial about this application.';
     notifyListeners();
   }
 

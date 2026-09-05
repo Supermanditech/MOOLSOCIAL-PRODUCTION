@@ -138,6 +138,9 @@ void main() {
     await tapVisible(tester, const Key('work-profile-retailer-grocery'));
     await tapVisible(tester, const Key('work-profile-choose-retailer-grocery'));
     await tapVisible(tester, const Key('work-requirements-ready'));
+    await tapVisible(tester, const Key('work-contact-email-send-otp'));
+    await enter(tester, const Key('work-contact-email-otp'), '123456');
+    await tapVisible(tester, const Key('work-contact-email-confirm-otp'));
     await tapVisible(tester, const Key('work-contact-continue'));
     expect(find.byKey(const Key('work-proof-screen')), findsOneWidget);
   }
@@ -188,13 +191,10 @@ void main() {
         findsOneWidget,
       );
       expect(work.reviewCaseId, isNotNull);
-      await tapVisible(tester, const Key('work-inline-review-check'));
-      expect(
-        find.byKey(const Key('work-inline-review-status')),
-        findsOneWidget,
-      );
+      await tester.pump(const Duration(seconds: 31));
+      await tester.pumpAndSettle();
       expect(work.activeWorkspace?.verified, isTrue);
-      await tapVisible(tester, const Key('work-inline-review-approved'));
+      expect(find.text('Workspace approved'), findsNothing);
 
       expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
       expect(work.activeWorkspace?.verified, isTrue);
@@ -333,6 +333,9 @@ void main() {
       await enter(tester, const Key('work-alternate-contact-otp'), '123456');
       await tapVisible(tester, const Key('work-alternate-contact-confirm-otp'));
       expect(work.alternateVerified, isTrue);
+      await tapVisible(tester, const Key('work-contact-email-send-otp'));
+      await enter(tester, const Key('work-contact-email-otp'), '123456');
+      await tapVisible(tester, const Key('work-contact-email-confirm-otp'));
       await tapVisible(tester, const Key('work-contact-continue'));
       expect(find.byKey(const Key('work-proof-screen')), findsOneWidget);
     },
@@ -373,11 +376,11 @@ void main() {
       );
 
       expect(find.byKey(const Key('workspace-account-setup-hero')), findsOne);
-      expect(find.text('Google account'), findsOne);
+      expect(find.text('Signed in with Google'), findsOne);
       expect(find.text('asha@example.com'), findsWidgets);
       expect(find.textContaining('Facebook'), findsNothing);
       expect(find.textContaining('YouTube account'), findsNothing);
-      expect(work.contactEmailVerified, isTrue);
+      expect(work.contactEmailVerified, isFalse);
       expect(work.primaryMobileVerified, isFalse);
 
       await enter(
@@ -390,6 +393,10 @@ void main() {
       await tapVisible(tester, const Key('work-primary-contact-confirm-otp'));
 
       expect(work.primaryMobileVerified, isTrue);
+      await tapVisible(tester, const Key('work-contact-email-send-otp'));
+      await enter(tester, const Key('work-contact-email-otp'), '123456');
+      await tapVisible(tester, const Key('work-contact-email-confirm-otp'));
+      expect(work.contactEmailVerified, isTrue);
       expect(work.workspaceContactsReady, isTrue);
       await tapVisible(tester, const Key('work-contact-continue'));
       expect(find.byKey(const Key('work-proof-screen')), findsOneWidget);
@@ -509,7 +516,9 @@ void main() {
       expect(find.text('Account owner identity'), findsOneWidget);
       expect(find.text('Shop address document'), findsOneWidget);
       expect(
-        find.textContaining('Requirements marked “Required when applicable”'),
+        find.textContaining(
+          'You can submit your application before adding documents',
+        ),
         findsOneWidget,
       );
       final gstDocument = workProfiles
@@ -554,7 +563,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('Required when applicable'), findsWidgets);
+      expect(find.text('When applicable'), findsWidgets);
       expect(find.textContaining('GST certificate is optional'), findsNothing);
       expect(find.byKey(const Key('work-requirements-ready')), findsOneWidget);
 
@@ -586,9 +595,9 @@ void main() {
       expect(find.byKey(const Key('work-global-chat')), findsNothing);
       expect(find.byKey(const Key('work-help')), findsNothing);
       await tapVisible(tester, const Key('work-details-continue'));
-      expect(find.text('Documents upload'), findsOneWidget);
+      expect(find.text('Documents'), findsWidgets);
       expect(find.byKey(const Key('work-proof-back-details')), findsNothing);
-      expect(find.text('Add when ready'), findsWidgets);
+      expect(find.text('Add document'), findsWidgets);
       await tapVisible(tester, const Key('work-proof-review'));
       await tapVisible(tester, const Key('work-declaration'));
       await tapVisible(tester, const Key('work-submit-profile'));
@@ -598,10 +607,13 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const Key('work-status-screen')), findsNothing);
-      expect(find.text('Submitted · documents pending'), findsOneWidget);
-      expect(gateway.lastSubmission?.proofReferences, {
-        'personal-kyc': 'ACCOUNT-KYC',
-      });
+      expect(find.text('Application received'), findsOneWidget);
+      expect(gateway.lastSubmission?.proofReferences, isEmpty);
+      expect(
+        find.byKey(const Key('work-inline-update-documents')),
+        findsNothing,
+      );
+      expect(work.submittedProfile, same(gateway.lastSubmission));
       expect(gateway.lastSubmission?.primaryMobile, '9829012321');
       expect(gateway.lastSubmission?.email, 'asha@example.com');
       expect(gateway.submissionCalls, 1);
@@ -629,14 +641,15 @@ void main() {
         find.byKey(const Key('work-inline-review-status')),
         findsOneWidget,
       );
-      expect(find.text('Workspace not approved'), findsOneWidget);
+      expect(find.text('Application not approved'), findsOneWidget);
       expect(
         find.textContaining('shop address could not be confirmed'),
         findsOneWidget,
       );
       expect(find.byKey(const Key('work-status-screen')), findsNothing);
+      expect(find.byKey(const Key('work-inline-review-update')), findsNothing);
       expect(
-        find.byKey(const Key('work-inline-review-update')),
+        find.byKey(const Key('work-inline-review-support')),
         findsOneWidget,
       );
     },
@@ -657,7 +670,10 @@ void main() {
       );
 
       await tapVisible(tester, const Key('work-details-continue'));
-      expect(find.text('Enter the work or business name.'), findsOneWidget);
+      expect(
+        find.text('Enter the business name shown on its PAN card.'),
+        findsOneWidget,
+      );
       await enter(tester, const Key('work-name'), 'Mahadev Fresh Mart');
       await enter(tester, const Key('work-area'), 'Jodhpur');
       await enter(tester, const Key('work-activity'), 'Grocery retail');
@@ -704,10 +720,10 @@ void main() {
   );
 
   testWidgets(
-    'GST and review failures keep one case then reach approved workspace',
+    'document and automatic review failures preserve one case with exact retry',
     (tester) async {
       final gateway = ReviewWorkGateway()
-        ..failGst = true
+        ..failProof = true
         ..failReview = true;
       final work = WorkSession(gateway: gateway)
         ..selectFamily('products-trade')
@@ -717,43 +733,40 @@ void main() {
           area: 'Jodhpur',
           activity: 'Grocery retail',
         );
-      work
-        ..reviewCaseId = 'WP-240701'
-        ..reviewStage = WorkReviewStage.gstPending;
-      await mount(tester, route: '/app/work/status', workSession: work);
-
-      await tapVisible(tester, const Key('work-add-gst'));
-      await enter(tester, const Key('work-gstin'), 'INVALID');
-      await tapVisible(tester, const Key('work-submit-gst'));
-      expect(find.text('Enter a valid 15-character GSTIN.'), findsOneWidget);
-      await enter(tester, const Key('work-gstin'), '22AAAAA0000A1Z5');
-      await tapVisible(tester, const Key('work-submit-gst'));
-      expect(
-        find.text('Attach the GST certificate before submission.'),
-        findsOneWidget,
+      confirmWorkspaceContacts(work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/proof',
+        workSession: work,
       );
-      await tapVisible(tester, const Key('work-attach-gst'));
-      await tapVisible(tester, const Key('work-gst-source-upload'));
-      await tapVisible(tester, const Key('work-submit-gst'));
+      await tapVisible(tester, const Key('work-details-continue'));
+      await tapVisible(tester, const Key('work-add-proof-gst'));
+      await tapVisible(tester, const Key('work-proof-source-upload'));
       expect(
         find.text(
-          'GST certificate was not submitted. Your Workspace review is still active.',
+          'Document not added. Choose the same file or another option and try again.',
         ),
         findsOneWidget,
       );
-      await tapVisible(tester, const Key('work-submit-gst'));
-      expect(gateway.gstCalls, 2);
-
-      await tapVisible(tester, const Key('work-check-review'));
+      await tapVisible(tester, const Key('work-proof-source-upload'));
+      expect(work.addedProofs['gst'], isNotNull);
+      await tapVisible(tester, const Key('work-proof-review'));
+      await tapVisible(tester, const Key('work-declaration'));
+      await tapVisible(tester, const Key('work-submit-profile'));
+      final caseId = work.reviewCaseId;
+      await tester.pump(const Duration(seconds: 31));
+      await tester.pumpAndSettle();
       expect(
         find.text(
           'Review update is unavailable. No duplicate request was created.',
         ),
         findsOneWidget,
       );
-      await tapVisible(tester, const Key('work-check-review'));
+      await tapVisible(tester, const Key('work-inline-review-check'));
       expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
       expect(gateway.reviewCalls, 2);
+      expect(gateway.submissionCalls, 1);
+      expect(work.reviewCaseId, caseId);
       expect(work.activeWorkspace?.id, isNotNull);
     },
   );
@@ -844,17 +857,21 @@ void main() {
       ..selectFamily('products-trade')
       ..selectProfile('retailer-grocery')
       ..reviewCaseId = 'WP-240701'
-      ..reviewStage = WorkReviewStage.gstPending;
+      ..reviewStage = WorkReviewStage.gstPending
+      ..remoteReviewStatus = WorkRemoteReviewStatus.rejected
+      ..reviewReason = 'The submitted address could not be confirmed.';
     await mount(tester, route: '/app/work/status', workSession: work);
 
     expect(find.byKey(const Key('work-global-chat')), findsNothing);
     expect(find.byKey(const Key('work-help')), findsNothing);
-    await tapVisible(tester, const Key('work-status-open-chat'));
+    await tapVisible(tester, const Key('work-inline-review-support'));
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
     expect(find.byKey(const Key('chat-back')), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-status-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-inline-review-status')), findsOneWidget);
+    expect(work.reviewCaseId, 'WP-240701');
+    expect(work.remoteReviewStatus, WorkRemoteReviewStatus.rejected);
   });
 
   testWidgets(
@@ -896,6 +913,13 @@ void main() {
       );
       await tapVisible(tester, const Key('work-back'));
       expect(find.byKey(const Key('work-review-corrections')), findsOneWidget);
+      await tapVisible(tester, const Key('work-review-edit-contact'));
+      await enter(tester, const Key('work-person-name'), 'Asha Kumar');
+      await tapVisible(tester, const Key('work-contact-continue'));
+      expect(find.byKey(const Key('work-review-corrections')), findsOneWidget);
+      expect(find.text('Asha Kumar'), findsOneWidget);
+      expect(work.declarationAccepted, isFalse);
+      expect(work.workName, 'Mahadev Daily Store');
       expect(find.byKey(const Key('work-global-chat')), findsNothing);
       expect(find.byKey(const Key('work-help')), findsNothing);
     },
@@ -904,7 +928,10 @@ void main() {
   testWidgets('clarification corrections update the existing review reference', (
     tester,
   ) async {
-    final gateway = ReviewWorkGateway();
+    final gateway = ReviewWorkGateway()
+      ..reviewResultStatus = WorkRemoteReviewStatus.pending
+      ..reviewResultReason =
+          'Please confirm the shop entrance and upload a clearer address document.';
     final work = WorkSession(gateway: gateway)
       ..selectFamily('products-trade')
       ..selectProfile('retailer-grocery')
@@ -921,7 +948,7 @@ void main() {
     confirmWorkspaceContacts(work);
     await mount(tester, route: '/app/work/workspace/proof', workSession: work);
 
-    expect(find.text('Clarification requested'), findsOneWidget);
+    expect(find.text('More information needed'), findsOneWidget);
     expect(
       find.textContaining('Please confirm the shop entrance'),
       findsOneWidget,
@@ -950,7 +977,7 @@ void main() {
   });
 
   testWidgets(
-    'rejected Workspace preserves edits and creates one resubmission',
+    'rejected Workspace retains its decision and cannot restart submission',
     (tester) async {
       final gateway = ReviewWorkGateway();
       final work = WorkSession(gateway: gateway)
@@ -972,25 +999,24 @@ void main() {
         workSession: work,
       );
 
-      expect(find.text('Workspace not approved'), findsOneWidget);
+      expect(find.text('Application not approved'), findsOneWidget);
       expect(
         find.text('The submitted address could not be confirmed.'),
         findsOneWidget,
       );
-      await tapVisible(tester, const Key('work-inline-review-update'));
-      expect(work.reviewCaseId, isNull);
+      expect(find.byKey(const Key('work-inline-review-update')), findsNothing);
+      expect(find.byKey(const Key('work-inline-update-details')), findsNothing);
+      expect(work.beginReviewCorrection(), isFalse);
+      work.reviseRejectedProfile();
+      await tester.pumpAndSettle();
+      expect(work.reviewCaseId, 'WP-REJECTED-101');
       expect(
         find.text('The submitted address could not be confirmed.'),
         findsOneWidget,
       );
-      await enter(tester, const Key('work-area'), 'Ratanada, Jodhpur');
-      await tapVisible(tester, const Key('work-details-continue'));
-      await tapVisible(tester, const Key('work-proof-review'));
-      await tapVisible(tester, const Key('work-declaration'));
-      await tapVisible(tester, const Key('work-submit-profile'));
-
-      expect(gateway.submissionCalls, 1);
-      expect(work.reviewCaseId, isNot('WP-REJECTED-101'));
+      expect(gateway.submissionCalls, 0);
+      expect(gateway.correctionCalls, 0);
+      expect(work.remoteReviewStatus, WorkRemoteReviewStatus.rejected);
       expect(
         find.byKey(const Key('work-inline-review-status')),
         findsOneWidget,
@@ -1016,9 +1042,8 @@ void main() {
     confirmWorkspaceContacts(work);
     await mount(tester, route: '/app/work/workspace/proof', workSession: work);
 
-    await tapVisible(tester, const Key('work-inline-review-check'));
-    expect(find.text('Workspace approved'), findsOneWidget);
-    await tapVisible(tester, const Key('work-inline-review-approved'));
+    expect(find.text('Workspace approved'), findsNothing);
+    expect(find.byKey(const Key('work-inline-review-approved')), findsNothing);
     expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
     expect(find.text('Your trusted care desk'), findsOneWidget);
     expect(find.textContaining('Clinic / Doctor'), findsWidgets);

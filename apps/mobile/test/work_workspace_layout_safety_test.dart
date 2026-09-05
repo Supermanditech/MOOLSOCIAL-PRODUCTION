@@ -159,6 +159,26 @@ void main() {
     return work;
   }
 
+  Future<void> reveal(WidgetTester tester, Finder finder) async {
+    final vertical = find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable &&
+          (widget.axisDirection == AxisDirection.down ||
+              widget.axisDirection == AxisDirection.up),
+    );
+    for (
+      var attempt = 0;
+      attempt < 12 && finder.evaluate().isEmpty;
+      attempt++
+    ) {
+      await tester.drag(vertical.last, const Offset(0, -220));
+      await tester.pumpAndSettle();
+    }
+    expect(finder, findsOneWidget);
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+  }
+
   Future<void> captureStoreView(WidgetTester tester, String name) async {
     if (!captureStoreViewV2) return;
     const folder = String.fromEnvironment(
@@ -171,6 +191,126 @@ void main() {
         '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/$name.png',
       ),
     );
+  }
+
+  for (final page in [
+    'choose',
+    'requirements',
+    'contact',
+    'details',
+    'documents',
+    'source',
+    'review',
+    'pending',
+    'clarification',
+    'rejected',
+    'approved',
+  ]) {
+    testWidgets('Workspace overnight visual - $page', (tester) async {
+      final gateway = ReviewWorkGateway()
+        ..reviewResultStatus = WorkRemoteReviewStatus.pending;
+      final work = WorkSession(gateway: gateway)
+        ..selectFamily('products-trade')
+        ..selectProfile('retailer-grocery')
+        ..saveDetails(
+          name: 'Mahadev Traders',
+          area: 'Sardarpura, Jodhpur',
+          activity: 'Groceries and household essentials',
+        )
+        ..authorizedPersonName = 'Asha Sharma'
+        ..businessRelationship = 'Owner'
+        ..primaryMobile = '9829012321'
+        ..contactEmail = 'asha@example.com'
+        ..primaryMobileVerified = true
+        ..contactEmailVerified = page != 'contact';
+      if (['pending', 'clarification', 'rejected', 'approved'].contains(page)) {
+        work.reviewCaseId = 'WP-REVIEW-206';
+        work.reviewStage = WorkReviewStage.gstPending;
+        if (page == 'clarification') {
+          gateway.reviewResultReason =
+              'Please provide a clearer shop address document.';
+        } else if (page == 'rejected') {
+          work.remoteReviewStatus = WorkRemoteReviewStatus.rejected;
+          work.reviewReason = 'The business address could not be confirmed.';
+        } else if (page == 'approved') {
+          gateway.reviewResultStatus = WorkRemoteReviewStatus.approved;
+        }
+      }
+      final route = switch (page) {
+        'choose' => '/app/work/workspace/choose',
+        'requirements' => '/app/work/workspace/requirements',
+        'contact' => '/app/work/workspace/contact',
+        _ => '/app/work/workspace/proof',
+      };
+      await mount(
+        tester,
+        route: route,
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+        bottomInset: 34,
+      );
+      Future<void> tap(String key) async {
+        await reveal(tester, find.byKey(Key(key)));
+        await tester.tap(find.byKey(Key(key)));
+        await tester.pumpAndSettle();
+      }
+
+      if (['documents', 'source', 'review'].contains(page)) {
+        await tap('work-details-continue');
+        if (page == 'source') {
+          await tap('work-add-proof-personal-kyc');
+        } else if (page == 'review') {
+          await tap('work-add-proof-shop-front');
+          await tap('work-proof-source-upload');
+          await tap('work-proof-review');
+        }
+      }
+      expect(tester.takeException(), isNull);
+      if (page == 'approved') {
+        expect(
+          find.byKey(const Key('work-workspace-dashboard')),
+          findsOneWidget,
+        );
+        expect(find.text('Workspace approved'), findsNothing);
+      }
+      await captureStoreView(tester, 'workspace-$page');
+      if (page == 'review') {
+        await reveal(tester, find.byKey(const Key('work-declaration')));
+        await captureStoreView(tester, 'workspace-review-consent');
+        await tap('work-review-edit-documents');
+        await tap('work-view-proof-shop-front');
+        expect(find.text('review-proof.pdf'), findsWidgets);
+        await captureStoreView(tester, 'workspace-document-preview');
+      } else if (page == 'requirements') {
+        await reveal(
+          tester,
+          find.byKey(const Key('work-gst-compliance-guidance')),
+        );
+        await captureStoreView(tester, 'workspace-requirements-guidance');
+      } else if (page == 'contact') {
+        await tap('work-contact-email-send-otp');
+        final code = find.byKey(const Key('work-contact-email-otp'));
+        await reveal(tester, code);
+        await tester.tap(code);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+        await tester.pumpAndSettle();
+        await reveal(
+          tester,
+          find.byKey(const Key('work-contact-email-confirm-otp')),
+        );
+        expect(
+          tester
+              .getBottomRight(
+                find.byKey(const Key('work-contact-email-confirm-otp')),
+              )
+              .dy,
+          lessThanOrEqualTo(635),
+        );
+        await captureStoreView(tester, 'workspace-contact-otp-keyboard');
+      }
+      expect(tester.takeException(), isNull);
+    }, skip: !captureStoreViewV2);
   }
 
   testWidgets('Store View v2 - zero tap working centre', (tester) async {
@@ -1172,26 +1312,6 @@ void main() {
     }
   }
 
-  Future<void> reveal(WidgetTester tester, Finder finder) async {
-    final vertical = find.byWidgetPredicate(
-      (widget) =>
-          widget is Scrollable &&
-          (widget.axisDirection == AxisDirection.down ||
-              widget.axisDirection == AxisDirection.up),
-    );
-    for (
-      var attempt = 0;
-      attempt < 12 && finder.evaluate().isEmpty;
-      attempt++
-    ) {
-      await tester.drag(vertical.last, const Offset(0, -220));
-      await tester.pumpAndSettle();
-    }
-    expect(finder, findsOneWidget);
-    await tester.ensureVisible(finder);
-    await tester.pumpAndSettle();
-  }
-
   WorkSession selectedRetailer() => WorkSession()
     ..selectFamily('products-trade')
     ..selectProfile('retailer-grocery');
@@ -1274,7 +1394,7 @@ void main() {
       await mount(tester, route: '/app/work/workspace/contact', work: work);
 
       expect(find.byKey(const Key('workspace-account-setup-hero')), findsOne);
-      expect(find.text('Google account'), findsOne);
+      expect(find.text('Signed in with Google'), findsOne);
       expect(find.byKey(const Key('work-global-chat')), findsNothing);
       expect(find.byKey(const Key('work-help')), findsNothing);
       expectHeaderAndStickyAction(tester);
@@ -1310,7 +1430,12 @@ void main() {
     final label = tester.widget<Text>(confirm);
     expect(label.maxLines, 1);
     expect(label.softWrap, isFalse);
-    expect(find.text('6-digit code'), findsOneWidget);
+    expect(find.text('Contact number code'), findsOneWidget);
+    final code = tester.widget<TextField>(
+      find.byKey(const Key('work-primary-contact-otp')),
+    );
+    expect(code.maxLength, 6);
+    expect(code.decoration?.helperText, 'Sent to 9829012321');
     expect(tester.takeException(), isNull);
   });
 
@@ -1422,7 +1547,7 @@ void main() {
       await tester.pumpAndSettle();
       for (final label in const ['Edit details', 'Edit documents']) {
         final text = tester.widget<Text>(find.text(label));
-        expect(text.maxLines, 2);
+        expect(text.overflow, isNot(TextOverflow.ellipsis));
         expect(tester.getSize(find.text(label)).height, lessThanOrEqualTo(40));
       }
       final declaration = find.byKey(const Key('work-declaration'));
@@ -1441,25 +1566,29 @@ void main() {
   );
 
   testWidgets(
-    'review status keeps Action available above Check review update',
+    'pending application fits without unsolicited update or document actions',
     (tester) async {
       final work = selectedRetailer()
         ..reviewStage = WorkReviewStage.gstPending
         ..reviewCaseId = 'WORK-REVIEW-204';
+      (work.gateway as ReviewWorkGateway).reviewResultStatus =
+          WorkRemoteReviewStatus.pending;
       await mount(tester, route: '/app/work/status', work: work);
-      expectHeaderAndStickyAction(tester);
-      final action = find.text('Action available');
+      final action = find.text('Application received');
       await tester.ensureVisible(action);
       await tester.pumpAndSettle();
       expect(
         tester.getBottomRight(action).dy,
         lessThanOrEqualTo(
-          tester
-              .getTopRight(find.byKey(const Key('work-sticky-action-bar')))
-              .dy,
+          tester.view.physicalSize.height / tester.view.devicePixelRatio,
         ),
       );
-      expect(find.byKey(const Key('work-check-review')), findsOneWidget);
+      expect(find.byKey(const Key('work-inline-review-check')), findsNothing);
+      expect(
+        find.byKey(const Key('work-inline-update-documents')),
+        findsNothing,
+      );
+      expect(work.activeWorkspace, isNull);
       expect(tester.takeException(), isNull);
     },
   );

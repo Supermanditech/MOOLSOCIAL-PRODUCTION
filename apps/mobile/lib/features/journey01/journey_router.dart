@@ -1740,8 +1740,7 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/work/status',
-        builder: (context, state) =>
-            WorkVerificationStatusScreen(session: workSession),
+        redirect: (context, state) => '/app/work/workspace/proof',
       ),
       GoRoute(
         path: '/app/work/ready',
@@ -1959,8 +1958,15 @@ WorkAccountSnapshot _workAccountSnapshot(JourneySession session) {
         : email.isNotEmpty
         ? email
         : mobile,
-    emailConfirmed: email.isNotEmpty && session.isAuthenticated,
-    mobileConfirmed: mobile.isNotEmpty && session.isAuthenticated,
+    emailConfirmed:
+        email.isNotEmpty &&
+        session.isAuthenticated &&
+        methods.any((method) => method.toLowerCase() == 'email') &&
+        session.emailAddress?.trim().toLowerCase() == email.toLowerCase(),
+    mobileConfirmed:
+        mobile.isNotEmpty &&
+        session.isAuthenticated &&
+        methods.any((method) => method.toLowerCase() == 'phone'),
   );
 }
 

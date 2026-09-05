@@ -27,6 +27,7 @@ class _WorkWorkspaceContactScreenState
   late final TextEditingController _primaryMobile;
   late final TextEditingController _email;
   late final TextEditingController _alternate;
+  late final TextEditingController _name;
   final TextEditingController _primaryOtp = TextEditingController();
   final TextEditingController _emailOtp = TextEditingController();
   final TextEditingController _alternateOtp = TextEditingController();
@@ -38,6 +39,26 @@ class _WorkWorkspaceContactScreenState
     _primaryMobile = TextEditingController(text: widget.session.primaryMobile);
     _email = TextEditingController(text: widget.session.contactEmail);
     _alternate = TextEditingController(text: widget.session.alternateMobile);
+    _name = TextEditingController(text: widget.session.authorizedPersonName);
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkWorkspaceContactScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    widget.session.hydrateAccountSnapshot(widget.accountSnapshot);
+    for (final field in [
+      (_primaryMobile, widget.session.primaryMobile),
+      (_email, widget.session.contactEmail),
+      (_alternate, widget.session.alternateMobile),
+      (_name, widget.session.authorizedPersonName),
+    ]) {
+      if (field.$1.text.isEmpty && field.$2.isNotEmpty) {
+        field.$1.value = TextEditingValue(
+          text: field.$2,
+          selection: TextSelection.collapsed(offset: field.$2.length),
+        );
+      }
+    }
   }
 
   @override
@@ -45,6 +66,7 @@ class _WorkWorkspaceContactScreenState
     _primaryMobile.dispose();
     _email.dispose();
     _alternate.dispose();
+    _name.dispose();
     _primaryOtp.dispose();
     _emailOtp.dispose();
     _alternateOtp.dispose();
@@ -52,9 +74,20 @@ class _WorkWorkspaceContactScreenState
   }
 
   void _continue() {
+    widget.session.savePersonName(_name.text);
+    if (_name.text.trim().length < 2) {
+      widget.session.errorMessage = 'Enter your full name to continue.';
+      setState(() {});
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     if (widget.session.continueToProof()) {
-      context.push('/app/work/workspace/proof');
+      if (GoRouterState.of(context).uri.queryParameters['return'] == 'review' &&
+          context.canPop()) {
+        context.pop();
+      } else {
+        context.push('/app/work/workspace/proof');
+      }
     }
   }
 
@@ -77,9 +110,7 @@ class _WorkWorkspaceContactScreenState
               ? null
               : WorkPrimaryButton(
                   keyName: 'work-contact-continue',
-                  label: session.workspaceContactsReady
-                      ? 'Continue to Workspace details'
-                      : 'Confirm your phone and email',
+                  label: 'Continue',
                   onPressed: _continue,
                 ),
           body: ListView(
@@ -114,14 +145,27 @@ class _WorkWorkspaceContactScreenState
                     const WorkSectionTitle(
                       title: 'How MoolSocial can reach you',
                       detail:
-                          'Your existing details are filled in. Confirm anything new or changed.',
+                          'Saved details appear below. Confirm new or changed contacts.',
                     ),
                     const SizedBox(height: MoolSpacing.sm),
+                    TextField(
+                      key: const Key('work-person-name'),
+                      controller: _name,
+                      textCapitalization: TextCapitalization.words,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.name],
+                      onChanged: session.savePersonName,
+                      decoration: const InputDecoration(
+                        labelText: 'Your full name',
+                        helperText: 'The person setting up this Workspace',
+                        border: UnderlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: MoolSpacing.md),
                     _ContactVerificationCard(
                       keyName: 'work-primary-contact',
-                      title: 'Number customers can reach you on',
-                      detail:
-                          'Use a phone you keep with you and answer for customer calls, orders and payment updates.',
+                      title: 'Contact number',
+                      detail: 'A number you can answer for customer calls',
                       requiredContact: true,
                       controller: _primaryMobile,
                       otpController: _primaryOtp,
@@ -130,8 +174,14 @@ class _WorkWorkspaceContactScreenState
                       confirmed: session.primaryMobileVerified,
                       otpSent: session.primaryMobileOtpSent,
                       busy: session.busy,
-                      confirmedMessage:
-                          'Confirmed from your MoolSocial account',
+                      onEdit: (value) {
+                        session.editWorkspaceContact(
+                          WorkContactChannel.primaryMobile,
+                          value,
+                        );
+                        _primaryOtp.clear();
+                      },
+                      confirmedMessage: 'Contact confirmed',
                       onSend: () async {
                         await session.sendPrimaryMobileOtp(_primaryMobile.text);
                       },
@@ -157,8 +207,14 @@ class _WorkWorkspaceContactScreenState
                       confirmed: session.contactEmailVerified,
                       otpSent: session.contactEmailOtpSent,
                       busy: session.busy,
-                      confirmedMessage:
-                          'Confirmed from your MoolSocial account',
+                      onEdit: (value) {
+                        session.editWorkspaceContact(
+                          WorkContactChannel.email,
+                          value,
+                        );
+                        _emailOtp.clear();
+                      },
+                      confirmedMessage: 'Contact confirmed',
                       onSend: () async {
                         await session.sendContactEmailOtp(_email.text);
                       },
@@ -185,6 +241,13 @@ class _WorkWorkspaceContactScreenState
                       confirmed: session.alternateVerified,
                       otpSent: session.alternateOtpSent,
                       busy: session.busy,
+                      onEdit: (value) {
+                        session.editWorkspaceContact(
+                          WorkContactChannel.alternateMobile,
+                          value,
+                        );
+                        _alternateOtp.clear();
+                      },
                       confirmedMessage: 'Alternate contact confirmed by OTP',
                       onSend: () async {
                         if (_alternate.text.trim().isEmpty) {
@@ -212,262 +275,84 @@ class _WorkWorkspaceContactScreenState
   }
 }
 
-class _WorkspaceAccountHero extends StatefulWidget {
+class _WorkspaceAccountHero extends StatelessWidget {
   const _WorkspaceAccountHero({required this.session, required this.profile});
-
   final WorkSession session;
   final WorkProfileOption profile;
-
   @override
-  State<_WorkspaceAccountHero> createState() => _WorkspaceAccountHeroState();
-}
-
-class _WorkspaceAccountHeroState extends State<_WorkspaceAccountHero>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 520),
-    value: 1,
-  );
-  bool _started = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_started || MediaQuery.disableAnimationsOf(context)) return;
-    _started = true;
-    _controller.repeat(reverse: true, count: 4).whenComplete(() {
-      if (mounted) _controller.value = 1;
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final motion = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutCubic,
-    );
-    final session = widget.session;
-    return AnimatedBuilder(
-      animation: motion,
-      builder: (context, child) => Container(
-        key: const Key('workspace-account-setup-hero'),
-        padding: const EdgeInsets.all(MoolSpacing.sm),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              MoolColors.navy,
-              Color.lerp(
-                const Color(0xFF3535B8),
-                const Color(0xFF006D5B),
-                motion.value,
-              )!,
-            ],
-          ),
-          borderRadius: BorderRadius.circular(MoolRadii.floating),
-          boxShadow: [
-            BoxShadow(
-              color: MoolColors.orange.withValues(
-                alpha: .12 + (.08 * motion.value),
-              ),
-              blurRadius: 14 + (6 * motion.value),
-              offset: const Offset(0, 7),
-            ),
-          ],
-        ),
-        child: child,
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: 0, end: 1),
+    duration: MoolMotion.accessible(context, MoolMotion.standard),
+    builder: (context, value, child) => Opacity(opacity: value, child: child),
+    child: Container(
+      key: const Key('workspace-account-setup-hero'),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: MoolColors.navy,
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                backgroundColor: MoolColors.orange,
-                foregroundColor: MoolColors.navy,
-                child: Icon(Icons.person_pin_circle_outlined),
-              ),
-              const SizedBox(width: MoolSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'MAKE YOUR WORKSPACE REACHABLE',
-                      style: TextStyle(
-                        color: Color(0xFFFFD6AD),
-                        fontSize: 9.5,
-                        letterSpacing: .45,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      widget.profile.label,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          const Text(
-            'One clear account for customer contact, payments and important Workspace updates.',
-            style: TextStyle(
-              color: Color(0xFFE8E8FF),
-              fontSize: 11,
-              height: 1.3,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: _HeroFact(
-                  label: 'ACCOUNT',
-                  value: session.connectedProviderLabel.isEmpty
-                      ? 'MoolSocial'
-                      : session.connectedProviderLabel,
-                  ready: true,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _HeroFact(
-                  label: 'PHONE',
-                  value: session.primaryMobileVerified ? 'Ready' : 'Needed',
-                  ready: session.primaryMobileVerified,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _HeroFact(
-                  label: 'EMAIL',
-                  value: session.contactEmailVerified ? 'Ready' : 'Needed',
-                  ready: session.contactEmailVerified,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroFact extends StatelessWidget {
-  const _HeroFact({
-    required this.label,
-    required this.value,
-    required this.ready,
-  });
-
-  final String label;
-  final String value;
-  final bool ready;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(MoolRadii.control),
-        border: Border.all(color: Colors.white.withValues(alpha: .18)),
-      ),
-      child: Column(
-        children: [
           Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFFDADAF7),
-              fontSize: 7.5,
+            'Stay within reach',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 19,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: 4),
           Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: ready ? Colors.white : const Color(0xFFFFD6AD),
-              fontSize: 10.5,
-              fontWeight: FontWeight.w900,
-            ),
+            'Keep customer calls and important updates close.',
+            style: TextStyle(color: Colors.white, fontSize: 12),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _ConnectedAccountCard extends StatelessWidget {
   const _ConnectedAccountCard({required this.session});
-
   final WorkSession session;
 
   @override
-  Widget build(BuildContext context) {
-    return WorkCard(
-      keyName: 'work-connected-provider-account',
-      color: const Color(0xFFEDEEFF),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: MoolColors.navy,
-            foregroundColor: Colors.white,
-            child: Icon(_providerIcon(session.connectedProviderLabel)),
+  Widget build(BuildContext context) => Padding(
+    key: const Key('work-connected-provider-account'),
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(
+      children: [
+        Icon(
+          _providerIcon(session.connectedProviderLabel),
+          color: MoolColors.navy,
+          size: 24,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Signed in with ${session.connectedProviderLabel}',
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                session.connectedProviderAccount.isEmpty
+                    ? session.accountDisplayName
+                    : session.connectedProviderAccount,
+                style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+              ),
+            ],
           ),
-          const SizedBox(width: MoolSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${session.connectedProviderLabel} account',
-                  style: const TextStyle(
-                    color: MoolColors.navy,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  session.connectedProviderAccount.isEmpty
-                      ? session.accountDisplayName
-                      : session.connectedProviderAccount,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MoolColors.muted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Text(
-                  'Only this signed-in account is shown for this setup.',
-                  style: TextStyle(color: MoolColors.muted, fontSize: 9.5),
-                ),
-              ],
-            ),
-          ),
-          const WorkPill(label: 'Connected', color: MoolColors.success),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }
 
 class _ContactVerificationCard extends StatelessWidget {
@@ -486,172 +371,125 @@ class _ContactVerificationCard extends StatelessWidget {
     required this.onSend,
     required this.onVerify,
     required this.onChange,
+    required this.onEdit,
     this.prefixText,
   });
-
-  final String keyName;
-  final String title;
-  final String detail;
-  final bool requiredContact;
-  final TextEditingController controller;
-  final TextEditingController otpController;
+  final String keyName, title, detail, confirmedMessage;
+  final bool requiredContact, confirmed, otpSent, busy;
+  final TextEditingController controller, otpController;
   final TextInputType keyboardType;
-  final bool confirmed;
-  final bool otpSent;
-  final bool busy;
-  final String confirmedMessage;
-  final VoidCallback onSend;
-  final VoidCallback onVerify;
-  final VoidCallback onChange;
   final String? prefixText;
+  final VoidCallback onSend, onVerify, onChange;
+  final ValueChanged<String> onEdit;
 
   @override
-  Widget build(BuildContext context) {
-    return WorkCard(
-      keyName: keyName,
-      color: confirmed ? const Color(0xFFEAF7E8) : Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+  Widget build(BuildContext context) => Padding(
+    key: Key(keyName),
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          key: Key('$keyName-field'),
+          controller: controller,
+          enabled: !busy,
+          readOnly: confirmed,
+          keyboardType: keyboardType,
+          textInputAction: TextInputAction.next,
+          scrollPadding: const EdgeInsets.only(bottom: 32),
+          onChanged: onEdit,
+          decoration: InputDecoration(
+            labelText: requiredContact ? title : '$title · optional',
+            helperText: detail,
+            helperMaxLines: 2,
+            prefixText: prefixText,
+            border: const UnderlineInputBorder(),
+            enabledBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFFCACEE0)),
+            ),
+            focusedBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: MoolColors.navy, width: 1.5),
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            suffixIcon: confirmed
+                ? const Icon(Icons.check_circle_outline, color: MoolColors.navy)
+                : null,
+          ),
+        ),
+        if (confirmed)
           Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: MoolColors.ink,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      detail,
-                      style: const TextStyle(
-                        color: MoolColors.muted,
-                        fontSize: 10,
-                        height: 1.25,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  confirmedMessage,
+                  style: const TextStyle(color: MoolColors.navy, fontSize: 12),
                 ),
               ),
-              WorkPill(
-                label: requiredContact ? 'Required' : 'Optional',
-                color: requiredContact ? MoolColors.navy : MoolColors.orange,
+              TextButton(
+                key: Key('$keyName-change'),
+                onPressed: busy ? null : onChange,
+                child: const Text('Change'),
+              ),
+            ],
+          )
+        else if (!otpSent)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              key: Key('$keyName-send-otp'),
+              onPressed: busy || (!requiredContact && controller.text.isEmpty)
+                  ? null
+                  : onSend,
+              child: Text(busy ? 'Please wait…' : 'Send code'),
+            ),
+          )
+        else ...[
+          const SizedBox(height: 10),
+          TextField(
+            key: Key('$keyName-otp'),
+            controller: otpController,
+            enabled: !busy,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.oneTimeCode],
+            maxLength: 6,
+            decoration: InputDecoration(
+              labelText: '$title code',
+              helperText: 'Sent to ${controller.text}',
+              helperMaxLines: 2,
+              counterText: '',
+              border: const UnderlineInputBorder(),
+            ),
+            onSubmitted: (_) {
+              if (!busy) onVerify();
+            },
+          ),
+          Wrap(
+            spacing: 12,
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              TextButton(
+                onPressed: busy ? null : onSend,
+                child: const Text('Resend code'),
+              ),
+              FilledButton(
+                key: Key('$keyName-confirm-otp'),
+                onPressed: busy ? null : onVerify,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                  backgroundColor: MoolColors.navy,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                ),
+                child: const Text('Confirm', maxLines: 1, softWrap: false),
               ),
             ],
           ),
-          const SizedBox(height: MoolSpacing.xs),
-          TextField(
-            key: Key('$keyName-field'),
-            controller: controller,
-            enabled: !confirmed && !busy,
-            keyboardType: keyboardType,
-            textInputAction: TextInputAction.done,
-            scrollPadding: const EdgeInsets.only(bottom: 150),
-            decoration: InputDecoration(
-              prefixText: prefixText,
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 12,
-              ),
-              suffixIcon: confirmed
-                  ? const Icon(
-                      Icons.check_circle_rounded,
-                      color: MoolColors.success,
-                    )
-                  : null,
-            ),
-          ),
-          if (confirmed) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(
-                  Icons.shield_outlined,
-                  color: MoolColors.success,
-                  size: 17,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    confirmedMessage,
-                    style: const TextStyle(
-                      color: MoolColors.success,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  key: Key('$keyName-change'),
-                  onPressed: busy ? null : onChange,
-                  child: const Text('Use another'),
-                ),
-              ],
-            ),
-          ] else if (!otpSent)
-            Align(
-              alignment: Alignment.centerRight,
-              child: SizedBox(
-                width: 132,
-                child: FilledButton.tonalIcon(
-                  key: Key('$keyName-send-otp'),
-                  onPressed: busy ? null : onSend,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 44),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  icon: const Icon(Icons.sms_outlined, size: 18),
-                  label: const Text('Send OTP', maxLines: 1, softWrap: false),
-                ),
-              ),
-            )
-          else ...[
-            const SizedBox(height: MoolSpacing.xs),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    key: Key('$keyName-otp'),
-                    controller: otpController,
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.done,
-                    maxLength: 6,
-                    decoration: const InputDecoration(
-                      labelText: '6-digit code',
-                      counterText: '',
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: MoolSpacing.xs),
-                SizedBox(
-                  width: 124,
-                  child: FilledButton(
-                    key: Key('$keyName-confirm-otp'),
-                    onPressed: busy ? null : onVerify,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 48),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    child: const Text('Confirm', maxLines: 1, softWrap: false),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
 }
 
 class _ContactReadinessSummary extends StatelessWidget {
@@ -668,37 +506,28 @@ class _ContactReadinessSummary extends StatelessWidget {
         'alternate contact',
     ];
     final ready = missing.isEmpty;
-    return WorkCard(
-      keyName: 'work-contact-readiness',
-      color: ready ? const Color(0xFFEAF7E8) : const Color(0xFFFFF4E5),
+    return Padding(
+      key: const Key('work-contact-readiness'),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            ready ? Icons.task_alt_rounded : Icons.pending_actions_outlined,
-            color: ready ? MoolColors.success : MoolColors.orange,
+            ready ? Icons.task_alt_rounded : Icons.info_outline,
+            color: MoolColors.navy,
+            size: 20,
           ),
-          const SizedBox(width: MoolSpacing.sm),
+          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  ready ? 'Contact details ready' : 'Complete required contact',
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  ready
-                      ? 'You can continue to Workspace details.'
-                      : 'Still needed: ${missing.join(' and ')}.',
-                  style: const TextStyle(
-                    color: MoolColors.muted,
-                    fontSize: 10.5,
-                  ),
-                ),
-              ],
+            child: Text(
+              ready
+                  ? 'Contact details ready'
+                  : 'Confirm your ${missing.join(' and ')} to continue.',
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontSize: 12,
+                height: 1.4,
+              ),
             ),
           ),
         ],

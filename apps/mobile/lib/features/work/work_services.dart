@@ -192,6 +192,8 @@ class WorkProfileSubmission {
     required this.familyId,
     required this.profileId,
     required this.name,
+    this.authorizedPersonName = '',
+    this.businessRelationship = '',
     required this.area,
     required this.primaryActivity,
     required this.proofReferences,
@@ -206,6 +208,8 @@ class WorkProfileSubmission {
   final String familyId;
   final String profileId;
   final String name;
+  final String authorizedPersonName;
+  final String businessRelationship;
   final String area;
   final String primaryActivity;
   final Map<String, String> proofReferences;
@@ -570,6 +574,8 @@ class AuthenticatedWorkGateway implements WorkGateway {
             'familyId': value.familyId,
             'profileId': value.profileId,
             'name': value.name,
+            'authorizedPersonName': value.authorizedPersonName,
+            'businessRelationship': value.businessRelationship,
             'area': value.area,
             'primaryActivity': value.primaryActivity,
             'proofReferences': value.proofReferences,
@@ -770,6 +776,8 @@ class ReviewWorkGateway implements WorkGateway {
   bool failProof = false;
   bool failSubmission = false;
   bool failReview = false;
+  WorkRemoteReviewStatus reviewResultStatus = WorkRemoteReviewStatus.approved;
+  String? reviewResultReason;
   bool failGst = false;
   bool failSetup = false;
   int applicationCalls = 0;
@@ -932,7 +940,8 @@ class ReviewWorkGateway implements WorkGateway {
     }
     return WorkReviewResult(
       caseId: caseId,
-      status: WorkRemoteReviewStatus.approved,
+      status: reviewResultStatus,
+      reason: reviewResultReason,
       plan: 'free',
       workspaceId: 'WK-${510000 + reviewCalls}',
     );

@@ -10,6 +10,44 @@
   },
   "entries": [
     {
+      "id": "REG-20260906-4502-WORKSPACE-CAPTURE-HELPER-DECLARATION-ORDER",
+      "status": "registered_compile_failure_before_visual_evidence",
+      "appliesTo": [
+        "primary",
+        "testing",
+        "evidence"
+      ],
+      "mistake": "The first pre-dashboard capture batch referenced the local reveal helper before its declaration, so the layout suite did not compile and produced no images. Earlier pre-dashboard test runs also retained stale status/OTP labels and a genuine keyboard clearance failure.",
+      "rootCause": "Capture tests were inserted above a locally declared helper; changed customer-facing contracts were not all updated before the first connected replay.",
+      "prevention": "Move the unchanged helper before all callers, run analysis before capture, preserve failed logs, and require complete connected execution and actual image inspection. Keep contact-specific OTP labels and safe-area geometry assertions; do not count missing captures or compile failures as passes.",
+      "gates": [
+        "apps/mobile/test/work_workspace_layout_safety_test.dart"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"
+      ]
+    },
+    {
+      "id": "REG-20260906-4500-WORKSPACE-CONTACT-AND-IDENTITY-PROOF-TRUTH",
+      "status": "founder_review_correction_in_progress",
+      "appliesTo": ["primary", "work", "testing", "device"],
+      "mistake": "Workspace contact fields remained editable while OTP verification used the earlier session value. The account adapter inferred both contacts confirmed from authenticated plus nonempty, and document capture inserted ACCOUNT-KYC without confirmed identity proof.",
+      "rootCause": "Authentication, per-contact verification and documentary identity were treated as one state; the editable field and OTP challenge did not share invalidation.",
+      "prevention": "Bind confirmation to the exact unchanged contact, invalidate changes and stale asynchronous responses, prefill without inventing verification, retain the person's name separately from PAN-linked business name, and show actual document references only. Never replace native document capture or admin verification with a fixture pass.",
+      "gates": ["apps/mobile/test/work_vertical_slice_test.dart", "apps/mobile/test/work_production_gateway_test.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"]
+    },
+    {
+      "id": "REG-20260906-4501-WORKSPACE-SUBMISSION-DECISION-CONTINUITY",
+      "status": "founder_review_correction_in_progress",
+      "appliesTo": ["primary", "work", "testing", "device"],
+      "mistake": "Back could lose unsaved business details; material edits did not always invalidate consent. Initial pending review exposed unsolicited update actions; rejected review could erase its case and restart; approved review required another landing tap.",
+      "rootCause": "Draft, submitted snapshot, admin decision and next navigation were coupled to local step UI rather than the actual review case and material data changes.",
+      "prevention": "Persist the draft before step transitions, invalidate consent on material changes, preserve the acknowledged submission and rejected case, refresh pending status automatically with bounded lifecycle handling, show clarification actions only for an actual request, and route confirmed approval directly to its exact Workspace. Keep unsupported production corrections and notification delivery explicit dependencies, not simulated successes.",
+      "gates": ["apps/mobile/test/work_vertical_slice_test.dart", "apps/mobile/test/work_production_gateway_test.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"]
+    },
+    {
       "id": "REG-20260906-4497-STORE-OVERNIGHT-ACTION-BOUNDARIES",
       "status": "correction_under_local_and_device_qualification",
       "appliesTo": ["primary", "work", "testing", "device"],

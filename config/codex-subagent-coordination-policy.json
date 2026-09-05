@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4470,
-    "sha256": "1A2D8CA4DB40240693FAA93ABB941F9FD70A39CDCC44C7B25C15B89FA17DD430"
+    "entryCount": 4473,
+    "sha256": "C1A64EB3F79F7BB1179F27BACF121EA46BD6E1F1784B48A5E6F791E19729359D"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -74,6 +74,8 @@
         "scripts/check-codex-subagent-coordination-policy.ps1",
         "apps/mobile/lib/features/work/screens/work_earn_screens.dart",
         "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/screens/work_onboarding_screens.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_contact_screen.dart",
         "apps/mobile/lib/features/work/work_models.dart",
         "apps/mobile/lib/features/work/work_session.dart",
         "apps/mobile/lib/features/work/work_services.dart",

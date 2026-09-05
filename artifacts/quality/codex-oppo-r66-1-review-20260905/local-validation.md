@@ -1,5 +1,25 @@
 # Codex OPPO r66.1 local validation
 
+## Successor pre-dashboard implementation — 6 September 2026 (not APK qualification)
+
+Dashboard checkpoint bc8e9d655c41f101d7513995e5ffb13a0443e158 was committed, pushed, remote-equal and clean before this slice. Pre-dashboard changes implement founder S01–S08: concise progressive guide; complete compact document list and CTA; contact/name prefill without invented verification; value-bound OTP invalidation; PAN business name and representative relationship; no fake ACCOUNT-KYC attachment; actual filename/type/size and image preview; editable compact review with consent invalidation; automatic pending refresh and exact approved dashboard entry; no rejected-case reset or unsolicited pending upload actions.
+
+REG-4500/4501 retain the product defects. REG-4502 retains capture-helper declaration-order failure and stale dependent test contracts. The source and tests changed during exploratory runs; none of these failed exploratory runs is qualification evidence. Complete logs are under C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905:
+
+- workspace-overnight-pre-connected1.log: 174 passed, 68 existing capture skips, 16 failures. SHA256 37A94081090B1E4229EA84EAA3ECDC54824E40489965E46FCCCC77F4FAC374E6.
+- workspace-overnight-pre-connected2.log: 188 passed, 68 skips, 2 failures (OTP label, keyboard clearance). SHA256 AF1AD04C6F6A6EBF74C956763AB5C17F4985F7F7DEA79E2E836952C7CE9F00C6.
+- workspace-overnight-pre-connected3.log: 64 passed, 3 failures including layout-suite compilation; no images generated. SHA256 97C5BC7F82264019D8990A7CD2AEF9A9FDF014365078B552CCDF289F34DCA806.
+- workspace-overnight-pre-connected4.log: 200 passed, 68 skips, 1 stale Google-account label. SHA256 1BAB45476052C8541FF44667EEBB0EEC0935B3A67B864516B15AE8783E17F481.
+- workspace-overnight-pre-connected5.log: 205 passed, 68 skips, 1 stale fixed-line-count expectation on compact edit controls. SHA256 129DECC224E549B1ABBA63437E5670A3410118D1B0257603185C10EFF89D6577.
+
+Full analysis attempts 2–5 passed with zero issues. Actual v23/v24 Flutter images were inspected: review-label wrapping and an obsolete selected-profile panel with placeholder verified contact were found and corrected. Existing fixtures are explicitly not real account, OTP, document verification, admin or delivery qualification.
+
+Backend dependencies remain open and excluded from frontend completion: the existing server requires its old proof set, drops the newly supplied person/relationship metadata, and does not implement correction/unsupported-Workspace submission or admin notification delivery. Production unsupported requests now retain the draft and fail without a false sent acknowledgement. No backend, Cursor/Redmi, integration, APK or device change occurred in this slice. A final frozen-source local replay, Git seal and OPPO loop remain required.
+
+Final frozen-source pre-dashboard replay: workspace-overnight-pre-connected6.log passed 206 tests, 68 existing capture skips, zero failures, exit 0. SHA256 31BBB107E62BFEE09BE987F1697D91E87E060A938CFE78E1BA260338133BEE1A. Exact command: flutter test --no-pub --concurrency=1 --reporter expanded --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=workspace-overnight-review-v25-20260906 --update-goldens test/work_workspace_layout_safety_test.dart test/work_store_atomic_operations_test.dart test/work_vertical_slice_test.dart test/work_production_gateway_test.dart test/ui_v2/work/work_main_v2_test.dart. Only new external captures were generated; protected reference goldens remain unchanged.
+
+Full analysis workspace-overnight-pre-analysis5.log: zero issues, exit 0, SHA256 AB234F7647992D6A86A6EBAF4C02C734DD273F794EFF1D556D74639D2B7DCB9E. Captures include eleven pre-dashboard states plus review consent, document preview, GST guidance and OTP keyboard; actual images were inspected. Known first-dashboard child remains: newly approved stores still encounter an oversized setup deck; the next bounded dashboard child will retain the approved rail layout and make this centre compact. Busy-order selection also remains a child. No APK qualification is claimed by this source checkpoint.
+
 ## Successor dashboard round — 6 September 2026 (not r66.1 APK evidence)
 
 Founder authorized one Dashboard/first-tap round, a Git checkpoint, then recorded pre-dashboard corrections and local visual/device testing. This section records successor source only; the r66.1 history below remains immutable historical evidence. No successor APK has been built or installed at this checkpoint.

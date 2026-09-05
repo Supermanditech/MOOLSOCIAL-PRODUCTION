@@ -11,6 +11,91 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 
 void main() {
+  for (final channel in WorkContactChannel.values) {
+    test('changed $channel invalidates an in-flight OTP and consent', () async {
+      final work = WorkSession(gateway: ReviewWorkGateway());
+      addTearDown(work.dispose);
+      await switch (channel) {
+        WorkContactChannel.primaryMobile => work.sendPrimaryMobileOtp(
+          '9829012321',
+        ),
+        WorkContactChannel.email => work.sendContactEmailOtp(
+          'asha@example.com',
+        ),
+        WorkContactChannel.alternateMobile => work.sendAlternateOtp(
+          '9876543210',
+        ),
+      };
+      work.setDeclaration(true);
+      final confirmation = switch (channel) {
+        WorkContactChannel.primaryMobile => work.verifyPrimaryMobileOtp(
+          '123456',
+        ),
+        WorkContactChannel.email => work.verifyContactEmailOtp('123456'),
+        WorkContactChannel.alternateMobile => work.verifyAlternateOtp('123456'),
+      };
+      work.editWorkspaceContact(
+        channel,
+        channel == WorkContactChannel.email
+            ? 'changed@example.com'
+            : '9123456789',
+      );
+      expect(await confirmation, isFalse);
+      expect(switch (channel) {
+        WorkContactChannel.primaryMobile => work.primaryMobileVerified,
+        WorkContactChannel.email => work.contactEmailVerified,
+        WorkContactChannel.alternateMobile => work.alternateVerified,
+      }, isFalse);
+      expect(work.declarationAccepted, isFalse);
+      expect(work.errorMessage, contains('Contact changed'));
+    });
+  }
+
+  test('identity prefill never creates documentary verification', () {
+    final work = WorkSession()
+      ..hydrateAccountSnapshot(
+        const WorkAccountSnapshot(
+          displayName: 'Asha Sharma',
+          email: 'asha@example.com',
+          mobile: '9829012321',
+          providerLabel: 'Google',
+        ),
+      );
+    addTearDown(work.dispose);
+    expect(work.authorizedPersonName, 'Asha Sharma');
+    expect(work.primaryMobileVerified, isFalse);
+    expect(work.contactEmailVerified, isFalse);
+    expect(work.addedProofs, isEmpty);
+    work.savePersonName('Edited name');
+    work.hydrateAccountSnapshot(
+      const WorkAccountSnapshot(displayName: 'Old name'),
+    );
+    expect(work.authorizedPersonName, 'Edited name');
+    work.setDeclaration(true);
+    work.saveBusinessRelationship('Authorized representative');
+    expect(work.declarationAccepted, isFalse);
+  });
+
+  test(
+    'unsupported production request stays a draft without acknowledgement',
+    () async {
+      final work = WorkSession.production(gateway: UnavailableWorkGateway());
+      addTearDown(work.dispose);
+      expect(
+        await work.sendUnsupportedRequest(
+          workspace: 'Furniture repair',
+          family: 'Other',
+          area: 'Jodhpur',
+          otherActivity: 'Furniture repairs',
+        ),
+        isFalse,
+      );
+      expect(work.unsupportedRequestSent, isFalse);
+      expect(work.unsupportedWorkspace, 'Furniture repair');
+      expect(work.noticeMessage, isNull);
+      expect(work.errorMessage, contains('cannot be sent yet'));
+    },
+  );
   test('release app defaults to the fail-closed production Work session', () {
     final source = File('lib/main.dart').readAsStringSync();
     expect(source, contains('workSession: WorkSession.production(),'));
@@ -165,11 +250,7 @@ void main() {
       );
       expect(
         session.selectedWorkspaceDocuments.map((document) => document.label),
-        profile.verificationDocuments
-            .where(
-              (document) => document.title != 'GST registration certificate',
-            )
-            .map((document) => document.title),
+        profile.verificationDocuments.map((document) => document.title),
       );
       expect(
         session.selectedWorkspaceDocuments.map((document) => document.label),
@@ -621,10 +702,11 @@ void main() {
     expect(await session.checkReview(), isFalse);
     expect(session.reviewStage, WorkReviewStage.gstPending);
     expect(session.activeWorkspace, isNull);
-    expect(session.noticeMessage, contains('still in progress'));
+    expect(session.noticeMessage, isNull);
+    expect(session.remoteReviewStatus, WorkRemoteReviewStatus.pending);
   });
 
-  test('rejected review preserves details for an exact resubmission', () async {
+  test('rejected review cannot silently erase or restart its case', () async {
     final session = WorkSession.production(gateway: _RejectedGateway())
       ..selectedProfile = workProfiles.first
       ..selectedFamilyId = workProfiles.first.familyId
@@ -641,8 +723,11 @@ void main() {
     expect(session.activeWorkspace, isNull);
 
     session.reviseRejectedProfile();
-    expect(session.reviewCaseId, isNull);
-    expect(session.reviewStage, WorkReviewStage.drafting);
+    expect(session.reviewCaseId, 'wp-rejected');
+    expect(session.reviewStage, WorkReviewStage.gstPending);
+    expect(session.remoteReviewStatus, WorkRemoteReviewStatus.rejected);
+    expect(session.reviewReason, 'Shop-front proof is unclear.');
+    expect(session.beginReviewCorrection(), isFalse);
     expect(session.workName, 'Mahadev Fresh Mart');
     expect(session.workArea, 'Sardarpura, Jodhpur');
   });
