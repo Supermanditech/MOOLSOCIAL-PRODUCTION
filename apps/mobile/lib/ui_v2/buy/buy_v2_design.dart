@@ -18,7 +18,13 @@ String buyV2Money(num value) => _buyV2Currency.format(value);
 
 /// Natural bounds for a current value using the same inherited font and scaler
 /// as its Text. Callers still own available width, placement and tap targets.
-Size buyV2ValueTextSize(BuildContext context, String text, TextStyle style) {
+Size buyV2ValueTextSize(
+  BuildContext context,
+  String text,
+  TextStyle style, {
+  double maxWidth = double.infinity,
+  int? maxLines = 1,
+}) {
   final painter = TextPainter(
     text: TextSpan(
       text: text,
@@ -27,8 +33,8 @@ Size buyV2ValueTextSize(BuildContext context, String text, TextStyle style) {
     textDirection: Directionality.of(context),
     textScaler: MediaQuery.textScalerOf(context),
     locale: Localizations.maybeLocaleOf(context),
-    maxLines: 1,
-  )..layout();
+    maxLines: maxLines,
+  )..layout(maxWidth: maxWidth);
   final size = Size(
     painter.width.ceilToDouble(),
     painter.height.ceilToDouble(),
@@ -496,7 +502,7 @@ class BuyV2FiniteValueTransition extends StatelessWidget {
   final Size ownerSize;
   final TextStyle style;
   final TextAlign textAlign;
-  final int maxLines;
+  final int? maxLines;
   final Duration duration;
 
   @override
@@ -518,7 +524,7 @@ class BuyV2FiniteValueTransition extends StatelessWidget {
         text,
         textAlign: textAlign,
         maxLines: maxLines,
-        overflow: TextOverflow.ellipsis,
+        overflow: maxLines == null ? TextOverflow.clip : TextOverflow.ellipsis,
         style: style,
       ),
     );
