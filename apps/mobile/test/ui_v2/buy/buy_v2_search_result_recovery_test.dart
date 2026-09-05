@@ -95,8 +95,13 @@ void main() {
               if (await file.exists()) throw StateError('Capture exists');
               final image = await boundary.toImage(pixelRatio: 1);
               try {
-                final bytes = await image.toByteData(format: ImageByteFormat.png);
-                await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
+                final bytes = await image.toByteData(
+                  format: ImageByteFormat.png,
+                );
+                await file.writeAsBytes(
+                  bytes!.buffer.asUint8List(),
+                  flush: true,
+                );
               } finally {
                 image.dispose();
               }
@@ -229,6 +234,12 @@ void main() {
     testWidgets('R66 combined query recovery fits compact keyboard $keyboard', (
       tester,
     ) async {
+      final originalErrorHandler = FlutterError.onError;
+      FlutterError.onError = (details) {
+        debugPrint(details.toString());
+        originalErrorHandler?.call(details);
+      };
+      addTearDown(() => FlutterError.onError = originalErrorHandler);
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(320, 700);
       tester.view.viewInsets = FakeViewPadding(bottom: keyboard);

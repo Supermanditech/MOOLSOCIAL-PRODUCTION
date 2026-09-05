@@ -5774,7 +5774,7 @@ class _ProductGrid extends StatelessWidget {
         session.activeShoppingIntent == null;
     if (products.isEmpty) {
       return Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -6868,6 +6868,16 @@ class _FeaturedProductRail extends StatelessWidget {
       BuyV2Destination.medicine => 'Pharmacy picks',
       BuyV2Destination.orders => 'Product picks',
     };
+    final viewport = MediaQuery.sizeOf(context);
+    final shortLandscape =
+        viewport.width > viewport.height && viewport.height <= 480;
+    final cardWidth = accessibleText && shortLandscape
+        ? (178 * MediaQuery.textScalerOf(context).scale(1))
+              .clamp(1.0, (viewport.width - 28).clamp(1.0, double.infinity))
+              .toDouble()
+        : accessibleText
+        ? 178.0
+        : 168.0;
     return SizedBox(
       key: const ValueKey('buy-featured-products'),
       height: accessibleText ? 365 : 285,
@@ -6936,7 +6946,7 @@ class _FeaturedProductRail extends StatelessWidget {
               itemCount: products.length,
               separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, index) => SizedBox(
-                width: accessibleText ? 178 : 168,
+                width: cardWidth,
                 child: _FeaturedProductCard(
                   session: session,
                   product: products[index],
@@ -7360,12 +7370,14 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                           Positioned(
                             right: 7,
                             bottom: 7,
-                            child: _FeaturedProductAction(
-                              session: session,
-                              product: product,
-                              quantity: quantity,
-                              rxBlocked: rxBlocked,
-                              offerDecision: offerDecision,
+                            child: BuyV2CartAvoidanceRegion(
+                              child: _FeaturedProductAction(
+                                session: session,
+                                product: product,
+                                quantity: quantity,
+                                rxBlocked: rxBlocked,
+                                offerDecision: offerDecision,
+                              ),
                             ),
                           ),
                         ],

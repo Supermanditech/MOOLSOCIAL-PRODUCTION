@@ -4887,296 +4887,216 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
           (destination) =>
               lines.any((line) => line.product.destination == destination),
         );
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(10, 7, 10, 5),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-            decoration: buyV2CardDecoration(radius: 16),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: BuyV2Colors.navy,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.shopping_cart_outlined,
-                    color: Colors.white,
-                  ),
+    final header = <Widget>[
+      Padding(
+        padding: const EdgeInsets.fromLTRB(10, 7, 10, 5),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+          decoration: buyV2CardDecoration(radius: 16),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: BuyV2Colors.navy,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Cart',
-                        style: context.buyTitle.copyWith(fontSize: 17),
-                      ),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final summary = _cartHeaderSummary(session);
-                          final style = context.buyMeta.copyWith(fontSize: 8);
-                          final size = buyV2ValueTextSize(
-                            context,
-                            summary,
-                            style,
-                            maxWidth: constraints.maxWidth,
-                            maxLines: null,
-                          );
-                          return BuyV2FiniteValueTransition(
-                            key: const ValueKey('buy-cart-header-value-motion'),
-                            stateKey: summary,
-                            text: summary,
-                            ownerSize: Size(constraints.maxWidth, size.height),
-                            textAlign: TextAlign.start,
-                            maxLines: null,
-                            style: style,
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                child: const Icon(
+                  Icons.shopping_cart_outlined,
+                  color: Colors.white,
                 ),
-                IconButton(
-                  key: const ValueKey('buy-cart-empty'),
-                  tooltip: 'Empty cart',
-                  onPressed: lines.isEmpty
-                      ? null
-                      : () =>
-                            unawaited(_confirmBuyV2CartClear(context, session)),
-                  icon: const Icon(
-                    Icons.delete_outline_rounded,
-                    color: Color(0xFFB42318),
-                  ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Cart',
+                      style: context.buyTitle.copyWith(fontSize: 17),
+                    ),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final summary = _cartHeaderSummary(session);
+                        final style = context.buyMeta.copyWith(fontSize: 8);
+                        final size = buyV2ValueTextSize(
+                          context,
+                          summary,
+                          style,
+                          maxWidth: constraints.maxWidth,
+                          maxLines: null,
+                        );
+                        return BuyV2FiniteValueTransition(
+                          key: const ValueKey('buy-cart-header-value-motion'),
+                          stateKey: summary,
+                          text: summary,
+                          ownerSize: Size(constraints.maxWidth, size.height),
+                          textAlign: TextAlign.start,
+                          maxLines: null,
+                          style: style,
+                        );
+                      },
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              IconButton(
+                key: const ValueKey('buy-cart-empty'),
+                tooltip: 'Empty cart',
+                onPressed: lines.isEmpty
+                    ? null
+                    : () => unawaited(_confirmBuyV2CartClear(context, session)),
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Color(0xFFB42318),
+                ),
+              ),
+            ],
           ),
         ),
-        _CartScopeBar(session: session),
-        const SizedBox(height: 7),
-        Expanded(
-          child: lines.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
+      ),
+      _CartScopeBar(session: session),
+      const SizedBox(height: 7),
+    ];
+    final empty = Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.shopping_cart_outlined,
+              color: BuyV2Colors.navy,
+              size: 34,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              session.cartScope == BuyV2CartScope.all
+                  ? 'Your cart is empty'
+                  : 'Your ${session.cartScope.label} cart is empty',
+              textAlign: TextAlign.center,
+              style: context.buyTitle.copyWith(fontSize: 17),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              session.cartScope == BuyV2CartScope.all
+                  ? 'Browse products to start your order.'
+                  : 'Browse ${session.cartScope.label} products to start your order.',
+              textAlign: TextAlign.center,
+              style: context.buyMeta,
+            ),
+          ],
+        ),
+      ),
+    );
+    final contents = <Widget>[
+      if (widget.onBrowseStore != null &&
+          widget.storeLabel?.trim().isNotEmpty == true) ...[
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonal(
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+              ),
+              key: const ValueKey('buy-cart-continue-store'),
+              onPressed: widget.onBrowseStore,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.storefront_outlined, size: 20),
+                  const SizedBox(width: 10),
+                  Flexible(
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.shopping_cart_outlined,
-                          color: BuyV2Colors.navy,
-                          size: 34,
+                        const Text(
+                          'Continue browsing',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 2),
                         Text(
-                          session.cartScope == BuyV2CartScope.all
-                              ? 'Your cart is empty'
-                              : 'Your ${session.cartScope.label} cart is empty',
-                          textAlign: TextAlign.center,
-                          style: context.buyTitle.copyWith(fontSize: 17),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          session.cartScope == BuyV2CartScope.all
-                              ? 'Browse products to start your order.'
-                              : 'Browse ${session.cartScope.label} products to start your order.',
-                          textAlign: TextAlign.center,
-                          style: context.buyMeta,
+                          widget.storeLabel!,
+                          key: const ValueKey('buy-cart-continue-store-name'),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            height: 1.05,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                )
-              : ListView(
-                  controller: _scrollController,
-                  key: PageStorageKey('buy-cart-${session.cartScope.name}'),
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 72),
-                  children: [
-                    if (widget.onBrowseStore != null &&
-                        widget.storeLabel?.trim().isNotEmpty == true) ...[
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(minHeight: 56),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.tonal(
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
-                              ),
-                            ),
-                            key: const ValueKey('buy-cart-continue-store'),
-                            onPressed: widget.onBrowseStore,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.storefront_outlined, size: 20),
-                                const SizedBox(width: 10),
-                                Flexible(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Continue browsing',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          height: 1,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        widget.storeLabel!,
-                                        key: const ValueKey(
-                                          'buy-cart-continue-store-name',
-                                        ),
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          height: 1.05,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 44),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                        ),
-                        key: const ValueKey('buy-cart-browse-more'),
-                        onPressed: widget.onBrowseMore,
-                        icon: const Icon(Icons.add_shopping_cart_outlined),
-                        label: const Text('Browse more products'),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    for (final line in lines)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 7),
-                        child: _CartLine(session: session, line: line),
-                      ),
-                    const SizedBox(height: 2),
-                    _CartBenefitPanel(session: session),
-                    const SizedBox(height: 10),
-                    _CartDiscoverySections(
-                      session: session,
-                      destinations: destinations.toList(growable: false),
-                    ),
-                    _CartDeliveryInstructionSections(
-                      session: session,
-                      destinations: destinations.toList(growable: false),
-                    ),
-                    _CartTipSections(session: session),
-                    _CartBillSummary(session: session),
-                    const SizedBox(height: 8),
-                    _CartSavingsSummary(session: session),
-                    BuyV2SponsoredSlot(
-                      content: session.sponsoredContentFor(
-                        BuyV2SponsoredPlacement.cartBeforeSummary,
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-        Container(
-          key: const ValueKey('buy-cart-action-bar'),
-          padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: BuyV2Colors.line)),
+                ],
+              ),
+            ),
           ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              if (lines.isEmpty) {
-                return SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, BuyV2Metrics.minimumTap),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                    ),
-                    key: const ValueKey('buy-empty-cart-browse'),
-                    onPressed: widget.onBrowseMore,
-                    icon: const Icon(Icons.storefront_outlined, size: 18),
-                    label: Text(
-                      session.cartScope == BuyV2CartScope.all
-                          ? 'Browse products'
-                          : 'Browse ${session.cartScope.label}',
-                    ),
-                  ),
-                );
-              }
-              final textScale = MediaQuery.textScalerOf(context).scale(1);
-              final compactAccessible =
-                  constraints.maxWidth < 350 && textScale > 1.2;
-              final totalText = buyV2Money(session.scopedPayableTotal);
-              final totalStyle = TextStyle(
-                color: BuyV2Colors.navy,
-                fontSize: compactAccessible ? 20 : 22,
-                fontWeight: FontWeight.w900,
-              );
-              final totalSize = buyV2ValueTextSize(
-                context,
-                totalText,
-                totalStyle,
-              );
-              final totalLabel = session.cartScope == BuyV2CartScope.wholesale
-                  ? session.scopedTipTotal > 0
-                        ? 'Landed total + delivery tip'
-                        : 'Landed cart total'
-                  : session.scopedTipTotal > 0
-                  ? 'Items + delivery tip'
-                  : 'Cart total';
-              final actionWidth = (constraints.maxWidth * .54).clamp(
-                150.0,
-                190.0,
-              );
-
-              void openCheckout() {
-                if (!session.openCheckout() &&
-                    session.selectedAddressOrNull == null) {
-                  showBuyV2AddressSheet(
-                    context,
-                    session,
-                    continueToCheckoutAfterSelection: true,
-                  );
-                }
-              }
-
-              final total = BuyV2FiniteValueTransition(
-                key: const ValueKey('buy-cart-payable-total-motion'),
-                incomingOnly: true,
-                stateKey: session.scopedPayableTotal,
-                text: totalText,
-                ownerSize: totalSize,
-                textAlign: TextAlign.start,
-                style: totalStyle,
-              );
-              final review = FilledButton(
+        ),
+        const SizedBox(height: 8),
+      ],
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          key: const ValueKey('buy-cart-browse-more'),
+          onPressed: widget.onBrowseMore,
+          icon: const Icon(Icons.add_shopping_cart_outlined),
+          label: const Text('Browse more products'),
+        ),
+      ),
+      const SizedBox(height: 8),
+      for (final line in lines)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 7),
+          child: _CartLine(session: session, line: line),
+        ),
+      const SizedBox(height: 2),
+      _CartBenefitPanel(session: session),
+      const SizedBox(height: 10),
+      _CartDiscoverySections(
+        session: session,
+        destinations: destinations.toList(growable: false),
+      ),
+      _CartDeliveryInstructionSections(
+        session: session,
+        destinations: destinations.toList(growable: false),
+      ),
+      _CartTipSections(session: session),
+      _CartBillSummary(session: session),
+      const SizedBox(height: 8),
+      _CartSavingsSummary(session: session),
+      BuyV2SponsoredSlot(
+        content: session.sponsoredContentFor(
+          BuyV2SponsoredPlacement.cartBeforeSummary,
+        ),
+      ),
+    ];
+    final footer = Container(
+      key: const ValueKey('buy-cart-action-bar'),
+      padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: BuyV2Colors.line)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (lines.isEmpty) {
+            return SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, BuyV2Metrics.minimumTap),
                   padding: const EdgeInsets.symmetric(
@@ -5184,75 +5104,162 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                     vertical: 10,
                   ),
                 ),
-                onPressed: openCheckout,
-                child: const Text('Review order'),
+                key: const ValueKey('buy-empty-cart-browse'),
+                onPressed: widget.onBrowseMore,
+                icon: const Icon(Icons.storefront_outlined, size: 18),
+                label: Text(
+                  session.cartScope == BuyV2CartScope.all
+                      ? 'Browse products'
+                      : 'Browse ${session.cartScope.label}',
+                ),
+              ),
+            );
+          }
+          final textScale = MediaQuery.textScalerOf(context).scale(1);
+          final compactAccessible =
+              constraints.maxWidth < 350 && textScale > 1.2;
+          final totalText = buyV2Money(session.scopedPayableTotal);
+          final totalStyle = TextStyle(
+            color: BuyV2Colors.navy,
+            fontSize: compactAccessible ? 20 : 22,
+            fontWeight: FontWeight.w900,
+          );
+          final totalSize = buyV2ValueTextSize(context, totalText, totalStyle);
+          final totalLabel = session.cartScope == BuyV2CartScope.wholesale
+              ? session.scopedTipTotal > 0
+                    ? 'Landed total + delivery tip'
+                    : 'Landed cart total'
+              : session.scopedTipTotal > 0
+              ? 'Items + delivery tip'
+              : 'Cart total';
+          final actionWidth = (constraints.maxWidth * .54).clamp(150.0, 190.0);
+
+          void openCheckout() {
+            if (!session.openCheckout() &&
+                session.selectedAddressOrNull == null) {
+              showBuyV2AddressSheet(
+                context,
+                session,
+                continueToCheckoutAfterSelection: true,
               );
-              final needsStack =
-                  textScale > 1.2 ||
-                  totalSize.width + 10 + actionWidth > constraints.maxWidth;
-              if (needsStack) {
-                final labelWidth = buyV2ValueTextSize(
-                  context,
-                  totalLabel,
-                  context.buyMeta,
-                ).width;
-                final totalSummary =
-                    labelWidth + 8 + totalSize.width <= constraints.maxWidth
-                    ? Row(
-                        children: [
-                          Expanded(
-                            child: Text(totalLabel, style: context.buyMeta),
-                          ),
-                          const SizedBox(width: 8),
-                          total,
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(totalLabel, style: context.buyMeta),
-                          total,
-                        ],
-                      );
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+            }
+          }
+
+          final total = BuyV2FiniteValueTransition(
+            key: const ValueKey('buy-cart-payable-total-motion'),
+            incomingOnly: true,
+            stateKey: session.scopedPayableTotal,
+            text: totalText,
+            ownerSize: totalSize,
+            textAlign: TextAlign.start,
+            style: totalStyle,
+          );
+          final review = FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, BuyV2Metrics.minimumTap),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+            onPressed: openCheckout,
+            child: const Text('Review order'),
+          );
+          final needsStack =
+              textScale > 1.2 ||
+              totalSize.width + 10 + actionWidth > constraints.maxWidth;
+          if (needsStack) {
+            final labelWidth = buyV2ValueTextSize(
+              context,
+              totalLabel,
+              context.buyMeta,
+            ).width;
+            final totalSummary =
+                labelWidth + 8 + totalSize.width <= constraints.maxWidth
+                ? Row(
+                    children: [
+                      Expanded(child: Text(totalLabel, style: context.buyMeta)),
+                      const SizedBox(width: 8),
+                      total,
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(totalLabel, style: context.buyMeta),
+                      total,
+                    ],
+                  );
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                totalSummary,
+                if (session.cartScope == BuyV2CartScope.wholesale)
+                  Text(
+                    'Freight included · GST invoice at checkout',
+                    style: context.buyMeta.copyWith(fontSize: 7.5),
+                  ),
+                const SizedBox(height: 7),
+                review,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    totalSummary,
+                    Text(totalLabel, style: context.buyMeta),
+                    total,
                     if (session.cartScope == BuyV2CartScope.wholesale)
                       Text(
                         'Freight included · GST invoice at checkout',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: context.buyMeta.copyWith(fontSize: 7.5),
                       ),
-                    const SizedBox(height: 7),
-                    review,
                   ],
-                );
-              }
-              return Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(totalLabel, style: context.buyMeta),
-                        total,
-                        if (session.cartScope == BuyV2CartScope.wholesale)
-                          Text(
-                            'Freight included · GST invoice at checkout',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: context.buyMeta.copyWith(fontSize: 7.5),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  SizedBox(width: actionWidth, child: review),
-                ],
-              );
-            },
-          ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(width: actionWidth, child: review),
+            ],
+          );
+        },
+      ),
+    );
+    final viewport = MediaQuery.sizeOf(context);
+    if (viewport.width > viewport.height && viewport.height <= 480) {
+      return ListView(
+        controller: _scrollController,
+        key: PageStorageKey('buy-cart-${session.cartScope.name}'),
+        padding: const EdgeInsets.only(bottom: 72),
+        children: [
+          ...header,
+          if (lines.isEmpty)
+            empty
+          else
+            for (final content in contents)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: content,
+              ),
+          footer,
+        ],
+      );
+    }
+    return Column(
+      children: [
+        ...header,
+        Expanded(
+          child: lines.isEmpty
+              ? empty
+              : ListView(
+                  controller: _scrollController,
+                  key: PageStorageKey('buy-cart-${session.cartScope.name}'),
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 72),
+                  children: contents,
+                ),
         ),
+        footer,
       ],
     );
   }

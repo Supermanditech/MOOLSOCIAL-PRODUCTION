@@ -4839,6 +4839,312 @@ void main() {
     );
   }
 
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+    BuyV2Destination.medicine,
+  ]) {
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'R66 landscape ${destination.name} $textScale retains usable product actions',
+        (tester) async {
+          final originalErrorHandler = FlutterError.onError;
+          FlutterError.onError = (details) {
+            debugPrint(details.toString());
+            originalErrorHandler?.call(details);
+          };
+          addTearDown(() => FlutterError.onError = originalErrorHandler);
+          addTearDown(() {
+            tester.view.resetPhysicalSize();
+            tester.view.resetDevicePixelRatio();
+          });
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(800, 360);
+          final session = BuyV2Session(core: BuySession());
+          await tester.pumpWidget(
+            app(
+              session,
+              textScale: textScale,
+              safePadding: const EdgeInsets.only(bottom: 32),
+              captureCart: const bool.fromEnvironment(
+                'BUY_R66_LANDSCAPE_CAPTURE',
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          session.openDestination(destination);
+          await tester.pumpAndSettle();
+
+          final product = session.visibleProducts.first;
+          session.openProduct(product.id);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: 'landscape product');
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.catalogue);
+
+          final catalogue = find.byType(BuyV2CatalogueView);
+          expect(tester.getSize(catalogue).width, greaterThan(700));
+          final scrollable = find
+              .descendant(
+                of: catalogue,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                ),
+              )
+              .first;
+          await tester.drag(scrollable, const Offset(0, -240));
+          await tester.pumpAndSettle();
+          final dockTop = tester
+              .getRect(
+                find.byKey(const Key('moolsocial-compact-destination-rail')),
+              )
+              .top;
+          expect(
+            dockTop - tester.getRect(scrollable).top,
+            greaterThanOrEqualTo(180),
+          );
+          final add = find.byKey(ValueKey('buy-add-${product.id}'));
+          for (var attempt = 0; attempt < 40; attempt += 1) {
+            final visibleTop = tester.getRect(scrollable).top;
+            var drag = -100.0;
+            if (add.evaluate().isNotEmpty) {
+              final rect = tester.getRect(add);
+              if (rect.top >= visibleTop &&
+                  rect.bottom <= dockTop &&
+                  add.hitTestable().evaluate().isNotEmpty) {
+                break;
+              }
+              if (rect.top < visibleTop) drag = 100;
+            }
+            await tester.drag(scrollable, Offset(0, drag));
+            await tester.pumpAndSettle();
+          }
+          final selectedCard = tester.getRect(
+            find.byKey(ValueKey('buy-product-${product.id}')),
+          );
+          expect(selectedCard.left, greaterThanOrEqualTo(0));
+          expect(selectedCard.right, lessThanOrEqualTo(800));
+          final action = tester.getRect(add);
+          expect(action.height, greaterThanOrEqualTo(44));
+          expect(action.width, greaterThanOrEqualTo(44));
+          expect(
+            action.top,
+            greaterThanOrEqualTo(tester.getRect(scrollable).top),
+          );
+          expect(action.bottom, lessThanOrEqualTo(dockTop));
+          expect(add.hitTestable(), findsOneWidget);
+          await _captureR66Landscape(
+            tester,
+            '${destination.name}-$textScale-product-action',
+          );
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(product.id), product.minimumOrder);
+          final miniCart = find.byKey(
+            const ValueKey('buy-compact-cart-indicator'),
+          );
+          expect(miniCart.hitTestable(), findsOneWidget);
+          expect(tester.getRect(miniCart).bottom, lessThanOrEqualTo(dockTop));
+          expect(
+            tester.getRect(miniCart).top,
+            greaterThanOrEqualTo(tester.getRect(catalogue).top),
+          );
+          final neighbours = session.visibleProducts.where((candidate) {
+            if (candidate.id == product.id) return false;
+            final control = find.byKey(ValueKey('buy-add-${candidate.id}'));
+            if (control.evaluate().isEmpty) return false;
+            final rect = tester.getRect(control);
+            return rect.left >= 0 &&
+                rect.right <= 800 &&
+                rect.top >= tester.getRect(scrollable).top &&
+                rect.bottom <= dockTop;
+          }).toList();
+          expect(neighbours, isNotEmpty);
+          final neighbour = neighbours.first;
+          final neighbourAdd = find.byKey(ValueKey('buy-add-${neighbour.id}'));
+          expect(neighbourAdd, findsOneWidget);
+          final neighbourAction = tester.getRect(neighbourAdd);
+          expect(neighbourAction.left, greaterThanOrEqualTo(0));
+          expect(neighbourAction.right, lessThanOrEqualTo(800));
+          expect(
+            neighbourAction.top,
+            greaterThanOrEqualTo(tester.getRect(scrollable).top),
+          );
+          expect(neighbourAction.bottom, lessThanOrEqualTo(dockTop));
+          for (final candidate in session.visibleProducts) {
+            for (final key in [
+              'buy-add-${candidate.id}',
+              'buy-review-offer-${candidate.id}',
+              'buy-featured-quantity-shell-${candidate.id}',
+            ]) {
+              final control = find.byKey(ValueKey(key));
+              if (control.evaluate().isEmpty) continue;
+              final rect = tester.getRect(control);
+              if (rect.left < 0 ||
+                  rect.right > 800 ||
+                  rect.top < tester.getRect(scrollable).top ||
+                  rect.bottom > dockTop) {
+                continue;
+              }
+              expect(
+                tester.getRect(miniCart).overlaps(rect),
+                isFalse,
+                reason: 'Floating Cart must leave $key available',
+              );
+            }
+          }
+          expect(neighbourAdd.hitTestable(), findsOneWidget);
+          await _captureR66Landscape(
+            tester,
+            '${destination.name}-$textScale-cart-added',
+          );
+          await tester.tap(neighbourAdd);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(neighbour.id), neighbour.minimumOrder);
+          expect(session.quantityFor(product.id), product.minimumOrder);
+          final title = find.descendant(
+            of: find.byKey(ValueKey('buy-product-${product.id}')),
+            matching: find.text(product.title),
+          );
+          final facts = find
+              .ancestor(of: title, matching: find.byType(Column))
+              .first;
+          await tester.drag(
+            scrollable,
+            Offset(
+              0,
+              tester.getRect(scrollable).top + 4 - tester.getRect(facts).top,
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.getRect(facts).top,
+            greaterThanOrEqualTo(tester.getRect(scrollable).top),
+          );
+          expect(tester.getRect(facts).bottom, lessThanOrEqualTo(dockTop));
+          for (final text
+              in find
+                  .descendant(of: facts, matching: find.byType(RichText))
+                  .evaluate()) {
+            final paragraph = text.renderObject! as RenderParagraph;
+            expect(
+              paragraph.didExceedMaxLines,
+              isFalse,
+              reason: paragraph.text.toPlainText(),
+            );
+          }
+          await _captureR66Landscape(
+            tester,
+            '${destination.name}-$textScale-product-facts',
+          );
+          await tester.tap(miniCart);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: 'landscape Cart');
+          expect(session.view, BuyV2View.cart);
+          expect(find.byType(NestedScrollView), findsNothing);
+          final cartScroll = scrollableWithin(
+            PageStorageKey('buy-cart-${session.cartScope.name}'),
+          );
+          final review = find.widgetWithText(FilledButton, 'Review order');
+          await tester.scrollUntilVisible(
+            review,
+            180,
+            maxScrolls: 60,
+            scrollable: cartScroll,
+          );
+          await tester.pumpAndSettle();
+          final reviewRect = tester.getRect(review);
+          expect(reviewRect.height, greaterThanOrEqualTo(44));
+          expect(reviewRect.bottom, lessThanOrEqualTo(dockTop));
+          expect(
+            reviewRect.top,
+            greaterThanOrEqualTo(tester.getRect(cartScroll).top),
+          );
+          expect(review.hitTestable(), findsOneWidget);
+          await _captureR66Landscape(
+            tester,
+            '${destination.name}-$textScale-cart-review',
+          );
+          await tester.tap(review);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.checkout);
+          expect(tester.takeException(), isNull, reason: 'landscape checkout');
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.catalogue);
+          expect(session.destination, destination);
+          expect(session.quantityFor(product.id), product.minimumOrder);
+
+          final search = find.byKey(const ValueKey('buy-search-control'));
+          await tester.scrollUntilVisible(search, -160, scrollable: scrollable);
+          await tester.pumpAndSettle();
+          expect(search.hitTestable(), findsOneWidget);
+          await tester.tap(search);
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byKey(const ValueKey('buy-search-field')),
+            product.title,
+          );
+          await tester.pumpAndSettle();
+          expect(session.query, product.title);
+          expect(tester.takeException(), isNull, reason: 'landscape search');
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          session.updateQuery('');
+          await tester.pumpAndSettle();
+
+          tester.view.physicalSize = const Size(360, 800);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: 'portrait rotation');
+          expect(find.byType(NestedScrollView), findsNothing);
+          expect(tester.getSize(catalogue).width, 360);
+          expect(session.quantityFor(product.id), product.minimumOrder);
+          tester.view.physicalSize = const Size(800, 360);
+          await tester.pumpAndSettle();
+          expect(tester.getSize(catalogue).width, greaterThan(700));
+          expect(session.quantityFor(product.id), product.minimumOrder);
+          session.clearCart();
+          session.openCart();
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.catalogue);
+          final otherProductId = destination == BuyV2Destination.shop
+              ? 'w-notebook'
+              : 's-tomato';
+          session.addProduct(otherProductId);
+          session.openCart(
+            scope: BuyV2CartScope.values.byName(destination.name),
+          );
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          expect(session.cartLines, isEmpty);
+          final browse = find.byKey(const ValueKey('buy-empty-cart-browse'));
+          await tester.scrollUntilVisible(
+            browse,
+            120,
+            scrollable: scrollableWithin(
+              PageStorageKey('buy-cart-${session.cartScope.name}'),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.getRect(browse).height, greaterThanOrEqualTo(44));
+          expect(tester.getRect(browse).bottom, lessThanOrEqualTo(dockTop));
+          expect(browse.hitTestable(), findsOneWidget);
+          await tester.tap(browse);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.catalogue);
+          expect(session.quantityFor(otherProductId), greaterThan(0));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   testWidgets('first-party promotions use established Buy actions', (
     tester,
   ) async {
@@ -6672,6 +6978,29 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+Future<void> _captureR66Landscape(WidgetTester tester, String label) async {
+  if (!const bool.fromEnvironment('BUY_R66_LANDSCAPE_CAPTURE')) return;
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('r66-cart-capture')),
+  );
+  await tester.runAsync(() async {
+    final directory = Directory('build/r66-landscape-v4-20260906');
+    await directory.create(recursive: true);
+    final output = File('${directory.path}/$label.png');
+    if (await output.exists()) {
+      throw StateError('Landscape capture already exists');
+    }
+    final image = await boundary.toImage(pixelRatio: 2);
+    try {
+      final data = await image.toByteData(format: ImageByteFormat.png);
+      if (data == null) throw StateError('Landscape capture encoding failed');
+      await output.writeAsBytes(data.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
+  });
 }
 
 Future<void> _captureR66MonthlyBasket(WidgetTester tester, String label) async {

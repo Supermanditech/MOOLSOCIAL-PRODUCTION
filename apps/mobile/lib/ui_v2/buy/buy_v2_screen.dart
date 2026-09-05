@@ -477,6 +477,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   Widget build(BuildContext context) {
     final session = widget.session;
     final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final viewport = MediaQuery.sizeOf(context);
+    final shortLandscapeCatalogue =
+        viewport.width > viewport.height &&
+        viewport.height <= 480 &&
+        session.view == BuyV2View.catalogue &&
+        session.destination != BuyV2Destination.orders &&
+        !_offersActive;
     final surfaceTheme = BuyV2ThemeSpec.resolve(
       session.destination,
       session.view,
@@ -518,8 +525,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
               bottom: true,
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: BuyV2Metrics.maxWidth,
+                  constraints: BoxConstraints(
+                    maxWidth: shortLandscapeCatalogue
+                        ? double.infinity
+                        : BuyV2Metrics.maxWidth,
                   ),
                   child: MoolFiniteGradientTransition(
                     key: const ValueKey('buy-theme-canvas'),
@@ -527,8 +536,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                     duration: BuyV2Motion.contentChange,
                     child: ColoredBox(
                       color: Colors.white.withValues(alpha: .94),
-                      child: Column(
-                        children: [
+                      child: _buildScreenLayout(
+                        scrollHeader: shortLandscapeCatalogue,
+                        header: [
                           if (session.view == BuyV2View.catalogue)
                             _BuySearchBand(
                               session: session,
@@ -548,67 +558,60 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               session.destination != BuyV2Destination.medicine)
                             BuyV2ShoppingIntentBar(session: session),
                           _buildDeliveryStatus(session, setState),
-                          Expanded(
-                            child: BuyV2CartAvoidanceScope(
-                              child: Stack(
-                                key: const ValueKey(
-                                  'buy-navigation-overlay-stack',
-                                ),
-                                children: [
-                                  Positioned.fill(
-                                    child: _BuyNavigationSurfaceOwner(
-                                      key: ObjectKey(session),
-                                      stateKey:
-                                          session.navigationMotionSequence,
-                                      direction: _surfaceMotionDirection,
-                                      child: _BuyExpandCollapseOwner(
-                                        key: ValueKey(
-                                          _searchOpen &&
-                                                  session.destination !=
-                                                      BuyV2Destination.orders
-                                              ? 'buy-search-owner-motion-search'
-                                              : 'buy-search-owner-motion-primary',
-                                        ),
-                                        child:
-                                            _storeProductRouteDepth > 0 &&
-                                                session.view !=
-                                                    BuyV2View.product
-                                            ? const SizedBox.expand()
-                                            : _searchOpen &&
-                                                  !_offersActive &&
-                                                  session.destination !=
-                                                      BuyV2Destination.orders
-                                            ? BuyV2SearchResultsView(
-                                                session: session,
-                                              )
-                                            : _currentView(session),
-                                      ),
-                                    ),
-                                  ),
-                                  ?_buildDeliveryRestore(session, setState),
-                                  if (!keyboardVisible &&
-                                      _showsMiniCart(session))
-                                    Positioned.fill(
-                                      child: _BuyMiniCartBar(
-                                        session: session,
-                                        aggregate: _offersActive,
-                                        initialPosition: _miniCartPosition,
-                                        onPositionChanged: (position) {
-                                          _miniCartPosition = position;
-                                        },
-                                      ),
-                                    ),
-                                  if (session.notice case final message?)
-                                    Positioned(
-                                      right: 8,
-                                      top: 8,
-                                      child: _BuyNotice(message: message),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
                         ],
+                        body: BuyV2CartAvoidanceScope(
+                          child: Stack(
+                            key: const ValueKey('buy-navigation-overlay-stack'),
+                            children: [
+                              Positioned.fill(
+                                child: _BuyNavigationSurfaceOwner(
+                                  key: ObjectKey(session),
+                                  stateKey: session.navigationMotionSequence,
+                                  direction: _surfaceMotionDirection,
+                                  child: _BuyExpandCollapseOwner(
+                                    key: ValueKey(
+                                      _searchOpen &&
+                                              session.destination !=
+                                                  BuyV2Destination.orders
+                                          ? 'buy-search-owner-motion-search'
+                                          : 'buy-search-owner-motion-primary',
+                                    ),
+                                    child:
+                                        _storeProductRouteDepth > 0 &&
+                                            session.view != BuyV2View.product
+                                        ? const SizedBox.expand()
+                                        : _searchOpen &&
+                                              !_offersActive &&
+                                              session.destination !=
+                                                  BuyV2Destination.orders
+                                        ? BuyV2SearchResultsView(
+                                            session: session,
+                                          )
+                                        : _currentView(session),
+                                  ),
+                                ),
+                              ),
+                              ?_buildDeliveryRestore(session, setState),
+                              if (!keyboardVisible && _showsMiniCart(session))
+                                Positioned.fill(
+                                  child: _BuyMiniCartBar(
+                                    session: session,
+                                    aggregate: _offersActive,
+                                    initialPosition: _miniCartPosition,
+                                    onPositionChanged: (position) {
+                                      _miniCartPosition = position;
+                                    },
+                                  ),
+                                ),
+                              if (session.notice case final message?)
+                                Positioned(
+                                  right: 8,
+                                  top: 8,
+                                  child: _BuyNotice(message: message),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -621,6 +624,28 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
               : _buildDestinationNavigation(session, _moolNavigationController),
         ),
       ),
+    );
+  }
+
+  Widget _buildScreenLayout({
+    required bool scrollHeader,
+    required List<Widget> header,
+    required Widget body,
+  }) {
+    if (scrollHeader) {
+      return NestedScrollView(
+        key: const PageStorageKey('buy-landscape-catalogue-scroll'),
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverToBoxAdapter(child: Column(children: header)),
+        ],
+        body: body,
+      );
+    }
+    return Column(
+      children: [
+        ...header,
+        Expanded(child: body),
+      ],
     );
   }
 
