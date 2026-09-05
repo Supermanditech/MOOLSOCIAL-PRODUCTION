@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_ticket_assessed",
+    "currentTicketId": "UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905",
+    "selectedTicketAssessment": {
+      "ticketId": "UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905",
+      "customerOutcome": "Correct confirmed current Redmi Buy defects in existing consumer journeys, beginning with visible safe Saved confirmation actions.",
+      "necessityProof": "Fresh installed r66.1 observations R66-UAT-001–035 identify launch-journey failures; founder explicitly directs necessary owned fixes and retests.",
+      "implementationDisposition": [
+        "reuse"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "scope-safe Saved confirmation",
+        "scanner permission/validation/keyboard",
+        "compact and enlarged-text actions/prices",
+        "exact nested navigation",
+        "review identity and truthful payment/delivery fallback",
+        "preserved provider boundaries"
+      ],
+      "adjustments": [
+        "One serialized corrective child from clean pushed audit checkpoint; preserve all observations and open coverage; one atomic runtime slice at a time."
+      ],
+      "explicitExclusions": [
+        "WhatsApp",
+        "OPPO",
+        "real transactions or recipients",
+        "Codex/shared/native source",
+        "backend implementation",
+        "integration",
+        "production app"
+      ],
+      "dependenciesAndApprovals": [
+        "Founder standing authority for confirmed Buy fixes and Redmi review",
+        "Exact audit checkpoint a09a2ecccf1e701a60117bdf34aa6a732cb132e2",
+        "Shared/backend dependent states stay unqualified"
+      ],
+      "manifestPath": "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+      "manifestSha256": "B3495A8F58D54F251067C7A68474D8873B45F29A4AE8999C24A58441F8E2E21F",
+      "evidencePath": "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "state": "ticket_disclosed_and_authorized",
+  "checkpoint": {
+    "successorRegistered": true
+  },
+  "ticket": {
+    "id": "UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905",
+    "classification": "mvp_required",
+    "customerOutcome": "Restore current Buy actions, fit, navigation and truthful consumer operational states without duplicating provider implementation.",
+    "classificationReason": "Confirmed real-device defects affect existing purchase journeys.",
+    "minimumCompleteScope": [
+      "Exact confirmed-owner corrections, one slice at a time",
+      "Focused and connected local regressions",
+      "Unique source-bound review APK and original-sequence Redmi retest after preflight"
+    ],
+    "explicitExclusions": [
+      "New screens/routes/services",
+      "WhatsApp",
+      "Codex/shared source",
+      "real transactions",
+      "integration",
+      "production app"
+    ],
+    "dependenciesAndApprovals": [
+      "Founder-approved continuous Redmi UAT and necessary fixes",
+      "Existing clean audit source checkpoint",
+      "Unavailable backend verification remains explicitly blocked"
+    ],
+    "testAndEvidencePlan": [
+      "Original screenshots/XML preserved",
+      "Focused reproduction before correction",
+      "Normal/enlarged text and safe-area assertions",
+      "Two affected connected regressions",
+      "Mandatory gates and exact pushed SHA",
+      "Unique review candidate identity and Redmi replay"
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md"
+  },
+  "authorization": {
+    "state": "existing_ticket_authority_confirmed",
+    "beyondMvpExplicitlyAuthorized": false,
+    "evidence": "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md"
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "externalServiceWriteAuthorized": false
+  }
+}

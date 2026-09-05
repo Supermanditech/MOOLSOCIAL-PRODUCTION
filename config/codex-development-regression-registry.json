@@ -100844,6 +100844,825 @@
   "prevention": "Verify the exact accepted Git blob and record inventory in each new worktree, then bind the actual local raw SHA. Do not treat newline-only checkout differences as source loss or weaken the hash gate. Preserve every existing record; use the refreshed count/SHA for subsequent gates.",
   "gates": ["scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-codex-development-regression-memory.ps1"],
   "evidence": ["docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md"]
+},
+{
+  "id": "REG-20260905-4498-CURSOR-R66-LANDSCAPE-CATALOGUE-FIT",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-001: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4499-CURSOR-R66-PREPARING-DELIVERED-COPY",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-002: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4500-CURSOR-R66-PRODUCT-DETAIL-REPETITION",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-003: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4501-CURSOR-R66-FLOATING-CART-ACTION-OBSTRUCTION",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-004: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4502-CURSOR-R66-CART-ACK-SCOPE-COUNT",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-005: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4503-CURSOR-R66-CART-DRAG-DISPLACEMENT",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-006: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4504-CURSOR-R66-NESTED-STORE-CART-BACK",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-007: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4505-CURSOR-R66-STORE-QUANTITY-TARGETS",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-008: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4506-CURSOR-R66-PAYMENT-ACTION-LABEL-FIT",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-009: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4507-CURSOR-R66-REVIEW-PURCHASE-ID-COLLISION",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-010: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4508-CURSOR-R66-UNASSIGNED-DELIVERY-ROUTE-PROGRESS",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-011: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4509-CURSOR-R66-IMMUTABLE-ORDER-ADDRESS-DISPLAY",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-012: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4510-CURSOR-R66-ORDER-PRODUCT-RETURN-LABEL",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-013: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4511-CURSOR-R66-BUY-CONSUMER-SEMANTIC-COPY",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-014: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4512-CURSOR-R66-ITEM-RESOLUTION-POLICY-CONTEXT",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-015: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4513-CURSOR-R66-SPARSE-PRODUCT-GRID",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-016: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4514-CURSOR-R66-SAVED-PRODUCT-RETURN",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-017: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4515-CURSOR-R66-SAVED-CLEAR-ANDROID-SAFE-AREA",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-018: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4516-CURSOR-R66-QUICK-PROMISE-CONSISTENCY",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-019: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4517-CURSOR-R66-EMPTY-RESULT-FILTER-RECOVERY",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-020: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4518-CURSOR-R66-SCANNER-CAPABILITY-FEEDBACK",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-021: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4519-CURSOR-R66-MANUAL-CODE-EMPTY-VALIDATION",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-022: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4520-CURSOR-R66-CART-STORE-CROSS-SCOPE-RETURN",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-023: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4521-CURSOR-R66-PAYMENT-HANDOFF-FAIL-CLOSED",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-024: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4522-CURSOR-R66-SUPPLIER-CATALOGUE-ORIGIN-SKU",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-025: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4523-CURSOR-R66-STORE-CART-INVISIBLE-HIT-AREA",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-026: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4524-CURSOR-R66-PAYMENT-OFFER-APPLIED-STATE",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-027: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4525-CURSOR-R66-SCALED-CART-AMOUNT-CLIPPING",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-028: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4526-CURSOR-R66-SCALED-BUY-ACTION-HEIGHT",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-029: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4527-CURSOR-R66-RECENT-CARD-SCALED-OVERFLOW",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-030: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4528-CURSOR-R66-SCANNER-KEYBOARD-SCALED-ACTIONS",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-031: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4529-CURSOR-R66-MONTHLY-BASKET-PRICE-SCOPE",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-032: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4530-CURSOR-R66-SHOPPING-ALERT-RETURN",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-033: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4531-CURSOR-R66-COMPARE-ALTERNATE-RETURN",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-034: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4532-CURSOR-R66-DELIVERY-PREFERENCE-SESSION-TRUTH",
+  "status": "registered_device_observation_diagnosis_pending",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence",
+    "device"
+  ],
+  "mistake": "R66-UAT-035: current Redmi r66.1 exposes the documented consumer defect; implementation and retest remain pending.",
+  "rootCause": "The exact current-candidate reproduction and owner boundary are recorded in DEFECTS.md. Code-level diagnosis must distinguish inherited source, review-data and shared/backend dependencies before correction.",
+  "prevention": "Preserve the original PNG/XML/JSON evidence; reproduce with a focused test, fix only the exact claimed Buy owner, retain accessibility and truthful provider data, and replay the original Redmi sequence. Do not reuse historical UAT passes or mark absent live adapters passed.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md"
+  ]
+},
+{
+  "id": "REG-20260905-4533-CURSOR-R66-EVIDENCE-FOREGROUND-IDENTITY",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Capture 061 incorrectly labelled Android DocumentsUI as the originating review package; the preserved original is corrected by E02 and fresh 062.",
+  "rootCause": "The helper matched older mResumedActivity rather than the unique topResumedActivity.",
+  "prevention": "Require one exact top-resumed surface before and after capture; record actual and originating packages separately. Missing XML is not a device pass. Preserve failed 021 and original 061 unchanged.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md"
+  ]
+},
+{
+  "id": "REG-20260905-4534-CURSOR-R66-ANDROID-INPUT-PROBE-RESTORATION",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Synthetic MOVE_END and Ctrl+A probes did not remove the intended four-character unsent suffix; no message was sent.",
+  "rootCause": "Desktop-style injected selection was assumed to work in the Android multiline field.",
+  "prevention": "Use observed touch selection, restore exact original text, capture independent readback and never send a test message without recipient authority.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md"
+  ]
+},
+{
+  "id": "REG-20260905-4535-CURSOR-R66-CHECKPOINT-STAGING-AND-ROLE",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Pre-commit was invoked before staging the two audit documents; a subsequent primary invocation incorrectly selected the subagent implementation identity. Both gates rejected before any commit.",
+  "rootCause": "The checkpoint sequence and coordinator versus implementation role parameters were confused during resume.",
+  "prevention": "Stage only exact reviewed owners before pre_commit; use the recorded Cursor continuation for implementation checks and the existing primary owner allowance for narrow coordination. Do not weaken or rewrite gate behaviour.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md"
+  ]
+},
+{
+  "id": "REG-20260905-4536-CURSOR-R66-READONLY-OWNER-DISCOVERY",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Several read-only source searches included guessed nonexistent Buy paths before discovery of the real owners.",
+  "rootCause": "File names were inferred rather than obtained from directory or rg inventory.",
+  "prevention": "Discover literal owners first; retain native nonzero results, then read the actual session/catalogue/views contract. Never treat a failed guessed path as complete diagnosis.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md",
+    "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md"
+  ]
 }
   ]
 }

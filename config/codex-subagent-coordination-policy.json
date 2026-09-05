@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4463,
-    "sha256": "F7C0E024CD6EEDF64A9326B5ED8ECE7EC48FE2035BA597562F6629D17A453C10"
+    "entryCount": 4502,
+    "sha256": "199715866A351B0508E155CEDB03D6B24E223D34AD83741FE2545CE746D54C7F"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -37,19 +37,54 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-codex-subagent-coordination-policy.ps1",
-        "docs/quality/UAW-CURSOR-BUY-REDMI-UAT-V1-20260905.md",
-        "docs/quality/cursor-buy-redmi-uat-v1-20260905/scope-state.json"
+        "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+        "docs/quality/cursor-buy-redmi-fixes-v1-20260905/scope-state.json"
       ]
     },
     {
-      "task": "/root/cursor_buy_redmi_uat_v1_20260905",
+      "task": "/root/cursor_buy_redmi_fixes_v1_20260905",
       "role": "subagent",
       "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_saved_clear_sheet_motion_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_manual_code_sheet_motion_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shopping_settings_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_decision_glance_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_discovery_refinement_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
         "docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md",
         "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md",
         "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
         "docs/quality/cursor-buy-redmi-uat-v1-20260905/candidate-state.json",
-        "docs/quality/cursor-buy-redmi-uat-v1-20260905/source-manifest.sha256"
+        "docs/quality/cursor-buy-redmi-uat-v1-20260905/source-manifest.sha256",
+        "docs/quality/cursor-buy-redmi-fixes-v1-20260905/RESULTS.md"
       ]
     }
   ],
@@ -1504,6 +1539,29 @@
           "scripts/test-codex-integration-repair-coordination-policy.ps1"
         ],
         "cursorIndependent": false,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_buy_redmi_fixes_v1_20260905",
+        "state": "founder_authorized_2026_09_05",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_buy_redmi_fixes_v1_20260905",
+        "workId": "buy-redmi-fixes-v1-20260905",
+        "ticketId": "UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-redmi-fixes-v1-20260905",
+        "branch": "work/cursor-ui/buy-redmi-fixes-v1-20260905",
+        "baselineHead": "a09a2ecccf1e701a60117bdf34aa6a732cb132e2",
+        "bootstrapCommitSubject": "coordination(buy-redmi-fixes-v1-20260905): bind observed Buy corrections after fresh Redmi audit",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+          "docs/quality/cursor-buy-redmi-fixes-v1-20260905/scope-state.json",
+          "docs/quality/cursor-buy-redmi-fixes-v1-20260905/RESULTS.md"
+        ],
+        "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
       },
       {
