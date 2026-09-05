@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4467,
-    "sha256": "E1ABABDC25747FAD69749D87F9425EB457BF6B17BF36CC4D81BF03586DEBCF06"
+    "sha256": "DF4C4BA1BD0A71BE4ED5B516359945B1128E4575AB987377B4A9E2483A2AE8F2"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -63,6 +63,8 @@
         "artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md",
         "artifacts/quality/codex-oppo-r66-1-review-20260905/motion-disposition.md",
         "artifacts/quality/codex-oppo-r66-1-review-20260905/apk-regression-state.json",
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/uaw-codex-oppo-r66.1-review-20260905-build-provenance.txt",
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/post-install.json",
         "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
         "docs/quality/UAW-CODEX-WORK-OPPORTUNITY-ROUTE-CONTRACT-V1-20260905.md",
         "config/codex-development-regression-registry.json",

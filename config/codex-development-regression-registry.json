@@ -64,8 +64,8 @@
       "status": "prebuild_read_only_detection_exact_binding_correction",
       "appliesTo": ["primary", "implementation", "build", "evidence"],
       "mistake": "Candidate preparation guessed a device-review-debug-manifest.txt filename and omitted the APK owner. Reading the unchanged guarded wrapper established its real build-provenance.txt filename before any build or evidence output occurred.",
-      "rootCause": "The candidate's exact output list was drafted before verifying the wrapper's artifactPath and manifestPath declarations.",
-      "prevention": "Bind only this candidate's actual APK and build-provenance paths, retain the existing wrapper unchanged, and activate claims only once evidence exists. Keep exact branch/task/work/ticket and baseline restrictions. Do not create a new runner or directory-wide exception.",
+      "rootCause": "The candidate's exact output list was drafted before verifying the wrapper's artifactPath and manifestPath declarations. The same caller-binding error later omitted already committed owners from ClaimedOwners, then compared the APK version to the base build name without its existing -runtime suffix; each check stopped before its downstream build/install action.",
+      "prevention": "Bind only this candidate's actual APK and build-provenance paths, retain the existing wrapper unchanged, and activate claims only once evidence exists. Supply the complete committed/current/untracked owner union, not only dirty files. Verify the actual manifest package/versionCode/versionName against the source-defined debug suffix: com.moolsocial.app.runtime, 2026090501, 1.0.0-r66.1-runtime. Never rebuild or loosen the package check for this caller mismatch. Keep exact branch/task/work/ticket and baseline restrictions. Do not create a new tracked runner or directory-wide exception.",
       "gates": ["scripts/build-buy-device-review.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
       "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/candidate-contract.md"]
     },

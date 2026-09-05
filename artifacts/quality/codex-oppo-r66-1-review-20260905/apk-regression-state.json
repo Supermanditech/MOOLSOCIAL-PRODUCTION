@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "prebuild_pending",
-  "buildAuthorization": "not_activated",
+  "machineState": "installed_awaiting_founder_review",
+  "buildAuthorization": "consumed",
   "preBuildValidation": {
-    "state": "pending",
+    "state": "passed",
     "evidence": "artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md"
   },
   "candidate": {
@@ -14,7 +14,7 @@
     "buildMode": "debug",
     "gateProfile": "uaw_runtime_ui_review_debug",
     "branch": "work/codex-ui/codex-oppo-review-v1-20260905",
-    "head": "66213baca34ac6219b1cdf34242a48ec41465975"
+    "head": "06f320339d52305f3339ded985550d0bd9ad7446"
   },
   "source": {
     "manifestPath": "artifacts/quality/codex-oppo-r66-1-review-20260905/source-manifest.txt",
@@ -30,7 +30,99 @@
   "promotion": {
     "state": "forbidden_non_promotable"
   },
-  "preBuildGates": [],
+  "preBuildGates": [
+    {
+      "id": "branch-head",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md"
+      ]
+    },
+    {
+      "id": "source-manifest",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/source-manifest.txt"
+      ]
+    },
+    {
+      "id": "format-analysis",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"
+      ]
+    },
+    {
+      "id": "focused-tests",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"
+      ]
+    },
+    {
+      "id": "positive-release-gates",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md"
+      ]
+    },
+    {
+      "id": "protected-boundary-disposition",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/candidate-contract.md"
+      ]
+    },
+    {
+      "id": "rejected-candidate-preserved",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/candidate-contract.md"
+      ]
+    },
+    {
+      "id": "startup-config-regression-registered",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md"
+      ]
+    },
+    {
+      "id": "buy-regression-1",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"
+      ]
+    },
+    {
+      "id": "buy-regression-2",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"
+      ]
+    },
+    {
+      "id": "clean-state-regression",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md"
+      ]
+    },
+    {
+      "id": "wrapper-self-test",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md"
+      ]
+    },
+    {
+      "id": "package-isolation",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md"
+      ]
+    }
+  ],
   "premiumMotionPolicy": {
     "state": "audited_for_r66_1",
     "policy": "config/buy-premium-motion-policy.json",
@@ -52,11 +144,14 @@
   "postBuildGates": [
     {
       "id": "apk-integrity",
-      "state": "pending"
+      "state": "passed",
+      "evidence": "artifacts/quality/codex-oppo-r66-1-review-20260905/uaw-codex-oppo-r66.1-review-20260905-build-provenance.txt",
+      "sha256": "8946FC59898A5BF3F81B84A6E3329F55E2DBE0BB174A04F955983898993F4F45"
     },
     {
       "id": "oppo-install",
-      "state": "pending"
+      "state": "passed",
+      "evidence": "artifacts/quality/codex-oppo-r66-1-review-20260905/post-install.json"
     },
     {
       "id": "founder-review",
