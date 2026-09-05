@@ -4341,88 +4341,116 @@ class BuyV2StoreCartBar extends StatelessWidget {
       onOpenCart();
     }
 
-    return Semantics(
-      key: const ValueKey('buy-store-cart-bar'),
-      container: true,
-      button: true,
-      liveRegion: true,
-      label: '$message. ${buyV2Money(total)}. View Cart',
-      onTap: activate,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: activate,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: SizedBox(
-              width: 160,
-              child: Container(
-                height: 44,
-                margin: const EdgeInsets.fromLTRB(8, 3, 8, 4),
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
+    const messageStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 9,
+      fontWeight: FontWeight.w900,
+    );
+    const totalStyle = TextStyle(
+      color: Colors.white70,
+      fontSize: 8,
+      fontWeight: FontWeight.w700,
+    );
+    final totalText = buyV2Money(total);
+    final messageSize = buyV2ValueTextSize(
+      context,
+      visibleMessage,
+      messageStyle,
+    );
+    final totalSize = buyV2ValueTextSize(context, totalText, totalStyle);
+    final valueWidth = messageSize.width > totalSize.width
+        ? messageSize.width
+        : totalSize.width;
+    final height = (messageSize.height + totalSize.height + 16)
+        .clamp(44.0, double.infinity)
+        .toDouble();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = (valueWidth + 55)
+            .clamp(
+              88.0,
+              (constraints.maxWidth - 16).clamp(88.0, double.infinity),
+            )
+            .toDouble();
+        return Align(
+          alignment: Alignment.centerRight,
+          heightFactor: 1,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 3, 8, 4),
+            child: Semantics(
+              key: const ValueKey('buy-store-cart-bar'),
+              container: true,
+              button: true,
+              liveRegion: true,
+              label: '$message. $totalText. View Cart',
+              onTap: activate,
+              child: SizedBox(
+                width: width,
+                height: height,
+                child: Material(
                   color: BuyV2Colors.navy,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: BuyV2Colors.royal),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.shopping_cart_outlined,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 5),
-                    SizedBox(
-                      width: 86,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: BuyV2Colors.royal),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: activate,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
                         children: [
-                          LayoutBuilder(
-                            builder: (context, constraints) =>
+                          const Icon(
+                            Icons.shopping_cart_outlined,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 BuyV2FiniteValueTransition(
                                   key: const ValueKey(
                                     'buy-store-cart-feedback',
                                   ),
                                   stateKey: message,
                                   text: visibleMessage,
-                                  ownerSize: Size(constraints.maxWidth, 13),
+                                  ownerSize: Size(
+                                    width - 55,
+                                    messageSize.height,
+                                  ),
                                   textAlign: TextAlign.start,
                                   duration: BuyV2Motion.contentChange,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w900,
-                                  ),
+                                  style: messageStyle,
                                 ),
-                          ),
-                          Text(
-                            buyV2Money(total),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 8,
-                              fontWeight: FontWeight.w700,
+                                Text(
+                                  totalText,
+                                  key: const ValueKey('buy-store-cart-total'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: totalStyle,
+                                ),
+                              ],
                             ),
+                          ),
+                          const SizedBox(width: 3),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            color: Colors.white,
+                            size: 15,
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 3),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: Colors.white,
-                      size: 15,
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

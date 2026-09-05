@@ -16,6 +16,27 @@ final NumberFormat _buyV2Currency = NumberFormat.currency(
 
 String buyV2Money(num value) => _buyV2Currency.format(value);
 
+/// Natural bounds for a current value using the same inherited font and scaler
+/// as its Text. Callers still own available width, placement and tap targets.
+Size buyV2ValueTextSize(BuildContext context, String text, TextStyle style) {
+  final painter = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: DefaultTextStyle.of(context).style.merge(style),
+    ),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+    locale: Localizations.maybeLocaleOf(context),
+    maxLines: 1,
+  )..layout();
+  final size = Size(
+    painter.width.ceilToDouble(),
+    painter.height.ceilToDouble(),
+  );
+  painter.dispose();
+  return size;
+}
+
 /// Converts the server-owned delivery fact into one compact buyer promise.
 ///
 /// Google route duration is only one upstream input. This presentation helper

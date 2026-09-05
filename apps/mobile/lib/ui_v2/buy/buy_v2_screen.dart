@@ -1915,7 +1915,6 @@ class _BuyMiniCartBar extends StatefulWidget {
 
 class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
   static const _edgeInset = 8.0;
-  static const _cartHeight = 48.0;
   Offset? _position;
 
   @override
@@ -1974,6 +1973,20 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
     final itemText = '$itemCount $itemLabel';
     final totalText = buyV2Money(total);
     final cartMessage = session.cartAcknowledgement ?? '$itemText ready';
+    const itemStyle = TextStyle(
+      color: Colors.white70,
+      fontSize: 8.5,
+      height: 1,
+      fontWeight: FontWeight.w800,
+    );
+    const totalStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 12.5,
+      height: 1,
+      fontWeight: FontWeight.w900,
+    );
+    final itemSize = buyV2ValueTextSize(context, itemText, itemStyle);
+    final totalSize = buyV2ValueTextSize(context, totalText, totalStyle);
 
     void activate() {
       HapticFeedback.selectionClick();
@@ -1984,28 +1997,28 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
       builder: (context, constraints) {
         final available = constraints.biggest;
         final maximumWidth = (available.width - (_edgeInset * 2)).clamp(
-          132.0,
-          240.0,
+          88.0,
+          double.infinity,
         );
-        final textScale = MediaQuery.textScalerOf(
-          context,
-        ).scale(1).clamp(1.0, 1.4);
-        final cartWidth = (112 + totalText.length * 6.5 * textScale).clamp(
-          132.0,
-          maximumWidth,
-        );
-        final cartSize = Size(cartWidth, _cartHeight);
+        final textWidth = itemSize.width > totalSize.width
+            ? itemSize.width
+            : totalSize.width;
+        final cartWidth = (textWidth + 40).clamp(88.0, maximumWidth).toDouble();
+        final cartHeight = (itemSize.height + totalSize.height + 18)
+            .clamp(48.0, double.infinity)
+            .toDouble();
+        final cartSize = Size(cartWidth, cartHeight);
         final currentPosition = _clampPosition(
           _position ?? _defaultPosition(available, cartSize),
           available,
           cartSize,
         );
-        final valueWidth = cartWidth - 52;
+        final valueWidth = cartWidth - 40;
 
         void move(DragUpdateDetails details) {
           setState(() {
             _position = _clampPosition(
-              currentPosition + details.delta,
+              (_position ?? currentPosition) + details.delta,
               available,
               cartSize,
             );
@@ -2041,7 +2054,7 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
                   onPanCancel: finishMove,
                   child: SizedBox(
                     width: cartWidth,
-                    height: _cartHeight,
+                    height: cartHeight,
                     child: Material(
                       color: BuyV2Colors.navy,
                       elevation: 3,
@@ -2088,28 +2101,24 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
                                     ),
                                     stateKey: '$cartMessage|$itemCount|$total',
                                     text: itemText,
-                                    ownerSize: Size(valueWidth, 14),
-                                    textAlign: TextAlign.start,
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 8.5,
-                                      height: 1,
-                                      fontWeight: FontWeight.w800,
+                                    ownerSize: Size(
+                                      valueWidth,
+                                      itemSize.height,
                                     ),
+                                    textAlign: TextAlign.start,
+                                    style: itemStyle,
                                   ),
                                   const SizedBox(height: 2),
                                   BuyV2FiniteValueTransition(
                                     key: const ValueKey('buy-cart-total'),
                                     stateKey: '$total|$totalText',
                                     text: totalText,
-                                    ownerSize: Size(valueWidth, 18),
-                                    textAlign: TextAlign.start,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12.5,
-                                      height: 1,
-                                      fontWeight: FontWeight.w900,
+                                    ownerSize: Size(
+                                      valueWidth,
+                                      totalSize.height,
                                     ),
+                                    textAlign: TextAlign.start,
+                                    style: totalStyle,
                                   ),
                                 ],
                               ),

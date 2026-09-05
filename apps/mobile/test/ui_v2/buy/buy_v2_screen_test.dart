@@ -1,7 +1,9 @@
 import 'dart:async';
-import 'dart:ui' show SemanticsAction;
+import 'dart:io';
+import 'dart:ui' show SemanticsAction, ImageByteFormat;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -132,6 +134,7 @@ void main() {
     double textScale = 1,
     EdgeInsets safePadding = EdgeInsets.zero,
     bool disableAnimations = false,
+    bool captureCart = false,
     BuyV2ScannerLauncher scannerLauncher = showBuyV2ProductScanner,
     VoidCallback? onOpenMool,
     VoidCallback? onOpenChat,
@@ -152,7 +155,12 @@ void main() {
             viewPadding: safePadding,
             disableAnimations: disableAnimations,
           ),
-          child: child!,
+          child: captureCart
+              ? RepaintBoundary(
+                  key: const ValueKey('r66-cart-capture'),
+                  child: child!,
+                )
+              : child!,
         );
       },
       home: BuyV2Screen(
@@ -2714,7 +2722,7 @@ void main() {
     expect(miniCart, findsOneWidget);
     expect(tester.getSize(surface).height, surfaceHeight);
     expect(tester.getSize(miniCart).height, 48);
-    expect(tester.getSize(miniCart).width, inInclusiveRange(132, 240));
+    expect(tester.getSize(miniCart).width, inInclusiveRange(88, 132));
     expect(
       find.byKey(const ValueKey('buy-mini-cart-transparent-overlay')),
       findsOneWidget,
@@ -2769,6 +2777,197 @@ void main() {
     expect(session.view, BuyV2View.cart);
     expect(miniCart, findsNothing);
   });
+
+  testWidgets('R66 cart drag accumulates every pointer update between frames', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    session.addProduct('s-tomato');
+    session.clearCartAcknowledgement();
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
+    final gesture = await tester.startGesture(tester.getCenter(cart));
+    await gesture.moveBy(const Offset(-30, -30));
+    await tester.pump();
+    final before = tester.getTopLeft(cart);
+    for (var update = 0; update < 5; update++) {
+      await gesture.moveBy(const Offset(-8, -12));
+    }
+    await tester.pump();
+    expect(tester.getTopLeft(cart).dx, closeTo(before.dx - 40, .1));
+    expect(tester.getTopLeft(cart).dy, closeTo(before.dy - 60, .1));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.catalogue);
+    await tester.tap(cart);
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.cart);
+    expect(session.cartScope, BuyV2CartScope.shop);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('R66 store cart only intercepts its visible compact control', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    session.addProduct('s-tomato');
+    var opened = 0;
+    var background = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => background++,
+                  child: const ColoredBox(color: Colors.white),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 24,
+                child: BuyV2StoreCartBar(
+                  session: session,
+                  destination: BuyV2Destination.shop,
+                  onOpenCart: () => opened++,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final bar = find.byKey(const ValueKey('buy-store-cart-bar'));
+    await tester.tapAt(Offset(12, tester.getCenter(bar).dy));
+    expect(background, 1);
+    expect(opened, 0);
+    expect(tester.getSize(bar).width, lessThan(300));
+    await tester.tap(bar);
+    expect(opened, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final total in [1, 10000, 10000000]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'R66 cart display fixture INR$total fits complete text at $scale',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(360, 800));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final session = _R66CartDisplayFixture(total);
+          addTearDown(session.dispose);
+          session.addProduct('w-notebook');
+          session.clearCartAcknowledgement();
+          await tester.pumpWidget(
+            app(
+              session,
+              textScale: scale,
+              captureCart: const bool.fromEnvironment('BUY_R66_CART_CAPTURE'),
+            ),
+          );
+          await tester.pumpAndSettle();
+          session.openDestination(BuyV2Destination.wholesale);
+          await tester.pumpAndSettle();
+          await _captureR66Cart(tester, 'root-inr$total-text$scale');
+          for (final key in ['buy-cart-summary', 'buy-cart-total']) {
+            final value = tester.widget<BuyV2FiniteValueTransition>(
+              find.byKey(ValueKey(key)),
+            );
+            final painter = TextPainter(
+              text: TextSpan(
+                text: value.text,
+                style: value.style.copyWith(fontFamily: 'Inter'),
+              ),
+              textDirection: TextDirection.ltr,
+              textScaler: TextScaler.linear(scale),
+              maxLines: 1,
+            )..layout();
+            expect(
+              value.ownerSize.height,
+              greaterThanOrEqualTo(painter.height),
+            );
+            expect(value.ownerSize.width, greaterThanOrEqualTo(painter.width));
+            painter.dispose();
+          }
+          expect(
+            tester
+                .widget<BuyV2FiniteValueTransition>(
+                  find.byKey(const ValueKey('buy-cart-total')),
+                )
+                .text,
+            buyV2Money(total),
+          );
+          expect(
+            tester
+                .getSize(
+                  find.byKey(const ValueKey('buy-compact-cart-indicator')),
+                )
+                .width,
+            lessThanOrEqualTo(344),
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: const bool.fromEnvironment('BUY_R66_CART_CAPTURE')
+                    ? RepaintBoundary(
+                        key: const ValueKey('r66-cart-capture'),
+                        child: child!,
+                      )
+                    : child!,
+              ),
+              home: Scaffold(
+                body: Align(
+                  alignment: Alignment.bottomRight,
+                  child: BuyV2StoreCartBar(
+                    session: session,
+                    destination: BuyV2Destination.wholesale,
+                    onOpenCart: () {},
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final store = find.byKey(const ValueKey('buy-store-cart-bar'));
+          await _captureR66Cart(tester, 'store-inr$total-text$scale');
+          final amount = find.byKey(const ValueKey('buy-store-cart-total'));
+          expect(tester.widget<Text>(amount).data, buyV2Money(total));
+          expect(
+            tester.renderObject<RenderParagraph>(amount).didExceedMaxLines,
+            isFalse,
+          );
+          expect(
+            tester.getRect(store).contains(tester.getTopLeft(amount)),
+            isTrue,
+          );
+          expect(
+            tester.getBottomRight(amount).dy,
+            lessThanOrEqualTo(tester.getRect(store).bottom),
+          );
+          expect(tester.getSize(store).width, lessThanOrEqualTo(344));
+          expect(tester.getSize(store).height, greaterThanOrEqualTo(44));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
 
   testWidgets(
     'Cart stays destination-scoped in Shop and Wholesale and aggregate in Orders',
@@ -6163,6 +6362,41 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+// Display geometry only; real session arithmetic is covered by connected tests.
+Future<void> _captureR66Cart(WidgetTester tester, String label) async {
+  if (!const bool.fromEnvironment('BUY_R66_CART_CAPTURE')) return;
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('r66-cart-capture')),
+  );
+  await tester.runAsync(() async {
+    final directory = Directory('build/r66-cart-review-v1-20260905');
+    await directory.create(recursive: true);
+    final output = File('${directory.path}/$label.png');
+    if (await output.exists()) {
+      throw StateError('Cart capture already exists');
+    }
+    final image = await boundary.toImage(pixelRatio: 2);
+    try {
+      final data = await image.toByteData(format: ImageByteFormat.png);
+      if (data == null) throw StateError('Cart capture encoding failed');
+      await output.writeAsBytes(data.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
+  });
+}
+
+class _R66CartDisplayFixture extends BuyV2Session {
+  _R66CartDisplayFixture(this.displayTotal) : super(core: BuySession());
+  final int displayTotal;
+
+  @override
+  int totalForDestination(BuyV2Destination value) => displayTotal;
+
+  @override
+  int get cartTotal => displayTotal;
 }
 
 void _expectCustomerFacingBuyCopy(WidgetTester tester) {
