@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -6,9 +7,137 @@ import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R66 current delivery filter is truthful at $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.viewPadding = const FakeViewPadding(bottom: 32);
+      tester.view.padding = const FakeViewPadding(bottom: 32);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      session.addProduct('s-milk');
+      final quantity = session.quantityFor('s-milk');
+
+      Future<void> openSettings(BuyV2Session current) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            key: ObjectKey(current),
+            theme: MoolTheme.light(),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showBuyV2ShoppingSettings(context, current),
+                  child: const Text('Open settings'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Open settings'));
+        await tester.pumpAndSettle();
+      }
+
+      Future<void> openFilter() async {
+        final settings = find.byKey(const ValueKey('buy-shopping-settings'));
+        final row = find.byKey(const ValueKey('buy-settings-delivery'));
+        await tester.scrollUntilVisible(
+          row,
+          120,
+          scrollable: find
+              .descendant(of: settings, matching: find.byType(Scrollable))
+              .first,
+        );
+        expect(
+          find.descendant(of: row, matching: find.text('Delivery filter')),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Preferred delivery'), findsNothing);
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        expect(find.text('For current browsing only.'), findsOneWidget);
+        expect(find.text('No preference'), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+
+      await openSettings(session);
+      for (final option in [
+        ('quick-local', BuyV2FulfilmentMode.quickLocal),
+        ('standard-courier', BuyV2FulfilmentMode.standardCourier),
+        ('bulk-freight', BuyV2FulfilmentMode.bulkFreight),
+        ('any', null),
+      ]) {
+        await openFilter();
+        final action = find.byKey(
+          ValueKey('buy-settings-delivery-${option.$1}'),
+        );
+        await tester.scrollUntilVisible(
+          action,
+          100,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.pumpAndSettle();
+        final bounds = tester.getRect(action);
+        expect(bounds.height, greaterThanOrEqualTo(44));
+        expect(bounds.bottom, lessThanOrEqualTo(668));
+        final text = find.descendant(
+          of: action,
+          matching: find.byType(RichText),
+        );
+        for (final paragraph in tester.renderObjectList<RenderParagraph>(
+          text,
+        )) {
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final topLeft = paragraph.localToGlobal(Offset.zero);
+          expect(topLeft.dy, greaterThanOrEqualTo(bounds.top));
+          expect(
+            topLeft.dy + paragraph.size.height,
+            lessThanOrEqualTo(bounds.bottom),
+          );
+        }
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(session.selectedFulfilmentMode, option.$2);
+        expect(session.quantityFor('s-milk'), quantity);
+        expect(
+          find.byKey(const ValueKey('buy-shopping-settings')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      }
+      await openFilter();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.selectedFulfilmentMode, isNull);
+      session.chooseFulfilmentMode(BuyV2FulfilmentMode.quickLocal);
+      final freshCore = BuySession();
+      final fresh = BuyV2Session(core: freshCore);
+      addTearDown(freshCore.dispose);
+      addTearDown(fresh.dispose);
+      await openSettings(fresh);
+      await openFilter();
+      expect(fresh.selectedFulfilmentMode, isNull);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-settings-delivery-any')),
+          matching: find.text('All delivery types'),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('shopping settings reuse owners and fit at 320 large text', (
     tester,

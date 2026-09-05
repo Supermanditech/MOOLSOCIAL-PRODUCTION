@@ -2793,8 +2793,8 @@ class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
         final savedCount =
             session.savedCountFor(BuyV2Destination.shop) +
             session.savedCountFor(BuyV2Destination.wholesale);
-        final preferredDelivery = session.selectedFulfilmentMode == null
-            ? 'No preference'
+        final deliveryFilter = session.selectedFulfilmentMode == null
+            ? 'All delivery types'
             : buyV2FulfilmentModeLabel(session.selectedFulfilmentMode!);
         return SafeArea(
           top: false,
@@ -2841,9 +2841,9 @@ class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
                 _ShoppingSettingsRow(
                   key: const ValueKey('buy-settings-delivery'),
                   icon: Icons.local_shipping_outlined,
-                  title: 'Preferred delivery',
-                  detail: preferredDelivery,
-                  onTap: () => _showBuyV2DeliveryPreference(context, session),
+                  title: 'Delivery filter',
+                  detail: deliveryFilter,
+                  onTap: () => _showBuyV2DeliveryFilter(context, session),
                 ),
                 const SizedBox(height: 12),
                 const _ShoppingSettingsHeading('Orders and activity'),
@@ -3051,7 +3051,7 @@ class _ShoppingSettingsRow extends StatelessWidget {
   );
 }
 
-Future<void> _showBuyV2DeliveryPreference(
+Future<void> _showBuyV2DeliveryFilter(
   BuildContext context,
   BuyV2Session session,
 ) async {
@@ -3074,12 +3074,14 @@ Future<void> _showBuyV2DeliveryPreference(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
         children: [
           Text(
-            'Preferred delivery',
+            'Delivery filter',
             style: sheetContext.buyTitle.copyWith(fontSize: 18),
           ),
           const SizedBox(height: 5),
+          Text('For current browsing only.', style: sheetContext.buyMeta),
+          const SizedBox(height: 5),
           for (final option in <(String, BuyV2FulfilmentMode?, String)>[
-            ('any', null, 'No preference'),
+            ('any', null, 'All delivery types'),
             (
               'quick-local',
               BuyV2FulfilmentMode.quickLocal,
