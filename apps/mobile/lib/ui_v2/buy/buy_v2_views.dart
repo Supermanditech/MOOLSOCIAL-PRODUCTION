@@ -486,7 +486,11 @@ class BuyV2ProductView extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(10, 8, 10, wholesale ? 112 : 104),
             children: [
               _ReturnAffordance(
-                label: returnLabel ?? product.destination.label,
+                label:
+                    returnLabel ??
+                    session.productReturnLabel ??
+                    product.destination.label,
+                minimumHeight: 44,
                 onTap: onReturn ?? session.closeProduct,
               ),
               const SizedBox(height: 7),

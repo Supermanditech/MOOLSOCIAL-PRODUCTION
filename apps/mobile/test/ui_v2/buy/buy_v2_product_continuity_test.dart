@@ -58,6 +58,77 @@ void main() {
 
   for (final productId in ['s-tomato', 'w-notebook']) {
     for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'R66 order product Back is contextual for $productId at $scale',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(320, 844));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          session.addProduct(productId);
+          session.openCart();
+          expect(session.openCheckout(), isTrue);
+          expect(session.confirmOrder(), isTrue);
+          final order = session.confirmedOrders.single;
+          await tester.pumpWidget(app(session, textScale: scale));
+          expect(session.openTracking(order.id), isTrue);
+          await tester.pumpAndSettle();
+          final items = find.text('Items');
+          await tester.scrollUntilVisible(
+            items,
+            240,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await tester.tap(items);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.orderItems);
+          for (final androidBack in [false, true]) {
+            final sku = find.byKey(ValueKey('buy-order-product-$productId'));
+            await tester.scrollUntilVisible(
+              sku,
+              160,
+              scrollable: find.byType(Scrollable).last,
+            );
+            await tester.tap(sku);
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.product);
+            final back = find.widgetWithText(InkWell, 'Order items');
+            expect(back, findsOneWidget);
+            expect(tester.getSize(back).height, greaterThanOrEqualTo(44));
+            expect(tester.getRect(back).right, lessThanOrEqualTo(320));
+            if (androidBack) {
+              await tester.binding.handlePopRoute();
+            } else {
+              await tester.tap(back);
+            }
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.orderItems);
+            expect(session.selectedOrderId, order.id);
+            expect(session.selectedOrder.total, order.total);
+            expect(session.quantityFor(productId), 0);
+            expect(find.text('Items in this order'), findsOneWidget);
+            expect(tester.takeException(), isNull);
+          }
+          session.openDestination(session.product(productId).destination);
+          session.openProduct(productId);
+          await tester.pumpAndSettle();
+          expect(find.widgetWithText(InkWell, 'Order items'), findsNothing);
+          expect(
+            find.descendant(
+              of: find.byKey(PageStorageKey('buy-product-$productId')),
+              matching: find.text(session.product(productId).destination.label),
+            ),
+            findsOneWidget,
+          );
+        },
+      );
+    }
+  }
+
+  for (final productId in ['s-tomato', 'w-notebook']) {
+    for (final scale in [1.0, 2.0]) {
       testWidgets('R66 Saved return preserves $productId at text $scale', (
         tester,
       ) async {

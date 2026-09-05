@@ -4077,6 +4077,9 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
+  String? get productReturnLabel =>
+      _productReturnView == BuyV2View.orderItems ? 'Order items' : null;
+
   void closeProduct() {
     final previous = _navigationSurfaceIdentity;
     destination = _productReturnDestination;
