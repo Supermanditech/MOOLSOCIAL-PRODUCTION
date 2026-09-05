@@ -20,7 +20,7 @@ void main() {
     BuyV2Destination.wholesale,
   ]) {
     for (final store in [false, true]) {
-      for (final count in [1, 18]) {
+      for (final count in [1, 2, 3, 18]) {
         testWidgets(
           'R66 customer catalogue announcements $destination $store $count',
           (tester) async {
@@ -57,6 +57,10 @@ void main() {
               await tester.pumpAndSettle();
               final grid = find.byKey(
                 const ValueKey('buy-horizontal-product-grid'),
+              );
+              expect(
+                find.byKey(const ValueKey('buy-horizontal-product-lane-1')),
+                count <= 3 ? findsNothing : findsOneWidget,
               );
               String announcement() =>
                   tester.getSemantics(grid).getSemanticsData().label;

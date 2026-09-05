@@ -1532,6 +1532,7 @@ class _SearchProductResults extends StatelessWidget {
                 tileHeight: layout.tileHeight,
                 storageKey:
                     'buy-search-horizontal-${session.destination.name}-$query',
+                laneCount: products.length <= layout.columns ? 1 : null,
               ),
             ),
           ],
@@ -5806,7 +5807,9 @@ class _ProductGrid extends StatelessWidget {
                       'buy-products-horizontal-${session.destination.name}-'
                       '${session.selectedCategoryId}-${savedOnly ? 'saved' : 'all'}',
                   compact: compactCards,
-                  laneCount: savedOnly ? 1 : null,
+                  laneCount: savedOnly || gridProducts.length <= layout.columns
+                      ? 1
+                      : null,
                   savedContext: savedOnly,
                 ),
               ),
@@ -6260,7 +6263,8 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
           tileHeight: layout.tileHeight,
           storageKey: storageKey,
           compact: true,
-          laneCount: laneCount,
+          laneCount:
+              laneCount ?? (products.length <= layout.columns ? 1 : null),
           savedContext: savedContext,
           semanticLabel: semanticLabel,
           onOpenProduct: onOpenProduct,

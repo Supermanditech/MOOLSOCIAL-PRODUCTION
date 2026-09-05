@@ -1,6 +1,8 @@
-import 'dart:ui' show SemanticsAction;
+import 'dart:io';
+import 'dart:ui' show SemanticsAction, ImageByteFormat;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -26,7 +28,10 @@ void main() {
             disableAnimations: disableAnimations,
             textScaler: TextScaler.linear(textScale),
           ),
-          child: child!,
+          child: RepaintBoundary(
+            key: const ValueKey('r66-sparse-search-capture'),
+            child: child!,
+          ),
         );
       },
       home: BuyV2Screen(
@@ -34,6 +39,86 @@ void main() {
         initialDestination: session.destination,
       ),
     );
+  }
+
+  for (final width in [320.0, 390.0]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final keyboard in [0.0, 280.0]) {
+        testWidgets('R66 sparse search $width $scale keyboard $keyboard', (
+          tester,
+        ) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(width, 844);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          await tester.pumpWidget(app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+          await tester.pumpAndSettle();
+          tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+          await tester.enterText(
+            find.byKey(const ValueKey('buy-search-field')),
+            'tomato',
+          );
+          await tester.pumpAndSettle();
+          final products = session.visibleProducts;
+          expect(products, hasLength(2));
+          final first = find.byKey(ValueKey('buy-product-${products[0].id}'));
+          final second = find.byKey(ValueKey('buy-product-${products[1].id}'));
+          final firstRect = tester.getRect(first);
+          final secondRect = tester.getRect(second);
+          expect(firstRect.top, closeTo(secondRect.top, 0.01));
+          expect(secondRect.left, greaterThan(firstRect.right));
+          expect(secondRect.right, lessThanOrEqualTo(width));
+          expect(
+            find.byKey(const ValueKey('buy-horizontal-product-lane-1')),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+          if (const bool.fromEnvironment('BUY_R66_SPARSE_CAPTURE')) {
+            final boundary = tester.renderObject<RenderRepaintBoundary>(
+              find.byKey(const ValueKey('r66-sparse-search-capture')),
+            );
+            boundary.markNeedsPaint();
+            await tester.pump();
+            await tester.runAsync(() async {
+              final directory = Directory(
+                'build/r66-sparse-search-v2-20260905',
+              );
+              await directory.create(recursive: true);
+              final file = File(
+                '${directory.path}/$width-$scale-$keyboard.png',
+              );
+              if (await file.exists()) throw StateError('Capture exists');
+              final image = await boundary.toImage(pixelRatio: 1);
+              try {
+                final bytes = await image.toByteData(format: ImageByteFormat.png);
+                await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
+              } finally {
+                image.dispose();
+              }
+            });
+          }
+          final add = find.byKey(ValueKey('buy-add-${products[1].id}'));
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
+          expect(tester.getRect(add).bottom, lessThanOrEqualTo(844 - keyboard));
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(products[1].id), 1);
+          await tester.ensureVisible(second);
+          await tester.tap(second);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.product);
+          expect(session.selectedProduct?.id, products[1].id);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
   }
 
   for (final mode in ['quick', 'scheduled', 'wholesale', 'bulk']) {
