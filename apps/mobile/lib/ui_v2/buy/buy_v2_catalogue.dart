@@ -6422,9 +6422,8 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
       liveRegion: true,
       label:
           '${widget.semanticLabel}. Showing ${products.length} of '
-          '${widget.products.length} in $resolvedLaneCount independently '
-          'scrollable ${resolvedLaneCount == 1 ? 'lane' : 'lanes'}. '
-          '${_visibleCount < widget.products.length ? 'More products load near the end.' : 'All products loaded.'}',
+          '${widget.products.length} ${widget.products.length == 1 ? 'product' : 'products'}.'
+          '${widget.products.length > 1 ? ' Swipe left or right to browse.' : ''}',
       child: SizedBox(
         key: ValueKey('buy-progressive-product-count-${widget.storageKey}'),
         height: (widget.tileHeight * resolvedLaneCount) + 14,
@@ -6443,8 +6442,7 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
                     key: ValueKey('buy-horizontal-product-lane-$laneIndex'),
                     container: true,
                     label:
-                        'Product lane ${laneIndex + 1}. '
-                        'Swipe left or right for more.',
+                        'Product row ${laneIndex + 1} of $resolvedLaneCount.',
                     child: NotificationListener<ScrollNotification>(
                       onNotification: _loadNextPage,
                       child: ListView.separated(

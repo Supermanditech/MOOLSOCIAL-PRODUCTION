@@ -15,6 +15,120 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final store in [false, true]) {
+      for (final count in [1, 18]) {
+        testWidgets(
+          'R66 customer catalogue announcements $destination $store $count',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = const Size(390, 844);
+            addTearDown(tester.view.reset);
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            final semantics = tester.ensureSemantics();
+            try {
+              final products = BuyV2Catalogue.products
+                  .where((product) => product.destination == destination)
+                  .take(count)
+                  .toList();
+              expect(products.length, count);
+              await tester.pumpWidget(
+                MaterialApp(
+                  theme: MoolTheme.light(),
+                  home: Scaffold(
+                    body: SingleChildScrollView(
+                      child: BuyV2ProgressiveProductGrid(
+                        session: session,
+                        products: products,
+                        storageKey: 'r66-customer-announcements',
+                        semanticLabel: store ? 'Store products' : 'Products',
+                        storeContext: store,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+              await tester.pumpAndSettle();
+              final grid = find.byKey(
+                const ValueKey('buy-horizontal-product-grid'),
+              );
+              String announcement() =>
+                  tester.getSemantics(grid).getSemanticsData().label;
+              expect(
+                announcement(),
+                contains(
+                  'Showing ${count < 8 ? count : 8} of $count ${count == 1 ? 'product' : 'products'}.',
+                ),
+              );
+              expect(
+                announcement(),
+                isNot(
+                  matches(
+                    RegExp(
+                      r'independently|\blanes?\b|load',
+                      caseSensitive: false,
+                    ),
+                  ),
+                ),
+              );
+              for (final row in tester.widgetList<Semantics>(
+                find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Semantics &&
+                      widget.key is ValueKey<String> &&
+                      (widget.key as ValueKey<String>).value.startsWith(
+                        'buy-horizontal-product-lane-',
+                      ),
+                ),
+              )) {
+                expect(row.properties.label, isNot(contains('lane')));
+                expect(row.properties.label, contains('Product row'));
+              }
+              if (count > 8) {
+                final row = find.byKey(
+                  const ValueKey('buy-horizontal-product-lane-0'),
+                );
+                for (
+                  var attempt = 0;
+                  attempt < 6 &&
+                      !announcement().contains('Showing $count of $count');
+                  attempt++
+                ) {
+                  await tester.drag(row, const Offset(-1600, 0));
+                  await tester.pumpAndSettle();
+                }
+                expect(
+                  announcement(),
+                  contains('Showing $count of $count products.'),
+                );
+                expect(
+                  announcement(),
+                  isNot(
+                    matches(
+                      RegExp(
+                        r'independently|\blanes?\b|load',
+                        caseSensitive: false,
+                      ),
+                    ),
+                  ),
+                );
+              }
+              expect(tester.takeException(), isNull);
+            } finally {
+              semantics.dispose();
+            }
+          },
+        );
+      }
+    }
+  }
+
   Future<void> captureQuantity(WidgetTester tester, String name) async {
     const phase = String.fromEnvironment('BUY_R66_QUANTITY_CAPTURE');
     if (phase.isEmpty) return;

@@ -4896,7 +4896,8 @@ void main() {
       find.byKey(const ValueKey('buy-horizontal-product-grid')),
     );
     expect(grid.properties.label, contains('Showing 1 of 1'));
-    expect(grid.properties.label, contains('All products loaded'));
+    expect(grid.properties.label, contains('Showing 1 of 1 product.'));
+    expect(grid.properties.label, isNot(contains('loaded')));
   });
 
   testWidgets('Offers completes product Cart and Checkout navigation', (
