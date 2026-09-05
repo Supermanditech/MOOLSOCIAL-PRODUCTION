@@ -2117,7 +2117,9 @@ void main() {
         expect(find.textContaining(product.seller), findsWidgets);
         expect(
           find.byKey(ValueKey('buy-shop-seller-action-${product.id}')),
-          findsNothing,
+          testCase.destination == BuyV2Destination.shop
+              ? findsOneWidget
+              : findsNothing,
         );
         expect(
           find.byKey(ValueKey('buy-wholesale-supplier-action-${product.id}')),
@@ -2681,7 +2683,12 @@ void main() {
     expect(session.quantityFor(product.id), 1);
 
     await tester.tap(
-      find.descendant(of: quantity, matching: find.byTooltip('Remove one')),
+      find
+          .descendant(
+            of: find.byKey(ValueKey('buy-product-${product.id}')),
+            matching: find.byTooltip('Remove one'),
+          )
+          .hitTestable(),
     );
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), 0);
@@ -4354,7 +4361,24 @@ void main() {
       expect(find.text('Delivery 2 of 2'), findsOneWidget);
       expect(find.text('Delivery 3 of 3'), findsNothing);
       for (final order in session.confirmedOrders) {
-        expect(find.textContaining(order.promise), findsWidgets);
+        final placedOrder = find.byKey(
+          ValueKey('buy-placed-order-${order.id}'),
+        );
+        expect(placedOrder, findsOneWidget);
+        expect(
+          find.descendant(
+            of: placedOrder,
+            matching: find.textContaining('Arrives · '),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: placedOrder,
+            matching: find.textContaining('Delivered in'),
+          ),
+          findsNothing,
+        );
       }
       expect(
         find.textContaining('Order reference · $purchaseId'),
@@ -5385,11 +5409,8 @@ void main() {
           const PageStorageKey('buy-product-s-eggs'),
         ),
       );
-      await tester.drag(
-        scrollableWithin(const PageStorageKey('buy-product-s-eggs')),
-        const Offset(0, -140),
-      );
       await tester.pumpAndSettle();
+      expect(storeAction.hitTestable(), findsOneWidget);
       await tester.tap(storeAction);
       await tester.pumpAndSettle();
 
@@ -5607,11 +5628,8 @@ void main() {
       220,
       scrollable: scrollableWithin(const PageStorageKey('buy-product-s-eggs')),
     );
-    await tester.drag(
-      scrollableWithin(const PageStorageKey('buy-product-s-eggs')),
-      const Offset(0, -140),
-    );
     await tester.pumpAndSettle();
+    expect(storeAction.hitTestable(), findsOneWidget);
     await tester.tap(storeAction);
     await tester.pumpAndSettle();
 
@@ -5674,7 +5692,11 @@ void main() {
     );
 
     expect(storeAction, findsOneWidget);
-    expect(find.text('1 available product from this store'), findsOneWidget);
+    expect(
+      find.textContaining(session.productFactsFor(tomato).partner),
+      findsWidgets,
+    );
+    expect(storeAction.hitTestable(), findsOneWidget);
     await tester.tap(storeAction);
     await tester.pumpAndSettle();
     expect(
@@ -5755,11 +5777,8 @@ void main() {
       220,
       scrollable: scrollableWithin(const PageStorageKey('buy-product-s-eggs')),
     );
-    await tester.drag(
-      scrollableWithin(const PageStorageKey('buy-product-s-eggs')),
-      const Offset(0, -140),
-    );
     await tester.pumpAndSettle();
+    expect(storeAction.hitTestable(), findsOneWidget);
     await tester.tap(storeAction);
     await tester.pumpAndSettle();
 
@@ -5842,11 +5861,8 @@ void main() {
           const PageStorageKey('buy-product-s-eggs'),
         ),
       );
-      await tester.drag(
-        scrollableWithin(const PageStorageKey('buy-product-s-eggs')),
-        const Offset(0, -140),
-      );
       await tester.pumpAndSettle();
+      expect(storeAction.hitTestable(), findsOneWidget);
       await tester.tap(storeAction);
       await tester.pumpAndSettle();
 
@@ -6199,8 +6215,8 @@ void main() {
       220,
       scrollable: productScroll,
     );
-    await tester.drag(productScroll, const Offset(0, -140));
     await tester.pumpAndSettle();
+    expect(storeAction.hitTestable(), findsOneWidget);
     expect(tester.getCenter(storeAction).dy, lessThan(740));
     await tester.tap(storeAction);
     await tester.pumpAndSettle();

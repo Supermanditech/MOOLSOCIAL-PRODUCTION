@@ -5169,6 +5169,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
 
               final total = BuyV2FiniteValueTransition(
                 key: const ValueKey('buy-cart-payable-total-motion'),
+                incomingOnly: true,
                 stateKey: session.scopedPayableTotal,
                 text: totalText,
                 ownerSize: totalSize,
@@ -14292,6 +14293,7 @@ class _CartScopeBar extends StatelessWidget {
                                 key: ValueKey(
                                   'buy-cart-scope-value-motion-${entry.scope.name}',
                                 ),
+                                incomingOnly: true,
                                 stateKey: entry.text,
                                 text: entry.text,
                                 ownerSize: entry.valueSize,
@@ -16433,6 +16435,7 @@ class _CartLine extends StatelessWidget {
           ),
         BuyV2FiniteValueTransition(
           key: ValueKey('buy-cart-line-total-motion-${product.id}'),
+          incomingOnly: true,
           stateKey: line.total,
           text: lineTotalText,
           ownerSize: lineTotalSize,
@@ -16473,6 +16476,7 @@ class _CartLine extends StatelessWidget {
           ),
           BuyV2FiniteValueTransition(
             key: ValueKey('buy-cart-line-quantity-motion-${product.id}'),
+            incomingOnly: true,
             stateKey: line.quantity,
             text: '${line.quantity}',
             ownerSize: Size(

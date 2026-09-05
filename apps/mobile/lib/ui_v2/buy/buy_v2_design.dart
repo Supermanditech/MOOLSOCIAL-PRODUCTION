@@ -678,6 +678,7 @@ class BuyV2FiniteValueTransition extends StatelessWidget {
     this.textAlign = TextAlign.center,
     this.maxLines = 1,
     this.duration = BuyV2Motion.stateChange,
+    this.incomingOnly = false,
   });
 
   final Object stateKey;
@@ -687,6 +688,7 @@ class BuyV2FiniteValueTransition extends StatelessWidget {
   final TextAlign textAlign;
   final int? maxLines;
   final Duration duration;
+  final bool incomingOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -697,6 +699,31 @@ class BuyV2FiniteValueTransition extends StatelessWidget {
       TextAlign.end => AlignmentDirectional.centerEnd,
       TextAlign.center || TextAlign.justify => Alignment.center,
     };
+    if (incomingOnly) {
+      return SizedBox.fromSize(
+        size: ownerSize,
+        child: Semantics(
+          label: text,
+          excludeSemantics: true,
+          child: Align(
+            alignment: alignment,
+            child: BuyV2FiniteIncomingTransition(
+              stateKey: stateKey,
+              duration: duration,
+              child: Text(
+                text,
+                textAlign: textAlign,
+                maxLines: maxLines,
+                overflow: maxLines == null
+                    ? TextOverflow.clip
+                    : TextOverflow.ellipsis,
+                style: style,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return MoolFiniteStateTransition(
       stateKey: stateKey,
       ownerSize: ownerSize,

@@ -58,6 +58,105 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final scale in [1.0, 2.0]) {
+    for (final reduced in [false, true]) {
+      testWidgets(
+        'R66 028 main Cart money transitions fit Redmi360 text$scale reduced$reduced',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.viewPadding = const FakeViewPadding(bottom: 32);
+          addTearDown(tester.view.reset);
+          final session = _R66PayableDisplayFixture(1);
+          addTearDown(session.dispose);
+          addTearDown(session.core.dispose);
+          session.addProduct('w-notebook');
+          session.openCart(scope: BuyV2CartScope.wholesale);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(scale),
+                  disableAnimations: reduced,
+                ),
+                child: child!,
+              ),
+              home: BuyV2Screen(
+                session: session,
+                initialDestination: session.destination,
+                initialView: session.view,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          var quantity = 1;
+          for (final total in [3480, 10000000, 1]) {
+            session.setDisplayTotal(total);
+            session.addProduct('w-notebook');
+            quantity += 1;
+            await tester.pump();
+            for (final elapsed in [0, 50, 80, 200]) {
+              await tester.pump(Duration(milliseconds: elapsed));
+              for (final key in [
+                'buy-cart-payable-total-motion',
+                'buy-cart-scope-value-motion-all',
+                'buy-cart-line-total-motion-w-notebook',
+                'buy-cart-line-quantity-motion-w-notebook',
+              ]) {
+                final owner = find.byKey(ValueKey(key));
+                final value = tester.widget<BuyV2FiniteValueTransition>(owner);
+                final expected = key.contains('line-total')
+                    ? buyV2Money(3480 * quantity)
+                    : key.contains('line-quantity')
+                    ? '$quantity'
+                    : buyV2Money(total);
+                expect(value.text, expected, reason: key);
+                final paragraphs = find.descendant(
+                  of: owner,
+                  matching: find.byType(RichText),
+                );
+                expect(paragraphs, findsOneWidget);
+                final opacity = tester.widget<Opacity>(
+                  find.descendant(of: owner, matching: find.byType(Opacity)),
+                );
+                if (reduced || elapsed == 200) {
+                  expect(opacity.opacity, 1);
+                } else if (elapsed == 0) {
+                  expect(opacity.opacity, lessThan(1));
+                }
+                for (final paragraph
+                    in tester.renderObjectList<RenderParagraph>(paragraphs)) {
+                  expect(paragraph.text.toPlainText(), expected);
+                  final natural = TextPainter(
+                    text: paragraph.text,
+                    textDirection: paragraph.textDirection,
+                    textScaler: paragraph.textScaler,
+                  )..layout(maxWidth: paragraph.size.width);
+                  expect(
+                    paragraph.didExceedMaxLines,
+                    isFalse,
+                    reason:
+                        '$key current=${value.text} painted=${paragraph.text.toPlainText()} '
+                        'width=${paragraph.size.width} elapsed=$elapsed total=$total',
+                  );
+                  expect(
+                    paragraph.size.height,
+                    greaterThanOrEqualTo(natural.height - .1),
+                    reason: key,
+                  );
+                  natural.dispose();
+                }
+              }
+              expect(tester.takeException(), isNull);
+            }
+            await tester.pumpAndSettle();
+          }
+        },
+      );
+    }
+  }
+
   for (final width in [320.0, 430.0]) {
     for (final scale in [1.0, 2.0]) {
       for (final total in [3480, 10000000]) {
@@ -1007,7 +1106,12 @@ Future<void> _captureR66MainCart(WidgetTester tester, String label) async {
 
 class _R66PayableDisplayFixture extends BuyV2Session {
   _R66PayableDisplayFixture(this.displayTotal) : super(core: BuySession());
-  final int displayTotal;
+  int displayTotal;
+
+  void setDisplayTotal(int total) {
+    displayTotal = total;
+    notifyListeners();
+  }
 
   @override
   int get scopedPayableTotal => displayTotal;
