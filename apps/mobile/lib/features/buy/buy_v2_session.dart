@@ -1592,12 +1592,9 @@ class BuyV2Session extends ChangeNotifier {
         : destination;
     final category = selectedCategoryId;
     final intentProductIds =
-        activeShoppingIntent == BuyV2ShoppingIntent.monthlyBasket
-        ? _catalogueProducts
-              .where((product) => product.destination == BuyV2Destination.shop)
-              .take(12)
-              .map((product) => product.id)
-              .toSet()
+        activeShoppingIntent == BuyV2ShoppingIntent.monthlyBasket &&
+            filterDestination == BuyV2Destination.shop
+        ? monthlyBasketPlan.map((line) => line.product.id).toSet()
         : null;
     final candidates = _catalogueProducts.where((product) {
       if (product.destination != filterDestination) return false;
@@ -5240,6 +5237,58 @@ class BuyV2Session extends ChangeNotifier {
     selectedFulfilmentMode = null;
     productSort = BuyV2ProductSort.relevance;
     availableProductsOnly = false;
+  }
+
+  List<BuyV2CartLine> get monthlyBasketPlan {
+    final originalProducts = BuyV2Catalogue.products
+        .where((product) => product.destination == BuyV2Destination.shop)
+        .take(12)
+        .toList(growable: false);
+    const quantities = <int>[2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1];
+    final plan = <BuyV2CartLine>[];
+    for (var index = 0; index < originalProducts.length; index++) {
+      final current = findProduct(originalProducts[index].id);
+      if (current != null) {
+        plan.add(BuyV2CartLine(product: current, quantity: quantities[index]));
+      }
+    }
+    return List.unmodifiable(plan);
+  }
+
+  bool get monthlyBasketCanAdd {
+    final plan = monthlyBasketPlan;
+    return !checkoutRequiresResolution &&
+        plan.length == 12 &&
+        plan.every((line) => _availableForDiscovery(line.product));
+  }
+
+  void addMonthlyBasket() {
+    if (_holdCartForPaymentResolution()) return;
+    if (!monthlyBasketCanAdd) {
+      showNotice(
+        'Some basket products are unavailable. Review products first.',
+      );
+      return;
+    }
+    final plan = monthlyBasketPlan;
+    for (final line in plan) {
+      while (quantityFor(line.product.id) < line.quantity) {
+        if (!addProduct(line.product.id)) {
+          clearCartAcknowledgement();
+          return;
+        }
+      }
+    }
+    final ready = plan
+        .where((line) => quantityFor(line.product.id) >= line.quantity)
+        .length;
+    _acknowledgeCart(
+      ready == plan.length
+          ? 'Monthly basket ready · $ready products'
+          : '$ready of ${plan.length} basket products ready',
+      destination: BuyV2Destination.shop,
+    );
+    notifyListeners();
   }
 
   void chooseShoppingIntent(BuyV2ShoppingIntent intent) {

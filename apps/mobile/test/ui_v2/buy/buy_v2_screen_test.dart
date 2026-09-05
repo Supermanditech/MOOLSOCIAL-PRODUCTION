@@ -4613,6 +4613,208 @@ void main() {
     );
   });
 
+  for (final textScale in [1.0, 2.0]) {
+    testWidgets('R66 032 basket preview price and actions fit $textScale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 780);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await tester.pumpWidget(
+        app(
+          session,
+          textScale: textScale,
+          safePadding: const EdgeInsets.only(bottom: 32),
+          captureCart: const bool.fromEnvironment(
+            'BUY_R66_MONTHLY_BASKET_CAPTURE',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      unawaited(
+        showBuyV2HouseholdBasket(
+          tester.element(find.byType(BuyV2Screen)),
+          session,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final sheet = find.byKey(
+        const ValueKey('buy-household-basket-info-sheet'),
+      );
+      expect(find.text('Product subtotal ₹5,145'), findsOneWidget);
+      expect(find.text('Save ₹415'), findsNothing);
+      expect(find.text('12 products'), findsOneWidget);
+      expect(find.text('21 packs'), findsOneWidget);
+      expect(find.text('Quick · 6 products'), findsOneWidget);
+      expect(find.text('Scheduled · 6 products'), findsOneWidget);
+      for (final richText
+          in find
+              .descendant(of: sheet, matching: find.byType(RichText))
+              .evaluate()) {
+        final paragraph = richText.renderObject! as RenderParagraph;
+        final painter = TextPainter(
+          text: paragraph.text,
+          textDirection: paragraph.textDirection,
+          textScaler: paragraph.textScaler,
+        )..layout(maxWidth: paragraph.size.width);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(
+          paragraph.size.height + .1,
+          greaterThanOrEqualTo(painter.height),
+        );
+        painter.dispose();
+      }
+      await _captureR66MonthlyBasket(tester, '$textScale-price');
+      final add = find.byKey(const ValueKey('buy-household-add-to-cart'));
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(add).bottom, lessThanOrEqualTo(748));
+      expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
+      await _captureR66MonthlyBasket(tester, '$textScale-actions');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.itemCount, 0);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('R66 032 monthly basket keeps price groups and Shop Cart scope', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    expect(session.addProduct('w-notebook'), isTrue);
+    final wholesaleQuantity = session.quantityFor('w-notebook');
+    final wholesaleTotal = session.totalForDestination(
+      BuyV2Destination.wholesale,
+    );
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-promotion-shop-basket')));
+    await tester.pumpAndSettle();
+    final see = find.byKey(const ValueKey('buy-household-see-products'));
+    await tester.ensureVisible(see);
+    await tester.pumpAndSettle();
+    await tester.tap(see);
+    await tester.pumpAndSettle();
+    expect(find.text('6 of 12 basket products · Quick'), findsOneWidget);
+    expect(session.catalogueSaleTypeProducts.length, 6);
+    await tester.tap(find.byKey(const ValueKey('buy-shop-sale-type-courier')));
+    await tester.pumpAndSettle();
+    expect(find.text('6 of 12 basket products · Scheduled'), findsOneWidget);
+    expect(session.catalogueSaleTypeProducts.length, 6);
+
+    Future<void> addBasket() async {
+      unawaited(
+        showBuyV2HouseholdBasket(
+          tester.element(find.byType(BuyV2Screen)),
+          session,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final add = find.byKey(const ValueKey('buy-household-add-to-cart'));
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+    }
+
+    await addBasket();
+    expect(session.countForDestination(BuyV2Destination.shop), 21);
+    expect(session.totalForDestination(BuyV2Destination.shop), 5145);
+    expect(
+      session.cartAcknowledgementForDestination(BuyV2Destination.shop),
+      'Monthly basket ready · 12 products',
+    );
+    await addBasket();
+    expect(session.countForDestination(BuyV2Destination.shop), 21);
+    expect(session.quantityFor('w-notebook'), wholesaleQuantity);
+    expect(
+      session.totalForDestination(BuyV2Destination.wholesale),
+      wholesaleTotal,
+    );
+    session.openCart(scope: BuyV2CartScope.shop);
+    await tester.pumpAndSettle();
+    expect(find.text('Monthly basket'), findsOneWidget);
+    expect(session.clearCartScope(BuyV2CartScope.shop), isTrue);
+    await tester.pumpAndSettle();
+    expect(session.quantityFor('w-notebook'), wholesaleQuantity);
+    expect(find.byKey(const ValueKey('buy-shopping-intent-bar')), findsNothing);
+    session.openDestination(BuyV2Destination.wholesale);
+    await tester.pumpAndSettle();
+    expect(session.catalogueSaleTypeProducts, isNotEmpty);
+    expect(find.byKey(const ValueKey('buy-shopping-intent-bar')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final missingCatalogue in [true, false]) {
+    testWidgets(
+      'R66 032 basket rejects unavailable products $missingCatalogue',
+      (tester) async {
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: !missingCatalogue,
+          productFactsAdapter: const _StoreStatusFactsAdapter(
+            state: BuyV2StoreOperatingState.closed,
+            nextOpeningLabel: 'tomorrow at 8:00 am',
+          ),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        if (!missingCatalogue) {
+          expect(session.addProduct('w-notebook'), isTrue);
+        }
+        final beforeCount = session.itemCount;
+        await tester.pumpWidget(app(session));
+        await tester.pumpAndSettle();
+        unawaited(
+          showBuyV2HouseholdBasket(
+            tester.element(find.byType(BuyV2Screen)),
+            session,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(session.monthlyBasketCanAdd, isFalse);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const ValueKey('buy-household-add-to-cart')),
+              )
+              .onPressed,
+          isNull,
+        );
+        if (missingCatalogue) {
+          expect(session.monthlyBasketPlan, isEmpty);
+          expect(
+            find.text('Basket prices are unavailable right now'),
+            findsOneWidget,
+          );
+          expect(find.text('Product subtotal ₹5,145'), findsNothing);
+        }
+        session.addMonthlyBasket();
+        expect(session.itemCount, beforeCount);
+        expect(session.countForDestination(BuyV2Destination.shop), 0);
+        expect(
+          session.notice,
+          'Some basket products are unavailable. Review products first.',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('first-party promotions use established Buy actions', (
     tester,
   ) async {
@@ -6441,6 +6643,31 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+Future<void> _captureR66MonthlyBasket(WidgetTester tester, String label) async {
+  if (!const bool.fromEnvironment('BUY_R66_MONTHLY_BASKET_CAPTURE')) return;
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('r66-cart-capture')),
+  );
+  await tester.runAsync(() async {
+    final directory = Directory('build/r66-monthly-basket-v1-20260905');
+    await directory.create(recursive: true);
+    final output = File('${directory.path}/$label.png');
+    if (await output.exists()) {
+      throw StateError('Monthly basket capture already exists');
+    }
+    final image = await boundary.toImage(pixelRatio: 2);
+    try {
+      final data = await image.toByteData(format: ImageByteFormat.png);
+      if (data == null) {
+        throw StateError('Monthly basket capture encoding failed');
+      }
+      await output.writeAsBytes(data.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
+  });
 }
 
 // Display geometry only; real session arithmetic is covered by connected tests.

@@ -1055,10 +1055,27 @@ class BuyV2ShoppingIntentBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final intent = session.activeShoppingIntent;
     if (intent == null) return const SizedBox.shrink();
+    final monthly = intent == BuyV2ShoppingIntent.monthlyBasket;
+    final basketIds = monthly
+        ? session.monthlyBasketPlan.map((line) => line.product.id).toSet()
+        : const <String>{};
+    final basketCartProducts = session.cartLines
+        .where((line) => basketIds.contains(line.product.id))
+        .length;
+    if (monthly &&
+        (session.destination != BuyV2Destination.shop ||
+            (session.view == BuyV2View.cart && basketCartProducts == 0))) {
+      return const SizedBox.shrink();
+    }
+    final basketGroup = session.shopSaleType == BuyV2ShopSaleType.quickDelivery
+        ? 'Quick'
+        : 'Scheduled';
     final (title, detail, icon) = switch (intent) {
       BuyV2ShoppingIntent.monthlyBasket => (
         'Monthly basket',
-        '12 household products · edit before Checkout',
+        session.view == BuyV2View.cart
+            ? '$basketCartProducts of 12 basket products in Shop Cart'
+            : '${session.catalogueSaleTypeProducts.length} of 12 basket products · $basketGroup',
         Icons.shopping_basket_outlined,
       ),
       BuyV2ShoppingIntent.businessBuying => (
@@ -1104,8 +1121,10 @@ class BuyV2ShoppingIntentBar extends StatelessWidget {
                     ),
                     Text(
                       detail,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: monthly ? null : 2,
+                      overflow: monthly
+                          ? TextOverflow.visible
+                          : TextOverflow.ellipsis,
                       style: context.buyMeta,
                     ),
                   ],
@@ -3361,38 +3380,27 @@ Future<void> showBuyV2HouseholdBasket(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     sheetAnimationStyle: BuyV2InfoSheetMotion.resolve(context),
-    builder: (sheetContext) => _HouseholdBasket(
-      onClose: () => Navigator.of(sheetContext).pop(),
-      onSeeProducts: () =>
-          Navigator.of(sheetContext).pop(_HouseholdBasketAction.seeProducts),
-      onAddToCart: () =>
-          Navigator.of(sheetContext).pop(_HouseholdBasketAction.addToCart),
+    builder: (sheetContext) => AnimatedBuilder(
+      animation: session,
+      builder: (context, _) => _HouseholdBasket(
+        session: session,
+        onClose: () => Navigator.of(sheetContext).pop(),
+        onSeeProducts: () =>
+            Navigator.of(sheetContext).pop(_HouseholdBasketAction.seeProducts),
+        onAddToCart: () =>
+            Navigator.of(sheetContext).pop(_HouseholdBasketAction.addToCart),
+      ),
     ),
   );
   switch (action) {
     case _HouseholdBasketAction.seeProducts:
       session.chooseCategory('all');
-      session.showNotice('Basket products are shown below');
+      session.showNotice(
+        'Choose Quick or Scheduled to view each basket group.',
+      );
       break;
     case _HouseholdBasketAction.addToCart:
-      final featured = BuyV2Catalogue.products
-          .where((product) => product.destination == BuyV2Destination.shop)
-          .take(12)
-          .toList(growable: false);
-      const plannedQuantities = <int>[2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1];
-      for (var index = 0; index < featured.length; index++) {
-        final product = featured[index];
-        final targetQuantity = plannedQuantities[index];
-        while (session.quantityFor(product.id) < targetQuantity) {
-          if (!session.addProduct(product.id)) break;
-        }
-      }
-      final itemCount = plannedQuantities
-          .take(featured.length)
-          .fold<int>(0, (sum, value) => sum + value);
-      session.showNotice(
-        '${featured.length} products · $itemCount items ready in Cart',
-      );
+      session.addMonthlyBasket();
       break;
     case null:
       break;
@@ -5408,33 +5416,52 @@ class _SavedProductInfoRow extends StatelessWidget {
 
 class _HouseholdBasket extends StatelessWidget {
   const _HouseholdBasket({
+    required this.session,
     required this.onClose,
     required this.onSeeProducts,
     required this.onAddToCart,
   });
 
+  final BuyV2Session session;
   final VoidCallback onClose;
   final VoidCallback onSeeProducts;
   final VoidCallback onAddToCart;
 
   @override
   Widget build(BuildContext context) {
+    final plan = session.monthlyBasketPlan;
+    final complete = plan.length == 12;
+    final subtotal = plan.fold<int>(0, (total, line) => total + line.total);
+    final quickProducts = plan
+        .where(
+          (line) =>
+              session.fulfilmentModeFor(line.product) ==
+              BuyV2FulfilmentMode.quickLocal,
+        )
+        .length;
+    final scheduledProducts = plan
+        .where(
+          (line) =>
+              session.fulfilmentModeFor(line.product) ==
+              BuyV2FulfilmentMode.standardCourier,
+        )
+        .length;
     final compactActions =
         MediaQuery.sizeOf(context).width < 360 ||
         MediaQuery.textScalerOf(context).scale(1) > 1.2;
     final seeProducts = OutlinedButton.icon(
       key: const ValueKey('buy-household-see-products'),
-      onPressed: onSeeProducts,
+      onPressed: plan.isEmpty ? null : onSeeProducts,
       style: OutlinedButton.styleFrom(
         minimumSize: const Size.fromHeight(BuyV2Metrics.minimumTap),
         side: const BorderSide(color: BuyV2Colors.line),
       ),
       icon: const Icon(Icons.grid_view_rounded, size: 18),
-      label: const Text('See 12 products'),
+      label: const Text('View basket products'),
     );
     final addToCart = FilledButton.icon(
       key: const ValueKey('buy-household-add-to-cart'),
-      onPressed: onAddToCart,
+      onPressed: session.monthlyBasketCanAdd ? onAddToCart : null,
       style: FilledButton.styleFrom(
         minimumSize: const Size.fromHeight(BuyV2Metrics.minimumTap),
       ),
@@ -5483,37 +5510,23 @@ class _HouseholdBasket extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'HOUSEHOLD BASKET',
-                              style: context.buyMeta.copyWith(
-                                color: BuyV2Colors.navy,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: .7,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: BuyV2Colors.softGreen,
-                              borderRadius: BorderRadius.circular(99),
-                            ),
-                            child: const Text(
-                              'Save ₹415',
-                              style: TextStyle(
-                                color: BuyV2Colors.green,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        'HOUSEHOLD BASKET',
+                        style: context.buyMeta.copyWith(
+                          color: BuyV2Colors.navy,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: .7,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        complete
+                            ? 'Product subtotal ${buyV2Money(subtotal)}'
+                            : 'Basket prices are unavailable right now',
+                        key: const ValueKey('buy-household-subtotal'),
+                        style: context.buyBody.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       const Wrap(
@@ -5535,8 +5548,27 @@ class _HouseholdBasket extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _HouseholdBasketFact(
+                            icon: Icons.speed_rounded,
+                            label: 'Quick · $quickProducts products',
+                          ),
+                          _HouseholdBasketFact(
+                            icon: Icons.schedule_rounded,
+                            label: 'Scheduled · $scheduledProducts products',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
                       Text(
-                        'Review the products first, or add the existing basket to your cart.',
+                        session.monthlyBasketCanAdd
+                            ? 'At current product prices. Any discounts and delivery charges are confirmed at Checkout. Only missing packs are added to reach this basket.'
+                            : session.checkoutRequiresResolution
+                            ? 'Check the current payment before changing your Cart.'
+                            : 'Some basket products are unavailable. Review products before adding.',
                         style: context.buyMeta,
                       ),
                     ],
@@ -5583,12 +5615,14 @@ class _HouseholdBasketFact extends StatelessWidget {
         children: [
           Icon(icon, color: BuyV2Colors.navy, size: 16),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: BuyV2Colors.ink,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: BuyV2Colors.ink,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
