@@ -481,10 +481,36 @@ class _WorkWorkspaceDashboardScreenState
     final saleOpen =
         _view == _WorkspaceControlView.operation &&
         _operation == _WorkspaceOperation.counterOrder;
+    final hasHeaderBack =
+        _view == _WorkspaceControlView.operation ||
+        _view == _WorkspaceControlView.alerts ||
+        _reviewedOrder != null;
+    final namePainter =
+        TextPainter(
+          text: TextSpan(
+            text: workspace.name,
+            style: Theme.of(context).textTheme.titleLarge!.copyWith(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(
+          maxWidth:
+              (MediaQuery.sizeOf(context).width -
+                      127 -
+                      (hasHeaderBack ? 47 : 0))
+                  .clamp(64.0, double.infinity),
+        );
+    final storeHeaderHeight =
+        47 + (namePainter.height + 8).clamp(44.0, double.infinity);
+    namePainter.dispose();
     return WorkPageScaffold(
       session: session,
       title: title,
       subtitle: subtitle,
+      headerHeight: storeRootSurface ? storeHeaderHeight : 88,
       headerTitle: storeRootSurface
           ? _WorkspaceDashboardHeader(
               session: session,
@@ -958,6 +984,7 @@ class _WorkWorkspaceDashboardScreenState
   Future<void> _showWorkspaceSwitcher(BuildContext context) async {
     final current = session.activeWorkspace;
     if (current == null) return;
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final choices = [current, ...session.otherWorkspaces];
     await showModalBottomSheet<void>(
       context: context,
@@ -966,52 +993,32 @@ class _WorkWorkspaceDashboardScreenState
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         top: false,
-        child: FractionallySizedBox(
-          heightFactor: .72,
+        bottom: false,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * .76,
+          ),
           child: Column(
             key: const Key('work-workspace-switcher-sheet'),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: MoolSpacing.md,
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  'Choose your Workspace',
+                  style: TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
                   ),
+                ),
+              ),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   children: [
-                    const Text(
-                      'Choose your Workspace',
-                      style: TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: MoolSpacing.sm),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3F5FF),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline_rounded,
-                            color: MoolColors.navy,
-                          ),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Create content anytime from Social. Request another Workspace only for a separate business or professional identity.',
-                              style: TextStyle(
-                                color: MoolColors.ink,
-                                height: 1.3,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: MoolSpacing.sm),
                     for (final workspace in choices)
                       ListTile(
                         key: ValueKey('work-switch-${workspace.id}'),
@@ -1037,25 +1044,25 @@ class _WorkWorkspaceDashboardScreenState
                   ],
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  MoolSpacing.md,
-                  8,
-                  MoolSpacing.md,
-                  MediaQuery.viewPaddingOf(sheetContext).bottom + 12,
+              const Divider(height: 16),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Create content anytime from Social.',
+                  style: TextStyle(color: MoolColors.muted, fontSize: 12),
                 ),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    key: const Key('work-switch-add-workspace'),
-                    onPressed: () {
-                      Navigator.of(sheetContext).pop();
-                      session.startAnotherWork();
-                      context.push('/app/work/workspace/choose');
-                    },
-                    icon: const Icon(Icons.add_business_outlined),
-                    label: const Text('Request another Workspace'),
-                  ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, bottomInset + 12),
+                child: OutlinedButton.icon(
+                  key: const Key('work-switch-add-workspace'),
+                  onPressed: () {
+                    Navigator.of(sheetContext).pop();
+                    session.startAnotherWork();
+                    context.push('/app/work/workspace/choose');
+                  },
+                  icon: const Icon(Icons.add_business_outlined, size: 18),
+                  label: const Text('Request another Workspace'),
                 ),
               ),
             ],
@@ -1473,12 +1480,17 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                           ),
                           const SizedBox(width: 5),
                           Expanded(
-                            child: Text(
-                              workspace.name,
-                              style: const TextStyle(
-                                color: MoolColors.navy,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
+                            child: DefaultTextStyle(
+                              style: DefaultTextStyle.of(context).style
+                                  .copyWith(
+                                    color: MoolColors.navy,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                              child: Text(
+                                workspace.name,
+                                key: const Key('work-store-full-name'),
+                                softWrap: true,
                               ),
                             ),
                           ),
@@ -1776,23 +1788,22 @@ class _StoreControlDashboard extends StatelessWidget {
       color: const Color(0xFFF7F8FC),
       child: Column(
         children: [
-          if (ready)
-            _StoreLiveBusinessPulse(
-              session: session,
-              onOrders: onCustomers,
-              onSales: onMoney,
-              onStock: onStock,
-              onSettlement: () => onOpenOperation(_WorkspaceOperation.payments),
-            ),
+          _StoreLiveBusinessPulse(
+            session: session,
+            onOrders: onCustomers,
+            onSales: onMoney,
+            onStock: onStock,
+            onSettlement: () => onOpenOperation(_WorkspaceOperation.payments),
+          ),
           if (session.workspaceDashboardState != WorkspaceDashboardState.ready)
             _DashboardSyncBanner(session: session),
           Expanded(
-            child: ready
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: _StoreActivityDeck(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: ready
+                      ? _StoreActivityDeck(
                           key: const Key('store-stable-working-centre'),
                           session: session,
                           reviewedOrder: reviewedOrder,
@@ -1802,31 +1813,28 @@ class _StoreControlDashboard extends StatelessWidget {
                           onMoney: onMoney,
                           onGroupBulk: () =>
                               onOpenOperation(_WorkspaceOperation.groupBuying),
+                        )
+                      : _StoreSetupDeck(
+                          session: session,
+                          workspace: workspace,
+                          onSetup: onSetup,
                         ),
-                      ),
-                      _StoreActionEdge(
-                        session: session,
-                        onRestock: onBuyStock,
-                        onDirect: () =>
-                            onOpenOperation(_WorkspaceOperation.direct),
-                        onGroup: () =>
-                            onOpenOperation(_WorkspaceOperation.groupBuying),
-                      ),
-                    ],
-                  )
-                : _StoreSetupDeck(
-                    session: session,
-                    workspace: workspace,
-                    onSetup: onSetup,
-                  ),
-          ),
-          if (ready)
-            _StoreReachStrip(
-              onLink: onDeliverOrder,
-              onPromote: onGrow,
-              onRequirement: () =>
-                  onOpenOperation(_WorkspaceOperation.paidWork),
+                ),
+                _StoreActionEdge(
+                  session: session,
+                  onRestock: onBuyStock,
+                  onDirect: () => onOpenOperation(_WorkspaceOperation.direct),
+                  onGroup: () =>
+                      onOpenOperation(_WorkspaceOperation.groupBuying),
+                ),
+              ],
             ),
+          ),
+          _StoreReachStrip(
+            onLink: onDeliverOrder,
+            onPromote: onGrow,
+            onRequirement: () => onOpenOperation(_WorkspaceOperation.paidWork),
+          ),
         ],
       ),
     );
@@ -4308,70 +4316,60 @@ class _StoreSetupDeck extends StatelessWidget {
         session.retailerHomeDelivery || session.retailerStoreCollection;
     final progress =
         ([productsReady, fulfilmentReady].where((value) => value).length) / 2;
-    return Padding(
+    return SingleChildScrollView(
       key: const Key('work-activity-setup'),
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+      padding: const EdgeInsets.all(16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Spacer(),
-          SizedBox(
-            width: 108,
-            height: 108,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: progress,
-                  strokeWidth: 12,
-                  color: MoolColors.orange,
-                  backgroundColor: const Color(0xFFDCE2F2),
-                ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${(progress * 100).round()}%',
-                      style: const TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const Text(
-                      'ready',
-                      style: TextStyle(color: MoolColors.muted),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+          const Icon(
+            Icons.storefront_outlined,
+            color: MoolColors.navy,
+            size: 30,
           ),
           const SizedBox(height: 12),
-          Text(
-            'Prepare ${workspace.name} for its first order',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: MoolColors.ink,
+          const Text(
+            'Ready for your first customer?',
+            style: TextStyle(
+              color: MoolColors.navy,
               fontSize: 19,
-              height: 1.1,
-              fontWeight: FontWeight.w900,
+              height: 1.2,
+              fontWeight: FontWeight.w800,
             ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Add products and choose pickup or delivery. Your store stays private until you publish it.',
+            style: TextStyle(
+              color: MoolColors.muted,
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 20),
+          LinearProgressIndicator(
+            value: progress,
+            minHeight: 4,
+            color: MoolColors.navy,
+            backgroundColor: const Color(0xFFE3E7F2),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            productsReady ? 'Products added' : 'Add your products',
+            style: const TextStyle(color: MoolColors.navy, fontSize: 12),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Confirm products, Selling Price, MRP and fulfilment. Your store remains private until you publish it.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: MoolColors.muted, height: 1.35),
+          Text(
+            fulfilmentReady
+                ? 'Fulfilment selected'
+                : 'Choose pickup or delivery',
+            style: const TextStyle(color: MoolColors.navy, fontSize: 12),
           ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              key: const Key('work-dashboard-priority-action'),
-              onPressed: onSetup,
-              icon: const Icon(Icons.arrow_forward_rounded),
-              label: const Text('Continue store setup'),
-            ),
+          const SizedBox(height: 16),
+          FilledButton(
+            key: const Key('work-dashboard-priority-action'),
+            onPressed: onSetup,
+            child: const Text('Continue store setup'),
           ),
         ],
       ),
@@ -11210,6 +11208,7 @@ class _LiveOrderTicket extends StatelessWidget {
     final nextAction = switch (stage) {
       'Confirmed' => 'Accept',
       'Preparing' => 'Mark ready',
+      'Ready for pickup' => 'Confirm pickup',
       'Ready' when order.needsDelivery => 'Arrange delivery',
       'Ready' => 'Complete pickup',
       'Delivery requested' => 'Track delivery',
@@ -11228,24 +11227,17 @@ class _LiveOrderTicket extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(
-                  Icons.receipt_long_outlined,
-                  size: 16,
-                  color: MoolColors.navy,
-                ),
-                const SizedBox(width: 7),
                 Expanded(
                   child: Row(
                     children: [
                       Flexible(
                         child: Text(
-                          stage == 'Confirmed' ? 'Awaiting acceptance' : stage,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          stage == 'Confirmed' ? 'Accept within' : stage,
+                          key: Key('work-order-stage-label-${order.id}'),
+                          softWrap: true,
                           style: const TextStyle(
                             color: MoolColors.navy,
                             fontSize: 10,
-                            letterSpacing: .6,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -11265,6 +11257,7 @@ class _LiveOrderTicket extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 Text(
                   '₹${_formatStoreAmount(order.amount)}',
                   style: const TextStyle(
@@ -11350,23 +11343,61 @@ class _LiveOrderTicket extends StatelessWidget {
             ],
             if (active) ...[
               const SizedBox(height: 10),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (stage == 'Confirmed')
+                    TextButton(
+                      onPressed:
+                          session.busy || session.workspaceOperationsSyncing
+                          ? null
+                          : () => _showRejectOrderSheet(context, session),
+                      child: const Text('Reject'),
+                    ),
+                  FilledButton.icon(
+                    onPressed:
+                        session.busy ||
+                            session.workspaceOperationsSyncing ||
+                            session.workspaceHandoverBusy ||
+                            (stage == 'Preparing' &&
+                                !session.workspacePackingComplete)
+                        ? null
+                        : stage == 'Ready for pickup'
+                        ? () => _showWorkspacePickupSheet(context, session)
+                        : stage == 'Delivery requested'
+                        ? onOpenDelivery
+                        : stage == 'Ready' && order.needsDelivery
+                        ? () {
+                            session.advanceWorkspaceOrder();
+                            onOpenDelivery();
+                          }
+                        : () => _advanceDeskOrder(
+                            session,
+                            expectedOrderId: order.id,
+                          ),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 17),
+                    label: Text(nextAction),
+                  ),
+                ],
+              ),
+            ] else if (!const ['Completed', 'Cancelled'].contains(stage)) ...[
               Align(
                 alignment: Alignment.centerRight,
-                child: FilledButton.icon(
+                child: TextButton(
+                  key: Key('work-order-open-${order.id}'),
                   onPressed:
-                      stage == 'Preparing' && !session.workspacePackingComplete
+                      session.busy ||
+                          session.workspaceOperationsSyncing ||
+                          session.workspaceHandoverBusy
                       ? null
-                      : stage == 'Ready' && order.needsDelivery
-                      ? () {
-                          session.advanceWorkspaceOrder();
-                          onOpenDelivery();
-                        }
-                      : () => _advanceDeskOrder(
-                          session,
-                          expectedOrderId: order.id,
-                        ),
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 17),
-                  label: Text(nextAction),
+                      : () => session.selectWorkspaceOrder(order.id),
+                  child: const Text('Open order'),
                 ),
               ),
             ],

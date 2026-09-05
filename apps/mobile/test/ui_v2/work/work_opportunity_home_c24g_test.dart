@@ -162,8 +162,11 @@ void main() {
     expect(find.byKey(const Key('my-work-screen')), findsNothing);
     expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
     expect(find.byKey(const Key('workspace-chooser-hero')), findsOneWidget);
-    expect(find.text('Grow your business with MoolSocial'), findsOneWidget);
-    expect(find.text('Signed in'), findsOneWidget);
+    expect(find.text('Grow with MoolSocial'), findsOneWidget);
+    expect(find.text('Your business. More customers.'), findsOneWidget);
+    expect(find.textContaining('Choose Workspace'), findsOneWidget);
+    expect(find.textContaining('Upload documents'), findsOneWidget);
+    expect(find.text('Signed in'), findsNothing);
     expect(find.text('Build your Workspace'), findsNothing);
     expect(find.text('Verified account'), findsNothing);
     expect(find.textContaining('GST category'), findsNothing);
@@ -226,8 +229,8 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('work-requirements-ready')), findsOneWidget);
-    expect(find.text('I have these documents ready'), findsOneWidget);
-    expect(find.text('Continue to secure Workspace setup'), findsOneWidget);
+    expect(find.text('Continue setup'), findsOneWidget);
+    expect(find.text('I have these documents ready'), findsNothing);
     expect(find.textContaining('GST category'), findsNothing);
     await _scrollTo(
       tester,
@@ -241,7 +244,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Required when applicable'), findsWidgets);
+    expect(find.text('When applicable'), findsWidgets);
     expect(find.textContaining('GST certificate is optional'), findsNothing);
     await _scrollTo(
       tester,
@@ -254,7 +257,12 @@ void main() {
     await tester.tap(find.byKey(const Key('work-back')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
-    expect(sessions.work.selectedProfile, isNull);
+    expect(sessions.work.selectedProfile?.id, 'retailer-grocery');
+    expect(
+      find.byKey(const Key('work-profile-retailer-grocery')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('work-requirements-screen')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

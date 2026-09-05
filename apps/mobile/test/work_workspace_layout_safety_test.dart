@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
@@ -312,6 +313,56 @@ void main() {
       expect(tester.takeException(), isNull);
     }, skip: !captureStoreViewV2);
   }
+
+  testWidgets(
+    'Store queue opens the chosen order without changing the previous order',
+    (tester) async {
+      final work = storeViewFixture();
+      work.workspaceOrders.add(
+        WorkspaceOrderRecord(
+          id: 'APP-1044',
+          customer: 'Sita · 9123456789',
+          items: 'Atta × 1',
+          quantities: const {},
+          amount: 310,
+          payment: 'Paid online',
+          source: 'App',
+          fulfilment: 'Pickup',
+          address: '',
+          stage: 'Confirmed',
+          needsDelivery: false,
+          createdAt: DateTime.now(),
+          actionDeadline: DateTime.now().add(const Duration(seconds: 60)),
+        ),
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+        bottomInset: 34,
+      );
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      final open = find.byKey(const Key('work-order-open-APP-1044'));
+      await reveal(tester, open);
+      await tester.tap(open);
+      await tester.pumpAndSettle();
+      expect(work.currentWorkspaceOrderId, 'APP-1044');
+      expect(work.workspaceOrderCustomer, 'Sita · 9123456789');
+      expect(work.workspaceOrderStage, 'Confirmed');
+      expect(work.workspaceOrders.first.stage, 'Confirmed');
+      await reveal(tester, find.text('Accept'));
+      await captureStoreView(tester, '29-selected-second-order');
+      await tester.tap(find.text('Accept'));
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderStage, 'Preparing');
+      expect(work.workspaceOrders.first.stage, 'Confirmed');
+      expect(work.workspaceOrders.last.stage, 'Preparing');
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('Store View v2 - zero tap working centre', (tester) async {
     await mount(
@@ -3209,6 +3260,77 @@ void main() {
     expect(tester.getBottomRight(request).dy, lessThanOrEqualTo(756));
     expect(find.textContaining('Create content anytime from Social'), findsOne);
   });
+
+  for (final width in [320.0, 412.0]) {
+    testWidgets(
+      'full store name and content-sized Workspace picker at $width',
+      (tester) async {
+        final work = storeViewFixture();
+        final original = work.activeWorkspace!;
+        work.activeWorkspace = WorkWorkspace(
+          id: original.id,
+          name: 'Shree Mahadev Fresh Mart and General Store',
+          profileLabel: original.profileLabel,
+          profileId: original.profileId,
+          area: original.area,
+          verified: original.verified,
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(width, 915),
+          textScale: 1.4,
+          bottomInset: 34,
+        );
+        await tester.tap(find.byKey(const Key('work-store-orders')));
+        await tester.pumpAndSettle();
+        final name = find.byKey(const Key('work-store-full-name'));
+        final paragraph = tester.renderObject<RenderParagraph>(name);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final stage = find.byKey(const Key('work-order-stage-label-APP-1043'));
+        expect(
+          tester.renderObject<RenderParagraph>(stage).didExceedMaxLines,
+          isFalse,
+        );
+        expect(find.text('Accept within'), findsOneWidget);
+        expect(
+          tester.getBottomRight(name).dy,
+          lessThan(
+            tester
+                .getTopLeft(find.byKey(const Key('work-dashboard-search')))
+                .dy,
+          ),
+        );
+        expect(tester.takeException(), isNull);
+        if (width == 320) {
+          await captureStoreView(tester, '30-full-store-name-large-text');
+        }
+        await tester.tap(
+          find.byKey(const Key('work-dashboard-workspace-switcher')),
+        );
+        await tester.pumpAndSettle();
+        final sheet = find.byKey(const Key('work-workspace-switcher-sheet'));
+        expect(tester.getRect(sheet).height, lessThan(430));
+        final request = find.byKey(const Key('work-switch-add-workspace'));
+        expect(request.hitTestable(), findsOneWidget);
+        expect(tester.getBottomRight(request).dy, lessThanOrEqualTo(881));
+        expect(tester.takeException(), isNull);
+        if (width == 320) {
+          await captureStoreView(
+            tester,
+            '31-compact-workspace-picker-large-text',
+          );
+        }
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-orders-destination')),
+          findsOneWidget,
+        );
+      },
+    );
+  }
 
   testWidgets(
     'order completion action clears Android navigation and is tappable',

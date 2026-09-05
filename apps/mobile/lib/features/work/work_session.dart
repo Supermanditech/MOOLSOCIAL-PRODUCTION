@@ -145,6 +145,8 @@ class WorkSession extends ChangeNotifier {
   final Map<String, int> workspaceOrderQuantities = {};
   final List<WorkspaceOrderRecord> workspaceOrders = [];
   final Set<String> workspacePackedProductIds = <String>{};
+  final Map<String, Set<String>> _packingByOrder = {};
+  final Map<String, WorkspaceDeliveryAssignment> _deliveryByOrder = {};
   final List<WorkspaceCustomerInvoice> workspaceInvoices = [];
   final List<WorkspaceStoreOffer> workspaceOffers = [];
   String? currentWorkspaceOrderId;
@@ -289,6 +291,61 @@ class WorkSession extends ChangeNotifier {
   WorkspaceOrderRecord? get currentWorkspaceOrder => workspaceOrders
       .where((order) => order.id == currentWorkspaceOrderId)
       .firstOrNull;
+
+  String _orderScope(String id) =>
+      '${activeWorkspace?.id ?? workspaceId ?? ''}::$id';
+
+  void _rememberActiveOrder() {
+    if (currentWorkspaceOrderId case final id?) {
+      _packingByOrder[_orderScope(id)] = Set.of(workspacePackedProductIds);
+      final assignment = workspaceDeliveryAssignment;
+      if (assignment != null && assignment.orderId == id) {
+        _deliveryByOrder[_orderScope(id)] = assignment;
+      }
+    }
+  }
+
+  bool selectWorkspaceOrder(String orderId) {
+    if (busy || workspaceOperationsSyncing || workspaceHandoverBusy) {
+      return false;
+    }
+    final order = workspaceOrders
+        .where((item) => item.id == orderId)
+        .firstOrNull;
+    if (order == null) return false;
+    if (currentWorkspaceOrderId == orderId) return true;
+    if (currentWorkspaceOrderId == null &&
+        (workspaceOrderQuantities.isNotEmpty ||
+            workspaceOrderCustomer.isNotEmpty)) {
+      showNotice(
+        'Finish or discard the current bill before opening another order.',
+      );
+      return false;
+    }
+    _rememberActiveOrder();
+    currentWorkspaceOrderId = order.id;
+    workspaceOrderCustomer = order.customer;
+    workspaceOrderItems = order.items;
+    workspaceOrderQuantities
+      ..clear()
+      ..addAll(order.quantities);
+    workspaceOrderAmount = order.amount.toString();
+    workspaceOrderSource = order.source;
+    workspaceOrderFulfilment = order.fulfilment;
+    workspaceOrderPayment = order.payment;
+    workspaceOrderAddress = order.address;
+    workspaceOrderStage = order.stage;
+    workspaceOrderNeedsDelivery = order.needsDelivery;
+    workspaceOrderExtraMinutes = order.extraMinutes;
+    workspaceOrderActionDeadline = order.actionDeadline;
+    workspacePackedProductIds
+      ..clear()
+      ..addAll(_packingByOrder[_orderScope(orderId)] ?? const <String>{});
+    workspaceDeliveryAssignment = _deliveryByOrder[_orderScope(orderId)];
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
 
   List<WorkspaceOrderRecord> get visibleWorkspaceOrders {
     if (workspaceOrders.isNotEmpty) {
@@ -1690,6 +1747,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   void startNewWorkspaceOrder() {
+    _rememberActiveOrder();
     workspaceOrderCustomer = '';
     workspaceOrderItems = '';
     workspaceOrderAmount = '';

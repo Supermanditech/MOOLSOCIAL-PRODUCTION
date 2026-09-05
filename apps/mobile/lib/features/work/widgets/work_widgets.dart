@@ -16,6 +16,7 @@ class WorkPageScaffold extends StatelessWidget {
     required this.subtitle,
     required this.body,
     this.headerTitle,
+    this.headerHeight = 88,
     this.fallbackBackRoute = '/app/work/earn',
     this.showBack = true,
     this.activeLocalAction = 'earn',
@@ -39,6 +40,7 @@ class WorkPageScaffold extends StatelessWidget {
   final String subtitle;
   final Widget body;
   final Widget? headerTitle;
+  final double headerHeight;
   final String fallbackBackRoute;
   final bool showBack;
   final String activeLocalAction;
@@ -220,7 +222,7 @@ class WorkPageScaffold extends StatelessWidget {
           backgroundColor: MoolColors.canvas,
           surfaceTintColor: Colors.transparent,
           automaticallyImplyLeading: false,
-          toolbarHeight: 88,
+          toolbarHeight: headerHeight,
           leadingWidth: showBack ? 64 : 16,
           leading: showBack
               ? Padding(

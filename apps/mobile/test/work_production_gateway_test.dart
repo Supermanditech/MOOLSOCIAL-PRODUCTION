@@ -11,6 +11,64 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 
 void main() {
+  test(
+    'order selection preserves packing and rider state without advancing another order',
+    () {
+      final session = WorkSession()..seedVerifiedWorkspace();
+      addTearDown(session.dispose);
+      WorkspaceOrderRecord order(String id, String stage) =>
+          WorkspaceOrderRecord(
+            id: id,
+            customer: '$id customer',
+            items: 'Atta × 1',
+            quantities: const {},
+            amount: 100,
+            payment: 'Paid online',
+            source: 'App',
+            fulfilment: 'Mool delivery',
+            address: '$id Market Road',
+            stage: stage,
+            needsDelivery: true,
+            createdAt: DateTime(2026, 9, 6),
+            actionDeadline: DateTime(2026, 9, 6, 10),
+          );
+      session.workspaceOrders.addAll([
+        order('A', 'Preparing'),
+        order('B', 'Confirmed'),
+      ]);
+      expect(session.selectWorkspaceOrder('A'), isTrue);
+      session.setWorkspacePackingLine('summary-0', true);
+      session.workspaceDeliveryAssignment = WorkspaceDeliveryAssignment(
+        orderId: 'A',
+        partnerName: 'Assigned rider',
+        vehicleLabel: 'Bike',
+        eta: DateTime(2026, 9, 6, 10),
+        stage: 'Accepted',
+      );
+      expect(session.selectWorkspaceOrder('B'), isTrue);
+      expect(session.currentWorkspaceOrderId, 'B');
+      expect(session.workspaceOrderStage, 'Confirmed');
+      expect(session.workspaceOrderAddress, 'B Market Road');
+      expect(session.workspaceDeliveryAssignment, isNull);
+      expect(session.workspacePackedProductIds, isEmpty);
+      expect(session.workspaceOrders.first.stage, 'Preparing');
+      expect(session.selectWorkspaceOrder('A'), isTrue);
+      expect(session.workspacePackedProductIds, {'summary-0'});
+      expect(session.workspaceDeliveryAssignment?.orderId, 'A');
+      session.startNewWorkspaceOrder();
+      expect(session.selectWorkspaceOrder('A'), isTrue);
+      expect(session.workspacePackedProductIds, {'summary-0'});
+      session.workspaceHandoverBusy = true;
+      expect(session.selectWorkspaceOrder('B'), isFalse);
+      expect(session.currentWorkspaceOrderId, 'A');
+      session.workspaceHandoverBusy = false;
+      session.startNewWorkspaceOrder();
+      session.workspaceOrderQuantities['atta'] = 2;
+      expect(session.selectWorkspaceOrder('B'), isFalse);
+      expect(session.workspaceOrderQuantities, {'atta': 2});
+      expect(session.currentWorkspaceOrderId, isNull);
+    },
+  );
   for (final channel in WorkContactChannel.values) {
     test('changed $channel invalidates an in-flight OTP and consent', () async {
       final work = WorkSession(gateway: ReviewWorkGateway());

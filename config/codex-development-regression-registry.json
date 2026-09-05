@@ -10,6 +10,85 @@
   },
   "entries": [
     {
+      "id": "REG-20260906-4507-WORKSPACE-PICKER-SPACE-AND-HEADER-READABILITY",
+      "status": "local_qualified_oppo_review_pending",
+      "appliesTo": ["primary", "work", "testing", "device"],
+      "mistake": "The first-tap Workspace picker still reserves 72 percent of the viewport for one entry. At 320 pixels and 140 percent text the store header inherits ellipsis despite the founder requiring its full name.",
+      "rootCause": "The picker uses a fixed viewport fraction and an Expanded list; the store name inherits a one-line default text contract.",
+      "prevention": "Make the picker content-sized with a bounded scrollable list and safe-area action; explicitly wrap the full store name. The first correction exposed lost outer Android padding and a reset font family. Preserve the original outside view padding explicitly and inherit the application font when resetting maxLines. Keep the original clearance assertions and inspect rendered glyphs, not only text semantics. Test one and multiple Workspaces, large text, keyboard and Android clearance without reducing touch targets.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"]
+    },
+    {
+      "id": "REG-20260906-4508-C24G-CHOOSER-DEPENDENT-COPY-CONTRACT",
+      "status": "contract_corrected_two_connected_replays_passed",
+      "appliesTo": ["primary", "work", "testing"],
+      "mistake": "The wider connected batch reached the older C24G chooser test and failed on Grow your business with MoolSocial. The approved compact Workspace entry now uses Grow with MoolSocial and progressive steps, with account details on the contact page.",
+      "rootCause": "The focused pre-dashboard test set did not include this older dependent chooser assertion.",
+      "prevention": "Change only the exact owned C24G copy expectations to the rendered founder-approved header, progressive steps, compact Continue setup action and When applicable document guidance. Preserve route, no fake verification, touch semantics, role coverage and two-stage selection checks. Back preserves the selected Workspace and actual chooser instead of clearing a saved choice. Preserve the 671-pass/83-skip/one-failure broad run and subsequent focused runs as failed evidence. Replay the complete connected batch twice.",
+      "gates": ["apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"]
+    },
+    {
+      "id": "REG-20260906-4506-ORDER-QUEUE-ACTION-INHERITED-FULL-WIDTH",
+      "status": "local_qualified_oppo_review_pending",
+      "appliesTo": ["primary", "work", "testing", "device"],
+      "mistake": "The order queue's Accept button inherited the global full-width minimum size, forcing Reject onto another line. The large-text compact-queue regression measured 261 pixels against the preserved under-220-pixel requirement; 207 tests passed, 68 captures skipped and one test failed.",
+      "rootCause": "Moving actions into a Wrap did not override the shared button theme's infinite minimum width.",
+      "prevention": "Use a content-sized local action with a 48-pixel minimum tap target, preserve the compact-height assertion and inspect both normal and large-text captures before the final connected runs. The 320-pixel large-text capture also exposed truncated acceptance status crowding the amount: use concise Accept within, remove a redundant decorative icon, reserve spacing before the amount and assert the complete status label is rendered.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"]
+    },
+    {
+      "id": "REG-20260906-4505-FLUTTER-CHILD-RUN-WRONG-WORKING-DIRECTORY",
+      "status": "runner_only_no_tests_executed",
+      "appliesTo": ["primary", "testing", "tooling"],
+      "mistake": "The first Store child regression invocation ran from the repository root and Flutter rejected it because pubspec.yaml was absent. No tests executed; the log is preserved as failed runner evidence.",
+      "rootCause": "The gate working directory was reused for the Flutter invocation rather than the mobile project directory.",
+      "prevention": "Require apps/mobile/pubspec.yaml in the explicit command working directory before Flutter testing; use a fresh evidence filename and verify the test exit code. Do not count the rejected invocation as test results. Read the manifest path from candidate state rather than guessing its suffix. A later candidate claim preflight rejected a not-yet-created evidence file: create truthful pending inputs before checking; claim generated provenance and install outputs only after they exist. Keep exact permitted paths and gate behavior unchanged.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"]
+    },
+    {
+      "id": "REG-20260906-4504-ATOMIC-WORK-TEST-EXACT-OWNER-OMITTED",
+      "status": "original_atomic_test_restored_owned_regression_passed",
+      "appliesTo": [
+        "primary",
+        "work",
+        "testing"
+      ],
+      "mistake": "The Store child added focused regressions to work_store_atomic_operations_test.dart and ran analysis before confirming this existing test was in the active claim. The next implementation gate rejected that exact test owner; no regression run followed the rejection.",
+      "rootCause": "Read-only use of an existing test in earlier batches was mistaken for write ownership.",
+      "prevention": "The subsequent check also rejected the same file at the lane allowlist. Keep the lane unchanged: relocate only the newly authored regression to already-owned work_production_gateway_test.dart, restore the original atomic test byte-for-byte, and remove the unused advance claim. Preserve both failed checks and require a passing implementation gate before replay; no owner root or checker behavior changes.",
+      "gates": [
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "apps/mobile/test/work_store_atomic_operations_test.dart"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"
+      ]
+    },
+    {
+      "id": "REG-20260906-4503-STORE-FIRST-ENTRY-AND-MULTIORDER-ISOLATION",
+      "status": "local_qualified_oppo_review_pending",
+      "appliesTo": [
+        "primary",
+        "work",
+        "testing",
+        "device"
+      ],
+      "mistake": "Fresh pre-dashboard captures exposed an oversized setup-only centre after approval that hid the accepted operational rails. Read-through also found that nonselected incoming orders had no way to become the active working order.",
+      "rootCause": "Dashboard visibility depended on setup completion rather than approved access; the order queue exposed only one mutable active order without a safe selector or isolated packing and delivery state.",
+      "prevention": "Keep approved rails visible before publication with a compact actionable setup centre. Select an exact recorded order without advancing it, preserve each order packing and rider state, reject switching during an in-flight action or unsaved bill, and test switching away and back. Never imply publication or delivery approval merely from selection.",
+      "gates": [
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"
+      ]
+    },
+    {
       "id": "REG-20260906-4502-WORKSPACE-CAPTURE-HELPER-DECLARATION-ORDER",
       "status": "registered_compile_failure_before_visual_evidence",
       "appliesTo": [
