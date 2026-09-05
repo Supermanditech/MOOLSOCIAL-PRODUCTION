@@ -3554,11 +3554,13 @@ class BuyV2Session extends ChangeNotifier {
       return const [];
     }
 
+    // Alternate packs stay out of the main grid, but the exact catalogue-backed
+    // entry pack must remain browsable when its customer visits this supplier.
     final candidates = _catalogueProducts
         .where(
           (product) =>
               product.destination == current.destination &&
-              product.catalogueListing &&
+              (product.catalogueListing || product.id == current.id) &&
               product.seller == current.seller &&
               switch (current.destination) {
                 BuyV2Destination.shop => true,

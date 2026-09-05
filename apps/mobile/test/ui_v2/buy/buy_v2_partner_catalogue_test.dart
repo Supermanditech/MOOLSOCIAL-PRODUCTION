@@ -9,6 +9,189 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final id in ['s-milk-500ml', 's-milk-2l', 'w-rice-50kg', 'w-oil-10l']) {
+    test('R66 supplier catalogue retains exact entry variant $id', () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      final product = session.product(id);
+      expect(product.catalogueListing, isFalse);
+      final products = session.partnerCatalogueFor(product);
+      expect(products.map((item) => item.id), contains(id));
+      expect(products.first, same(product));
+      expect(session.partnerCatalogueFor(product, limit: 1), [product]);
+      expect(session.partnerCatalogueFor(product, limit: 0), isEmpty);
+      expect(products.map((item) => item.id).toSet().length, products.length);
+      for (final item in products) {
+        expect(item, same(session.product(item.id)));
+        expect(item.seller, product.seller);
+        expect(item.destination, product.destination);
+        expect(item.catalogueListing || item.id == id, isTrue);
+        if (product.destination == BuyV2Destination.wholesale) {
+          expect(item.minimumOrder > 2, product.minimumOrder > 2);
+        }
+      }
+      expect(product.catalogueListing, isFalse);
+      final main = BuyV2Catalogue.products.firstWhere(
+        (item) =>
+            item.canonicalId == product.canonicalId &&
+            item.destination == product.destination,
+      );
+      expect(
+        session
+            .partnerCatalogueFor(main)
+            .every((item) => item.catalogueListing),
+        isTrue,
+        reason: 'A variant visit must not change the main catalogue listing',
+      );
+      expect(
+        session
+            .partnerCatalogueFor(product.copyWith(id: 'unlisted-$id'))
+            .any((item) => item.id == 'unlisted-$id'),
+        isFalse,
+        reason: 'Never manufacture a catalogue entry from a caller object',
+      );
+    });
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R66 supplier variant journey $id text $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = Size(scale == 2 ? 320 : 390, 844);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        final product = session.product(id);
+        final otherId = product.destination == BuyV2Destination.shop
+            ? 'w-notebook'
+            : 's-eggs';
+        session.addProduct(otherId);
+        final otherQuantity = session.quantityFor(otherId);
+        expect(session.openProduct(id), isTrue);
+        await tester.pumpWidget(_app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        final shop = product.destination == BuyV2Destination.shop;
+        final prefix = shop ? 'buy-shop-seller' : 'buy-wholesale-supplier';
+        final action = find.byKey(
+          ValueKey(
+            '${shop ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-$id',
+          ),
+        );
+        await _revealProductAction(tester, id, action);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        final sheet = find.byKey(ValueKey('$prefix-sheet-$id'));
+        expect(sheet, findsOneWidget);
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.byKey(ValueKey('buy-product-$id')),
+          ),
+          findsOneWidget,
+        );
+        final viewAll = find.byKey(ValueKey('$prefix-view-more-$id'));
+        await tester.ensureVisible(viewAll);
+        await tester.tap(viewAll);
+        await tester.pumpAndSettle();
+        final full = find.byKey(ValueKey('$prefix-full-catalogue-list'));
+        expect(full, findsOneWidget);
+        final card = find.descendant(
+          of: full,
+          matching: find.byKey(ValueKey('buy-product-$id')),
+        );
+        expect(card, findsOneWidget);
+        final add = find.descendant(
+          of: card,
+          matching: find.byKey(ValueKey('buy-add-$id')),
+        );
+        await tester.ensureVisible(add);
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(id), product.minimumOrder);
+        expect(session.quantityFor(otherId), otherQuantity);
+        await tester.tap(card);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.byKey(PageStorageKey('buy-product-$id')), findsWidgets);
+        await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        expect(
+          session.cartScope,
+          shop ? BuyV2CartScope.shop : BuyV2CartScope.wholesale,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(PageStorageKey('buy-product-$id')), findsWidgets);
+        expect(
+          find.byKey(const ValueKey('buy-store-cart-bar')),
+          findsOneWidget,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(full, findsOneWidget);
+        await tester.tap(
+          find.descendant(
+            of: find.byKey(ValueKey('$prefix-full-catalogue-sheet')),
+            matching: find.byKey(const ValueKey('buy-store-cart-bar')),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        expect(
+          session.cartScope,
+          shop ? BuyV2CartScope.shop : BuyV2CartScope.wholesale,
+        );
+        final cartProduct = find.byKey(
+          ValueKey('buy-cart-product-details-$id'),
+        );
+        await tester.ensureVisible(cartProduct);
+        await tester.tap(cartProduct);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.product);
+        expect(session.selectedProductId, id);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        await tester.tap(find.widgetWithText(FilledButton, 'Review order'));
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.checkout);
+        await tester.tap(
+          find.byKey(const ValueKey('buy-checkout-return-cart')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(full, findsOneWidget);
+        await tester.tap(find.byKey(ValueKey('$prefix-full-catalogue-close')));
+        await tester.pumpAndSettle();
+        expect(sheet, findsOneWidget);
+        await tester.tap(
+          find.descendant(
+            of: find.byKey(ValueKey('$prefix-route-$id')),
+            matching: find.byKey(const ValueKey('buy-store-cart-bar')),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(sheet, findsOneWidget);
+        await tester.tap(find.byKey(ValueKey('$prefix-sheet-close')));
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, id);
+        expect(session.quantityFor(id), product.minimumOrder);
+        expect(session.quantityFor(otherId), otherQuantity);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   for (final firstId in ['s-eggs', 'w-notebook']) {
     testWidgets('R66 Cart store continuation stays scoped after $firstId', (
       tester,
@@ -451,9 +634,15 @@ void main() {
   });
 }
 
-Widget _app(BuyV2Session session) => MaterialApp(
+Widget _app(BuyV2Session session, {double textScale = 1}) => MaterialApp(
   debugShowCheckedModeBanner: false,
   theme: MoolTheme.light(),
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(
+      context,
+    ).copyWith(textScaler: TextScaler.linear(textScale)),
+    child: child!,
+  ),
   home: BuyV2Screen(
     session: session,
     initialDestination: session.destination,

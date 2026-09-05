@@ -3462,6 +3462,7 @@ Future<void> showBuyV2PartnerCatalogue(
   ValueChanged<BuyV2Product>? onStoreChanged,
   Future<bool> Function(BuyV2Product product)? onOpenProduct,
   VoidCallback? onOpenCart,
+  ValueChanged<BuyV2Product>? onOpenStoreCart,
 }) async {
   final supportedDestination =
       current.destination == BuyV2Destination.shop ||
@@ -3562,6 +3563,9 @@ Future<void> showBuyV2PartnerCatalogue(
       products,
       ownerPrefix,
       onOpenProduct: onOpenProduct,
+      onOpenCart: onOpenStoreCart == null
+          ? null
+          : () => onOpenStoreCart(current),
     );
     if (productId == null || !sheetContext.mounted) return;
     if (productId == 'cart:') {
@@ -3815,6 +3819,7 @@ Future<void> showBuyV2PartnerCatalogue(
                                                   ),
                                               onOpenProduct: onOpenProduct,
                                               onStoreChanged: onStoreChanged,
+                                              onOpenStoreCart: onOpenStoreCart,
                                               onOpenCart: () => Navigator.of(
                                                 sheetContext,
                                               ).pop('cart:'),
@@ -3839,7 +3844,9 @@ Future<void> showBuyV2PartnerCatalogue(
                     child: BuyV2StoreCartBar(
                       session: session,
                       destination: current.destination,
-                      onOpenCart: () => Navigator.of(sheetContext).pop('cart:'),
+                      onOpenCart: onOpenStoreCart == null
+                          ? () => Navigator.of(sheetContext).pop('cart:')
+                          : () => onOpenStoreCart(current),
                     ),
                   ),
               ],
@@ -3880,6 +3887,7 @@ Future<void> showBuyV2PartnerCatalogue(
           onStoreChanged: onStoreChanged,
           onOpenProduct: onOpenProduct,
           onOpenCart: onOpenCart,
+          onOpenStoreCart: onOpenStoreCart,
         );
       } else {
         final product = session.product(selectedProductId);
@@ -4463,6 +4471,7 @@ Future<String?> _showBuyV2FullStoreCatalogue(
   List<BuyV2Product> products,
   String ownerPrefix, {
   Future<bool> Function(BuyV2Product product)? onOpenProduct,
+  VoidCallback? onOpenCart,
 }) {
   Future<void> openProduct(
     BuildContext sheetContext,
@@ -4574,7 +4583,9 @@ Future<String?> _showBuyV2FullStoreCatalogue(
                   child: BuyV2StoreCartBar(
                     session: session,
                     destination: current.destination,
-                    onOpenCart: () => Navigator.of(sheetContext).pop('cart:'),
+                    onOpenCart:
+                        onOpenCart ??
+                        () => Navigator.of(sheetContext).pop('cart:'),
                   ),
                 ),
             ],

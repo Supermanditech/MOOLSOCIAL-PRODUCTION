@@ -1007,6 +1007,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         onAskStore: _openStoreQuestion,
         onStoreChanged: _rememberStoreBrowse,
         onOpenProduct: _openStoreProduct,
+        onOpenStoreCart: (store) {
+          unawaited(_openStoreProduct(store, cartEntry: true));
+        },
         onOpenCart: () => widget.session.openCart(
           scope: switch (product.destination) {
             BuyV2Destination.shop ||
@@ -1019,7 +1022,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     );
   }
 
-  Future<bool> _openStoreProduct(BuyV2Product product) async {
+  Future<bool> _openStoreProduct(
+    BuyV2Product product, {
+    bool cartEntry = false,
+  }) async {
     final session = widget.session;
     if (_storeBrowseAnchor?.seller != product.seller ||
         _storeBrowseAnchor?.destination != product.destination) {
@@ -1030,6 +1036,15 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     final previousProductId = session.selectedProductId;
     final previousCartScope = session.cartScope;
     if (!session.openProduct(product.id) || !mounted) return false;
+    if (cartEntry) {
+      session.openCart(
+        scope: switch (product.destination) {
+          BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+          BuyV2Destination.medicine => BuyV2CartScope.medicine,
+          _ => BuyV2CartScope.shop,
+        },
+      );
+    }
     final generation = _storeNavigationGeneration;
     final navigation = MoolGlobalNavigationController();
     final routeDepth = ++_storeProductRouteDepth;
@@ -1042,7 +1057,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
           builder: (context, setRouteState) => AnimatedBuilder(
             animation: session,
             builder: (context, _) {
-              final showingProduct = session.view == BuyV2View.product;
+              final showingProduct =
+                  !cartEntry && session.view == BuyV2View.product;
               void update(VoidCallback change) {
                 setState(change);
                 setRouteState(() {});
@@ -1051,7 +1067,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
               return BuyV2ThemeScope(
                 spec: BuyV2ThemeSpec.resolve(session.destination, session.view),
                 child: PopScope<bool>(
-                  canPop: showingProduct,
+                  canPop: cartEntry
+                      ? session.view == BuyV2View.cart
+                      : showingProduct,
                   onPopInvokedWithResult: (didPop, _) {
                     if (didPop) return;
                     if (navigation.isOpen) {
