@@ -110,6 +110,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   String? _presentedQuickOrderId;
   BuyV2OrderStatus? _presentedQuickOrderStatus;
   final Map<BuyV2Destination, BuyV2Product> _storeBrowseAnchors = {};
+  int _storeProductRouteDepth = 0;
+  int _storeNavigationGeneration = 0;
   BuyV2Product? get _storeBrowseAnchor =>
       _storeBrowseAnchors.isEmpty ? null : _storeBrowseAnchors.values.last;
   BuyV2NavigationMotionDirection _surfaceMotionDirection =
@@ -218,6 +220,14 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
 
   void _sessionChanged() {
     if (!mounted) return;
+    if (_storeProductRouteDepth > 0 &&
+        widget.session.view == BuyV2View.catalogue) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.session.view == BuyV2View.catalogue) {
+          _dismissStoreProductRoutes();
+        }
+      });
+    }
     _surfaceMotionDirection = widget.session.navigationMotionDirection;
     final quickOrder = widget.session.activeQuickDeliveryOrder;
     final quickOrderId = quickOrder?.id;
@@ -458,19 +468,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    final careNavigation =
-        session.activeDockDestination == BuyV2Destination.medicine;
     final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     final surfaceTheme = BuyV2ThemeSpec.resolve(
       session.destination,
       session.view,
     );
-    final quickOrder = session.view == BuyV2View.tracking
-        ? null
-        : session.activeQuickDeliveryOrder;
-    final quietOrder = quickOrder == null && session.view != BuyV2View.tracking
-        ? session.activeQuietDeliveryOrder
-        : null;
     return BuyV2ThemeScope(
       spec: surfaceTheme,
       child: PopScope<Object?>(
@@ -537,30 +539,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               session.destination != BuyV2Destination.orders &&
                               session.destination != BuyV2Destination.medicine)
                             BuyV2ShoppingIntentBar(session: session),
-                          if (quickOrder != null && !_quickTrackerHidden)
-                            _BuyQuickDeliveryStatusBar(
-                              order: quickOrder,
-                              minimized: _quickTrackerMinimized,
-                              soundOnArrival: _quickTrackerSoundOnArrival,
-                              onMinimizedChanged: (value) => setState(
-                                () => _quickTrackerMinimized = value,
-                              ),
-                              onHiddenChanged: (value) =>
-                                  setState(() => _quickTrackerHidden = value),
-                              onSoundChanged: (value) => setState(
-                                () => _quickTrackerSoundOnArrival = value,
-                              ),
-                              onKeepOnScreen: () => setState(() {
-                                _quickTrackerHidden = false;
-                                _quickTrackerMinimized = true;
-                              }),
-                              onOpen: () => session.openTracking(quickOrder.id),
-                            )
-                          else if (quietOrder != null)
-                            _BuyQuietDeliveryStatusBar(
-                              order: quietOrder,
-                              onOpen: () => session.openTracking(quietOrder.id),
-                            ),
+                          _buildDeliveryStatus(session, setState),
                           Expanded(
                             child: Stack(
                               key: const ValueKey(
@@ -581,10 +560,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                                             : 'buy-search-owner-motion-primary',
                                       ),
                                       child:
-                                          _searchOpen &&
-                                              !_offersActive &&
-                                              session.destination !=
-                                                  BuyV2Destination.orders
+                                          _storeProductRouteDepth > 0 &&
+                                              session.view != BuyV2View.product
+                                          ? const SizedBox.expand()
+                                          : _searchOpen &&
+                                                !_offersActive &&
+                                                session.destination !=
+                                                    BuyV2Destination.orders
                                           ? BuyV2SearchResultsView(
                                               session: session,
                                             )
@@ -592,42 +574,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                                     ),
                                   ),
                                 ),
-                                if (quickOrder != null && _quickTrackerHidden)
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(right: 4),
-                                      child: Semantics(
-                                        key: const ValueKey(
-                                          'buy-quick-delivery-status-hidden',
-                                        ),
-                                        label: 'Live delivery hidden',
-                                        button: true,
-                                        child: Material(
-                                          color: Colors.white,
-                                          shape: const CircleBorder(
-                                            side: BorderSide(
-                                              color: BuyV2Colors.royal,
-                                            ),
-                                          ),
-                                          child: IconButton(
-                                            key: const ValueKey(
-                                              'buy-quick-delivery-restore',
-                                            ),
-                                            tooltip: 'Restore live delivery',
-                                            onPressed: () => setState(
-                                              () => _quickTrackerHidden = false,
-                                            ),
-                                            color: BuyV2Colors.royal,
-                                            icon: const Icon(
-                                              Icons.bolt_rounded,
-                                              size: 20,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                ?_buildDeliveryRestore(session, setState),
                                 if (!keyboardVisible && _showsMiniCart(session))
                                   Positioned.fill(
                                     child: _BuyMiniCartBar(
@@ -658,34 +605,104 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
           ),
           bottomNavigationBar: keyboardVisible
               ? null
-              : MoolDestinationNavigationV2(
-                  activeId: careNavigation ? 'book' : 'buy',
-                  destinationLabel: careNavigation ? 'Care' : 'Shop',
-                  familyRootSelected:
-                      !careNavigation &&
-                      !_offersActive &&
-                      session.activeDockDestination == BuyV2Destination.shop,
-                  selectedLocalIndex: careNavigation
-                      ? 1
-                      : _offersActive
-                      ? 2
-                      : switch (session.activeDockDestination) {
-                          BuyV2Destination.orders => 1,
-                          _ => 0,
-                        },
-                  localActionCount: 3,
-                  localNavigation: careNavigation
-                      ? _buildCareLocalNavigation()
-                      : _buildBuyLocalNavigation(session),
-                  onOpenMool: _openGlobalMool,
-                  onOpenAction: _openGlobalAction,
-                  onOpenChat: _openShopChat,
-                  moolNavigationController: _moolNavigationController,
-                  onPreviousLocalAction: () => _moveBuyLocal(session, -1),
-                  onNextLocalAction: () => _moveBuyLocal(session, 1),
-                ),
+              : _buildDestinationNavigation(session, _moolNavigationController),
         ),
       ),
+    );
+  }
+
+  Widget _buildDeliveryStatus(BuyV2Session session, StateSetter update) {
+    if (session.view == BuyV2View.tracking) return const SizedBox.shrink();
+    final quickOrder = session.activeQuickDeliveryOrder;
+    if (quickOrder != null) {
+      if (_quickTrackerHidden) return const SizedBox.shrink();
+      return _BuyQuickDeliveryStatusBar(
+        order: quickOrder,
+        minimized: _quickTrackerMinimized,
+        soundOnArrival: _quickTrackerSoundOnArrival,
+        onMinimizedChanged: (value) =>
+            update(() => _quickTrackerMinimized = value),
+        onHiddenChanged: (value) => update(() => _quickTrackerHidden = value),
+        onSoundChanged: (value) =>
+            update(() => _quickTrackerSoundOnArrival = value),
+        onKeepOnScreen: () => update(() {
+          _quickTrackerHidden = false;
+          _quickTrackerMinimized = true;
+        }),
+        onOpen: () => session.openTracking(quickOrder.id),
+      );
+    }
+    final quietOrder = session.activeQuietDeliveryOrder;
+    if (quietOrder == null) return const SizedBox.shrink();
+    return _BuyQuietDeliveryStatusBar(
+      order: quietOrder,
+      onOpen: () => session.openTracking(quietOrder.id),
+    );
+  }
+
+  Widget? _buildDeliveryRestore(BuyV2Session session, StateSetter update) {
+    if (session.view == BuyV2View.tracking ||
+        session.activeQuickDeliveryOrder == null ||
+        !_quickTrackerHidden) {
+      return null;
+    }
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 4),
+        child: Semantics(
+          key: const ValueKey('buy-quick-delivery-status-hidden'),
+          label: 'Live delivery hidden',
+          button: true,
+          child: Material(
+            color: Colors.white,
+            shape: const CircleBorder(
+              side: BorderSide(color: BuyV2Colors.royal),
+            ),
+            child: IconButton(
+              key: const ValueKey('buy-quick-delivery-restore'),
+              tooltip: 'Restore live delivery',
+              onPressed: () => update(() => _quickTrackerHidden = false),
+              color: BuyV2Colors.royal,
+              icon: const Icon(Icons.bolt_rounded, size: 20),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDestinationNavigation(
+    BuyV2Session session,
+    MoolGlobalNavigationController controller,
+  ) {
+    final careNavigation =
+        session.activeDockDestination == BuyV2Destination.medicine;
+    return MoolDestinationNavigationV2(
+      activeId: careNavigation ? 'book' : 'buy',
+      destinationLabel: careNavigation ? 'Care' : 'Shop',
+      familyRootSelected:
+          !careNavigation &&
+          !_offersActive &&
+          session.activeDockDestination == BuyV2Destination.shop,
+      selectedLocalIndex: careNavigation
+          ? 1
+          : _offersActive
+          ? 2
+          : switch (session.activeDockDestination) {
+              BuyV2Destination.orders => 1,
+              _ => 0,
+            },
+      localActionCount: 3,
+      localNavigation: careNavigation
+          ? _buildCareLocalNavigation()
+          : _buildBuyLocalNavigation(session),
+      onOpenMool: _openGlobalMool,
+      onOpenAction: _openGlobalAction,
+      onOpenChat: _openShopChat,
+      moolNavigationController: controller,
+      onPreviousLocalAction: () => _moveBuyLocal(session, -1),
+      onNextLocalAction: () => _moveBuyLocal(session, 1),
     );
   }
 
@@ -724,6 +741,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   void _openBuyDestination(BuyV2Destination destination) {
+    _dismissStoreProductRoutes();
     HapticFeedback.selectionClick();
     setState(() {
       _offersActive = false;
@@ -737,6 +755,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   void _openOffers() {
+    _dismissStoreProductRoutes();
     HapticFeedback.selectionClick();
     setState(() {
       _offersActive = true;
@@ -1006,40 +1025,150 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     final previousProductId = session.selectedProductId;
     final previousCartScope = session.cartScope;
     if (!session.openProduct(product.id) || !mounted) return false;
-
+    final generation = _storeNavigationGeneration;
+    final navigation = MoolGlobalNavigationController();
+    final routeDepth = ++_storeProductRouteDepth;
     final openCart = await Navigator.of(context).push<bool>(
       PageRouteBuilder<bool>(
         settings: const RouteSettings(name: 'buy-store-product'),
         transitionDuration: BuyV2Motion.contentChange,
         reverseTransitionDuration: BuyV2Motion.contentChange,
-        pageBuilder: (routeContext, _, _) => Scaffold(
-          backgroundColor: Colors.white,
-          body: SafeArea(
-            child: AnimatedBuilder(
-              animation: session,
-              builder: (context, _) => Column(
-                children: [
-                  Expanded(
-                    child: BuyV2ProductView(
-                      session: session,
-                      returnLabel:
-                          'Back to ${_storeBrowseAnchor?.seller ?? product.seller}',
-                      onReturn: () => Navigator.of(routeContext).pop(false),
-                      onAskSeller: _openProductQuestion,
-                      onOpenPartnerCatalogue: _openPartnerCatalogue,
-                      wholesaleTradeDecisionAdapter:
-                          widget.wholesaleTradeDecisionAdapter,
+        pageBuilder: (routeContext, _, _) => StatefulBuilder(
+          builder: (context, setRouteState) => AnimatedBuilder(
+            animation: session,
+            builder: (context, _) {
+              final showingProduct = session.view == BuyV2View.product;
+              void update(VoidCallback change) {
+                setState(change);
+                setRouteState(() {});
+              }
+
+              return BuyV2ThemeScope(
+                spec: BuyV2ThemeSpec.resolve(session.destination, session.view),
+                child: PopScope<bool>(
+                  canPop: showingProduct,
+                  onPopInvokedWithResult: (didPop, _) {
+                    if (didPop) return;
+                    if (navigation.isOpen) {
+                      unawaited(navigation.close());
+                    } else {
+                      session.goBack();
+                    }
+                  },
+                  child: Scaffold(
+                    backgroundColor: Colors.white,
+                    body: SafeArea(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: showingProduct
+                                ? double.infinity
+                                : BuyV2Metrics.maxWidth,
+                          ),
+                          child: Column(
+                            children: [
+                              if (!showingProduct) ...[
+                                if (session.activeShoppingIntent != null &&
+                                    session.destination !=
+                                        BuyV2Destination.orders &&
+                                    session.destination !=
+                                        BuyV2Destination.medicine)
+                                  BuyV2ShoppingIntentBar(session: session),
+                                _buildDeliveryStatus(session, update),
+                              ],
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: _BuyNavigationSurfaceOwner(
+                                        key: const ValueKey(
+                                          'buy-store-product-surface-owner',
+                                        ),
+                                        stateKey:
+                                            session.navigationMotionSequence,
+                                        direction:
+                                            session.navigationMotionDirection,
+                                        child: showingProduct
+                                            ? Column(
+                                                children: [
+                                                  Expanded(
+                                                    child: BuyV2ProductView(
+                                                      session: session,
+                                                      returnLabel:
+                                                          'Back to ${_storeBrowseAnchor?.seller ?? product.seller}',
+                                                      onReturn: () =>
+                                                          Navigator.of(
+                                                            routeContext,
+                                                          ).pop(false),
+                                                      onAskSeller:
+                                                          _openProductQuestion,
+                                                      onOpenPartnerCatalogue:
+                                                          _openPartnerCatalogue,
+                                                      wholesaleTradeDecisionAdapter:
+                                                          widget
+                                                              .wholesaleTradeDecisionAdapter,
+                                                    ),
+                                                  ),
+                                                  if (session
+                                                          .countForDestination(
+                                                            product.destination,
+                                                          ) >
+                                                      0)
+                                                    BuyV2StoreCartBar(
+                                                      session: session,
+                                                      destination:
+                                                          product.destination,
+                                                      onOpenCart: () =>
+                                                          session.openCart(
+                                                            scope: switch (product
+                                                                .destination) {
+                                                              BuyV2Destination
+                                                                  .wholesale =>
+                                                                BuyV2CartScope
+                                                                    .wholesale,
+                                                              BuyV2Destination
+                                                                  .medicine =>
+                                                                BuyV2CartScope
+                                                                    .medicine,
+                                                              _ =>
+                                                                BuyV2CartScope
+                                                                    .shop,
+                                                            },
+                                                          ),
+                                                    ),
+                                                ],
+                                              )
+                                            : routeDepth ==
+                                                  _storeProductRouteDepth
+                                            ? _currentView(session)
+                                            : const SizedBox.expand(),
+                                      ),
+                                    ),
+                                    if (!showingProduct)
+                                      ?_buildDeliveryRestore(session, update),
+                                    if (session.notice case final message?)
+                                      Positioned(
+                                        right: 8,
+                                        top: 8,
+                                        child: _BuyNotice(message: message),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
+                    bottomNavigationBar:
+                        showingProduct ||
+                            MediaQuery.viewInsetsOf(context).bottom > 0
+                        ? null
+                        : _buildDestinationNavigation(session, navigation),
                   ),
-                  if (session.countForDestination(product.destination) > 0)
-                    BuyV2StoreCartBar(
-                      session: session,
-                      destination: product.destination,
-                      onOpenCart: () => Navigator.of(routeContext).pop(true),
-                    ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ),
         transitionsBuilder: (context, animation, _, child) {
@@ -1063,7 +1192,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         },
       ),
     );
+    _storeProductRouteDepth--;
     if (!mounted) return openCart ?? false;
+    setState(() {});
+    if (generation != _storeNavigationGeneration) return false;
 
     if (previousView == BuyV2View.cart) {
       session.destination = previousDestination;
@@ -1072,6 +1204,14 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       session.openProduct(previousProductId);
     }
     return openCart ?? false;
+  }
+
+  void _dismissStoreProductRoutes() {
+    if (_storeProductRouteDepth == 0) return;
+    final root = ModalRoute.of(context);
+    if (root == null) return;
+    _storeNavigationGeneration++;
+    Navigator.of(context).popUntil((route) => route == root);
   }
 
   void _openShopChat() {

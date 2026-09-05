@@ -4611,11 +4611,53 @@ class _RelatedStoreCard extends StatelessWidget {
       BuyV2FulfilmentMode.bulkFreight =>
         'Bulk delivery · ${_compactDeliveryPromise(product.deliveryPromise)}',
     };
+    double rowHeight(TextStyle style, {int lines = 1}) => buyV2ValueTextSize(
+      context,
+      lines == 2 ? 'Ag\nAg' : 'Ag',
+      style,
+      maxLines: lines,
+    ).height;
+    final headerHeight = rowHeight(
+      context.buyBody.copyWith(
+        fontSize: 11.5,
+        height: 1.05,
+        fontWeight: FontWeight.w900,
+      ),
+      lines: 2,
+    ).clamp(28, double.infinity);
+    final identityHeight = rowHeight(
+      context.buyMeta.copyWith(
+        fontSize: 9.5,
+        height: 1.05,
+        fontWeight: FontWeight.w900,
+      ),
+      lines: 2,
+    );
+    final productHeight = rowHeight(
+      context.buyMeta.copyWith(fontSize: 9.5, height: 1.05),
+      lines: 2,
+    );
+    final priceHeight = rowHeight(
+      context.buyBody.copyWith(fontWeight: FontWeight.w900),
+    ).clamp(rowHeight(context.buyMeta), double.infinity);
+    final deliveryHeight = rowHeight(
+      context.buyMeta.copyWith(fontWeight: FontWeight.w900),
+      lines: 2,
+    ).clamp(14, double.infinity);
+    final cardHeight =
+        (27 +
+                headerHeight +
+                identityHeight +
+                productHeight +
+                priceHeight +
+                deliveryHeight)
+            .clamp(accessibleText ? 190 : 145, double.infinity)
+            .toDouble();
     return BuyV2IntentDepth(
       spatial: false,
       child: SizedBox(
         width: accessibleText ? 208 : 196,
-        height: accessibleText ? 190 : 145,
+        height: cardHeight,
         child: Material(
           key: ValueKey('buy-related-store-surface-${product.id}'),
           color: Colors.transparent,

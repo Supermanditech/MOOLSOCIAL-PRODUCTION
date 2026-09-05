@@ -6295,8 +6295,24 @@ void main() {
         find.byKey(const ValueKey('buy-cart-continue-store-name')),
       );
       expect(returnName.data, 'Thar Grains Wholesale');
-      expect(returnName.maxLines, 2);
-      expect(returnName.overflow, TextOverflow.clip);
+      final returnNameFinder = find.byKey(
+        const ValueKey('buy-cart-continue-store-name'),
+      );
+      expect(returnName.maxLines, isNull);
+      expect(
+        tester
+            .renderObject<RenderParagraph>(returnNameFinder)
+            .didExceedMaxLines,
+        isFalse,
+      );
+      final returnBounds = tester.getRect(
+        find.byKey(const ValueKey('buy-cart-continue-store')),
+      );
+      final nameBounds = tester.getRect(returnNameFinder);
+      expect(nameBounds.left, greaterThanOrEqualTo(returnBounds.left));
+      expect(nameBounds.right, lessThanOrEqualTo(returnBounds.right));
+      expect(nameBounds.top, greaterThanOrEqualTo(returnBounds.top));
+      expect(nameBounds.bottom, lessThanOrEqualTo(returnBounds.bottom));
       await tester.tap(find.byKey(const ValueKey('buy-cart-continue-store')));
       await tester.pumpAndSettle();
       expect(supplierSheet, findsOneWidget);

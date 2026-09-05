@@ -2841,10 +2841,38 @@ class _ProductContinuationSection extends StatelessWidget {
             Text(detail, style: context.buyMeta.copyWith(fontSize: 8)),
             const SizedBox(height: 7),
             Semantics(
+              key: PageStorageKey(
+                'buy-product-continuation-scroll-${product.id}',
+              ),
               container: true,
               label: '$title. $detail. Swipe horizontally for more products.',
               child: SizedBox(
-                height: 174,
+                height:
+                    (101 +
+                            buyV2ValueTextSize(
+                              context,
+                              'Ag\nAg',
+                              context.buyBody.copyWith(
+                                fontSize: 9,
+                                height: 1.05,
+                              ),
+                              maxLines: 2,
+                            ).height +
+                            buyV2ValueTextSize(
+                              context,
+                              'Ag',
+                              context.buyMeta.copyWith(fontSize: 7.5),
+                            ).height +
+                            buyV2ValueTextSize(
+                              context,
+                              'Ag',
+                              const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ).height.clamp(18, double.infinity))
+                        .clamp(174, double.infinity)
+                        .toDouble(),
                 child: ListView.separated(
                   key: ValueKey('buy-product-continuation-lane-${product.id}'),
                   scrollDirection: Axis.horizontal,
@@ -8425,7 +8453,7 @@ class BuyV2OrdersView extends StatelessWidget {
           const SizedBox(height: 6),
         ],
         Container(
-          height: 44,
+          constraints: const BoxConstraints(minHeight: 44),
           padding: const EdgeInsets.fromLTRB(9, 2, 2, 2),
           decoration: buyV2CardDecoration(radius: 15),
           child: Row(
@@ -13508,7 +13536,7 @@ class _ReturnAffordance extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       child: Container(
         constraints: BoxConstraints(minHeight: minimumHeight),
-        padding: const EdgeInsets.symmetric(horizontal: 11),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -13523,12 +13551,14 @@ class _ReturnAffordance extends StatelessWidget {
               size: 19,
             ),
             const SizedBox(width: 3),
-            Text(
-              label,
-              style: const TextStyle(
-                color: BuyV2Colors.navy,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
+            Flexible(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: BuyV2Colors.navy,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
@@ -13538,13 +13568,15 @@ class _ReturnAffordance extends StatelessWidget {
     if (tightHitOwner) {
       return Row(
         children: [
-          Semantics(
-            key: hitOwnerKey,
-            container: true,
-            button: true,
-            label: label,
-            onTap: onTap,
-            child: ExcludeSemantics(child: affordance),
+          Flexible(
+            child: Semantics(
+              key: hitOwnerKey,
+              container: true,
+              button: true,
+              label: label,
+              onTap: onTap,
+              child: ExcludeSemantics(child: affordance),
+            ),
           ),
         ],
       );
