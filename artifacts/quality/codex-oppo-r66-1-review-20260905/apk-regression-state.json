@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "prebuild_pending",
+  "buildAuthorization": "not_activated",
+  "preBuildValidation": {
+    "state": "pending",
+    "evidence": "artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md"
+  },
+  "candidate": {
+    "id": "UAW-CODEX-OPPO-R66.1-REVIEW-20260905",
+    "versionName": "1.0.0-r66.1",
+    "versionCode": "2026090501",
+    "buildMode": "debug",
+    "gateProfile": "uaw_runtime_ui_review_debug",
+    "branch": "work/codex-ui/codex-oppo-review-v1-20260905",
+    "head": "66213baca34ac6219b1cdf34242a48ec41465975"
+  },
+  "source": {
+    "manifestPath": "artifacts/quality/codex-oppo-r66-1-review-20260905/source-manifest.txt",
+    "manifestSha256": "DCDF7707F3219924109139ABA9E3BE4215C62668BA423716661AFF2C1B42855D",
+    "fileCount": 336
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-CODEX-OPPO-R66.1-REVIEW-20260905"
+  },
+  "promotion": {
+    "state": "forbidden_non_promotable"
+  },
+  "preBuildGates": [],
+  "premiumMotionPolicy": {
+    "state": "audited_for_r66_1",
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "candidateContract": "artifacts/quality/codex-oppo-r66-1-review-20260905/candidate-contract.md",
+    "disposition": "artifacts/quality/codex-oppo-r66-1-review-20260905/motion-disposition.md",
+    "applied": [],
+    "reused": [
+      "accepted_Work_Store_Chat_finite_native_transitions",
+      "reduced_motion_static_resolution"
+    ],
+    "dependencyHeld": [
+      "native_performance_and_founder_visual_acceptance"
+    ],
+    "inapplicable": [
+      "new_decorative_or_invented_live_motion"
+    ]
+  },
+  "postBuildGates": [
+    {
+      "id": "apk-integrity",
+      "state": "pending"
+    },
+    {
+      "id": "oppo-install",
+      "state": "pending"
+    },
+    {
+      "id": "founder-review",
+      "state": "pending"
+    }
+  ]
+}

@@ -215,10 +215,10 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                       subtitle: Text(
                         serviceBackedCalls
                             ? 'Let people know whether they can voice call you.'
-                            : 'Show or hide voice calling on this device.',
+                            : 'Voice calling is not available yet. Messages remain available.',
                       ),
                       value: session.globalVoiceCallsAvailableForSession,
-                      onChanged: session.callLoading
+                      onChanged: session.callLoading || !serviceBackedCalls
                           ? null
                           : (available) => unawaited(
                               _saveCallPreferences(
@@ -245,10 +245,10 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                       subtitle: Text(
                         serviceBackedCalls
                             ? 'Let people know whether they can video call you.'
-                            : 'Show or hide video calling on this device.',
+                            : 'Video calling is not available yet. Messages remain available.',
                       ),
                       value: session.globalVideoCallsAvailableForSession,
-                      onChanged: session.callLoading
+                      onChanged: session.callLoading || !serviceBackedCalls
                           ? null
                           : (available) => unawaited(
                               _saveCallPreferences(
@@ -268,7 +268,7 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
                     _ChatSettingsScopeNote(
                       serviceBackedCalls
                           ? 'Chat pause resets when you close the app. Voice and video call availability is saved to your account so callers receive the correct status.'
-                          : 'Chat and call choices reset when you close the app. Showing your call availability to other people needs the calling service and is not available yet.',
+                          : 'Chat pause resets when you close the app. Calling controls will appear when calling is available.',
                     ),
                   ],
                 ),

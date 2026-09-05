@@ -2,6 +2,33 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
 
 void main() {
+  test(
+    'Medicine aliases retain Care ownership and explicit Buy precedence',
+    () {
+      for (final value in const ['medicine', 'rx']) {
+        for (final key in const ['sub', 'view', 'context', 'scope']) {
+          expect(moolActionFamilyIdForRoute('/app/buy?$key=$value'), 'book');
+        }
+        expect(
+          moolActionFamilyIdForRoute('/app/buy?sub=orders&scope=$value'),
+          'book',
+        );
+        for (final sub in const ['shop', 'wholesale', 'business', 'orders']) {
+          expect(
+            moolActionFamilyIdForRoute('/app/buy?sub=$sub&view=$value'),
+            'buy',
+          );
+        }
+      }
+      expect(moolActionFamilyIdForRoute('/app/buy/medicine?view=cart'), 'book');
+      expect(
+        moolActionFamilyIdForRoute('/app/book/medicine?view=product'),
+        'book',
+      );
+      expect(moolActionFamilyIdForRoute('/app/buy?view=product'), 'buy');
+    },
+  );
+
   test('C25B exposes the exact six-domain main catalogue', () {
     expect(
       moolActionFamilies.map((family) => '${family.id}:${family.label}'),
@@ -31,7 +58,7 @@ void main() {
         family.label: family.actions.map((action) => action.label).toList(),
     };
     expect(catalogue, const {
-      'Social': ['Shorts', 'Videos', 'Feed', 'Create'],
+      'Social': ['Home', 'Shorts', 'Create', 'Feed'],
       'Shop': ['Wholesale', 'Orders'],
       'Food': ['Order Food', 'Book Table'],
       'Travel': ['Bike', 'Auto', 'Cab', 'Bus'],
@@ -74,7 +101,7 @@ void main() {
       moolActionFamilyById(
         'book',
       ).actions.singleWhere((action) => action.id == 'medicine').route,
-      '/app/buy?sub=medicine',
+      '/app/book/medicine',
     );
     expect(
       moolActionFamilyById(

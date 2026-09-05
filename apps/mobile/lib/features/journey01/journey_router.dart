@@ -296,8 +296,17 @@ GoRouter createJourneyRouter(
       session.buyExitRoute(requestedRoute: state.uri.queryParameters['return']),
     );
   };
+  VoidCallback careMedicineExit(BuildContext context) => () {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    router.go('/app/book/doctor');
+  };
   VoidCallback openMoolFromBuy(BuildContext context) =>
       () => context.push('/app/mool?from=buy');
+  VoidCallback openMoolFromCare(BuildContext context) =>
+      () => context.push('/app/mool?from=book');
   void rememberBuyDestination(BuyV2Destination destination) {
     final location = '/app/buy?sub=${destination.name}';
     session.confirmReadyRoute(location);
@@ -318,6 +327,8 @@ GoRouter createJourneyRouter(
     ]),
     redirect: (context, state) {
       final location = state.uri.path;
+      final careMedicineRedirect = _careMedicineRedirect(state.uri);
+      if (careMedicineRedirect != null) return careMedicineRedirect;
       final protected = location.startsWith('/app/');
       final returnLocation = state.uri.toString();
       final authenticatedRoute = journeyRouteRequiresAuthentication(
@@ -497,20 +508,6 @@ GoRouter createJourneyRouter(
                 accountIdentity: session.accountIdentity,
                 accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.shop,
-                onExit: buyExit(context, state),
-                onOpenMool: openMoolFromBuy(context),
-                onDestinationChanged: rememberBuyDestination,
-              ),
-      ),
-      GoRoute(
-        path: '/app/buy/medicine',
-        builder: (context, state) => legacyPresentationForTestsOnly
-            ? BuyMedicineScreen(session: buySession)
-            : BuyV2Screen(
-                session: buyV2Session,
-                accountIdentity: session.accountIdentity,
-                accountAuthenticated: session.isAuthenticated,
-                initialDestination: BuyV2Destination.medicine,
                 onExit: buyExit(context, state),
                 onOpenMool: openMoolFromBuy(context),
                 onDestinationChanged: rememberBuyDestination,
@@ -843,6 +840,31 @@ GoRouter createJourneyRouter(
         builder: (context, state) => BookHomeScreen(
           session: bookSession,
           initialIntent: state.uri.queryParameters['intent'],
+        ),
+      ),
+      GoRoute(
+        path: '/app/book/medicine',
+        pageBuilder: (context, state) => moolMainDestinationPage(
+          state: state,
+          child: legacyPresentationForTestsOnly
+              ? BuyMedicineScreen(session: buySession)
+              : BuyV2Screen(
+                  session: buyV2Session,
+                  accountIdentity: session.accountIdentity,
+                  accountAuthenticated: session.isAuthenticated,
+                  initialDestination: BuyV2Destination.medicine,
+                  initialView: _buyV2View(state.uri.queryParameters['view']),
+                  initialCartScope: BuyV2CartScope.medicine,
+                  productId: state.uri.queryParameters['product'],
+                  orderId: state.uri.queryParameters['order'],
+                  recoveryKind: _buyV2Recovery(
+                    state.uri.queryParameters['recovery'],
+                  ),
+                  onExit: careMedicineExit(context),
+                  onOpenMool: openMoolFromCare(context),
+                  onDestinationChanged: (_) =>
+                      session.confirmReadyRoute(state.uri.toString()),
+                ),
         ),
       ),
       GoRoute(
@@ -1949,6 +1971,32 @@ ChatThreadType? _chatFilter(String? value) => switch (value) {
   'support' => ChatThreadType.support,
   _ => null,
 };
+
+String? _careMedicineRedirect(Uri uri) {
+  if (uri.path == '/app/book/medicine') return null;
+  final medicineValues = const {'medicine', 'rx'};
+  final isLegacyPath = uri.path == '/app/buy/medicine';
+  final isMedicineScopedBuy =
+      uri.path == '/app/buy' &&
+      medicineValues.any(
+        (value) =>
+            uri.queryParameters['sub'] == value ||
+            (uri.queryParameters['sub'] == null &&
+                uri.queryParameters['view'] == value) ||
+            uri.queryParameters['context'] == value ||
+            uri.queryParameters['scope'] == value,
+      );
+  if (!isLegacyPath && !isMedicineScopedBuy) return null;
+
+  final query = Map<String, String>.from(uri.queryParameters);
+  for (final key in const ['sub', 'view', 'context', 'scope']) {
+    if (medicineValues.contains(query[key])) query.remove(key);
+  }
+  return Uri(
+    path: '/app/book/medicine',
+    queryParameters: query.isEmpty ? null : query,
+  ).toString();
+}
 
 BuyV2Destination _buyV2Destination(String? value) => switch (value) {
   'wholesale' || 'business' => BuyV2Destination.wholesale,

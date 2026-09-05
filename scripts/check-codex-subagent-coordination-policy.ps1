@@ -1515,7 +1515,11 @@ if ($ProductionLane -ceq 'baseline') {
         [string]$selectedContinuationBinding.id -ceq 'codex_oppo_review_v1_20260905' -and
         [string]$selectedContinuationBinding.baselineHead -ceq '1f3c91d07af1b4487d9b4039f13d3fd5cefeea7d' -and
         $effectiveOwner -cin @(
+          'apps/mobile/android/app/build.gradle.kts',
+          'config/codex-development-regression-registry.json',
           'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1',
+          'apps/mobile/test/universal_intent_completion_test.dart',
           'apps/mobile/lib/features/chat/chat_entry_context.dart',
           'apps/mobile/lib/features/chat/chat_session.dart',
           'apps/mobile/lib/features/chat/screens/chat_settings_screen.dart',
@@ -1536,13 +1540,15 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/test/ui_v2/universal/mool_six_domain_route_projection_c25e_test.dart',
           'apps/mobile/test/ui_v2/universal/uaw_r08_personal_book_exposure_test.dart',
           'apps/mobile/test/platform_configuration_test.dart',
+          'apps/mobile/test/android_review_share_contract_test.dart',
           'artifacts/quality/codex-oppo-r66-1-review-20260905/candidate-contract.md',
           'artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md',
           'artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md',
           'artifacts/quality/codex-oppo-r66-1-review-20260905/source-manifest.txt',
           'artifacts/quality/codex-oppo-r66-1-review-20260905/apk-regression-state.json',
           'artifacts/quality/codex-oppo-r66-1-review-20260905/motion-disposition.md',
-          'artifacts/quality/codex-oppo-r66-1-review-20260905/uaw-codex-oppo-r66.1-review-20260905-device-review-debug-manifest.txt',
+          'artifacts/quality/codex-oppo-r66-1-review-20260905/uaw-codex-oppo-r66.1-review-20260905-build-provenance.txt',
+          'artifacts/quality/codex-oppo-r66-1-review-20260905/uaw-codex-oppo-r66.1-review-20260905-device-review-debug.apk',
           'artifacts/quality/codex-oppo-r66-1-review-20260905/post-install.json'
         )
       )

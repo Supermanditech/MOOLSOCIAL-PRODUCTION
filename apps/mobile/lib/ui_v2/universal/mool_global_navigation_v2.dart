@@ -82,17 +82,27 @@ MoolDirectActionSpec moolDefaultActionForFamily(String familyId) {
 /// Resolves the customer-facing domain from the canonical catalogue instead
 /// of assuming that a route's path prefix is its presentation owner.
 ///
-/// Care/Medicine deliberately reuses Buy commerce, and Travel/Bus deliberately
-/// reuses Book booking. Exact catalogue membership therefore wins over the
-/// legacy route namespace.
+/// Care/Medicine deliberately reuses the shared commerce implementation, and
+/// Travel/Bus deliberately reuses Book booking. Exact catalogue membership
+/// therefore wins over an implementation's source directory.
 String? moolActionFamilyIdForRoute(String route) {
+  final uri = Uri.tryParse(route);
+  final query = uri?.queryParameters;
+  const medicineValues = {'medicine', 'rx'};
+  if (uri?.path == '/app/buy/medicine' ||
+      (uri?.path == '/app/buy' &&
+          (medicineValues.contains(query?['sub'] ?? query?['view']) ||
+              medicineValues.contains(query?['context']) ||
+              medicineValues.contains(query?['scope'])))) {
+    return 'book';
+  }
   for (final family in moolActionFamilies) {
     if (family.route == route ||
         family.actions.any((action) => action.route == route)) {
       return family.id;
     }
   }
-  final path = Uri.tryParse(route)?.path;
+  final path = uri?.path;
   if (path == null) return null;
   for (final familyId in const [
     'social',
@@ -229,7 +239,7 @@ const moolActionFamilies = <MoolActionFamilySpec>[
         id: 'medicine',
         label: 'Medicine',
         icon: Icons.medication_outlined,
-        route: '/app/buy?sub=medicine',
+        route: '/app/book/medicine',
       ),
       MoolDirectActionSpec(
         id: 'salon',

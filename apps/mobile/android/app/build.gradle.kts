@@ -1,4 +1,5 @@
 import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
+import java.util.Base64
 
 plugins {
     id("com.android.application")
@@ -122,6 +123,25 @@ if (androidDebugPackage == "cursorreview") {
     tasks.matching { it.name == "processDebugGoogleServices" }.configureEach {
         // Cursor review is a non-promotable UI-only package. It intentionally
         // has no Firebase client configuration and must not process one.
+        enabled = false
+    }
+}
+
+val runtimeReviewDefines = providers.gradleProperty("dart-defines").orNull
+    .orEmpty().split(",").mapNotNull { encoded ->
+        runCatching {
+            String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+        }.getOrNull()
+    }.toSet()
+val runtimeUiReview = androidDebugPackage == "runtime" && setOf(
+    "MOOLSOCIAL_UI_REVIEW_ONLY=true",
+    "MOOLSOCIAL_DEVICE_REVIEW=true",
+    "MOOLSOCIAL_USE_EMULATORS=true",
+).all { it in runtimeReviewDefines }
+if (runtimeUiReview) {
+    // Provider-free UI review must not require a Firebase client file.
+    // All non-review builds retain normal Google Services processing.
+    tasks.matching { it.name == "processDebugGoogleServices" }.configureEach {
         enabled = false
     }
 }

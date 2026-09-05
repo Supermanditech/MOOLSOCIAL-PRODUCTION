@@ -10,6 +10,66 @@
   },
   "entries": [
     {
+      "id": "REG-20260905-4495-LOCKED-PLATFORM-STALE-RUNTIME-SENTENCE",
+      "status": "historical_locked_assertion_retained_current_contract_separately_tested",
+      "appliesTo": ["primary", "testing", "build"],
+      "mistake": "Restoring the immutable platform test exposed one inherited expectation for an obsolete runtime error sentence. The attempt returned 25 passed and one failed; it is not passing evidence.",
+      "rootCause": "The accepted baseline main.dart uses isQualifiedDeviceReviewRuntimeMode, while the locked historical test still searches for an old inline error sentence. Earlier platform child tests corrected that assertion inside the locked file.",
+      "prevention": "Keep the locked owner and main.dart exact to the accepted baseline. Retain the complete failed historical run. Preserve the corrected current source contract in the separate Android focused owner and require the full behavioral release-runtime suite twice. Report this as scoped UI-review qualification, never a full historical-suite pass; do not change approved locks or production bootstrap to satisfy old wording.",
+      "gates": ["apps/mobile/test/android_review_share_contract_test.dart", "apps/mobile/test/release_runtime_configuration_test.dart", "scripts/check-approved-ui-locks.ps1"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"]
+    },
+    {
+      "id": "REG-20260905-4496-BUILD-CHECK-ARCHIVE-PARAMETER-OMITTED",
+      "status": "use_existing_evidence_archive_parameter_without_gate_change",
+      "appliesTo": ["primary", "build", "evidence"],
+      "mistake": "The prebuild controls stopped on historical evidence already moved into the founder-authorized archive because the nested memory check did not receive its existing EvidenceArchiveRoot parameter. No APK was built.",
+      "rootCause": "Direct memory checks used the archive argument, but the caller of nested build controls omitted the supported PowerShell parameter default.",
+      "prevention": "Set the exact existing check-codex-development-regression-memory.ps1 EvidenceArchiveRoot parameter default in the invocation scope to the validated archive. Do not copy, invent, remove evidence or change the checker; retain the failed output and rerun the same controls.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md"]
+    },
+    {
+      "id": "REG-20260905-4494-ADDITIVE-ANDROID-TESTS-IN-LOCKED-OWNER",
+      "status": "preserve_locked_test_split_additive_contract_tests",
+      "appliesTo": ["primary", "implementation", "testing", "build"],
+      "mistake": "The positive prebuild gate rejected additive sharing/debug-review tests in platform_configuration_test.dart because that historical owner is part of the immutable login production lock. No APK build followed the rejection.",
+      "rootCause": "The earlier isolated Android child added correct new tests to a whole-file locked owner instead of a separate focused test file. Functional tests and analysis alone do not replace approved UI lock validation.",
+      "prevention": "Preserve platform_configuration_test.dart exactly at accepted f94 baseline. Move every added sharing and debug-isolation assertion unchanged into android_review_share_contract_test.dart, claim that exact file, rerun both test owners and runtime checks twice, and pass the unchanged approved-lock gate. Never update lock hashes, remove assertions or weaken protected-file enforcement for additive tests.",
+      "gates": ["scripts/check-approved-ui-locks.ps1", "apps/mobile/test/android_review_share_contract_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/candidate-contract.md"]
+    },
+    {
+      "id": "REG-20260905-4493-RUNTIME-UI-REVIEW-GOOGLE-SERVICES-BOUNDARY",
+      "status": "prebuild_source_detection_debug_only_correction_required",
+      "appliesTo": ["primary", "implementation", "testing", "build", "android"],
+      "mistake": "Pre-APK source inspection found the RuntimeUiReview debug variant still schedules processDebugGoogleServices although the isolated provider-free candidate intentionally has no google-services.json. Cursor's existing isolated review variant already disables its debug-only task. No APK build was attempted with this missing prerequisite.",
+      "rootCause": "The prior RuntimeUiReview wrapper reused the runtime package but its Android task selection was not made conditional on the exact UI-review-only, device-review and emulator flags.",
+      "prevention": "Disable only processDebugGoogleServices for runtime when all three exact review flags are true. Preserve normal runtime, production release/profile and Cursor behavior; do not create fake Firebase configuration or use credentials. Verify actual Gradle task states for valid, missing, partial and malformed flags, plus production-task preservation and focused platform regressions before the guarded APK build.",
+      "gates": ["apps/mobile/test/platform_configuration_test.dart", "scripts/build-buy-device-review.ps1"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/candidate-contract.md"]
+    },
+    {
+      "id": "REG-20260905-4491-CARE-LEGACY-UNIVERSAL-RETURN-TEST-CONTRACT",
+      "status": "legacy_care_back_fallback_and_test_contract_correction_required",
+      "appliesTo": ["primary", "implementation", "testing", "care", "navigation"],
+      "mistake": "The Codex OPPO candidate connected cycle returned 599 passed, 72 existing capture skips and one failure: universal_intent_completion_test.dart line 168 still expects the legacy Medicine action to return to section-buy after its accepted Care migration.",
+      "rootCause": "The shared legacy-only test combines Buy catalogue/basket with a Medicine action now owned by Care. The first separated focused run (18 passed, 1 failed; SHA-256 BA4B26CBEF446C0B1E969453F580D877CA79BADD7CCBA9919D6E1BF664A933A9) exposed a second issue in the same migration: the legacy-only Medicine scaffold fallback points to /app/book/medicine itself rather than /app/book. The current V2 Care canonical-route and Chat-boundary cases pass.",
+      "prevention": "Keep Buy catalogue and basket checks intact and verify the legacy Medicine action separately with its exact Care route and Back destination. Correct only the already Codex-owned legacy Medicine fallback from its self-loop to /app/book. Do not restore Medicine to Buy or change V2 Buy source. Retain both failed logs and require focused plus two passing connected cycles after this bounded child correction.",
+      "gates": ["apps/mobile/test/universal_intent_completion_test.dart", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/candidate-contract.md"]
+    },
+    {
+      "id": "REG-20260905-4492-OPPO-CANDIDATE-EXACT-ARTIFACT-BINDING",
+      "status": "prebuild_read_only_detection_exact_binding_correction",
+      "appliesTo": ["primary", "implementation", "build", "evidence"],
+      "mistake": "Candidate preparation guessed a device-review-debug-manifest.txt filename and omitted the APK owner. Reading the unchanged guarded wrapper established its real build-provenance.txt filename before any build or evidence output occurred.",
+      "rootCause": "The candidate's exact output list was drafted before verifying the wrapper's artifactPath and manifestPath declarations.",
+      "prevention": "Bind only this candidate's actual APK and build-provenance paths, retain the existing wrapper unchanged, and activate claims only once evidence exists. Keep exact branch/task/work/ticket and baseline restrictions. Do not create a new runner or directory-wide exception.",
+      "gates": ["scripts/build-buy-device-review.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/candidate-contract.md"]
+    },
+    {
       "id": "REG-20260905-4490-WORK-TEST-CONTINUED-AFTER-OWNER-GATE-REJECTION",
       "status": "invalid_qualification_run_preserved_corrected_gate_and_rerun_required",
       "appliesTo": ["primary", "implementation", "testing", "coordination"],

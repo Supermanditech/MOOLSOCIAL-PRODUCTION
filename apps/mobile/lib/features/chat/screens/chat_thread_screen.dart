@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
@@ -45,6 +46,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   int _threadLoadRequest = 0;
   String? _highlightedMessageId;
   bool _applyingDraftText = false;
+  String? _boundCommerceRoute;
 
   @override
   void initState() {
@@ -61,6 +63,12 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _bindCommerceContextFromRoute();
+  }
+
+  @override
   void didUpdateWidget(covariant ChatThreadScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.session, widget.session) ||
@@ -71,12 +79,30 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
       }
       _messageKeys.clear();
       _highlightedMessageId = null;
+      _boundCommerceRoute = null;
+      _bindCommerceContextFromRoute();
       _applyInitialDraftIfEmpty(widget.initialMessageDraft);
       unawaited(_recoverInterruptedPhoto(widget.threadId));
       unawaited(_loadThread(widget.threadId));
     } else if (oldWidget.initialMessageDraft != widget.initialMessageDraft) {
       _applyInitialDraftIfEmpty(widget.initialMessageDraft);
     }
+  }
+
+  void _bindCommerceContextFromRoute() {
+    Uri? uri;
+    try {
+      uri = GoRouterState.of(context).uri;
+    } on Object {
+      return;
+    }
+    final signature = '${widget.threadId}|$uri';
+    if (_boundCommerceRoute == signature) return;
+    _boundCommerceRoute = signature;
+    widget.session.bindCommerceContext(
+      widget.threadId,
+      ChatCommerceContext.maybeFromUri(uri),
+    );
   }
 
   void _applyInitialDraftIfEmpty(String? initialDraft) {
@@ -358,13 +384,23 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   }
 
   Future<void> _startCall(ChatThread thread, ChatCallKind kind) async {
-    final available = kind == ChatCallKind.voice
-        ? widget.session.voiceCallsAvailableForSession(thread.id)
-        : widget.session.videoCallsAvailableForSession(thread.id);
+    final label = kind == ChatCallKind.voice ? 'Voice' : 'Video';
     final recoveryKey = kind == ChatCallKind.voice
         ? 'chat-call-recovery'
         : 'chat-video-recovery';
-    final label = kind == ChatCallKind.voice ? 'Voice' : 'Video';
+    if (!widget.session.callServiceAvailable) {
+      await showChatUnavailableCapability(
+        context,
+        keyName: recoveryKey,
+        title: '$label calling unavailable',
+        message:
+            '$label calling is not available yet. You can continue with messages.',
+      );
+      return;
+    }
+    final available = kind == ChatCallKind.voice
+        ? widget.session.voiceCallsAvailableForSession(thread.id)
+        : widget.session.videoCallsAvailableForSession(thread.id);
     if (!available) {
       await showChatUnavailableCapability(
         context,
@@ -559,7 +595,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
               ),
               IconButton(
                 key: const Key('chat-thread-video'),
-                tooltip: widget.session.videoCallsAvailableForSession(thread.id)
+                tooltip: !widget.session.callServiceAvailable
+                    ? 'Video calling unavailable'
+                    : widget.session.videoCallsAvailableForSession(thread.id)
                     ? 'Video call'
                     : 'Video calls paused',
                 onPressed: () =>
@@ -568,7 +606,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
               ),
               IconButton(
                 key: const Key('chat-thread-call'),
-                tooltip: widget.session.voiceCallsAvailableForSession(thread.id)
+                tooltip: !widget.session.callServiceAvailable
+                    ? 'Voice calling unavailable'
+                    : widget.session.voiceCallsAvailableForSession(thread.id)
                     ? 'Voice call'
                     : 'Voice calls paused',
                 onPressed: () =>
@@ -581,9 +621,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           body:
               widget.session.loadingMessageThreads.contains(thread.id) &&
                   widget.session.messages(thread.id).isEmpty
-              ? const ChatFiniteIncomingMotion(
+              ? ChatFiniteIncomingMotion(
                   stateKey: 'chat-thread-loading-state',
-                  child: _ThreadLoadingState(),
+                  child: _ThreadLoadingState(title: thread.title),
                 )
               : widget.session.messageLoadError(thread.id) != null &&
                     widget.session.messages(thread.id).isEmpty
@@ -817,6 +857,8 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
       builder: (context, _) {
         final thread = widget.thread;
         final session = widget.session;
+        final commerceContext = session.commerceContext(thread.id);
+        final callServiceAvailable = session.callServiceAvailable;
         final chatAvailable = session.chatAvailableForSession(thread.id);
         final globalChatAvailable = session.globalChatAvailableForSession;
         final globalVoiceAvailable =
@@ -828,8 +870,10 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
         return ChatPageScaffold(
           key: const Key('chat-conversation-info-screen'),
           session: session,
-          title: 'Conversation info',
-          subtitle: thread.title,
+          title: commerceContext == null ? 'Conversation info' : thread.title,
+          subtitle: commerceContext == null
+              ? thread.title
+              : 'Conversation details',
           returnRoute: '/app/chat/thread/${thread.id}',
           showContentBack: true,
           backKeyName: 'chat-conversation-info-back',
@@ -847,6 +891,14 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                 globalChatAvailable: globalChatAvailable,
                 accent: widget.entryContext.accent,
               ),
+              if (commerceContext != null) ...[
+                const SizedBox(height: 12),
+                _ChatCommerceContextCard(
+                  commerceContext: commerceContext,
+                  onOpenProduct: () =>
+                      _openCommerceProduct(context, commerceContext),
+                ),
+              ],
               if (_statusMessage != null) ...[
                 const SizedBox(height: 12),
                 ChatFiniteIncomingMotion(
@@ -965,7 +1017,9 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                       ),
                       title: const Text('Voice calls in this app'),
                       subtitle: Text(
-                        globalVoiceAvailable
+                        !callServiceAvailable
+                            ? 'Voice calling is not available yet. Messages remain available.'
+                            : globalVoiceAvailable
                             ? 'Control the voice-call action in this conversation.'
                             : 'Paused across Chat. Turn it on in Chat settings first.',
                       ),
@@ -974,7 +1028,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                           session.voiceCallsAvailableForConversationInSession(
                             thread.id,
                           ),
-                      onChanged: !globalVoiceAvailable
+                      onChanged: !callServiceAvailable || !globalVoiceAvailable
                           ? null
                           : (available) {
                               session.setVoiceCallsAvailableForSession(
@@ -996,7 +1050,9 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                       ),
                       title: const Text('Video calls in this app'),
                       subtitle: Text(
-                        globalVideoAvailable
+                        !callServiceAvailable
+                            ? 'Video calling is not available yet. Messages remain available.'
+                            : globalVideoAvailable
                             ? 'Control the video-call action in this conversation.'
                             : 'Paused across Chat. Turn it on in Chat settings first.',
                       ),
@@ -1005,7 +1061,7 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                           session.videoCallsAvailableForConversationInSession(
                             thread.id,
                           ),
-                      onChanged: !globalVideoAvailable
+                      onChanged: !callServiceAvailable || !globalVideoAvailable
                           ? null
                           : (available) {
                               session.setVideoCallsAvailableForSession(
@@ -1025,29 +1081,31 @@ class _ConversationInfoScreenState extends State<_ConversationInfoScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              _ConversationSettingsSection(
-                title: 'Conversation',
-                child: ListTile(
-                  key: const Key('chat-info-voice-chat'),
-                  minLeadingWidth: 28,
-                  leading: const Icon(Icons.graphic_eq_rounded),
-                  title: const Text('Start a voice chat'),
-                  subtitle: const Text(
-                    'Talk live with this conversation when voice chat is available.',
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => unawaited(
-                    showChatUnavailableCapability(
-                      context,
-                      keyName: 'chat-voice-chat-recovery',
-                      title: 'Voice chat unavailable',
-                      message:
-                          'Voice chat is not available right now. You can continue with messages or try a voice call.',
+              if (callServiceAvailable) ...[
+                const SizedBox(height: 16),
+                _ConversationSettingsSection(
+                  title: 'Conversation',
+                  child: ListTile(
+                    key: const Key('chat-info-voice-chat'),
+                    minLeadingWidth: 28,
+                    leading: const Icon(Icons.graphic_eq_rounded),
+                    title: const Text('Start a voice chat'),
+                    subtitle: const Text(
+                      'Talk live with this conversation when voice chat is available.',
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => unawaited(
+                      showChatUnavailableCapability(
+                        context,
+                        keyName: 'chat-voice-chat-recovery',
+                        title: 'Voice chat unavailable',
+                        message:
+                            'Voice chat is not available right now. You can continue with messages or try a voice call.',
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
               const SizedBox(height: 16),
               _ConversationSettingsSection(
                 title: 'Wellbeing',
@@ -1459,16 +1517,22 @@ class _ChatPausedBar extends StatelessWidget {
 }
 
 class _ThreadLoadingState extends StatelessWidget {
-  const _ThreadLoadingState();
+  const _ThreadLoadingState({required this.title});
+
+  final String title;
 
   @override
-  Widget build(BuildContext context) => const Center(
+  Widget build(BuildContext context) => Center(
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        CircularProgressIndicator(),
-        SizedBox(height: MoolSpacing.sm),
-        Text('Loading messages'),
+        const CircularProgressIndicator(),
+        const SizedBox(height: MoolSpacing.sm),
+        Text(
+          'Getting your latest messages from $title',
+          key: const Key('chat-thread-loading-message'),
+          textAlign: TextAlign.center,
+        ),
       ],
     ),
   );
@@ -1528,6 +1592,9 @@ class _ThreadBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final messages = session.messages(thread.id);
+    final commerceContext = session.commerceContext(thread.id);
+    final contextOffset = commerceContext == null ? 0 : 1;
+    final emptyOffset = messages.isEmpty ? 1 : 0;
     return ListView.builder(
       key: const Key('chat-message-list'),
       controller: scrollController,
@@ -1537,24 +1604,191 @@ class _ThreadBody extends StatelessWidget {
         MoolSpacing.md,
         112,
       ),
-      itemCount: messages.length,
-      itemBuilder: (context, index) => KeyedSubtree(
-        key: messageKeys.putIfAbsent(messages[index].id, () => GlobalKey()),
-        child: ChatListEntryMotion(
-          key: ValueKey('chat-message-entry-motion-${messages[index].id}'),
-          stateKey: messages[index].id,
-          index: index,
-          child: _MessageBubble(
-            message: messages[index],
-            threadId: thread.id,
-            session: session,
-            highlighted: messages[index].id == highlightedMessageId,
-            onRetry: onRetryMessage,
+      itemCount: messages.length + contextOffset + emptyOffset,
+      itemBuilder: (context, index) {
+        if (commerceContext != null && index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: MoolSpacing.sm),
+            child: _ChatCommerceContextCard(
+              commerceContext: commerceContext,
+              onOpenProduct: () =>
+                  _openCommerceProduct(context, commerceContext),
+            ),
+          );
+        }
+        if (messages.isEmpty) {
+          return _ThreadEmptyState(
+            title: thread.title,
+            message:
+                commerceContext?.emptyMessage ??
+                'Send your first message to ${thread.title}.',
+          );
+        }
+        final messageIndex = index - contextOffset;
+        final message = messages[messageIndex];
+        return KeyedSubtree(
+          key: messageKeys.putIfAbsent(message.id, () => GlobalKey()),
+          child: ChatListEntryMotion(
+            key: ValueKey('chat-message-entry-motion-${message.id}'),
+            stateKey: message.id,
+            index: messageIndex,
+            child: _MessageBubble(
+              message: message,
+              threadId: thread.id,
+              session: session,
+              highlighted: message.id == highlightedMessageId,
+              onRetry: onRetryMessage,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ThreadEmptyState extends StatelessWidget {
+  const _ThreadEmptyState({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    key: const Key('chat-thread-empty-state'),
+    padding: const EdgeInsets.symmetric(vertical: MoolSpacing.lg),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.forum_outlined, size: 38, color: MoolColors.muted),
+        const SizedBox(height: MoolSpacing.sm),
+        Text(
+          'No messages with $title yet',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: MoolColors.navy,
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
           ),
         ),
+        const SizedBox(height: MoolSpacing.xs),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: MoolColors.muted),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ChatCommerceContextCard extends StatelessWidget {
+  const _ChatCommerceContextCard({
+    required this.commerceContext,
+    required this.onOpenProduct,
+  });
+
+  final ChatCommerceContext commerceContext;
+  final VoidCallback onOpenProduct;
+
+  @override
+  Widget build(BuildContext context) {
+    final facts = commerceContext.decisionFacts;
+    return Material(
+      key: const Key('chat-commerce-context-card'),
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: MoolColors.navy.withValues(alpha: .10)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        key: const Key('chat-commerce-context-expand'),
+        leading: CircleAvatar(
+          backgroundColor: MoolColors.navy.withValues(alpha: .08),
+          foregroundColor: MoolColors.navy,
+          child: Icon(
+            commerceContext.isOrderConversation
+                ? Icons.receipt_long_outlined
+                : Icons.inventory_2_outlined,
+          ),
+        ),
+        title: Text(
+          commerceContext.contextLabel,
+          style: const TextStyle(
+            color: MoolColors.navy,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        subtitle: Text(
+          commerceContext.productTitle ??
+              commerceContext.orderId ??
+              commerceContext.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+        children: [
+          const Divider(height: 1),
+          const SizedBox(height: MoolSpacing.sm),
+          for (final fact in facts)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: Row(
+                key: Key('chat-commerce-fact-${_factKey(fact.label)}'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 108,
+                    child: Text(
+                      fact.label,
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      fact.value,
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (commerceContext.productAppRoute != null) ...[
+            const SizedBox(height: MoolSpacing.xs),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const Key('chat-commerce-open-product'),
+                onPressed: onOpenProduct,
+                icon: const Icon(Icons.open_in_new_rounded),
+                label: const Text('View product'),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
+}
+
+String _factKey(String value) => value
+    .toLowerCase()
+    .replaceAll(RegExp('[^a-z0-9]+'), '-')
+    .replaceAll(RegExp(r'^-|-$'), '');
+
+void _openCommerceProduct(
+  BuildContext context,
+  ChatCommerceContext commerceContext,
+) {
+  final route = commerceContext.productAppRoute;
+  if (route != null) context.go(route);
 }
 
 class _MessageBubble extends StatelessWidget {

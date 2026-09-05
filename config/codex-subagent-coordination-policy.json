@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4461,
-    "sha256": "99E2FC6253A0130E36EA29023AB2224E4C60178B0DDC2CF9ECD2629502EEB7B8"
+    "entryCount": 4467,
+    "sha256": "E1ABABDC25747FAD69749D87F9425EB457BF6B17BF36CC4D81BF03586DEBCF06"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -54,7 +54,15 @@
         "apps/mobile/test/ui_v2/universal/mool_six_domain_route_projection_c25e_test.dart",
         "apps/mobile/test/ui_v2/universal/uaw_r08_personal_book_exposure_test.dart",
         "apps/mobile/test/platform_configuration_test.dart",
+        "apps/mobile/test/android_review_share_contract_test.dart",
+        "apps/mobile/android/app/build.gradle.kts",
+        "apps/mobile/test/universal_intent_completion_test.dart",
         "artifacts/quality/codex-oppo-r66-1-review-20260905/candidate-contract.md",
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/source-manifest.txt",
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md",
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/prebuild-validation.md",
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/motion-disposition.md",
+        "artifacts/quality/codex-oppo-r66-1-review-20260905/apk-regression-state.json",
         "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
         "docs/quality/UAW-CODEX-WORK-OPPORTUNITY-ROUTE-CONTRACT-V1-20260905.md",
         "config/codex-development-regression-registry.json",
