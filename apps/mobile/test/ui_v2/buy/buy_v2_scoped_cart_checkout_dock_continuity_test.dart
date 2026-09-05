@@ -1,9 +1,15 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 void main() {
@@ -25,26 +31,53 @@ void main() {
     bool reducedMotion = false,
     EdgeInsets safeArea = EdgeInsets.zero,
   }) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: MoolTheme.light(),
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(
-          size: size,
-          padding: safeArea,
-          viewPadding: safeArea,
-          textScaler: TextScaler.linear(textScale),
-          disableAnimations: reducedMotion,
+    return RepaintBoundary(
+      key: const ValueKey('r66-cart-feedback-capture'),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: MoolTheme.light(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            size: size,
+            padding: safeArea,
+            viewPadding: safeArea,
+            textScaler: TextScaler.linear(textScale),
+            disableAnimations: reducedMotion,
+          ),
+          child: child!,
         ),
-        child: child!,
-      ),
-      home: BuyV2Screen(
-        session: session,
-        initialDestination: session.destination,
-        initialView: session.view,
-        initialCartScope: session.cartScope,
+        home: BuyV2Screen(
+          session: session,
+          initialDestination: session.destination,
+          initialView: session.view,
+          initialCartScope: session.cartScope,
+        ),
       ),
     );
+  }
+
+  Future<void> capture(WidgetTester tester, String name) async {
+    if (!const bool.fromEnvironment('BUY_R66_CART_FEEDBACK_CAPTURE')) {
+      return;
+    }
+    final boundary = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(const ValueKey('r66-cart-feedback-capture')),
+    );
+    boundary.markNeedsPaint();
+    await tester.pump();
+    await tester.runAsync(() async {
+      final directory = Directory('build/r66-cart-feedback-v1-20260905');
+      await directory.create(recursive: true);
+      final file = File('${directory.path}/$name.png');
+      if (await file.exists()) throw StateError('Capture already exists');
+      final image = await boundary.toImage(pixelRatio: 1);
+      try {
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        await file.writeAsBytes(bytes!.buffer.asUint8List());
+      } finally {
+        image.dispose();
+      }
+    });
   }
 
   BuyV2Product productFor(BuyV2Destination destination) =>
@@ -117,6 +150,214 @@ void main() {
       expected: BuyV2Destination.medicine,
     ),
   ];
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'R66 scoped add feedback and Cart return ${destination.name} at $scale',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(320, 844));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          final other = destination == BuyV2Destination.shop
+              ? BuyV2Destination.wholesale
+              : BuyV2Destination.shop;
+          final product = productFor(destination);
+          final retained = productFor(other);
+          expect(session.addProduct(retained.id), isTrue);
+          final retainedQuantity = session.quantityFor(retained.id);
+          session.openDestination(destination);
+          await tester.pumpWidget(
+            app(session, size: const Size(320, 844), textScale: scale),
+          );
+          session.openProduct(product.id);
+          await tester.pumpAndSettle();
+          final primary = find.byKey(
+            ValueKey('buy-product-primary-${product.id}'),
+          );
+          final scroll = find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(primary, 180, scrollable: scroll);
+          await tester.pumpAndSettle();
+          await tester.tap(primary);
+          await tester.pumpAndSettle();
+          final count = session.countForDestination(destination);
+          final items = '$count ${count == 1 ? 'item' : 'items'}';
+          final total = session.totalForDestination(destination);
+          final dock = find.byKey(const ValueKey('buy-compact-cart-indicator'));
+          final semantics = tester.ensureSemantics();
+          try {
+            expect(
+              tester.getSemantics(dock).label,
+              contains('${product.title} added · $items'),
+            );
+            expect(
+              tester.getSemantics(dock).label,
+              contains(buyV2Money(total)),
+            );
+            expect(
+              find.descendant(of: dock, matching: find.text(items)),
+              findsOneWidget,
+            );
+            await capture(tester, '${destination.name}-added-$scale');
+            await tester.tap(dock);
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.cart);
+            expect(
+              session.cartScope,
+              destination == BuyV2Destination.shop
+                  ? BuyV2CartScope.shop
+                  : BuyV2CartScope.wholesale,
+            );
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.product);
+            expect(session.selectedProductId, product.id);
+            expect(session.countForDestination(destination), count);
+            expect(session.totalForDestination(destination), total);
+            expect(session.quantityFor(retained.id), retainedQuantity);
+            session.openDestination(other);
+            await tester.pumpAndSettle();
+            expect(
+              tester.getSemantics(dock).label,
+              isNot(contains(product.title)),
+            );
+            expect(
+              find.byKey(const ValueKey('buy-mini-cart-added-icon')),
+              findsNothing,
+            );
+            await tester.tap(
+              find.byKey(const ValueKey('buy-local-tab-offers')),
+            );
+            await tester.pumpAndSettle();
+            final factsRail = find.byKey(
+              const ValueKey('buy-published-offer-facts'),
+            );
+            final offerCards = find.descendant(
+              of: factsRail,
+              matching: find.byType(InkWell),
+            );
+            expect(offerCards, findsWidgets);
+            for (final element in offerCards.evaluate()) {
+              final card = find.byWidget(element.widget);
+              final bounds = tester.getRect(card);
+              final facts = find.descendant(
+                of: card,
+                matching: find.byType(Text),
+              );
+              expect(facts, findsNWidgets(4));
+              for (final factElement in facts.evaluate()) {
+                final fact = find.byWidget(factElement.widget);
+                final paragraph = tester.renderObject<RenderParagraph>(fact);
+                expect(paragraph.didExceedMaxLines, isFalse);
+                expect(paragraph.maxLines, isNull);
+                final factBounds = tester.getRect(fact);
+                expect(factBounds.bottom, lessThanOrEqualTo(bounds.bottom - 7));
+                expect(factBounds.right, lessThanOrEqualTo(bounds.right - 10));
+              }
+            }
+            await capture(tester, '${destination.name}-offers-$scale');
+            final allItems = '${session.itemCount} items';
+            expect(tester.getSemantics(dock).label, contains(allItems));
+            expect(
+              tester.getSemantics(dock).label,
+              contains(buyV2Money(session.cartTotal)),
+            );
+            await tester.tap(dock);
+            await tester.pumpAndSettle();
+            expect(session.cartScope, BuyV2CartScope.all);
+            expect(session.quantityFor(retained.id), retainedQuantity);
+          } finally {
+            semantics.dispose();
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      testWidgets(
+        'R66 Store Cart feedback stays scoped ${destination.name} at $scale',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(320, 844));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          final other = destination == BuyV2Destination.shop
+              ? BuyV2Destination.wholesale
+              : BuyV2Destination.shop;
+          final product = productFor(destination);
+          final retained = productFor(other);
+          expect(session.addProduct(retained.id), isTrue);
+          final scope = destination == BuyV2Destination.shop
+              ? BuyV2CartScope.shop
+              : BuyV2CartScope.wholesale;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              home: MediaQuery(
+                data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+                child: Scaffold(
+                  body: AnimatedBuilder(
+                    animation: session,
+                    builder: (context, child) => BuyV2StoreCartBar(
+                      session: session,
+                      destination: destination,
+                      onOpenCart: () => session.openCart(scope: scope),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          expect(session.addProduct(product.id), isTrue);
+          await tester.pumpAndSettle();
+          final count = session.countForDestination(destination);
+          final items = '$count ${count == 1 ? 'item' : 'items'}';
+          final bar = find.byKey(const ValueKey('buy-store-cart-bar'));
+          final semantics = tester.ensureSemantics();
+          try {
+            expect(
+              tester.getSemantics(bar).label,
+              contains('${product.title} added · $items'),
+            );
+            expect(
+              find.descendant(of: bar, matching: find.text(items)),
+              findsOneWidget,
+            );
+            expect(tester.getSize(bar).height, greaterThanOrEqualTo(44));
+            await tester.tap(bar);
+            await tester.pumpAndSettle();
+            expect(session.cartScope, scope);
+            session.increase(retained.id);
+            await tester.pumpAndSettle();
+            expect(
+              tester.getSemantics(bar).label,
+              isNot(contains(retained.title)),
+            );
+            expect(
+              find.descendant(of: bar, matching: find.text(items)),
+              findsOneWidget,
+            );
+            expect(session.quantityFor(product.id), count);
+          } finally {
+            semantics.dispose();
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
 
   test(
     'derived dock owner follows scoped Cart and Checkout without routing',

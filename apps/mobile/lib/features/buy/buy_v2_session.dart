@@ -517,6 +517,11 @@ class BuyV2Session extends ChangeNotifier {
   _BuyV2RecoveryOrigin? _recoveryOrigin;
   String? notice;
   String? cartAcknowledgement;
+  BuyV2Destination? _cartAcknowledgementDestination;
+
+  String? cartAcknowledgementForDestination(BuyV2Destination value) =>
+      _cartAcknowledgementDestination == value ? cartAcknowledgement : null;
+
   String? selectedFilter;
   final Set<String> _selectedBrands = {};
   Set<String> get selectedBrands => Set.unmodifiable(_selectedBrands);
@@ -5267,8 +5272,7 @@ class BuyV2Session extends ChangeNotifier {
       quantity: (current?.quantity ?? 0) + item.minimumOrder,
     );
     _pruneCartSelections();
-    final unitLabel = itemCount == 1 ? 'item' : 'items';
-    _acknowledgeCart('${item.title} added · $itemCount $unitLabel');
+    _acknowledgeCart('${item.title} added', destination: item.destination);
     _persistCustomerState();
     notifyListeners();
     return true;
@@ -5354,6 +5358,7 @@ class BuyV2Session extends ChangeNotifier {
     _pruneCartSelections();
     _acknowledgeCart(
       '${current.product.title} · ${current.quantity + 1} in cart',
+      destination: current.product.destination,
     );
     _persistCustomerState();
     notifyListeners();
@@ -5367,11 +5372,15 @@ class BuyV2Session extends ChangeNotifier {
     final minimum = current.product.minimumOrder;
     if (current.quantity <= minimum) {
       _cart.remove(id);
-      _acknowledgeCart('${current.product.title} removed');
+      _acknowledgeCart(
+        '${current.product.title} removed',
+        destination: current.product.destination,
+      );
     } else {
       _cart[id] = current.copyWith(quantity: current.quantity - 1);
       _acknowledgeCart(
         '${current.product.title} · ${current.quantity - 1} in cart',
+        destination: current.product.destination,
       );
     }
     if (_cart.isEmpty) {
@@ -5393,7 +5402,10 @@ class BuyV2Session extends ChangeNotifier {
     final previous = _navigationSurfaceIdentity;
     final removed = _cart.remove(id);
     if (removed == null) return;
-    _acknowledgeCart('${removed.product.title} removed');
+    _acknowledgeCart(
+      '${removed.product.title} removed',
+      destination: removed.product.destination,
+    );
     if (_cart.isEmpty) {
       destination = removed.product.destination;
       view = BuyV2View.catalogue;
@@ -5429,6 +5441,7 @@ class BuyV2Session extends ChangeNotifier {
     cartScope = BuyV2CartScope.all;
     notice = null;
     cartAcknowledgement = null;
+    _cartAcknowledgementDestination = null;
     _persistCustomerState();
     _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
   }
@@ -5457,6 +5470,7 @@ class BuyV2Session extends ChangeNotifier {
       cartScope = BuyV2CartScope.all;
       notice = null;
       cartAcknowledgement = null;
+      _cartAcknowledgementDestination = null;
       _persistCustomerState();
       _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
       return true;
@@ -5478,6 +5492,9 @@ class BuyV2Session extends ChangeNotifier {
     cartAcknowledgement =
         '${scope.label} ${removedCount == 1 ? 'item' : 'items'} removed · '
         '$remainingCount ${remainingCount == 1 ? 'item remains' : 'items remain'}';
+    _cartAcknowledgementDestination = remainingDestinations.length == 1
+        ? remainingDestinations.single
+        : null;
     _persistCustomerState();
     _notifyNavigationIfChanged(
       previous,
@@ -6476,6 +6493,7 @@ class BuyV2Session extends ChangeNotifier {
     view = BuyV2View.cart;
     notice = 'Previous products are ready to edit.';
     cartAcknowledgement = 'Previous products are ready to edit.';
+    _cartAcknowledgementDestination = order.destination;
     _persistCustomerState();
     _notifyNavigationIfChanged(
       previous,
@@ -6596,7 +6614,10 @@ class BuyV2Session extends ChangeNotifier {
     if (removed == null) return false;
     _checkoutAvailabilityIssue = null;
     _restoreRecoveryOrigin(notify: false);
-    _acknowledgeCart('${removed.product.title} removed');
+    _acknowledgeCart(
+      '${removed.product.title} removed',
+      destination: removed.product.destination,
+    );
     _pruneCartSelections();
     if (_cart.isEmpty) {
       destination = removed.product.destination;
@@ -6748,12 +6769,14 @@ class BuyV2Session extends ChangeNotifier {
   void clearCartAcknowledgement() {
     if (cartAcknowledgement == null) return;
     cartAcknowledgement = null;
+    _cartAcknowledgementDestination = null;
     notifyListeners();
   }
 
-  void _acknowledgeCart(String message) {
+  void _acknowledgeCart(String message, {BuyV2Destination? destination}) {
     notice = null;
     cartAcknowledgement = message;
+    _cartAcknowledgementDestination = destination;
   }
 
   void showNotice(String message) {

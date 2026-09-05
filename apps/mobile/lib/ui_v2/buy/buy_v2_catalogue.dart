@@ -441,10 +441,57 @@ class _PublishedOfferFactsRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accessibleText = MediaQuery.textScalerOf(context).scale(10) > 13;
+    final factsByEntry = entries
+        .map((entry) {
+          final product = entry.product;
+          final minimum = product.destination == BuyV2Destination.wholesale
+              ? 'Minimum ${product.minimumOrder} packs'
+              : 'Pack-size minimum';
+          return <({String text, TextStyle style})>[
+            (
+              text: entry.offer.headline,
+              style: context.buyBody.copyWith(
+                color: BuyV2Colors.navy,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            (
+              text: product.title,
+              style: context.buyMeta.copyWith(
+                color: BuyV2Colors.ink,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            (
+              text: 'Offer price ${buyV2Money(product.price)} · $minimum',
+              style: context.buyMeta.copyWith(
+                color: BuyV2Colors.green,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            (
+              text: 'Published by ${product.seller} · Available while listed',
+              style: context.buyMeta.copyWith(fontSize: 8),
+            ),
+          ];
+        })
+        .toList(growable: false);
+    final railHeight = factsByEntry.fold<double>(96, (height, facts) {
+      final requiredHeight = facts.fold<double>(35, (sum, fact) {
+        return sum +
+            buyV2ValueTextSize(
+              context,
+              fact.text,
+              fact.style,
+              maxWidth: 226,
+              maxLines: null,
+            ).height;
+      });
+      return requiredHeight > height ? requiredHeight : height;
+    });
     return SizedBox(
       key: const ValueKey('buy-published-offer-facts'),
-      height: accessibleText ? 106 : 96,
+      height: railHeight,
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(8, 2, 12, 8),
         scrollDirection: Axis.horizontal,
@@ -453,9 +500,7 @@ class _PublishedOfferFactsRail extends StatelessWidget {
         itemBuilder: (context, index) {
           final entry = entries[index];
           final product = entry.product;
-          final minimum = product.destination == BuyV2Destination.wholesale
-              ? 'Minimum ${product.minimumOrder} packs'
-              : 'Pack-size minimum';
+          final facts = factsByEntry[index];
           return SizedBox(
             width: 248,
             child: Material(
@@ -474,42 +519,10 @@ class _PublishedOfferFactsRail extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        entry.offer.headline,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.buyBody.copyWith(
-                          color: BuyV2Colors.navy,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        product.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.buyMeta.copyWith(
-                          color: BuyV2Colors.ink,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Offer price ${buyV2Money(product.price)} · $minimum',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.buyMeta.copyWith(
-                          color: BuyV2Colors.green,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Published by ${product.seller} · Available while listed',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.buyMeta.copyWith(fontSize: 8),
-                      ),
+                      for (var i = 0; i < facts.length; i++) ...[
+                        if (i > 0) SizedBox(height: i == 2 ? 4 : 2),
+                        Text(facts[i].text, style: facts[i].style),
+                      ],
                     ],
                   ),
                 ),
@@ -4313,12 +4326,15 @@ class BuyV2StoreCartBar extends StatelessWidget {
     final itemCount = session.countForDestination(destination);
     final total = session.totalForDestination(destination);
     final itemLabel = itemCount == 1 ? 'item' : 'items';
+    final acknowledgement = session.cartAcknowledgementForDestination(
+      destination,
+    );
+    final visibleMessage = '$itemCount $itemLabel';
     final message = itemCount == 0
         ? 'Cart is empty'
-        : session.cartAcknowledgement ?? '$itemCount $itemLabel in Cart';
-    final visibleMessage = session.cartAcknowledgement == null
-        ? '$itemCount $itemLabel'
-        : 'Added';
+        : acknowledgement == null
+        ? '$visibleMessage in Cart'
+        : '$acknowledgement · $visibleMessage';
     void activate() {
       HapticFeedback.selectionClick();
       onOpenCart();
@@ -4383,8 +4399,10 @@ class BuyV2StoreCartBar extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.shopping_cart_outlined,
+                          Icon(
+                            acknowledgement == null
+                                ? Icons.shopping_cart_outlined
+                                : Icons.check_circle_rounded,
                             color: Colors.white,
                             size: 16,
                           ),

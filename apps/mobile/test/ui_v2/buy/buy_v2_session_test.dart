@@ -1347,7 +1347,7 @@ void main() {
 
       expect(session.addProduct(product.id), isTrue);
       expect(session.notice, isNull);
-      expect(session.cartAcknowledgement, '${product.title} added · 1 item');
+      expect(session.cartAcknowledgement, '${product.title} added');
 
       session.increase(product.id);
       expect(session.notice, isNull);
@@ -1355,6 +1355,48 @@ void main() {
 
       session.clearCartAcknowledgement();
       expect(session.cartAcknowledgement, isNull);
+    });
+
+    test('R66 Cart acknowledgement keeps its mutation destination', () {
+      final shop = session.product('s-tomato');
+      final wholesale = session.product('w-tomato');
+      expect(session.addProduct(shop.id), isTrue);
+      expect(session.addProduct(wholesale.id), isTrue);
+      expect(session.cartAcknowledgement, '${wholesale.title} added');
+      expect(
+        session.cartAcknowledgementForDestination(BuyV2Destination.shop),
+        isNull,
+      );
+      expect(
+        session.cartAcknowledgementForDestination(BuyV2Destination.wholesale),
+        session.cartAcknowledgement,
+      );
+      session.increase(shop.id);
+      expect(
+        session.cartAcknowledgementForDestination(BuyV2Destination.shop),
+        '${shop.title} · 2 in cart',
+      );
+      session.decrease(shop.id);
+      expect(
+        session.cartAcknowledgementForDestination(BuyV2Destination.shop),
+        '${shop.title} · 1 in cart',
+      );
+      session.remove(wholesale.id);
+      expect(
+        session.cartAcknowledgementForDestination(BuyV2Destination.wholesale),
+        '${wholesale.title} removed',
+      );
+      expect(
+        session.cartAcknowledgementForDestination(BuyV2Destination.shop),
+        isNull,
+      );
+      expect(session.quantityFor(shop.id), 1);
+      session.clearCartAcknowledgement();
+      expect(session.cartAcknowledgement, isNull);
+      expect(
+        session.cartAcknowledgementForDestination(BuyV2Destination.wholesale),
+        isNull,
+      );
     });
 
     test('Buy assist returns to the exact originating purchase depth', () {

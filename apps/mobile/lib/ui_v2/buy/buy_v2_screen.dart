@@ -1914,7 +1914,13 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
     final itemLabel = itemCount == 1 ? 'item' : 'items';
     final itemText = '$itemCount $itemLabel';
     final totalText = buyV2Money(total);
-    final cartMessage = session.cartAcknowledgement ?? '$itemText ready';
+    final acknowledgement =
+        widget.aggregate || destination == BuyV2Destination.orders
+        ? session.cartAcknowledgement
+        : session.cartAcknowledgementForDestination(destination);
+    final cartMessage = acknowledgement == null
+        ? '$itemText ready'
+        : '$acknowledgement · $itemText';
     const itemStyle = TextStyle(
       color: Colors.white70,
       fontSize: 8.5,
@@ -2018,11 +2024,11 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
                                   BuyV2Motion.stateChange,
                                 ),
                                 child: Icon(
-                                  session.cartAcknowledgement == null
+                                  acknowledgement == null
                                       ? Icons.shopping_cart_outlined
                                       : Icons.check_circle_rounded,
                                   key: ValueKey(
-                                    session.cartAcknowledgement == null
+                                    acknowledgement == null
                                         ? 'buy-mini-cart-icon'
                                         : 'buy-mini-cart-added-icon',
                                   ),
@@ -2037,7 +2043,7 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
                                 children: [
                                   BuyV2FiniteValueTransition(
                                     key: ValueKey(
-                                      session.cartAcknowledgement == null
+                                      acknowledgement == null
                                           ? 'buy-cart-summary'
                                           : 'buy-cart-acknowledgement',
                                     ),

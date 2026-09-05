@@ -2683,7 +2683,7 @@ void main() {
     await tester.pump();
 
     expect(session.notice, isNull);
-    expect(session.cartAcknowledgement, '${product.title} added · 1 item');
+    expect(session.cartAcknowledgement, '${product.title} added');
     expect(
       find.byKey(const ValueKey('buy-cart-acknowledgement')),
       findsOneWidget,
