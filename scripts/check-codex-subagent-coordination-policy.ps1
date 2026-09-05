@@ -72,6 +72,33 @@ function Get-Sha256([string]$Path) {
   return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
 }
 
+function Get-R66Utf8GitJson([string]$Commit, [string]$Owner) {
+  Assert-Coordination ($Commit -cmatch '^[0-9a-f]{40}$' -and
+    $Owner -cmatch '^[A-Za-z0-9_./-]+$' -and -not $root.Contains('"')) `
+    'Social repair historical JSON arguments are invalid.'
+  $startInfo = New-Object Diagnostics.ProcessStartInfo
+  $startInfo.FileName = 'git'
+  $startInfo.Arguments = '-C "' + $root + '" show "' + $Commit + ':' + $Owner + '"'
+  $startInfo.UseShellExecute = $false
+  $startInfo.CreateNoWindow = $true
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  $startInfo.StandardOutputEncoding = New-Object Text.UTF8Encoding($false, $true)
+  $process = New-Object Diagnostics.Process
+  $process.StartInfo = $startInfo
+  try {
+    [void]$process.Start()
+    $errorRead = $process.StandardError.ReadToEndAsync()
+    $jsonText = $process.StandardOutput.ReadToEnd()
+    $process.WaitForExit()
+    [void]$errorRead.GetAwaiter().GetResult()
+    Assert-Coordination ($process.ExitCode -eq 0) 'Social repair historical JSON read failed.'
+    return ($jsonText | ConvertFrom-Json)
+  } finally {
+    $process.Dispose()
+  }
+}
+
 function Get-CanonicalOwner([string]$Owner) {
   Assert-Coordination (-not [string]::IsNullOrWhiteSpace($Owner)) `
     'owner claim is empty.'
@@ -1695,12 +1722,105 @@ if ($ProductionLane -ceq 'baseline') {
           (@($r66CommittedOwners | Sort-Object) -join '|') -ceq
           (@($r66CoordinationOwners | Sort-Object) -join '|')
         ) 'R66 owner amendment included source, evidence or another owner.'
-        & git -C $root diff --quiet $r66CoordinationCommit -- @r66CoordinationOwners
-        Assert-Coordination ($LASTEXITCODE -eq 0) 'R66 coordination blobs changed after admission.'
-        $r66LaterCoordination = @(& git -C $root log --format=%H `
-            "${r66CoordinationCommit}..$head" -- @r66CoordinationOwners)
-        Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66LaterCoordination.Count -eq 0) `
-          'R66 owner amendment cannot be replayed or revised by later feature commits.'
+        $r66GateRepairParent = '0dc950ff1ba41a5a50808c5905bb8dd88e52448a'
+        & git -C $root merge-base --is-ancestor $r66GateRepairParent $head
+        $r66GateRepairContext = $LASTEXITCODE -eq 0
+        $r66FreezeCommit = $r66CoordinationCommit
+        $r66FreezeOwners = $r66CoordinationOwners
+        if ($r66GateRepairContext) {
+          $r66PriorCoordination = @(& git -C $root log --format=%H `
+              "${r66CoordinationCommit}..$r66GateRepairParent" -- @r66CoordinationOwners)
+          Assert-Coordination (
+            $LASTEXITCODE -eq 0 -and $r66PriorCoordination.Count -eq 0
+          ) 'R66 prior coordination freeze changed before the authorized repair.'
+          $r66SocialGate = 'scripts/check-social-protected-baseline.ps1'
+          $r66RepairOwners = @($r66CoordinationOwners) + $r66SocialGate
+          $r66RepairSubject =
+            'ui(buy-redmi-fixes-v1-20260905): bind accepted Social protection baseline'
+          if ($head -ceq $r66GateRepairParent) {
+            Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) `
+              'pending Social gate repair cannot be handed off or accepted.'
+            $r66RepairDirty = @(& git -C $root diff HEAD --name-only)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r66RepairDirty | Sort-Object) -join '|') -ceq
+              (@($r66RepairOwners | Sort-Object) -join '|')
+            ) 'Social gate repair must change exactly its five coordination owners.'
+            $r66RepairPolicyBefore = Get-R66Utf8GitJson `
+              $r66GateRepairParent $r66CoordinationOwners[0]
+            $r66RepairPolicyAfter = Get-Content -Encoding UTF8 -Raw -LiteralPath `
+              (Join-Path $root $r66CoordinationOwners[0]) | ConvertFrom-Json
+            $r66PrimaryClaim = @($r66RepairPolicyAfter.activeClaims | Where-Object {
+              $_.task -ceq '/root'
+            })[0]
+            Assert-Coordination (
+              $r66PrimaryClaim.owners.Count -eq 6 -and
+              @($r66PrimaryClaim.owners | Where-Object { $_ -ceq $r66SocialGate }).Count -eq 1
+            ) 'Social repair must add only its checker to primary coordination.'
+            $r66PrimaryClaim.owners = @($r66PrimaryClaim.owners | Where-Object {
+              $_ -cne $r66SocialGate
+            })
+            Assert-Coordination (
+              ($r66RepairPolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+              ($r66RepairPolicyAfter | ConvertTo-Json -Depth 100 -Compress)
+            ) 'Social repair changed policy beyond the one primary checker claim.'
+            $r66RepairManifestHash = 'C0869A9788CFC7E3C773A5180656BB17E4E78383F7ED43B90914D262E13D64EB'
+            Assert-Coordination (
+              (Get-Sha256 (Join-Path $root $r66CoordinationOwners[1])) -ceq
+                $r66RepairManifestHash -and
+              (Get-Sha256 (Join-Path $root $r66SocialGate)) -ceq
+                '47CBC31DCBAA058D5E6AC2E0AAC3F68DD8D76D0906FFDB4C1D7DBAE84811756D'
+            ) 'Social repair differs from its reviewed manifest or exact checker.'
+            $r66RepairScopeBefore = Get-R66Utf8GitJson `
+              $r66GateRepairParent $r66CoordinationOwners[2]
+            $r66RepairScopeAfter = Get-Content -Encoding UTF8 -Raw -LiteralPath `
+              (Join-Path $root $r66CoordinationOwners[2]) | ConvertFrom-Json
+            Assert-Coordination (
+              $r66RepairScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq
+                $r66RepairManifestHash
+            ) 'Social repair manifest is not bound to the ticket scope.'
+            $r66RepairScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 =
+              $r66RepairScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+            Assert-Coordination (
+              ($r66RepairScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+              ($r66RepairScopeAfter | ConvertTo-Json -Depth 100 -Compress)
+            ) 'Social repair changed execution authority beyond its manifest binding.'
+            $r66FreezeCommit = $null
+          } else {
+            $r66RepairFollowing = @(& git -C $root rev-list --reverse --ancestry-path `
+                "${r66GateRepairParent}..$head")
+            Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66RepairFollowing.Count -gt 0) `
+              'Social repair ancestry lookup failed.'
+            $r66FreezeCommit = [string]$r66RepairFollowing[0]
+            $r66RepairParents = @(& git -C $root show -s --format=%P $r66FreezeCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $r66RepairParents.Count -eq 1 -and
+              [string]$r66RepairParents[0] -ceq $r66GateRepairParent
+            ) 'Social repair must have exactly its authorized parent.'
+            $r66RepairCommitSubject = @(& git -C $root show -s --format=%s $r66FreezeCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and $r66RepairCommitSubject.Count -eq 1 -and
+              [string]$r66RepairCommitSubject[0] -ceq $r66RepairSubject
+            ) 'Social repair commit subject changed.'
+            $r66RepairCommittedOwners = @(& git -C $root diff-tree --no-commit-id `
+                --name-only -r $r66FreezeCommit)
+            Assert-Coordination (
+              $LASTEXITCODE -eq 0 -and
+              (@($r66RepairCommittedOwners | Sort-Object) -join '|') -ceq
+              (@($r66RepairOwners | Sort-Object) -join '|')
+            ) 'Social repair commit changed an unexpected owner.'
+          }
+          $r66FreezeOwners = $r66RepairOwners
+          $r66CoordinationOwners = $r66RepairOwners
+        }
+        if ($null -ne $r66FreezeCommit) {
+          & git -C $root diff --quiet $r66FreezeCommit -- @r66FreezeOwners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'R66 coordination blobs changed after admission.'
+          $r66LaterCoordination = @(& git -C $root log --format=%H `
+              "${r66FreezeCommit}..$head" -- @r66FreezeOwners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66LaterCoordination.Count -eq 0) `
+            'R66 coordination amendment cannot be replayed or revised by later feature commits.'
+        }
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
         $_.ToLowerInvariant()
