@@ -97,6 +97,19 @@ String buyV2DeliveryPromiseSummary({
       : '$relative · $deadline';
 }
 
+String buyV2OrderPromiseSummary(BuyV2Order order) {
+  final summary = buyV2DeliveryPromiseSummary(
+    promise: order.promise,
+    promisedByLabel: order.promisedByLabel,
+  );
+  return order.status == BuyV2OrderStatus.delivered
+      ? summary
+      : summary.replaceFirst(
+          RegExp(r'^Delivered\b', caseSensitive: false),
+          'Delivery',
+        );
+}
+
 String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
     switch (destination) {
       BuyV2Destination.shop ||

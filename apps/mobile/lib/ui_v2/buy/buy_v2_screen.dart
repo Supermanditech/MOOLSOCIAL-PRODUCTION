@@ -1221,8 +1221,17 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final collapsedWidth = (MediaQuery.sizeOf(context).width - 16)
-        .clamp(0.0, 236.0)
+    final status = _buyOrderStatusLabel(order.status);
+    final promise = buyV2OrderPromiseSummary(order);
+    const statusStyle = TextStyle(
+      color: BuyV2Colors.navy,
+      fontSize: 9,
+      fontWeight: FontWeight.w800,
+    );
+    final measuredWidth =
+        buyV2ValueTextSize(context, status, statusStyle).width + 74;
+    final collapsedWidth = (measuredWidth < 236 ? 236.0 : measuredWidth)
+        .clamp(0.0, MediaQuery.sizeOf(context).width - 16)
         .toDouble();
     final statusBar = minimized
         ? Align(
@@ -1234,8 +1243,9 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   SizedBox(
-                    height: 34,
+                    height: 44,
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
                           child: InkWell(
@@ -1254,14 +1264,13 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 6),
                                   Expanded(
-                                    child: Text(
-                                      '${_buyOrderStatusLabel(order.status)} · ${order.promise}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: BuyV2Colors.navy,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w800,
+                                    child: Semantics(
+                                      label: '$status · $promise',
+                                      excludeSemantics: true,
+                                      child: Text(
+                                        status,
+                                        maxLines: 1,
+                                        style: statusStyle,
                                       ),
                                     ),
                                   ),
@@ -1277,7 +1286,7 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                           icon: const Icon(Icons.expand_more_rounded, size: 18),
                           color: BuyV2Colors.royal,
                           style: IconButton.styleFrom(
-                            minimumSize: const Size(44, 34),
+                            minimumSize: const Size(48, 44),
                             padding: EdgeInsets.zero,
                           ),
                         ),
@@ -1321,12 +1330,7 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                               'Quick delivery',
                               style: context.buyBody.copyWith(fontSize: 10.5),
                             ),
-                            Text(
-                              '${_buyOrderStatusLabel(order.status)} · ${order.promise}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.buyMeta,
-                            ),
+                            Text('$status · $promise', style: context.buyMeta),
                           ],
                         ),
                       ),
@@ -1443,9 +1447,7 @@ class _BuyQuietDeliveryStatusBar extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${_buyOrderStatusLabel(order.status)} · ${order.promise}',
-                      maxLines: 2,
-                      overflow: TextOverflow.clip,
+                      '${_buyOrderStatusLabel(order.status)} · ${buyV2OrderPromiseSummary(order)}',
                       style: context.buyMeta.copyWith(
                         color: BuyV2Colors.navy,
                         fontWeight: FontWeight.w800,

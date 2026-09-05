@@ -375,10 +375,8 @@ class BuyV2GstInvoiceController extends ChangeNotifier {
   }
 }
 
-String _orderPromiseSummary(BuyV2Order order) => buyV2DeliveryPromiseSummary(
-  promise: order.promise,
-  promisedByLabel: order.promisedByLabel,
-);
+String _orderPromiseSummary(BuyV2Order order) =>
+    buyV2OrderPromiseSummary(order);
 
 typedef _BuyV2PurchaseGroup = ({String? purchaseId, List<BuyV2Order> orders});
 
@@ -16878,15 +16876,16 @@ class _TrackingRoute extends StatelessWidget {
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(5),
-                  child: BuyV2HonestProgressIndicator(
-                    ownerId: order.id,
-                    progress: order.progress,
-                    statusLabel: _trackingStatusLabel(order.status),
-                    isComplete: order.status == BuyV2OrderStatus.delivered,
-                    minHeight: 5,
-                    backgroundColor: BuyV2Colors.softBlue,
-                    valueColor: BuyV2Colors.orange,
-                    indicatorKey: const ValueKey('buy-tracking-route-progress'),
+                  child: const SizedBox(
+                    key: ValueKey('buy-tracking-route-connector'),
+                    height: 5,
+                    child: Center(
+                      child: Divider(
+                        height: 2,
+                        thickness: 2,
+                        color: BuyV2Colors.softBlue,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -16904,16 +16903,16 @@ class _TrackingRoute extends StatelessWidget {
               Expanded(
                 child: Text(
                   order.partner,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   style: context.buyMeta.copyWith(fontSize: 7.5),
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                order.destinationLabel,
-                maxLines: 1,
-                style: context.buyMeta.copyWith(fontSize: 7.5),
+              Expanded(
+                child: Text(
+                  order.destinationLabel,
+                  textAlign: TextAlign.end,
+                  style: context.buyMeta.copyWith(fontSize: 7.5),
+                ),
               ),
             ],
           ),

@@ -207,8 +207,19 @@ void main() {
       activeOrder.progress,
     );
     expect(
-      renderedProgress(tester, const ValueKey('buy-tracking-route-progress')),
-      activeOrder.progress,
+      find.byKey(const ValueKey('buy-tracking-route-connector')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-tracking-route')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is LinearProgressIndicator ||
+              widget is BuyV2HonestProgressIndicator,
+        ),
+      ),
+      findsNothing,
     );
     await tester.scrollUntilVisible(
       find.text('Order updates'),

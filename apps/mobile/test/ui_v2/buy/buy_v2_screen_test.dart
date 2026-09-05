@@ -3718,7 +3718,7 @@ void main() {
             find.byKey(const ValueKey('buy-quick-delivery-status-minimized')),
           )
           .height,
-      lessThanOrEqualTo(38),
+      inInclusiveRange(46, 48),
     );
     await tester.tap(find.byKey(const ValueKey('buy-quick-delivery-expand')));
     await tester.pumpAndSettle();
@@ -4172,11 +4172,11 @@ void main() {
       expect(find.text('Delivery 1 of 2'), findsOneWidget);
       expect(find.text('Delivery 2 of 2'), findsOneWidget);
       expect(
-        find.text('Arrives · Delivered in 5 min · by 6:35 PM'),
+        find.text('Arrives · Delivery in 5 min · by 6:35 PM'),
         findsOneWidget,
       );
       expect(
-        find.text('Arrives · Delivered in 1 day · by tomorrow 4:00 PM'),
+        find.text('Arrives · Delivery in 1 day · by tomorrow 4:00 PM'),
         findsOneWidget,
       );
       expect(find.textContaining(shop.seller), findsWidgets);
@@ -4249,7 +4249,7 @@ void main() {
     await completeReviewPayment(tester, session);
     expect(find.text('Order placed'), findsOneWidget);
     expect(
-      find.text('Arrives · Delivered in 10 min · by 6:40 PM'),
+      find.text('Arrives · Delivery in 10 min · by 6:40 PM'),
       findsOneWidget,
     );
   });

@@ -244,15 +244,7 @@ void main() {
         expect(find.text('Not available for this order'), findsOneWidget);
       }
       expect(find.text(order.destinationLabel), findsWidgets);
-      expect(
-        find.text(
-          buyV2DeliveryPromiseSummary(
-            promise: order.promise,
-            promisedByLabel: order.promisedByLabel,
-          ),
-        ),
-        findsWidgets,
-      );
+      expect(find.text(buyV2OrderPromiseSummary(order)), findsWidgets);
       expect(
         find.text('No delivery instruction was recorded for this order.'),
         findsOneWidget,
