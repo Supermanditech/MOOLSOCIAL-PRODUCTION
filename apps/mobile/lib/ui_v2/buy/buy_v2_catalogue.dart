@@ -773,7 +773,7 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
     final shop = session.destination == BuyV2Destination.shop;
     final options = shop
         ? const [
-            (id: 'quick', title: 'Quick 10m', icon: Icons.speed_rounded),
+            (id: 'quick', title: 'Quick', icon: Icons.speed_rounded),
             (id: 'courier', title: 'Scheduled', icon: Icons.schedule_rounded),
           ]
         : const [
@@ -815,7 +815,7 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
       container: true,
       explicitChildNodes: true,
       label: shop
-          ? 'Choose Quick 10 minute or scheduled Shop products'
+          ? 'Choose Quick or scheduled Shop products'
           : 'Choose Wholesale or Bulk products',
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -3918,7 +3918,7 @@ List<String> _publicStoreFulfilmentLabels(
         facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
     switch (mode) {
       case BuyV2FulfilmentMode.quickLocal:
-        labels.add('Quick 10m');
+        labels.add('Quick');
       case BuyV2FulfilmentMode.standardCourier:
         labels.add('Scheduled delivery');
       case BuyV2FulfilmentMode.bulkFreight:
@@ -4618,7 +4618,7 @@ class _RelatedStoreCard extends StatelessWidget {
         : 'MoolSocial Fulfilment Partner';
     final fulfilmentMode = buyV2CatalogueFulfilmentModeFor(product);
     final delivery = switch (fulfilmentMode) {
-      BuyV2FulfilmentMode.quickLocal => 'Quick 10m',
+      BuyV2FulfilmentMode.quickLocal => 'Quick',
       BuyV2FulfilmentMode.standardCourier => _compactDeliveryPromise(
         product.deliveryPromise,
       ),

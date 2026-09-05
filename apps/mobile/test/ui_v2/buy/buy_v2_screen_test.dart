@@ -1049,7 +1049,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      for (final title in const ['Quick 10m', 'Scheduled']) {
+      for (final title in const ['Quick', 'Scheduled']) {
         final iconSurface = tester.widget<AnimatedContainer>(
           find.byKey(ValueKey('buy-sale-type-icon-surface-$title')),
         );
@@ -1111,9 +1111,7 @@ void main() {
         findsNothing,
       );
       final segmentTransition = tester.widget<AnimatedSwitcher>(
-        find.byKey(
-          const ValueKey('buy-sale-type-segment-transition-Quick 10m'),
-        ),
+        find.byKey(const ValueKey('buy-sale-type-segment-transition-Quick')),
       );
       expect(segmentTransition.duration, BuyV2Motion.stateChange);
       final quickTypography = tester.widget<AnimatedDefaultTextStyle>(
@@ -1202,7 +1200,7 @@ void main() {
       expect(category.right, lessThan(selector.left));
       expect(selector.right, lessThan(saved.left));
       expect(saved.right, lessThan(filters.left));
-      expect(find.text('Quick 10m'), findsOneWidget);
+      expect(find.text('Quick'), findsOneWidget);
       expect(find.text('Scheduled'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
@@ -1242,7 +1240,7 @@ void main() {
       find.byKey(const ValueKey('buy-shop-sale-type-quick-label-style')),
     );
     final segmentTransition = tester.widget<AnimatedSwitcher>(
-      find.byKey(const ValueKey('buy-sale-type-segment-transition-Quick 10m')),
+      find.byKey(const ValueKey('buy-sale-type-segment-transition-Quick')),
     );
     final catalogueMotion = tester.widget<TweenAnimationBuilder<double>>(
       find.byKey(const ValueKey('buy-catalogue-motion-tween-shop')),
@@ -2015,6 +2013,70 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final testCase in const [
+    (productId: 's-tomato', minutes: 12),
+    (productId: 's-noodles', minutes: 18),
+  ]) {
+    testWidgets(
+      'R66 019 Quick category retains ${testCase.minutes} minute product and Cart promise',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        final product = session.product(testCase.productId);
+        expect(product.deliveryPromise, 'Delivered in ${testCase.minutes} min');
+        await tester.pumpWidget(app(session));
+        await tester.pumpAndSettle();
+        final selector = find.byKey(
+          const ValueKey('buy-shop-sale-type-selector'),
+        );
+        expect(
+          find.descendant(of: selector, matching: find.text('Quick')),
+          findsOneWidget,
+        );
+        expect(find.text('Quick 10m'), findsNothing);
+        expect(
+          tester.widget<Semantics>(selector).properties.label,
+          'Choose Quick or scheduled Shop products',
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('buy-shop-sale-type-courier')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.shopSaleType, BuyV2ShopSaleType.courier);
+        await tester.tap(
+          find.byKey(const ValueKey('buy-shop-sale-type-quick')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
+        session.openProduct(product.id);
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
+          220,
+          scrollable: scrollableWithin(
+            PageStorageKey('buy-product-${product.id}'),
+          ),
+        );
+        expect(find.text('Delivered in ${testCase.minutes} min'), findsWidgets);
+        expect(session.addProduct(product.id), isTrue);
+        session.openCart();
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Delivered in ${testCase.minutes} min'),
+          findsOneWidget,
+        );
+        expect(session.quantityFor(product.id), 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'B01 T02 keeps one product while server promises 3 5 and 10 minutes',
@@ -5152,7 +5214,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Open'), findsOneWidget);
-      expect(find.text('Quick 10m'), findsWidgets);
+      expect(find.text('Quick'), findsWidgets);
       final askStore = find.byKey(const ValueKey('buy-public-store-ask'));
       expect(askStore, findsOneWidget);
       expect(tester.getSize(askStore), const Size(78, 44));
@@ -5206,7 +5268,7 @@ void main() {
               find.byKey(const ValueKey('buy-store-cart-feedback')),
             )
             .text,
-        'Added',
+        '1 item',
       );
 
       final chicken = find.byKey(const ValueKey('buy-product-s-chicken'));
@@ -5666,7 +5728,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: relatedStore, matching: find.text('Quick 10m')),
+        find.descendant(of: relatedStore, matching: find.text('Quick')),
         findsOneWidget,
       );
 
@@ -6185,7 +6247,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Open'), findsOneWidget);
-    expect(find.text('Quick 10m'), findsWidgets);
+    expect(find.text('Quick'), findsWidgets);
     await tester.tap(
       find.byKey(const ValueKey('buy-public-store-fulfilment-toggle')),
     );
@@ -6346,7 +6408,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('buy-product-s-atta')), findsNothing);
-      expect(find.text('Quick 10m'), findsOneWidget);
+      expect(find.text('Quick'), findsOneWidget);
       expect(find.text('Scheduled'), findsOneWidget);
 
       await tester.fling(shopSelector, const Offset(-140, 0), 800);
