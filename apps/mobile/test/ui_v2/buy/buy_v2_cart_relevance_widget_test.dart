@@ -313,6 +313,14 @@ void main() {
       expect(action, findsOneWidget);
       final labels = find.descendant(of: action, matching: find.byType(Text));
       expect(labels, findsOneWidget);
+      final paragraph = tester.renderObject<RenderParagraph>(labels);
+      final naturalLabel = TextPainter(
+        text: paragraph.text,
+        textDirection: TextDirection.ltr,
+        textScaler: const TextScaler.linear(2),
+      )..layout(maxWidth: paragraph.size.width);
+      expect(paragraph.size.height, greaterThanOrEqualTo(naturalLabel.height));
+      naturalLabel.dispose();
       expect(
         tester.getRect(labels).top,
         greaterThanOrEqualTo(tester.getRect(action).top),
@@ -322,12 +330,88 @@ void main() {
         lessThanOrEqualTo(tester.getRect(action).bottom),
       );
       expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
+      expect(find.text('Your cart is empty'), findsOneWidget);
+      expect(find.text('Browse products'), findsOneWidget);
+      expect(find.textContaining('₹ Total products'), findsNothing);
+      final header = tester.widget<BuyV2FiniteValueTransition>(
+        find.byKey(const ValueKey('buy-cart-header-value-motion')),
+      );
+      expect(header.text, isNot(contains('·  ·')));
       expect(tester.takeException(), isNull);
       await _captureR66MainCart(tester, 'empty-${destination.name}-text2');
       await tester.tap(action);
       await tester.pumpAndSettle();
       expect(browseCount, 1);
     });
+  }
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    testWidgets(
+      'R66 delivery instructions stay complete at 200 percent ${destination.name}',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(320, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final session = BuyV2Session(core: BuySession());
+        addTearDown(session.dispose);
+        session.addProduct(
+          destination == BuyV2Destination.shop ? 's-tomato' : 'w-notebook',
+        );
+        session.openCart();
+        await tester.pumpWidget(app(session, textScale: 2));
+        await tester.pumpAndSettle();
+        if (destination == BuyV2Destination.wholesale) {
+          expect(find.textContaining('MOQ 1 pack ·'), findsOneWidget);
+          expect(find.textContaining('MOQ 1 packs'), findsNothing);
+        }
+        final owner = find.byKey(
+          ValueKey('buy-cart-delivery-instructions-${destination.name}'),
+        );
+        await showInMainCartList(tester, owner);
+        final lane = find.descendant(
+          of: owner,
+          matching: find.byType(Scrollable),
+        );
+        expect(lane, findsOneWidget);
+        await _captureR66MainCart(
+          tester,
+          'instructions-${destination.name}-text2',
+        );
+        for (final option in session.deliveryInstructionsFor(destination)) {
+          final action = find.byKey(
+            ValueKey('buy-cart-instruction-${destination.name}-${option.id}'),
+          );
+          await tester.scrollUntilVisible(
+            action,
+            110,
+            scrollable: lane,
+            maxScrolls: 15,
+          );
+          await tester.pumpAndSettle();
+          final label = find.descendant(
+            of: action,
+            matching: find.text(option.label),
+          );
+          expect(label, findsOneWidget);
+          expect(
+            tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+            isFalse,
+            reason: option.label,
+          );
+          expect(
+            tester.getRect(label).bottom,
+            lessThanOrEqualTo(tester.getRect(action).bottom),
+          );
+          expect(
+            tester.getRect(label).top,
+            greaterThanOrEqualTo(tester.getRect(action).top),
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('mixed Cart uses real media and context-specific benefit pages', (
@@ -904,7 +988,7 @@ Future<void> _captureR66MainCart(WidgetTester tester, String label) async {
     find.byKey(const ValueKey('r66-main-cart-capture')),
   );
   await tester.runAsync(() async {
-    final directory = Directory('build/r66-main-cart-review-v4-20260905');
+    final directory = Directory('build/r66-cart-wording-review-v3-20260905');
     await directory.create(recursive: true);
     final output = File('${directory.path}/$label.png');
     if (await output.exists()) {

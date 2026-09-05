@@ -63,9 +63,12 @@ String _cartHeaderSummary(BuyV2Session session) {
       ? _packCountLabel(session.scopedItemCount)
       : '${session.scopedItemCount} '
             '${session.scopedItemCount == 1 ? 'item' : 'items'}';
-  return '${_productCountLabel(lines.length)} · $quantityLabel · '
-      '${_destinationSummary(destinations)} · '
-      '${buyV2Money(session.scopedCartTotal)}';
+  return [
+    _productCountLabel(lines.length),
+    quantityLabel,
+    if (destinations.isNotEmpty) _destinationSummary(destinations),
+    buyV2Money(session.scopedCartTotal),
+  ].join(' · ');
 }
 
 String _destinationSummary(Set<BuyV2Destination> destinations) {
@@ -5069,13 +5072,17 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Your ${session.cartScope.label} cart is empty',
+                          session.cartScope == BuyV2CartScope.all
+                              ? 'Your cart is empty'
+                              : 'Your ${session.cartScope.label} cart is empty',
                           textAlign: TextAlign.center,
                           style: context.buyTitle.copyWith(fontSize: 17),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Browse ${session.cartScope.label} products to start this order.',
+                          session.cartScope == BuyV2CartScope.all
+                              ? 'Browse products to start your order.'
+                              : 'Browse ${session.cartScope.label} products to start your order.',
                           textAlign: TextAlign.center,
                           style: context.buyMeta,
                         ),
@@ -5201,12 +5208,22 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
               if (lines.isEmpty) {
                 return SizedBox(
                   width: double.infinity,
-                  height: BuyV2Metrics.minimumTap,
                   child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, BuyV2Metrics.minimumTap),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
                     key: const ValueKey('buy-empty-cart-browse'),
                     onPressed: widget.onBrowseMore,
                     icon: const Icon(Icons.storefront_outlined, size: 18),
-                    label: Text('Browse ${session.cartScope.label}'),
+                    label: Text(
+                      session.cartScope == BuyV2CartScope.all
+                          ? 'Browse products'
+                          : 'Browse ${session.cartScope.label}',
+                    ),
                   ),
                 );
               }
@@ -15588,12 +15605,17 @@ class _CartDeliveryInstructionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final options = session.deliveryInstructionsFor(destination);
     final selected = session.selectedDeliveryInstructionFor(destination);
-    final optionLineHeight = buyV2ValueTextSize(
-      context,
-      'Ag',
-      const TextStyle(fontSize: 9, fontWeight: FontWeight.w900),
-    ).height;
-    final optionHeight = (optionLineHeight * 2 + 42)
+    final maximumLabelHeight = options.fold(0.0, (height, option) {
+      final labelHeight = buyV2ValueTextSize(
+        context,
+        option.label,
+        const TextStyle(fontSize: 9, fontWeight: FontWeight.w900),
+        maxWidth: 122,
+        maxLines: null,
+      ).height;
+      return height > labelHeight ? height : labelHeight;
+    });
+    final optionHeight = (maximumLabelHeight + 42)
         .clamp(82.0, double.infinity)
         .toDouble();
     return Container(
@@ -15655,8 +15677,6 @@ class _CartDeliveryInstructionCard extends StatelessWidget {
                           const Spacer(),
                           Text(
                             option.label,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: isSelected
                                   ? Colors.white
@@ -16060,7 +16080,7 @@ class _CartLine extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'MOQ ${product.minimumOrder} packs · '
+                    'MOQ ${_packCountLabel(product.minimumOrder)} · '
                     '${buyV2Money(product.price)} per pack',
                     style: context.buyMeta.copyWith(
                       color: BuyV2Colors.navy,
