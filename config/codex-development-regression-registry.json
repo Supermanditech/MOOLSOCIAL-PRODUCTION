@@ -91552,7 +91552,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-payment-mvp-r64-11-review-20260902/redmi-r64-11-payment-confirmed.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-payment-mvp-r64-11-review-20260902/redmi-r64-11-payment-confirmed.png",
+          "originalSha256": "27386F5E46E614DAB9C42B35F04B021438840B215CC2EBE404E59CD422D5EA62",
+          "originalBytes": 181178,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -91574,7 +91584,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-payment-mvp-r64-11-review-20260902/redmi-r64-11-payment-confirmed.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-payment-mvp-r64-11-review-20260902/redmi-r64-11-payment-confirmed.png",
+          "originalSha256": "27386F5E46E614DAB9C42B35F04B021438840B215CC2EBE404E59CD422D5EA62",
+          "originalBytes": 181178,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -91596,7 +91616,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-payment-mvp-r64-11-review-20260902/redmi-r64-11-payment-confirmed.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-payment-mvp-r64-11-review-20260902/redmi-r64-11-payment-confirmed.png",
+          "originalSha256": "27386F5E46E614DAB9C42B35F04B021438840B215CC2EBE404E59CD422D5EA62",
+          "originalBytes": 181178,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92184,8 +92214,18 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-payment-replacement-r64-12-review-20260903/redmi-r64-12-payment.png",
-        "artifacts/quality/buy-payment-replacement-r64-12-review-20260903/redmi-r64-12-payment.xml"
+        "artifacts/quality/buy-payment-replacement-r64-12-review-20260903/redmi-r64-12-payment.xml",
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-payment-replacement-r64-12-review-20260903/redmi-r64-12-payment.png",
+          "originalSha256": "8841F8A9B53B5DC20FE0970707E2A04A5F45DE9E238B91821EBC975F8E3B5F0F",
+          "originalBytes": 188360,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92207,7 +92247,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-payment-replacement-r64-12-review-20260903/redmi-r64-12-payment-cancelled.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-payment-replacement-r64-12-review-20260903/redmi-r64-12-payment-cancelled.png",
+          "originalSha256": "980AA4ADFAAEE69449210C58D7197BCE32ECA357D5E859012BEDFCA61A2E100A",
+          "originalBytes": 201102,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92447,8 +92497,18 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/uaw-buy-cursor-compact-storefront-r64.14-review-20260903-device-review-debug.apk",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/uaw-buy-cursor-compact-storefront-r64.14-review-20260903-build-provenance.txt"
+        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/uaw-buy-cursor-compact-storefront-r64.14-review-20260903-build-provenance.txt",
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/uaw-buy-cursor-compact-storefront-r64.14-review-20260903-device-review-debug.apk",
+          "originalSha256": "B96BB5A3525BA4622DF44CB377D919258CD19628BD666D6A3C70247B7AACB436",
+          "originalBytes": 208653269,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92470,7 +92530,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png",
+          "originalSha256": "621C6AD602781943C934607CCD40227E74A1CAE937255F709E957B173F0D3BF1",
+          "originalBytes": 283779,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92492,7 +92562,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png",
+          "originalSha256": "621C6AD602781943C934607CCD40227E74A1CAE937255F709E957B173F0D3BF1",
+          "originalBytes": 283779,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92514,7 +92594,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png",
+          "originalSha256": "621C6AD602781943C934607CCD40227E74A1CAE937255F709E957B173F0D3BF1",
+          "originalBytes": 283779,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92536,7 +92626,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png",
+          "originalSha256": "621C6AD602781943C934607CCD40227E74A1CAE937255F709E957B173F0D3BF1",
+          "originalBytes": 283779,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92558,7 +92658,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png",
+          "originalSha256": "621C6AD602781943C934607CCD40227E74A1CAE937255F709E957B173F0D3BF1",
+          "originalBytes": 283779,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92620,7 +92730,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-compact-storefront-r64-14-review-20260903/redmi-r64-14-store-ask-row-defect.png",
+          "originalSha256": "621C6AD602781943C934607CCD40227E74A1CAE937255F709E957B173F0D3BF1",
+          "originalBytes": 283779,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92702,8 +92822,18 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-storefront-density-r64-15-review-20260903/uaw-buy-cursor-storefront-density-r64.15-review-20260903-device-review-debug.apk",
-        "artifacts/quality/buy-storefront-density-r64-15-review-20260903/uaw-buy-cursor-storefront-density-r64.15-review-20260903-build-provenance.txt"
+        "artifacts/quality/buy-storefront-density-r64-15-review-20260903/uaw-buy-cursor-storefront-density-r64.15-review-20260903-build-provenance.txt",
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-storefront-density-r64-15-review-20260903/uaw-buy-cursor-storefront-density-r64.15-review-20260903-device-review-debug.apk",
+          "originalSha256": "6A03CD44419BDE01C3FF713244EE36F3CADF0282E2109501A49A74DA8613BAE0",
+          "originalBytes": 208658097,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92726,8 +92856,25 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-storefront-density-r64-15-review-20260903/redmi-r64-15-ask-store-chat.png",
-        "artifacts/quality/buy-storefront-density-r64-15-review-20260903/redmi-r64-15-chat-back-store.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-storefront-density-r64-15-review-20260903/redmi-r64-15-ask-store-chat.png",
+          "originalSha256": "0CB4A57ADD3659308E084C576CCBFE8F84FD5BC2042EFB397A7B87AE7F0A96CE",
+          "originalBytes": 55352,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        },
+        {
+          "originalPath": "artifacts/quality/buy-storefront-density-r64-15-review-20260903/redmi-r64-15-chat-back-store.png",
+          "originalSha256": "2B6C3768738475B3545EAAEF8484B9F8DBDAD53A768AB1A584FF296066D436C7",
+          "originalBytes": 207809,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92771,7 +92918,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-store-chat-return-r64-17-review-20260903/redmi-r64-17-bulk-scoped-cart.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-store-chat-return-r64-17-review-20260903/redmi-r64-17-bulk-scoped-cart.png",
+          "originalSha256": "AF7393C80C8E50A1A2820453B4E9D44F56C335C9B56421E1A62F139AD040F7C5",
+          "originalBytes": 213841,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92811,7 +92968,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-11-product-share-whatsapp-recipient.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-11-product-share-whatsapp-recipient.png",
+          "originalSha256": "64DDFD024EC65FF11DC592FE22D39A281F9A10037EC0D4B7128C718490AC5A44",
+          "originalBytes": 236356,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -92912,7 +93079,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-31-invoice-download-result.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-31-invoice-download-result.png",
+          "originalSha256": "889ABC842FFF83BD339CCD5AAC36EAE417BFE4C36082D4A4AFCB18733E5490E4",
+          "originalBytes": 46704,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -93163,7 +93340,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-91-global-chat.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-91-global-chat.png",
+          "originalSha256": "79202596B12EDC017B1BC4DF7315817EA9B74170471500AA34198F50EA29037A",
+          "originalBytes": 92424,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -93184,7 +93371,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-91-global-chat.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-91-global-chat.png",
+          "originalSha256": "79202596B12EDC017B1BC4DF7315817EA9B74170471500AA34198F50EA29037A",
+          "originalBytes": 92424,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -93226,7 +93423,17 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-97-monthly-basket-added.png"
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-97-monthly-basket-added.png",
+          "originalSha256": "B6B0F529CEEECD9BF9E5C884C521D4C5D05D99DD58FEAC7D956D101404916DA2",
+          "originalBytes": 407482,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -93248,8 +93455,18 @@
       ],
       "evidence": [
         "config/codex-development-regression-registry.json",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-102-gst-form.png",
-        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-102-gst-form.xml"
+        "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-102-gst-form.xml",
+        "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+      ],
+      "retiredEvidence": [
+        {
+          "originalPath": "artifacts/quality/buy-pre-go-live-uat-r64-18-20260903/screen-102-gst-form.png",
+          "originalSha256": "EB9CFF9FC0A9D9D94A22736FA1B5A3C09F663A662F1DD447E548CC7AE11D3F92",
+          "originalBytes": 218091,
+          "disposition": "founder_approved_cleanup_deleted_not_current_test_evidence",
+          "cleanupManifestSha256": "E754D9B80A494F7D4C38D76CF7688AF77E32E40D5EDB281A60A90B54EDA98190",
+          "retainedRecord": "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md"
+        }
       ]
     },
     {
@@ -100526,6 +100743,96 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"
       ]
-    }
+    },
+    {
+      "id": "REG-20260905-4489-CURSOR-CATALOGUE-FEATURED-INFORMATION-OVERFLOW",
+      "status": "registered_correction_pending",
+      "appliesTo": ["implementation", "testing", "buy", "accessibility"],
+      "mistake": "Medicine featured catalogue cards overflow their information column by approximately 2.4 to 20 pixels in the supplied boundary diagnostic.",
+      "rootCause": "A fixed image/information flex split gives the decision-information column less height than its rendered text needs.",
+      "prevention": "Size the information section from its content, preserve every decision field and the compact exterior, and exercise normal/enlarged text and narrow phones without suppressing Flutter overflow assertions.",
+      "gates": ["apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_prescription_sheet_motion_test.dart"],
+      "evidence": ["docs/quality/UAW-CURSOR-BUY-CARD-OVERFLOW-V1-20260905.md", "docs/quality/cursor-buy-card-overflow-v1-20260905/RESULTS.md"]
+    },
+    {
+      "id": "REG-20260905-4490-CURSOR-RESUME-WRONG-BASELINE-PREFLIGHT",
+      "status": "registered_prevention_active",
+      "appliesTo": ["primary", "implementation", "coordination"],
+      "mistake": "The initial resume preflight invoked the old production checkout baseline phase instead of the founder-selected f94cfd47 corrective continuation; the gate rejected its HEAD.",
+      "rootCause": "An old production governance binding was selected during reconstruction instead of the exact new child identity.",
+      "prevention": "Bind the isolated corrective child to the exact founder-selected SHA and owner set, preserve production and other worktrees, and use that child's continuation identity for every later gate.",
+      "gates": ["scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["docs/quality/UAW-CURSOR-BUY-CARD-OVERFLOW-V1-20260905.md"]
+    },
+    {
+      "id": "REG-20260905-4491-CURSOR-RESUME-RECONSTRUCTION-OUTPUT-TRUNCATION",
+      "status": "registered_prevention_active",
+      "appliesTo": ["primary", "implementation", "evidence"],
+      "mistake": "Several reconstruction reads exceeded the returned output budget, including long instruction files and combined source windows.",
+      "rootCause": "Owner size and aggregate output were not bounded sufficiently before reading.",
+      "prevention": "Discard truncated projections, finish required reads in independent bounded pages through EOF, retain native exits/session IDs and record complete test logs separately from chat summaries.",
+      "gates": ["scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["docs/quality/UAW-CURSOR-BUY-CARD-OVERFLOW-V1-20260905.md"]
+    },
+    {
+      "id": "REG-20260905-4492-CURSOR-CHILD-INHERITED-ACTIVE-CLAIM",
+      "status": "registered_correction_pending",
+      "appliesTo": ["primary", "coordination", "implementation"],
+      "mistake": "The catalogue bootstrap gate rejected two open Cursor tasks because the baseline's completed historical Buy claim remained active beside the new child claim.",
+      "rootCause": "The isolated child policy retained the old integration snapshot's active task inventory.",
+      "prevention": "Scope the child activeClaims to its exact primary bootstrap and one Cursor correction; preserve historical bindings, Git history, source and evidence unchanged.",
+      "gates": ["scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["docs/quality/cursor-buy-card-overflow-v1-20260905/RESULTS.md"]
+    },
+    {
+      "id": "REG-20260905-4493-CURSOR-CLAIM-PATCH-LINE-BOUNDARY",
+      "recurrences": [{"date": "2026-09-05", "operation": "read-only cleanup-manifest projection", "result": "PowerShell rejected a missing closing brace before execution; no file bytes changed.", "prevention": "Use independently bounded, multiline loops with complete statement boundaries."}],
+      "status": "registered_prevention_active",
+      "appliesTo": ["primary", "coordination", "evidence"],
+      "mistake": "The first generated claim-array patch was atomically rejected because its final expected line omitted the JSON trailing comma; the large error body also exceeded the output budget.",
+      "rootCause": "The patch range ended at the array bracket rather than the complete source line.",
+      "prevention": "Include complete literal line boundaries in generated patches, validate JSON before patching, and retain bounded error summaries rather than forwarding a large failed patch body.",
+      "gates": ["scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["docs/quality/cursor-buy-card-overflow-v1-20260905/RESULTS.md"]
+    },
+    {
+      "id": "REG-20260905-4494-CURSOR-PRESERVED-EVIDENCE-ARCHIVE-ARGUMENT",
+      "status": "registered_prevention_active",
+      "appliesTo": ["primary", "implementation", "evidence"],
+      "mistake": "The first implementation memory gate could not resolve historical REG3955 evidence because the explicit retained archive root was omitted.",
+      "rootCause": "The evidence had been preserved by the approved disk cleanup in the checksum-backed dirty-worktree archive, outside registered worktrees.",
+      "prevention": "Supply the existing EvidenceArchiveRoot option for the preserved archive; do not fabricate the zero-byte preimage, alter historical evidence references, restore obsolete worktrees or weaken existence checks.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["docs/quality/cursor-buy-card-overflow-v1-20260905/RESULTS.md"]
+    },
+    {
+      "id": "REG-20260905-4495-CURSOR-POST-CLEANUP-HISTORICAL-EVIDENCE-UNAVAILABLE",
+      "status": "registered_blocked_no_gate_waiver",
+      "appliesTo": ["primary", "implementation", "evidence"],
+      "mistake": "The archive-aware memory gate still failed because a historical screenshot referenced by REG4083 was removed during the founder-approved post-integration cleanup; read-only inventory found sixteen unresolved historical evidence paths.",
+      "rootCause": "The accepted baseline's mandatory evidence-existence contract predates the approved binary cleanup and archived worktree removal. Supplying the retained archive cannot recover a file recorded as deleted.",
+      "prevention": "Preserve the complete failed gate logs, original registry references and deletion manifests. Reconcile historical evidence disposition through the shared coordination owner before retrying; do not fabricate screenshots, suppress the memory gate, claim current device coverage or alter Buy source before authorization is valid.",
+      "gates": ["scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["docs/quality/cursor-buy-card-overflow-v1-20260905/RESULTS.md"]
+    },
+{
+  "gates": [
+    "scripts/check-codex-development-regression-memory.ps1",
+    "scripts/check-codex-subagent-coordination-policy.ps1"
+  ],
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "evidence"
+  ],
+  "status": "registered_recovered_from_exact_accepted_blob",
+  "evidence": [
+    "docs/quality/cursor-buy-card-overflow-v1-20260905/RESULTS.md"
+  ],
+  "rootCause": "The working registry no longer preserved the accepted historical prefix. Attribution to a specific write is unproven; the damaged bytes were retained before recovery.",
+  "id": "REG-20260905-4496-CURSOR-REGISTRY-HISTORICAL-INTEGRITY-RECOVERY",
+  "prevention": "Recover the historical prefix from the exact accepted Git blob, retain all seven valid task records, verify every accepted entry remains identical, and use explicit UTF-8 parsing with bounded errors and full logs after each registry write.",
+  "mistake": "Registry validation found unexpected historical deletions and malformed JSON after the tooling/environment transition; the failed parser produced truncated output. No Buy source or test was changed."
+}
   ]
 }
