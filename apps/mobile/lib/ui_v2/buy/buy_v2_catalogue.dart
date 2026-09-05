@@ -7392,107 +7392,126 @@ class _FeaturedProductAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final requiresOfferReview = offerDecision?.canAdd == false;
-    return AnimatedSwitcher(
-      duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
-      switchInCurve: Curves.easeOutBack,
-      switchOutCurve: Curves.easeInCubic,
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: ScaleTransition(
-          scale: Tween<double>(begin: .92, end: 1).animate(animation),
-          child: child,
-        ),
-      ),
-      child: quantity > 0
-          ? SizedBox(
-              key: ValueKey('buy-featured-quantity-shell-${product.id}'),
-              width: 108,
-              child: _QuantityStepper(
-                key: ValueKey('buy-quantity-${product.id}'),
-                productTitle: product.title,
-                quantity: quantity,
-                onDecrease: () => session.decrease(product.id),
-                onIncrease: () => session.increase(product.id),
-              ),
-            )
-          : Semantics(
-              label: requiresOfferReview
-                  ? 'Review ${product.title}. ${offerDecision!.statusLabel}'
-                  : rxBlocked
-                  ? 'Use prescription for ${product.title}'
-                  : 'Add ${product.title} to cart',
-              button: true,
-              child: Material(
-                key: ValueKey(
-                  requiresOfferReview
-                      ? 'buy-review-offer-${product.id}'
-                      : 'buy-add-${product.id}',
+    return Stack(
+      children: [
+        IgnorePointer(
+          ignoring: quantity > 0,
+          child: ExcludeSemantics(
+            excluding: quantity > 0,
+            child: AnimatedSwitcher(
+              duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
+              switchInCurve: Curves.easeOutBack,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: .92, end: 1).animate(animation),
+                  child: child,
                 ),
-                color: requiresOfferReview
-                    ? BuyV2Colors.softOrange
-                    : rxBlocked
-                    ? BuyV2Colors.navy
-                    : Colors.white,
-                elevation: 3,
-                shadowColor: const Color(0x33000040),
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    if (requiresOfferReview) {
-                      session.openProduct(product.id);
-                      return;
-                    }
-                    final added = session.addProduct(product.id);
-                    if (!added &&
-                        session.pendingPrescriptionProductId == product.id) {
-                      showBuyV2PrescriptionSheet(context, session);
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    width: 62,
-                    height: BuyV2Metrics.minimumTap,
-                    child: Center(
-                      child: rxBlocked
-                          ? const Text(
-                              'Rx',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            )
-                          : requiresOfferReview
-                          ? const Icon(
-                              Icons.info_outline_rounded,
-                              color: BuyV2Colors.orange,
-                              size: 23,
-                            )
-                          : const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.add_rounded,
-                                  color: BuyV2Colors.navy,
-                                  size: 19,
-                                ),
-                                SizedBox(width: 2),
-                                Text(
-                                  'Add',
-                                  style: TextStyle(
-                                    color: BuyV2Colors.navy,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ],
+              ),
+              child: quantity > 0
+                  ? SizedBox(
+                      key: ValueKey(
+                        'buy-featured-quantity-shell-${product.id}',
+                      ),
+                      width: 108,
+                      child: _QuantityStepper(
+                        key: ValueKey('buy-quantity-${product.id}'),
+                        quantity: quantity,
+                      ),
+                    )
+                  : Semantics(
+                      label: requiresOfferReview
+                          ? 'Review ${product.title}. ${offerDecision!.statusLabel}'
+                          : rxBlocked
+                          ? 'Use prescription for ${product.title}'
+                          : 'Add ${product.title} to cart',
+                      button: true,
+                      child: Material(
+                        key: ValueKey(
+                          requiresOfferReview
+                              ? 'buy-review-offer-${product.id}'
+                              : 'buy-add-${product.id}',
+                        ),
+                        color: requiresOfferReview
+                            ? BuyV2Colors.softOrange
+                            : rxBlocked
+                            ? BuyV2Colors.navy
+                            : Colors.white,
+                        elevation: 3,
+                        shadowColor: const Color(0x33000040),
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            if (requiresOfferReview) {
+                              session.openProduct(product.id);
+                              return;
+                            }
+                            final added = session.addProduct(product.id);
+                            if (!added &&
+                                session.pendingPrescriptionProductId ==
+                                    product.id) {
+                              showBuyV2PrescriptionSheet(context, session);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: SizedBox(
+                            width: 62,
+                            height: BuyV2Metrics.minimumTap,
+                            child: Center(
+                              child: rxBlocked
+                                  ? const Text(
+                                      'Rx',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    )
+                                  : requiresOfferReview
+                                  ? const Icon(
+                                      Icons.info_outline_rounded,
+                                      color: BuyV2Colors.orange,
+                                      size: 23,
+                                    )
+                                  : const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.add_rounded,
+                                          color: BuyV2Colors.navy,
+                                          size: 19,
+                                        ),
+                                        SizedBox(width: 2),
+                                        Text(
+                                          'Add',
+                                          style: TextStyle(
+                                            color: BuyV2Colors.navy,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                             ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
             ),
+          ),
+        ),
+        if (quantity > 0)
+          Positioned.fill(
+            child: _QuantityStepperTargets(
+              productTitle: product.title,
+              quantity: quantity,
+              onDecrease: () => session.decrease(product.id),
+              onIncrease: () => session.increase(product.id),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -7803,152 +7822,165 @@ class BuyV2ProductCard extends StatelessWidget {
                               ),
                             ),
                             if (!compact) const SizedBox(height: 6),
-                            AnimatedSwitcher(
-                              key: ValueKey(
-                                'buy-product-action-motion-${product.id}',
-                              ),
-                              duration: BuyV2Motion.resolved(
-                                context,
-                                BuyV2Motion.stateChange,
-                              ),
-                              switchInCurve: Curves.easeOutCubic,
-                              switchOutCurve: Curves.easeInCubic,
-                              transitionBuilder: (child, animation) =>
-                                  FadeTransition(
-                                    opacity: animation,
-                                    child: ScaleTransition(
-                                      scale: Tween<double>(
-                                        begin: .97,
-                                        end: 1,
-                                      ).animate(animation),
-                                      child: child,
-                                    ),
+                            IgnorePointer(
+                              ignoring: quantity > 0,
+                              child: ExcludeSemantics(
+                                excluding: quantity > 0,
+                                child: AnimatedSwitcher(
+                                  key: ValueKey(
+                                    'buy-product-action-motion-${product.id}',
                                   ),
-                              child: quantity > 0
-                                  ? _QuantityStepper(
-                                      key: ValueKey(
-                                        'buy-quantity-${product.id}',
+                                  duration: BuyV2Motion.resolved(
+                                    context,
+                                    BuyV2Motion.stateChange,
+                                  ),
+                                  switchInCurve: Curves.easeOutCubic,
+                                  switchOutCurve: Curves.easeInCubic,
+                                  transitionBuilder: (child, animation) =>
+                                      FadeTransition(
+                                        opacity: animation,
+                                        child: ScaleTransition(
+                                          scale: Tween<double>(
+                                            begin: .97,
+                                            end: 1,
+                                          ).animate(animation),
+                                          child: child,
+                                        ),
                                       ),
-                                      productTitle: product.title,
-                                      quantity: quantity,
-                                      onDecrease: () =>
-                                          session.decrease(product.id),
-                                      onIncrease: () =>
-                                          session.increase(product.id),
-                                    )
-                                  : SizedBox(
-                                      key: ValueKey(
-                                        'buy-add-shell-${product.id}',
-                                      ),
-                                      width: double.infinity,
-                                      height: BuyV2Metrics.minimumTap,
-                                      child: Semantics(
-                                        label: requiresOfferReview
-                                            ? 'Review ${product.title}. ${offerDecision!.statusLabel}'
-                                            : rxBlocked
-                                            ? 'Use prescription for '
-                                                  '${product.title}'
-                                            : 'Add ${product.title} to cart',
-                                        button: true,
-                                        child: Material(
+                                  child: quantity > 0
+                                      ? _QuantityStepper(
                                           key: ValueKey(
-                                            requiresOfferReview
-                                                ? 'buy-review-offer-${product.id}'
-                                                : 'buy-add-${product.id}',
+                                            'buy-quantity-${product.id}',
                                           ),
-                                          color: Colors.transparent,
-                                          child: InkWell(
-                                            onTap: () {
-                                              HapticFeedback.selectionClick();
-                                              if (requiresOfferReview) {
-                                                session.openProduct(product.id);
-                                                return;
-                                              }
-                                              final added = session.addProduct(
-                                                product.id,
-                                              );
-                                              if (!added &&
-                                                  session.pendingPrescriptionProductId ==
-                                                      product.id) {
-                                                showBuyV2PrescriptionSheet(
-                                                  context,
-                                                  session,
-                                                );
-                                              }
-                                            },
-                                            borderRadius: BorderRadius.circular(
-                                              11,
-                                            ),
-                                            child: Center(
-                                              child: Container(
-                                                height: 32,
-                                                alignment: Alignment.center,
-                                                decoration: BoxDecoration(
-                                                  color: requiresOfferReview
-                                                      ? BuyV2Colors.softOrange
-                                                      : rxBlocked
-                                                      ? BuyV2Colors.navy
-                                                      : Colors.white,
-                                                  borderRadius:
-                                                      BorderRadius.circular(10),
-                                                  border: Border.all(
-                                                    color: requiresOfferReview
-                                                        ? BuyV2Colors.orange
-                                                        : rxBlocked
-                                                        ? BuyV2Colors.navy
-                                                        : const Color(
-                                                            0x66000080,
+                                          quantity: quantity,
+                                        )
+                                      : SizedBox(
+                                          key: ValueKey(
+                                            'buy-add-shell-${product.id}',
+                                          ),
+                                          width: double.infinity,
+                                          height: BuyV2Metrics.minimumTap,
+                                          child: Semantics(
+                                            label: requiresOfferReview
+                                                ? 'Review ${product.title}. ${offerDecision!.statusLabel}'
+                                                : rxBlocked
+                                                ? 'Use prescription for '
+                                                      '${product.title}'
+                                                : 'Add ${product.title} to cart',
+                                            button: true,
+                                            child: Material(
+                                              key: ValueKey(
+                                                requiresOfferReview
+                                                    ? 'buy-review-offer-${product.id}'
+                                                    : 'buy-add-${product.id}',
+                                              ),
+                                              color: Colors.transparent,
+                                              child: InkWell(
+                                                onTap: () {
+                                                  HapticFeedback.selectionClick();
+                                                  if (requiresOfferReview) {
+                                                    session.openProduct(
+                                                      product.id,
+                                                    );
+                                                    return;
+                                                  }
+                                                  final added = session
+                                                      .addProduct(product.id);
+                                                  if (!added &&
+                                                      session.pendingPrescriptionProductId ==
+                                                          product.id) {
+                                                    showBuyV2PrescriptionSheet(
+                                                      context,
+                                                      session,
+                                                    );
+                                                  }
+                                                },
+                                                borderRadius:
+                                                    BorderRadius.circular(11),
+                                                child: Center(
+                                                  child: Container(
+                                                    height: 32,
+                                                    alignment: Alignment.center,
+                                                    decoration: BoxDecoration(
+                                                      color: requiresOfferReview
+                                                          ? BuyV2Colors
+                                                                .softOrange
+                                                          : rxBlocked
+                                                          ? BuyV2Colors.navy
+                                                          : Colors.white,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            10,
                                                           ),
-                                                  ),
-                                                ),
-                                                child: requiresOfferReview
-                                                    ? const Icon(
-                                                        Icons
-                                                            .info_outline_rounded,
+                                                      border: Border.all(
                                                         color:
-                                                            BuyV2Colors.orange,
-                                                        size: 20,
-                                                      )
-                                                    : rxBlocked
-                                                    ? const Text(
-                                                        'Use Rx',
-                                                        style: TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 9,
-                                                          fontWeight:
-                                                              FontWeight.w900,
-                                                        ),
-                                                      )
-                                                    : const Row(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          Icon(
-                                                            Icons.add_rounded,
+                                                            requiresOfferReview
+                                                            ? BuyV2Colors.orange
+                                                            : rxBlocked
+                                                            ? BuyV2Colors.navy
+                                                            : const Color(
+                                                                0x66000080,
+                                                              ),
+                                                      ),
+                                                    ),
+                                                    child: requiresOfferReview
+                                                        ? const Icon(
+                                                            Icons
+                                                                .info_outline_rounded,
                                                             color: BuyV2Colors
-                                                                .navy,
-                                                            size: 17,
-                                                          ),
-                                                          SizedBox(width: 3),
-                                                          Text(
-                                                            'Add',
+                                                                .orange,
+                                                            size: 20,
+                                                          )
+                                                        : rxBlocked
+                                                        ? const Text(
+                                                            'Use Rx',
                                                             style: TextStyle(
-                                                              color: BuyV2Colors
-                                                                  .navy,
+                                                              color:
+                                                                  Colors.white,
                                                               fontSize: 9,
                                                               fontWeight:
                                                                   FontWeight
                                                                       .w900,
                                                             ),
+                                                          )
+                                                        : const Row(
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
+                                                            children: [
+                                                              Icon(
+                                                                Icons
+                                                                    .add_rounded,
+                                                                color:
+                                                                    BuyV2Colors
+                                                                        .navy,
+                                                                size: 17,
+                                                              ),
+                                                              SizedBox(
+                                                                width: 3,
+                                                              ),
+                                                              Text(
+                                                                'Add',
+                                                                style: TextStyle(
+                                                                  color:
+                                                                      BuyV2Colors
+                                                                          .navy,
+                                                                  fontSize: 9,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w900,
+                                                                ),
+                                                              ),
+                                                            ],
                                                           ),
-                                                        ],
-                                                      ),
+                                                  ),
+                                                ),
                                               ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    ),
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -7965,6 +7997,20 @@ class BuyV2ProductCard extends StatelessWidget {
                     showRemoveLabel: savedContext,
                   ),
                 ),
+                if (quantity > 0)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: compact ? 2 : 8,
+                    height: BuyV2Metrics.minimumTap,
+                    child: _QuantityStepperTargets(
+                      visualInset: compact ? 6 : 9,
+                      productTitle: product.title,
+                      quantity: quantity,
+                      onDecrease: () => session.decrease(product.id),
+                      onIncrease: () => session.increase(product.id),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -7977,75 +8023,118 @@ class BuyV2ProductCard extends StatelessWidget {
 String _sellerTypeLabel(String source) => _publicProviderType(source);
 
 class _QuantityStepper extends StatelessWidget {
-  const _QuantityStepper({
-    super.key,
+  const _QuantityStepper({super.key, required this.quantity});
+
+  final int quantity;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: Container(
+        height: BuyV2Metrics.minimumTap,
+        decoration: BoxDecoration(
+          color: BuyV2Colors.softBlue,
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: const Color(0x23000080)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Center(
+                child: Icon(Icons.remove, size: 17, color: BuyV2Colors.navy),
+              ),
+            ),
+            BuyV2FiniteValueTransition(
+              key: const ValueKey('buy-grid-quantity-value-motion'),
+              stateKey: quantity,
+              text: '$quantity',
+              ownerSize: const Size(24, 24),
+              style: const TextStyle(
+                color: BuyV2Colors.navy,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: Icon(Icons.add, size: 17, color: BuyV2Colors.navy),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuantityStepperTargets extends StatelessWidget {
+  const _QuantityStepperTargets({
     required this.productTitle,
     required this.quantity,
     required this.onDecrease,
     required this.onIncrease,
+    this.visualInset = 0,
   });
 
   final String productTitle;
   final int quantity;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
+  final double visualInset;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: BuyV2Metrics.minimumTap,
-      decoration: BoxDecoration(
-        color: BuyV2Colors.softBlue,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: const Color(0x23000080)),
-      ),
-      child: Row(
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      const target = BuyV2Metrics.minimumTap;
+      final maximumInset = ((constraints.maxWidth - target * 2) / 2).clamp(
+        0.0,
+        double.infinity,
+      );
+      final inset =
+          (visualInset +
+                  1 +
+                  (constraints.maxWidth - visualInset * 2 - 2 - 24) / 4 -
+                  target / 2)
+              .clamp(0.0, maximumInset)
+              .toDouble();
+      Widget action(String verb, String tooltip, VoidCallback onTap) =>
+          Semantics(
+            label: '$verb $productTitle quantity from $quantity',
+            button: true,
+            excludeSemantics: true,
+            onTap: onTap,
+            child: IconButton(
+              tooltip: tooltip,
+              onPressed: onTap,
+              constraints: const BoxConstraints.tightFor(
+                width: target,
+                height: target,
+              ),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.standard,
+              icon: const SizedBox.shrink(),
+            ),
+          );
+      return Stack(
         children: [
-          Expanded(
-            child: Semantics(
-              label: 'Decrease $productTitle quantity from $quantity',
-              button: true,
-              excludeSemantics: true,
-              onTap: onDecrease,
-              child: IconButton(
-                tooltip: 'Remove one',
-                onPressed: onDecrease,
-                icon: const Icon(Icons.remove, size: 17),
-                color: BuyV2Colors.navy,
-                padding: EdgeInsets.zero,
-              ),
-            ),
+          Positioned(
+            left: inset,
+            top: 0,
+            width: target,
+            height: target,
+            child: action('Decrease', 'Remove one', onDecrease),
           ),
-          BuyV2FiniteValueTransition(
-            key: const ValueKey('buy-grid-quantity-value-motion'),
-            stateKey: quantity,
-            text: '$quantity',
-            ownerSize: const Size(24, 24),
-            style: const TextStyle(
-              color: BuyV2Colors.navy,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Expanded(
-            child: Semantics(
-              label: 'Increase $productTitle quantity from $quantity',
-              button: true,
-              excludeSemantics: true,
-              onTap: onIncrease,
-              child: IconButton(
-                tooltip: 'Add one',
-                onPressed: onIncrease,
-                icon: const Icon(Icons.add, size: 17),
-                color: BuyV2Colors.navy,
-                padding: EdgeInsets.zero,
-              ),
-            ),
+          Positioned(
+            right: inset,
+            top: 0,
+            width: target,
+            height: target,
+            child: action('Increase', 'Add one', onIncrease),
           ),
         ],
-      ),
-    );
-  }
+      );
+    },
+  );
 }
 
 class _ProductSaveButton extends StatelessWidget {

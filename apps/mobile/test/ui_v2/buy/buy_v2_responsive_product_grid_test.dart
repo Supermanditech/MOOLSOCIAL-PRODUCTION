@@ -1,7 +1,12 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
@@ -9,6 +14,208 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  Future<void> captureQuantity(WidgetTester tester, String name) async {
+    const phase = String.fromEnvironment('BUY_R66_QUANTITY_CAPTURE');
+    if (phase.isEmpty) return;
+    if (!['before', 'after'].contains(phase)) {
+      throw StateError('Unknown capture phase');
+    }
+    final boundary = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(const ValueKey('r66-quantity-capture')),
+    );
+    boundary.markNeedsPaint();
+    await tester.pump();
+    await tester.runAsync(() async {
+      final directory = Directory('build/r66-quantity-targets-$phase-20260905');
+      await directory.create(recursive: true);
+      final file = File('${directory.path}/$name.png');
+      if (await file.exists()) throw StateError('Capture already exists');
+      final image = await boundary.toImage(pixelRatio: 1);
+      try {
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        await file.writeAsBytes(bytes!.buffer.asUint8List());
+      } finally {
+        image.dispose();
+      }
+    });
+  }
+
+  for (final surface in ['store', 'main', 'featured']) {
+    for (final lane in ['quick', 'scheduled', 'wholesale', 'bulk']) {
+      for (final width in [320.0, 360.0, 430.0]) {
+        for (final scale in [1.0, 2.0]) {
+          testWidgets(
+            'R66 quantity targets $surface $lane at $width / $scale',
+            (tester) async {
+              final size = Size(width, 844);
+              tester.view.devicePixelRatio = 1;
+              tester.view.physicalSize = size;
+              addTearDown(tester.view.reset);
+              final core = BuySession();
+              final session = BuyV2Session(core: core);
+              addTearDown(core.dispose);
+              addTearDown(session.dispose);
+              final retail = lane == 'quick' || lane == 'scheduled';
+              session.openDestination(
+                retail ? BuyV2Destination.shop : BuyV2Destination.wholesale,
+              );
+              if (retail) {
+                session.chooseShopSaleType(
+                  lane == 'quick'
+                      ? BuyV2ShopSaleType.quickDelivery
+                      : BuyV2ShopSaleType.courier,
+                );
+              } else {
+                session.chooseWholesaleSaleType(
+                  lane == 'bulk'
+                      ? BuyV2WholesaleSaleType.bulk
+                      : BuyV2WholesaleSaleType.wholesale,
+                );
+              }
+              final products = session.catalogueSaleTypeProducts
+                  .take(3)
+                  .toList();
+              expect(products, isNotEmpty);
+              final product = products.first;
+              if (retail) {
+                expect(
+                  session.fulfilmentModeFor(product),
+                  lane == 'quick'
+                      ? BuyV2FulfilmentMode.quickLocal
+                      : BuyV2FulfilmentMode.standardCourier,
+                );
+              } else {
+                expect(
+                  product.minimumOrder,
+                  lane == 'bulk' ? greaterThan(2) : lessThanOrEqualTo(2),
+                );
+              }
+              final retainedId = retail ? 'w-tomato' : 's-tomato';
+              expect(session.addProduct(retainedId), isTrue);
+              final retained = session.quantityFor(retainedId);
+              expect(session.addProduct(product.id), isTrue);
+              final initial = session.quantityFor(product.id);
+              await tester.pumpWidget(
+                RepaintBoundary(
+                  key: const ValueKey('r66-quantity-capture'),
+                  child: MaterialApp(
+                    debugShowCheckedModeBanner: false,
+                    theme: MoolTheme.light(),
+                    home: MediaQuery(
+                      data: MediaQueryData(
+                        size: size,
+                        textScaler: TextScaler.linear(scale),
+                      ),
+                      child: Scaffold(
+                        body: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: AnimatedBuilder(
+                            animation: session,
+                            builder: (context, _) => surface == 'featured'
+                                ? BuyV2CatalogueView(session: session)
+                                : BuyV2ProgressiveProductGrid(
+                                    session: session,
+                                    products: products,
+                                    storageKey: 'r66-quantity-$lane',
+                                    semanticLabel: 'Store products',
+                                    storeContext: surface == 'store',
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+              await tester.pumpAndSettle();
+              final card = find.byKey(
+                ValueKey(
+                  surface == 'featured'
+                      ? 'buy-featured-product-${product.id}'
+                      : 'buy-product-${product.id}',
+                ),
+              );
+              if (surface == 'featured') {
+                await tester.ensureVisible(card);
+                await tester.pumpAndSettle();
+              }
+              Finder action(String verb, int quantity) => find.descendant(
+                of: card,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Semantics &&
+                      widget.properties.label ==
+                          '$verb ${product.title} quantity from $quantity',
+                ),
+              );
+              final decrease = action('Decrease', initial);
+              final increase = action('Increase', initial);
+              expect(decrease, findsOneWidget);
+              expect(increase, findsOneWidget);
+              if (surface == 'store') {
+                await captureQuantity(
+                  tester,
+                  '$lane-${product.id}-$width-$scale',
+                );
+              }
+              final cardBounds = tester.getRect(card);
+              final decreaseBounds = tester.getRect(decrease);
+              final increaseBounds = tester.getRect(increase);
+              for (final bounds in [decreaseBounds, increaseBounds]) {
+                expect(bounds.width, greaterThanOrEqualTo(44));
+                expect(bounds.height, greaterThanOrEqualTo(44));
+                expect(bounds.left, greaterThanOrEqualTo(cardBounds.left));
+                expect(bounds.right, lessThanOrEqualTo(cardBounds.right));
+                expect(bounds.top, greaterThanOrEqualTo(cardBounds.top));
+                expect(bounds.bottom, lessThanOrEqualTo(cardBounds.bottom));
+              }
+              expect(decreaseBounds.overlaps(increaseBounds), isFalse);
+              await tester.tapAt(increaseBounds.topLeft + const Offset(2, 2));
+              await tester.pumpAndSettle();
+              expect(session.quantityFor(product.id), initial + 1);
+              expect(session.view, BuyV2View.catalogue);
+              await tester.tapAt(
+                tester.getRect(action('Decrease', initial + 1)).bottomRight -
+                    const Offset(2, 2),
+              );
+              await tester.pumpAndSettle();
+              expect(session.quantityFor(product.id), initial);
+              expect(session.quantityFor(retainedId), retained);
+              expect(session.view, BuyV2View.catalogue);
+              await tester.tap(action('Decrease', initial));
+              await tester.pumpAndSettle();
+              expect(session.quantityFor(product.id), 0);
+              final add = find.descendant(
+                of: card,
+                matching: find.byKey(ValueKey('buy-add-${product.id}')),
+              );
+              await tester.tap(add);
+              await tester.pump();
+              await tester.pump(const Duration(milliseconds: 16));
+              final transitioning = action('Increase', initial);
+              expect(
+                tester.getRect(transitioning).width,
+                greaterThanOrEqualTo(44),
+              );
+              expect(
+                tester.getRect(transitioning).height,
+                greaterThanOrEqualTo(44),
+              );
+              await tester.tapAt(
+                tester.getRect(transitioning).topLeft + const Offset(2, 2),
+              );
+              await tester.pumpAndSettle();
+              expect(session.quantityFor(product.id), initial + 1);
+              expect(session.quantityFor(retainedId), retained);
+              expect(session.view, BuyV2View.catalogue);
+              expect(tester.takeException(), isNull);
+            },
+          );
+        }
+      }
+    }
+  }
 
   for (final destination in const [
     BuyV2Destination.shop,
