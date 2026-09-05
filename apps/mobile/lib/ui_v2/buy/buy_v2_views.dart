@@ -9789,7 +9789,7 @@ class BuyV2TrackingView extends StatelessWidget {
     final returnToOrders = IntrinsicWidth(
       child: _ReturnAffordance(
         key: const ValueKey('buy-tracking-return-orders'),
-        label: 'Orders',
+        label: session.canReturnToShoppingAlerts ? 'Shopping alerts' : 'Orders',
         onTap: session.returnToOrders,
       ),
     );
@@ -9867,13 +9867,21 @@ class BuyV2TrackingView extends StatelessWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 4,
+                    runSpacing: 4,
                     children: [
                       returnToOrders,
-                      const Spacer(),
-                      refreshOrder,
-                      const SizedBox(width: 4),
-                      currentStatus,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          refreshOrder,
+                          const SizedBox(width: 4),
+                          currentStatus,
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 5),

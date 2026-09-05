@@ -515,6 +515,14 @@ class BuyV2Session extends ChangeNotifier {
   String? pendingPrescriptionProductId;
   BuyV2RecoveryKind? recoveryKind;
   _BuyV2RecoveryOrigin? _recoveryOrigin;
+  ({
+    Object token,
+    BuyV2ShoppingAlert alert,
+    VoidCallback returnToAlerts,
+    VoidCallback restoreOrigin,
+  })?
+  _shoppingAlertVisit;
+  bool _shoppingAlertReturnRequested = false;
   String? notice;
   String? cartAcknowledgement;
   BuyV2Destination? _cartAcknowledgementDestination;
@@ -4109,11 +4117,14 @@ class BuyV2Session extends ChangeNotifier {
 
   String? get productReturnLabel => canReturnToComparedProduct
       ? findProduct(_comparedProductOrigins.last)?.title ?? 'Previous product'
+      : canReturnToShoppingAlerts
+      ? 'Shopping alerts'
       : _productReturnView == BuyV2View.orderItems
       ? 'Order items'
       : null;
 
   void closeProduct() {
+    if (_returnToShoppingAlerts()) return;
     final previous = _navigationSurfaceIdentity;
     while (_comparedProductOrigins.isNotEmpty) {
       final product = findProduct(_comparedProductOrigins.removeLast());
@@ -4388,6 +4399,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void returnToOrders() {
+    if (_returnToShoppingAlerts()) return;
     final previous = _navigationSurfaceIdentity;
     destination = selectedOrderOrNull?.destination == BuyV2Destination.medicine
         ? BuyV2Destination.medicine
@@ -4606,6 +4618,93 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2ShoppingAlert> get shoppingAlerts =>
       List.unmodifiable(_shoppingAlerts);
 
+  bool get hasShoppingAlertReturnOrigin => _shoppingAlertVisit != null;
+
+  Object beginShoppingAlertVisit(
+    BuyV2ShoppingAlert alert,
+    VoidCallback returnToAlerts,
+  ) {
+    final token = Object();
+    final origin = (
+      destination: destination,
+      view: view,
+      cartScope: cartScope,
+      checkoutScope: checkoutScope,
+      ordersTab: ordersTab,
+      shopCategoryId: shopCategoryId,
+      wholesaleCategoryId: wholesaleCategoryId,
+      medicineCategoryId: medicineCategoryId,
+      query: query,
+      filter: selectedFilter,
+      productId: selectedProductId,
+      orderId: _selectedOrderId,
+    );
+    final productReturnDestination = _productReturnDestination;
+    final productReturnView = _productReturnView;
+    final comparisons = List<String>.of(_comparedProductOrigins);
+    _comparedProductOrigins.clear();
+    _shoppingAlertReturnRequested = false;
+    _shoppingAlertVisit = (
+      token: token,
+      alert: alert,
+      returnToAlerts: returnToAlerts,
+      restoreOrigin: () {
+        final previous = _navigationSurfaceIdentity;
+        destination = origin.destination;
+        view = origin.view;
+        cartScope = origin.cartScope;
+        checkoutScope = origin.checkoutScope;
+        ordersTab = origin.ordersTab;
+        shopCategoryId = origin.shopCategoryId;
+        wholesaleCategoryId = origin.wholesaleCategoryId;
+        medicineCategoryId = origin.medicineCategoryId;
+        query = origin.query;
+        selectedFilter = origin.filter;
+        selectedProductId = origin.productId;
+        _selectedOrderId = origin.orderId;
+        _productReturnDestination = productReturnDestination;
+        _productReturnView = productReturnView;
+        _comparedProductOrigins
+          ..clear()
+          ..addAll(comparisons);
+        notice = null;
+        _notifyNavigationIfChanged(
+          previous,
+          BuyV2NavigationMotionDirection.back,
+        );
+      },
+    );
+    return token;
+  }
+
+  void finishShoppingAlertVisit(Object token, {required bool restore}) {
+    final visit = _shoppingAlertVisit;
+    if (visit == null || !identical(visit.token, token)) return;
+    _shoppingAlertVisit = null;
+    _shoppingAlertReturnRequested = false;
+    if (restore) visit.restoreOrigin();
+  }
+
+  bool get canReturnToShoppingAlerts {
+    final visit = _shoppingAlertVisit;
+    if (visit == null || _shoppingAlertReturnRequested) return false;
+    final alert = visit.alert;
+    if (alert.orderId != null) {
+      return view == BuyV2View.tracking && _selectedOrderId == alert.orderId;
+    }
+    if (alert.productId != null) {
+      return view == BuyV2View.product && !canReturnToComparedProduct;
+    }
+    return view == BuyV2View.catalogue && destination == BuyV2Destination.shop;
+  }
+
+  bool _returnToShoppingAlerts() {
+    if (!canReturnToShoppingAlerts) return false;
+    _shoppingAlertReturnRequested = true;
+    _shoppingAlertVisit!.returnToAlerts();
+    return true;
+  }
+
   Future<bool> restoreShoppingAlerts() async {
     if (shoppingAlertsBusy) return false;
     shoppingAlertsBusy = true;
@@ -4822,11 +4921,13 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool get canHandleBack =>
+      canReturnToShoppingAlerts ||
       canReturnToAccount ||
       view != BuyV2View.catalogue ||
       destination != BuyV2Destination.shop;
 
   void goBack() {
+    if (_returnToShoppingAlerts()) return;
     if (view == BuyV2View.checkout && checkoutBusy) {
       notice = 'Keep Checkout open while your payment status is checked.';
       notifyListeners();

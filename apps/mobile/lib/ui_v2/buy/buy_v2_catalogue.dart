@@ -3170,8 +3170,7 @@ Future<void> _confirmClearBuyV2RecentlyViewed(
 void _openBuyV2SettingsRoute(BuildContext context, String route) {
   final router = GoRouter.maybeOf(context);
   if (router == null) return;
-  Navigator.of(context).pop();
-  Future<void>.microtask(() => router.push(route));
+  unawaited(router.push(route));
 }
 
 Future<void> showBuyV2ShoppingAlerts(
@@ -3192,12 +3191,25 @@ Future<void> showBuyV2ShoppingAlerts(
     builder: (sheetContext) => AnimatedBuilder(
       animation: session,
       builder: (sheetContext, _) {
-        void openAlert(BuyV2ShoppingAlert alert) {
-          if (router == null) return;
+        Future<void> openAlert(BuyV2ShoppingAlert alert) async {
+          if (router == null || session.hasShoppingAlertReturnOrigin) return;
           final location = buyV2ShoppingAlertLocation(alert);
-          Navigator.of(sheetContext).pop();
-          Navigator.of(context).pop();
-          Future<void>.microtask(() => router.push(location));
+          final visit = session.beginShoppingAlertVisit(alert, () {
+            if (sheetContext.mounted && router.canPop()) router.pop();
+          });
+          unawaited(
+            ModalRoute.of(sheetContext)!.completed.then<void>((_) {
+              session.finishShoppingAlertVisit(visit, restore: false);
+            }),
+          );
+          try {
+            await router.push(location);
+          } finally {
+            session.finishShoppingAlertVisit(
+              visit,
+              restore: sheetContext.mounted,
+            );
+          }
         }
 
         return SafeArea(

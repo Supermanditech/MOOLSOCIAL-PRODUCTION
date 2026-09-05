@@ -128,8 +128,16 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     _gstInvoiceController = BuyV2GstInvoiceController(
       store: widget.session.gstInvoiceProfileStore,
     );
-    _applyInitialState();
-    unawaited(_restoreSessionState());
+    if (widget.session.hasShoppingAlertReturnOrigin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _applyInitialState();
+        unawaited(_restoreSessionState());
+      });
+    } else {
+      _applyInitialState();
+      unawaited(_restoreSessionState());
+    }
     _lastSearchDestination = widget.session.destination;
     widget.session.addListener(_sessionChanged);
   }
