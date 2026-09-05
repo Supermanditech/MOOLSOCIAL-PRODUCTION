@@ -1,5 +1,28 @@
 # Codex OPPO r66.1 local validation
 
+## Successor dashboard round — 6 September 2026 (not r66.1 APK evidence)
+
+Founder authorized one Dashboard/first-tap round, a Git checkpoint, then recorded pre-dashboard corrections and local visual/device testing. This section records successor source only; the r66.1 history below remains immutable historical evidence. No successor APK has been built or installed at this checkpoint.
+
+Implemented within Work: native compact selection windows and bill editing; exact-order central action surfaces; requirement category/outcome review with honest unavailable fees; original sixty-second acceptance and ten-minute App retail fulfilment target; compact invoice and balance actions; outer Android safe inset; editable delivery address; no misuse of customer OTP to report rider pickup. Product catalogue contracts and pinned Buy implementation remain unchanged.
+
+New incidents: REG-20260906-4497 through REG-20260906-4499. Full logs and actual Flutter renders are retained outside the worktree at `C:\GUARANTEED OUTCOME\MOOLSOCIAL-POST-UI-AUDIT-20260905`.
+
+| Retained run | Result | SHA-256 |
+| --- | --- | --- |
+| store-overnight-v20-combined2.log | 186 passed, 68 capture skips, 3 failed; not qualification | 25979F5EC9D54A4A26AC001F2345A8A3C606A8662763F04DFA3459C594D9DC76 |
+| store-overnight-v20-child1.log | 2 passed, 1 failed; exposed follow-on balance overflow | 178EED02BDA8A6F476A2FB82508DA2BA48E8B585B27F6C4DBFF6064526EF79BB |
+| store-overnight-v20-combined3.log | 189 passed, 68 capture skips, 0 failed; before final timer/wording follow-up | A6B9F6F3F05D854CE51690B2F91ECC4F19FD5267BBF4B62C2928C63BE681CC94 |
+| store-overnight-v21-connected1.log | 664 passed, 72 capture skips, 1 stale label failure; recovered complete log, not exit-code qualification | 555FBF8E3D031C1124981C334C355F168FFB433B56B641AD4F50959C3553C9FE |
+
+Final local checkpoint: connected 32-file replay `store-overnight-v21-connected2.log` passed 665 tests, 72 capture skips, zero failures (exit 0; SHA-256 `26BAD61335B3D8313A6D69DD594CD792ECF4E7F02FCBED251F4264C678EAEAF1`). Second affected five-suite replay `store-overnight-v21-affected2.log` passed 190 tests, 68 capture skips, zero failures (exit 0; SHA-256 `AA9DF918E156A92DB3BF7D8AB54224C8464089E578F0917DFEE19A693D6B96ED`). Full analysis `store-overnight-v21-analysis.log` reported zero issues (exit 0; SHA-256 `181A2942EA46D73D04A2E86540C6F13B9497984C31D40E9824AFAF92E4A48812`).
+
+Visual review covered all 28 actual Flutter dashboard/first-tap/keyboard states in `store-overnight-review-v20-20260906`; refreshed captures are in `store-overnight-review-v21-20260906`. Rechecked the changed Orders surface and original ten-minute packing target in the refreshed images. These use review fixtures, not live transactions. The remaining full-journey pass must include secondary/non-selected order selection and small-screen header/name fit; do not infer that one seeded active-order fixture qualifies every busy-store queue state.
+
+Explicit dependencies: no authoritative public store URL, rider pickup event, live manufacturer quote, paid requirement fee/subscription injection, or production payment/GPS/admin approval is invented. UI review and local tests do not qualify those services. Cursor/Redmi and the shared baseline remain untouched.
+
+## Original r66.1 qualification
+
 UI-review candidate only; not production or founder/device acceptance. Flutter 3.44.6 / Dart 3.12.2. No protected golden was generated or accepted.
 
 - Shared Universal focused correction: 19 passed.

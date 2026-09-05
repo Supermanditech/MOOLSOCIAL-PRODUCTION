@@ -1180,7 +1180,7 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderExtraMinutes = 0;
     workspacePackedProductIds.clear();
     workspaceOrderActionDeadline = DateTime.now().add(
-      const Duration(minutes: 3),
+      const Duration(seconds: 60),
     );
     final orderId =
         currentWorkspaceOrderId ??
@@ -1341,7 +1341,17 @@ class WorkSession extends ChangeNotifier {
       'Delivery requested' => 'Delivery requested',
       _ => workspaceOrderStage,
     };
+    final quickStoreOrder =
+        order.source == 'App' &&
+        const {
+          'retailer-grocery',
+          'retailer-speciality',
+        }.contains(activeWorkspace?.profileId);
+    final fulfilmentTarget = order.createdAt.add(const Duration(minutes: 10));
     workspaceOrderActionDeadline = switch (workspaceOrderStage) {
+      'Preparing' ||
+      'Ready' ||
+      'Ready for pickup' when quickStoreOrder => fulfilmentTarget,
       'Preparing' => DateTime.now().add(const Duration(minutes: 15)),
       'Ready' => DateTime.now().add(const Duration(minutes: 10)),
       'Ready for pickup' => DateTime.now().add(const Duration(minutes: 10)),

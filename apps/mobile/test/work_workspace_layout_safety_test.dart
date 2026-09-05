@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -8,6 +9,7 @@ import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 
 void main() {
+  const captureStoreViewV2 = bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2');
   const captureFounderEvidence = bool.fromEnvironment(
     'MOOL_CAPTURE_WORK_STORE_1_40',
   );
@@ -52,12 +54,1086 @@ void main() {
     addTearDown(journey.dispose);
     addTearDown(work.dispose);
     await tester.pumpWidget(
-      MoolSocialApp(
-        session: journey,
-        workSession: work,
-        initialLocation: route,
+      RepaintBoundary(
+        key: const Key('store-review-root'),
+        child: MoolSocialApp(
+          session: journey,
+          workSession: work,
+          initialLocation: route,
+        ),
       ),
     );
+    await tester.pumpAndSettle();
+  }
+
+  WorkSession storeViewFixture() {
+    final work = WorkSession()
+      ..seedVerifiedWorkspace()
+      ..retailerSetupSaved = true
+      ..reviewStage = WorkReviewStage.live
+      ..workspaceStoreState = WorkspaceStoreState.open
+      ..workspaceAcceptingOrders = true
+      ..workspaceVisibleToCustomers = true
+      ..workspaceSalesToday = 28450
+      ..workspaceSettlementBalance = 17820
+      ..workspacePayoutBankName = 'Review Bank'
+      ..workspacePayoutAccountEnding = '1234'
+      ..workspaceOrderCustomer = 'Rakesh · 98290 12345'
+      ..workspaceOrderSource = 'App'
+      ..workspaceOrderItems = 'Fortune Oil × 2 · Aashirvaad Atta × 1'
+      ..workspaceOrderAmount = '1468'
+      ..workspaceOrderStage = 'Confirmed'
+      ..workspaceOrderActionDeadline = DateTime.now().add(
+        const Duration(seconds: 60),
+      )
+      ..workspaceOrderPayment = 'Paid online'
+      ..workspaceOrderFulfilment = 'Pickup';
+    work.currentWorkspaceOrderId = 'APP-1043';
+    work.workspaceOrders.add(
+      WorkspaceOrderRecord(
+        id: 'APP-1043',
+        customer: work.workspaceOrderCustomer,
+        createdAt: DateTime.now(),
+        amount: 1468,
+        payment: 'Paid online',
+        source: 'App',
+        items: work.workspaceOrderItems,
+        quantities: const {},
+        fulfilment: 'Pickup',
+        address: '',
+        stage: 'Confirmed',
+        needsDelivery: false,
+        actionDeadline: work.workspaceOrderActionDeadline,
+      ),
+    );
+    work.activeGroupBuy = const WorkspaceGroupBuy(
+      id: 'REVIEW-ONION-01',
+      productName: 'Onions',
+      specification: 'Fresh red onions · 45–65 mm · 50 kg sacks',
+      leadRetailer: 'Mahadev Fresh Mart',
+      confirmedRetailers: ['Mahadev Fresh Mart', 'Shree Grocery'],
+      targetQuantity: 1000,
+      securedQuantity: 150,
+      unitLabel: 'kg',
+      regularUnitPrice: 20,
+      groupUnitPrice: 14,
+      facilitationFee: 50,
+      deliveryFee: 100,
+      confirmationAmount: 500,
+      closingLabel: '10 Sep · 6 PM',
+      storeDeliveryLabel: '12 Sep · Store delivery',
+      paymentConfirmed: true,
+      participants: [
+        WorkspaceGroupBuyParticipant(
+          businessName: 'Mahadev Fresh Mart',
+          locality: 'Sardarpura',
+          quantity: 100,
+          unitLabel: 'kg',
+          milestone: 'Confirmed',
+        ),
+        WorkspaceGroupBuyParticipant(
+          businessName: 'Shree Grocery',
+          locality: 'Ratanada',
+          quantity: 50,
+          unitLabel: 'kg',
+          milestone: 'Confirmed',
+        ),
+      ],
+    );
+    work.workspaceOrders.add(
+      WorkspaceOrderRecord(
+        id: 'SALE-1042',
+        customer: 'Meena · 98765 43210',
+        createdAt: DateTime.now(),
+        amount: 860,
+        payment: 'Payment due',
+        source: 'Counter',
+        items: 'Grocery purchases',
+        quantities: const {},
+        fulfilment: 'Pickup',
+        address: '',
+        stage: 'Completed',
+        needsDelivery: false,
+      ),
+    );
+    return work;
+  }
+
+  Future<void> captureStoreView(WidgetTester tester, String name) async {
+    if (!captureStoreViewV2) return;
+    const folder = String.fromEnvironment(
+      'MOOL_STORE_VIEW_CAPTURE_DIR',
+      defaultValue: 'store-dashboard-first-tap-local-review-20260905',
+    );
+    await expectLater(
+      find.byKey(const Key('store-review-root')),
+      matchesGoldenFile(
+        '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/$name.png',
+      ),
+    );
+  }
+
+  testWidgets('Store View v2 - zero tap working centre', (tester) async {
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: storeViewFixture(),
+      viewport: const Size(412, 915),
+      textScale: 1,
+      bottomInset: 34,
+    );
+    for (final label in [
+      'View statement',
+      'Collect dues',
+      'Settle',
+      'Restock',
+      'Buy Direct',
+      'Group Bulk Buying',
+      'Send store link',
+      'Promote store',
+      'Post requirement',
+      'Accept',
+      'Reject',
+    ]) {
+      expect(find.text(label).hitTestable(), findsOneWidget, reason: label);
+    }
+    expect(find.text('Orders'), findsOneWidget);
+    expect(find.text('More'), findsNothing);
+    expect(find.text('Open · Public'), findsNothing);
+    expect(find.byKey(const Key('work-dashboard-hero')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await captureStoreView(tester, '01-dashboard');
+  });
+
+  for (final entry in <(String, String, String)>[
+    ('work-store-orders', 'work-orders-destination', '02-customer-orders'),
+    (
+      'work-store-sell',
+      'work-dashboard-counter-order-screen',
+      '03-counter-sale',
+    ),
+    ('work-store-stock', 'work-dashboard-catalogue-screen', '04-stock'),
+    ('work-pulse-sales', 'work-store-statement', '05-statement'),
+    ('work-pulse-dues', 'work-store-dues', '06-collect-dues'),
+    ('work-pulse-settlement', 'work-money-destination', '07-settlement'),
+    ('work-quick-buy', 'work-store-procurement-screen', '08-restock'),
+    ('work-quick-direct', 'work-store-buy-direct', '09-buy-direct'),
+    ('work-quick-group-buy', '', '10-group-bulk-buying'),
+    ('work-quick-store-link', 'work-store-link', '11-store-link'),
+    ('work-quick-promote', 'work-store-offers-screen', '12-promote-store'),
+    (
+      'work-quick-requirement',
+      'work-requirement-selector',
+      '17-post-requirement',
+    ),
+  ]) {
+    testWidgets('Store View v2 - first tap ${entry.$3} and Back', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      if (entry.$1 == 'work-store-sell') {
+        work.workspaceCatalogueItems
+          ..clear()
+          ..addAll(
+            workspaceMasterCatalogue.map(
+              (product) => product.copyWith(stock: 24),
+            ),
+          );
+      }
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+        bottomInset: 34,
+      );
+      await tester.tap(find.byKey(Key(entry.$1)));
+      await tester.pumpAndSettle();
+      if (entry.$2.isNotEmpty) {
+        expect(find.byKey(Key(entry.$2)), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, entry.$3);
+      // A clean first view has no submitted transaction or draft to discard.
+      if (entry.$1 == 'work-quick-buy' ||
+          entry.$1 == 'work-quick-requirement') {
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(find.byKey(const Key('work-operation-back')));
+      }
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Store View v2 - compact large text, signals and keyboard', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: storeViewFixture(),
+      viewport: const Size(320, 568),
+      textScale: 1.4,
+      bottomInset: 24,
+    );
+    expect(find.text('Accept').hitTestable(), findsOneWidget);
+    expect(find.text('Reject').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await captureStoreView(tester, '13-compact-large-text');
+    await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+    await tester.pumpAndSettle();
+    expect(find.text('Store status'), findsOneWidget);
+    expect(find.text('Public'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-dashboard-search')));
+    await tester.pumpAndSettle();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+    await tester.enterText(
+      find.byKey(const Key('work-dashboard-search-field')),
+      'Fortune',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-dashboard-search-field')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await captureStoreView(tester, '14-search-keyboard');
+  });
+
+  testWidgets(
+    'Store Desk - exact order stays in centre and Back restores desk',
+    (tester) async {
+      final work = storeViewFixture();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+        bottomInset: 34,
+      );
+      final edge = tester.getRect(
+        find.byKey(const Key('work-store-action-edge')),
+      );
+      await tester.tap(find.byKey(const Key('work-activity-order-review')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-exact-order')), findsOneWidget);
+      expect(find.text('APP-1043'), findsOneWidget);
+      expect(find.byKey(const Key('work-orders-destination')), findsNothing);
+      expect(
+        tester.getRect(find.byKey(const Key('work-store-action-edge'))),
+        edge,
+      );
+      expect(find.text('Accept').hitTestable(), findsOneWidget);
+      await captureStoreView(tester, '15-exact-order');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-exact-order')), findsNothing);
+      expect(
+        find.byKey(const Key('work-activity-incoming-order')),
+        findsOneWidget,
+      );
+      expect(work.workspaceOrderStage, 'Confirmed');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Store Desk - accept from exact order becomes packing without a gateway',
+    (tester) async {
+      final work = storeViewFixture();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+        bottomInset: 34,
+      );
+      await tester.tap(find.byKey(const Key('work-activity-order-review')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-activity-order-accept')));
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderStage, 'Preparing');
+      expect(find.byKey(const Key('work-activity-packing')), findsOneWidget);
+      expect(find.byKey(const Key('work-store-exact-order')), findsNothing);
+      expect(find.byKey(const Key('work-local-navigation')), findsOneWidget);
+      await captureStoreView(tester, '16-after-accept-packing');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Store Desk - update cannot replace a reviewed customer or mutate another order',
+    (tester) async {
+      final work = storeViewFixture();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+      );
+      await tester.tap(find.byKey(const Key('work-activity-order-review')));
+      await tester.pumpAndSettle();
+      work.currentWorkspaceOrderId = 'APP-1044';
+      work.workspaceOrderCustomer = 'Different customer';
+      work.updateWorkspaceSearch('');
+      await tester.pumpAndSettle();
+      expect(find.text('APP-1043'), findsOneWidget);
+      expect(find.text('Rakesh · 98290 12345'), findsOneWidget);
+      expect(find.text('Different customer'), findsNothing);
+      expect(find.byKey(const Key('work-activity-order-accept')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final size in [
+    const Size(320, 568),
+    const Size(360, 640),
+    const Size(390, 844),
+    const Size(430, 932),
+  ]) {
+    for (final scale in [1.0, 1.4]) {
+      testWidgets(
+        'Store Desk - fit ${size.width} by ${size.height} text $scale',
+        (tester) async {
+          final work = storeViewFixture();
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: size,
+            textScale: scale,
+            bottomInset: 34,
+          );
+          for (final key in [
+            'work-activity-order-accept',
+            'work-activity-order-reject',
+            'work-activity-order-review',
+            'work-quick-store-link',
+            'work-quick-promote',
+          ]) {
+            final target = find.byKey(Key(key)).hitTestable();
+            expect(target, findsOneWidget, reason: key);
+            expect(
+              tester.getSize(target).height,
+              greaterThanOrEqualTo(44),
+              reason: key,
+            );
+          }
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.byKey(const Key('work-activity-order-review')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-store-exact-order')),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.byKey(const Key('work-activity-order-accept')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-activity-packing')),
+            findsOneWidget,
+          );
+          expect(
+            tester
+                .getSize(find.byKey(const Key('work-activity-mark-ready')))
+                .height,
+            greaterThanOrEqualTo(44),
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'Store Desk - reduced motion keeps feedback and packing accessible',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        final work = storeViewFixture();
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(412, 915),
+          textScale: 1,
+        );
+        final pulse = find.byKey(const Key('work-store-live-business-pulse'));
+        for (final widget in tester.widgetList<AnimatedSwitcher>(
+          find.descendant(of: pulse, matching: find.byType(AnimatedSwitcher)),
+        )) {
+          expect(widget.duration, Duration.zero);
+        }
+        final edge = tester.getRect(
+          find.byKey(const Key('work-store-action-edge')),
+        );
+        await tester.tap(find.byKey(const Key('work-activity-order-accept')));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(find.byKey(const Key('work-store-action-edge'))),
+          edge,
+        );
+        expect(find.byKey(const Key('work-notice')), findsNothing);
+        final progress = tester.widget<TweenAnimationBuilder<double>>(
+          find.descendant(
+            of: find.byKey(const Key('work-activity-packing')),
+            matching: find.byWidgetPredicate(
+              (widget) => widget is TweenAnimationBuilder<double>,
+            ),
+          ),
+        );
+        expect(progress.duration, Duration.zero);
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    'Store Desk - quiet store shows no invented order or group deal',
+    (tester) async {
+      final work = WorkSession()
+        ..seedVerifiedWorkspace()
+        ..retailerSetupSaved = true;
+      work.workspaceOrderCustomer = '';
+      work.workspaceOrderStage = 'No order';
+      work.workspaceOrders.clear();
+      work.workspaceSettlementBalance = 0;
+      work.activeGroupBuy = null;
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+      );
+      expect(find.byKey(const Key('work-activity-order-accept')), findsNothing);
+      expect(find.byKey(const Key('work-store-recent-sales')), findsNothing);
+      expect(find.text('Onions'), findsNothing);
+      expect(find.text('Send store link').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final size in [const Size(320, 568), const Size(412, 915)]) {
+    for (final index in List.generate(10, (index) => index)) {
+      testWidgets(
+        'Store Review - requirement category $index at ${size.width}',
+        (tester) async {
+          final work = storeViewFixture();
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: size,
+            textScale: size.width == 320 ? 1.4 : 1,
+            bottomInset: 24,
+          );
+          await tester.tap(find.byKey(const Key('work-quick-requirement')));
+          await tester.pumpAndSettle();
+          final choice = find.byKey(Key('work-requirement-category-$index'));
+          await Scrollable.ensureVisible(tester.element(choice), alignment: .5);
+          await tester.pumpAndSettle();
+          expect(choice.hitTestable(), findsOneWidget);
+          expect(tester.getSize(choice).height, greaterThanOrEqualTo(48));
+          if (size.width == 320) {
+            expect(tester.getSize(choice).height, lessThanOrEqualTo(72));
+          }
+          await tester.tap(choice);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-requirement-details')),
+            findsOneWidget,
+          );
+          expect(find.text('People needed'), findsNothing);
+          expect(find.text('₹0'), findsNothing);
+          if (index == 3) {
+            await tester.scrollUntilVisible(
+              find.byKey(const Key('work-requirement-terms')),
+              120,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(const Key('work-requirement-details')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+            expect(find.text('Proposed partnership terms'), findsOneWidget);
+            expect(find.text('Completion and payment terms'), findsNothing);
+          }
+          expect(tester.takeException(), isNull);
+          if (size.width == 412 && index == 4) {
+            expect(
+              find.byKey(const Key('work-requirement-review')).hitTestable(),
+              findsOneWidget,
+            );
+            await captureStoreView(tester, '18-requirement-details');
+          }
+          await tester.scrollUntilVisible(
+            find.byKey(const Key('work-requirement-change')),
+            -180,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const Key('work-requirement-details')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-requirement-change')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-requirement-selector')),
+            findsOneWidget,
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-requirement-details')),
+            findsOneWidget,
+          );
+          await tester.tap(find.byKey(const Key('work-operation-back')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-workspace-dashboard')),
+            findsOneWidget,
+          );
+          expect(work.workspacePaidRequirementReference, isNull);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final size in [const Size(320, 568), const Size(412, 915)]) {
+    testWidgets('Store Review - compact requirement window at ${size.width}', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: size,
+        textScale: size.width == 320 ? 1.4 : 1,
+        bottomInset: 34,
+      );
+      final dashboard = find.byKey(const Key('work-workspace-dashboard'));
+      final original = tester.getRect(dashboard);
+      await tester.tap(find.byKey(const Key('work-quick-requirement')));
+      await tester.pumpAndSettle();
+      final selector = find.byKey(const Key('work-requirement-selector'));
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(
+        tester.getSize(find.byType(BottomSheet)).height,
+        lessThanOrEqualTo(size.height * .7),
+      );
+      expect(tester.getRect(dashboard), original);
+      expect(
+        tester.getSize(selector).height,
+        lessThanOrEqualTo(size.height * .7),
+      );
+      expect(tester.getTopLeft(selector).dy, greaterThan(size.height * .25));
+      expect(
+        find.byKey(const Key('work-paid-requirement-screen')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('work-requirement-review')), findsNothing);
+      if (size.width == 412) {
+        for (var index = 0; index < 10; index++) {
+          expect(
+            find.byKey(Key('work-requirement-category-$index')).hitTestable(),
+            findsOneWidget,
+          );
+        }
+      } else {
+        await captureStoreView(tester, '26-compact-requirement-window');
+      }
+      await tester.tap(
+        find.byKey(const Key('work-requirement-selector-close')),
+      );
+      await tester.pumpAndSettle();
+      expect(selector, findsNothing);
+      expect(
+        find.byKey(const Key('work-activity-order-accept')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(work.workspacePaidRequirementReference, isNull);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Store Review - requirement window honors reduced motion', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: storeViewFixture(),
+      viewport: const Size(412, 915),
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-quick-requirement')));
+    await tester.pumpAndSettle();
+    final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
+    expect(sheet.animationController?.duration, Duration.zero);
+    expect(sheet.animationController?.reverseDuration, Duration.zero);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Store Review - requirement keyboard, preview and fee safety', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(320, 568),
+      textScale: 1.4,
+      bottomInset: 24,
+    );
+    await tester.tap(find.byKey(const Key('work-quick-requirement')));
+    await tester.pumpAndSettle();
+    await Scrollable.ensureVisible(
+      tester.element(find.byKey(const Key('work-requirement-category-4'))),
+      alignment: .5,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-requirement-category-4')));
+    await tester.pumpAndSettle();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+    await tester.enterText(
+      find.byKey(const Key('work-requirement-title')),
+      'Manage product content',
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+    await tester.ensureVisible(
+      find.byKey(const Key('work-requirement-outcome')),
+    );
+    await tester.enterText(
+      find.byKey(const Key('work-requirement-outcome')),
+      'Update 20 product descriptions',
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await captureStoreView(tester, '19-requirement-keyboard');
+    tester.view.viewInsets = const FakeViewPadding();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('work-requirement-review')),
+      140,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('work-requirement-details')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-requirement-review')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-requirement-review-surface')),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Not posted. No payment has been taken.'),
+      140,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('work-requirement-review-surface')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Not posted. No payment has been taken.'), findsOneWidget);
+    expect(find.text('Included in your plan'), findsNothing);
+    expect(find.text('Fund and publish to Earn Today'), findsNothing);
+    expect(work.workspacePaidRequirementReference, isNull);
+    await tester.ensureVisible(find.byKey(const Key('work-requirement-edit')));
+    await tester.tap(find.byKey(const Key('work-requirement-edit')));
+    await tester.pumpAndSettle();
+    expect(find.text('Manage product content'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final action in <(String, String)>[
+    ('work-dashboard-settings', '20-store-signals'),
+    ('work-dashboard-workspace-switcher', '21-workspace-switcher'),
+    ('work-dashboard-profile', '22-business-profile'),
+    ('work-dashboard-alerts', '23-alerts'),
+  ]) {
+    testWidgets('Store Review - first tap ${action.$2}', (tester) async {
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: storeViewFixture(),
+        viewport: const Size(412, 915),
+        textScale: 1,
+        bottomInset: 34,
+      );
+      await tester.tap(find.byKey(Key(action.$1)));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, action.$2);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+    });
+  }
+
+  testWidgets('Store Review - acceptance deadline never invents reassignment', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    work.workspaceOrderActionDeadline = DateTime.now().subtract(
+      const Duration(seconds: 1),
+    );
+    final index = work.workspaceOrders.indexWhere(
+      (order) => order.id == 'APP-1043',
+    );
+    work.workspaceOrders[index] = work.workspaceOrders[index].copyWith(
+      actionDeadline: work.workspaceOrderActionDeadline,
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+      textScale: 1,
+      bottomInset: 34,
+    );
+    expect(find.text('Time ended'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-activity-order-accept')));
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderStage, 'Confirmed');
+    expect(
+      work.errorMessage,
+      'Acceptance time ended. Waiting for an order update.',
+    );
+    expect(find.text('Order reassigned to another retailer'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Store Review - global Chat first tap and exact Store return', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: storeViewFixture(),
+      viewport: const Size(412, 915),
+      textScale: 1,
+      bottomInset: 34,
+    );
+    await tester.tap(find.text('Chat').hitTestable());
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await captureStoreView(tester, '24-store-chat');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+    expect(find.text('Rakesh'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Store Review - requirement survives leaving and returning to Store',
+    (tester) async {
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: storeViewFixture(),
+        viewport: const Size(412, 915),
+        textScale: 1,
+        bottomInset: 34,
+      );
+      await tester.tap(find.byKey(const Key('work-quick-requirement')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-requirement-category-0')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('work-requirement-title')),
+        'Source 20 cartons of oil',
+      );
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-operation-back')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-quick-requirement')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-requirement-details')), findsOneWidget);
+      expect(find.text('Source 20 cartons of oil'), findsOneWidget);
+      expect(find.text('Product sourcing'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final size in [const Size(320, 568), const Size(412, 915)]) {
+    testWidgets('Store Review - compact bill actions at ${size.width}', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: size,
+        textScale: size.width == 320 ? 1.4 : 1,
+        bottomInset: 24,
+      );
+      final originalOrders = work.workspaceOrders.length;
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      final sale = find.byKey(const Key('work-dashboard-counter-order-screen'));
+      expect(
+        find.descendant(of: sale, matching: find.byType(ChoiceChip)),
+        findsNothing,
+      );
+      expect(find.text('How did the customer order?'), findsNothing);
+      expect(find.text('How will the customer receive it?'), findsNothing);
+      expect(find.text('Create customer order'), findsNothing);
+      expect(find.text('Phone'), findsNothing);
+      expect(find.text('My delivery'), findsNothing);
+      expect(find.byKey(const Key('work-order-customer')), findsNothing);
+      expect(
+        tester
+            .getSize(find.byKey(const Key('work-sale-compact-controls')))
+            .height,
+        lessThanOrEqualTo(88),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const Key('work-sale-products'))).dy,
+        lessThan(size.height * .4),
+      );
+      final search = find.byKey(const Key('work-dashboard-search-field'));
+      expect(tester.widget<TextField>(search).focusNode!.hasFocus, isFalse);
+      for (final key in [
+        'work-dashboard-scan',
+        'work-dashboard-alerts',
+        'work-dashboard-profile',
+      ]) {
+        expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
+      }
+      expect(find.byTooltip('Scan barcode'), findsNothing);
+      final add = find.byKey(const Key('work-order-add-oil-fortune-1l'));
+      final before = tester.getRect(add);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+      expect(tester.getRect(add), before);
+      expect(tester.getSize(add).shortestSide, greaterThanOrEqualTo(44));
+      await tester.tap(find.byKey(const Key('work-sale-customer')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-sale-customer-sheet')), findsOneWidget);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+      await tester.enterText(
+        find.byKey(const Key('work-order-customer')),
+        '9876543210',
+      );
+      await tester.pumpAndSettle();
+      await Scrollable.ensureVisible(
+        tester.element(find.byKey(const Key('work-sale-customer-confirm'))),
+        alignment: .5,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      if (size.width == 320) {
+        await captureStoreView(tester, '27-sale-customer-keyboard');
+      }
+      await tester.tap(find.byKey(const Key('work-sale-customer-confirm')));
+      tester.view.viewInsets = const FakeViewPadding();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderCustomer, '9876543210');
+      expect(work.workspaceOrders.length, originalOrders);
+      expect(find.text('Review bill').hitTestable(), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-sale-delivery')));
+      await tester.pumpAndSettle();
+      expect(find.text('Delivery options'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('work-order-receive-own-delivery')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('My delivery').hitTestable(), findsOneWidget);
+      expect(work.workspaceOrders.length, originalOrders);
+      await tester.enterText(search, 'no-match-product');
+      await tester.pumpAndSettle();
+      expect(find.text('No products match your search'), findsOneWidget);
+      expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+      await tester.enterText(search, 'FRT-1L');
+      await tester.pumpAndSettle();
+      expect(add.hitTestable(), findsOneWidget);
+      expect(
+        find.byKey(const Key('work-dashboard-catalogue-screen')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final sale in [false, true]) {
+    testWidgets(
+      'Store Review - scanner permission fallback and Back, sale=$sale',
+      (tester) async {
+        const channel = MethodChannel(
+          'flutter.baseflow.com/permissions/methods',
+        );
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          (call) async {
+            if (call.method == 'requestPermissions') {
+              return <int, int>{
+                for (final id in call.arguments as List) id as int: 0,
+              };
+            }
+            return 0;
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            channel,
+            null,
+          ),
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: storeViewFixture(),
+          viewport: const Size(412, 915),
+          textScale: 1,
+          bottomInset: 34,
+        );
+        if (sale) {
+          await tester.tap(find.byKey(const Key('work-store-sell')));
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.byKey(const Key('work-dashboard-scan')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('buy-manual-code-panel')),
+          findsOneWidget,
+        );
+        expect(find.text('Camera access needed'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await captureStoreView(
+          tester,
+          sale ? '28-sale-scanner-fallback' : '25-scanner-permission-fallback',
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('buy-manual-code-panel')), findsNothing);
+        expect(
+          find.byKey(
+            Key(
+              sale
+                  ? 'work-dashboard-counter-order-screen'
+                  : 'work-dashboard-catalogue-screen',
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  Future<void> openStoreTools(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+    await tester.pumpAndSettle();
+    final operations = find.byKey(const Key('global-profile-quick-operations'));
+    await tester.ensureVisible(operations);
+    await tester.tap(operations);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'Store Review - acceptance keeps the original ten-minute fulfilment target',
+    (tester) async {
+      final work = storeViewFixture();
+      final created = work.currentWorkspaceOrder!.createdAt;
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+      );
+      expect(
+        work.workspaceOrderActionDeadline!.difference(created).inSeconds,
+        inInclusiveRange(59, 60),
+      );
+      await tester.tap(find.byKey(const Key('work-activity-order-accept')));
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderStage, 'Preparing');
+      expect(
+        work.workspaceOrderActionDeadline,
+        created.add(const Duration(minutes: 10)),
+      );
+      for (final line in work.workspacePackingLines) {
+        work.setWorkspacePackingLine(line.id, true);
+      }
+      work.advanceWorkspaceOrder();
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderStage, 'Ready for pickup');
+      expect(
+        work.workspaceOrderActionDeadline,
+        created.add(const Duration(minutes: 10)),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  Future<void> openStoreSettings(WidgetTester tester) async {
+    await openStoreTools(tester);
+    await tester.tap(find.byKey(const Key('work-business-settings')));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openExistingDeliveryDraft(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-sale-source')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-sell-source-phone')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-sale-delivery')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-order-receive-mool-delivery')));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> enterSaleCustomer(WidgetTester tester, String phone) async {
+    await tester.tap(find.byKey(const Key('work-sale-customer')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-order-customer')), phone);
+    await tester.tap(find.byKey(const Key('work-sale-customer-confirm')));
     await tester.pumpAndSettle();
   }
 
@@ -740,7 +1816,7 @@ void main() {
           findsOneWidget,
         );
 
-        await tester.tap(find.byKey(const Key('work-quick-new-sale')));
+        await tester.tap(find.byKey(const Key('work-store-sell')));
         await tester.pumpAndSettle();
         expect(find.text('Create order'), findsOneWidget);
         expect(find.text('Counter'), findsWidgets);
@@ -832,15 +1908,15 @@ void main() {
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
       for (final keyName in const [
-        'work-quick-new-sale',
-        'work-quick-delivery',
+        'work-store-sell',
+        'work-quick-store-link',
         'work-quick-buy',
         'work-quick-group-buy',
       ]) {
         expect(find.byKey(Key(keyName)), findsOneWidget);
       }
 
-      await tester.tap(find.byKey(const Key('work-quick-delivery')));
+      await openExistingDeliveryDraft(tester);
       await tester.pumpAndSettle();
       expect(find.text('Create customer order'), findsOneWidget);
       expect(find.text('Phone'), findsWidgets);
@@ -1199,7 +2275,7 @@ void main() {
           textScale: 1,
           bottomInset: 34,
         );
-        await tester.tap(find.byKey(const Key('work-business-drawer')));
+        await openStoreTools(tester);
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('work-business-grow')));
         await tester.pumpAndSettle();
@@ -1231,9 +2307,9 @@ void main() {
           textScale: 1,
           bottomInset: 34,
         );
-        await tester.tap(find.byKey(const Key('work-business-drawer')));
+        await openStoreTools(tester);
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('work-business-storefront')));
+        await tester.tap(find.byKey(const Key('work-business-preview')));
         await tester.pumpAndSettle();
         await expectLater(
           find.byType(Scaffold).first,
@@ -1278,19 +2354,15 @@ void main() {
         viewport: const Size(412, 915),
       );
 
-      await tester.tap(find.byKey(const Key('work-quick-delivery')));
+      await openExistingDeliveryDraft(tester);
       await tester.pumpAndSettle();
-      expect(find.text('How did the customer order?'), findsOneWidget);
-      expect(find.text('How will the customer receive it?'), findsOneWidget);
-      expect(
-        find.byKey(const Key('work-order-recent-customers')),
-        findsOneWidget,
-      );
+      expect(find.text('How did the customer order?'), findsNothing);
+      expect(find.text('How will the customer receive it?'), findsNothing);
+      await tester.tap(find.byKey(const Key('work-sale-customer')));
+      await tester.pumpAndSettle();
+      expect(find.text('Recent customers'), findsOneWidget);
       await tester.tap(find.text('Rakesh · 98290 12345'));
-      await tester.enterText(
-        find.byKey(const Key('work-order-address')),
-        '12 Market Road, Sardarpura',
-      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
       await tester.pumpAndSettle();
       expect(find.text('1 units'), findsOneWidget);
@@ -1306,10 +2378,17 @@ void main() {
       expect(find.text('Fortune Sunflower Oil × 1'), findsOneWidget);
       expect(find.text('Create order for Mool delivery'), findsOneWidget);
       expect(
-        find.textContaining('first delivery does not require app'),
+        find.textContaining('Rider availability is confirmed after'),
         findsOneWidget,
       );
 
+      await tester.ensureVisible(find.byKey(const Key('work-order-address')));
+      await tester.enterText(
+        find.byKey(const Key('work-order-address')),
+        '12 Market Road, Sardarpura',
+      );
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-order-save')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
@@ -1333,31 +2412,26 @@ void main() {
         textScale: 1.6,
       );
 
-      await tester.tap(find.byKey(const Key('work-quick-new-sale')));
+      await tester.tap(find.byKey(const Key('work-store-sell')));
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const Key('work-order-customer')),
-        '9829012345',
-      );
+      await enterSaleCustomer(tester, '9829012345');
       await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
       await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-sale-source')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-sell-source-chat')));
+      await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const Key('work-order-reduce-oil-fortune-1l')),
       );
       await tester.pumpAndSettle();
 
-      expect(
-        tester
-            .widget<TextField>(find.byKey(const Key('work-order-customer')))
-            .controller
-            ?.text,
-        '9829012345',
-      );
+      expect(work.workspaceOrderCustomer, '9829012345');
       expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
       expect(find.byKey(const Key('work-order-address')), findsNothing);
-      expect(find.text('Review ₹264'), findsOneWidget);
+      expect(find.text('Review bill'), findsOneWidget);
+      expect(find.text('₹264'), findsWidgets);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1372,8 +2446,8 @@ void main() {
       'work-store-activity-deck',
       'work-activity-ready',
       'work-live-status-bubbles',
-      'work-floating-command-dock',
-      'work-business-drawer',
+      'work-store-action-edge',
+      'work-quick-promote',
       'work-dashboard-settings',
       'work-dashboard-scan',
     ]) {
@@ -1405,15 +2479,15 @@ void main() {
         findsOneWidget,
       );
       for (final key in const [
-        'work-pulse-orders',
+        'work-store-orders',
         'work-pulse-sales',
-        'work-pulse-stock',
+        'work-store-stock',
         'work-pulse-settlement',
-        'work-quick-new-sale',
-        'work-quick-delivery',
+        'work-store-sell',
+        'work-quick-store-link',
         'work-quick-buy',
         'work-quick-group-buy',
-        'work-business-drawer',
+        'work-quick-promote',
       ]) {
         final action = find.byKey(Key(key));
         expect(action, findsOneWidget);
@@ -1425,9 +2499,9 @@ void main() {
       expect(find.text('Your store is ready'), findsOneWidget);
       expect(find.text('Mahadev Fresh Mart'), findsOneWidget);
       expect(find.text('₹28,450'), findsOneWidget);
-      expect(find.text('Bill'), findsOneWidget);
-      expect(find.text('Buy stock'), findsOneWidget);
-      expect(find.text('Group buy'), findsOneWidget);
+      expect(find.text('Sell'), findsOneWidget);
+      expect(find.text('Restock'), findsOneWidget);
+      expect(find.text('Group Bulk Buying'), findsOneWidget);
 
       expect(tester.takeException(), isNull);
     },
@@ -1439,13 +2513,13 @@ void main() {
     final work = liveStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
-    await tester.tap(find.byKey(const Key('work-pulse-orders')));
+    await tester.tap(find.byKey(const Key('work-store-orders')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
     await tester.tap(find.byKey(const Key('work-operation-back')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('work-pulse-stock')));
+    await tester.tap(find.byKey(const Key('work-store-stock')));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('work-dashboard-catalogue-screen')),
@@ -1473,13 +2547,13 @@ void main() {
       textScale: 1.4,
     );
 
-    await tester.tap(find.byKey(const Key('work-pulse-orders')));
+    await tester.tap(find.byKey(const Key('work-store-orders')));
     await tester.pumpAndSettle();
     expect(find.text('Customer orders'), findsOneWidget);
     expect(find.text('1 active'), findsOneWidget);
     expect(find.text('All 1'), findsOneWidget);
     expect(find.text('New 1'), findsOneWidget);
-    expect(find.text('New customer order'), findsOneWidget);
+    expect(find.text('Create bill'), findsOneWidget);
     final order = find.byKey(const Key('work-live-order-ticket'));
     expect(order, findsOneWidget);
     expect(tester.getRect(order).height, lessThan(220));
@@ -1558,14 +2632,15 @@ void main() {
     ]) {
       expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
     }
-    expect(find.text('Act now'), findsOneWidget);
+    expect(find.text('Awaiting acceptance'), findsOneWidget);
     expect(
       find.text('Swipe left to reject · Tap to review · Swipe right to accept'),
       findsNothing,
     );
     await tester.tap(find.byKey(const Key('work-activity-order-review')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+    expect(find.byKey(const Key('work-store-exact-order')), findsOneWidget);
+    expect(find.byKey(const Key('work-orders-destination')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -1785,7 +2860,7 @@ void main() {
       'work-delivery-call-customer',
       'work-delivery-chat-customer',
       'work-delivery-open-map',
-      'work-activity-confirm-handover',
+      'work-delivery-proof-pending',
     ]) {
       expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
     }
@@ -1804,11 +2879,12 @@ void main() {
   });
 
   testWidgets(
-    'customer OTP completes delivery without a sheet lifecycle error',
+    'own-delivery customer OTP completes delivery without a sheet lifecycle error',
     (tester) async {
       final work = liveStore();
       seedIncomingOrder(work, stage: 'Delivery requested', delivery: true);
       work.currentWorkspaceOrderId = 'current-store-order';
+      work.workspaceOrderFulfilment = 'Own delivery';
       work.workspaceOrders.add(
         WorkspaceOrderRecord(
           id: 'current-store-order',
@@ -1830,10 +2906,13 @@ void main() {
         partnerName: 'Ravi Kumar',
         vehicleLabel: 'Bike RJ19 AB 1234',
         eta: DateTime.now().add(const Duration(minutes: 8)),
-        stage: 'Assigned',
+        stage: 'Picked up',
       );
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
+      await tester.ensureVisible(
+        find.byKey(const Key('work-activity-confirm-handover')),
+      );
       await tester.tap(find.byKey(const Key('work-activity-confirm-handover')));
       await tester.pumpAndSettle();
       await tester.enterText(
@@ -1858,7 +2937,7 @@ void main() {
     final work = liveStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
-    await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+    await openStoreSettings(tester);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-dashboard-status-screen')), findsOne);
     expect(find.text('Public storefront'), findsOneWidget);
@@ -1933,12 +3012,12 @@ void main() {
     await tester.tap(find.byKey(const Key('work-quick-group-buy')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-group-buy-active-screen')), findsOne);
-    expect(find.text('GROUP BULK BUYING'), findsOneWidget);
+    expect(find.text('Group Bulk Buying'), findsOneWidget);
     expect(find.text('₹14/kg'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Group Bulk keeps the full decision and next action visible', (
+  testWidgets('Group Bulk keeps confirmed quantity costs and payment truth', (
     tester,
   ) async {
     final work = liveStore()
@@ -1965,33 +3044,24 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('work-quick-group-buy')));
     await tester.pumpAndSettle();
-
-    expect(find.text('280 kg secured'), findsOneWidget);
-    expect(find.text('720 kg left'), findsOneWidget);
-    expect(find.text('Target 1000 kg'), findsOneWidget);
+    expect(find.text('280 / 1000 kg'), findsOneWidget);
     expect(find.text('₹14/kg'), findsWidgets);
-    expect(find.text('₹18/kg'), findsWidgets);
+    await reveal(tester, find.text('720 kg'));
+    expect(find.text('720 kg'), findsOneWidget);
+    await reveal(tester, find.text('Saving after listed fees'));
     expect(find.text('₹920'), findsOneWidget);
-    expect(find.text('Your amount paid'), findsOneWidget);
-    expect(find.text('Payment confirmed'), findsOneWidget);
-    final next = find.byKey(const Key('work-group-buy-next-action'));
-    expect(next.hitTestable(), findsOneWidget);
-    expect(find.text('Review balance ₹200'), findsOneWidget);
-    expect(
-      tester.getBottomRight(next).dy,
-      lessThanOrEqualTo(
-        tester.getTopLeft(find.byKey(const Key('work-local-navigation'))).dy,
-      ),
-    );
     expect(work.activeGroupBuy?.deliveredTotal, 4120);
-    expect(work.activeGroupBuy?.netSaving, 920);
     expect(work.activeGroupBuy?.balanceDue, 200);
-
-    await tester.tap(next);
-    await tester.pumpAndSettle();
-    expect(find.text('Your payment schedule'), findsOneWidget);
-    expect(find.text('Balance before dispatch'), findsOneWidget);
-    expect(find.text('₹200'), findsWidgets);
+    await reveal(tester, find.text('Confirmation payment recorded'));
+    expect(find.text('Confirmation payment recorded'), findsOneWidget);
+    expect(find.text('₹3920'), findsOneWidget);
+    expect(find.textContaining('Awaiting stock confirmation'), findsOneWidget);
+    expect(
+      find.byKey(const Key('work-group-buy-next-action')),
+      findsNothing,
+      reason: 'No payment request before authoritative stock confirmation',
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Workspace switcher keeps the approval action above Android', (
@@ -2016,12 +3086,9 @@ void main() {
     (tester) async {
       final work = liveStore();
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-      await tester.tap(find.byKey(const Key('work-quick-new-sale')));
+      await tester.tap(find.byKey(const Key('work-store-sell')));
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const Key('work-order-customer')),
-        '9829012345',
-      );
+      await enterSaleCustomer(tester, '9829012345');
       await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
       await tester.pump();
       await tester.tap(find.byKey(const Key('work-order-review')));
@@ -2036,7 +3103,7 @@ void main() {
   testWidgets('Store settings destinations match their labels', (tester) async {
     final work = liveStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+    await openStoreSettings(tester);
     await tester.pumpAndSettle();
     await reveal(tester, find.text('Delivery area and charges'));
     await tester.tap(find.text('Delivery area and charges'));
@@ -2081,6 +3148,10 @@ void main() {
     await tester.tap(find.byKey(const Key('work-pickup-confirm')));
     await tester.pumpAndSettle();
     expect(work.workspaceOrderStage, 'Completed');
+    expect(work.workspaceInvoices, isNotEmpty);
+    expect(find.byKey(const Key('work-invoice-open')).hitTestable(), findsOne);
+    await tester.tap(find.byKey(const Key('work-invoice-open')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-invoice-share-chat')), findsOne);
     await tester.tap(find.byKey(const Key('work-invoice-share-chat')));
     await tester.pumpAndSettle();
@@ -2092,7 +3163,7 @@ void main() {
     final work = liveStore();
     seedIncomingOrder(work);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-customers')));
     await tester.pumpAndSettle();
@@ -2141,7 +3212,7 @@ void main() {
       viewport: const Size(412, 915),
       textScale: 1,
     );
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-customers')));
     await tester.pumpAndSettle();
@@ -2191,7 +3262,7 @@ void main() {
       ),
     ]);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-customers')));
     await tester.pumpAndSettle();
@@ -2224,7 +3295,7 @@ void main() {
     final work = liveStore(gateway: gateway)
       ..workspaceSettlementBalance = 17820;
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-money')));
     await tester.pumpAndSettle();
@@ -2250,7 +3321,7 @@ void main() {
       work: work,
       viewport: const Size(412, 915),
     );
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-money')));
     await tester.pumpAndSettle();
@@ -2272,31 +3343,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Group Bulk product discovery searches beyond Store catalogue', (
-    tester,
-  ) async {
-    final work = liveStore();
-    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-quick-group-buy')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-group-buy-product')));
-    await tester.pumpAndSettle();
-    final search = find.byKey(const Key('work-group-buy-product-search'));
-    expect(search, findsOne);
-    await tester.enterText(search, 'atta');
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Aashirvaad'), findsWidgets);
-    await tester.tap(
-      find.widgetWithText(ListTile, 'Aashirvaad Whole Wheat Atta'),
-    );
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('work-group-buy-product-search')),
-      findsNothing,
-    );
-    expect(find.text('Aashirvaad Whole Wheat Atta'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'Group Bulk does not fabricate an offer or self-confirm payment',
+    (tester) async {
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await tester.tap(find.byKey(const Key('work-quick-group-buy')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('The next bulk opportunity will appear here'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-group-buy-product')), findsNothing);
+      expect(
+        find.byKey(const Key('work-group-buy-payment-confirmed')),
+        findsNothing,
+      );
+      expect(work.activeGroupBuy, isNull);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('product editor keeps Save and Cancel above keyboard', (
     tester,
@@ -2345,8 +3414,9 @@ void main() {
     await tester.tap(find.byKey(const Key('work-store-stock')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Products customers can buy'), findsOneWidget);
-    expect(find.byKey(const Key('work-catalogue-scan')), findsOneWidget);
+    expect(find.text('Products'), findsWidgets);
+    expect(find.byKey(const Key('work-catalogue-scan')), findsNothing);
+    expect(find.byKey(const Key('work-dashboard-scan')), findsOneWidget);
     expect(find.byKey(const Key('work-catalogue-add')), findsOneWidget);
     expect(find.byKey(const Key('work-catalogue-more')), findsOneWidget);
     expect(
@@ -2527,33 +3597,39 @@ void main() {
     );
   });
 
-  testWidgets('Work inputs expose merged accessibility names', (tester) async {
-    final semantics = tester.ensureSemantics();
-    final work = liveStore();
-    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-quick-new-sale')));
-    await tester.pumpAndSettle();
-    expect(find.bySemanticsLabel('Customer mobile number'), findsOne);
-    final customerSemantics = tester.getSemantics(
-      find.bySemanticsLabel('Customer mobile number'),
-    );
-    expect(customerSemantics.identifier, 'work-order-customer');
-    expect(customerSemantics.value, 'Not entered');
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-quick-group-buy')));
-    await tester.pumpAndSettle();
-    expect(find.bySemanticsLabel('Target quantity'), findsOne);
-    expect(find.bySemanticsLabel('Your confirmed quantity'), findsOne);
-    semantics.dispose();
-  });
+  testWidgets(
+    'Work inputs expose named customer fields inside compact chooser',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-sale-customer')));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Customer mobile number'), findsOne);
+      final customerSemantics = tester.getSemantics(
+        find.bySemanticsLabel('Customer mobile number'),
+      );
+      expect(customerSemantics.identifier, 'work-order-customer');
+      expect(customerSemantics.value, 'Not entered');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-dashboard-counter-order-screen')),
+        findsOne,
+      );
+      expect(work.workspaceOrders, isEmpty);
+      semantics.dispose();
+    },
+  );
 
   testWidgets('Grow keeps offers and funded work inside Store ownership', (
     tester,
   ) async {
     final work = liveStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-grow')));
     await tester.pumpAndSettle();
@@ -2568,7 +3644,19 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-growth-paid-work')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-requirement-selector')), findsOne);
+    expect(find.byKey(const Key('work-grow-destination')), findsOne);
+    final service = find.byKey(const Key('work-requirement-category-4'));
+    await Scrollable.ensureVisible(tester.element(service), alignment: .5);
+    await tester.pumpAndSettle();
+    await tester.tap(service);
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-paid-requirement-screen')), findsOne);
+    expect(find.byKey(const Key('work-local-navigation')), findsOne);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-grow-destination')), findsOne);
+    expect(work.workspacePaidRequirementReference, isNull);
   });
 
   testWidgets('Grow shows live Store outcomes before its first actions', (
@@ -2599,7 +3687,7 @@ void main() {
     );
     work.workspacePaidRequirementReference = 'WORK-1';
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-grow')));
     await tester.pumpAndSettle();
@@ -2607,7 +3695,7 @@ void main() {
     expect(find.text('Grow repeat business'), findsOneWidget);
     expect(find.text('Repeat'), findsOneWidget);
     expect(find.text('Offers live'), findsOneWidget);
-    expect(find.text('Paid work'), findsOneWidget);
+    expect(find.text('Requirements'), findsOneWidget);
     expect(find.text('Public'), findsOneWidget);
     for (final keyName in const [
       'work-growth-customers',
@@ -2633,7 +3721,7 @@ void main() {
       work.workspaceOrders.add(customer);
       work.workspaceCustomersAllowingMessages.add('9829012345');
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-      await tester.tap(find.byKey(const Key('work-business-drawer')));
+      await openStoreTools(tester);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-business-grow')));
       await tester.pumpAndSettle();
@@ -2655,60 +3743,52 @@ void main() {
   );
 
   testWidgets(
-    'funded Store work reviews candidate-facing facts before publish',
+    'Store requirement reviews outcome and fees before any publication',
     (tester) async {
       final work = liveStore();
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-      await tester.tap(find.byKey(const Key('work-business-drawer')));
+      await tester.tap(find.byKey(const Key('work-quick-requirement')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-business-grow')));
+      final service = find.byKey(const Key('work-requirement-category-4'));
+      await Scrollable.ensureVisible(tester.element(service), alignment: .5);
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-growth-paid-work')));
+      await tester.tap(service);
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const Key('work-paid-position')),
-        'Store delivery helper',
-      );
-      await tester.enterText(
-        find.byKey(const Key('work-paid-work')),
-        'Deliver packed customer orders in Sardarpura.',
-      );
-      await tester.enterText(
-        find.byKey(const Key('work-paid-candidate')),
-        'Own bike and valid driving licence.',
-      );
-      await tester.enterText(find.byKey(const Key('work-paid-amount')), '500');
-      await tester.drag(
-        find.byKey(const Key('work-paid-requirement-screen')),
-        const Offset(0, -520),
-      );
+      for (final entry in const {
+        'work-requirement-title': 'Create store product photos',
+        'work-requirement-outcome': 'Deliver ten clear product photos.',
+        'work-requirement-terms': 'Payment after approved photos.',
+        'work-requirement-budget': '500',
+      }.entries) {
+        final field = find.byKey(Key(entry.key));
+        await tester.ensureVisible(field);
+        await tester.enterText(field, entry.value);
+      }
+      FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const Key('work-paid-deadline')));
-      await tester.tap(find.byKey(const Key('work-paid-deadline')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
-      await tester.drag(
-        find.byKey(const Key('work-paid-requirement-screen')),
-        const Offset(0, -360),
-      );
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const Key('work-paid-publish')));
-      await tester.tap(find.byKey(const Key('work-paid-publish')));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('work-paid-review')), findsOneWidget);
-      expect(find.text('Review what candidates will see'), findsOneWidget);
-      expect(find.text('Mahadev Fresh Mart'), findsWidgets);
-      expect(find.text('₹500 · Assignment'), findsOneWidget);
-      expect(work.workspacePaidRequirementReference, isNull);
-      await tester.tap(find.byKey(const Key('work-paid-review-confirm')));
+      await tester.tap(find.byKey(const Key('work-requirement-review')));
       await tester.pumpAndSettle();
       expect(
-        work.workspacePaidRequirementState,
-        WorkspacePaidRequirementState.published,
+        find.byKey(const Key('work-requirement-review-surface')),
+        findsOne,
       );
-      expect(work.workspacePaidRequirementReference, isNotNull);
+      expect(find.text('Create store product photos'), findsOne);
+      expect(find.text('Deliver ten clear product photos.'), findsOne);
+      await reveal(tester, find.text('₹500'));
+      expect(find.text('₹500'), findsOne);
+      expect(work.workspacePaidRequirementReference, isNull);
+      await reveal(tester, find.byKey(const Key('work-requirement-edit')));
+      expect(find.text('Not posted. No payment has been taken.'), findsOne);
+      await tester.tap(find.byKey(const Key('work-requirement-edit')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('work-requirement-title')))
+            .controller
+            ?.text,
+        'Create store product photos',
+      );
+      expect(work.workspacePaidRequirementReference, isNull);
       expect(tester.takeException(), isNull);
     },
   );
@@ -2718,7 +3798,7 @@ void main() {
   ) async {
     final work = liveStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+    await openStoreSettings(tester);
     await tester.pumpAndSettle();
     await reveal(tester, find.byKey(const Key('work-status-max-orders-12')));
     await tester.tap(find.byKey(const Key('work-status-max-orders-12')));
@@ -2737,7 +3817,7 @@ void main() {
   ) async {
     final work = liveStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+    await openStoreSettings(tester);
     await tester.pumpAndSettle();
     await reveal(tester, find.text('Business details and documents'));
     await tester.tap(find.text('Business details and documents'));
@@ -2769,7 +3849,7 @@ void main() {
   ) async {
     final work = liveStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+    await openStoreSettings(tester);
     await tester.pumpAndSettle();
     await reveal(tester, find.text('Delivery area and charges'));
     await tester.tap(find.text('Delivery area and charges'));
@@ -2780,15 +3860,18 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-grow')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-growth-offers')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-back')).hitTestable(), findsOneWidget);
-    expect(find.byKey(const Key('work-operation-back')), findsNothing);
-    await tester.tap(find.byKey(const Key('work-back')));
+    expect(
+      find.byKey(const Key('work-operation-back')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('work-back')), findsNothing);
+    await tester.tap(find.byKey(const Key('work-operation-back')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-grow-destination')), findsOne);
   });
@@ -2798,12 +3881,9 @@ void main() {
   ) async {
     final work = liveStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-quick-new-sale')));
+    await tester.tap(find.byKey(const Key('work-store-sell')));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('work-order-customer')),
-      '9829012345',
-    );
+    await enterSaleCustomer(tester, '9829012345');
     await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-operation-back')));
@@ -2811,7 +3891,8 @@ void main() {
     expect(find.byKey(const Key('work-order-discard-dialog')), findsOne);
     await tester.tap(find.byKey(const Key('work-order-keep-editing')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-order-customer')), findsOne);
+    expect(find.byKey(const Key('work-sale-customer')), findsOne);
+    expect(work.workspaceOrderCustomer, '9829012345');
     await tester.tap(find.byKey(const Key('work-operation-back')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-order-discard')));
@@ -2828,9 +3909,9 @@ void main() {
     final searchLabel = tester.widget<Text>(find.text('Search your store'));
     expect(searchLabel.maxLines, 1);
     expect(searchLabel.overflow, isNull);
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-business-storefront')));
+    await tester.tap(find.byKey(const Key('work-business-preview')));
     await tester.pumpAndSettle();
     for (final label in const [
       'Today',
@@ -2887,9 +3968,9 @@ void main() {
   ) async {
     final work = liveStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-business-storefront')));
+    await tester.tap(find.byKey(const Key('work-business-preview')));
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('work-preview-product-oil-fortune-1l')),
@@ -2907,23 +3988,24 @@ void main() {
     expect(find.byKey(const Key('work-dashboard-preview-screen')), findsOne);
   });
 
-  testWidgets('funded work uses compact named customer fields', (tester) async {
+  testWidgets('Store requirements use outcome-facing accessible fields', (
+    tester,
+  ) async {
     final semantics = tester.ensureSemantics();
     final work = liveStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await tester.tap(find.byKey(const Key('work-quick-requirement')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-business-grow')));
+    final service = find.byKey(const Key('work-requirement-category-0'));
+    await tester.tap(service);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('work-growth-paid-work')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-growth-paid-work')));
-    await tester.pumpAndSettle();
-    expect(find.text('Experience or qualification'), findsOneWidget);
+    expect(find.text('Experience or qualification'), findsNothing);
+    expect(find.bySemanticsLabel('Expected result'), findsOneWidget);
     expect(
-      find.bySemanticsLabel('Experience or qualification'),
+      find.byKey(const Key('work-requirement-review')).hitTestable(),
       findsOneWidget,
     );
+    expect(work.workspacePaidRequirementReference, isNull);
     semantics.dispose();
   });
 
@@ -3027,7 +4109,7 @@ void main() {
         directory: 'work-store-live-v1-local-review-20260903',
         fileName: '05-store-live-orders-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-pulse-orders')));
+          await tester.tap(find.byKey(const Key('work-store-orders')));
         },
       );
     },
@@ -3101,7 +4183,7 @@ void main() {
         directory: 'work-store-live-sell-deliver-v1-local-review-20260904',
         fileName: '01-customer-delivery-composer-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-quick-delivery')));
+          await openExistingDeliveryDraft(tester);
         },
       );
     },
@@ -3118,7 +4200,7 @@ void main() {
         fileName: '02-customer-delivery-review-412x915.png',
         target: find.byType(MaterialApp),
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-quick-delivery')));
+          await openExistingDeliveryDraft(tester);
           await tester.pumpAndSettle();
           await tester.enterText(
             find.byKey(const Key('work-order-customer')),
@@ -3275,7 +4357,7 @@ void main() {
         directory: 'work-store-live-customers-money-v1-local-review-20260904',
         fileName: '01-customer-book-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await openStoreTools(tester);
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-business-customers')));
         },
@@ -3309,7 +4391,7 @@ void main() {
         fileName: '02-customer-actions-412x915.png',
         target: find.byType(MaterialApp),
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await openStoreTools(tester);
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-business-customers')));
           await tester.pumpAndSettle();
@@ -3336,7 +4418,7 @@ void main() {
         directory: 'work-store-live-customers-money-v1-local-review-20260904',
         fileName: '03-money-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await openStoreTools(tester);
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-business-money')));
         },
@@ -3368,7 +4450,7 @@ void main() {
         directory: 'work-store-live-growth-settings-v1-local-review-20260904',
         fileName: '01-growth-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await openStoreTools(tester);
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-business-grow')));
         },
@@ -3386,7 +4468,7 @@ void main() {
         directory: 'work-store-live-growth-settings-v1-local-review-20260904',
         fileName: '02-store-settings-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+          await openStoreSettings(tester);
         },
       );
     },
@@ -3402,7 +4484,7 @@ void main() {
         directory: 'work-store-live-growth-settings-v1-local-review-20260904',
         fileName: '03-business-record-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+          await openStoreSettings(tester);
           await tester.pumpAndSettle();
           await reveal(tester, find.text('Business details and documents'));
           await tester.tap(find.text('Business details and documents'));
@@ -3474,7 +4556,7 @@ void main() {
         work: liveStore(),
         fileName: 'store-settings-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+          await openStoreSettings(tester);
         },
       );
     },
@@ -3535,9 +4617,9 @@ void main() {
         work: liveStore(),
         fileName: 'destination-customer-storefront-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await openStoreTools(tester);
           await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const Key('work-business-storefront')));
+          await tester.tap(find.byKey(const Key('work-business-preview')));
         },
       );
     },
@@ -3638,12 +4720,9 @@ void main() {
         fileName: 'correction-order-completion-412x915.png',
         target: find.byType(Overlay).last,
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-quick-new-sale')));
+          await tester.tap(find.byKey(const Key('work-store-sell')));
           await tester.pumpAndSettle();
-          await tester.enterText(
-            find.byKey(const Key('work-order-customer')),
-            '9829012345',
-          );
+          await enterSaleCustomer(tester, '9829012345');
           await tester.tap(
             find.byKey(const Key('work-order-add-oil-fortune-1l')),
           );
@@ -3708,7 +4787,7 @@ void main() {
         work: liveStore(),
         fileName: 'correction-store-offers-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await openStoreTools(tester);
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-business-grow')));
           await tester.pumpAndSettle();
@@ -3727,7 +4806,7 @@ void main() {
         work: liveStore(),
         fileName: 'correction-funded-store-work-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await openStoreTools(tester);
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-business-grow')));
           await tester.pumpAndSettle();
@@ -3746,7 +4825,7 @@ void main() {
         work: liveStore(),
         fileName: 'correction-approved-business-record-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+          await openStoreSettings(tester);
           await tester.pumpAndSettle();
           await reveal(tester, find.text('Business details and documents'));
           await tester.tap(find.text('Business details and documents'));
@@ -3761,7 +4840,7 @@ void main() {
     final work = liveStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
-    await tester.tap(find.byKey(const Key('work-quick-new-sale')));
+    await tester.tap(find.byKey(const Key('work-store-sell')));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('work-dashboard-counter-order-screen')),
@@ -3772,14 +4851,14 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-quick-delivery')));
+    await openExistingDeliveryDraft(tester);
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('work-dashboard-counter-order-screen')),
       findsOne,
     );
     expect(work.workspaceOrderSource, 'Phone');
-    expect(work.workspaceOrderNeedsDelivery, isTrue);
+    expect(work.workspaceOrders, isEmpty);
     expect(work.workspaceOrderFulfilment, 'Mool delivery');
     expect(tester.takeException(), isNull);
   });
@@ -3795,11 +4874,21 @@ void main() {
       viewport: const Size(360, 800),
     );
 
-    await tester.tap(find.byKey(const Key('work-quick-delivery')));
+    await openExistingDeliveryDraft(tester);
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-order-customer')), findsOneWidget);
-    expect(find.byKey(const Key('work-order-address')), findsOneWidget);
-    expect(find.byKey(const Key('work-order-review')), findsOneWidget);
+    expect(
+      find.byKey(const Key('work-sale-customer')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('work-sale-delivery')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('work-order-address')), findsNothing);
+    expect(
+      find.byKey(const Key('work-order-review')).hitTestable(),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -3810,7 +4899,7 @@ void main() {
     seedIncomingOrder(work);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-customers')));
     await tester.pumpAndSettle();
@@ -3818,7 +4907,7 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-money')));
     await tester.pumpAndSettle();
@@ -3826,7 +4915,7 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-business-drawer')));
+    await openStoreTools(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-business-grow')));
     await tester.pumpAndSettle();
@@ -3860,7 +4949,7 @@ void main() {
         work: liveStore(),
         fileName: 'destination-new-sale-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-quick-new-sale')));
+          await tester.tap(find.byKey(const Key('work-store-sell')));
         },
       );
     },
@@ -3875,7 +4964,7 @@ void main() {
         work: liveStore(),
         fileName: 'destination-deliver-order-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-quick-delivery')));
+          await openExistingDeliveryDraft(tester);
         },
       );
     },
@@ -3907,7 +4996,7 @@ void main() {
         work: work,
         fileName: 'destination-customers-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await openStoreTools(tester);
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-business-customers')));
         },
@@ -3928,7 +5017,7 @@ void main() {
         work: work,
         fileName: 'destination-money-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await openStoreTools(tester);
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-business-money')));
         },
@@ -3945,7 +5034,7 @@ void main() {
         work: liveStore(),
         fileName: 'destination-grow-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-business-drawer')));
+          await openStoreTools(tester);
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-business-grow')));
         },

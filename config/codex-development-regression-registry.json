@@ -10,6 +10,36 @@
   },
   "entries": [
     {
+      "id": "REG-20260906-4497-STORE-OVERNIGHT-ACTION-BOUNDARIES",
+      "status": "correction_under_local_and_device_qualification",
+      "appliesTo": ["primary", "work", "testing", "device"],
+      "mistake": "Dashboard review exposed a rider-pickup action that invoked customer-delivery OTP completion, a missing editable delivery address, and a fulfilment countdown restarted after acceptance instead of retaining the original ten-minute target.",
+      "rootCause": "Distinct fulfilment events reused customer-completion behavior; compact bill review removed an input; presentation-stage deadlines replaced the original order target.",
+      "prevention": "Keep Mool rider confirmation pending until an authoritative event, reserve customer OTP for actual customer handover, retain address editing in bill review, and test a sixty-second acceptance window with the original ten-minute App retail target. Do not qualify review fixtures as real rider, payment or backend evidence.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart", "apps/mobile/test/work_store_atomic_operations_test.dart", "apps/mobile/test/work_production_gateway_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"]
+    },
+    {
+      "id": "REG-20260906-4498-STORE-OPERATIVE-SAFE-AREA-AND-OVERFLOW",
+      "status": "correction_under_local_and_device_qualification",
+      "appliesTo": ["primary", "work", "ui", "testing"],
+      "mistake": "Local tests found bill confirmation below the Android safe edge, an obscured Send invoice action and a 61-pixel sales-balance overflow after invoice sharing.",
+      "rootCause": "The inner modal lost the outer navigation inset and short central activities used oversized fixed-height content without a separately pinned action.",
+      "prevention": "Capture the outer system inset before opening bill review; use scrollable central content with stable reachable actions; replay invoice completion, keyboard and compact large-text journeys, not only initial dashboard renders.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"]
+    },
+    {
+      "id": "REG-20260906-4499-STORE-REVIEW-TEST-CONTRACT-AND-OUTPUT-RECOVERY",
+      "status": "retained_failed_runs_corrected_contract_requires_replay",
+      "appliesTo": ["primary", "testing", "evidence"],
+      "mistake": "Old tests expected removed selection chips, old requirement publishing and the New customer order label. A large multi-image tool response hid the connected-run session identifier. Its retained log completed with 664 passes, 72 capture skips and one stale Create bill label assertion.",
+      "rootCause": "Approved compact interaction and wording changes were not propagated to all dependent journey assertions; excessive tool output obscured execution metadata.",
+      "prevention": "Test the actual native selection windows, preserve the same business outcomes and strong navigation/inset assertions, never invent service fees or publication, retain complete failed logs and rerun after correction. Emit at most two full screenshots per response and use bounded log summaries; an orphaned completed log is diagnostic evidence, not a substitute for a verified exit-code qualification run.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-1-review-20260905/local-validation.md"]
+    },
+    {
       "id": "REG-20260905-4495-LOCKED-PLATFORM-STALE-RUNTIME-SENTENCE",
       "status": "historical_locked_assertion_retained_current_contract_separately_tested",
       "appliesTo": ["primary", "testing", "build"],
