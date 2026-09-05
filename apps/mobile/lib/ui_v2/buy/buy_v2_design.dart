@@ -1654,6 +1654,45 @@ class BuyV2PromotionCard extends StatefulWidget {
   final double width;
   final int sequenceIndex;
 
+  static const titleStyle = TextStyle(
+    color: BuyV2Colors.ink,
+    fontSize: 10.5,
+    height: 1.08,
+    fontWeight: FontWeight.w900,
+  );
+  static const detailStyle = TextStyle(
+    color: BuyV2Colors.muted,
+    fontSize: 9.5,
+    height: 1.2,
+    fontWeight: FontWeight.w700,
+  );
+
+  bool fitsTextWidth(BuildContext context, double cardWidth) {
+    final textWidth = cardWidth - 91;
+    if (textWidth <= 0) return false;
+    for (final value in [
+      (text: title, style: titleStyle, lines: 3),
+      (text: detail, style: detailStyle, lines: 4),
+    ]) {
+      final style = DefaultTextStyle.of(context).style.merge(value.style);
+      final painter = TextPainter(
+        text: TextSpan(text: value.text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        locale: Localizations.maybeLocaleOf(context),
+      )..layout(maxWidth: textWidth);
+      final fitsLines = painter.computeLineMetrics().length <= value.lines;
+      painter.dispose();
+      if (!fitsLines) return false;
+      for (final word in value.text.split(RegExp(r'\s+'))) {
+        if (buyV2ValueTextSize(context, word, value.style).width > textWidth) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   @override
   State<BuyV2PromotionCard> createState() => _BuyV2PromotionCardState();
 }
@@ -1709,6 +1748,7 @@ class _BuyV2PromotionCardState extends State<BuyV2PromotionCard>
   Widget build(BuildContext context) {
     final theme = BuyV2ThemeScope.of(context);
     final entryBegin = (widget.sequenceIndex.clamp(0, 3) * .12).toDouble();
+    final accessibleText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
     final entry = CurvedAnimation(
       parent: _entryController,
       curve: Interval(entryBegin, 1, curve: Curves.easeOutCubic),
@@ -1809,26 +1849,18 @@ class _BuyV2PromotionCardState extends State<BuyV2PromotionCard>
                                   children: [
                                     Text(
                                       widget.title,
-                                      maxLines: 3,
+                                      maxLines: accessibleText ? null : 3,
                                       overflow: TextOverflow.clip,
-                                      style: const TextStyle(
-                                        color: BuyV2Colors.ink,
-                                        fontSize: 10.5,
-                                        height: 1.08,
-                                        fontWeight: FontWeight.w900,
-                                      ),
+                                      style: BuyV2PromotionCard.titleStyle,
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
                                       widget.detail,
-                                      maxLines: 4,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: BuyV2Colors.muted,
-                                        fontSize: 9.5,
-                                        height: 1.2,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                      maxLines: accessibleText ? null : 4,
+                                      overflow: accessibleText
+                                          ? TextOverflow.clip
+                                          : TextOverflow.ellipsis,
+                                      style: BuyV2PromotionCard.detailStyle,
                                     ),
                                   ],
                                 ),

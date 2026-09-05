@@ -33,8 +33,214 @@ void main() {
     ),
   );
 
-  for (final productId in ['s-tomato', 'w-notebook']) {
-    for (final width in [320.0, 430.0]) {
+  Future<void> capture(WidgetTester tester, String name) async {
+    if (!const bool.fromEnvironment('BUY_R66_RECENT_CAPTURE')) return;
+    final boundary = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(const ValueKey('r66-recent-review-capture')),
+    );
+    await tester.runAsync(() async {
+      final directory = Directory('build/r66-recent-review-v5-20260906');
+      await directory.create(recursive: true);
+      final output = File('${directory.path}/$name.png');
+      if (await output.exists()) throw StateError('Capture already exists');
+      final image = await boundary.toImage(pixelRatio: 2);
+      try {
+        final bytes = await image.toByteData(format: ImageByteFormat.png);
+        if (bytes == null) throw StateError('Capture encoding failed');
+        await output.writeAsBytes(bytes.buffer.asUint8List());
+      } finally {
+        image.dispose();
+      }
+    });
+  }
+
+  void expectCompleteText(
+    WidgetTester tester,
+    Finder owner, {
+    bool wordsFit = false,
+  }) {
+    final labels = find.descendant(
+      of: owner,
+      matching: find.byType(Text),
+      matchRoot: true,
+    );
+    expect(labels, findsWidgets);
+    for (final element in labels.evaluate()) {
+      final paragraph = element.renderObject! as RenderParagraph;
+      final natural = TextPainter(
+        text: paragraph.text,
+        textDirection: paragraph.textDirection,
+        textScaler: paragraph.textScaler,
+      )..layout(maxWidth: paragraph.size.width);
+      final label = paragraph.text.toPlainText();
+      expect(paragraph.didExceedMaxLines, isFalse, reason: label);
+      expect(
+        paragraph.size.height,
+        greaterThanOrEqualTo(natural.height - .1),
+        reason: label,
+      );
+      natural.dispose();
+      if (wordsFit) {
+        for (final word in label.split(RegExp(r'\s+'))) {
+          final wordPainter = TextPainter(
+            text: TextSpan(text: word, style: paragraph.text.style),
+            textDirection: paragraph.textDirection,
+            textScaler: paragraph.textScaler,
+          )..layout();
+          expect(
+            wordPainter.width,
+            lessThanOrEqualTo(paragraph.size.width + .1),
+            reason: label,
+          );
+          wordPainter.dispose();
+        }
+      }
+      expect(
+        tester.getRect(find.byWidget(element.widget)).bottom,
+        lessThanOrEqualTo(tester.getRect(owner).bottom + .1),
+        reason: label,
+      );
+    }
+  }
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final width in [320.0, 360.0, 430.0]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'R66 catalogue 029 030 complete ${destination.name} $width text$scale',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = Size(width, 800);
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(tester.view.reset);
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(session.dispose);
+            addTearDown(core.dispose);
+            session.openDestination(destination);
+            await tester.pumpWidget(app(session));
+            await tester.pumpAndSettle();
+            final modePrefix = destination == BuyV2Destination.shop
+                ? 'shop'
+                : 'wholesale';
+            final modes = destination == BuyV2Destination.shop
+                ? ['quick', 'courier']
+                : ['wholesale', 'bulk'];
+            for (final mode in [modes.last, modes.first]) {
+              final selector = find.byKey(
+                ValueKey('buy-$modePrefix-sale-type-selector'),
+              );
+              expectCompleteText(tester, selector, wordsFit: true);
+              final target = find.byKey(
+                ValueKey('buy-$modePrefix-sale-type-$mode'),
+              );
+              expect(target.hitTestable(), findsOneWidget);
+              expect(tester.getSize(target).height, greaterThanOrEqualTo(44));
+              await tester.tap(target);
+              await tester.pumpAndSettle();
+              if (destination == BuyV2Destination.shop) {
+                expect(
+                  session.shopSaleType,
+                  mode == 'quick'
+                      ? BuyV2ShopSaleType.quickDelivery
+                      : BuyV2ShopSaleType.courier,
+                );
+              } else {
+                expect(session.wholesaleSaleType.name, mode);
+              }
+              expectCompleteText(tester, selector);
+              expect(tester.takeException(), isNull);
+            }
+            final swipe = find.byKey(
+              ValueKey('buy-$modePrefix-sale-type-swipe'),
+            );
+            for (final left in [true, false]) {
+              await tester.fling(swipe, Offset(left ? -80 : 80, 0), 500);
+              await tester.pumpAndSettle();
+              if (destination == BuyV2Destination.shop) {
+                expect(
+                  session.shopSaleType,
+                  left
+                      ? BuyV2ShopSaleType.courier
+                      : BuyV2ShopSaleType.quickDelivery,
+                );
+              } else {
+                expect(
+                  session.wholesaleSaleType,
+                  left
+                      ? BuyV2WholesaleSaleType.bulk
+                      : BuyV2WholesaleSaleType.wholesale,
+                );
+              }
+              expect(tester.takeException(), isNull);
+            }
+            for (final key in [
+              'buy-category-picker',
+              'buy-saved-products-button',
+              'buy-filter-button',
+            ]) {
+              final action = find.byKey(ValueKey(key));
+              expect(action.hitTestable(), findsOneWidget);
+              expect(
+                tester.getSize(action).shortestSide,
+                greaterThanOrEqualTo(44),
+              );
+            }
+            final catalogueScroll = find
+                .descendant(
+                  of: find.byType(BuyV2CatalogueView),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            if (width == 360 && scale == 2) {
+              await capture(tester, '${destination.name}-360-text2-modes');
+            }
+            final cardKeys = destination == BuyV2Destination.shop
+                ? ['buy-promotion-shop-basket', 'buy-promotion-shop-wholesale']
+                : [
+                    'buy-promotion-wholesale-restock',
+                    'buy-promotion-wholesale-shop',
+                  ];
+            for (final key in cardKeys) {
+              final card = find.byKey(ValueKey(key));
+              await tester.scrollUntilVisible(
+                card,
+                180,
+                scrollable: catalogueScroll,
+              );
+              await tester.pumpAndSettle();
+              expectCompleteText(tester, card, wordsFit: true);
+              if (scale == 2) {
+                expect(tester.getSize(card).width, greaterThan(width * .8));
+              }
+              expect(tester.takeException(), isNull);
+            }
+            if (width == 360 && scale == 2) {
+              await capture(tester, '${destination.name}-360-text2-promotions');
+            }
+            await tester.tap(find.byKey(ValueKey(cardKeys.last)));
+            await tester.pumpAndSettle();
+            expect(
+              session.destination,
+              destination == BuyV2Destination.shop
+                  ? BuyV2Destination.wholesale
+                  : BuyV2Destination.shop,
+            );
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+
+  for (final productId in ['s-tomato', 's-noodles', 'w-notebook']) {
+    for (final width in [320.0, 360.0, 430.0]) {
       testWidgets(
         'R66 Recently Viewed fits $productId at $width and 200 percent',
         (tester) async {
@@ -68,51 +274,33 @@ void main() {
           final card = find.byKey(
             ValueKey('buy-recently-viewed-product-$productId'),
           );
-          final labels = find.descendant(of: card, matching: find.byType(Text));
-          for (final element in labels.evaluate()) {
-            final paragraph = element.renderObject! as RenderParagraph;
-            final natural = TextPainter(
-              text: paragraph.text,
-              textDirection: paragraph.textDirection,
-              textScaler: paragraph.textScaler,
-              maxLines: paragraph.maxLines,
-            )..layout(maxWidth: paragraph.size.width);
-            expect(paragraph.size.height, greaterThanOrEqualTo(natural.height));
-            natural.dispose();
-            expect(
-              tester.getRect(find.byWidget(element.widget)).bottom,
-              lessThanOrEqualTo(tester.getRect(card).bottom),
-            );
-          }
+          expectCompleteText(
+            tester,
+            find.byKey(const ValueKey('buy-recently-viewed-heading')),
+          );
+          expectCompleteText(
+            tester,
+            find.byKey(const ValueKey('buy-recently-viewed-subheading')),
+          );
+          expectCompleteText(
+            tester,
+            find.byKey(ValueKey('buy-recently-viewed-facts-$productId')),
+          );
+          expectCompleteText(
+            tester,
+            find.byKey(const ValueKey('buy-recently-viewed-clear')),
+            wordsFit: true,
+          );
+          final clearLabel = tester.renderObject<RenderParagraph>(
+            find.descendant(
+              of: find.byKey(const ValueKey('buy-recently-viewed-clear')),
+              matching: find.byType(Text),
+            ),
+          );
+          expect(clearLabel.text.style?.fontFamily, isNotNull);
           expect(tester.getSize(card).height, greaterThanOrEqualTo(44));
           expect(tester.takeException(), isNull);
-          if (const bool.fromEnvironment('BUY_R66_RECENT_CAPTURE')) {
-            final boundary = tester.renderObject<RenderRepaintBoundary>(
-              find.byKey(const ValueKey('r66-recent-review-capture')),
-            );
-            await tester.runAsync(() async {
-              final directory = Directory(
-                'build/r66-recent-review-v1-20260905',
-              );
-              await directory.create(recursive: true);
-              final output = File(
-                '${directory.path}/$productId-$width-text2.png',
-              );
-              if (await output.exists()) {
-                throw StateError('Capture already exists');
-              }
-              final image = await boundary.toImage(pixelRatio: 2);
-              try {
-                final bytes = await image.toByteData(
-                  format: ImageByteFormat.png,
-                );
-                if (bytes == null) throw StateError('Capture encoding failed');
-                await output.writeAsBytes(bytes.buffer.asUint8List());
-              } finally {
-                image.dispose();
-              }
-            });
-          }
+          await capture(tester, '$productId-$width-text2');
           await tester.tap(card);
           await tester.pumpAndSettle();
           expect(session.selectedProductId, productId);

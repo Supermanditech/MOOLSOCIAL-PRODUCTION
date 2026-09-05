@@ -4911,17 +4911,30 @@ void main() {
       final dockTop = tester
           .getRect(find.byKey(const Key('moolsocial-compact-destination-rail')))
           .top;
-      final rect = tester.getRect(
-        find.byKey(ValueKey('buy-product-${product.id}')),
+      final card = find.byKey(ValueKey('buy-product-${product.id}'));
+      expect(tester.getRect(card).top, lessThan(dockTop));
+      final add = find.byKey(ValueKey('buy-add-${product.id}'));
+      await tester.scrollUntilVisible(
+        add,
+        160,
+        scrollable: find
+            .descendant(
+              of: find.byType(BuyV2CatalogueView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
-      expect(rect.top, lessThan(dockTop));
-      expect(dockTop - rect.top, greaterThanOrEqualTo(180));
-      final action = tester.getRect(
-        find.byKey(ValueKey('buy-add-${product.id}')),
-      );
+      await tester.pumpAndSettle();
+      final rect = tester.getRect(card);
+      final action = tester.getRect(add);
       expect(action.height, 44);
       expect(action.width, greaterThanOrEqualTo(60));
       expect(rect.contains(action.center), isTrue);
+      expect(action.bottom, lessThanOrEqualTo(dockTop));
+      expect(add.hitTestable(), findsOneWidget);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(session.quantityFor(product.id), 1);
       expect(tester.takeException(), isNull);
     },
   );

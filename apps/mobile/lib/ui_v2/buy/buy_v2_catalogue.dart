@@ -768,6 +768,28 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
 
   final BuyV2Session session;
 
+  static double minimumHorizontalWidth(
+    BuildContext context,
+    BuyV2Session session,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: session.destination == BuyV2Destination.shop
+            ? 'Scheduled'
+            : 'Wholesale',
+        style: DefaultTextStyle.of(
+          context,
+        ).style.merge(_CatalogueSaleSegment.labelStyle(true)),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      locale: Localizations.maybeLocaleOf(context),
+    )..layout();
+    final width = 12 + 2 * painter.width.ceilToDouble();
+    painter.dispose();
+    return width;
+  }
+
   @override
   Widget build(BuildContext context) {
     final shop = session.destination == BuyV2Destination.shop;
@@ -819,10 +841,12 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
           : 'Choose Wholesale or Bulk products',
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final minimumWidth = minimumHorizontalWidth(context, session);
+          final vertical = constraints.maxWidth < minimumWidth;
           final showIcons =
-              constraints.maxWidth >= 184 &&
+              constraints.maxWidth >= minimumWidth + 50 &&
               MediaQuery.textScalerOf(context).scale(1) <= 1.25;
-          final segmentWidth = constraints.maxWidth / 2;
+          final segmentWidth = constraints.maxWidth / (vertical ? 1 : 2);
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onHorizontalDragEnd: (details) {
@@ -834,7 +858,7 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
               key: ValueKey(
                 'buy-${shop ? 'shop' : 'wholesale'}-sale-type-swipe',
               ),
-              height: 48,
+              height: vertical ? 96 : 48,
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -866,9 +890,9 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                       BuyV2Motion.contentChange,
                     ),
                     curve: Curves.easeOutQuart,
-                    left: selectedIndex == 0 ? 0 : segmentWidth,
-                    top: 7,
-                    bottom: 7,
+                    left: vertical || selectedIndex == 0 ? 0 : segmentWidth,
+                    top: vertical ? selectedIndex * 48.0 + 7 : 7,
+                    bottom: vertical ? (1 - selectedIndex) * 48.0 + 7 : 7,
                     width: segmentWidth,
                     child: DecoratedBox(
                       key: ValueKey(
@@ -878,7 +902,8 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
                       decoration: const BoxDecoration(color: Color(0xFF1010A8)),
                     ),
                   ),
-                  Row(
+                  Flex(
+                    direction: vertical ? Axis.vertical : Axis.horizontal,
                     children: [
                       for (var index = 0; index < options.length; index++)
                         Expanded(
@@ -927,6 +952,14 @@ class _CatalogueSaleSegment extends StatelessWidget {
   final bool showIcon;
   final Key labelStyleKey;
   final VoidCallback onTap;
+
+  static TextStyle labelStyle(bool selected) => TextStyle(
+    color: selected ? Colors.white : BuyV2Colors.navy,
+    fontSize: 11.25,
+    fontWeight: FontWeight.w900,
+    height: 1,
+    letterSpacing: selected ? .15 : .05,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -1020,13 +1053,9 @@ class _CatalogueSaleSegment extends StatelessWidget {
                         BuyV2Motion.selection,
                       ),
                       curve: Curves.easeOutCubic,
-                      style: TextStyle(
-                        color: selected ? Colors.white : BuyV2Colors.navy,
-                        fontSize: 11.25,
-                        fontWeight: FontWeight.w900,
-                        height: 1,
-                        letterSpacing: selected ? .15 : .05,
-                      ),
+                      style: DefaultTextStyle.of(
+                        context,
+                      ).style.merge(labelStyle(selected)),
                       child: Text(
                         title,
                         maxLines: 1,
@@ -1581,45 +1610,74 @@ class _CatalogueToolbar extends StatelessWidget {
               session.destination == BuyV2Destination.shop,
         )
         .firstOrNull;
-    return Container(
-      key: const ValueKey('buy-catalogue-toolbar'),
-      height: 60,
-      padding: const EdgeInsets.fromLTRB(6, 6, 6, 5),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [Color(0xFFFFF9F2), Color(0xFFF8F8FF), Color(0xFFF5F8FF)],
-        ),
-        border: Border(bottom: BorderSide(color: BuyV2Colors.line)),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x10000080),
-            blurRadius: 8,
-            offset: Offset(0, 3),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final separateModeRow =
+            (session.destination == BuyV2Destination.shop ||
+                session.destination == BuyV2Destination.wholesale) &&
+            constraints.maxWidth - 171 <
+                _CatalogueSaleTypeSelector.minimumHorizontalWidth(
+                  context,
+                  session,
+                );
+        final category = _CatalogueCategoryPickerButton(session: session);
+        final feature = _CatalogueOwnedFeature(session: session);
+        final saved = _CompactCatalogueAction(
+          key: const ValueKey('buy-saved-products-button'),
+          icon: savedOnly
+              ? Icons.bookmark_rounded
+              : Icons.bookmark_border_rounded,
+          label: savedOnly ? 'Show all products' : 'Show Saved products',
+          badge: '${session.savedCountFor(session.destination)}',
+          active: savedOnly,
+          onTap: onSaved,
+        );
+        final tools = _CatalogueToolsMenu(session: session, order: order);
+        return Container(
+          key: const ValueKey('buy-catalogue-toolbar'),
+          constraints: const BoxConstraints(minHeight: 60),
+          padding: const EdgeInsets.fromLTRB(6, 6, 6, 5),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [Color(0xFFFFF9F2), Color(0xFFF8F8FF), Color(0xFFF5F8FF)],
+            ),
+            border: Border(bottom: BorderSide(color: BuyV2Colors.line)),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x10000080),
+                blurRadius: 8,
+                offset: Offset(0, 3),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          _CatalogueCategoryPickerButton(session: session),
-          const SizedBox(width: 5),
-          Expanded(child: _CatalogueOwnedFeature(session: session)),
-          const SizedBox(width: 5),
-          _CompactCatalogueAction(
-            key: const ValueKey('buy-saved-products-button'),
-            icon: savedOnly
-                ? Icons.bookmark_rounded
-                : Icons.bookmark_border_rounded,
-            label: savedOnly ? 'Show all products' : 'Show Saved products',
-            badge: '${session.savedCountFor(session.destination)}',
-            active: savedOnly,
-            onTap: onSaved,
-          ),
-          const SizedBox(width: 5),
-          _CatalogueToolsMenu(session: session, order: order),
-        ],
-      ),
+          child: separateModeRow
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    feature,
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [category, saved, tools],
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    category,
+                    const SizedBox(width: 5),
+                    Expanded(child: feature),
+                    const SizedBox(width: 5),
+                    saved,
+                    const SizedBox(width: 5),
+                    tools,
+                  ],
+                ),
+        );
+      },
     );
   }
 }
@@ -6616,26 +6674,48 @@ class _CataloguePromotionRail extends StatelessWidget {
       ],
       BuyV2Destination.orders => const <BuyV2PromotionCard>[],
     };
-    return SizedBox(
-      key: const ValueKey('buy-catalogue-promotions'),
-      height:
-          (accessibleText ? 164.0 : 148.0) +
-          (textScale - 1.4).clamp(0.0, double.infinity) * 120,
-      child: Padding(
-        key: PageStorageKey(
-          'buy-catalogue-promotions-${session.destination.name}',
-        ),
-        padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var index = 0; index < cards.length; index++) ...[
-              if (index > 0) const SizedBox(width: 7),
-              Expanded(child: cards[index]),
-            ],
-          ],
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = (constraints.maxWidth - 19) / 2;
+        if (accessibleText ||
+            cards.any((card) => !card.fitsTextWidth(context, cardWidth))) {
+          return Padding(
+            key: const ValueKey('buy-catalogue-promotions'),
+            padding: const EdgeInsets.all(6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var index = 0; index < cards.length; index++) ...[
+                  if (index > 0) const SizedBox(height: 7),
+                  cards[index],
+                ],
+              ],
+            ),
+          );
+        }
+        return SizedBox(
+          key: const ValueKey('buy-catalogue-promotions'),
+          height:
+              (accessibleText ? 164.0 : 148.0) +
+              (textScale - 1.4).clamp(0.0, double.infinity) * 120,
+          child: Padding(
+            key: PageStorageKey(
+              'buy-catalogue-promotions-${session.destination.name}',
+            ),
+            padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var index = 0; index < cards.length; index++) ...[
+                  if (index > 0) const SizedBox(width: 7),
+                  Expanded(child: cards[index]),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -6910,14 +6990,20 @@ class _RecentlyViewedRail extends StatelessWidget {
                   children: [
                     Text(
                       'Recently viewed',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      key: const ValueKey('buy-recently-viewed-heading'),
+                      maxLines: accessibleText ? null : 1,
+                      overflow: accessibleText
+                          ? TextOverflow.clip
+                          : TextOverflow.ellipsis,
                       style: context.buyTitle.copyWith(fontSize: 14),
                     ),
                     Text(
                       'Continue with the exact pack you viewed',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      key: const ValueKey('buy-recently-viewed-subheading'),
+                      maxLines: accessibleText ? null : 1,
+                      overflow: accessibleText
+                          ? TextOverflow.clip
+                          : TextOverflow.ellipsis,
                       style: context.buyMeta.copyWith(fontSize: 8),
                     ),
                   ],
@@ -6930,10 +7016,9 @@ class _RecentlyViewedRail extends StatelessWidget {
                 style: TextButton.styleFrom(
                   minimumSize: const Size(44, 44),
                   foregroundColor: BuyV2Colors.navy,
-                  textStyle: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  textStyle: DefaultTextStyle.of(
+                    context,
+                  ).style.copyWith(fontSize: 9, fontWeight: FontWeight.w900),
                 ),
                 child: const Text('Clear'),
               ),
@@ -7007,14 +7092,18 @@ class _RecentlyViewedCard extends StatelessWidget {
           maxLines: maxLines,
         ).height;
     return 17 +
-        textHeight(product.title, titleStyle, 2) +
-        textHeight(product.pack, context.buyMeta.copyWith(fontSize: 8), 1) +
+        textHeight(product.title, titleStyle, accessibleText ? null : 2) +
+        textHeight(
+          product.pack,
+          context.buyMeta.copyWith(fontSize: 8),
+          accessibleText ? null : 1,
+        ) +
         textHeight(buyV2Money(facts.price), priceStyle, null) +
         textHeight(
           '${buyV2CompactFulfilmentModeLabel(mode)} · '
           '${_compactDeliveryPromise(buyV2BuyerDeliveryPromise(facts))}',
           promiseStyle,
-          1,
+          accessibleText ? null : 1,
         );
   }
 
@@ -7071,19 +7160,24 @@ class _RecentlyViewedCard extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(9, 7, 8, 7),
                     child: Column(
+                      key: ValueKey('buy-recently-viewed-facts-${product.id}'),
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           product.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          maxLines: accessibleText ? null : 2,
+                          overflow: accessibleText
+                              ? TextOverflow.clip
+                              : TextOverflow.ellipsis,
                           style: titleStyle,
                         ),
                         const SizedBox(height: 2),
                         Text(
                           product.pack,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          maxLines: accessibleText ? null : 1,
+                          overflow: accessibleText
+                              ? TextOverflow.clip
+                              : TextOverflow.ellipsis,
                           style: context.buyMeta.copyWith(fontSize: 8),
                         ),
                         const Spacer(),
@@ -7092,8 +7186,10 @@ class _RecentlyViewedCard extends StatelessWidget {
                         Text(
                           '${buyV2CompactFulfilmentModeLabel(fulfilmentMode)} · '
                           '${_compactDeliveryPromise(deliveryPromise)}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          maxLines: accessibleText ? null : 1,
+                          overflow: accessibleText
+                              ? TextOverflow.clip
+                              : TextOverflow.ellipsis,
                           style: promiseStyle,
                         ),
                       ],
