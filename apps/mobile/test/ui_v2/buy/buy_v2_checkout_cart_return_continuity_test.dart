@@ -1,7 +1,8 @@
-import 'dart:ui' show Tristate;
+import 'dart:io';
+import 'dart:ui' show ImageByteFormat, Tristate;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -11,6 +12,7 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
@@ -347,6 +349,53 @@ Future<bool> _submitAndCompleteReviewPayment(BuyV2Session session) async {
   return session.reconcilePayment();
 }
 
+Future<void> _captureR66Checkout(
+  WidgetTester tester,
+  int amount,
+  double width,
+  double scale,
+  String stage,
+) async {
+  if (!const bool.fromEnvironment('BUY_R66_CHECKOUT_CAPTURE')) return;
+  const requestedStage = String.fromEnvironment(
+    'BUY_R66_CHECKOUT_CAPTURE_STAGE',
+  );
+  if (!['address', 'payment', 'confirm', 'action'].contains(requestedStage)) {
+    throw StateError('Choose one exact checkout capture stage');
+  }
+  if (stage != requestedStage) return;
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('r66-checkout-review-capture')),
+  );
+  await tester.runAsync(() async {
+    final directory = Directory('build/r66-checkout-review-v3-20260905');
+    await directory.create(recursive: true);
+    final output = File(
+      '${directory.path}/$stage-INR$amount-width$width-text$scale.png',
+    );
+    if (await output.exists()) {
+      throw StateError('Checkout capture already exists');
+    }
+    final image = await boundary.toImage(pixelRatio: 2);
+    try {
+      final data = await image.toByteData(format: ImageByteFormat.png);
+      if (data == null) throw StateError('Checkout capture encoding failed');
+      await output.writeAsBytes(data.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
+  });
+}
+
+class _R66CheckoutAmountFixture extends BuyV2Session {
+  _R66CheckoutAmountFixture(this.displayAmount, {required super.core});
+
+  final int displayAmount;
+
+  @override
+  int get checkoutAmountDueNow => displayAmount;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -371,7 +420,12 @@ void main() {
           textScaler: TextScaler.linear(textScale),
           disableAnimations: reducedMotion,
         ),
-        child: child!,
+        child: const bool.fromEnvironment('BUY_R66_CHECKOUT_CAPTURE')
+            ? RepaintBoundary(
+                key: const ValueKey('r66-checkout-review-capture'),
+                child: child!,
+              )
+            : child!,
       ),
       home: BuyV2Screen(
         session: session,
@@ -411,6 +465,218 @@ void main() {
     expect(session.continueCheckoutFromPayment(), isTrue);
     expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
   }
+
+  for (final width in [320.0, 360.0, 430.0]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final amount in [1, 10000000]) {
+        testWidgets(
+          'R66 checkout complete action INR$amount at $width text$scale',
+          (tester) async {
+            final size = Size(width, 800);
+            await tester.binding.setSurfaceSize(size);
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final core = BuySession();
+            final session = _R66CheckoutAmountFixture(amount, core: core);
+            addTearDown(session.dispose);
+            addTearDown(core.dispose);
+            expect(session.addProduct('w-notebook'), isTrue);
+            session.openCart(scope: BuyV2CartScope.wholesale);
+            expect(session.openCheckout(), isTrue);
+            expect(session.choosePayment('PhonePe'), isTrue);
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                textScale: scale,
+                safeArea: const EdgeInsets.only(top: 24, bottom: 32),
+                paymentHandoff: (_) async => true,
+              ),
+            );
+            await tester.pumpAndSettle();
+
+            void expectCompleteFooter(String label) {
+              final progress = find.byKey(
+                ValueKey('buy-checkout-progress-${session.checkoutStep.name}'),
+              );
+              final cellHeights = <double>[];
+              for (final stepLabel in ['Address', 'Payment', 'Confirm order']) {
+                final text = find.descendant(
+                  of: progress,
+                  matching: find.text(stepLabel),
+                );
+                final paragraph = tester.renderObject<RenderParagraph>(text);
+                for (final word in stepLabel.split(' ')) {
+                  final wordPainter = TextPainter(
+                    text: TextSpan(text: word, style: paragraph.text.style),
+                    textDirection: paragraph.textDirection,
+                    textScaler: paragraph.textScaler,
+                  )..layout();
+                  expect(
+                    paragraph.size.width + .1,
+                    greaterThanOrEqualTo(wordPainter.width),
+                    reason: 'Unbroken checkout word: $word',
+                  );
+                  wordPainter.dispose();
+                }
+                expect(
+                  paragraph.didExceedMaxLines,
+                  isFalse,
+                  reason: 'Complete checkout step: $stepLabel',
+                );
+                cellHeights.add(
+                  tester
+                      .getSize(
+                        find
+                            .ancestor(
+                              of: text,
+                              matching: find.byType(AnimatedContainer),
+                            )
+                            .first,
+                      )
+                      .height,
+                );
+              }
+              expect(cellHeights.toSet(), hasLength(1));
+              final bar = find.byKey(const ValueKey('buy-checkout-action-bar'));
+              final action = find.byKey(
+                ValueKey('buy-checkout-primary-${session.checkoutStep.name}'),
+              );
+              final actionRect = tester.getRect(action);
+              expect(actionRect.height, greaterThanOrEqualTo(44));
+              expect(actionRect.left, greaterThanOrEqualTo(0));
+              expect(actionRect.right, lessThanOrEqualTo(width));
+              expect(actionRect.bottom, lessThanOrEqualTo(768));
+              expect(
+                find.descendant(of: action, matching: find.text(label)),
+                findsOneWidget,
+              );
+              expect(
+                find.descendant(
+                  of: bar,
+                  matching: find.text(buyV2Money(amount)),
+                ),
+                findsOneWidget,
+              );
+              for (final finder
+                  in find
+                      .descendant(of: bar, matching: find.byType(RichText))
+                      .evaluate()
+                      .map(
+                        (element) => find.byElementPredicate(
+                          (candidate) => identical(candidate, element),
+                        ),
+                      )) {
+                final paragraph = tester.renderObject<RenderParagraph>(finder);
+                expect(
+                  paragraph.didExceedMaxLines,
+                  isFalse,
+                  reason: paragraph.text.toPlainText(),
+                );
+                final natural = TextPainter(
+                  text: paragraph.text,
+                  textDirection: paragraph.textDirection,
+                  textScaler: paragraph.textScaler,
+                )..layout(maxWidth: paragraph.size.width);
+                expect(
+                  paragraph.size.height + .1,
+                  greaterThanOrEqualTo(natural.height),
+                  reason: paragraph.text.toPlainText(),
+                );
+                natural.dispose();
+                final textRect = tester.getRect(finder);
+                expect(textRect.left, greaterThanOrEqualTo(0));
+                expect(textRect.right, lessThanOrEqualTo(width));
+                expect(textRect.bottom, lessThanOrEqualTo(768));
+              }
+              expect(tester.takeException(), isNull);
+            }
+
+            expectCompleteFooter('Continue to payment');
+            await _captureR66Checkout(tester, amount, width, scale, 'address');
+            await tester.tap(
+              find.byKey(const ValueKey('buy-checkout-primary-address')),
+            );
+            await tester.pumpAndSettle();
+            expect(session.checkoutStep, BuyV2CheckoutStep.payment);
+            expectCompleteFooter('Review order');
+            await _captureR66Checkout(tester, amount, width, scale, 'payment');
+            await tester.tap(
+              find.byKey(const ValueKey('buy-checkout-primary-payment')),
+            );
+            await tester.pumpAndSettle();
+            expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+            expectCompleteFooter('Place order');
+            await _captureR66Checkout(tester, amount, width, scale, 'confirm');
+            expect(await session.submitOrder(), isFalse);
+            await tester.pumpAndSettle();
+            expect(
+              session.checkoutSubmissionState,
+              BuyV2CheckoutSubmissionState.paymentActionRequired,
+            );
+            expectCompleteFooter('Pay ${buyV2Money(amount)}');
+            await _captureR66Checkout(tester, amount, width, scale, 'action');
+            expect(session.confirmedOrders, isEmpty);
+            expect(session.quantityFor('w-notebook'), 1);
+          },
+        );
+      }
+    }
+  }
+
+  testWidgets(
+    'R66 checkout hides footer for IME without losing stage or Back',
+    (tester) async {
+      const size = Size(320, 568);
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      expect(session.addProduct('w-notebook'), isTrue);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue);
+      expect(session.choosePayment('PhonePe'), isTrue);
+      for (final step in [
+        BuyV2CheckoutStep.address,
+        BuyV2CheckoutStep.payment,
+      ]) {
+        if (step == BuyV2CheckoutStep.payment) {
+          expect(session.continueCheckoutFromAddress(), isTrue);
+        }
+        for (final keyboard in [true, false]) {
+          await tester.pumpWidget(
+            app(
+              session,
+              size: size,
+              textScale: 2,
+              safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+              viewInsets: EdgeInsets.only(bottom: keyboard ? 260 : 0),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-checkout-action-bar')),
+            keyboard ? findsNothing : findsOneWidget,
+          );
+          expect(session.checkoutStep, step);
+          expect(session.cartScope, BuyV2CartScope.wholesale);
+          expect(session.selectedPayment, 'PhonePe');
+          expect(session.quantityFor('w-notebook'), 1);
+          expect(tester.takeException(), isNull);
+        }
+      }
+      await tester.tap(find.byKey(const ValueKey('buy-checkout-back')));
+      await tester.pumpAndSettle();
+      expect(session.checkoutStep, BuyV2CheckoutStep.address);
+      await tester.tap(find.byKey(const ValueKey('buy-checkout-return-cart')));
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.cart);
+      expect(session.cartScope, BuyV2CartScope.wholesale);
+      expect(session.quantityFor('w-notebook'), 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   Future<BuyV2Session> mountPaymentAction(
     WidgetTester tester,

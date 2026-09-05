@@ -6656,71 +6656,106 @@ class _CheckoutProgressHeader extends StatelessWidget {
       container: true,
       label: '${labels[activeIndex]}, step ${activeIndex + 1} of 3',
       child: ExcludeSemantics(
-        child: Row(
-          children: [
-            for (var index = 0; index < labels.length; index++) ...[
-              Expanded(
-                child: AnimatedContainer(
-                  duration: BuyV2Motion.resolved(
-                    context,
-                    BuyV2Motion.stateChange,
-                  ),
-                  curve: Curves.easeOutCubic,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: index == activeIndex
-                        ? BuyV2Colors.navy
-                        : index < activeIndex
-                        ? BuyV2Colors.softBlue
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(11),
-                    border: Border.all(
-                      color: index <= activeIndex
-                          ? BuyV2Colors.navy
-                          : BuyV2Colors.line,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        index < activeIndex
-                            ? Icons.check_rounded
-                            : switch (index) {
-                                0 => Icons.location_on_outlined,
-                                1 => Icons.account_balance_wallet_outlined,
-                                _ => Icons.verified_outlined,
-                              },
-                        size: 15,
-                        color: index == activeIndex
-                            ? Colors.white
-                            : BuyV2Colors.navy,
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          labels[index],
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: index == activeIndex
-                                ? Colors.white
-                                : BuyV2Colors.navy,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const labelStyle = TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+            );
+            final cellWidth = (constraints.maxWidth - 10) / 3;
+            final contentWidth = cellWidth - 14;
+            final iconsAbove = labels.any(
+              (label) =>
+                  buyV2ValueTextSize(context, label, labelStyle).width + 19 >
+                  contentWidth,
+            );
+            final widestWord = labels
+                .expand((label) => label.split(' '))
+                .map(
+                  (word) => buyV2ValueTextSize(context, word, labelStyle).width,
+                )
+                .fold(0.0, (widest, width) => width > widest ? width : widest);
+            final horizontalPadding = iconsAbove
+                ? ((cellWidth - 2 - widestWord) / 2).floorToDouble().clamp(
+                    2.0,
+                    6.0,
+                  )
+                : 6.0;
+
+            Widget cellContent(int index) {
+              final color = index == activeIndex
+                  ? Colors.white
+                  : BuyV2Colors.navy;
+              final icon = Icon(
+                index < activeIndex
+                    ? Icons.check_rounded
+                    : switch (index) {
+                        0 => Icons.location_on_outlined,
+                        1 => Icons.account_balance_wallet_outlined,
+                        _ => Icons.verified_outlined,
+                      },
+                size: 15,
+                color: color,
+              );
+              final text = Text(
+                labels[index],
+                textAlign: TextAlign.center,
+                style: labelStyle.copyWith(color: color),
+              );
+              return iconsAbove
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [icon, const SizedBox(height: 4), text],
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        icon,
+                        const SizedBox(width: 4),
+                        Flexible(child: text),
+                      ],
+                    );
+            }
+
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var index = 0; index < labels.length; index++) ...[
+                    Expanded(
+                      child: AnimatedContainer(
+                        duration: BuyV2Motion.resolved(
+                          context,
+                          BuyV2Motion.stateChange,
+                        ),
+                        curve: Curves.easeOutCubic,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: index == activeIndex
+                              ? BuyV2Colors.navy
+                              : index < activeIndex
+                              ? BuyV2Colors.softBlue
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(11),
+                          border: Border.all(
+                            color: index <= activeIndex
+                                ? BuyV2Colors.navy
+                                : BuyV2Colors.line,
                           ),
                         ),
+                        child: cellContent(index),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                    if (index != labels.length - 1) const SizedBox(width: 5),
+                  ],
+                ],
               ),
-              if (index != labels.length - 1) const SizedBox(width: 5),
-            ],
-          ],
+            );
+          },
         ),
       ),
     );
@@ -7333,65 +7368,110 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _checkoutDockCountLabel(session),
-                      style: context.buyMeta.copyWith(fontSize: 8),
-                    ),
-                    Text(
-                      buyV2Money(session.checkoutAmountDueNow),
-                      style: const TextStyle(
-                        color: BuyV2Colors.navy,
-                        fontSize: 19,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final countText = _checkoutDockCountLabel(session);
+              final countStyle = context.buyMeta.copyWith(fontSize: 8);
+              final amountText = buyV2Money(session.checkoutAmountDueNow);
+              const amountStyle = TextStyle(
+                color: BuyV2Colors.navy,
+                fontSize: 19,
+                height: 1,
+                fontWeight: FontWeight.w900,
+              );
+              final actionStyle =
+                  (Theme.of(context).textTheme.labelLarge ??
+                          const TextStyle(fontSize: 14))
+                      .merge(
+                        FilledButtonTheme.of(
+                          context,
+                        ).style?.textStyle?.resolve(const <WidgetState>{}),
+                      );
+              final countWidth = buyV2ValueTextSize(
+                context,
+                countText,
+                countStyle,
+              ).width;
+              final amountWidth = buyV2ValueTextSize(
+                context,
+                amountText,
+                amountStyle,
+              ).width;
+              final labelWidth = buyV2ValueTextSize(
+                context,
+                label,
+                actionStyle,
+              ).width;
+              final actionWidth = (labelWidth + 24).clamp(
+                164.0.clamp(0.0, constraints.maxWidth),
+                constraints.maxWidth,
+              );
+              final summaryWidth = amountWidth > countWidth
+                  ? amountWidth
+                  : countWidth;
+              final stacked =
+                  summaryWidth + 10 + actionWidth > constraints.maxWidth;
+              final count = Text(countText, style: countStyle);
+              final amount = Text(amountText, style: amountStyle);
+              final summary =
+                  stacked &&
+                      countWidth + 10 + amountWidth <= constraints.maxWidth
+                  ? Row(
+                      children: [
+                        Expanded(child: count),
+                        const SizedBox(width: 10),
+                        amount,
+                      ],
+                    )
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [count, amount],
+                    );
+              final action = FilledButton(
+                key: ValueKey(
+                  'buy-checkout-primary-${session.checkoutStep.name}',
                 ),
-              ),
-              const SizedBox(width: 10),
-              ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 164, maxWidth: 210),
-                child: SizedBox(
-                  height: BuyV2Metrics.minimumTap,
-                  child: FilledButton(
-                    key: ValueKey(
-                      'buy-checkout-primary-${session.checkoutStep.name}',
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: BuyV2Colors.navy,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: BuyV2Colors.line,
-                      disabledForegroundColor: BuyV2Colors.muted,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    onPressed: onPressed,
-                    child: busy
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2.2,
-                            ),
-                          )
-                        : Text(
-                            label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: BuyV2Colors.navy,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: BuyV2Colors.line,
+                  disabledForegroundColor: BuyV2Colors.muted,
+                  textStyle: actionStyle,
+                  minimumSize: const Size(0, BuyV2Metrics.minimumTap),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-              ),
-            ],
+                onPressed: onPressed,
+                child: busy
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.2,
+                        ),
+                      )
+                    : Text(label, textAlign: TextAlign.center),
+              );
+              return stacked
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [summary, const SizedBox(height: 7), action],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(child: summary),
+                        const SizedBox(width: 10),
+                        SizedBox(width: actionWidth, child: action),
+                      ],
+                    );
+            },
           ),
         ),
       ),
