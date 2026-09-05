@@ -109,7 +109,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   Offset? _miniCartPosition;
   String? _presentedQuickOrderId;
   BuyV2OrderStatus? _presentedQuickOrderStatus;
-  BuyV2Product? _storeBrowseAnchor;
+  final Map<BuyV2Destination, BuyV2Product> _storeBrowseAnchors = {};
+  BuyV2Product? get _storeBrowseAnchor =>
+      _storeBrowseAnchors.isEmpty ? null : _storeBrowseAnchors.values.last;
   BuyV2NavigationMotionDirection _surfaceMotionDirection =
       BuyV2NavigationMotionDirection.replace;
   late BuyV2GstInvoiceController _gstInvoiceController;
@@ -959,11 +961,18 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     if (anchor != null) _openPartnerCatalogue(anchor);
   }
 
+  void _rememberStoreBrowse(BuyV2Product product) {
+    setState(() {
+      _storeBrowseAnchors.remove(product.destination);
+      _storeBrowseAnchors[product.destination] = product;
+    });
+  }
+
   void _openPartnerCatalogue(BuyV2Product product, {bool brandOnly = false}) {
     HapticFeedback.selectionClick();
     FocusScope.of(context).unfocus();
     if (!brandOnly) {
-      setState(() => _storeBrowseAnchor = product);
+      _rememberStoreBrowse(product);
     }
     unawaited(
       showBuyV2PartnerCatalogue(
@@ -972,8 +981,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         product,
         brandOnly: brandOnly,
         onAskStore: _openStoreQuestion,
-        onStoreChanged: (storeProduct) =>
-            setState(() => _storeBrowseAnchor = storeProduct),
+        onStoreChanged: _rememberStoreBrowse,
         onOpenProduct: _openStoreProduct,
         onOpenCart: () => widget.session.openCart(
           scope: switch (product.destination) {
@@ -989,8 +997,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
 
   Future<bool> _openStoreProduct(BuyV2Product product) async {
     final session = widget.session;
-    if (_storeBrowseAnchor?.seller != product.seller) {
-      setState(() => _storeBrowseAnchor = product);
+    if (_storeBrowseAnchor?.seller != product.seller ||
+        _storeBrowseAnchor?.destination != product.destination) {
+      _rememberStoreBrowse(product);
     }
     final previousView = session.view;
     final previousDestination = session.destination;
@@ -1165,6 +1174,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   Widget _currentView(BuyV2Session session) {
+    final cartStoreAnchor = switch (session.cartScope) {
+      BuyV2CartScope.all => _storeBrowseAnchor,
+      BuyV2CartScope.shop => _storeBrowseAnchors[BuyV2Destination.shop],
+      BuyV2CartScope.wholesale =>
+        _storeBrowseAnchors[BuyV2Destination.wholesale],
+      BuyV2CartScope.medicine => _storeBrowseAnchors[BuyV2Destination.medicine],
+    };
     if (_offersActive && session.view == BuyV2View.catalogue) {
       return BuyV2OffersView(session: session, source: widget.offersSource);
     }
@@ -1195,10 +1211,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       ),
       BuyV2View.cart => BuyV2CartView(
         session: session,
-        storeLabel: _storeBrowseAnchor?.seller,
-        onBrowseStore: _storeBrowseAnchor == null
+        storeLabel: cartStoreAnchor?.seller,
+        onBrowseStore: cartStoreAnchor == null
             ? null
-            : () => _openPartnerCatalogue(_storeBrowseAnchor!),
+            : () => _openPartnerCatalogue(cartStoreAnchor),
         onBrowseMore: () {
           if (_offersActive) {
             _openOffers();

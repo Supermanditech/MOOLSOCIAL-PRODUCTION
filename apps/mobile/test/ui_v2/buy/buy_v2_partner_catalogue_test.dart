@@ -9,6 +9,106 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final firstId in ['s-eggs', 'w-notebook']) {
+    testWidgets('R66 Cart store continuation stays scoped after $firstId', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      session.addProduct('s-eggs');
+      session.addProduct('w-notebook');
+      final first = session.product(firstId);
+      final other = session.product(
+        firstId == 's-eggs' ? 'w-notebook' : 's-eggs',
+      );
+      expect(session.openProduct(first.id), isTrue);
+      await tester.pumpWidget(_app(session));
+      await tester.pumpAndSettle();
+
+      Future<void> visitAndClose(BuyV2Product product) async {
+        final prefix = product.destination == BuyV2Destination.shop
+            ? 'buy-shop-seller'
+            : 'buy-wholesale-supplier';
+        final action = find.byKey(
+          ValueKey(
+            '${product.destination == BuyV2Destination.shop ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-${product.id}',
+          ),
+        );
+        await _revealProductAction(tester, product.id, action);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(ValueKey('$prefix-sheet-${product.id}')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(ValueKey('$prefix-sheet-close')));
+        await tester.pumpAndSettle();
+      }
+
+      await visitAndClose(first);
+      session.openCart();
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(ValueKey('buy-cart-scope-${other.destination.name}')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-cart-continue-store')),
+        findsNothing,
+        reason: 'An unvisited scope must not offer the other scope store',
+      );
+
+      expect(session.openProduct(other.id), isTrue);
+      await tester.pumpAndSettle();
+      await visitAndClose(other);
+      session.openCart();
+      await tester.pumpAndSettle();
+      for (final product in [first, other]) {
+        await tester.tap(
+          find.byKey(ValueKey('buy-cart-scope-${product.destination.name}')),
+        );
+        await tester.pumpAndSettle();
+        final action = find.byKey(const ValueKey('buy-cart-continue-store'));
+        expect(action, findsOneWidget);
+        expect(
+          find.descendant(of: action, matching: find.text(product.seller)),
+          findsOneWidget,
+        );
+        await tester.ensureVisible(action);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        final prefix = product.destination == BuyV2Destination.shop
+            ? 'buy-shop-seller'
+            : 'buy-wholesale-supplier';
+        expect(
+          find.byKey(ValueKey('$prefix-sheet-${product.id}')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(ValueKey('$prefix-sheet-close')));
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+      }
+      await tester.tap(find.byKey(const ValueKey('buy-cart-scope-all')));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-cart-continue-store')),
+          matching: find.text(other.seller),
+        ),
+        findsOneWidget,
+        reason: 'All-scope Cart retains the most recently visited store',
+      );
+      expect(session.quantityFor('s-eggs'), 1);
+      expect(session.quantityFor('w-notebook'), 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   test('store and brand catalogues remain exact and destination-scoped', () {
     final core = BuySession();
     final session = BuyV2Session(core: core);
