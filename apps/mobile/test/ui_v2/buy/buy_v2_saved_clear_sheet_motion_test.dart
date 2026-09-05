@@ -1,4 +1,8 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -7,14 +11,38 @@ import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_saved_clear_sheet_motion.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
+Directory _reviewCaptureDirectory(String value) {
+  final root = Directory('build').absolute.uri.normalizePath().toFilePath();
+  final path = Directory(value).absolute.uri.normalizePath().toFilePath();
+  final prefix = Platform.isWindows ? root.toLowerCase() : root;
+  final candidate = Platform.isWindows ? path.toLowerCase() : path;
+  if (!candidate.startsWith(prefix) || candidate == prefix) {
+    throw StateError(
+      'Review captures must stay below the package build folder',
+    );
+  }
+  return Directory(path);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('R66 review captures reject paths outside package build outputs', () {
+    expect(() => _reviewCaptureDirectory('../outside'), throwsStateError);
+    expect(() => _reviewCaptureDirectory('build/../outside'), throwsStateError);
+    expect(
+      () => _reviewCaptureDirectory('build-sibling/out'),
+      throwsStateError,
+    );
+    expect(_reviewCaptureDirectory('build/saved-review'), isA<Directory>());
+  });
 
   Widget app(
     BuyV2Session session, {
     bool disableAnimations = false,
     double textScale = 1,
     EdgeInsets viewInsets = EdgeInsets.zero,
+    EdgeInsets viewPadding = EdgeInsets.zero,
   }) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -26,8 +54,13 @@ void main() {
             disableAnimations: disableAnimations,
             textScaler: TextScaler.linear(textScale),
             viewInsets: viewInsets,
+            viewPadding: viewPadding,
+            padding: viewPadding,
           ),
-          child: child!,
+          child: RepaintBoundary(
+            key: const ValueKey('buy-saved-review-capture'),
+            child: child!,
+          ),
         );
       },
       home: BuyV2Screen(
@@ -51,6 +84,7 @@ void main() {
     bool disableAnimations = false,
     double textScale = 1,
     EdgeInsets viewInsets = EdgeInsets.zero,
+    EdgeInsets viewPadding = EdgeInsets.zero,
     bool settleSheet = true,
   }) async {
     await tester.pumpWidget(
@@ -59,6 +93,7 @@ void main() {
         disableAnimations: disableAnimations,
         textScale: textScale,
         viewInsets: viewInsets,
+        viewPadding: viewPadding,
       ),
     );
     await tester.pumpAndSettle();
@@ -210,6 +245,97 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final scenario in <(Size, double, double, bool)>[
+    (const Size(360, 800), 1, 48, false),
+    (const Size(320, 700), 1.4, 48, false),
+    (const Size(320, 568), 2, 48, true),
+    (const Size(430, 932), 2, 34, false),
+  ]) {
+    testWidgets('R66 Saved confirmation actions fit system insets '
+        '${scenario.$1.width}x${scenario.$1.height} text ${scenario.$2}', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(scenario.$1);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final reportError = FlutterError.onError!;
+      FlutterError.onError = (details) {
+        debugPrint(details.toString());
+        reportError(details);
+      };
+      addTearDown(() => FlutterError.onError = reportError);
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      final shop = productFor(BuyV2Destination.shop);
+      final wholesale = productFor(BuyV2Destination.wholesale);
+      session.toggleSaved(shop.id);
+      session.toggleSaved(wholesale.id);
+      session.addProduct(shop.id);
+
+      Future<void> open() => openSavedClearSheet(
+        tester,
+        session,
+        textScale: scenario.$2,
+        disableAnimations: scenario.$4,
+        viewPadding: EdgeInsets.only(top: 24, bottom: scenario.$3),
+      );
+      await open();
+      final keep = find.byKey(const ValueKey('buy-saved-keep'));
+      final clear = find.byKey(const ValueKey('buy-saved-confirm-clear'));
+      final usableBottom = scenario.$1.height - scenario.$3;
+      for (final action in [keep, clear]) {
+        final bounds = tester.getRect(action);
+        expect(bounds.bottom, lessThanOrEqualTo(usableBottom));
+        expect(bounds.top, greaterThanOrEqualTo(24));
+        expect(bounds.width, greaterThanOrEqualTo(44));
+        expect(bounds.height, greaterThanOrEqualTo(44));
+        expect(action.hitTestable(), findsOneWidget);
+        final label = find.descendant(of: action, matching: find.byType(Text));
+        expect(tester.getRect(label).height, lessThanOrEqualTo(bounds.height));
+      }
+      expect(tester.takeException(), isNull);
+
+      const captureDirectory = String.fromEnvironment(
+        'BUY_R66_SAVED_CAPTURE_DIRECTORY',
+      );
+      if (captureDirectory.isNotEmpty) {
+        final directory = _reviewCaptureDirectory(captureDirectory);
+        await tester.runAsync(() async {
+          final boundary = tester.renderObject<RenderRepaintBoundary>(
+            find.byKey(const ValueKey('buy-saved-review-capture')),
+          );
+          final image = await boundary.toImage(pixelRatio: 2);
+          try {
+            final data = await image.toByteData(format: ui.ImageByteFormat.png);
+            await directory.create(recursive: true);
+            final file = File(
+              '${directory.path}/saved-${scenario.$1.width.toInt()}x'
+              '${scenario.$1.height.toInt()}-text${scenario.$2}.png',
+            );
+            if (await file.exists()) {
+              throw StateError('Review capture already exists: ${file.path}');
+            }
+            await file.writeAsBytes(data!.buffer.asUint8List());
+          } finally {
+            image.dispose();
+          }
+        });
+      }
+
+      await tester.tap(keep);
+      await tester.pumpAndSettle();
+      expect(session.isSaved(shop.id), isTrue);
+      expect(session.isSaved(wholesale.id), isTrue);
+      await tester.tap(find.byKey(const ValueKey('buy-saved-clear')));
+      await tester.pumpAndSettle();
+      await tester.tap(clear);
+      await tester.pumpAndSettle();
+      expect(session.isSaved(shop.id), isFalse);
+      expect(session.isSaved(wholesale.id), isTrue);
+      expect(session.quantityFor(shop.id), shop.minimumOrder);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets(
     'R56.1 Saved-clear responsive evidence captures',

@@ -5832,6 +5832,37 @@ class _SavedDecisionShelf extends StatelessWidget {
               product.requiresPrescription &&
               !session.isPrescriptionApproved(product.id),
         );
+    final expandedHeader = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+    final clearAction = TextButton(
+      key: const ValueKey('buy-saved-clear'),
+      onPressed: () => _confirmClearSaved(
+        context,
+        session,
+        destination,
+        savedTitle,
+        productLabel,
+        products.length,
+      ),
+      style: TextButton.styleFrom(
+        foregroundColor: BuyV2Colors.muted,
+        padding: const EdgeInsets.symmetric(horizontal: 5),
+        visualDensity: VisualDensity.compact,
+        textStyle: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800),
+      ),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Changed your mind?'),
+          Text(
+            'Clear list',
+            style: TextStyle(
+              color: BuyV2Colors.navy,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
 
     return Semantics(
       key: const ValueKey('buy-saved-decision-shelf'),
@@ -5886,41 +5917,11 @@ class _SavedDecisionShelf extends StatelessWidget {
                     ],
                   ),
                 ),
-                TextButton(
-                  key: const ValueKey('buy-saved-clear'),
-                  onPressed: () => _confirmClearSaved(
-                    context,
-                    session,
-                    destination,
-                    savedTitle,
-                    productLabel,
-                    products.length,
-                  ),
-                  style: TextButton.styleFrom(
-                    foregroundColor: BuyV2Colors.muted,
-                    padding: const EdgeInsets.symmetric(horizontal: 5),
-                    visualDensity: VisualDensity.compact,
-                    textStyle: const TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  child: const Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Changed your mind?'),
-                      Text(
-                        'Clear list',
-                        style: TextStyle(
-                          color: BuyV2Colors.navy,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                if (!expandedHeader) clearAction,
               ],
             ),
+            if (expandedHeader)
+              Align(alignment: Alignment.centerRight, child: clearAction),
             if (hasPrescriptionGate) ...[
               const SizedBox(height: 4),
               Text(
@@ -6018,84 +6019,115 @@ class _SavedClearDecisionSheet extends StatelessWidget {
       namesRoute: true,
       explicitChildNodes: true,
       label: 'Clear $savedTitle',
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          0,
-          16,
-          16 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: BuyV2ThemeScope.of(context).softAccent,
-                    borderRadius: BorderRadius.circular(12),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            16 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: BuyV2ThemeScope.of(context).softAccent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.bookmark_remove_outlined,
+                      color: BuyV2Colors.navy,
+                      size: 21,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.bookmark_remove_outlined,
-                    color: BuyV2Colors.navy,
-                    size: 21,
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Clear $savedTitle?',
+                          style: context.buyTitle.copyWith(fontSize: 16),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Remove $productCount saved $productLabel from '
+                          '$destinationNoun. Items already in Cart stay there.',
+                          style: context.buyMeta.copyWith(fontSize: 10),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Clear $savedTitle?',
-                        style: context.buyTitle.copyWith(fontSize: 16),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Remove $productCount saved $productLabel from '
-                        '$destinationNoun. Items already in Cart stay there.',
-                        style: context.buyMeta.copyWith(fontSize: 10),
-                      ),
-                    ],
+                  IconButton(
+                    key: const ValueKey('buy-saved-clear-close'),
+                    tooltip: 'Keep saved',
+                    onPressed: onKeep,
+                    icon: const Icon(Icons.close_rounded),
                   ),
-                ),
-                IconButton(
-                  key: const ValueKey('buy-saved-clear-close'),
-                  tooltip: 'Keep saved',
-                  onPressed: onKeep,
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
+                ],
+              ),
+              const SizedBox(height: 14),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final keep = OutlinedButton(
                     key: const ValueKey('buy-saved-keep'),
                     onPressed: onKeep,
-                    child: const Text('Keep saved'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                    child: const Text(
+                      'Keep saved',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                  final clear = FilledButton(
                     key: const ValueKey('buy-saved-confirm-clear'),
                     onPressed: onClear,
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFB3261E),
                       foregroundColor: Colors.white,
+                      minimumSize: const Size(0, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
-                    child: const Text('Clear list'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+                    child: const Text(
+                      'Clear list',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                  final stackActions =
+                      constraints.maxWidth < 280 ||
+                      MediaQuery.textScalerOf(context).scale(15) > 20;
+                  return stackActions
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [keep, const SizedBox(height: 10), clear],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(child: keep),
+                            const SizedBox(width: 10),
+                            Expanded(child: clear),
+                          ],
+                        );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
