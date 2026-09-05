@@ -1,4 +1,8 @@
+import 'dart:io';
+import 'dart:ui' show ImageByteFormat;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -14,6 +18,13 @@ void main() {
   Widget app(BuyV2Session session) => MaterialApp(
     debugShowCheckedModeBanner: false,
     theme: MoolTheme.light(),
+    builder: (context, child) =>
+        const bool.fromEnvironment('BUY_R66_RECENT_CAPTURE')
+        ? RepaintBoundary(
+            key: const ValueKey('r66-recent-review-capture'),
+            child: child!,
+          )
+        : child!,
     home: BuyV2Screen(
       session: session,
       initialDestination: session.destination,
@@ -21,6 +32,94 @@ void main() {
       productId: session.selectedProductId,
     ),
   );
+
+  for (final productId in ['s-tomato', 'w-notebook']) {
+    for (final width in [320.0, 430.0]) {
+      testWidgets(
+        'R66 Recently Viewed fits $productId at $width and 200 percent',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(width, 844);
+          tester.platformDispatcher.textScaleFactorTestValue = 2;
+          addTearDown(tester.view.reset);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          final product = session.product(productId);
+          session.openDestination(product.destination);
+          expect(session.openProduct(productId), isTrue);
+          session.closeProduct();
+          await tester.pumpWidget(app(session));
+          await tester.pumpAndSettle();
+          final rail = find.byKey(const ValueKey('buy-recently-viewed'));
+          await tester.scrollUntilVisible(
+            rail,
+            220,
+            scrollable: find
+                .descendant(
+                  of: find.byType(BuyV2CatalogueView),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          final card = find.byKey(
+            ValueKey('buy-recently-viewed-product-$productId'),
+          );
+          final labels = find.descendant(of: card, matching: find.byType(Text));
+          for (final element in labels.evaluate()) {
+            final paragraph = element.renderObject! as RenderParagraph;
+            final natural = TextPainter(
+              text: paragraph.text,
+              textDirection: paragraph.textDirection,
+              textScaler: paragraph.textScaler,
+              maxLines: paragraph.maxLines,
+            )..layout(maxWidth: paragraph.size.width);
+            expect(paragraph.size.height, greaterThanOrEqualTo(natural.height));
+            natural.dispose();
+            expect(
+              tester.getRect(find.byWidget(element.widget)).bottom,
+              lessThanOrEqualTo(tester.getRect(card).bottom),
+            );
+          }
+          expect(tester.getSize(card).height, greaterThanOrEqualTo(44));
+          expect(tester.takeException(), isNull);
+          if (const bool.fromEnvironment('BUY_R66_RECENT_CAPTURE')) {
+            final boundary = tester.renderObject<RenderRepaintBoundary>(
+              find.byKey(const ValueKey('r66-recent-review-capture')),
+            );
+            await tester.runAsync(() async {
+              final directory = Directory(
+                'build/r66-recent-review-v1-20260905',
+              );
+              await directory.create(recursive: true);
+              final output = File(
+                '${directory.path}/$productId-$width-text2.png',
+              );
+              if (await output.exists()) {
+                throw StateError('Capture already exists');
+              }
+              final image = await boundary.toImage(pixelRatio: 2);
+              try {
+                final bytes = await image.toByteData(
+                  format: ImageByteFormat.png,
+                );
+                if (bytes == null) throw StateError('Capture encoding failed');
+                await output.writeAsBytes(bytes.buffer.asUint8List());
+              } finally {
+                image.dispose();
+              }
+            });
+          }
+          await tester.tap(card);
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, productId);
+        },
+      );
+    }
+  }
 
   test(
     'recently viewed keeps exact products, restores and stays bounded',

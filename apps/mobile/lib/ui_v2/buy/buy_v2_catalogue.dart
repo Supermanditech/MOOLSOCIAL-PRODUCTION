@@ -714,39 +714,22 @@ class _OfferPublisherChip extends StatelessWidget {
   }
 }
 
-class BuyV2CatalogueView extends StatefulWidget {
+class BuyV2CatalogueView extends StatelessWidget {
   const BuyV2CatalogueView({super.key, required this.session});
 
   final BuyV2Session session;
 
   @override
-  State<BuyV2CatalogueView> createState() => _BuyV2CatalogueViewState();
-}
-
-class _BuyV2CatalogueViewState extends State<BuyV2CatalogueView> {
-  bool _savedOnly = false;
-  late BuyV2Destination _lastDestination = widget.session.destination;
-
-  @override
   Widget build(BuildContext context) {
-    final session = widget.session;
-    if (_lastDestination != session.destination) {
-      _lastDestination = session.destination;
-      _savedOnly = false;
-    }
+    final savedOnly = session.showingSavedProducts;
     return Column(
       children: [
         if (session.canReturnToAccount)
           _CatalogueAccountReturn(session: session),
         _CatalogueToolbar(
           session: session,
-          savedOnly: _savedOnly,
-          onSaved: () {
-            if (!_savedOnly) {
-              session.chooseCategory('all');
-            }
-            setState(() => _savedOnly = !_savedOnly);
-          },
+          savedOnly: savedOnly,
+          onSaved: () => session.showSavedProducts(!savedOnly),
         ),
         Expanded(
           child: _CatalogueMotionOwner(
@@ -757,8 +740,8 @@ class _BuyV2CatalogueViewState extends State<BuyV2CatalogueView> {
             destination: session.destination,
             child: _ProductGrid(
               session: session,
-              savedOnly: _savedOnly,
-              onShowAll: () => setState(() => _savedOnly = false),
+              savedOnly: savedOnly,
+              onShowAll: () => session.showSavedProducts(false),
             ),
           ),
         ),
@@ -6776,68 +6759,79 @@ class _RecentlyViewedRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    final cardHeight = products.fold(accessibleText ? 122.0 : 102.0, (
+      height,
+      product,
+    ) {
+      final needed = _RecentlyViewedCard.minimumHeight(
+        context,
+        session,
+        product,
+        accessibleText,
+      );
+      return height > needed ? height : needed;
+    });
+    return Column(
       key: const ValueKey('buy-recently-viewed'),
-      height: accessibleText ? 178 : 158,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(9, 2, 4, 2),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Recently viewed',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.buyTitle.copyWith(fontSize: 14),
-                      ),
-                      Text(
-                        'Continue with the exact pack you viewed',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.buyMeta.copyWith(fontSize: 8),
-                      ),
-                    ],
-                  ),
-                ),
-                TextButton(
-                  key: const ValueKey('buy-recently-viewed-clear'),
-                  onPressed: () =>
-                      session.clearRecentlyViewed(session.destination),
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(44, 44),
-                    foregroundColor: BuyV2Colors.navy,
-                    textStyle: const TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(9, 2, 4, 2),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Recently viewed',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyTitle.copyWith(fontSize: 14),
                     ),
-                  ),
-                  child: const Text('Clear'),
+                    Text(
+                      'Continue with the exact pack you viewed',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.buyMeta.copyWith(fontSize: 8),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.separated(
-              key: const ValueKey('buy-recently-viewed-list'),
-              padding: const EdgeInsets.fromLTRB(7, 0, 12, 8),
-              scrollDirection: Axis.horizontal,
-              itemCount: products.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) => _RecentlyViewedCard(
-                session: session,
-                product: products[index],
-                accessibleText: accessibleText,
               ),
+              TextButton(
+                key: const ValueKey('buy-recently-viewed-clear'),
+                onPressed: () =>
+                    session.clearRecentlyViewed(session.destination),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  foregroundColor: BuyV2Colors.navy,
+                  textStyle: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                child: const Text('Clear'),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: cardHeight + 8,
+          child: ListView.separated(
+            key: const ValueKey('buy-recently-viewed-list'),
+            padding: const EdgeInsets.fromLTRB(7, 0, 12, 8),
+            scrollDirection: Axis.horizontal,
+            itemCount: products.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, index) => _RecentlyViewedCard(
+              session: session,
+              product: products[index],
+              accessibleText: accessibleText,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -6852,6 +6846,53 @@ class _RecentlyViewedCard extends StatelessWidget {
   final BuyV2Session session;
   final BuyV2Product product;
   final bool accessibleText;
+
+  static const titleStyle = TextStyle(
+    color: BuyV2Colors.ink,
+    fontSize: 10,
+    height: 1.05,
+    fontWeight: FontWeight.w900,
+  );
+  static const priceStyle = TextStyle(
+    color: BuyV2Colors.navy,
+    fontSize: 13,
+    fontWeight: FontWeight.w900,
+  );
+  static const promiseStyle = TextStyle(
+    color: BuyV2Colors.green,
+    fontSize: 7,
+    fontWeight: FontWeight.w800,
+  );
+
+  static double minimumHeight(
+    BuildContext context,
+    BuyV2Session session,
+    BuyV2Product product,
+    bool accessibleText,
+  ) {
+    final facts = session.productFactsFor(product);
+    final mode =
+        facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
+    final width = (accessibleText ? 224.0 : 206.0) - 78 - 17;
+    double textHeight(String text, TextStyle style, int? maxLines) =>
+        buyV2ValueTextSize(
+          context,
+          text,
+          style,
+          maxWidth: width,
+          maxLines: maxLines,
+        ).height;
+    return 17 +
+        textHeight(product.title, titleStyle, 2) +
+        textHeight(product.pack, context.buyMeta.copyWith(fontSize: 8), 1) +
+        textHeight(buyV2Money(facts.price), priceStyle, null) +
+        textHeight(
+          '${buyV2CompactFulfilmentModeLabel(mode)} · '
+          '${_compactDeliveryPromise(buyV2BuyerDeliveryPromise(facts))}',
+          promiseStyle,
+          1,
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -6912,12 +6953,7 @@ class _RecentlyViewedCard extends StatelessWidget {
                           product.title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: BuyV2Colors.ink,
-                            fontSize: 10,
-                            height: 1.05,
-                            fontWeight: FontWeight.w900,
-                          ),
+                          style: titleStyle,
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -6927,25 +6963,14 @@ class _RecentlyViewedCard extends StatelessWidget {
                           style: context.buyMeta.copyWith(fontSize: 8),
                         ),
                         const Spacer(),
-                        Text(
-                          buyV2Money(facts.price),
-                          style: const TextStyle(
-                            color: BuyV2Colors.navy,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
+                        Text(buyV2Money(facts.price), style: priceStyle),
                         const SizedBox(height: 1),
                         Text(
                           '${buyV2CompactFulfilmentModeLabel(fulfilmentMode)} · '
                           '${_compactDeliveryPromise(deliveryPromise)}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: BuyV2Colors.green,
-                            fontSize: 7,
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: promiseStyle,
                         ),
                       ],
                     ),

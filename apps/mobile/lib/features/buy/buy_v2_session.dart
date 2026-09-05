@@ -507,6 +507,8 @@ class BuyV2Session extends ChangeNotifier {
   String shopCategoryId = 'all';
   String wholesaleCategoryId = 'all';
   String medicineCategoryId = 'all';
+  BuyV2Destination? _savedCatalogueDestination;
+  bool get showingSavedProducts => _savedCatalogueDestination == destination;
   String query = '';
   String? selectedProductId;
   String? _pendingStoreReturnAnchorId;
@@ -3976,6 +3978,7 @@ class BuyV2Session extends ChangeNotifier {
     final previous = _navigationSurfaceIdentity;
     _clearRecoveryOriginIfActive();
     _accountChildReturnActive = false;
+    _savedCatalogueDestination = null;
     destination = value;
     view = value == BuyV2Destination.orders
         ? BuyV2View.catalogue
@@ -5012,6 +5015,16 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     } finally {
       _productFeedbackBusyIds.remove(productId);
+      notifyListeners();
+    }
+  }
+
+  void showSavedProducts(bool value) {
+    if (showingSavedProducts == value) return;
+    _savedCatalogueDestination = value ? destination : null;
+    if (value) {
+      chooseCategory('all');
+    } else {
       notifyListeners();
     }
   }

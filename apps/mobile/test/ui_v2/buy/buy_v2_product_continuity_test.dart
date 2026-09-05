@@ -56,6 +56,124 @@ void main() {
     await tester.pump();
   }
 
+  for (final productId in ['s-tomato', 'w-notebook']) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R66 Saved return preserves $productId at text $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        session.toggleSaved(productId);
+        session.addProduct(productId);
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        final product = session.product(productId);
+        session.openDestination(product.destination);
+        await tester.pumpAndSettle();
+        final savedToggle = find.byKey(
+          const ValueKey('buy-saved-products-button'),
+        );
+        await tester.tap(savedToggle);
+        await tester.pumpAndSettle();
+        final savedHeading = product.destination == BuyV2Destination.wholesale
+            ? 'Saved for Wholesale'
+            : 'Saved in Shop';
+        expect(find.text(savedHeading), findsOneWidget);
+
+        for (final throughCart in [false, true]) {
+          final tile = find.byKey(ValueKey('buy-product-$productId'));
+          await tester.ensureVisible(tile);
+          await tester.tap(tile);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.product);
+          if (throughCart) {
+            await tester.tap(
+              find.byKey(const ValueKey('buy-compact-cart-indicator')),
+            );
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.cart);
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.product);
+          }
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.catalogue);
+          expect(session.destination, product.destination);
+          expect(find.text(savedHeading), findsOneWidget);
+          expect(session.isSaved(productId), isTrue);
+        }
+        await tester.tap(savedToggle);
+        await tester.pumpAndSettle();
+        expect(find.text(savedHeading), findsNothing);
+        await tester.tap(savedToggle);
+        await tester.pumpAndSettle();
+        expect(find.text(savedHeading), findsOneWidget);
+        session.openDestination(
+          product.destination == BuyV2Destination.shop
+              ? BuyV2Destination.wholesale
+              : BuyV2Destination.shop,
+        );
+        await tester.pumpAndSettle();
+        session.openDestination(product.destination);
+        await tester.pumpAndSettle();
+        expect(find.text(savedHeading), findsNothing);
+        expect(session.isSaved(productId), isTrue);
+        expect(session.quantityFor(productId), 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('R66 Saved return retains the horizontal browsing position', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    final products = session.visibleProducts.take(6).toList();
+    expect(products.length, greaterThanOrEqualTo(4));
+    for (final product in products) {
+      session.toggleSaved(product.id);
+    }
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-saved-products-button')));
+    await tester.pumpAndSettle();
+    final lane = find
+        .byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              widget.axisDirection == AxisDirection.right,
+        )
+        .last;
+    final tile = find.byKey(ValueKey('buy-product-${products[2].id}'));
+    await tester.scrollUntilVisible(tile, 200, scrollable: lane);
+    await tester.pumpAndSettle();
+    final before = tester.state<ScrollableState>(lane).position.pixels;
+    expect(before, greaterThan(0));
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(session.selectedProductId, products[2].id);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Saved in Shop'), findsOneWidget);
+    expect(
+      tester.state<ScrollableState>(lane).position.pixels,
+      closeTo(before, 1),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('detail media zoom is explicit, bounded and resettable', (
     tester,
   ) async {
