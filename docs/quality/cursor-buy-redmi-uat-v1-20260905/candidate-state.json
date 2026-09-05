@@ -1,15 +1,67 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "preparation_pending_gates",
-  "buildAuthorization": "not_yet_bound",
+  "machineState": "installed_redmi_uat_in_progress",
+  "buildAuthorization": "consumed_successfully",
   "candidate": {
     "id": "UAW-CURSOR-BUY-R66-1-REDMI-REVIEW-20260905",
-    "buildName": "1.0.0-r66.1",
-    "buildNumber": "2026090501",
+    "versionName": "1.0.0-r66.1",
+    "versionCode": "2026090501",
     "buildMode": "debug",
-    "gateProfile": "uaw_cursor_ui_review_debug"
+    "gateProfile": "uaw_cursor_ui_review_debug",
+    "branch": "work/cursor-ui/buy-redmi-uat-v1-20260905",
+    "head": "49d6d413d40708c913805b8201ed2bcae1c968a1"
   },
   "promotion": {"state": "forbidden_non_promotable"},
-  "postBuildDeviceState": "not_started"
+  "source": {
+    "manifestPath": "docs/quality/cursor-buy-redmi-uat-v1-20260905/source-manifest.sha256",
+    "manifestSha256": "02D3AF0C8BBADCE80725E24695E4BA5F921383BE62B6787046043C6D95408044",
+    "fileCount": 710,
+    "implementationHead": "e2dd3bc706065fbc08d9c526c48e24374cd32e6e"
+  },
+  "preBuildValidation": {"state": "passed", "evidence": "docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md"},
+  "premiumMotionPolicy": {
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "candidateContract": "docs/quality/UAW-CURSOR-BUY-REDMI-UAT-V1-20260905.md",
+    "disposition": "docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md",
+    "state": "existing_motion_preserved_layout_only",
+    "applied": [],
+    "reused": ["finite Buy card/action transitions", "reduced-motion static state", "existing semantics and action hit ownership"],
+    "dependencyHeld": ["authoritative payment/delivery/network state"],
+    "inapplicable": ["new decorative loops or motion redesign"]
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-CURSOR-BUY-R66-1-REDMI-REVIEW-20260905"
+  },
+  "preBuildGates": [
+    {"id": "branch-head", "state": "passed", "evidence": ["docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md"]},
+    {"id": "source-manifest", "state": "passed", "evidence": ["docs/quality/cursor-buy-redmi-uat-v1-20260905/source-manifest.sha256"]},
+    {"id": "format-analysis", "state": "passed", "evidence": ["docs/quality/cursor-buy-card-overflow-v1-20260905/RESULTS.md"]},
+    {"id": "focused-tests", "state": "passed", "evidence": ["docs/quality/cursor-buy-card-overflow-v1-20260905/RESULTS.md"]},
+    {"id": "positive-release-gates", "state": "passed", "evidence": ["docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md"]},
+    {"id": "protected-boundary-disposition", "state": "passed", "evidence": ["docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md"]},
+    {"id": "rejected-candidate-preserved", "state": "passed", "evidence": ["docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md"]},
+    {"id": "startup-config-regression-registered", "state": "passed", "evidence": ["config/codex-development-regression-registry.json", "docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md"]},
+    {"id": "buy-regression-1", "state": "passed", "evidence": ["docs/quality/cursor-buy-card-overflow-v1-20260905/RESULTS.md"]},
+    {"id": "buy-regression-2", "state": "passed", "evidence": ["docs/quality/cursor-buy-card-overflow-v1-20260905/RESULTS.md"]},
+    {"id": "clean-state-regression", "state": "passed", "evidence": ["docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md"]},
+    {"id": "wrapper-self-test", "state": "passed", "evidence": ["docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md"]},
+    {"id": "package-isolation", "state": "passed", "evidence": ["docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md"]}
+  ],
+  "postBuildGates": [
+    {"id": "apk-plugin-package", "state": "passed"},
+    {"id": "apk-checksum", "state": "passed", "sha256": "30A71FE8B6696BF51400FBED5A90C3179E25CE0A6153A998F5A041657C9D35C3", "bytes": 209417681},
+    {"id": "installed-checksum", "state": "passed", "sha256": "30A71FE8B6696BF51400FBED5A90C3179E25CE0A6153A998F5A041657C9D35C3"},
+    {"id": "redmi-first-frame", "state": "passed", "evidence": "redmi-r66-1/001-launch-buy.json", "qualification": "review app launch only; not performance or full UAT acceptance"},
+    {"id": "redmi-catalogue-regression", "state": "pending"},
+    {"id": "redmi-operational-uat", "state": "pending"},
+    {"id": "founder-review", "state": "pending"}
+  ],
+  "postBuildDeviceState": "installed_uat_in_progress",
+  "deviceInstallAuthorization": {"state": "consumed_successfully", "serial": "TG8HCYTGGQT885OF", "package": "com.moolsocial.app.cursorreview", "clearData": false, "downgrade": false},
+  "preservedApk": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/r66-1-cursorreview.apk"
 }
