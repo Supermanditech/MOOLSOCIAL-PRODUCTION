@@ -159,6 +159,14 @@ P2 purchase-decision/context clarity. Preview advertises 12 products/21 packs/Sa
 
 P2 return continuity. Shopping settings → Shopping alerts → Delivery update opens retained Wholesale order PO-NEW-01 (245–246). Android Back returns to Orders with the previously selected Delivered filter, not to the alerts list/settings entry (247). Expected: restore the actual origin and its selection/scroll so customers can inspect the next alert without rebuilding the path. Preserve the correct order target and existing direct Orders flow. Link Saved/store return corrections where a shared Buy return-context owner can be reused; do not copy shared Chat navigation.
 
+### R66-UAT-034 — Compare alternate-product Back loses Offers and comparison origin
+
+P1 navigation context. Offers → manufacturer oil → Compare (267) → View alternate 10 L pack (268) opens the correct ₹1,580 product with an Offers return label. Android Back (269) returns to Quick Shop, neither the comparison/source product nor Offers. Expected: preserve the actual product/collection origin and truthful return label using the existing Buy context owner; no duplicate comparison route. No manufacturer product was added or order submitted. Link 007/017/023/033 for connected navigation regression coverage, while preserving separately traceable reproductions.
+
+### R66-UAT-035 — Shopping delivery preference behaves as a temporary catalogue filter
+
+P2 settings truth/persistence. Shopping settings changes No preference → Quick local delivery (243–244). After review-process force-stop/cold launch (250–253), reopening settings shows No preference (255). The Quick top tab alone did not prove preference persistence; that earlier inference is explicitly withdrawn. Source `_showBuyV2DeliveryPreference` calls `chooseFulfilmentMode` on the catalogue's session filter. Expected: either persist an actual customer preference through the existing customer-state contract, or label it honestly as a current browsing filter; do not invent a second preference store or fake backend persistence. Exact minimal correction and customer-state dependency remain to be assessed.
+
 ## Additional evidence and ownership boundaries
 
 - E02 evidence-helper correction: capture 061 is Android DocumentsUI opened by this review invoice download, not the review app itself. Its original JSON incorrectly names the originating package because the helper read an older `mResumedActivity` rather than `topResumedActivity`. Preserve 061 unchanged with this correction. Helper now requires exactly one top-resumed activity, validates it again after hierarchy capture, records the actual package, and permits DocumentsUI only with explicit `-AllowInvoicePicker`. Fresh 062 verifies that system save step; no WhatsApp or unrelated file was opened. Existing captures 001–060 show the review flow; 061 is not an app-screen proof.
