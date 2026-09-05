@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4462,
-    "sha256": "E3D5ED52D6F469F8BD9AFD40F3A3FD61BC794C9F2946C0A5853D79FA6694D8C4"
+    "entryCount": 4463,
+    "sha256": "F7C0E024CD6EEDF64A9326B5ED8ECE7EC48FE2035BA597562F6629D17A453C10"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -37,20 +37,19 @@
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-codex-subagent-coordination-policy.ps1",
-        "docs/quality/UAW-CURSOR-BUY-CARD-OVERFLOW-V1-20260905.md",
-      "docs/quality/cursor-buy-card-overflow-v1-20260905/scope-state.json",
-      "docs/quality/cursor-buy-card-overflow-v1-20260905/historical-evidence-disposition.md",
-      "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-DIAGNOSTIC-EVIDENCE-V2-20260904.md",
-      "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V1-20260904.md"
+        "docs/quality/UAW-CURSOR-BUY-REDMI-UAT-V1-20260905.md",
+        "docs/quality/cursor-buy-redmi-uat-v1-20260905/scope-state.json"
       ]
     },
     {
-      "task": "/root/cursor_buy_card_overflow_v1_20260905",
+      "task": "/root/cursor_buy_redmi_uat_v1_20260905",
       "role": "subagent",
       "owners": [
-        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart",
-        "docs/quality/cursor-buy-card-overflow-v1-20260905/RESULTS.md"
+        "docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md",
+        "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md",
+        "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+        "docs/quality/cursor-buy-redmi-uat-v1-20260905/candidate-state.json",
+        "docs/quality/cursor-buy-redmi-uat-v1-20260905/source-manifest.sha256"
       ]
     }
   ],
@@ -1505,6 +1504,33 @@
           "scripts/test-codex-integration-repair-coordination-policy.ps1"
         ],
         "cursorIndependent": false,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_buy_redmi_uat_v1_20260905",
+        "state": "founder_authorized_2026_09_05",
+        "lane": "cursor_ui",
+        "role": "subagent",
+        "task": "/root/cursor_buy_redmi_uat_v1_20260905",
+        "workId": "buy-redmi-uat-v1-20260905",
+        "ticketId": "UAW-CURSOR-BUY-REDMI-UAT-V1-20260905",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-redmi-uat-v1-20260905",
+        "branch": "work/cursor-ui/buy-redmi-uat-v1-20260905",
+        "baselineHead": "e2dd3bc706065fbc08d9c526c48e24374cd32e6e",
+        "bootstrapCommitSubject": "coordination(buy-redmi-uat-v1-20260905): bind fresh Redmi audit after catalogue checkpoint",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "docs/quality/UAW-CURSOR-BUY-REDMI-UAT-V1-20260905.md",
+          "docs/quality/cursor-buy-redmi-uat-v1-20260905/scope-state.json",
+          "docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md",
+          "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md",
+          "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md",
+          "docs/quality/cursor-buy-redmi-uat-v1-20260905/candidate-state.json",
+          "docs/quality/cursor-buy-redmi-uat-v1-20260905/source-manifest.sha256"
+        ],
+        "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
       },
       {

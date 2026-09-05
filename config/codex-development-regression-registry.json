@@ -100776,6 +100776,7 @@
     },
     {
       "id": "REG-20260905-4492-CURSOR-CHILD-INHERITED-ACTIVE-CLAIM",
+      "recurrences": [{"date": "2026-09-05", "operation": "Redmi evidence bootstrap", "result": "Gate rejected a predeclared candidate-state owner before its preparation file existed; no build ran.", "prevention": "Materialize truthful preparation-state documents before owner validation; keep generated APK/provenance in the ignored build output with a retained checksum index, never create fake placeholder binaries."}],
       "status": "registered_correction_pending",
       "appliesTo": ["primary", "coordination", "implementation"],
       "mistake": "The catalogue bootstrap gate rejected two open Cursor tasks because the baseline's completed historical Buy claim remained active beside the new child claim.",
@@ -100833,6 +100834,16 @@
   "id": "REG-20260905-4496-CURSOR-REGISTRY-HISTORICAL-INTEGRITY-RECOVERY",
   "prevention": "Recover the historical prefix from the exact accepted Git blob, retain all seven valid task records, verify every accepted entry remains identical, and use explicit UTF-8 parsing with bounded errors and full logs after each registry write.",
   "mistake": "Registry validation found unexpected historical deletions and malformed JSON after the tooling/environment transition; the failed parser produced truncated output. No Buy source or test was changed."
+},
+{
+  "id": "REG-20260905-4497-CURSOR-REVIEW-CHECKOUT-NEWLINE-GENERATION",
+  "status": "registered_prevention_active",
+  "appliesTo": ["primary", "implementation", "evidence", "build"],
+  "mistake": "The fresh Redmi review bootstrap inherited the prior worktree's raw registry SHA; its mandatory gate correctly rejected that pin after Git checkout newline conversion.",
+  "rootCause": "The registry was Git-clean and all 4462 records were identical to the source checkpoint, but CRLF checkout bytes differed from the prior worktree's raw bytes. Read-only normalized-text comparison proved this before any registry correction.",
+  "prevention": "Verify the exact accepted Git blob and record inventory in each new worktree, then bind the actual local raw SHA. Do not treat newline-only checkout differences as source loss or weaken the hash gate. Preserve every existing record; use the refreshed count/SHA for subsequent gates.",
+  "gates": ["scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-codex-development-regression-memory.ps1"],
+  "evidence": ["docs/quality/cursor-buy-redmi-uat-v1-20260905/PREBUILD.md"]
 }
   ]
 }

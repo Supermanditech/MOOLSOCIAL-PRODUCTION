@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "preparation_pending_gates",
+  "buildAuthorization": "not_yet_bound",
+  "candidate": {
+    "id": "UAW-CURSOR-BUY-R66-1-REDMI-REVIEW-20260905",
+    "buildName": "1.0.0-r66.1",
+    "buildNumber": "2026090501",
+    "buildMode": "debug",
+    "gateProfile": "uaw_cursor_ui_review_debug"
+  },
+  "promotion": {"state": "forbidden_non_promotable"},
+  "postBuildDeviceState": "not_started"
+}
