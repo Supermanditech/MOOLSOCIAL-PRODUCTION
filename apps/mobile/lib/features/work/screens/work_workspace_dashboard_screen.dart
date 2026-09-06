@@ -736,43 +736,64 @@ class _WorkWorkspaceDashboardScreenState
   void _closeOrderDetails() => setState(() => _reviewedOrder = null);
 
   void _showStoreSignals(BuildContext context) {
+    final view = View.of(context);
+    final bottomInset = view.viewPadding.bottom / view.devicePixelRatio;
     showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
-      showDragHandle: true,
+      isScrollControlled: true,
+      showDragHandle: false,
       builder: (context) => SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Store status',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        minimum: EdgeInsets.only(bottom: bottomInset),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .75,
+          ),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: DefaultTextStyle.merge(
+                style: const TextStyle(fontSize: 13, height: 1.25),
+                child: Column(
+                  key: const Key('work-store-status-panel'),
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Store status',
+                      style: TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 16,
+                        height: 1.2,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _ProductPreviewLine(
+                      label: 'Taking orders',
+                      value: switch (session.workspaceStoreState) {
+                        WorkspaceStoreState.open => 'Open',
+                        WorkspaceStoreState.paused => 'Paused',
+                        _ => 'Off',
+                      },
+                    ),
+                    _ProductPreviewLine(
+                      label: 'Storefront',
+                      value: session.workspaceVisibleToCustomers
+                          ? 'Public'
+                          : 'Private',
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Change in your business profile.',
+                      key: Key('work-store-status-guidance'),
+                      style: TextStyle(color: MoolColors.muted, fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              _ProductPreviewLine(
-                label: 'Taking orders',
-                value: switch (session.workspaceStoreState) {
-                  WorkspaceStoreState.open => 'Open',
-                  WorkspaceStoreState.paused => 'Paused',
-                  _ => 'Off',
-                },
-              ),
-              _ProductPreviewLine(
-                label: 'Storefront',
-                value: session.workspaceVisibleToCustomers
-                    ? 'Public'
-                    : 'Private',
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Manage opening hours and visibility in your business profile.',
-                style: TextStyle(color: MoolColors.muted),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1522,6 +1543,8 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
               const SizedBox(width: 6),
               Semantics(
                 button: true,
+                excludeSemantics: true,
+                onTap: onSettings,
                 label:
                     '${session.workspaceStoreState == WorkspaceStoreState.open
                         ? 'Open'
@@ -1530,14 +1553,15 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                         : 'Off'}, ${session.workspaceVisibleToCustomers ? 'public storefront' : 'private storefront'}. Store status',
                 child: Material(
                   key: const Key('work-dashboard-settings'),
-                  color: Colors.transparent,
+                  color: MoolColors.navy.withValues(alpha: .06),
                   borderRadius: BorderRadius.circular(999),
                   child: InkWell(
+                    excludeFromSemantics: true,
                     borderRadius: BorderRadius.circular(999),
                     onTap: onSettings,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(
-                        minHeight: 44,
+                        minHeight: 48,
                         minWidth: 48,
                       ),
                       child: Padding(
@@ -1545,29 +1569,19 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                           horizontal: 9,
                           vertical: 6,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              session.workspaceStoreState ==
-                                      WorkspaceStoreState.open
-                                  ? Icons.radio_button_checked_rounded
-                                  : session.workspaceStoreState ==
-                                        WorkspaceStoreState.paused
-                                  ? Icons.pause_circle_outline_rounded
-                                  : Icons.power_settings_new_rounded,
-                              size: 16,
-                              color: MoolColors.navy,
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(
-                              session.workspaceVisibleToCustomers
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              size: 16,
-                              color: MoolColors.navy,
-                            ),
-                          ],
+                        child: SizedBox(
+                          width: 40,
+                          child: Icon(
+                            session.workspaceStoreState ==
+                                    WorkspaceStoreState.open
+                                ? Icons.radio_button_checked_rounded
+                                : session.workspaceStoreState ==
+                                      WorkspaceStoreState.paused
+                                ? Icons.pause_circle_outline_rounded
+                                : Icons.power_settings_new_rounded,
+                            size: 18,
+                            color: MoolColors.navy,
+                          ),
                         ),
                       ),
                     ),

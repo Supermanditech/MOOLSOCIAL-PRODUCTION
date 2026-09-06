@@ -1222,6 +1222,137 @@ void main() {
     });
   }
 
+  for (final display in [
+    (width: 412.0, height: 915.0, scale: 1.0),
+    (width: 320.0, height: 568.0, scale: 1.4),
+  ]) {
+    for (final state in WorkspaceStoreState.values) {
+      for (final isPublic in [false, true]) {
+        testWidgets(
+          'OPPO S09 one read-only status control ${state.name} $isPublic ${display.width}',
+          (tester) async {
+            final semantics = tester.ensureSemantics();
+            try {
+              final work = liveStore()
+                ..workspaceStoreState = state
+                ..workspaceAcceptingOrders = state == WorkspaceStoreState.open
+                ..workspaceVisibleToCustomers = isPublic;
+              await mount(
+                tester,
+                route: '/app/work/workspace/dashboard',
+                work: work,
+                viewport: Size(display.width, display.height),
+                textScale: display.scale,
+              );
+              final opening = switch (state) {
+                WorkspaceStoreState.open => 'Open',
+                WorkspaceStoreState.paused => 'Paused',
+                _ => 'Off',
+              };
+              final visibility = isPublic ? 'Public' : 'Private';
+              final control = find.byKey(const Key('work-dashboard-settings'));
+              final header = find.byKey(
+                const Key('work-dashboard-inline-header'),
+              );
+              final headerBefore = tester.getRect(header);
+              expect(control.hitTestable(), findsOneWidget);
+              expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
+              expect(tester.getSize(control).width, 58);
+              expect(
+                find.descendant(of: control, matching: find.byType(Icon)),
+                findsOneWidget,
+              );
+              expect(
+                tester.getSemantics(control),
+                matchesSemantics(
+                  isButton: true,
+                  hasTapAction: true,
+                  label:
+                      '$opening, ${visibility.toLowerCase()} storefront. Store status',
+                ),
+              );
+              final capture = !isPublic && state == WorkspaceStoreState.off;
+              if (capture) {
+                await captureStoreView(
+                  tester,
+                  'r665-status-dashboard-${display.width.toInt()}',
+                );
+              }
+              await tester.tap(control);
+              await tester.pumpAndSettle();
+              final panel = find.byKey(const Key('work-store-status-panel'));
+              expect(panel, findsOneWidget);
+              expect(
+                tester.getSize(find.byType(BottomSheet)).height,
+                closeTo(tester.getSize(panel).height + 24 + 44, 1),
+              );
+              expect(
+                find.descendant(of: panel, matching: find.byType(TextButton)),
+                findsNothing,
+              );
+              expect(
+                find.descendant(of: panel, matching: find.byType(FilledButton)),
+                findsNothing,
+              );
+              for (final text in [
+                'Taking orders',
+                opening,
+                'Storefront',
+                visibility,
+              ]) {
+                expect(
+                  find.descendant(of: panel, matching: find.text(text)),
+                  findsOneWidget,
+                );
+              }
+              final guidance = find.byKey(
+                const Key('work-store-status-guidance'),
+              );
+              await reveal(tester, guidance);
+              expect(
+                tester.getRect(guidance).bottom,
+                lessThanOrEqualTo(display.height - 44),
+              );
+              expect(work.workspaceStoreState, state);
+              expect(work.workspaceVisibleToCustomers, isPublic);
+              expect(
+                work.workspaceAcceptingOrders,
+                state == WorkspaceStoreState.open,
+              );
+              if (capture) {
+                await captureStoreView(
+                  tester,
+                  'r665-status-panel-${display.width.toInt()}',
+                );
+              }
+              await tester.binding.handlePopRoute();
+              await tester.pumpAndSettle();
+              expect(panel, findsNothing);
+              expect(control.hitTestable(), findsOneWidget);
+              expect(tester.getRect(header), headerBefore);
+              await tester.tap(control);
+              await tester.pumpAndSettle();
+              expect(panel, findsOneWidget);
+              await tester.tapAt(const Offset(8, 100));
+              await tester.pumpAndSettle();
+              expect(panel, findsNothing);
+              expect(control.hitTestable(), findsOneWidget);
+              expect(work.workspaceStoreState, state);
+              expect(work.workspaceVisibleToCustomers, isPublic);
+              expect(
+                work.workspaceAcceptingOrders,
+                state == WorkspaceStoreState.open,
+              );
+              expect(tester.takeException(), isNull);
+            } finally {
+              semantics.dispose();
+            }
+          },
+        );
+      }
+    }
+  }
+
   testWidgets('Store View v2 - compact large text, signals and keyboard', (
     tester,
   ) async {
