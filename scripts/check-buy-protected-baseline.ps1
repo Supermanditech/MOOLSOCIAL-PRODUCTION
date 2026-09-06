@@ -250,9 +250,12 @@ function Test-SealedBuyOverlay {
 function Test-RedmiReviewBuySource {
   param([string]$SourceCommit, [string[]]$CurrentOwners)
   # This is an unaccepted, locally tested review source, never a replacement baseline.
-  $qualifiedSource = 'd07559609ffad7371a6a98d765d4fefa186dc065'
+  $qualifiedSources = @(
+    'd07559609ffad7371a6a98d765d4fefa186dc065',
+    'd119c85eccc85af99c86c32ae526f57421855ff3'
+  )
   $acceptedBase = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
-  if ($SourceCommit -cne $qualifiedSource) { return $false }
+  if ($SourceCommit -cnotin $qualifiedSources) { return $false }
   $branch = @(& git -C $root branch --show-current)
   if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
       [string]$branch[0] -cne 'work/cursor-ui/buy-redmi-fixes-v1-20260905') { return $false }
@@ -274,6 +277,9 @@ function Test-RedmiReviewBuySource {
     'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
     'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart'
   )
+  if ($SourceCommit -ceq $qualifiedSources[1]) {
+    $expectedDelta = @('apps/mobile/lib/features/buy/buy_v2_models.dart') + $expectedDelta
+  }
   $sourceDelta = @(& git -C $root diff --name-only $acceptedBase $SourceCommit -- @boundaryRoots)
   if ($LASTEXITCODE -ne 0 -or
       (@($sourceDelta | Sort-Object) -join '|') -cne ($expectedDelta -join '|')) { return $false }
