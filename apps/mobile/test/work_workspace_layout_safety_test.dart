@@ -366,6 +366,156 @@ void main() {
     );
   }
 
+  for (final profileId in [
+    'retailer-grocery',
+    'retailer-speciality',
+    'salon',
+  ]) {
+    for (final display in [
+      (width: 412.0, height: 915.0, scale: 1.0),
+      (width: 320.0, height: 568.0, scale: 1.4),
+      if (profileId == 'retailer-grocery')
+        (width: 320.0, height: 568.0, scale: 2.0),
+    ]) {
+      testWidgets(
+        'OPPO S04 setup headers preserve identity $profileId ${display.width} ${display.scale}',
+        (tester) async {
+          final work = WorkSession()
+            ..selectProfile(profileId)
+            ..saveDetails(
+              name: 'Mahadev Traders',
+              area: 'Sardarpura, Jodhpur',
+              activity: 'Groceries and household essentials',
+            )
+            ..authorizedPersonName = 'Asha Sharma'
+            ..businessRelationship = 'Owner'
+            ..primaryMobile = '9829012321'
+            ..contactEmail = 'asha@example.com'
+            ..primaryMobileVerified = true
+            ..contactEmailVerified = true;
+          final originalLabel = work.selectedProfile!.label;
+          final originalDocuments = work.selectedWorkspaceDocuments
+              .map((proof) => proof.id)
+              .toList();
+          final subtitle = profileId == 'salon'
+              ? originalLabel
+              : 'Grocery / Kirana Shop or Speciality Retail Shop';
+          await mount(
+            tester,
+            route: '/app/work/workspace/requirements',
+            work: work,
+            viewport: Size(display.width, display.height),
+            textScale: display.scale,
+          );
+
+          void checkHeader(String title, String subtitle) {
+            final bar = find.byType(AppBar);
+            final barBounds = tester.getRect(bar);
+            expect(barBounds.height, lessThanOrEqualTo(display.height * .3));
+            for (final entry in [
+              ('work-page-title', title),
+              ('work-page-subtitle', subtitle),
+            ]) {
+              final text = find.byKey(Key(entry.$1));
+              expect(tester.widget<Text>(text).data, entry.$2);
+              final paragraph = tester.renderObject<RenderParagraph>(
+                find.descendant(of: text, matching: find.byType(RichText)),
+              );
+              expect(paragraph.softWrap, isTrue);
+              expect(paragraph.maxLines, isNull);
+              expect(paragraph.overflow, isNot(TextOverflow.ellipsis));
+              expect(paragraph.didExceedMaxLines, isFalse);
+              expect(
+                paragraph.textScaler.scale(12),
+                closeTo(12 * display.scale, .01),
+              );
+              final bounds = tester.getRect(text);
+              expect(bounds.top, greaterThanOrEqualTo(barBounds.top));
+              expect(bounds.bottom, lessThanOrEqualTo(barBounds.bottom));
+              expect(bounds.left, greaterThanOrEqualTo(64));
+              expect(bounds.right, lessThanOrEqualTo(display.width - 4));
+            }
+            if (display.scale == 1) {
+              expect(tester.widget<AppBar>(bar).toolbarHeight, 88);
+            }
+            expect(
+              find.byKey(const Key('work-back')).hitTestable(),
+              findsOneWidget,
+            );
+            expect(work.selectedProfile!.id, profileId);
+            expect(work.selectedProfile!.label, originalLabel);
+            expect(
+              work.selectedWorkspaceDocuments.map((proof) => proof.id),
+              originalDocuments,
+            );
+            expect(tester.takeException(), isNull);
+          }
+
+          Future<void> tap(String key) async {
+            final action = find.byKey(Key(key));
+            await reveal(tester, action);
+            await tester.tap(action);
+            await tester.pumpAndSettle();
+          }
+
+          Future<void> capture(String page) async {
+            if (profileId != 'retailer-grocery') return;
+            await captureStoreView(
+              tester,
+              'r665-header-$page-${display.width.toInt()}-${display.scale}',
+            );
+          }
+
+          checkHeader('Documents to keep ready', originalLabel);
+          await capture('requirements');
+          await tap('work-requirements-ready');
+          checkHeader('Set up your Workspace', subtitle);
+          await capture('contact');
+          await reveal(tester, find.byKey(const Key('work-person-name')));
+          final name = tester.widget<TextField>(
+            find.byKey(const Key('work-person-name')),
+          );
+          expect(
+            name.decoration!.helperText,
+            'The authorised person setting up this Workspace',
+          );
+          expect(name.decoration!.helperMaxLines, 3);
+          await tap('work-back');
+          checkHeader('Documents to keep ready', originalLabel);
+          await tap('work-requirements-ready');
+          await tap('work-contact-continue');
+          checkHeader('Complete your Workspace', subtitle);
+          await capture('details');
+          final relationship = find.byKey(
+            const Key('work-business-relationship'),
+          );
+          await reveal(tester, relationship);
+          expect(
+            find.text('Your relationship with the business'),
+            findsOneWidget,
+          );
+          expect(find.text('Your connection to this business'), findsNothing);
+          await tap('work-details-continue');
+          checkHeader('Complete your Workspace', subtitle);
+          await capture('documents');
+          await tap('work-proof-review');
+          checkHeader('Complete your Workspace', subtitle);
+          await reveal(tester, find.text('Business relationship'));
+          expect(find.text('Connection'), findsNothing);
+          await capture('review');
+          await tap('work-review-edit-contact');
+          checkHeader('Set up your Workspace', subtitle);
+          expect(find.text('Save and return'), findsOneWidget);
+          await tap('work-contact-continue');
+          checkHeader('Complete your Workspace', subtitle);
+          expect(work.primaryMobileVerified, isTrue);
+          expect(work.contactEmailVerified, isTrue);
+          expect(work.reviewCaseId, isNull);
+        },
+      );
+    }
+  }
+
   for (final page in [
     'choose',
     'requirements',
@@ -1570,14 +1720,31 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  void expectHeaderAndStickyAction(WidgetTester tester) {
+  void expectHeaderAndStickyAction(
+    WidgetTester tester, {
+    bool wrappedHeader = false,
+  }) {
     final titleFinder = find.byKey(const Key('work-page-title'));
     final subtitleFinder = find.byKey(const Key('work-page-subtitle'));
     expect(
       tester.widget<Text>(titleFinder).overflow,
       isIn([TextOverflow.clip, TextOverflow.ellipsis]),
     );
-    expect(tester.widget<Text>(subtitleFinder).maxLines, 2);
+    if (wrappedHeader) {
+      final bounds = tester.getRect(find.byType(AppBar));
+      for (final text in [titleFinder, subtitleFinder]) {
+        expect(tester.widget<Text>(text).maxLines, isNull);
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: text, matching: find.byType(RichText)),
+        );
+        expect(paragraph.softWrap, isTrue);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(tester.getRect(text).top, greaterThanOrEqualTo(bounds.top));
+        expect(tester.getRect(text).bottom, lessThanOrEqualTo(bounds.bottom));
+      }
+    } else {
+      expect(tester.widget<Text>(subtitleFinder).maxLines, 2);
+    }
     expect(tester.getRect(titleFinder).right, lessThanOrEqualTo(360));
     expect(tester.getRect(subtitleFinder).right, lessThanOrEqualTo(360));
     final sticky = find.byKey(const Key('work-sticky-action-bar'));
@@ -1681,7 +1848,7 @@ void main() {
       expect(find.text('Signed in with Google'), findsOne);
       expect(find.byKey(const Key('work-global-chat')), findsNothing);
       expect(find.byKey(const Key('work-help')), findsNothing);
-      expectHeaderAndStickyAction(tester);
+      expectHeaderAndStickyAction(tester, wrappedHeader: true);
       final alternate = find.byKey(const Key('work-alternate-contact-field'));
       await reveal(tester, alternate);
       expect(

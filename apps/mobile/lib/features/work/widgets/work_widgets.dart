@@ -17,6 +17,7 @@ class WorkPageScaffold extends StatelessWidget {
     required this.body,
     this.headerTitle,
     this.headerHeight = 88,
+    this.wrapHeader = false,
     this.fallbackBackRoute = '/app/work/earn',
     this.showBack = true,
     this.activeLocalAction = 'earn',
@@ -41,6 +42,7 @@ class WorkPageScaffold extends StatelessWidget {
   final Widget body;
   final Widget? headerTitle;
   final double headerHeight;
+  final bool wrapHeader;
   final String fallbackBackRoute;
   final bool showBack;
   final String activeLocalAction;
@@ -59,6 +61,26 @@ class WorkPageScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final titleWidth =
+        (MediaQuery.sizeOf(context).width -
+                MediaQuery.paddingOf(context).horizontal -
+                (showBack ? 64 : 0) -
+                (showBack ? 8 : 32) -
+                (showHeaderChat ? 52 : 0) -
+                (showTrailingAction ? 64 : 0))
+            .clamp(1.0, double.infinity)
+            .toDouble();
+    final wrappedTitle = wrapHeader && headerTitle == null
+        ? _WorkSetupHeader(
+            title: title,
+            subtitle: subtitle,
+            textScaler: MediaQuery.textScalerOf(context),
+          )
+        : null;
+    final measuredHeight = wrappedTitle?.height(context, titleWidth) ?? 0;
+    final toolbarHeight = measuredHeight > headerHeight
+        ? measuredHeight
+        : headerHeight;
     final canPop = Navigator.of(context).canPop();
     void leaveContentDepth() {
       session.clearMessages();
@@ -223,7 +245,7 @@ class WorkPageScaffold extends StatelessWidget {
           backgroundColor: MoolColors.canvas,
           surfaceTintColor: Colors.transparent,
           automaticallyImplyLeading: false,
-          toolbarHeight: headerHeight,
+          toolbarHeight: toolbarHeight,
           leadingWidth: showBack ? 64 : 16,
           leading: showBack
               ? Padding(
@@ -237,6 +259,7 @@ class WorkPageScaffold extends StatelessWidget {
           titleSpacing: showBack ? 4 : MoolSpacing.md,
           title:
               headerTitle ??
+              wrappedTitle ??
               MoolServiceHeaderTitle(
                 title: title,
                 subtitle: subtitle,
@@ -280,6 +303,95 @@ class WorkPageScaffold extends StatelessWidget {
       ),
     );
   }
+}
+
+class _WorkSetupHeader extends StatelessWidget {
+  const _WorkSetupHeader({
+    required this.title,
+    required this.subtitle,
+    required this.textScaler,
+  });
+
+  final String title;
+  final String subtitle;
+  final TextScaler textScaler;
+
+  ({TextStyle title, TextStyle subtitle}) _styles(
+    BuildContext context,
+    double width,
+  ) {
+    final compact = width < 300;
+    final theme = Theme.of(context);
+    final base = theme.appBarTheme.titleTextStyle ?? theme.textTheme.titleLarge;
+    return (
+      title: (base ?? const TextStyle()).merge(
+        TextStyle(
+          color: MoolColors.ink,
+          fontSize: compact ? 15 : 20,
+          height: 1.05,
+          fontWeight: FontWeight.w900,
+          letterSpacing: compact ? -.15 : -.35,
+        ),
+      ),
+      subtitle: (base ?? const TextStyle()).merge(
+        TextStyle(
+          color: MoolColors.muted,
+          fontSize: compact ? 10.5 : 12,
+          height: 1.1,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  double height(BuildContext context, double width) {
+    final styles = _styles(context, width);
+    double measure(String text, TextStyle style) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: textScaler,
+      )..layout(maxWidth: width);
+      final height = painter.height;
+      painter.dispose();
+      return height;
+    }
+
+    return (measure(title, styles.title) +
+            measure(subtitle, styles.subtitle) +
+            18)
+        .ceilToDouble();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final styles = _styles(context, constraints.maxWidth);
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            key: const Key('work-page-title'),
+            style: styles.title,
+            textScaler: textScaler,
+            softWrap: true,
+            overflow: TextOverflow.clip,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            key: const Key('work-page-subtitle'),
+            style: styles.subtitle,
+            textScaler: textScaler,
+            softWrap: true,
+            overflow: TextOverflow.clip,
+          ),
+        ],
+      );
+    },
+  );
 }
 
 class _WorkPageReveal extends StatelessWidget {

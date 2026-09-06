@@ -240,17 +240,24 @@ void main() {
     expect(find.textContaining('GST category'), findsNothing);
     await _scrollTo(
       tester,
-      find.text('GST registration certificate'),
+      find.text('GST certificate'),
       const Key('work-requirements-screen'),
     );
     expect(
       find.text(
-        'Required when GST registration applies to this Workspace. '
-        'Applicability is confirmed during verification.',
+        'Your registration certificate, where GST registration applies to your business.',
       ),
       findsOneWidget,
     );
     expect(find.text('When applicable'), findsWidgets);
+    expect(
+      sessions.work.selectedGstChecklistItem?.title,
+      'GST registration certificate',
+    );
+    expect(
+      sessions.work.selectedGstChecklistItem?.importance,
+      WorkDocumentImportance.ifApplicable,
+    );
     expect(find.textContaining('GST certificate is optional'), findsNothing);
     await _scrollTo(
       tester,

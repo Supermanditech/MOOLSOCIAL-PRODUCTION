@@ -126,7 +126,8 @@ class _WorkWorkspaceContactScreenState
         return WorkPageScaffold(
           session: session,
           title: 'Set up your Workspace',
-          subtitle: profile?.label ?? 'Choose a Workspace first',
+          subtitle: profile?.setupSubtitle ?? 'Choose a Workspace first',
+          wrapHeader: true,
           fallbackBackRoute: '/app/work/workspace/requirements',
           activeLocalAction: 'workspace',
           showHeaderChat: false,
@@ -137,7 +138,11 @@ class _WorkWorkspaceContactScreenState
               ? null
               : WorkPrimaryButton(
                   keyName: 'work-contact-continue',
-                  label: 'Continue',
+                  label:
+                      GoRouterState.of(context).uri.queryParameters['return'] ==
+                          'review'
+                      ? 'Save and return'
+                      : 'Continue',
                   onPressed: _continue,
                 ),
           body: ListView(
@@ -184,7 +189,9 @@ class _WorkWorkspaceContactScreenState
                       onChanged: session.savePersonName,
                       decoration: const InputDecoration(
                         labelText: 'Your full name',
-                        helperText: 'The person setting up this Workspace',
+                        helperText:
+                            'The authorised person setting up this Workspace',
+                        helperMaxLines: 3,
                         border: UnderlineInputBorder(),
                       ),
                     ),

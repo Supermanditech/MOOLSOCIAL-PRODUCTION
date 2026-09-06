@@ -651,6 +651,7 @@ class WorkDocumentRequirementsScreen extends StatelessWidget {
       session: session,
       title: 'Documents to keep ready',
       subtitle: profile.label,
+      wrapHeader: true,
       fallbackBackRoute: '/app/work/my-work',
       activeLocalAction: 'workspace',
       showHeaderChat: false,
@@ -930,7 +931,8 @@ class _WorkWorkspaceContactScreenState
         return WorkPageScaffold(
           session: widget.session,
           title: 'Set up your Workspace',
-          subtitle: profile?.label ?? 'Choose a Workspace first',
+          subtitle: profile?.setupSubtitle ?? 'Choose a Workspace first',
+          wrapHeader: true,
           fallbackBackRoute: '/app/work/workspace/requirements',
           activeLocalAction: 'workspace',
           showHeaderChat: false,
@@ -1879,7 +1881,10 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
       builder: (context, _) => WorkPageScaffold(
         session: widget.session,
         title: 'Complete your Workspace',
-        subtitle: widget.session.selectedProfile?.label ?? 'Workspace details',
+        subtitle:
+            widget.session.selectedProfile?.setupSubtitle ??
+            'Workspace details',
+        wrapHeader: true,
         fallbackBackRoute: '/app/work/workspace/contact',
         activeLocalAction: 'workspace',
         showHeaderChat: false,
@@ -2010,7 +2015,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                     : widget.session.businessRelationship,
                 isExpanded: true,
                 decoration: const InputDecoration(
-                  labelText: 'Your connection to this business',
+                  labelText: 'Your relationship with the business',
                   border: UnderlineInputBorder(),
                 ),
                 items:
@@ -2128,7 +2133,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                             ),
                           if (widget.session.businessRelationship.isNotEmpty)
                             _ReviewRow(
-                              label: 'Connection',
+                              label: 'Business relationship',
                               value: widget.session.businessRelationship,
                             ),
                           _ReviewRow(

@@ -819,6 +819,12 @@ class WorkProfileOption {
   final String buySide;
   final String tools;
   final IconData icon;
+
+  String get setupSubtitle => switch (id) {
+    'retailer-grocery' ||
+    'retailer-speciality' => 'Grocery / Kirana Shop or Speciality Retail Shop',
+    _ => label,
+  };
 }
 
 enum WorkContactChannel { primaryMobile, email, alternateMobile }

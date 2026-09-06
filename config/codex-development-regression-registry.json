@@ -10,6 +10,51 @@
   },
   "entries": [
     {
+      "id": "REG-20260906-4525-WORK-PRECOMMIT-CLAIM-OMITTED-INDEX",
+      "status": "confirmed_invocation_correction",
+      "appliesTo": ["primary", "git", "testing"],
+      "mistake": "The S04 pre_commit invocation rejected apps/mobile/lib/features/work/work_models.dart after exact staging although that file is already registered to primary /root in the existing active owners.",
+      "rootCause": "The invocation built ClaimedOwners from baseline-to-HEAD plus unstaged changes and candidate untracked evidence, omitting git diff --cached --name-only. The model first changed in this slice, so staging removed it from the supplied claim.",
+      "prevention": "Include the exact cached, unstaged and committed owner unions in the invocation, deduplicate, then run unchanged pre_commit. Do not add an owner, weaken the checker, unstage source as a workaround or commit after a failed gate.",
+      "diagnosticEvidence": "Preserved tool result chunk8cca42: exit1, check-codex-subagent-coordination-policy.ps1:54, production feature changed an owner outside its claim: apps/mobile/lib/features/work/work_models.dart. Active owner was independently read at policy line107; checker effectiveOwnerKeys enforcement remained unchanged. No commit or push followed the rejection.",
+      "gates": ["scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["config/codex-development-regression-registry.json", "config/codex-subagent-coordination-policy.json"]
+    },
+    {
+      "id": "REG-20260906-4524-WORK-RENDERED-HEADER-AND-GST-CONTRACT-COVERAGE",
+      "status": "confirmed_bounded_contract_correction_in_progress",
+      "continuationEvidence": "The exact nine-case rerun passed8 and exposed the next stale GST preview sentence in the same C24G contract. Retained r665-s04-header-final-focused-visual.log SHA256D5797B6E13B58543AE3BBD92F2D069BE5C7AC86F7E776BB22E674E53F011EF82. Correct the full displayed preview and additionally assert unchanged canonical GST title and ifApplicable importance; do not change product conditions.",
+      "appliesTo": ["primary", "work", "testing", "accessibility"],
+      "mistake": "The five-suite S04 run returned254 passes,81 intentional skips and2 failures: the old contact helper requires a two-line subtitle and clipped/ellipsis overflow; C24G still searches for the pre-S02 display title GST registration certificate.",
+      "rootCause": "The new wrapped setup header must retain safe paint containment while permitting enough measured lines, and the S02 display-only GST rename was not propagated to the C24G journey in that earlier three-suite qualification.",
+      "prevention": "Use clipped paint overflow with unrestricted measured wrapping only on opted-in setup headers. Update that helper to assert full actual containment and retain the old max-lines contract on unchanged headers. Update only the C24G display-name lookup to GST certificate; preserve its mandatory-applicability, nationwide-note, chooser and Back assertions. Rerun both exact cases and the full five-suite batch.",
+      "diagnosticEvidence": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/r665-s04-header-work-regressions-attempt1.log; SHA2564F012CB7089020D421E2F85C8F9DD4403B60280DA9A252C7DD6854E8D39777C9; exit1; complete names, assertions and stacks retained.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart", "apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/work/widgets/work_widgets.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart", "apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart"]
+    },
+    {
+      "id": "REG-20260906-4523-WORK-HEADER-TEST-LAZY-CONTACT-FIELD",
+      "status": "confirmed_test_harness_correction_in_progress",
+      "appliesTo": ["primary", "work", "testing"],
+      "mistake": "The new S04 focused header journey passes three normal-width cases but fails four compact cases when its test reads the name TextField before the lazy contact list has built that off-screen field.",
+      "rootCause": "The assertion assumed the name field was present on the first viewport despite the connected-account and introduction content above it; all four failures are No element at the same test line, not a header rendering failure.",
+      "prevention": "Capture the actual first view, then reveal the name field using the existing bounded scroll helper before inspecting its helper text. Preserve every header, identity, navigation, font-scale and proof-binding assertion; rerun the complete seven-case journey matrix.",
+      "diagnosticEvidence": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/r665-s04-header-focused-attempt1.log; SHA256DD8CEEC36252997BFE638D473FC36895E3AC875B7816D7E46FF61820E7FC54F8; exit1;3 passed/4 failed; complete expanded output retained.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/work_workspace_layout_safety_test.dart"]
+    },
+    {
+      "id": "REG-20260906-4522-WORK-SETUP-HEADER-SCALED-TEXT-CLIPPING",
+      "status": "confirmed_owned_visual_child_in_progress",
+      "appliesTo": ["primary", "work", "testing", "accessibility"],
+      "mistake": "The r66.5 S02 local320x568/140% renders truncate Documents to keep ready even though the body and Continue remain reachable. This inherited header behaviour must not be qualified as a fully passing visual view.",
+      "rootCause": "The shared service title selects a one-line20px style from physical available width; its decision and fixed toolbar do not measure scaled title/subtitle height.",
+      "prevention": "Adapt only the opted-in Work setup headers to their measured wrapped text. Preserve default/shared Buy headers, normal-size placement, font scale, Back, selected profile and proof bindings. Test actual rendered title/subtitle containment at320/412px and increased text sizes without ellipsis or shrinking the requested scale.",
+      "diagnosticEvidence": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r665-s02-local-20260906/r665-documents-retailer-grocery-320-large-text.png; SHA2568F1204E409ACC1AD566895719209B7A6D7CD5BBE3D38BB613E8D49946A79F4D1. Retained under the existing setup-header fit scope; no new product feature.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart", "apps/mobile/test/work_vertical_slice_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/work/widgets/work_widgets.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"]
+    },
+    {
       "id": "REG-20260906-4521-WORK-SELECTOR-INLINE-HEADER-STALE-C24G-CONTRACT",
       "status": "confirmed_test_contract_correction_in_progress",
       "appliesTo": ["primary", "work", "testing", "copy"],
