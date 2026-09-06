@@ -226,6 +226,128 @@ void main() {
     (width: 320.0, height: 640.0, scale: 2.0),
   ]) {
     final suffix = '${display.width.toInt()}-${display.scale}';
+    for (final hasOrder in [false, true]) {
+      testWidgets('S09 rail word fit $hasOrder $suffix', (tester) async {
+        final work = hasOrder ? storeViewFixture() : liveStore();
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        await captureStoreView(tester, 'r665-rail-root-$hasOrder-$suffix');
+        Future<void> checkWords(Finder text, String value) async {
+          await reveal(tester, text);
+          final paragraph = tester.renderObject<RenderParagraph>(text);
+          expect(paragraph.textScaler.scale(1), closeTo(display.scale, .01));
+          expect(paragraph.didExceedMaxLines, isFalse);
+          for (final word in RegExp(r'\S+').allMatches(value)) {
+            final boxes = paragraph.getBoxesForSelection(
+              TextSelection(baseOffset: word.start, extentOffset: word.end),
+            );
+            expect(
+              boxes,
+              hasLength(1),
+              reason: '$value: ${word.group(0)} splits',
+            );
+            expect(
+              boxes.single.right,
+              lessThanOrEqualTo(paragraph.size.width + .5),
+            );
+          }
+        }
+
+        if (hasOrder) {
+          final centre = find.byKey(const Key('work-activity-incoming-order'));
+          for (final value in [
+            'Rakesh',
+            'Customer pickup',
+            'Awaiting acceptance',
+            'View details',
+            'Accept',
+            'Reject',
+          ]) {
+            await checkWords(
+              find.descendant(of: centre, matching: find.text(value)),
+              value,
+            );
+          }
+          final clock = find.descendant(
+            of: centre,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Text &&
+                  RegExp(r'^\d{2}:\d{2}$').hasMatch(widget.data ?? ''),
+            ),
+          );
+          expect(clock, findsOneWidget);
+          await checkWords(clock, tester.widget<Text>(clock).data!);
+          await captureStoreView(tester, 'r665-rail-order-controls-$suffix');
+        } else {
+          await checkWords(
+            find.text('Ready for orders'),
+            'Ready for orders',
+          );
+        }
+        final labels = [
+          ('work-pulse-sales', 'View statement'),
+          ('work-pulse-dues', 'Collect dues'),
+          ('work-pulse-settlement', 'Settle'),
+          ('work-quick-buy', 'Restock'),
+          ('work-quick-direct', 'Buy Direct'),
+          ('work-quick-group-buy', 'Group Bulk Buying'),
+          ('work-quick-store-link', 'Send store link'),
+          ('work-quick-promote', 'Promote store'),
+          ('work-quick-requirement', 'Post requirement'),
+        ];
+        for (final entry in labels) {
+          final action = find.byKey(Key(entry.$1));
+          await reveal(tester, action);
+          expect(action.hitTestable(), findsOneWidget);
+          expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+          expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
+          final text = find.descendant(
+            of: action,
+            matching: find.text(entry.$2),
+          );
+          final paragraph = tester.renderObject<RenderParagraph>(text);
+          expect(
+            paragraph.textScaler.scale(11),
+            closeTo(11 * display.scale, .01),
+          );
+          for (final word in RegExp(r'\S+').allMatches(entry.$2)) {
+            final boxes = paragraph.getBoxesForSelection(
+              TextSelection(baseOffset: word.start, extentOffset: word.end),
+            );
+            expect(
+              boxes,
+              hasLength(1),
+              reason: '${entry.$2}: ${word.group(0)} splits',
+            );
+            expect(boxes.single.left, greaterThanOrEqualTo(-.5));
+            expect(
+              boxes.single.right,
+              lessThanOrEqualTo(paragraph.size.width + .5),
+            );
+          }
+        }
+        await captureStoreView(tester, 'r665-rail-reach-$hasOrder-$suffix');
+        await tester.tap(find.byKey(const Key('work-quick-requirement')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-requirement-selector')),
+          findsOneWidget,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
+        expect(work.workspaceVisibleToCustomers, isTrue);
+        expect(work.workspaceAcceptingOrders, isTrue);
+        expect(work.workspaceOrders.length, hasOrder ? 2 : 0);
+        expect(tester.takeException(), isNull);
+      });
+    }
     for (final state in [
       (products: false, delivery: false, complete: 0),
       (products: true, delivery: false, complete: 1),
@@ -2389,7 +2511,7 @@ void main() {
         }),
         findsOneWidget,
       );
-      expect(find.text('Ready for customers'), findsNothing);
+      expect(find.text('Ready for orders'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -5394,7 +5516,7 @@ void main() {
         expect(tester.getRect(action).right, lessThanOrEqualTo(320));
       }
       expect(find.text('Ready for customer activity'), findsNothing);
-      expect(find.text('Ready for customers'), findsOneWidget);
+      expect(find.text('Ready for orders'), findsOneWidget);
       expect(find.text('Mahadev Fresh Mart'), findsOneWidget);
       expect(find.text('₹28,450'), findsOneWidget);
       expect(find.text('Sell'), findsOneWidget);

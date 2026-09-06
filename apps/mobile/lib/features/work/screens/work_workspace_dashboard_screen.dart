@@ -1976,9 +1976,14 @@ class _StoreActionEdge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final deal = session.activeGroupBuy;
+    final normalWidth = MediaQuery.sizeOf(context).width < 360 ? 80.0 : 92.0;
+    final readableWidth = MediaQuery.textScalerOf(context).scale(11) > 16
+        ? _storeRailWordWidth(context, 'Restock Buy Direct Group Bulk Buying') +
+              20
+        : normalWidth;
     return Container(
       key: const Key('work-store-action-edge'),
-      width: MediaQuery.sizeOf(context).width < 360 ? 80 : 92,
+      width: readableWidth > normalWidth ? readableWidth : normalWidth,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(left: BorderSide(color: Color(0xFFE5E8F1))),
@@ -2101,6 +2106,62 @@ class _StoreEdgeAction extends StatelessWidget {
   );
 }
 
+double _storeRailWordWidth(BuildContext context, String labels) {
+  final style = DefaultTextStyle.of(
+    context,
+  ).style.merge(const TextStyle(fontSize: 11, fontWeight: FontWeight.w700));
+  var width = 0.0;
+  for (final word in labels.split(RegExp(r'\s+'))) {
+    final painter = TextPainter(
+      text: TextSpan(text: word, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    if (painter.width > width) width = painter.width;
+    painter.dispose();
+  }
+  return width;
+}
+
+class _StoreAdaptiveRail extends StatelessWidget {
+  const _StoreAdaptiveRail({
+    required this.labels,
+    required this.normalFlex,
+    required this.builder,
+  });
+  final List<String> labels;
+  final List<int> normalFlex;
+  final Widget Function(List<int>) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.textScalerOf(context).scale(11) <= 16) {
+      return builder(normalFlex);
+    }
+    final widths = labels
+        .map((label) => (_storeRailWordWidth(context, label) + 16).ceil())
+        .toList();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final minimum = widths
+            .fold<int>(2, (total, width) => total + width)
+            .toDouble();
+        final needsScroll = minimum > constraints.maxWidth;
+        final rail = SizedBox(
+          width: needsScroll ? minimum : constraints.maxWidth,
+          child: builder(widths),
+        );
+        if (!needsScroll) return rail;
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: rail,
+        );
+      },
+    );
+  }
+}
+
 class _StoreReachStrip extends StatelessWidget {
   const _StoreReachStrip({
     required this.onLink,
@@ -2117,66 +2178,78 @@ class _StoreReachStrip extends StatelessWidget {
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFFE5E8F1))),
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            _action(
-              'work-quick-store-link',
-              Icons.link_rounded,
-              'Send store link',
-              onLink,
-            ),
-            const VerticalDivider(width: 1, indent: 12, endIndent: 12),
-            _action(
-              'work-quick-promote',
-              Icons.campaign_outlined,
-              'Promote store',
-              onPromote,
-            ),
-            const VerticalDivider(width: 1, indent: 12, endIndent: 12),
-            _action(
-              'work-quick-requirement',
-              Icons.post_add_rounded,
-              'Post requirement',
-              onRequirement,
-            ),
-          ],
+      child: _StoreAdaptiveRail(
+        labels: const ['Send store link', 'Promote store', 'Post requirement'],
+        normalFlex: const [10, 10, 13],
+        builder: (flex) => IntrinsicHeight(
+          child: Row(
+            children: [
+              _action(
+                'work-quick-store-link',
+                Icons.link_rounded,
+                'Send store link',
+                onLink,
+                flex[0],
+              ),
+              const VerticalDivider(width: 1, indent: 12, endIndent: 12),
+              _action(
+                'work-quick-promote',
+                Icons.campaign_outlined,
+                'Promote store',
+                onPromote,
+                flex[1],
+              ),
+              const VerticalDivider(width: 1, indent: 12, endIndent: 12),
+              _action(
+                'work-quick-requirement',
+                Icons.post_add_rounded,
+                'Post requirement',
+                onRequirement,
+                flex[2],
+              ),
+            ],
+          ),
         ),
       ),
     ),
   );
 
-  Widget _action(String key, IconData icon, String label, VoidCallback onTap) =>
-      Expanded(
-        flex: key == 'work-quick-requirement' ? 13 : 10,
-        child: InkWell(
-          key: Key(key),
-          onTap: onTap,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 52),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, size: 19, color: MoolColors.navy),
-                  const SizedBox(height: 4),
-                  Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      height: 1.25,
-                      fontWeight: FontWeight.w700,
-                      color: MoolColors.navy,
-                    ),
-                  ),
-                ],
+  Widget _action(
+    String key,
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+    int flex,
+  ) => Expanded(
+    flex: flex,
+    child: InkWell(
+      key: Key(key),
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 52),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 19, color: MoolColors.navy),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 11,
+                  height: 1.25,
+                  fontWeight: FontWeight.w700,
+                  color: MoolColors.navy,
+                ),
               ),
-            ),
+            ],
           ),
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _StoreLiveBusinessPulse extends StatelessWidget {
@@ -2205,40 +2278,51 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
           color: Colors.white,
           border: Border(bottom: BorderSide(color: Color(0xFFE5E8F1))),
         ),
-        child: IntrinsicHeight(
-          key: const Key('work-store-live-business-pulse'),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _StorePulseMetric(
-                keyName: 'work-pulse-sales',
-                label: 'View statement',
-                contextLabel: 'Sales today',
-                value: '₹${_formatStoreAmount(session.workspaceSalesToday)}',
-                icon: Icons.point_of_sale_outlined,
-                onTap: onSales,
-              ),
-              _StorePulseDivider(),
-              _StorePulseMetric(
-                keyName: 'work-pulse-dues',
-                label: 'Collect dues',
-                contextLabel: 'Unpaid bills',
-                value:
-                    '₹${_formatStoreAmount(session.workspaceCustomerBook.fold<int>(0, (total, customer) => total + customer.amountDue))}',
-                icon: Icons.payments_outlined,
-                onTap: onOrders,
-              ),
-              _StorePulseDivider(),
-              _StorePulseMetric(
-                keyName: 'work-pulse-settlement',
-                label: 'Settle',
-                contextLabel: 'Available',
-                value:
-                    '₹${_formatStoreAmount(session.workspaceSettlementEligible)}',
-                icon: Icons.account_balance_wallet_outlined,
-                onTap: onSettlement,
-              ),
-            ],
+        child: _StoreAdaptiveRail(
+          labels: const [
+            'View statement Sales today',
+            'Collect dues Unpaid bills',
+            'Settle Available',
+          ],
+          normalFlex: const [1, 1, 1],
+          builder: (flex) => IntrinsicHeight(
+            key: const Key('work-store-live-business-pulse'),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _StorePulseMetric(
+                  keyName: 'work-pulse-sales',
+                  flex: flex[0],
+                  label: 'View statement',
+                  contextLabel: 'Sales today',
+                  value: '₹${_formatStoreAmount(session.workspaceSalesToday)}',
+                  icon: Icons.point_of_sale_outlined,
+                  onTap: onSales,
+                ),
+                _StorePulseDivider(),
+                _StorePulseMetric(
+                  keyName: 'work-pulse-dues',
+                  flex: flex[1],
+                  label: 'Collect dues',
+                  contextLabel: 'Unpaid bills',
+                  value:
+                      '₹${_formatStoreAmount(session.workspaceCustomerBook.fold<int>(0, (total, customer) => total + customer.amountDue))}',
+                  icon: Icons.payments_outlined,
+                  onTap: onOrders,
+                ),
+                _StorePulseDivider(),
+                _StorePulseMetric(
+                  keyName: 'work-pulse-settlement',
+                  flex: flex[2],
+                  label: 'Settle',
+                  contextLabel: 'Available',
+                  value:
+                      '₹${_formatStoreAmount(session.workspaceSettlementEligible)}',
+                  icon: Icons.account_balance_wallet_outlined,
+                  onTap: onSettlement,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2266,6 +2350,7 @@ class _StorePulseMetric extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.onTap,
+    required this.flex,
   });
 
   final String keyName;
@@ -2274,11 +2359,13 @@ class _StorePulseMetric extends StatelessWidget {
   final String value;
   final IconData icon;
   final VoidCallback onTap;
+  final int flex;
 
   @override
   Widget build(BuildContext context) {
     const accent = MoolColors.navy;
     return Expanded(
+      flex: flex,
       child: Semantics(
         button: true,
         label: '$label, $contextLabel, $value in store records',
@@ -2644,71 +2731,51 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                       ],
                     ),
                   SizedBox(height: compact ? 0 : 14),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          session.workspaceOrderCustomer
-                              .split('·')
-                              .first
-                              .trim(),
-                          style: TextStyle(
-                            fontSize: compact ? 14 : 18,
-                            height: 1.25,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF141633),
-                          ),
+                  _StoreScaledPair(
+                    first: Text(
+                      session.workspaceOrderCustomer.split('·').first.trim(),
+                      style: TextStyle(
+                        fontSize: compact ? 14 : 18,
+                        height: 1.25,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF141633),
+                      ),
+                    ),
+                    second: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        amount,
+                        style: TextStyle(
+                          fontSize: compact ? 18 : 24,
+                          height: 1.15,
+                          fontWeight: FontWeight.w800,
+                          color: MoolColors.navy,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            amount,
-                            style: TextStyle(
-                              fontSize: compact ? 18 : 24,
-                              height: 1.15,
-                              fontWeight: FontWeight.w800,
-                              color: MoolColors.navy,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                   const SizedBox(height: 7),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          collection,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            height: 1.35,
-                            color: MoolColors.muted,
-                          ),
-                        ),
+                  _StoreScaledPair(
+                    gap: 10,
+                    first: Text(
+                      collection,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        height: 1.35,
+                        color: MoolColors.muted,
                       ),
-                      const SizedBox(width: 10),
-                      Flexible(
-                        child: Text(
-                          session.workspaceOrderPayment,
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            height: 1.35,
-                            fontWeight: FontWeight.w600,
-                            color: MoolColors.navy,
-                          ),
-                        ),
+                    ),
+                    second: Text(
+                      session.workspaceOrderPayment,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                        color: MoolColors.navy,
                       ),
-                    ],
+                    ),
                   ),
                   const Divider(height: 25, color: Color(0xFFE6E9F2)),
                   Text(
@@ -2731,25 +2798,28 @@ class _IncomingOrderActivityCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             color: const Color(0xFFF3F5FD),
-            child: Row(
-              children: [
-                const Icon(Icons.circle, size: 5, color: MoolColors.navy),
-                const SizedBox(width: 6),
-                const Expanded(
-                  child: Text(
-                    'Awaiting acceptance',
-                    style: TextStyle(
-                      fontSize: 10,
-                      height: 1.2,
-                      fontWeight: FontWeight.w600,
-                      color: MoolColors.navy,
+            child: _StoreScaledPair(
+              gap: 5,
+              first: const Row(
+                children: [
+                  Icon(Icons.circle, size: 5, color: MoolColors.navy),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Awaiting acceptance',
+                      style: TextStyle(
+                        fontSize: 10,
+                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                        color: MoolColors.navy,
+                      ),
                     ),
                   ),
-                ),
-                if (session.workspaceOrderActionDeadline != null) ...[
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: _LiveCountdownText(
+                ],
+              ),
+              second: session.workspaceOrderActionDeadline == null
+                  ? const SizedBox.shrink()
+                  : _LiveCountdownText(
                       deadline: session.workspaceOrderActionDeadline,
                       fallback: 'Review now',
                       style: const TextStyle(
@@ -2758,38 +2828,30 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                         color: MoolColors.navy,
                       ),
                     ),
-                  ),
-                ],
-              ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    key: const Key('work-activity-order-review'),
-                    onPressed: onReview,
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(44, 44),
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                    ),
-                    child: const Text(
-                      'View details',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+            child: _StoreScaledPair(
+              gap: 0,
+              flexibleSecond: false,
+              first: TextButton(
+                key: const Key('work-activity-order-review'),
+                onPressed: onReview,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
                 ),
-                _DeskCustomerActions(
-                  customer: session.workspaceOrderCustomer,
-                  orderId:
-                      session.currentWorkspaceOrderId ?? 'current-store-order',
+                child: const Text(
+                  'View details',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                 ),
-              ],
+              ),
+              second: _DeskCustomerActions(
+                customer: session.workspaceOrderCustomer,
+                orderId:
+                    session.currentWorkspaceOrderId ?? 'current-store-order',
+              ),
             ),
           ),
           _OrderDecisionButtons(
@@ -2803,6 +2865,49 @@ class _IncomingOrderActivityCard extends StatelessWidget {
   }
 }
 
+class _StoreScaledPair extends StatelessWidget {
+  const _StoreScaledPair({
+    required this.first,
+    required this.second,
+    this.gap = 8,
+    this.flexibleFirst = true,
+    this.flexibleSecond = true,
+    this.expandSecond = false,
+    this.crossAxisAlignment = CrossAxisAlignment.start,
+  });
+  final Widget first, second;
+  final double gap;
+  final bool flexibleFirst, flexibleSecond, expandSecond;
+  final CrossAxisAlignment crossAxisAlignment;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.textScalerOf(context).scale(11) > 16) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          first,
+          SizedBox(height: gap),
+          second,
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: crossAxisAlignment,
+      children: [
+        if (flexibleFirst) Expanded(child: first) else first,
+        SizedBox(width: gap),
+        if (expandSecond)
+          Expanded(child: second)
+        else if (flexibleSecond)
+          Flexible(child: second)
+        else
+          second,
+      ],
+    );
+  }
+}
+
 class _DeskItemLine extends StatelessWidget {
   const _DeskItemLine({required this.label, required this.quantity});
   final String label;
@@ -2810,31 +2915,27 @@ class _DeskItemLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              height: 1.4,
-              color: MoolColors.ink,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+    child: _StoreScaledPair(
+      gap: 10,
+      flexibleSecond: false,
+      first: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 13,
+          height: 1.4,
+          color: MoolColors.ink,
+          fontWeight: FontWeight.w600,
         ),
-        const SizedBox(width: 10),
-        Text(
-          '× $quantity',
-          style: const TextStyle(
-            fontSize: 13,
-            height: 1.4,
-            color: MoolColors.navy,
-            fontWeight: FontWeight.w700,
-          ),
+      ),
+      second: Text(
+        '× $quantity',
+        style: const TextStyle(
+          fontSize: 13,
+          height: 1.4,
+          color: MoolColors.navy,
+          fontWeight: FontWeight.w700,
         ),
-      ],
+      ),
     ),
   );
 }
@@ -2920,40 +3021,34 @@ class _OrderDecisionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
-    child: Row(
-      children: [
-        Expanded(
-          child: OutlinedButton(
-            key: const Key('work-activity-order-reject'),
-            onPressed: busy ? null : onReject,
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(44, 48),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              side: const BorderSide(color: Color(0xFFD7DCED)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Reject', style: TextStyle(fontSize: 13)),
+    child: _StoreScaledPair(
+      expandSecond: true,
+      first: OutlinedButton(
+        key: const Key('work-activity-order-reject'),
+        onPressed: busy ? null : onReject,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(44, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          side: const BorderSide(color: Color(0xFFD7DCED)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: FilledButton(
-            key: const Key('work-activity-order-accept'),
-            onPressed: busy ? null : onAccept,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(44, 48),
-              backgroundColor: MoolColors.navy,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Accept', style: TextStyle(fontSize: 13)),
+        child: const Text('Reject', style: TextStyle(fontSize: 13)),
+      ),
+      second: FilledButton(
+        key: const Key('work-activity-order-accept'),
+        onPressed: busy ? null : onAccept,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(44, 48),
+          backgroundColor: MoolColors.navy,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
-      ],
+        child: const Text('Accept', style: TextStyle(fontSize: 13)),
+      ),
     ),
   );
 }
@@ -4452,46 +4547,49 @@ class _StoreReadyActivity extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              CircleAvatar(
+          _StoreScaledPair(
+            gap: 12,
+            flexibleFirst: false,
+            expandSecond: true,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            first: const Align(
+              alignment: Alignment.centerLeft,
+              widthFactor: 1,
+              child: CircleAvatar(
                 radius: 22,
                 backgroundColor: Color(0xFFF0F3FF),
                 child: Icon(Icons.storefront_rounded, color: MoolColors.navy),
               ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      open
-                          ? 'Ready for customers'
-                          : paused
-                          ? 'Orders are paused'
-                          : private
-                          ? 'Your store is private'
-                          : 'Your store is off',
-                      style: const TextStyle(
-                        color: MoolColors.ink,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      open
-                          ? 'New orders will appear here.'
-                          : 'Manage opening and visibility in your business profile.',
-                      style: const TextStyle(
-                        color: MoolColors.muted,
-                        fontSize: 10.5,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
+            ),
+            second: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  open
+                      ? 'Ready for orders'
+                      : paused
+                      ? 'Orders are paused'
+                      : private
+                      ? 'Your store is private'
+                      : 'Your store is off',
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-            ],
+                Text(
+                  open
+                      ? 'New orders will appear here.'
+                      : 'Manage opening and visibility in your business profile.',
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 10.5,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -6021,7 +6119,7 @@ class _WorkspaceSectionLabel extends StatelessWidget {
         final supporting = Text(
           detail,
           textAlign: stacked ? TextAlign.start : TextAlign.end,
-          maxLines: 2,
+          maxLines: largeText ? null : 2,
           style: const TextStyle(
             color: MoolColors.muted,
             fontSize: 9.5,
