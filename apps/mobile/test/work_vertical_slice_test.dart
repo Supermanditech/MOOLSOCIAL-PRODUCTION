@@ -511,12 +511,10 @@ void main() {
         const Key('work-profile-choose-retailer-grocery'),
       );
       expect(find.byKey(const Key('work-requirements-screen')), findsOneWidget);
-      expect(find.text('Account owner identity'), findsOneWidget);
-      expect(find.text('Shop address document'), findsOneWidget);
+      expect(find.text('Your identity proof'), findsOneWidget);
+      expect(find.text('Shop address proof'), findsOneWidget);
       expect(
-        find.textContaining(
-          'You can submit your application before adding documents',
-        ),
+        find.textContaining('You can add documents later.'),
         findsOneWidget,
       );
       final gstDocument = workProfiles
@@ -527,7 +525,7 @@ void main() {
           );
       expect(gstDocument.importance, WorkDocumentImportance.ifApplicable);
       await tester.scrollUntilVisible(
-        find.text('Payout bank account proof'),
+        find.text('Bank proof for payments'),
         240,
         scrollable: find
             .descendant(
@@ -537,13 +535,13 @@ void main() {
             .first,
       );
       await tester.pumpAndSettle();
-      expect(find.text('Payout bank account proof'), findsOneWidget);
+      expect(find.text('Bank proof for payments'), findsOneWidget);
       expect(
         find.textContaining('cancelled cheque or recent bank statement PDF'),
         findsOneWidget,
       );
       await tester.scrollUntilVisible(
-        find.text('GST registration certificate'),
+        find.text('GST certificate'),
         240,
         scrollable: find
             .descendant(
@@ -553,11 +551,10 @@ void main() {
             .first,
       );
       await tester.pumpAndSettle();
-      expect(find.text('GST registration certificate'), findsOneWidget);
+      expect(find.text('GST certificate'), findsOneWidget);
       expect(
         find.text(
-          'Required when GST registration applies to this Workspace. '
-          'Applicability is confirmed during verification.',
+          'Your registration certificate, where GST registration applies to your business.',
         ),
         findsOneWidget,
       );

@@ -672,7 +672,7 @@ class WorkDocumentRequirementsScreen extends StatelessWidget {
             key: Key('work-requirements-role-summary'),
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Text(
-              'Keep clear copies ready. You can submit your application before adding documents; MoolSocial will confirm what is needed.',
+              'MoolSocial will verify your documents and update you on activation or further details by MoolSocial Chat, WhatsApp, email or phone. You can add documents later.',
               style: TextStyle(
                 color: MoolColors.muted,
                 fontSize: 12,
@@ -688,6 +688,10 @@ class WorkDocumentRequirementsScreen extends StatelessWidget {
             _DocumentRequirementCard(
               index: index,
               item: profile.verificationDocuments[index],
+              retailer: const {
+                'retailer-grocery',
+                'retailer-speciality',
+              }.contains(profile.id),
             ),
             const SizedBox(height: MoolSpacing.sm),
           ],
@@ -699,9 +703,45 @@ class WorkDocumentRequirementsScreen extends StatelessWidget {
 }
 
 class _DocumentRequirementCard extends StatelessWidget {
-  const _DocumentRequirementCard({required this.index, required this.item});
+  const _DocumentRequirementCard({
+    required this.index,
+    required this.item,
+    required this.retailer,
+  });
   final int index;
   final WorkDocumentChecklistItem item;
+  final bool retailer;
+
+  // Presentation only: canonical document names still bind stored proof IDs.
+  (String, String) get _copy => !retailer
+      ? (item.title, item.detail)
+      : switch (item.title) {
+          'Account owner identity' => (
+            'Your identity proof',
+            'PAN, Aadhaar or another accepted government ID.',
+          ),
+          'Shop address document' || 'Store address document' => (
+            'Shop address proof',
+            'Ownership papers, rent or lease agreement, owner’s consent, or a recent utility bill.',
+          ),
+          'Food business registration or licence' => (
+            'Food business licence',
+            'FSSAI registration or licence, where applicable.',
+          ),
+          'Owner or operator authority' => (
+            'Owner’s authorisation',
+            'Permission from the shop owner if you are setting up the shop on their behalf.',
+          ),
+          'Payout bank account proof' => (
+            'Bank proof for payments',
+            'A cancelled cheque or recent bank statement PDF showing the account holder’s name, account number and IFSC.',
+          ),
+          'GST registration certificate' => (
+            'GST certificate',
+            'Your registration certificate, where GST registration applies to your business.',
+          ),
+          _ => (item.title, item.detail),
+        };
 
   @override
   Widget build(BuildContext context) => Container(
@@ -720,7 +760,7 @@ class _DocumentRequirementCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                item.title,
+                _copy.$1,
                 style: const TextStyle(
                   color: MoolColors.navy,
                   fontSize: 14,
@@ -729,7 +769,7 @@ class _DocumentRequirementCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                item.detail,
+                _copy.$2,
                 style: const TextStyle(
                   color: MoolColors.muted,
                   fontSize: 12,

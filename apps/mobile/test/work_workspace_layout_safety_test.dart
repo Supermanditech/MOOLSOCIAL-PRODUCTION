@@ -291,6 +291,81 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final profileId in [
+    'retailer-grocery',
+    'retailer-speciality',
+    'salon',
+  ]) {
+    testWidgets(
+      'OPPO S02 document copy preserves proof bindings - $profileId',
+      (tester) async {
+        final work = WorkSession()..selectProfile(profileId);
+        final originalIds = work.selectedWorkspaceDocuments
+            .map((proof) => proof.id)
+            .toList();
+        await mount(
+          tester,
+          route: '/app/work/workspace/requirements',
+          work: work,
+          viewport: const Size(320, 568),
+          textScale: 1.4,
+          bottomInset: 24,
+        );
+        final retailer = profileId.startsWith('retailer-');
+        expect(
+          find.text(
+            retailer ? 'Your identity proof' : 'Account owner identity',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('You can add documents later.'),
+          findsOneWidget,
+        );
+        expect(
+          work.selectedGstChecklistItem?.title,
+          'GST registration certificate',
+        );
+        expect(
+          work.selectedGstChecklistItem?.importance,
+          WorkDocumentImportance.ifApplicable,
+        );
+        expect(
+          work.selectedWorkspaceDocuments.map((proof) => proof.id),
+          originalIds,
+        );
+        if (profileId == 'retailer-grocery') {
+          expect(originalIds, [
+            'personal-kyc',
+            'shop-front',
+            'retailer-grocery-document-2',
+            'owner-authority',
+            'payout-bank-account',
+            'gst',
+          ]);
+        }
+        await captureStoreView(
+          tester,
+          'r665-documents-$profileId-320-large-text',
+        );
+        final bank = find.text(
+          retailer ? 'Bank proof for payments' : 'Payout bank account proof',
+        );
+        await reveal(tester, bank);
+        expect(bank, findsOneWidget);
+        expect(
+          find.byKey(const Key('work-requirements-ready')).hitTestable(),
+          findsOneWidget,
+        );
+        await captureStoreView(
+          tester,
+          'r665-documents-bank-$profileId-320-large-text',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final page in [
     'choose',
     'requirements',
