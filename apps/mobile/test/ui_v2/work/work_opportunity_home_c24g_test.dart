@@ -162,8 +162,14 @@ void main() {
     expect(find.byKey(const Key('my-work-screen')), findsNothing);
     expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
     expect(find.byKey(const Key('workspace-chooser-hero')), findsOneWidget);
-    expect(find.text('Grow with MoolSocial'), findsOneWidget);
-    expect(find.text('Your business. More customers.'), findsOneWidget);
+    final search = find.byKey(const Key('work-workspace-search'));
+    expect(
+      find.ancestor(of: search, matching: find.byType(AppBar)),
+      findsOneWidget,
+    );
+    expect(tester.widget<TextField>(search).decoration!.filled, isFalse);
+    expect(find.text('Partner with MoolSocial'), findsOneWidget);
+    expect(find.text('Your business. More customers.'), findsNothing);
     expect(find.textContaining('Choose Workspace'), findsOneWidget);
     expect(find.textContaining('Upload documents'), findsOneWidget);
     expect(find.text('Signed in'), findsNothing);

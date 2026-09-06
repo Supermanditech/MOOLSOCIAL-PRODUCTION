@@ -10,6 +10,17 @@
   },
   "entries": [
     {
+      "id": "REG-20260906-4521-WORK-SELECTOR-INLINE-HEADER-STALE-C24G-CONTRACT",
+      "status": "confirmed_test_contract_correction_in_progress",
+      "appliesTo": ["primary", "work", "testing", "copy"],
+      "mistake": "The r66.5 S01 four-suite regression returned197 passes,81 intentional skips and1 failure because C24G still expected Grow with MoolSocial and Your business. More customers. after the founder-approved inline Search header and partnership-copy replacement.",
+      "rootCause": "Focused discovery tests covered the new header, alias, category, keyboard and Back behaviour; the older C24G rendered-copy contract was not updated in the same bounded change.",
+      "prevention": "Assert the native header Search and Partner with MoolSocial introduction while preserving chooser, document progression, tap-target, no-fabricated-state, navigation and accessibility checks. Rerun the exact failed C24G test and all four Work suites; do not remove the test or restore superseded copy to force a pass.",
+      "diagnosticEvidence": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/r665-s01-work-regressions-attempt1.log; SHA25625B40B5DC3D92FF64BD9AE2E4ED139C399176F93657B64C5B4541E2A3E0017C0; exit1; complete expanded output retained.",
+      "gates": ["apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/test/ui_v2/work/work_opportunity_home_c24g_test.dart"]
+    },
+    {
       "id": "REG-20260906-4520-WORK-REQUEST-MEMORY-DRAFT-CLAIMS-DEVICE-SAVE",
       "status": "confirmed_owned_child_in_progress",
       "appliesTo": ["primary", "work", "testing", "copy"],

@@ -205,6 +205,92 @@ void main() {
     );
   }
 
+  testWidgets('OPPO S01 inline discovery preserves the selected application', (
+    tester,
+  ) async {
+    final work = WorkSession()..selectProfile('retailer-grocery');
+    await mount(
+      tester,
+      route: '/app/work/workspace/choose',
+      work: work,
+      viewport: const Size(412, 915),
+      textScale: 1,
+    );
+    final search = find.byKey(const Key('work-workspace-search'));
+    expect(
+      find.ancestor(of: search, matching: find.byType(AppBar)),
+      findsOneWidget,
+    );
+    expect(tester.widget<TextField>(search).decoration!.filled, isFalse);
+    expect(find.text('Partner with MoolSocial'), findsOneWidget);
+    await captureStoreView(tester, 'r665-selector-first-view');
+    await tester.enterText(search, 'saloon');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-profile-salon')), findsOneWidget);
+    expect(find.byKey(const Key('workspace-chooser-hero')), findsNothing);
+    expect(work.selectedProfile?.id, 'retailer-grocery');
+    await tester.enterText(search, 'not-a-workspace');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-workspace-no-match')), findsOneWidget);
+    expect(find.byKey(const Key('work-profile-not-shown')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-workspace-search-clear')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(search).controller!.text, isEmpty);
+    await tester.tap(find.byKey(const Key('work-workspace-category')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byType(PopupMenuItem<String>),
+      findsNWidgets(work.familyIds.length + 1),
+    );
+    await tester.tap(find.text('All businesses'));
+    await tester.pumpAndSettle();
+    expect(work.selectedProfile?.id, 'retailer-grocery');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('OPPO S01 search keeps a complete match above compact keyboard', (
+    tester,
+  ) async {
+    final work = WorkSession();
+    await mount(
+      tester,
+      route: '/app/work/workspace/choose',
+      work: work,
+      viewport: const Size(320, 568),
+      textScale: 1.4,
+      bottomInset: 24,
+    );
+    final search = find.byKey(const Key('work-workspace-search'));
+    await tester.enterText(search, 'grocery');
+    tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+    await tester.pumpAndSettle();
+    final match = find.byKey(const Key('work-profile-retailer-grocery'));
+    expect(match, findsOneWidget);
+    expect(tester.getBottomRight(match).dy, lessThanOrEqualTo(328));
+    expect(tester.getTopLeft(search).dy, lessThan(tester.getTopLeft(match).dy));
+    expect(find.byKey(const Key('workspace-chooser-hero')), findsNothing);
+    await captureStoreView(tester, 'r665-selector-keyboard-320-large-text');
+    tester.view.viewInsets = const FakeViewPadding();
+    tester.testTextInput.hide();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(search).controller!.text, 'grocery');
+    await tester.tap(match);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('workspace-benefits-retailer-grocery')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('work-back')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('workspace-benefits-retailer-grocery')),
+      findsNothing,
+    );
+    expect(tester.widget<TextField>(search).controller!.text, 'grocery');
+    expect(tester.takeException(), isNull);
+  });
+
   for (final page in [
     'choose',
     'requirements',

@@ -30,13 +30,32 @@ class WorkChooseActivityScreen extends StatefulWidget {
 class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
   String? _expandedProfileId;
   String _workspaceQuery = '';
+  String? _categoryId;
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
+
+  bool _matches(WorkProfileOption option) {
+    final query = _workspaceQuery.replaceAll('saloon', 'salon');
+    return option.label.toLowerCase().contains(query);
+  }
 
   @override
   void initState() {
     super.initState();
+    _searchFocus.addListener(_refreshSearch);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) widget.session.loadInitialWorkspaceState();
     });
+  }
+
+  void _refreshSearch() => setState(() {});
+
+  @override
+  void dispose() {
+    _searchFocus.removeListener(_refreshSearch);
+    _searchFocus.dispose();
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -45,7 +64,14 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
       animation: widget.session,
       builder: (context, _) {
         final family = widget.session.selectedFamilyId;
-        final profile = widget.session.selectedProfile;
+        final category = _categoryId ?? family;
+        final matchingFamilies = widget.session.familyIds
+            .where(
+              (id) =>
+                  (category == null || category.isEmpty || category == id) &&
+                  widget.session.profilesForFamily(id).any(_matches),
+            )
+            .toList();
 
         void collapseBenefits() {
           setState(() => _expandedProfileId = null);
@@ -67,7 +93,41 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
         return WorkPageScaffold(
           session: widget.session,
           title: 'Grow with MoolSocial',
-          headerHeight: 68,
+          headerHeight: 56,
+          headerTitle: TextField(
+            key: const Key('work-workspace-search'),
+            controller: _searchController,
+            focusNode: _searchFocus,
+            textInputAction: TextInputAction.search,
+            style: const TextStyle(fontSize: 15, color: MoolColors.ink),
+            decoration: InputDecoration(
+              hintText: 'Search',
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              prefixIcon: const Icon(Icons.search, size: 22),
+              suffixIcon: _workspaceQuery.isEmpty
+                  ? null
+                  : IconButton(
+                      key: const Key('work-workspace-search-clear'),
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _workspaceQuery = '');
+                      },
+                      icon: const Icon(Icons.close, size: 20),
+                    ),
+            ),
+            onChanged: (value) => setState(() {
+              _workspaceQuery = value.trim().toLowerCase();
+              _expandedProfileId = null;
+              // A search spans every category without changing the application.
+              _categoryId = '';
+            }),
+            onSubmitted: (_) => _searchFocus.unfocus(),
+          ),
           subtitle: family == null
               ? 'Choose the Workspace that matches what you do'
               : widget.session.familyLabel(family),
@@ -83,7 +143,31 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
               : widget.session.changeFamily,
           activeLocalAction: 'workspace',
           showHeaderChat: false,
-          showTrailingAction: false,
+          showTrailingAction: true,
+          hideNavigationWhenKeyboardVisible: true,
+          trailing: PopupMenuButton<String>(
+            key: const Key('work-workspace-category'),
+            tooltip: 'Business categories',
+            icon: const Icon(Icons.tune_rounded),
+            initialValue: category ?? '',
+            onSelected: (value) {
+              _searchFocus.unfocus();
+              _searchController.clear();
+              setState(() {
+                _categoryId = value;
+                _workspaceQuery = '';
+                _expandedProfileId = null;
+              });
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: '', child: Text('All businesses')),
+              for (final id in widget.session.familyIds)
+                PopupMenuItem(
+                  value: id,
+                  child: Text(widget.session.familyLabel(id)),
+                ),
+            ],
+          ),
           body: ListView(
             key: const Key('work-choose-screen'),
             padding: const EdgeInsets.fromLTRB(
@@ -93,7 +177,8 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
               MoolSpacing.xl,
             ),
             children: [
-              const _WorkspaceEntryHero(),
+              if (!_searchFocus.hasFocus && _workspaceQuery.isEmpty)
+                const _WorkspaceEntryHero(),
               if (widget.session.selectedOpportunity
                   case final opportunity?) ...[
                 const SizedBox(height: MoolSpacing.sm),
@@ -110,82 +195,22 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                 _WorkspaceApplicationSummary(session: widget.session),
               ],
               const SizedBox(height: MoolSpacing.sm),
-              if (family == null) ...[
-                TextField(
-                  key: const Key('work-workspace-search'),
-                  decoration: const InputDecoration(
-                    hintText: 'Find your business or profession',
-                    prefixIcon: Icon(Icons.search),
-                    border: UnderlineInputBorder(),
+              for (final familyId in matchingFamilies) ...[
+                if (_searchFocus.hasFocus || _workspaceQuery.isNotEmpty)
+                  Text(
+                    widget.session.familyLabel(familyId),
+                    style: Theme.of(context).textTheme.labelLarge,
+                  )
+                else
+                  WorkSectionTitle(
+                    title: widget.session.familyLabel(familyId),
+                    detail: _workspaceGroupPresentation(familyId).examples,
                   ),
-                  onChanged: (value) => setState(
-                    () => _workspaceQuery = value.trim().toLowerCase(),
-                  ),
-                ),
                 const SizedBox(height: MoolSpacing.sm),
-                for (final familyId in widget.session.familyIds)
-                  if (widget.session
-                      .profilesForFamily(familyId)
-                      .any(
-                        (option) => option.label.toLowerCase().contains(
-                          _workspaceQuery,
-                        ),
-                      )) ...[
-                    WorkSectionTitle(
-                      title: widget.session.familyLabel(familyId),
-                      detail: _workspaceGroupPresentation(familyId).examples,
-                    ),
-                    const SizedBox(height: MoolSpacing.sm),
-                    for (final option
-                        in widget.session
-                            .profilesForFamily(familyId)
-                            .where(
-                              (option) => option.label.toLowerCase().contains(
-                                _workspaceQuery,
-                              ),
-                            )) ...[
-                      WorkWorkspaceBenefitCard(
-                        option: option,
-                        content: workWorkspaceBenefitFor(option.id),
-                        expanded: _expandedProfileId == option.id,
-                        onToggle: () => toggleBenefits(option.id),
-                        onChoose: () => chooseWorkspace(option),
-                      ),
-                      const SizedBox(height: MoolSpacing.sm),
-                    ],
-                    const SizedBox(height: MoolSpacing.xs),
-                  ],
-                OutlinedButton.icon(
-                  key: const Key('work-profile-not-shown'),
-                  onPressed: () => _showUnsupportedRequest(context),
-                  icon: const Icon(Icons.chat_bubble_outline_rounded),
-                  label: const Text(
-                    'Can’t find your Workspace? Tell us what you do',
-                  ),
-                ),
-              ] else ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: WorkSectionTitle(
-                        title:
-                            'Choose a ${widget.session.familyLabel(family)} Workspace',
-                        detail: profile == null
-                            ? 'Select the Workspace that best matches what you do.'
-                            : 'See how this Workspace can help you grow.',
-                      ),
-                    ),
-                    TextButton(
-                      key: const Key('work-change-family'),
-                      onPressed: widget.session.changeFamily,
-                      child: const Text('Browse Workspaces'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                for (final option in widget.session.profilesForFamily(
-                  family,
-                )) ...[
+                for (final option
+                    in widget.session
+                        .profilesForFamily(familyId)
+                        .where(_matches)) ...[
                   WorkWorkspaceBenefitCard(
                     option: option,
                     content: workWorkspaceBenefitFor(option.id),
@@ -195,7 +220,25 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                   ),
                   const SizedBox(height: MoolSpacing.sm),
                 ],
+                const SizedBox(height: MoolSpacing.xs),
               ],
+              if (matchingFamilies.isEmpty)
+                Padding(
+                  key: const Key('work-workspace-no-match'),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'No matching Workspace. Try another name or tell us what you do.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              OutlinedButton.icon(
+                key: const Key('work-profile-not-shown'),
+                onPressed: () => _showUnsupportedRequest(context),
+                icon: const Icon(Icons.chat_bubble_outline_rounded),
+                label: const Text(
+                  'Can’t find your Workspace? Tell us what you do',
+                ),
+              ),
             ],
           ),
         );
@@ -980,8 +1023,8 @@ class _WorkspaceEntryHero extends StatelessWidget {
       'Choose Workspace',
       'Upload documents',
       'MoolSocial review',
-      'Add your products',
-      'Go live',
+      'Set up Workspace',
+      'Get started',
     ];
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
@@ -998,10 +1041,10 @@ class _WorkspaceEntryHero extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Your business. More customers.',
+              'Partner with MoolSocial',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 19,
+                fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
             ),
