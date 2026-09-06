@@ -110,6 +110,48 @@ void main() {
     }
   }
 
+  for (final source in ['pasta', 'w-rice-50kg']) {
+    testWidgets('R664 Recent keeps the complete arrival deadline for $source', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      final product = source == 'pasta'
+          ? BuyV2Catalogue.products.firstWhere(
+              (product) => product.title == 'Durum wheat pasta',
+            )
+          : session.product(source);
+      session.openDestination(product.destination);
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      session.openProduct(product.id);
+      await tester.pumpAndSettle();
+      session.goBack();
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.catalogue);
+      final facts = find.byKey(
+        ValueKey('buy-recently-viewed-facts-${product.id}'),
+      );
+      await tester.ensureVisible(facts);
+      await tester.pumpAndSettle();
+      expectCompleteText(tester, facts, wordsFit: true);
+      await captureR66Visual(tester, 'r664-recent-deadline-$source');
+      final target = find.byKey(
+        ValueKey('buy-recently-viewed-product-${product.id}'),
+      );
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+      expect(session.selectedProductId, product.id);
+      expect(session.view, BuyV2View.product);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final destination in [
     BuyV2Destination.shop,
     BuyV2Destination.wholesale,

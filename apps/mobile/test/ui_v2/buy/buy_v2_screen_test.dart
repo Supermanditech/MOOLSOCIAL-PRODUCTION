@@ -2985,6 +2985,40 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  bool expectCartSummary(WidgetTester tester, int count, int total) {
+    final summary = '$count ${count == 1 ? 'item' : 'items'}';
+    final indicator = find.byKey(const ValueKey('buy-compact-cart-indicator'));
+    final parked = find.byKey(const ValueKey('buy-cart-navigation-button'));
+    if (parked.evaluate().isNotEmpty) {
+      expect(parked.hitTestable(), findsOneWidget);
+      expect(tester.getSize(parked), const Size(44, 44));
+      final tooltip = tester.widget<Tooltip>(
+        find.descendant(of: indicator, matching: find.byType(Tooltip)),
+      );
+      expect(tooltip.message, contains(summary));
+      expect(tooltip.message, contains(buyV2Money(total)));
+      expect(tester.getSemantics(indicator).label, tooltip.message);
+      return true;
+    }
+    expect(
+      tester
+          .widget<BuyV2FiniteValueTransition>(
+            find.byKey(const ValueKey('buy-cart-summary')),
+          )
+          .text,
+      summary,
+    );
+    expect(
+      tester
+          .widget<BuyV2FiniteValueTransition>(
+            find.byKey(const ValueKey('buy-cart-total')),
+          )
+          .text,
+      buyV2Money(total),
+    );
+    return false;
+  }
+
   for (final total in [1, 10000, 10000000]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(
@@ -3023,7 +3057,29 @@ void main() {
               expect(cartRect.overlaps(visible), isFalse);
             }
           }
-          for (final key in ['buy-cart-summary', 'buy-cart-total']) {
+          final parked = expectCartSummary(
+            tester,
+            session.countForDestination(BuyV2Destination.wholesale),
+            total,
+          );
+          if (parked) {
+            final tooltip = find.descendant(
+              of: find.byKey(const ValueKey('buy-compact-cart-indicator')),
+              matching: find.byType(Tooltip),
+            );
+            await tester.longPress(
+              find.byKey(const ValueKey('buy-cart-navigation-button')),
+            );
+            await tester.pumpAndSettle();
+            final message = find.text(tester.widget<Tooltip>(tooltip).message!);
+            expect(message, findsOneWidget);
+            expect(
+              tester.renderObject<RenderParagraph>(message).didExceedMaxLines,
+              isFalse,
+            );
+          }
+          for (final key
+              in parked ? <String>[] : ['buy-cart-summary', 'buy-cart-total']) {
             final value = tester.widget<BuyV2FiniteValueTransition>(
               find.byKey(ValueKey(key)),
             );
@@ -3043,14 +3099,6 @@ void main() {
             expect(value.ownerSize.width, greaterThanOrEqualTo(painter.width));
             painter.dispose();
           }
-          expect(
-            tester
-                .widget<BuyV2FiniteValueTransition>(
-                  find.byKey(const ValueKey('buy-cart-total')),
-                )
-                .text,
-            buyV2Money(total),
-          );
           expect(
             tester
                 .getSize(
@@ -3135,14 +3183,10 @@ void main() {
 
       session.openDestination(BuyV2Destination.wholesale);
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<BuyV2FiniteValueTransition>(
-              find.byKey(const ValueKey('buy-cart-summary')),
-            )
-            .text,
-        '${session.countForDestination(BuyV2Destination.wholesale)} '
-        '${session.countForDestination(BuyV2Destination.wholesale) == 1 ? 'item' : 'items'}',
+      expectCartSummary(
+        tester,
+        session.countForDestination(BuyV2Destination.wholesale),
+        session.totalForDestination(BuyV2Destination.wholesale),
       );
       expect(
         tester
@@ -3174,14 +3218,7 @@ void main() {
 
       session.openDestination(BuyV2Destination.orders);
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<BuyV2FiniteValueTransition>(
-              find.byKey(const ValueKey('buy-cart-summary')),
-            )
-            .text,
-        '${session.itemCount} ${session.itemCount == 1 ? 'item' : 'items'}',
-      );
+      expectCartSummary(tester, session.itemCount, session.cartTotal);
       expect(
         tester
             .getSemantics(
@@ -3852,7 +3889,7 @@ void main() {
             find.byKey(const ValueKey('buy-quick-delivery-status-minimized')),
           )
           .width,
-      lessThanOrEqualTo(236),
+      lessThanOrEqualTo(48),
     );
     expect(
       tester
@@ -3860,7 +3897,7 @@ void main() {
             find.byKey(const ValueKey('buy-quick-delivery-status-minimized')),
           )
           .height,
-      inInclusiveRange(46, 48),
+      inInclusiveRange(44, 48),
     );
     await tester.tap(find.byKey(const ValueKey('buy-quick-delivery-expand')));
     await tester.pumpAndSettle();
@@ -3902,7 +3939,7 @@ void main() {
     );
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('buy-confirmation'))).dy,
-      lessThan(minimizedContentTop),
+      minimizedContentTop,
     );
     await tester.tap(find.byKey(const ValueKey('buy-quick-delivery-restore')));
     await tester.pumpAndSettle();

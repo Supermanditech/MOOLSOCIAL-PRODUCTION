@@ -217,6 +217,63 @@ void main() {
           expect(session.view, BuyV2View.product);
           expect(session.selectedProductId, sourceId);
           expect(session.quantityFor(sourceId), quantity);
+          final report = find.byKey(ValueKey('buy-report-product-$sourceId'));
+          await tester.scrollUntilVisible(
+            report,
+            160,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-$sourceId')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.ensureVisible(report);
+          await tester.pumpAndSettle();
+          final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
+          expect(cart, findsOneWidget);
+          expect(
+            tester.getRect(cart).overlaps(tester.getRect(report)),
+            isFalse,
+          );
+          expect(report.hitTestable(), findsOneWidget);
+          final protectedContent = [
+            find.byKey(ValueKey('buy-marketplace-trust-ready-$sourceId')),
+            find.byKey(ValueKey('buy-product-continuations-$sourceId')),
+          ];
+          Rect visiblePart(Finder target) => tester
+              .getRect(target)
+              .intersect(
+                tester.getRect(
+                  find.byKey(const ValueKey('buy-cart-content-viewport')),
+                ),
+              );
+          void expectDecisionContentClear() {
+            for (final target in protectedContent) {
+              if (target.evaluate().isEmpty) {
+                continue;
+              }
+              expect(target, findsOneWidget);
+              final visible = visiblePart(target);
+              if (!visible.isEmpty) {
+                expect(
+                  tester.getRect(cart).overlaps(visible),
+                  isFalse,
+                  reason: 'Cart must not move over policy or related products',
+                );
+              }
+            }
+          }
+
+          expectDecisionContentClear();
+          expect(protectedContent.last, findsOneWidget);
+          final continuation = visiblePart(protectedContent.last);
+          expect(continuation.isEmpty, isFalse);
+          await tester.drag(cart, continuation.center - tester.getCenter(cart));
+          await tester.pumpAndSettle();
+          expectDecisionContentClear();
+          expect(report.hitTestable(), findsOneWidget);
+          await captureR66Visual(tester, 'r664-compare-report-$offers-$scale');
           final returnAction = find.descendant(
             of: find.byKey(PageStorageKey('buy-product-$sourceId')),
             matching: find.widgetWithText(InkWell, offers ? 'Offers' : 'Shop'),

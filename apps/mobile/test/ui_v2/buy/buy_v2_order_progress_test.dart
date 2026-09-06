@@ -57,6 +57,7 @@ void main() {
   Widget app(BuyV2Session session, double scale) => RepaintBoundary(
     key: const ValueKey('r66-order-state-app-capture'),
     child: MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: MoolTheme.light(),
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(
@@ -71,16 +72,30 @@ void main() {
   );
 
   Future<void> capture(WidgetTester tester, String name) async {
-    if (!const bool.fromEnvironment('BUY_R66_ORDER_STATE_CAPTURE')) {
+    const currentDirectory = String.fromEnvironment(
+      'BUY_R664_VISUAL_DIRECTORY',
+    );
+    if (currentDirectory.isEmpty &&
+        !const bool.fromEnvironment('BUY_R66_ORDER_STATE_CAPTURE')) {
       return;
     }
+    for (final image in tester.widgetList<Image>(find.byType(Image))) {
+      await tester.runAsync(
+        () => precacheImage(image.image, tester.element(find.byWidget(image))),
+      );
+    }
+    await tester.pumpAndSettle();
     final boundary = tester.renderObject<RenderRepaintBoundary>(
       find.byKey(const ValueKey('r66-order-state-app-capture')),
     );
     boundary.markNeedsPaint();
     await tester.pump();
     await tester.runAsync(() async {
-      final directory = Directory('build/r66-order-state-v1-20260905');
+      final directory = Directory(
+        currentDirectory.isNotEmpty
+            ? currentDirectory
+            : 'build/r66-order-state-v1-20260905',
+      );
       await directory.create(recursive: true);
       final file = File('${directory.path}/$name.png');
       if (await file.exists()) {
@@ -115,23 +130,38 @@ void main() {
               const ValueKey('buy-quick-delivery-status-minimized'),
             );
             expect(bar, findsOneWidget);
-            final open = find.byKey(
-              const ValueKey('buy-quick-delivery-open-minimized'),
+            final toggle = find.byKey(
+              const ValueKey('buy-quick-delivery-toggle'),
             );
-            expect(tester.getSize(open).height, greaterThanOrEqualTo(44));
+            expect(tester.getSize(toggle), const Size(44, 44));
             final semantics = tester.ensureSemantics();
             late String announcement;
             try {
-              announcement = tester.getSemantics(open).getSemanticsData().label;
+              announcement = tester.getSemantics(bar).getSemanticsData().label;
             } finally {
               semantics.dispose();
             }
             expect(announcement, contains('Delivery in 12 min · by 6:35 PM'));
             expect(announcement, isNot(contains('Delivered')));
+            expect(announcement, contains(order.id));
+            expect(tester.getSize(bar).width, lessThanOrEqualTo(48));
+            await capture(tester, 'active-${status.name}-$scale-collapsed');
+            await tester.tap(toggle);
+            await tester.pumpAndSettle();
+            final expanded = find.byKey(
+              const ValueKey('buy-quick-delivery-status-expanded'),
+            );
+            expect(expanded, findsOneWidget);
+            expect(find.text(order.id), findsOneWidget);
+            expect(
+              find.textContaining('Delivery in 12 min · by 6:35 PM'),
+              findsOneWidget,
+            );
             final labels = find.descendant(
-              of: bar,
+              of: expanded,
               matching: find.byType(Text),
             );
+            expect(labels, findsWidgets);
             for (final text in tester.widgetList<Text>(labels)) {
               expect(text.data, isNot(contains('Delivered')));
             }
@@ -142,21 +172,9 @@ void main() {
                 isFalse,
                 reason:
                     'label=${paragraph.text.toPlainText()} available=${paragraph.size.width} '
-                    'bar=${tester.getSize(bar).width} expand=${tester.getSize(find.byKey(const ValueKey('buy-quick-delivery-expand'))).width}',
+                    'panel=${tester.getSize(expanded).width}',
               );
             }
-            final expand = find.byKey(
-              const ValueKey('buy-quick-delivery-expand'),
-            );
-            expect(tester.getSize(expand).height, greaterThanOrEqualTo(44));
-            expect(tester.getSize(bar).width, lessThanOrEqualTo(304));
-            await capture(tester, 'active-${status.name}-$scale-collapsed');
-            await tester.tap(expand);
-            await tester.pumpAndSettle();
-            expect(
-              find.textContaining('Delivery in 12 min · by 6:35 PM'),
-              findsOneWidget,
-            );
             await capture(tester, 'active-${status.name}-$scale-expanded');
             final hide = find.byKey(const ValueKey('buy-quick-delivery-hide'));
             await tester.tap(hide);

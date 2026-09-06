@@ -106,8 +106,13 @@ class BuyV2CartAvoidanceRegion extends StatefulWidget {
 /// Keeps the content scrollable above a separately parked Cart when the
 /// visible decision regions leave no unobstructed floating position.
 class BuyV2CartAvoidanceViewport extends StatelessWidget {
-  const BuyV2CartAvoidanceViewport({super.key, required this.child});
+  const BuyV2CartAvoidanceViewport({
+    super.key,
+    required this.child,
+    this.reserveBottomSpace = true,
+  });
   final Widget child;
+  final bool reserveBottomSpace;
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +122,9 @@ class BuyV2CartAvoidanceViewport extends StatelessWidget {
       animation: layout,
       child: child,
       builder: (context, child) => Padding(
-        padding: EdgeInsets.only(bottom: layout.dockHeight),
+        padding: EdgeInsets.only(
+          bottom: reserveBottomSpace ? layout.dockHeight : 0,
+        ),
         child: ClipRect(
           key: const ValueKey('buy-cart-content-viewport'),
           child: child,

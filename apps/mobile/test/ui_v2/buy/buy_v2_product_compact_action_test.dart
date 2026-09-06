@@ -275,7 +275,10 @@ void main() {
     await tester.tap(add);
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), 2);
-    expect(find.text('2'), findsOneWidget);
+    expect(
+      find.descendant(of: stepper, matching: find.text('2')),
+      findsOneWidget,
+    );
 
     await tester.tap(remove);
     await tester.pumpAndSettle();
