@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4500,
-    "sha256": "30BAACE556ACF67D7C4D202FCB49F09ACC7A2FC47DA618DA9CFD74A5CB380001"
+    "sha256": "6045B3E5DF0BF4AA4134AC8DD617EF8D49231FD2B552485549272CCF790A96C1"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,6 +34,9 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "apps/mobile/test/global_customer_copy_professionalization_test.dart",
+        "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart",
+        "apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "artifacts/quality/codex-oppo-r66-4-review-20260906/candidate-contract.md",
         "artifacts/quality/codex-oppo-r66-4-review-20260906/source-manifest.txt",

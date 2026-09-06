@@ -4369,6 +4369,156 @@ void main() {
     createdAt: createdAt,
   );
 
+  for (final display in [
+    (width: 412.0, height: 915.0, scale: 1.0),
+    (width: 320.0, height: 640.0, scale: 1.4),
+    (width: 320.0, height: 640.0, scale: 2.0),
+  ]) {
+    final suffix = '${display.width.toInt()}-${display.scale}';
+    testWidgets('S09 remaining money customer history $suffix', (tester) async {
+      final work = liveStore();
+      work.workspaceOrders.add(
+        customerOrder(
+          id: 'CUSTOMER-RANGE',
+          customer: 'Rakesh · 98290 12345',
+          createdAt: DateTime.now(),
+          amount: 10000000000,
+          payment: 'Customer due',
+        ),
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.width, display.height),
+        textScale: display.scale,
+      );
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'Customer range dashboard entry',
+      );
+      final priorErrorHandler = FlutterError.onError!;
+      final boundaryErrors = <String>[];
+      FlutterError.onError = (details) {
+        boundaryErrors.add(details.toString());
+        priorErrorHandler(details);
+      };
+      try {
+        await openStoreTools(tester);
+      } finally {
+        FlutterError.onError = priorErrorHandler;
+      }
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'Customer range operations entry: ${boundaryErrors.join('\n')}',
+      );
+      final customers = find.byKey(const Key('work-business-customers'));
+      await reveal(tester, customers);
+      await tester.tap(customers);
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'r665-money-customer-book-$suffix');
+      expect(tester.takeException(), isNull);
+      expectExactMoneyVisible(tester, find.text('Customers'));
+      final customer = find.byKey(const Key('work-customer-9829012345'));
+      await reveal(tester, customer);
+      expectExactMoneyVisible(
+        tester,
+        find.descendant(of: customer, matching: find.text('₹1,000 cr')),
+      );
+      await tester.tap(customer);
+      await tester.pumpAndSettle();
+      final order = find.byKey(const Key('work-customer-order-CUSTOMER-RANGE'));
+      await reveal(tester, order);
+      final amount = find.descendant(
+        of: order,
+        matching: find.text('₹10,00,00,00,000'),
+      );
+      expectExactMoneyVisible(tester, amount);
+      await captureStoreView(tester, 'r665-money-customer-history-$suffix');
+      expect(tester.takeException(), isNull);
+      expect(work.workspaceOrders.single.amount, 10000000000);
+      expect(work.workspaceCustomerBook.single.amountDue, 10000000000);
+      expect(work.workspaceSettlementRequested, 0);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-customers-destination')),
+        findsOneWidget,
+      );
+      final period = find.byKey(const Key('work-customer-period'));
+      await reveal(tester, period);
+      await tester.tap(period);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Financial year').last);
+      await tester.pumpAndSettle();
+      expect(work.workspaceCustomerPeriod, 'Financial year');
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'r665-money-customer-period-$suffix');
+    });
+    testWidgets('S09 remaining money paid customer context $suffix', (
+      tester,
+    ) async {
+      final created = DateTime.now();
+      final work = liveStore();
+      work.workspaceOrders.add(
+        customerOrder(
+          id: 'CUSTOMER-PAID-RANGE',
+          customer: 'Rakesh · 98290 12345',
+          createdAt: created,
+          amount: 10000000000,
+          payment: 'Paid',
+        ),
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.width, display.height),
+        textScale: display.scale,
+      );
+      await openStoreTools(tester);
+      final customers = find.byKey(const Key('work-business-customers'));
+      await reveal(tester, customers);
+      await tester.tap(customers);
+      await tester.pumpAndSettle();
+      final customer = find.byKey(const Key('work-customer-9829012345'));
+      expectExactMoneyVisible(tester, find.text('Customers'));
+      await reveal(tester, customer);
+      expect(
+        find.descendant(
+          of: customer,
+          matching: find.text('Last purchase ${created.day}/${created.month}'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: customer, matching: find.text('Payment due')),
+        findsNothing,
+      );
+      expectExactMoneyVisible(
+        tester,
+        find.descendant(of: customer, matching: find.text('₹1,000 cr')),
+      );
+      work.markWorkspaceCustomerContacted('9829012345');
+      await tester.pumpAndSettle();
+      final contact = work.workspaceCustomerBook.single.lastContactAt!;
+      expect(
+        find.descendant(
+          of: customer,
+          matching: find.text('Contacted ${contact.day}/${contact.month}'),
+        ),
+        findsOneWidget,
+      );
+      expect(work.workspaceCustomerBook.single.amountDue, 0);
+      expect(work.workspaceCustomerBook.single.totalSpend, 10000000000);
+      expect(work.workspaceOrders.single.payment, 'Paid');
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'r665-money-customer-paid-$suffix');
+    });
+  }
+
   testWidgets(
     'selected Workspace profile keeps contact clear of sticky Continue',
     (tester) async {

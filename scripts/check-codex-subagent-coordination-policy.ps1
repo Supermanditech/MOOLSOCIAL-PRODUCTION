@@ -1515,6 +1515,9 @@ if ($ProductionLane -ceq 'baseline') {
         [string]$selectedContinuationBinding.id -ceq 'codex_oppo_review_v1_20260905' -and
         [string]$selectedContinuationBinding.baselineHead -ceq '1f3c91d07af1b4487d9b4039f13d3fd5cefeea7d' -and
         $effectiveOwner -cin @(
+          'apps/mobile/test/global_customer_copy_professionalization_test.dart',
+          'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart',
+          'apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart',
           'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
           'artifacts/quality/codex-oppo-r66-4-review-20260906/candidate-contract.md',
           'artifacts/quality/codex-oppo-r66-4-review-20260906/source-manifest.txt',

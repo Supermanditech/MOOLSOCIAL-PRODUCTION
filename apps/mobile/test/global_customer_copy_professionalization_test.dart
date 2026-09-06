@@ -68,6 +68,22 @@ void main() {
     expect(buy, contains("title: 'Order details'"));
     expect(buy, contains('Check local insight again'));
     expect(chat, contains('reset when you close the app'));
-    expect(work, contains('Choose how you want to add this document.'));
+    for (final source in [
+      'Camera',
+      'Photo gallery',
+      'PDF or image',
+      'Cloud files',
+    ]) {
+      expect(
+        work.contains("label: '$source'"),
+        isTrue,
+        reason: 'The compact document chooser must retain $source',
+      );
+    }
+    expect(
+      work.contains('PDF, JPG, JPEG, PNG or WebP · up to 10 MB.'),
+      isTrue,
+      reason: 'Show accepted document formats and the upload limit',
+    );
   });
 }

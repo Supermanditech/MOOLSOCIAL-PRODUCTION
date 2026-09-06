@@ -381,40 +381,52 @@ class GlobalProfilePanelV2 extends StatelessWidget {
                             },
                           ),
                         ),
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(
-                              MoolSpacing.sm,
-                              MoolSpacing.md,
-                              MoolSpacing.sm,
-                              MoolSpacing.md + exportedBottomClearance,
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (activeWorkspace != null)
-                                  _PersonalAccountSection(
-                                    onOpenRoute: onOpenRoute,
-                                  )
-                                else if (contextAction case final action?)
-                                  _GlobalProfileContextCard(
-                                    action: action,
-                                    onPressed:
-                                        onContextAction ??
-                                        () {
-                                          onClose();
-                                          action.onPressed();
-                                        },
-                                  )
-                                else
-                                  _ProfileAccessCard(
-                                    applicationInProgress:
-                                        applicationInProgress,
-                                    onOpenRoute: onOpenRoute,
-                                  ),
-                              ],
+                        SliverLayoutBuilder(
+                          builder: (context, constraints) => SliverToBoxAdapter(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: math.max(
+                                  0,
+                                  constraints.viewportMainAxisExtent -
+                                      constraints.precedingScrollExtent,
+                                ),
+                              ),
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  MoolSpacing.sm,
+                                  MoolSpacing.md,
+                                  MoolSpacing.sm,
+                                  MoolSpacing.md + exportedBottomClearance,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (activeWorkspace != null)
+                                      _PersonalAccountSection(
+                                        onOpenRoute: onOpenRoute,
+                                      )
+                                    else if (contextAction case final action?)
+                                      _GlobalProfileContextCard(
+                                        action: action,
+                                        onPressed:
+                                            onContextAction ??
+                                            () {
+                                              onClose();
+                                              action.onPressed();
+                                            },
+                                      )
+                                    else
+                                      _ProfileAccessCard(
+                                        applicationInProgress:
+                                            applicationInProgress,
+                                        onOpenRoute: onOpenRoute,
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),
