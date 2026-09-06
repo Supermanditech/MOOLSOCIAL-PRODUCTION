@@ -183,7 +183,20 @@ void main() {
       attempt < 12 && finder.evaluate().isEmpty;
       attempt++
     ) {
-      await tester.drag(vertical.last, const Offset(0, -220));
+      final contactPage = find.byKey(const Key('work-contact-screen'));
+      final pageScroll = contactPage.evaluate().isEmpty
+          ? vertical.last
+          : find
+                .descendant(
+                  of: contactPage,
+                  matching: find.byWidgetPredicate(
+                    (widget) =>
+                        widget is Scrollable &&
+                        widget.axisDirection == AxisDirection.down,
+                  ),
+                )
+                .first;
+      await tester.drag(pageScroll, const Offset(0, -220));
       await tester.pumpAndSettle();
     }
     expect(finder, findsOneWidget);
@@ -256,6 +269,94 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+  }
+
+  for (final display in [
+    (width: 412.0, height: 915.0, scale: 1.0),
+    (width: 320.0, height: 568.0, scale: 1.4),
+    (width: 320.0, height: 568.0, scale: 2.0),
+  ]) {
+    testWidgets(
+      'S03 compact contact first view and full labels ${display.scale}',
+      (tester) async {
+        final work = WorkSession()
+          ..selectProfile('retailer-grocery')
+          ..authorizedPersonName = 'Asha Sharma'
+          ..primaryMobile = '9829012321'
+          ..primaryMobileVerified = true
+          ..contactEmail = 'ashasharma.authorisedrepresentative@example.com'
+          ..contactEmailVerified = true;
+        await mount(
+          tester,
+          route: '/app/work/workspace/contact',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        expect(find.text('How MoolSocial can reach you'), findsNothing);
+        expect(find.byKey(const Key('work-contact-readiness')), findsNothing);
+        await captureStoreView(
+          tester,
+          'r665-contact-compact-first-${display.scale}',
+        );
+        final editableName = find.descendant(
+          of: find.byKey(const Key('work-person-name')),
+          matching: find.byType(EditableText),
+        );
+        expect(editableName.hitTestable(), findsOneWidget);
+        expect(
+          tester.getRect(editableName).bottom,
+          lessThanOrEqualTo(
+            tester.getRect(find.byKey(const Key('work-contact-continue'))).top -
+                12,
+          ),
+        );
+        final hero = tester.getSize(
+          find.byKey(const Key('workspace-account-setup-hero')),
+        );
+        expect(hero.height, lessThanOrEqualTo(display.scale == 2 ? 105 : 80));
+        final email = find.byKey(const Key('work-contact-email-field'));
+        await reveal(tester, email);
+        final input = tester.widget<TextField>(email);
+        expect(input.maxLines, isNull);
+        expect(
+          input.controller!.text,
+          'ashasharma.authorisedrepresentative@example.com',
+        );
+        await captureStoreView(
+          tester,
+          'r665-contact-full-email-${display.scale}',
+        );
+        final backup = find.byKey(const Key('work-alternate-contact-field'));
+        await reveal(tester, backup);
+        expect(work.alternateOtpSent, isFalse);
+        expect(
+          find.byKey(const Key('work-alternate-contact-otp')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('work-alternate-contact-confirm-otp')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('work-alternate-contact-send-otp')),
+          findsNothing,
+        );
+        if (display.scale > 1.2) {
+          expect(find.text('Backup number · optional'), findsOneWidget);
+          expect(
+            tester
+                .widget<Text>(
+                  find.byKey(const Key('work-alternate-contact-label')),
+                )
+                .maxLines,
+            isNull,
+          );
+        }
+        await captureStoreView(tester, 'r665-contact-backup-${display.scale}');
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final display in [
@@ -2631,7 +2732,7 @@ void main() {
       await mount(tester, route: '/app/work/workspace/contact', work: work);
 
       expect(find.byKey(const Key('workspace-account-setup-hero')), findsOne);
-      expect(find.text('Signed in with Google'), findsOne);
+      expect(find.text('Google account'), findsOne);
       expect(find.byKey(const Key('work-global-chat')), findsNothing);
       expect(find.byKey(const Key('work-help')), findsNothing);
       expectHeaderAndStickyAction(tester, wrappedHeader: true);

@@ -41,6 +41,9 @@ class _WorkWorkspaceContactScreenState
   final GlobalKey _primaryCodeActions = GlobalKey();
   final GlobalKey _emailCodeActions = GlobalKey();
   final GlobalKey _alternateCodeActions = GlobalKey();
+  final FocusNode _nameFocus = FocusNode();
+  bool _showNameError = false;
+  WorkContactChannel? _errorChannel;
 
   void _focusCode(FocusNode node, GlobalKey actions) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -115,6 +118,7 @@ class _WorkWorkspaceContactScreenState
 
   @override
   void dispose() {
+    _nameFocus.dispose();
     _primaryMobile.dispose();
     _email.dispose();
     _alternate.dispose();
@@ -134,10 +138,17 @@ class _WorkWorkspaceContactScreenState
   void _continue() {
     widget.session.savePersonName(_name.text);
     if (_name.text.trim().length < 2) {
-      widget.session.errorMessage = 'Enter your full name to continue.';
-      setState(() {});
+      widget.session.clearMessages();
+      setState(() => _showNameError = true);
+      _nameFocus.requestFocus();
       return;
     }
+    _showNameError = false;
+    _errorChannel = !widget.session.primaryMobileVerified
+        ? WorkContactChannel.primaryMobile
+        : !widget.session.contactEmailVerified
+        ? WorkContactChannel.email
+        : WorkContactChannel.alternateMobile;
     FocusManager.instance.primaryFocus?.unfocus();
     if (widget.session.continueToProof()) {
       if (GoRouterState.of(context).uri.queryParameters['return'] == 'review' &&
@@ -145,6 +156,15 @@ class _WorkWorkspaceContactScreenState
         context.pop();
       } else {
         context.push('/app/work/workspace/proof');
+      }
+    } else {
+      switch (_errorChannel!) {
+        case WorkContactChannel.primaryMobile:
+          _primaryFocus.requestFocus();
+        case WorkContactChannel.email:
+          _emailFocus.requestFocus();
+        case WorkContactChannel.alternateMobile:
+          _alternateFocus.requestFocus();
       }
     }
   }
@@ -165,6 +185,7 @@ class _WorkWorkspaceContactScreenState
           activeLocalAction: 'workspace',
           showHeaderChat: false,
           showTrailingAction: false,
+          showMessageBanner: false,
           hideNavigationWhenKeyboardVisible: true,
           bottomAction:
               profile == null || MediaQuery.viewInsetsOf(context).bottom > 0
@@ -201,18 +222,12 @@ class _WorkWorkspaceContactScreenState
                     ),
                   ]
                 : [
-                    _WorkspaceAccountHero(session: session, profile: profile),
-                    const SizedBox(height: MoolSpacing.md),
+                    const _WorkspaceAccountHero(),
+                    const SizedBox(height: MoolSpacing.sm),
                     if (session.connectedProviderLabel.isNotEmpty) ...[
                       _ConnectedAccountCard(session: session),
-                      const SizedBox(height: MoolSpacing.md),
+                      const SizedBox(height: MoolSpacing.sm),
                     ],
-                    const WorkSectionTitle(
-                      title: 'How MoolSocial can reach you',
-                      detail:
-                          'Saved details appear below. Confirm new or changed contacts.',
-                    ),
-                    const SizedBox(height: MoolSpacing.sm),
                     if (session.contactDraftMessage case final String message)
                       Padding(
                         padding: const EdgeInsets.only(bottom: MoolSpacing.sm),
@@ -233,23 +248,39 @@ class _WorkWorkspaceContactScreenState
                     TextField(
                       key: const Key('work-person-name'),
                       controller: _name,
+                      focusNode: _nameFocus,
                       textCapitalization: TextCapitalization.words,
                       textInputAction: TextInputAction.next,
                       autofillHints: const [AutofillHints.name],
-                      onChanged: session.savePersonName,
-                      decoration: const InputDecoration(
+                      onChanged: (value) {
+                        session.savePersonName(value);
+                        if (_showNameError) {
+                          setState(() => _showNameError = false);
+                        }
+                      },
+                      onSubmitted: (_) => _primaryFocus.requestFocus(),
+                      decoration: InputDecoration(
                         labelText: 'Your full name',
                         helperText:
                             'The authorised person setting up this Workspace',
                         helperMaxLines: 3,
-                        border: UnderlineInputBorder(),
+                        error: _showNameError
+                            ? const Text(
+                                'Enter your full name.',
+                                key: Key('work-contact-name-error'),
+                              )
+                            : null,
+                        border: const UnderlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: MoolSpacing.md),
                     _ContactVerificationCard(
                       keyName: 'work-primary-contact',
                       title: 'Contact number',
-                      detail: 'A number you can answer for customer calls',
+                      detail: 'For customer calls and order updates',
+                      error: _errorChannel == WorkContactChannel.primaryMobile
+                          ? session.errorMessage
+                          : null,
                       requiredContact: true,
                       controller: _primaryMobile,
                       inputFocusNode: _primaryFocus,
@@ -273,6 +304,7 @@ class _WorkWorkspaceContactScreenState
                       },
                       confirmedMessage: 'Contact confirmed',
                       onSend: () async {
+                        _errorChannel = WorkContactChannel.primaryMobile;
                         await session.sendPrimaryMobileOtp(_primaryMobile.text);
                         if (!mounted) return;
                         if (session.primaryMobileOtpSent) {
@@ -280,6 +312,7 @@ class _WorkWorkspaceContactScreenState
                         }
                       },
                       onVerify: () async {
+                        _errorChannel = WorkContactChannel.primaryMobile;
                         await session.verifyPrimaryMobileOtp(_primaryOtp.text);
                         if (!mounted) return;
                         if (!session.primaryMobileVerified) {
@@ -304,8 +337,10 @@ class _WorkWorkspaceContactScreenState
                     _ContactVerificationCard(
                       keyName: 'work-contact-email',
                       title: 'Email address',
-                      detail:
-                          'Required for review updates, invoices and recovery',
+                      detail: 'For review updates and invoices',
+                      error: _errorChannel == WorkContactChannel.email
+                          ? session.errorMessage
+                          : null,
                       requiredContact: true,
                       controller: _email,
                       inputFocusNode: _emailFocus,
@@ -328,6 +363,7 @@ class _WorkWorkspaceContactScreenState
                       },
                       confirmedMessage: 'Contact confirmed',
                       onSend: () async {
+                        _errorChannel = WorkContactChannel.email;
                         await session.sendContactEmailOtp(_email.text);
                         if (!mounted) return;
                         if (session.contactEmailOtpSent) {
@@ -335,6 +371,7 @@ class _WorkWorkspaceContactScreenState
                         }
                       },
                       onVerify: () async {
+                        _errorChannel = WorkContactChannel.email;
                         await session.verifyContactEmailOtp(_emailOtp.text);
                         if (!mounted) return;
                         if (!session.contactEmailVerified) {
@@ -358,9 +395,11 @@ class _WorkWorkspaceContactScreenState
                     const SizedBox(height: MoolSpacing.sm),
                     _ContactVerificationCard(
                       keyName: 'work-alternate-contact',
-                      title: 'Alternate contact number',
-                      detail:
-                          'Optional backup if you cannot answer your usual phone',
+                      title: 'Backup number',
+                      detail: 'If your contact number is unavailable',
+                      error: _errorChannel == WorkContactChannel.alternateMobile
+                          ? session.errorMessage
+                          : null,
                       requiredContact: false,
                       controller: _alternate,
                       inputFocusNode: _alternateFocus,
@@ -384,6 +423,7 @@ class _WorkWorkspaceContactScreenState
                       },
                       confirmedMessage: 'Alternate contact confirmed by OTP',
                       onSend: () async {
+                        _errorChannel = WorkContactChannel.alternateMobile;
                         if (_alternate.text.trim().isEmpty) {
                           session.removeAlternateMobile();
                           return;
@@ -395,6 +435,7 @@ class _WorkWorkspaceContactScreenState
                         }
                       },
                       onVerify: () async {
+                        _errorChannel = WorkContactChannel.alternateMobile;
                         await session.verifyAlternateOtp(_alternateOtp.text);
                         if (!mounted) return;
                         if (!session.alternateVerified) {
@@ -415,8 +456,6 @@ class _WorkWorkspaceContactScreenState
                         _alternateOtp,
                       ),
                     ),
-                    const SizedBox(height: MoolSpacing.md),
-                    _ContactReadinessSummary(session: session),
                   ],
           ),
         );
@@ -426,9 +465,7 @@ class _WorkWorkspaceContactScreenState
 }
 
 class _WorkspaceAccountHero extends StatelessWidget {
-  const _WorkspaceAccountHero({required this.session, required this.profile});
-  final WorkSession session;
-  final WorkProfileOption profile;
+  const _WorkspaceAccountHero();
   @override
   Widget build(BuildContext context) => TweenAnimationBuilder<double>(
     tween: Tween(begin: 0, end: 1),
@@ -436,28 +473,19 @@ class _WorkspaceAccountHero extends StatelessWidget {
     builder: (context, value, child) => Opacity(opacity: value, child: child),
     child: Container(
       key: const Key('workspace-account-setup-hero'),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: MoolColors.navy,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Stay within reach',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 19,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            'Keep customer calls and important updates close.',
-            style: TextStyle(color: Colors.white, fontSize: 12),
-          ),
-        ],
+      child: const Text(
+        'Stay within reach',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+          height: 1.2,
+        ),
       ),
     ),
   );
@@ -470,7 +498,7 @@ class _ConnectedAccountCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     key: const Key('work-connected-provider-account'),
-    padding: const EdgeInsets.symmetric(vertical: 8),
+    padding: const EdgeInsets.symmetric(vertical: 4),
     child: Row(
       children: [
         Icon(
@@ -484,7 +512,7 @@ class _ConnectedAccountCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Signed in with ${session.connectedProviderLabel}',
+                '${session.connectedProviderLabel} account',
                 style: const TextStyle(
                   color: MoolColors.navy,
                   fontSize: 12,
@@ -528,6 +556,7 @@ class _ContactVerificationCard extends StatelessWidget {
     required this.onCancel,
     required this.onEdit,
     this.prefixText,
+    this.error,
   });
   final String keyName, title, detail, confirmedMessage;
   final bool requiredContact, confirmed, otpSent, busy, editing;
@@ -536,197 +565,204 @@ class _ContactVerificationCard extends StatelessWidget {
   final GlobalKey codeActionsKey;
   final TextInputType keyboardType;
   final String? prefixText;
+  final String? error;
   final VoidCallback onSend, onVerify, onChange, onCancel;
   final ValueChanged<String> onEdit;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    key: Key(keyName),
-    padding: const EdgeInsets.symmetric(vertical: 10),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          key: Key('$keyName-field'),
-          controller: controller,
-          focusNode: inputFocusNode,
-          enabled: !busy,
-          readOnly: confirmed && !editing,
-          keyboardType: keyboardType,
-          autocorrect: false,
-          enableSuggestions: false,
-          textInputAction: TextInputAction.next,
-          scrollPadding: const EdgeInsets.only(bottom: 32),
-          onChanged: onEdit,
-          decoration: InputDecoration(
-            labelText: requiredContact ? title : '$title · optional',
-            helperText: detail,
-            helperMaxLines: 2,
-            prefixText: prefixText,
-            border: const UnderlineInputBorder(),
-            enabledBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Color(0xFFCACEE0)),
-            ),
-            focusedBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: MoolColors.navy, width: 1.5),
-            ),
-            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-            suffixIcon: otpSent && !confirmed
-                ? IconButton(
-                    key: Key('$keyName-${editing ? 'cancel' : 'change'}'),
-                    tooltip: editing
-                        ? 'Cancel changes to $title'
-                        : 'Change $title',
-                    onPressed: busy
-                        ? null
-                        : editing
-                        ? onCancel
-                        : onChange,
-                    icon: Icon(
-                      editing ? Icons.close_rounded : Icons.edit_outlined,
-                      color: MoolColors.navy,
-                      size: 20,
-                    ),
-                  )
-                : confirmed
-                ? const Icon(Icons.check_circle_outline, color: MoolColors.navy)
-                : null,
-          ),
-        ),
-        if (confirmed)
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  confirmedMessage,
-                  style: const TextStyle(color: MoolColors.navy, fontSize: 12),
-                ),
-              ),
-              TextButton(
-                key: Key('$keyName-${editing ? 'cancel' : 'change'}'),
-                onPressed: busy
-                    ? null
-                    : editing
-                    ? onCancel
-                    : onChange,
-                child: Text(editing ? 'Cancel' : 'Change'),
-              ),
-            ],
-          )
-        else if (!otpSent)
-          Wrap(
-            alignment: WrapAlignment.end,
-            spacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (editing)
-                TextButton(
-                  key: Key('$keyName-cancel'),
-                  onPressed: busy ? null : onCancel,
-                  child: const Text('Cancel'),
-                ),
-              TextButton(
-                key: Key('$keyName-send-otp'),
-                onPressed: busy || (!requiredContact && controller.text.isEmpty)
-                    ? null
-                    : onSend,
-                child: Text(busy ? 'Please wait…' : 'Send code'),
-              ),
-            ],
-          )
-        else ...[
-          const SizedBox(height: 10),
-          TextField(
-            key: Key('$keyName-otp'),
-            controller: otpController,
-            focusNode: otpFocusNode,
-            enabled: !busy,
-            autocorrect: false,
-            enableSuggestions: false,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 104),
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.done,
-            autofillHints: const [AutofillHints.oneTimeCode],
-            maxLength: 6,
-            decoration: InputDecoration(
-              labelText: '$title code',
-              helperText: 'Sent to ${controller.text}',
-              helperMaxLines: 2,
-              counterText: '',
-              border: const UnderlineInputBorder(),
-            ),
-            onSubmitted: (_) {
-              if (!busy) onVerify();
-            },
-          ),
-          Wrap(
-            key: codeActionsKey,
-            spacing: 12,
-            alignment: WrapAlignment.end,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              TextButton(
-                onPressed: busy ? null : onSend,
-                child: const Text('Resend code'),
-              ),
-              FilledButton(
-                key: Key('$keyName-confirm-otp'),
-                onPressed: busy ? null : onVerify,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 48),
-                  backgroundColor: MoolColors.navy,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                ),
-                child: const Text('Confirm', maxLines: 1, softWrap: false),
-              ),
-            ],
-          ),
-        ],
-      ],
-    ),
-  );
-}
-
-class _ContactReadinessSummary extends StatelessWidget {
-  const _ContactReadinessSummary({required this.session});
-
-  final WorkSession session;
-
-  @override
   Widget build(BuildContext context) {
-    final missing = <String>[
-      if (!session.primaryMobileVerified) 'phone number',
-      if (!session.contactEmailVerified) 'email',
-      if (session.alternateMobile.isNotEmpty && !session.alternateVerified)
-        'alternate contact',
-    ];
-    final ready = missing.isEmpty;
+    final wrapLabel = MediaQuery.textScalerOf(context).scale(14) > 17;
+    final label = requiredContact ? title : '$title · optional';
+    Widget feedback() => Semantics(
+      liveRegion: true,
+      child: Text(
+        error!,
+        key: const Key('work-error'),
+        style: const TextStyle(fontSize: 12),
+      ),
+    );
     return Padding(
-      key: const Key('work-contact-readiness'),
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      key: Key(keyName),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(
-            ready ? Icons.task_alt_rounded : Icons.info_outline,
-            color: MoolColors.navy,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              ready
-                  ? 'Contact details ready'
-                  : 'Confirm your ${missing.join(' and ')} to continue.',
-              style: const TextStyle(
-                color: MoolColors.navy,
-                fontSize: 12,
-                height: 1.4,
+          if (wrapLabel)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                label,
+                key: Key('$keyName-label'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          Semantics(
+            label: wrapLabel ? label : null,
+            child: TextField(
+              key: Key('$keyName-field'),
+              controller: controller,
+              focusNode: inputFocusNode,
+              enabled: !busy,
+              readOnly: confirmed && !editing,
+              maxLines:
+                  confirmed &&
+                      !editing &&
+                      keyboardType == TextInputType.emailAddress
+                  ? null
+                  : 1,
+              scrollPhysics:
+                  confirmed &&
+                      !editing &&
+                      keyboardType == TextInputType.emailAddress
+                  ? const NeverScrollableScrollPhysics()
+                  : null,
+              keyboardType: keyboardType,
+              autocorrect: false,
+              enableSuggestions: false,
+              textInputAction: TextInputAction.next,
+              scrollPadding: const EdgeInsets.only(bottom: 32),
+              onChanged: onEdit,
+              decoration: InputDecoration(
+                labelText: wrapLabel ? null : label,
+                helperText: detail,
+                helperMaxLines: 4,
+                helperStyle: const TextStyle(fontSize: 12),
+                error: !otpSent && error != null ? feedback() : null,
+                prefixText: prefixText,
+                border: const UnderlineInputBorder(),
+                enabledBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFFCACEE0)),
+                ),
+                focusedBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: MoolColors.navy, width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                suffixIcon: otpSent && !confirmed
+                    ? IconButton(
+                        key: Key('$keyName-${editing ? 'cancel' : 'change'}'),
+                        tooltip: editing
+                            ? 'Cancel changes to $title'
+                            : 'Change $title',
+                        onPressed: busy
+                            ? null
+                            : editing
+                            ? onCancel
+                            : onChange,
+                        icon: Icon(
+                          editing ? Icons.close_rounded : Icons.edit_outlined,
+                          color: MoolColors.navy,
+                          size: 20,
+                        ),
+                      )
+                    : confirmed
+                    ? const Icon(
+                        Icons.check_circle_outline,
+                        color: MoolColors.navy,
+                      )
+                    : null,
               ),
             ),
           ),
+          if (confirmed)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    confirmedMessage,
+                    style: const TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  key: Key('$keyName-${editing ? 'cancel' : 'change'}'),
+                  onPressed: busy
+                      ? null
+                      : editing
+                      ? onCancel
+                      : onChange,
+                  child: Text(editing ? 'Cancel' : 'Change'),
+                ),
+              ],
+            )
+          else if (!otpSent &&
+              (requiredContact || controller.text.isNotEmpty || editing))
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (editing)
+                  TextButton(
+                    key: Key('$keyName-cancel'),
+                    onPressed: busy ? null : onCancel,
+                    child: const Text('Cancel'),
+                  ),
+                TextButton(
+                  key: Key('$keyName-send-otp'),
+                  onPressed:
+                      busy || (!requiredContact && controller.text.isEmpty)
+                      ? null
+                      : onSend,
+                  child: Text(busy ? 'Please wait…' : 'Send code'),
+                ),
+              ],
+            )
+          else if (otpSent) ...[
+            const SizedBox(height: 10),
+            TextField(
+              key: Key('$keyName-otp'),
+              controller: otpController,
+              focusNode: otpFocusNode,
+              enabled: !busy,
+              autocorrect: false,
+              enableSuggestions: false,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 104),
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.oneTimeCode],
+              maxLength: 6,
+              decoration: InputDecoration(
+                labelText: '$title code',
+                helperText: 'Sent to ${controller.text}',
+                helperMaxLines: 2,
+                error: error == null ? null : feedback(),
+                counterText: '',
+                border: const UnderlineInputBorder(),
+              ),
+              onSubmitted: (_) {
+                if (!busy) onVerify();
+              },
+            ),
+            Wrap(
+              key: codeActionsKey,
+              spacing: 12,
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                TextButton(
+                  onPressed: busy ? null : onSend,
+                  child: const Text('Resend code'),
+                ),
+                FilledButton(
+                  key: Key('$keyName-confirm-otp'),
+                  onPressed: busy ? null : onVerify,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    backgroundColor: MoolColors.navy,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  child: const Text('Confirm', maxLines: 1, softWrap: false),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

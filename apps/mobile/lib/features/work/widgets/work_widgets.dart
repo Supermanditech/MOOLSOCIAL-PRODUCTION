@@ -23,6 +23,7 @@ class WorkPageScaffold extends StatelessWidget {
     this.activeLocalAction = 'earn',
     this.showHeaderChat = true,
     this.showTrailingAction = true,
+    this.showMessageBanner = true,
     this.onBack,
     this.trailing,
     this.bottomAction,
@@ -48,6 +49,7 @@ class WorkPageScaffold extends StatelessWidget {
   final String activeLocalAction;
   final bool showHeaderChat;
   final bool showTrailingAction;
+  final bool showMessageBanner;
   final VoidCallback? onBack;
   final Widget? trailing;
   final Widget? bottomAction;
@@ -189,7 +191,7 @@ class WorkPageScaffold extends StatelessWidget {
           ),
           child: Column(
             children: [
-              WorkMessageBanner(session: session),
+              if (showMessageBanner) WorkMessageBanner(session: session),
               Expanded(child: _WorkPageReveal(child: body)),
               if (bottomAction != null)
                 Material(

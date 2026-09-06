@@ -374,7 +374,7 @@ void main() {
       );
 
       expect(find.byKey(const Key('workspace-account-setup-hero')), findsOne);
-      expect(find.text('Signed in with Google'), findsOne);
+      expect(find.text('Google account'), findsOne);
       expect(find.text('asha@example.com'), findsWidgets);
       expect(find.textContaining('Facebook'), findsNothing);
       expect(find.textContaining('YouTube account'), findsNothing);
