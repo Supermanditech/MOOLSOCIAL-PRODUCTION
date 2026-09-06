@@ -13,6 +13,175 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 
 void main() {
+  for (final channel in WorkContactChannel.values) {
+    String replacement() => channel == WorkContactChannel.email
+        ? 'replacement@example.com'
+        : '9123456780';
+    WorkSession contacts({
+      ReviewWorkGateway? gateway,
+      WorkPendingProofStore? store,
+    }) => WorkSession(gateway: gateway, pendingProofStore: store)
+      ..primaryMobile = '9829012321'
+      ..primaryMobileVerified = true
+      ..contactEmail = 'asha@example.com'
+      ..contactEmailVerified = true
+      ..alternateMobile = '9876543210'
+      ..alternateVerified = true;
+    Future<bool> send(WorkSession work, String value) => switch (channel) {
+      WorkContactChannel.primaryMobile => work.sendPrimaryMobileOtp(value),
+      WorkContactChannel.email => work.sendContactEmailOtp(value),
+      WorkContactChannel.alternateMobile => work.sendAlternateOtp(value),
+    };
+    Future<bool> verify(WorkSession work, String code) => switch (channel) {
+      WorkContactChannel.primaryMobile => work.verifyPrimaryMobileOtp(code),
+      WorkContactChannel.email => work.verifyContactEmailOtp(code),
+      WorkContactChannel.alternateMobile => work.verifyAlternateOtp(code),
+    };
+
+    test('S03 contact Change and Cancel retain exact confirmed $channel', () {
+      final gateway = ReviewWorkGateway();
+      final work = contacts(gateway: gateway);
+      addTearDown(work.dispose);
+      final original = work.workspaceContactValue(channel);
+      work.beginWorkspaceContactEdit(channel);
+      expect(work.workspaceContactValue(channel), original);
+      expect(work.workspaceContactVerified(channel), isTrue);
+      work.cancelWorkspaceContactEdit(channel);
+      expect(work.workspaceContactsReady, isTrue);
+      work.beginWorkspaceContactEdit(channel);
+      work.setDeclaration(true);
+      work.editWorkspaceContact(channel, replacement());
+      expect(work.workspaceContactVerified(channel), isFalse);
+      expect(work.workspaceContactsReady, isFalse);
+      for (final other in WorkContactChannel.values.where(
+        (c) => c != channel,
+      )) {
+        expect(work.workspaceContactVerified(other), isTrue);
+      }
+      work.cancelWorkspaceContactEdit(channel);
+      expect(work.workspaceContactValue(channel), original);
+      expect(work.workspaceContactsReady, isTrue);
+      expect(work.isEditingWorkspaceContact(channel), isFalse);
+      expect(work.declarationAccepted, isFalse);
+      expect(gateway.otpCalls, 0);
+      expect(gateway.otpVerificationCalls, 0);
+    });
+
+    test(
+      'S03 contact replacement needs its own successful code $channel',
+      () async {
+        final gateway = ReviewWorkGateway();
+        final work = contacts(gateway: gateway);
+        addTearDown(work.dispose);
+        work.beginWorkspaceContactEdit(channel);
+        work.editWorkspaceContact(channel, replacement());
+        expect(await verify(work, '123456'), isFalse);
+        expect(gateway.otpVerificationCalls, 0);
+        expect(await send(work, replacement()), isTrue);
+        expect(await verify(work, '000000'), isFalse);
+        expect(work.workspaceContactVerified(channel), isFalse);
+        expect(work.isEditingWorkspaceContact(channel), isTrue);
+        expect(await verify(work, '123456'), isTrue);
+        expect(gateway.lastOtpValue, replacement());
+        expect(work.workspaceContactsReady, isTrue);
+        expect(work.isEditingWorkspaceContact(channel), isFalse);
+        work.cancelWorkspaceContactEdit(channel);
+        expect(work.workspaceContactValue(channel), replacement());
+      },
+    );
+
+    for (final operation in ['send', 'verify']) {
+      test(
+        'S03 contact Cancel rejects stale $operation result $channel',
+        () async {
+          final work = contacts();
+          addTearDown(work.dispose);
+          final original = work.workspaceContactValue(channel);
+          work.beginWorkspaceContactEdit(channel);
+          work.editWorkspaceContact(channel, replacement());
+          if (operation == 'verify') await send(work, replacement());
+          final pending = operation == 'send'
+              ? send(work, replacement())
+              : verify(work, '123456');
+          work.cancelWorkspaceContactEdit(channel);
+          expect(await pending, isFalse);
+          expect(work.workspaceContactValue(channel), original);
+          expect(work.workspaceContactsReady, isTrue);
+          expect(work.primaryMobileOtpSent, isFalse);
+          expect(work.contactEmailOtpSent, isFalse);
+          expect(work.alternateOtpSent, isFalse);
+        },
+      );
+    }
+
+    test(
+      'S03 contact cannot restore another account or accept its code $channel',
+      () async {
+        final store = _PendingProofMemory();
+        final work = contacts(store: store);
+        addTearDown(work.dispose);
+        work.beginWorkspaceContactEdit(channel);
+        work.editWorkspaceContact(channel, replacement());
+        await send(work, replacement());
+        final pending = verify(work, '123456');
+        store.accountScope = 'another-account';
+        expect(await pending, isFalse);
+        work.cancelWorkspaceContactEdit(channel);
+        expect(work.workspaceContactValue(channel), isEmpty);
+        expect(work.workspaceContactVerified(channel), isFalse);
+        expect(store.draft, isNull);
+      },
+    );
+
+    test(
+      'S03 contact busy request cannot change the sent value $channel',
+      () async {
+        final gateway = ReviewWorkGateway();
+        final work = contacts(gateway: gateway);
+        addTearDown(work.dispose);
+        final original = work.workspaceContactValue(channel);
+        final pending = send(work, original);
+        expect(await send(work, replacement()), isFalse);
+        expect(await pending, isTrue);
+        expect(work.workspaceContactValue(channel), original);
+        expect(gateway.lastOtpValue, original);
+        expect(gateway.otpCalls, 1);
+      },
+    );
+
+    test(
+      'S03 contact Cancel never confirms an unverified original $channel',
+      () {
+        final work = contacts();
+        addTearDown(work.dispose);
+        work.editWorkspaceContact(channel, replacement());
+        work.beginWorkspaceContactEdit(channel);
+        work.editWorkspaceContact(channel, '');
+        work.cancelWorkspaceContactEdit(channel);
+        expect(work.workspaceContactValue(channel), replacement());
+        expect(work.workspaceContactVerified(channel), isFalse);
+      },
+    );
+  }
+
+  test('S03 contact Continue commits optional backup removal', () {
+    final work = WorkSession()
+      ..selectProfile('retailer-grocery')
+      ..primaryMobile = '9829012321'
+      ..primaryMobileVerified = true
+      ..contactEmail = 'asha@example.com'
+      ..contactEmailVerified = true
+      ..alternateMobile = '9876543210'
+      ..alternateVerified = true;
+    addTearDown(work.dispose);
+    work.beginWorkspaceContactEdit(WorkContactChannel.alternateMobile);
+    work.editWorkspaceContact(WorkContactChannel.alternateMobile, '');
+    expect(work.continueToProof(), isTrue);
+    work.cancelWorkspaceContactEdit(WorkContactChannel.alternateMobile);
+    expect(work.alternateMobile, isEmpty);
+    expect(work.workspaceContactsReady, isTrue);
+  });
+
   for (final area in [
     'Jodhpur',
     'Sardarpura, Jodhpur',

@@ -35,6 +35,9 @@ class _WorkWorkspaceContactScreenState
   final FocusNode _primaryOtpFocus = FocusNode();
   final FocusNode _emailOtpFocus = FocusNode();
   final FocusNode _alternateOtpFocus = FocusNode();
+  final FocusNode _primaryFocus = FocusNode();
+  final FocusNode _emailFocus = FocusNode();
+  final FocusNode _alternateFocus = FocusNode();
   final GlobalKey _primaryCodeActions = GlobalKey();
   final GlobalKey _emailCodeActions = GlobalKey();
   final GlobalKey _alternateCodeActions = GlobalKey();
@@ -52,6 +55,33 @@ class _WorkWorkspaceContactScreenState
         );
       }
     });
+  }
+
+  void _changeContact(
+    WorkContactChannel channel,
+    TextEditingController code,
+    FocusNode input,
+  ) {
+    widget.session.beginWorkspaceContactEdit(channel);
+    code.clear();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) input.requestFocus();
+    });
+  }
+
+  void _cancelContact(
+    WorkContactChannel channel,
+    TextEditingController contact,
+    TextEditingController code,
+  ) {
+    widget.session.cancelWorkspaceContactEdit(channel);
+    final value = widget.session.workspaceContactValue(channel);
+    contact.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+    code.clear();
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   @override
@@ -95,6 +125,9 @@ class _WorkWorkspaceContactScreenState
     _primaryOtpFocus.dispose();
     _emailOtpFocus.dispose();
     _alternateOtpFocus.dispose();
+    _primaryFocus.dispose();
+    _emailFocus.dispose();
+    _alternateFocus.dispose();
     super.dispose();
   }
 
@@ -202,6 +235,10 @@ class _WorkWorkspaceContactScreenState
                       detail: 'A number you can answer for customer calls',
                       requiredContact: true,
                       controller: _primaryMobile,
+                      inputFocusNode: _primaryFocus,
+                      editing: session.isEditingWorkspaceContact(
+                        WorkContactChannel.primaryMobile,
+                      ),
                       otpController: _primaryOtp,
                       otpFocusNode: _primaryOtpFocus,
                       codeActionsKey: _primaryCodeActions,
@@ -220,21 +257,31 @@ class _WorkWorkspaceContactScreenState
                       confirmedMessage: 'Contact confirmed',
                       onSend: () async {
                         await session.sendPrimaryMobileOtp(_primaryMobile.text);
+                        if (!mounted) return;
                         if (session.primaryMobileOtpSent) {
                           _focusCode(_primaryOtpFocus, _primaryCodeActions);
                         }
                       },
                       onVerify: () async {
                         await session.verifyPrimaryMobileOtp(_primaryOtp.text);
+                        if (!mounted) return;
                         if (!session.primaryMobileVerified) {
                           _focusCode(_primaryOtpFocus, _primaryCodeActions);
+                        } else {
+                          _primaryOtp.clear();
+                          _primaryOtpFocus.unfocus();
                         }
                       },
-                      onChange: () {
-                        session.changePrimaryMobile();
-                        _primaryMobile.clear();
-                        _primaryOtp.clear();
-                      },
+                      onChange: () => _changeContact(
+                        WorkContactChannel.primaryMobile,
+                        _primaryOtp,
+                        _primaryFocus,
+                      ),
+                      onCancel: () => _cancelContact(
+                        WorkContactChannel.primaryMobile,
+                        _primaryMobile,
+                        _primaryOtp,
+                      ),
                     ),
                     const SizedBox(height: MoolSpacing.sm),
                     _ContactVerificationCard(
@@ -244,6 +291,10 @@ class _WorkWorkspaceContactScreenState
                           'Required for review updates, invoices and recovery',
                       requiredContact: true,
                       controller: _email,
+                      inputFocusNode: _emailFocus,
+                      editing: session.isEditingWorkspaceContact(
+                        WorkContactChannel.email,
+                      ),
                       otpController: _emailOtp,
                       otpFocusNode: _emailOtpFocus,
                       codeActionsKey: _emailCodeActions,
@@ -261,21 +312,31 @@ class _WorkWorkspaceContactScreenState
                       confirmedMessage: 'Contact confirmed',
                       onSend: () async {
                         await session.sendContactEmailOtp(_email.text);
+                        if (!mounted) return;
                         if (session.contactEmailOtpSent) {
                           _focusCode(_emailOtpFocus, _emailCodeActions);
                         }
                       },
                       onVerify: () async {
                         await session.verifyContactEmailOtp(_emailOtp.text);
+                        if (!mounted) return;
                         if (!session.contactEmailVerified) {
                           _focusCode(_emailOtpFocus, _emailCodeActions);
+                        } else {
+                          _emailOtp.clear();
+                          _emailOtpFocus.unfocus();
                         }
                       },
-                      onChange: () {
-                        session.changeContactEmail();
-                        _email.clear();
-                        _emailOtp.clear();
-                      },
+                      onChange: () => _changeContact(
+                        WorkContactChannel.email,
+                        _emailOtp,
+                        _emailFocus,
+                      ),
+                      onCancel: () => _cancelContact(
+                        WorkContactChannel.email,
+                        _email,
+                        _emailOtp,
+                      ),
                     ),
                     const SizedBox(height: MoolSpacing.sm),
                     _ContactVerificationCard(
@@ -285,6 +346,10 @@ class _WorkWorkspaceContactScreenState
                           'Optional backup if you cannot answer your usual phone',
                       requiredContact: false,
                       controller: _alternate,
+                      inputFocusNode: _alternateFocus,
+                      editing: session.isEditingWorkspaceContact(
+                        WorkContactChannel.alternateMobile,
+                      ),
                       otpController: _alternateOtp,
                       otpFocusNode: _alternateOtpFocus,
                       codeActionsKey: _alternateCodeActions,
@@ -307,21 +372,31 @@ class _WorkWorkspaceContactScreenState
                           return;
                         }
                         await session.sendAlternateOtp(_alternate.text);
+                        if (!mounted) return;
                         if (session.alternateOtpSent) {
                           _focusCode(_alternateOtpFocus, _alternateCodeActions);
                         }
                       },
                       onVerify: () async {
                         await session.verifyAlternateOtp(_alternateOtp.text);
+                        if (!mounted) return;
                         if (!session.alternateVerified) {
                           _focusCode(_alternateOtpFocus, _alternateCodeActions);
+                        } else {
+                          _alternateOtp.clear();
+                          _alternateOtpFocus.unfocus();
                         }
                       },
-                      onChange: () {
-                        session.removeAlternateMobile();
-                        _alternate.clear();
-                        _alternateOtp.clear();
-                      },
+                      onChange: () => _changeContact(
+                        WorkContactChannel.alternateMobile,
+                        _alternateOtp,
+                        _alternateFocus,
+                      ),
+                      onCancel: () => _cancelContact(
+                        WorkContactChannel.alternateMobile,
+                        _alternate,
+                        _alternateOtp,
+                      ),
                     ),
                     const SizedBox(height: MoolSpacing.md),
                     _ContactReadinessSummary(session: session),
@@ -420,6 +495,8 @@ class _ContactVerificationCard extends StatelessWidget {
     required this.detail,
     required this.requiredContact,
     required this.controller,
+    required this.inputFocusNode,
+    required this.editing,
     required this.otpController,
     required this.otpFocusNode,
     required this.codeActionsKey,
@@ -431,17 +508,18 @@ class _ContactVerificationCard extends StatelessWidget {
     required this.onSend,
     required this.onVerify,
     required this.onChange,
+    required this.onCancel,
     required this.onEdit,
     this.prefixText,
   });
   final String keyName, title, detail, confirmedMessage;
-  final bool requiredContact, confirmed, otpSent, busy;
+  final bool requiredContact, confirmed, otpSent, busy, editing;
   final TextEditingController controller, otpController;
-  final FocusNode otpFocusNode;
+  final FocusNode otpFocusNode, inputFocusNode;
   final GlobalKey codeActionsKey;
   final TextInputType keyboardType;
   final String? prefixText;
-  final VoidCallback onSend, onVerify, onChange;
+  final VoidCallback onSend, onVerify, onChange, onCancel;
   final ValueChanged<String> onEdit;
 
   @override
@@ -454,8 +532,9 @@ class _ContactVerificationCard extends StatelessWidget {
         TextField(
           key: Key('$keyName-field'),
           controller: controller,
+          focusNode: inputFocusNode,
           enabled: !busy,
-          readOnly: confirmed,
+          readOnly: confirmed && !editing,
           keyboardType: keyboardType,
           autocorrect: false,
           enableSuggestions: false,
@@ -475,7 +554,24 @@ class _ContactVerificationCard extends StatelessWidget {
               borderSide: BorderSide(color: MoolColors.navy, width: 1.5),
             ),
             contentPadding: const EdgeInsets.symmetric(vertical: 12),
-            suffixIcon: confirmed
+            suffixIcon: otpSent && !confirmed
+                ? IconButton(
+                    key: Key('$keyName-${editing ? 'cancel' : 'change'}'),
+                    tooltip: editing
+                        ? 'Cancel changes to $title'
+                        : 'Change $title',
+                    onPressed: busy
+                        ? null
+                        : editing
+                        ? onCancel
+                        : onChange,
+                    icon: Icon(
+                      editing ? Icons.close_rounded : Icons.edit_outlined,
+                      color: MoolColors.navy,
+                      size: 20,
+                    ),
+                  )
+                : confirmed
                 ? const Icon(Icons.check_circle_outline, color: MoolColors.navy)
                 : null,
           ),
@@ -490,22 +586,36 @@ class _ContactVerificationCard extends StatelessWidget {
                 ),
               ),
               TextButton(
-                key: Key('$keyName-change'),
-                onPressed: busy ? null : onChange,
-                child: const Text('Change'),
+                key: Key('$keyName-${editing ? 'cancel' : 'change'}'),
+                onPressed: busy
+                    ? null
+                    : editing
+                    ? onCancel
+                    : onChange,
+                child: Text(editing ? 'Cancel' : 'Change'),
               ),
             ],
           )
         else if (!otpSent)
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              key: Key('$keyName-send-otp'),
-              onPressed: busy || (!requiredContact && controller.text.isEmpty)
-                  ? null
-                  : onSend,
-              child: Text(busy ? 'Please wait…' : 'Send code'),
-            ),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (editing)
+                TextButton(
+                  key: Key('$keyName-cancel'),
+                  onPressed: busy ? null : onCancel,
+                  child: const Text('Cancel'),
+                ),
+              TextButton(
+                key: Key('$keyName-send-otp'),
+                onPressed: busy || (!requiredContact && controller.text.isEmpty)
+                    ? null
+                    : onSend,
+                child: Text(busy ? 'Please wait…' : 'Send code'),
+              ),
+            ],
           )
         else ...[
           const SizedBox(height: 10),

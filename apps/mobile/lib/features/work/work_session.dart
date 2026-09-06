@@ -84,6 +84,8 @@ class WorkSession extends ChangeNotifier {
   bool alternateOtpSent = false;
   bool alternateVerified = false;
   final Map<WorkContactChannel, int> _contactRevisions = {};
+  final Map<WorkContactChannel, ({String value, bool verified, String? scope})>
+  _contactEditOrigins = {};
 
   String workName = '';
   String workArea = '';
@@ -2250,6 +2252,72 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  String workspaceContactValue(WorkContactChannel channel) => switch (channel) {
+    WorkContactChannel.primaryMobile => primaryMobile,
+    WorkContactChannel.email => contactEmail,
+    WorkContactChannel.alternateMobile => alternateMobile,
+  };
+
+  bool workspaceContactVerified(WorkContactChannel channel) =>
+      switch (channel) {
+        WorkContactChannel.primaryMobile => primaryMobileVerified,
+        WorkContactChannel.email => contactEmailVerified,
+        WorkContactChannel.alternateMobile => alternateVerified,
+      };
+
+  bool isEditingWorkspaceContact(WorkContactChannel channel) =>
+      _contactEditOrigins.containsKey(channel);
+
+  void _invalidateContactChallenge(WorkContactChannel channel) {
+    _contactRevisions[channel] = (_contactRevisions[channel] ?? 0) + 1;
+    switch (channel) {
+      case WorkContactChannel.primaryMobile:
+        primaryMobileOtpSent = false;
+      case WorkContactChannel.email:
+        contactEmailOtpSent = false;
+      case WorkContactChannel.alternateMobile:
+        alternateOtpSent = false;
+    }
+  }
+
+  void beginWorkspaceContactEdit(WorkContactChannel channel) {
+    if (busy) return;
+    _contactEditOrigins.putIfAbsent(
+      channel,
+      () => (
+        value: workspaceContactValue(channel),
+        verified: workspaceContactVerified(channel),
+        scope: pendingProofStore?.accountScope,
+      ),
+    );
+    _invalidateContactChallenge(channel);
+    clearMessages();
+    notifyListeners();
+  }
+
+  void cancelWorkspaceContactEdit(WorkContactChannel channel) {
+    final original = _contactEditOrigins.remove(channel);
+    if (original == null) return;
+    _invalidateContactChallenge(channel);
+    if (original.scope != pendingProofStore?.accountScope) {
+      editWorkspaceContact(channel, '');
+      errorMessage = 'Sign in again to confirm your contact details.';
+      notifyListeners();
+      return;
+    }
+    editWorkspaceContact(channel, original.value);
+    switch (channel) {
+      case WorkContactChannel.primaryMobile:
+        primaryMobileVerified = original.verified;
+      case WorkContactChannel.email:
+        contactEmailVerified = original.verified;
+      case WorkContactChannel.alternateMobile:
+        alternateVerified = original.verified;
+    }
+    clearMessages();
+    notifyListeners();
+  }
+
   void editWorkspaceContact(WorkContactChannel channel, String value) {
     final normalized = channel == WorkContactChannel.email
         ? value.trim().toLowerCase()
@@ -2281,13 +2349,14 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> sendPrimaryMobileOtp(String mobile) async {
+    if (busy) return false;
     final normalized = mobile.replaceAll(RegExp(r'\D'), '');
     if (normalized.length != 10) {
       errorMessage = 'Enter a valid 10-digit phone number.';
       notifyListeners();
       return false;
     }
-    primaryMobile = normalized;
+    editWorkspaceContact(WorkContactChannel.primaryMobile, normalized);
     return _sendWorkspaceContactOtp(
       WorkContactChannel.primaryMobile,
       normalized,
@@ -2307,13 +2376,14 @@ class WorkSession extends ChangeNotifier {
       );
 
   Future<bool> sendContactEmailOtp(String email) async {
+    if (busy) return false;
     final normalized = email.trim().toLowerCase();
     if (!_validEmail(normalized)) {
       errorMessage = 'Enter a valid email address.';
       notifyListeners();
       return false;
     }
-    contactEmail = normalized;
+    editWorkspaceContact(WorkContactChannel.email, normalized);
     return _sendWorkspaceContactOtp(
       WorkContactChannel.email,
       normalized,
@@ -2354,6 +2424,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> sendAlternateOtp(String mobile) async {
+    if (busy) return false;
     final normalized = mobile.replaceAll(RegExp(r'\D'), '');
     if (normalized.length != 10) {
       errorMessage = 'Enter a valid 10-digit alternate mobile number.';
@@ -2365,7 +2436,7 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    alternateMobile = normalized;
+    editWorkspaceContact(WorkContactChannel.alternateMobile, normalized);
     return _sendWorkspaceContactOtp(
       WorkContactChannel.alternateMobile,
       normalized,
@@ -2389,15 +2460,19 @@ class WorkSession extends ChangeNotifier {
     required VoidCallback onSent,
   }) {
     final revision = _contactRevisions[channel] ?? 0;
+    final scope = pendingProofStore?.accountScope;
     return _runBool(() async {
       await gateway.sendContactOtp(channel: channel, value: value);
-      if (_disposed || revision != (_contactRevisions[channel] ?? 0)) {
+      if (_disposed ||
+          revision != (_contactRevisions[channel] ?? 0) ||
+          scope != pendingProofStore?.accountScope ||
+          workspaceContactValue(channel) != value) {
         throw const WorkGatewayException(
           'Contact changed. Request a new code.',
         );
       }
       onSent();
-    }, success: 'Code sent. Enter it to confirm this contact.');
+    }, success: null);
   }
 
   Future<bool> _verifyWorkspaceContactOtp(
@@ -2423,19 +2498,24 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     final revision = _contactRevisions[channel] ?? 0;
+    final scope = pendingProofStore?.accountScope;
     return _runBool(() async {
       await gateway.verifyContactOtp(
         channel: channel,
         value: value,
         code: normalizedCode,
       );
-      if (_disposed || revision != (_contactRevisions[channel] ?? 0)) {
+      if (_disposed ||
+          revision != (_contactRevisions[channel] ?? 0) ||
+          scope != pendingProofStore?.accountScope ||
+          workspaceContactValue(channel) != value) {
         throw const WorkGatewayException(
           'Contact changed. Request a new code.',
         );
       }
       onVerified();
-    }, success: 'Contact confirmed for this Workspace.');
+      _contactEditOrigins.remove(channel);
+    }, success: null);
   }
 
   void removeAlternateMobile() {
@@ -2471,6 +2551,7 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    _contactEditOrigins.clear();
     reviewStage = WorkReviewStage.drafting;
     clearMessages();
     notifyListeners();
@@ -3535,7 +3616,7 @@ class WorkSession extends ChangeNotifier {
 
   Future<bool> _runBool(
     Future<void> Function() action, {
-    required String success,
+    required String? success,
   }) async {
     if (busy) return false;
     busy = true;

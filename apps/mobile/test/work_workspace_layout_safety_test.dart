@@ -205,6 +205,225 @@ void main() {
     );
   }
 
+  for (final channel in WorkContactChannel.values) {
+    for (final operation in ['send', 'verify']) {
+      testWidgets('S03 contact leaving during $operation is safe $channel', (
+        tester,
+      ) async {
+        final work = WorkSession()
+          ..selectProfile('retailer-grocery')
+          ..primaryMobile = '9829012321'
+          ..contactEmail = 'asha@example.com'
+          ..alternateMobile = '9876543210';
+        final key = switch (channel) {
+          WorkContactChannel.primaryMobile => 'work-primary-contact',
+          WorkContactChannel.email => 'work-contact-email',
+          WorkContactChannel.alternateMobile => 'work-alternate-contact',
+        };
+        await mount(tester, route: '/app/work/workspace/contact', work: work);
+        final field = find.byKey(Key('$key-field'));
+        await reveal(tester, field);
+        await tester.enterText(
+          field,
+          channel == WorkContactChannel.email
+              ? 'pending@example.com'
+              : '9123456780',
+        );
+        await tester.pumpAndSettle();
+        final send = find.byKey(Key('$key-send-otp'));
+        await reveal(tester, send);
+        expect(send.hitTestable(), findsOneWidget);
+        if (operation == 'verify') {
+          await tester.tap(send);
+          await tester.pumpAndSettle();
+          final code = find.byKey(Key('$key-otp'));
+          await reveal(tester, code);
+          await tester.enterText(code, '123456');
+          await tester.pumpAndSettle();
+          final confirm = find.byKey(Key('$key-confirm-otp'));
+          await reveal(tester, confirm);
+          expect(confirm.hitTestable(), findsOneWidget);
+          await tester.tap(confirm);
+        } else {
+          await tester.tap(send);
+        }
+        expect(work.busy, isTrue);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump(const Duration(milliseconds: 80));
+        expect(work.busy, isFalse);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final display in [
+    (width: 412.0, height: 915.0, scale: 1.0),
+    (width: 320.0, height: 568.0, scale: 1.4),
+    (width: 320.0, height: 568.0, scale: 2.0),
+  ]) {
+    for (final channel in WorkContactChannel.values) {
+      testWidgets(
+        'S03 contact replacement Cancel keyboard and return $channel ${display.width} ${display.scale}',
+        (tester) async {
+          final work = WorkSession()
+            ..selectFamily('products-trade')
+            ..selectProfile('retailer-grocery')
+            ..authorizedPersonName = 'Asha Sharma'
+            ..primaryMobile = '9829012321'
+            ..primaryMobileVerified = true
+            ..contactEmail = 'asha@example.com'
+            ..contactEmailVerified = true
+            ..alternateMobile = '9876543210'
+            ..alternateVerified = true;
+          final key = switch (channel) {
+            WorkContactChannel.primaryMobile => 'work-primary-contact',
+            WorkContactChannel.email => 'work-contact-email',
+            WorkContactChannel.alternateMobile => 'work-alternate-contact',
+          };
+          final original = work.workspaceContactValue(channel);
+          final replacement = channel == WorkContactChannel.email
+              ? 'new.contact@example.com'
+              : '9123456780';
+          await mount(
+            tester,
+            route: '/app/work/workspace/contact',
+            work: work,
+            viewport: Size(display.width, display.height),
+            textScale: display.scale,
+          );
+          Future<void> tap(String suffix) async {
+            final action = find.byKey(Key('$key-$suffix'));
+            await reveal(tester, action);
+            expect(action.hitTestable(), findsOneWidget);
+            await tester.tap(action);
+            await tester.pumpAndSettle();
+          }
+
+          await tap('change');
+          tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+          await tester.pumpAndSettle();
+          final field = find.byKey(Key('$key-field'));
+          Future<void> revealContactField() async {
+            for (var step = 0; step < 12 && field.evaluate().isEmpty; step++) {
+              await tester.drag(
+                find.byKey(const Key('work-contact-screen')),
+                const Offset(0, 240),
+              );
+              await tester.pumpAndSettle();
+            }
+            await reveal(tester, field);
+          }
+
+          await revealContactField();
+          expect(tester.widget<TextField>(field).controller!.text, original);
+          expect(tester.widget<TextField>(field).readOnly, isFalse);
+          expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+          expect(work.workspaceContactsReady, isTrue);
+          expect(find.byKey(Key('$key-otp')), findsNothing);
+          await tester.enterText(field, replacement);
+          await tester.pumpAndSettle();
+          expect(work.workspaceContactVerified(channel), isFalse);
+          final cancel = find.byKey(Key('$key-cancel'));
+          await reveal(tester, cancel);
+          expect(
+            tester.getRect(cancel).bottom,
+            lessThanOrEqualTo(display.height - 240),
+          );
+          if (channel == WorkContactChannel.email) {
+            await captureStoreView(
+              tester,
+              'r665-contact-edit-${display.width}-${display.scale}',
+            );
+          }
+          await tap('cancel');
+          tester.view.viewInsets = const FakeViewPadding();
+          await tester.pumpAndSettle();
+          await revealContactField();
+          expect(tester.widget<TextField>(field).controller!.text, original);
+          expect(tester.widget<TextField>(field).readOnly, isTrue);
+          expect(work.workspaceContactsReady, isTrue);
+          expect(find.byKey(Key('$key-otp')), findsNothing);
+
+          await tap('change');
+          await tester.enterText(field, replacement);
+          await tester.pumpAndSettle();
+          await tap('send-otp');
+          final pendingCancel = find.byKey(Key('$key-cancel'));
+          expect(
+            tester.widget<IconButton>(pendingCancel).tooltip,
+            startsWith('Cancel changes'),
+          );
+          await tap('cancel');
+          expect(work.workspaceContactsReady, isTrue);
+          expect(work.workspaceContactValue(channel), original);
+          expect(find.byKey(Key('$key-otp')), findsNothing);
+          await tap('change');
+          await tester.enterText(field, replacement);
+          await tester.pumpAndSettle();
+          await tap('send-otp');
+          tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+          await tester.pumpAndSettle();
+          final code = find.byKey(Key('$key-otp'));
+          await reveal(tester, code);
+          final codeField = tester.widget<TextField>(code);
+          expect(codeField.autofillHints, contains(AutofillHints.oneTimeCode));
+          expect(codeField.focusNode!.hasFocus, isTrue);
+          expect(codeField.decoration!.helperText, 'Sent to $replacement');
+          await tester.enterText(code, '123456');
+          await tester.pumpAndSettle();
+          final confirm = find.byKey(Key('$key-confirm-otp'));
+          await reveal(tester, confirm);
+          expect(confirm.hitTestable(), findsOneWidget);
+          expect(tester.getSize(confirm).height, greaterThanOrEqualTo(48));
+          expect(
+            tester.getRect(confirm).bottom,
+            lessThanOrEqualTo(display.height - 240),
+          );
+          expect(work.workspaceContactVerified(channel), isFalse);
+          if (channel == WorkContactChannel.email) {
+            await captureStoreView(
+              tester,
+              'r665-contact-code-${display.width}-${display.scale}',
+            );
+          }
+          await tester.tap(confirm);
+          await tester.pumpAndSettle();
+          expect(work.workspaceContactVerified(channel), isTrue);
+          expect(work.workspaceContactValue(channel), replacement);
+          expect(work.isEditingWorkspaceContact(channel), isFalse);
+          expect(codeField.controller!.text, isEmpty);
+          tester.view.viewInsets = const FakeViewPadding();
+          await tester.pumpAndSettle();
+          await revealContactField();
+          expect(tester.widget<TextField>(field).controller!.text, replacement);
+          expect(tester.widget<TextField>(field).readOnly, isTrue);
+          expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
+          if (channel == WorkContactChannel.email) {
+            await captureStoreView(
+              tester,
+              'r665-contact-confirmed-${display.width}-${display.scale}',
+            );
+          }
+          final proceed = find.byKey(const Key('work-contact-continue'));
+          await reveal(tester, proceed);
+          await tester.tap(proceed);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-details-continue')),
+            findsOneWidget,
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          await revealContactField();
+          expect(tester.widget<TextField>(field).controller!.text, replacement);
+          expect(work.workspaceContactsReady, isTrue);
+          expect(find.byKey(Key('$key-otp')), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   for (final display in [
     (width: 412.0, height: 915.0, scale: 1.0),
     (width: 320.0, height: 568.0, scale: 1.4),
