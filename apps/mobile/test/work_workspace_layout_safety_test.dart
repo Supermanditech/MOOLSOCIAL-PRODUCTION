@@ -226,6 +226,140 @@ void main() {
     (width: 320.0, height: 640.0, scale: 2.0),
   ]) {
     final suffix = '${display.width.toInt()}-${display.scale}';
+    for (final state in [
+      (products: false, delivery: false, complete: 0),
+      (products: true, delivery: false, complete: 1),
+      (products: false, delivery: true, complete: 1),
+      (products: true, delivery: true, complete: 2),
+    ]) {
+      testWidgets(
+        'S09 direct setup exact progress ${state.products}-${state.delivery} $suffix',
+        (tester) async {
+          final work = WorkSession()..seedVerifiedWorkspace();
+          if (!state.products) work.workspaceCatalogueItems.clear();
+          work.retailerHomeDelivery = state.delivery;
+          final semantics = tester.ensureSemantics();
+          try {
+            await mount(
+              tester,
+              route: '/app/work/workspace/dashboard',
+              work: work,
+              viewport: Size(display.width, display.height),
+              textScale: display.scale,
+            );
+            final progress = find.byKey(const Key('work-setup-progress'));
+            final indicator = tester.widget<LinearProgressIndicator>(progress);
+            expect(indicator.value, state.complete / 2);
+            expect(
+              indicator.semanticsLabel,
+              'Store setup, ${state.complete} of 2 steps complete',
+            );
+            expect(indicator.semanticsValue, isNull);
+            final node = tester.getSemantics(progress);
+            expect(
+              node.label,
+              'Store setup, ${state.complete} of 2 steps complete',
+            );
+            expect(node.value, '${state.complete * 50}');
+            final products = find.byKey(
+              const Key('work-setup-products-direct'),
+            );
+            await reveal(tester, products);
+            expect(tester.getSize(products).height, greaterThanOrEqualTo(48));
+            expect(
+              find.descendant(
+                of: products,
+                matching: find.text(
+                  state.products ? 'View products' : 'Add products',
+                ),
+              ),
+              findsOneWidget,
+            );
+            if (!state.products && !state.delivery) {
+              await captureStoreView(tester, 'r665-direct-setup-$suffix');
+            }
+            final original = List<WorkspaceCatalogueItem>.of(
+              work.workspaceCatalogueItems,
+            );
+            await tester.tap(products);
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const Key('work-dashboard-catalogue-screen')),
+              findsOneWidget,
+            );
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const Key('work-activity-setup')),
+              findsOneWidget,
+            );
+            expect(work.workspaceCatalogueItems, orderedEquals(original));
+            expect(work.retailerSetupSaved, isFalse);
+            expect(work.workspaceVisibleToCustomers, isFalse);
+            expect(work.workspaceAcceptingOrders, isFalse);
+            expect(work.reviewStage, WorkReviewStage.approved);
+            expect(tester.takeException(), isNull);
+          } finally {
+            semantics.dispose();
+          }
+        },
+      );
+    }
+    testWidgets('S09 direct setup delivery choices stay local $suffix', (
+      tester,
+    ) async {
+      final work = WorkSession()
+        ..seedVerifiedWorkspace()
+        ..workspaceCatalogueItems.clear();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.width, display.height),
+        textScale: display.scale,
+      );
+      final action = find.byKey(const Key('work-setup-delivery-direct'));
+      await reveal(tester, action);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(work.retailerStoreCollection, isFalse);
+      expect(work.retailerHomeDelivery, isFalse);
+      final pickup = find.byKey(const Key('work-setup-pickup-choice'));
+      await reveal(tester, pickup);
+      expect(pickup.hitTestable(), findsOneWidget);
+      await captureStoreView(tester, 'r665-direct-setup-choices-$suffix');
+      await tester.tap(pickup);
+      await tester.pumpAndSettle();
+      expect(work.retailerStoreCollection, isTrue);
+      expect(work.retailerHomeDelivery, isFalse);
+      expect(
+        tester
+            .widget<LinearProgressIndicator>(
+              find.byKey(const Key('work-setup-progress')),
+            )
+            .value,
+        .5,
+      );
+      await reveal(tester, action);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(pickup, findsNothing);
+      expect(work.retailerStoreCollection, isTrue);
+      final next = find.byKey(const Key('work-dashboard-priority-action'));
+      await reveal(tester, next);
+      await tester.tap(next);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('retailer-setup-screen')), findsOneWidget);
+      expect(work.retailerStoreCollection, isTrue);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-activity-setup')), findsOneWidget);
+      expect(work.retailerSetupSaved, isFalse);
+      expect(work.workspaceCatalogueItems, isEmpty);
+      expect(work.workspaceVisibleToCustomers, isFalse);
+      expect(work.workspaceAcceptingOrders, isFalse);
+      expect(tester.takeException(), isNull);
+    });
     Future<void> tapRefinementAction(WidgetTester tester, String key) async {
       final action = find.byKey(Key(key));
       if (display.scale > 1.4) await reveal(tester, action);

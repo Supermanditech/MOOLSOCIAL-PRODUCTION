@@ -1927,6 +1927,7 @@ class _StoreControlDashboard extends StatelessWidget {
                               session: session,
                               workspace: workspace,
                               onSetup: onSetup,
+                              onProducts: onStock,
                             ),
                     ),
                     _StoreActionEdge(
@@ -4498,83 +4499,196 @@ class _StoreReadyActivity extends StatelessWidget {
   }
 }
 
-class _StoreSetupDeck extends StatelessWidget {
+class _StoreSetupDeck extends StatefulWidget {
   const _StoreSetupDeck({
     required this.session,
     required this.workspace,
     required this.onSetup,
+    required this.onProducts,
   });
 
   final WorkSession session;
   final WorkWorkspace workspace;
   final VoidCallback onSetup;
+  final VoidCallback onProducts;
+
+  @override
+  State<_StoreSetupDeck> createState() => _StoreSetupDeckState();
+}
+
+class _StoreSetupDeckState extends State<_StoreSetupDeck> {
+  bool _showDeliveryChoices = false;
 
   @override
   Widget build(BuildContext context) {
+    final session = widget.session;
     final productsReady = session.workspaceCatalogueItems.isNotEmpty;
     final fulfilmentReady =
         session.retailerHomeDelivery || session.retailerStoreCollection;
-    final progress =
-        ([productsReady, fulfilmentReady].where((value) => value).length) / 2;
+    final completed = [
+      productsReady,
+      fulfilmentReady,
+    ].where((value) => value).length;
     return SingleChildScrollView(
       key: const Key('work-activity-setup'),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.storefront_outlined,
-            color: MoolColors.navy,
-            size: 30,
-          ),
-          const SizedBox(height: 12),
           const Text(
-            'Ready for your first customer?',
+            'Get ready to sell',
             style: TextStyle(
               color: MoolColors.navy,
-              fontSize: 19,
+              fontSize: 17,
               height: 1.2,
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 8),
           const Text(
-            'Add products and choose pickup or delivery. Your store stays private until you publish it.',
+            'Your store stays private until you publish it.',
             style: TextStyle(
               color: MoolColors.muted,
               fontSize: 12,
               height: 1.4,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           LinearProgressIndicator(
-            value: progress,
+            key: const Key('work-setup-progress'),
+            value: completed / 2,
+            semanticsLabel: 'Store setup, $completed of 2 steps complete',
             minHeight: 4,
             color: MoolColors.navy,
             backgroundColor: const Color(0xFFE3E7F2),
           ),
           const SizedBox(height: 10),
-          Text(
-            productsReady ? 'Products added' : 'Add your products',
-            style: const TextStyle(color: MoolColors.navy, fontSize: 12),
+          _setupAction(
+            keyName: 'work-setup-products-direct',
+            label: productsReady ? 'View products' : 'Add products',
+            detail: productsReady
+                ? '${session.workspaceCatalogueItems.length} added'
+                : 'Choose from the catalogue',
+            complete: productsReady,
+            icon: Icons.inventory_2_outlined,
+            onTap: widget.onProducts,
           ),
-          const SizedBox(height: 6),
-          Text(
-            fulfilmentReady
-                ? 'Fulfilment selected'
-                : 'Choose pickup or delivery',
-            style: const TextStyle(color: MoolColors.navy, fontSize: 12),
+          const Divider(height: 12),
+          _setupAction(
+            keyName: 'work-setup-delivery-direct',
+            label: 'Delivery or pickup',
+            detail: fulfilmentReady
+                ? [
+                    if (session.retailerHomeDelivery) 'Delivery',
+                    if (session.retailerStoreCollection) 'Pickup',
+                  ].join(' and ')
+                : 'Choose how customers receive orders',
+            complete: fulfilmentReady,
+            icon: Icons.local_shipping_outlined,
+            onTap: () =>
+                setState(() => _showDeliveryChoices = !_showDeliveryChoices),
           ),
-          const SizedBox(height: 16),
+          AnimatedSize(
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
+            alignment: Alignment.topCenter,
+            child: !_showDeliveryChoices
+                ? const SizedBox.shrink()
+                : Column(
+                    children: [
+                      CheckboxListTile.adaptive(
+                        key: const Key('work-setup-delivery-choice'),
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: const Text('Delivery'),
+                        value: session.retailerHomeDelivery,
+                        onChanged: (value) => session.setRetailerFulfilment(
+                          homeDelivery: value ?? false,
+                          storeCollection: session.retailerStoreCollection,
+                        ),
+                      ),
+                      CheckboxListTile.adaptive(
+                        key: const Key('work-setup-pickup-choice'),
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: const Text('Customer pickup'),
+                        value: session.retailerStoreCollection,
+                        onChanged: (value) => session.setRetailerFulfilment(
+                          homeDelivery: session.retailerHomeDelivery,
+                          storeCollection: value ?? false,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 12),
           FilledButton(
             key: const Key('work-dashboard-priority-action'),
-            onPressed: onSetup,
+            onPressed: widget.onSetup,
             child: const Text('Continue store setup'),
           ),
         ],
       ),
     );
   }
+
+  Widget _setupAction({
+    required String keyName,
+    required String label,
+    required String detail,
+    required bool complete,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) => Semantics(
+    button: true,
+    label: '$label, $detail',
+    onTap: onTap,
+    excludeSemantics: true,
+    child: InkWell(
+      key: Key(keyName),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              Icon(
+                complete ? Icons.check_circle_outline : icon,
+                color: MoolColors.navy,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      detail,
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _LiveDot extends StatelessWidget {
@@ -8396,7 +8510,9 @@ class _WorkspaceProductRow extends StatelessWidget {
                     ),
                   ),
                   if (owned)
-                    Row(
+                    Wrap(
+                      spacing: 5,
+                      runSpacing: 4,
                       children: [
                         _ProductQuickValue(
                           keyName: 'work-catalogue-price-${product.id}',
@@ -8404,7 +8520,6 @@ class _WorkspaceProductRow extends StatelessWidget {
                           label: '₹${product.sellingPrice}',
                           onTap: onChangePrice,
                         ),
-                        const SizedBox(width: 5),
                         _ProductQuickValue(
                           keyName: 'work-catalogue-stock-${product.id}',
                           icon: Icons.inventory_2_outlined,
@@ -16939,9 +17054,9 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
   if (!session.retailerSetupSaved) {
     alerts.add((
       id: 'store-setup',
-      title: 'Finish store operations setup',
+      title: 'Finish setting up your store',
       detail:
-          'Add the products and fulfilment choices needed before customers can order.',
+          'Add products and choose delivery or pickup before taking orders.',
       actionLabel: 'Continue store setup',
       route: '/app/work/retailer/setup',
       operation: null,
@@ -17181,7 +17296,7 @@ class _DashboardPriorityCard extends StatelessWidget {
                 ),
                 Text(
                   shopReady
-                      ? 'Your catalogue and fulfilment choices are ready for daily work.'
+                      ? 'Your products and delivery or pickup options are ready.'
                       : presentation.focusDetail,
                   style: const TextStyle(
                     color: MoolColors.muted,
