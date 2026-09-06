@@ -2542,19 +2542,32 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? get detailsNameError => workName.trim().length < 3
+      ? 'Enter the business name shown on its PAN card.'
+      : null;
+
+  String? get detailsAreaError {
+    final area = workArea.trim();
+    final pin = area.replaceAll(RegExp(r'\s'), '');
+    if (RegExp(r'^[0-9]+$').hasMatch(pin)) {
+      return RegExp(r'^[1-9][0-9]{5}$').hasMatch(pin)
+          ? null
+          : 'Enter a 6-digit PIN code, or use your city name.';
+    }
+    if (area.length < 3 || !RegExp(r'\p{L}', unicode: true).hasMatch(area)) {
+      return 'Enter your city name or a 6-digit PIN code.';
+    }
+    return null;
+  }
+
+  String? get detailsActivityError => primaryActivity.trim().length < 3
+      ? 'Describe the primary activity.'
+      : null;
+
   bool validateDetails() {
-    if (workName.length < 3) {
-      errorMessage = 'Enter the business name shown on its PAN card.';
-      notifyListeners();
-      return false;
-    }
-    if (workArea.length < 3) {
-      errorMessage = 'Enter an operating city or PIN code.';
-      notifyListeners();
-      return false;
-    }
-    if (primaryActivity.length < 3) {
-      errorMessage = 'Describe the primary activity.';
+    final error = detailsNameError ?? detailsAreaError ?? detailsActivityError;
+    if (error != null) {
+      errorMessage = error;
       notifyListeners();
       return false;
     }

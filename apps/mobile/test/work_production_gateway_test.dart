@@ -13,6 +13,48 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 
 void main() {
+  for (final area in [
+    'Jodhpur',
+    'Sardarpura, Jodhpur',
+    'Sector 12, New Delhi',
+    'जयपुर',
+    'சென்னை',
+    '342001',
+    '342 001',
+  ]) {
+    test('Workspace Details accepts city or PIN syntax $area', () {
+      final work = WorkSession()
+        ..selectProfile('retailer-grocery')
+        ..saveDetails(
+          name: 'Mahadev Traders',
+          area: area,
+          activity: 'Grocery retail',
+        );
+      addTearDown(work.dispose);
+      expect(work.detailsAreaError, isNull);
+      expect(work.validateDetails(), isTrue);
+      expect(work.workArea, area);
+      expect(work.reviewCaseId, isNull);
+      expect(work.hasVerifiedWorkspace, isFalse);
+    });
+  }
+  for (final area in ['', '12', '123', '000000', '1234567', '---', '!!!']) {
+    test('Workspace Details rejects incomplete location $area', () {
+      final work = WorkSession()
+        ..saveDetails(
+          name: 'Mahadev Traders',
+          area: area,
+          activity: 'Grocery retail',
+        );
+      addTearDown(work.dispose);
+      expect(work.detailsAreaError, isNotNull);
+      expect(work.errorMessage, isNull);
+      expect(work.validateDetails(), isFalse);
+      expect(work.errorMessage, work.detailsAreaError);
+      expect(work.workArea, area);
+      expect(work.reviewCaseId, isNull);
+    });
+  }
   for (final source in [WorkProofSource.upload, WorkProofSource.cloudDrive]) {
     for (final extension in ['pdf', 'jpg', 'jpeg', 'png', 'webp']) {
       test(

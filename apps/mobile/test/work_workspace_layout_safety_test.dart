@@ -205,6 +205,216 @@ void main() {
     );
   }
 
+  for (final display in [
+    (width: 412.0, height: 915.0, scale: 1.0),
+    (width: 320.0, height: 568.0, scale: 1.4),
+    (width: 320.0, height: 568.0, scale: 2.0),
+  ]) {
+    testWidgets(
+      'OPPO S04 details local errors focus and progress ${display.width} ${display.scale}',
+      (tester) async {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        final semantics = tester.ensureSemantics();
+        try {
+          final work = WorkSession()
+            ..selectProfile('retailer-grocery')
+            ..saveDetails(
+              name: 'Mahadev Traders',
+              area: '123',
+              activity: 'Grocery retail',
+            )
+            ..businessRelationship = 'Owner'
+            ..authorizedPersonName = 'Asha Sharma'
+            ..primaryMobile = '9829012321'
+            ..contactEmail = 'asha@example.com'
+            ..primaryMobileVerified = true
+            ..contactEmailVerified = true;
+          await mount(
+            tester,
+            route: '/app/work/workspace/proof',
+            work: work,
+            viewport: Size(display.width, display.height),
+            textScale: display.scale,
+          );
+          Future<void> capture(String page) => captureStoreView(
+            tester,
+            'r665-details-$page-${display.width.toInt()}-${display.scale}',
+          );
+          Future<void> tap(String key) async {
+            final action = find.byKey(Key(key));
+            await reveal(tester, action);
+            expect(action.hitTestable(), findsOneWidget);
+            await tester.tap(action);
+            await tester.pumpAndSettle();
+          }
+
+          void checkProgress(int step, String label) {
+            expect(
+              find.bySemanticsLabel(RegExp('Details, Documents, Review')),
+              findsWidgets,
+            );
+            final progress = find.byKey(const Key('work-workspace-progress'));
+            final texts = find.descendant(
+              of: progress,
+              matching: find.byType(Text),
+            );
+            expect(
+              tester
+                  .widget<Text>(find.byKey(const Key('work-progress-current')))
+                  .data,
+              display.scale == 1 ? 'Step $step of 3' : '$label · $step of 3',
+            );
+            for (final element in texts.evaluate()) {
+              final text = element.widget as Text;
+              final paragraph = tester.renderObject<RenderParagraph>(
+                find.descendant(
+                  of: find.byWidget(text),
+                  matching: find.byType(RichText),
+                ),
+              );
+              expect(paragraph.didExceedMaxLines, isFalse);
+              expect(paragraph.overflow, isNot(TextOverflow.ellipsis));
+              expect(
+                paragraph
+                    .getBoxesForSelection(
+                      TextSelection(
+                        baseOffset: 0,
+                        extentOffset: text.data!.length,
+                      ),
+                    )
+                    .length,
+                1,
+              );
+              expect(
+                paragraph.textScaler.scale(12),
+                closeTo(12 * display.scale, .01),
+              );
+            }
+            final bars = find.descendant(
+              of: progress,
+              matching: find.byType(AnimatedContainer),
+            );
+            expect(bars, findsNWidgets(3));
+            final widths = tester.getSize(bars.first).width;
+            for (final element in bars.evaluate()) {
+              final bar = element.widget as AnimatedContainer;
+              expect(bar.duration, Duration.zero);
+              expect(
+                tester.getSize(find.byWidget(bar)).width,
+                closeTo(widths, .01),
+              );
+            }
+            expect(tester.getSize(progress).height, lessThanOrEqualTo(52));
+            expect(tester.takeException(), isNull);
+          }
+
+          checkProgress(1, 'Details');
+          await capture('first');
+          final name = find.byKey(const Key('work-name'));
+          final area = find.byKey(const Key('work-area'));
+          final activity = find.byKey(const Key('work-activity'));
+          expect(name.hitTestable(), findsOneWidget);
+          await reveal(tester, name);
+          await tester.enterText(name, 'Mahadev Traders');
+          tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+          await tester.testTextInput.receiveAction(TextInputAction.next);
+          await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(area).focusNode!.hasFocus, isTrue);
+          await tester.testTextInput.receiveAction(TextInputAction.next);
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<TextField>(activity).focusNode!.hasFocus,
+            isTrue,
+          );
+          final editable = find.descendant(
+            of: activity,
+            matching: find.byType(EditableText),
+          );
+          expect(editable.hitTestable(), findsOneWidget);
+          expect(
+            tester.getRect(editable).bottom,
+            lessThanOrEqualTo(display.height - 240),
+          );
+          await capture('keyboard');
+          await tester.testTextInput.receiveAction(TextInputAction.done);
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<TextField>(activity).focusNode!.hasFocus,
+            isFalse,
+          );
+          tester.view.viewInsets = FakeViewPadding.zero;
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-local-navigation')),
+            findsOneWidget,
+          );
+          await tap('work-business-relationship');
+          await tester.tap(find.text('Authorized representative').last);
+          await tester.pumpAndSettle();
+          expect(work.businessRelationship, 'Authorized representative');
+          final selectedRelationship = find.text('Authorized representative');
+          final relationshipField = find.byKey(
+            const Key('work-business-relationship'),
+          );
+          expect(
+            tester.getRect(selectedRelationship).bottom,
+            lessThanOrEqualTo(tester.getRect(relationshipField).bottom),
+          );
+          await capture('relationship');
+          if (display.scale == 2) {
+            final label = find.byKey(
+              const Key('work-business-relationship-full-label'),
+            );
+            await reveal(tester, label);
+            final widget = tester.widget<Text>(label);
+            expect(widget.data, 'Your relationship with the business');
+            expect(widget.maxLines, isNull);
+            expect(widget.overflow, isNot(TextOverflow.ellipsis));
+          }
+          await tap('work-details-continue');
+          expect(work.errorMessage, isNull);
+          expect(work.noticeMessage, isNull);
+          expect(work.reviewCaseId, isNull);
+          expect(
+            tester.widget<TextField>(area).decoration!.errorText,
+            work.detailsAreaError,
+          );
+          expect(tester.widget<TextField>(area).focusNode!.hasFocus, isTrue);
+          await reveal(tester, area);
+          await capture('location-error');
+          await tester.enterText(area, 'Jaipur');
+          await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(area).decoration!.errorText, isNull);
+          await tap('work-details-continue');
+          checkProgress(2, 'Documents');
+          await tap('work-proof-review');
+          checkProgress(3, 'Review');
+          await capture('review');
+          await tap('work-back');
+          checkProgress(2, 'Documents');
+          await tap('work-back');
+          checkProgress(1, 'Details');
+          expect(work.workName, 'Mahadev Traders');
+          expect(work.workArea, 'Jaipur');
+          expect(work.primaryActivity, 'Grocery retail');
+          expect(work.primaryMobileVerified, isTrue);
+          expect(work.contactEmailVerified, isTrue);
+          expect(work.declarationAccepted, isFalse);
+          expect(work.reviewCaseId, isNull);
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
+
   testWidgets('OPPO S01 inline discovery preserves the selected application', (
     tester,
   ) async {

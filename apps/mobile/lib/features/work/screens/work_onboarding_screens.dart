@@ -1704,6 +1704,10 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   bool _correctionMode = false;
   bool _reviewEditMode = false;
   bool _showDeclarationError = false;
+  bool _showDetailsErrors = false;
+  final _nameFocus = FocusNode();
+  final _areaFocus = FocusNode();
+  final _activityFocus = FocusNode();
   final GlobalKey _declarationAnchor = GlobalKey();
   String? _correctionInstruction;
   late final TextEditingController _name = TextEditingController(
@@ -1746,6 +1750,9 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
     _name.dispose();
     _area.dispose();
     _activity.dispose();
+    _nameFocus.dispose();
+    _areaFocus.dispose();
+    _activityFocus.dispose();
     super.dispose();
   }
 
@@ -1889,6 +1896,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
         wrapHeader: true,
         fallbackBackRoute: '/app/work/workspace/contact',
         activeLocalAction: 'workspace',
+        hideNavigationWhenKeyboardVisible: true,
         showHeaderChat: false,
         showTrailingAction: false,
         onBack: _goBack,
@@ -1900,11 +1908,24 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                 : 'Continue to documents',
             onPressed: () {
               _saveFields();
+              setState(() => _showDetailsErrors = true);
+              final invalidFocus = widget.session.detailsNameError != null
+                  ? _nameFocus
+                  : widget.session.detailsAreaError != null
+                  ? _areaFocus
+                  : widget.session.detailsActivityError != null
+                  ? _activityFocus
+                  : null;
+              if (invalidFocus != null) {
+                invalidFocus.requestFocus();
+                return;
+              }
               if (widget.session.validateDetails()) {
                 _resetScroll();
                 setState(() {
                   _step = _reviewEditMode ? 2 : 1;
                   _reviewEditMode = false;
+                  _showDetailsErrors = false;
                 });
               }
             },
@@ -1984,76 +2005,111 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
               _CorrectionInstructionCard(instruction: _correctionInstruction!),
               const SizedBox(height: MoolSpacing.md),
             ],
-            if (_step == 0) ...[
-              const WorkSectionTitle(
-                title: 'Business details',
-                detail: 'Information needed to verify this Workspace',
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              TextField(
-                key: const Key('work-name'),
-                controller: _name,
-                textInputAction: TextInputAction.next,
-                textCapitalization: TextCapitalization.words,
-                onChanged: (_) => _saveFields(),
-                decoration: const InputDecoration(
-                  labelText: 'Business name (as per PAN card)',
-                  helperText:
-                      'Enter the name shown on the PAN used for this business.',
-                  helperMaxLines: 2,
-                  border: UnderlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              TextField(
-                key: const Key('work-area'),
-                controller: _area,
-                textInputAction: TextInputAction.next,
-                onChanged: (_) => _saveFields(),
-                decoration: const InputDecoration(
-                  labelText: 'Operating city or PIN code',
-                  border: UnderlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              TextField(
-                key: const Key('work-activity'),
-                controller: _activity,
-                textInputAction: TextInputAction.done,
-                onChanged: (_) => _saveFields(),
-                decoration: const InputDecoration(
-                  labelText: 'Primary activity',
-                  border: UnderlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              DropdownButtonFormField<String>(
-                key: const Key('work-business-relationship'),
-                initialValue: widget.session.businessRelationship.isEmpty
-                    ? null
-                    : widget.session.businessRelationship,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Your relationship with the business',
-                  border: UnderlineInputBorder(),
-                ),
-                items:
-                    const [
-                          'Owner',
-                          'Partner or director',
-                          'Authorized representative',
-                        ]
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-                onChanged: (value) =>
-                    widget.session.saveBusinessRelationship(value ?? ''),
-              ),
-            ] else if (_step == 1) ...[
+            if (_step == 0)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (MediaQuery.textScalerOf(context).scale(20) <= 30) ...[
+                    const WorkSectionTitle(
+                      title: 'Business details',
+                      detail: 'Information needed to verify this Workspace',
+                    ),
+                    const SizedBox(height: MoolSpacing.sm),
+                  ],
+                  _WorkDetailField(
+                    label: 'Business name (as per PAN card)',
+                    fieldKey: 'work-name',
+                    builder: (decoration) => TextField(
+                      key: const Key('work-name'),
+                      controller: _name,
+                      focusNode: _nameFocus,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _areaFocus.requestFocus(),
+                      textCapitalization: TextCapitalization.words,
+                      onChanged: (_) => _saveFields(),
+                      decoration: decoration.copyWith(
+                        errorText: _showDetailsErrors
+                            ? widget.session.detailsNameError
+                            : null,
+                        errorMaxLines: 3,
+                        helperText:
+                            'Enter the name shown on the PAN used for this business.',
+                        helperMaxLines: 2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: MoolSpacing.sm),
+                  _WorkDetailField(
+                    label: 'Operating city or PIN code',
+                    fieldKey: 'work-area',
+                    builder: (decoration) => TextField(
+                      key: const Key('work-area'),
+                      controller: _area,
+                      focusNode: _areaFocus,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _activityFocus.requestFocus(),
+                      onChanged: (_) => _saveFields(),
+                      decoration: decoration.copyWith(
+                        errorText: _showDetailsErrors
+                            ? widget.session.detailsAreaError
+                            : null,
+                        errorMaxLines: 3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: MoolSpacing.sm),
+                  _WorkDetailField(
+                    label: 'Primary activity',
+                    fieldKey: 'work-activity',
+                    builder: (decoration) => TextField(
+                      key: const Key('work-activity'),
+                      controller: _activity,
+                      focusNode: _activityFocus,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _activityFocus.unfocus(),
+                      onChanged: (_) => _saveFields(),
+                      decoration: decoration.copyWith(
+                        errorText: _showDetailsErrors
+                            ? widget.session.detailsActivityError
+                            : null,
+                        errorMaxLines: 3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: MoolSpacing.sm),
+                  _WorkDetailField(
+                    label: 'Your relationship with the business',
+                    fieldKey: 'work-business-relationship',
+                    builder: (decoration) => DropdownButtonFormField<String>(
+                      key: const Key('work-business-relationship'),
+                      initialValue: widget.session.businessRelationship.isEmpty
+                          ? null
+                          : widget.session.businessRelationship,
+                      isExpanded: true,
+                      isDense:
+                          MediaQuery.textScalerOf(context).scale(16) <= 20.8,
+                      itemHeight: null,
+                      decoration: decoration,
+                      items:
+                          const [
+                                'Owner',
+                                'Partner or director',
+                                'Authorized representative',
+                              ]
+                              .map(
+                                (value) => DropdownMenuItem(
+                                  value: value,
+                                  child: Text(value),
+                                ),
+                              )
+                              .toList(),
+                      onChanged: (value) =>
+                          widget.session.saveBusinessRelationship(value ?? ''),
+                    ),
+                  ),
+                ],
+              )
+            else if (_step == 1) ...[
               if (widget.session.documentRecoveryMessage
                   case final message?) ...[
                 Semantics(
@@ -2115,11 +2171,13 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const WorkSectionTitle(
-                      title: 'Review and submit',
-                      detail: 'Check your Workspace details and documents',
-                    ),
-                    const SizedBox(height: MoolSpacing.sm),
+                    if (MediaQuery.textScalerOf(context).scale(20) <= 30) ...[
+                      const WorkSectionTitle(
+                        title: 'Review and submit',
+                        detail: 'Check your Workspace details and documents',
+                      ),
+                      const SizedBox(height: MoolSpacing.sm),
+                    ],
                     _buildReviewSummary(context),
                     const SizedBox(height: MoolSpacing.sm),
                     Column(
@@ -2858,6 +2916,58 @@ class _ReviewStepMotion extends StatelessWidget {
   }
 }
 
+class _WorkDetailField extends StatelessWidget {
+  const _WorkDetailField({
+    required this.label,
+    required this.fieldKey,
+    required this.builder,
+  });
+
+  final String label;
+  final String fieldKey;
+  final Widget Function(InputDecoration) builder;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      const style = TextStyle(
+        color: MoolColors.muted,
+        fontSize: 12,
+        height: 1.3,
+      );
+      final painter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: DefaultTextStyle.of(context).style.merge(style),
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final needsWrapping = painter.width > constraints.maxWidth - 24;
+      painter.dispose();
+      final decoration = InputDecoration(
+        labelText: needsWrapping ? null : label,
+        border: const UnderlineInputBorder(),
+      );
+      if (!needsWrapping) return builder(decoration);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ExcludeSemantics(
+            child: Text(
+              label,
+              key: Key('$fieldKey-full-label'),
+              style: style,
+              softWrap: true,
+            ),
+          ),
+          Semantics(label: label, child: builder(decoration)),
+        ],
+      );
+    },
+  );
+}
+
 class _ProgressHeader extends StatelessWidget {
   const _ProgressHeader({required this.step});
   final int step;
@@ -2866,55 +2976,94 @@ class _ProgressHeader extends StatelessWidget {
     final labels = step > 2
         ? const ['Submitted', 'MoolSocial review']
         : const ['Details', 'Documents', 'Review'];
-    return Column(
-      key: const Key('work-workspace-progress'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          step > 2 ? 'Application status' : 'Step ${step + 1} of 3',
-          style: const TextStyle(
-            color: MoolColors.navy,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            for (var i = 0; i < labels.length; i++) ...[
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AnimatedContainer(
-                      duration: MoolMotion.accessible(
-                        context,
-                        MoolMotion.quick,
-                      ),
-                      height: 3,
-                      color: (step > 2 ? i == 0 : i <= step)
-                          ? MoolColors.navy
-                          : const Color(0xFFE2E4EE),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      labels[i],
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: (step > 2 ? i == 1 : i == step)
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: MoolColors.navy,
-                      ),
-                    ),
-                  ],
+    final current = step > 2 ? 1 : step;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final labelWidth =
+            (constraints.maxWidth - (labels.length - 1) * 10) / labels.length;
+        final painter = TextPainter(
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        );
+        var compactLabels = false;
+        for (var i = 0; i < labels.length; i++) {
+          painter.text = TextSpan(
+            text: labels[i],
+            style: DefaultTextStyle.of(context).style.merge(
+              TextStyle(
+                fontSize: 12,
+                fontWeight: i == current ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          );
+          painter.layout();
+          if (painter.width > labelWidth) compactLabels = true;
+        }
+        painter.dispose();
+        return Semantics(
+          label: labels.join(', '),
+          child: Column(
+            key: const Key('work-workspace-progress'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                compactLabels
+                    ? step > 2
+                          ? labels[current]
+                          : '${labels[current]} · ${step + 1} of 3'
+                    : step > 2
+                    ? 'Application status'
+                    : 'Step ${step + 1} of 3',
+                key: const Key('work-progress-current'),
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              if (i < labels.length - 1) const SizedBox(width: 10),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < labels.length; i++) ...[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AnimatedContainer(
+                            duration: MoolMotion.accessible(
+                              context,
+                              MoolMotion.quick,
+                            ),
+                            height: 3,
+                            color: (step > 2 ? i == 0 : i <= step)
+                                ? MoolColors.navy
+                                : const Color(0xFFE2E4EE),
+                          ),
+                          if (!compactLabels) const SizedBox(height: 6),
+                          if (!compactLabels)
+                            Text(
+                              labels[i],
+                              key: Key('work-progress-label-$i'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: (step > 2 ? i == 1 : i == step)
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: MoolColors.navy,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (i < labels.length - 1) const SizedBox(width: 10),
+                  ],
+                ],
+              ),
             ],
-          ],
-        ),
-      ],
+          ),
+        );
+      },
     );
   }
 }

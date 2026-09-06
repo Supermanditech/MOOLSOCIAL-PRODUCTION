@@ -10,6 +10,18 @@
   },
   "entries": [
     {
+      "id": "REG-20260906-4527-WORK-DETAILS-LOCATION-AND-KEYBOARD-VALIDATION",
+      "visualContinuation": "The corrected17-case focused run passes; final visual inspection still finds the200% relationship selection clipping Authorized representative to Authorized because the existing dense dropdown fixes a one-line height. The same200% first view spends its available body on a duplicate step introduction. Preserve oppo-r665-s04-details-local-20260906 images. Allow the existing dropdown to size its selected value at enlarged text; retain full labels and normal density. At200% omit only the duplicate Details/Review introduction because the progress line already names the current step, leaving actual input/summary content visible. Add selected-value containment, first-field visibility and simulated-IME focus/clearance assertions before final qualification.",
+      "status": "confirmed_review_child_in_progress",
+      "appliesTo": ["primary", "work", "testing", "accessibility"],
+      "mistake": "The retained r66.4 Details review accepts123 as a city/PIN and advances; keyboard Next from location closes instead of reaching activity, and global validation shifts the form. Large-text renders also split progress words and truncate long floating labels.",
+      "rootCause": "Location checks only minimum length; field traversal is implicit; client validation uses a global notice and fixed-width progress/label assumptions.",
+      "prevention": "Reuse the current Details page and validation owner. Reject incomplete digit-only PINs and punctuation-only locations while retaining real city names in Indian scripts; never claim address verification. Bind explicit name/location/activity focus order, show errors locally, and measure progress/field labels without shrinking user font scale. Preserve normal layout, draft, profile/document identity, review return and submission authority.",
+      "diagnosticEvidence": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r66-4-screen04-business-details-20260906/SCREEN04-REVIEW.md; existing S03-02/S04-02/S04-03 scope. Large-text review images remain in oppo-r665-s06-review-local-final-20260906. No additional founder parent ticket or external address lookup.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart", "apps/mobile/test/work_production_gateway_test.dart", "apps/mobile/test/work_vertical_slice_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/work/screens/work_onboarding_screens.dart", "apps/mobile/lib/features/work/work_session.dart"]
+    },
+    {
       "id": "REG-20260906-4526-WORK-PROOF-PREVIEW-ANDROID-BOTTOM-CLEARANCE",
       "status": "confirmed_local_preview_child_in_progress",
       "appliesTo": ["primary", "work", "testing", "accessibility"],
@@ -4753,6 +4765,7 @@
     },
     {
       "id": "REG-20260807-209-C10D-SEMANTICS-HANDLE-DEFERRED-PAST-END-VERIFICATION",
+      "workDetailsRecurrence20260906": "The three new S04 Details journeys completed their assertions but failed final verification because ensureSemantics was disposed by addTearDown. Retain r665-s04-details-focused-attempt1.log SHA256335DDBA33E5E14A91655229E6AE4826C3D7A20D519DEC89A8F08C0B4B3BFC327 (14unit passes/3widget failures, exit1). Dispose the handle in a test-body try/finally, retain and assert the live progress semantics, and rerun all17 cases. No product fix or new root-cause ticket is needed for this harness recurrence.",
       "status": "resolved_gate_active",
       "appliesTo": [
         "tests",
