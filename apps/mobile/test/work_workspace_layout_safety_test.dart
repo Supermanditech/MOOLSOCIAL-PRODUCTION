@@ -10,6 +10,7 @@ import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
 
 void main() {
   WorkSession liveStore({ReviewWorkGateway? gateway}) =>
@@ -216,6 +217,155 @@ void main() {
       matchesGoldenFile(
         '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/$name.png',
       ),
+    );
+  }
+
+  for (final filters in <(String?, String?)>[
+    (null, null),
+    ('freight', null),
+    (null, 'nearby'),
+  ]) {
+    testWidgets(
+      'S09 Buy Direct filter remains local ${filters.$1} ${filters.$2}',
+      (tester) async {
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: liveStore(),
+          textScale: 1,
+        );
+        final buy = tester
+            .widget<WorkWorkspaceDashboardScreen>(
+              find.byType(WorkWorkspaceDashboardScreen),
+            )
+            .procurementSession;
+        buy.chooseFilter(filters.$1);
+        await tester.tap(find.byKey(const Key('work-quick-direct')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-store-buy-direct')), findsOneWidget);
+        expect(buy.selectedFilter, 'manufacturer');
+        if (filters.$2 != null) buy.chooseFilter(filters.$2);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-store-activity-deck')),
+          findsOneWidget,
+        );
+        expect(buy.selectedFilter, filters.$2 ?? filters.$1);
+        await tester.tap(find.byKey(const Key('work-quick-buy')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-store-procurement-screen')),
+          findsOneWidget,
+        );
+        expect(buy.selectedFilter, filters.$2 ?? filters.$1);
+        await captureStoreView(
+          tester,
+          'r665-restock-filter-${filters.$1}-${filters.$2}',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final origin in ['dashboard', 'stock', 'direct']) {
+    testWidgets('S09 scanner cancel restores $origin', (tester) async {
+      const channel = MethodChannel('flutter.baseflow.com/permissions/methods');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        if (call.method == 'requestPermissions') {
+          return <int, int>{
+            for (final id in call.arguments as List) id as int: 0,
+          };
+        }
+        return 0;
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        ),
+      );
+      final work = liveStore();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        textScale: 1,
+      );
+      if (origin == 'stock') {
+        await tester.tap(find.byKey(const Key('work-store-stock')));
+      } else if (origin == 'direct') {
+        await tester.tap(find.byKey(const Key('work-quick-direct')));
+      }
+      await tester.pumpAndSettle();
+      final products = List<WorkspaceCatalogueItem>.of(
+        work.workspaceCatalogueItems,
+      );
+      await tester.tap(find.byKey(const Key('work-dashboard-scan')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('buy-manual-code-panel')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('buy-cancel-product-code')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(
+          Key(switch (origin) {
+            'stock' => 'work-dashboard-catalogue-screen',
+            'direct' => 'work-store-buy-direct',
+            _ => 'work-store-activity-deck',
+          }),
+        ),
+        findsOneWidget,
+      );
+      expect(work.workspaceCatalogueItems, orderedEquals(products));
+      if (origin == 'direct') {
+        final buy = tester
+            .widget<WorkWorkspaceDashboardScreen>(
+              find.byType(WorkWorkspaceDashboardScreen),
+            )
+            .procurementSession;
+        expect(buy.selectedFilter, 'manufacturer');
+      }
+      await captureStoreView(tester, 'r665-scanner-cancel-$origin');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final destination in ['store', 'orders', 'sell', 'stock']) {
+    testWidgets(
+      'S09 setup navigation to $destination does not create or publish products',
+      (tester) async {
+        final work = liveStore()..workspaceCatalogueItems.clear();
+        await mount(
+          tester,
+          route: '/app/work/retailer/setup',
+          work: work,
+          textScale: 1,
+        );
+        await tester.enterText(
+          find.byKey(const Key('retailer-product-quantity')),
+          '7',
+        );
+        await tester.enterText(
+          find.byKey(const Key('retailer-product-buy-price')),
+          '40',
+        );
+        await tester.enterText(
+          find.byKey(const Key('retailer-product-sell-price')),
+          '50',
+        );
+        await tester.tap(find.byKey(Key('work-setup-$destination')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('retailer-setup-screen')), findsNothing);
+        expect(work.workspaceCatalogueItems, isEmpty);
+        expect(work.retailerQuantity, 7);
+        expect(work.retailerBuyPrice, 40);
+        expect(work.retailerSellPrice, 50);
+        expect(work.retailerProductAdded, isFalse);
+        await captureStoreView(tester, 'r665-setup-nav-$destination');
+        expect(tester.takeException(), isNull);
+      },
     );
   }
 
@@ -2805,7 +2955,7 @@ void main() {
             Key(
               sale
                   ? 'work-dashboard-counter-order-screen'
-                  : 'work-dashboard-catalogue-screen',
+                  : 'work-store-activity-deck',
             ),
           ),
           findsOneWidget,

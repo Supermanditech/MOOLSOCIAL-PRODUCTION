@@ -13,6 +13,56 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 
 void main() {
+  test('S09 setup draft cannot create or mutate a catalogue listing', () {
+    final work = WorkSession();
+    addTearDown(work.dispose);
+    work.saveRetailerProduct(quantity: 10, buyPrice: 40, sellPrice: 50);
+    expect(work.workspaceCatalogueItems, isEmpty);
+    expect(work.retailerProductAdded, isFalse);
+    work.addRetailerProduct();
+    final product = work.workspaceCatalogueItems.single;
+    expect(product.publicListing, isFalse);
+    work.saveRetailerProduct(
+      quantity: 20,
+      buyPrice: 45,
+      sellPrice: 60,
+      updateCatalogue: false,
+    );
+    expect(work.workspaceCatalogueItems.single, same(product));
+    expect(work.retailerQuantity, 20);
+    expect(work.retailerBuyPrice, 45);
+    expect(work.retailerSellPrice, 60);
+    work.saveRetailerProduct(quantity: 20, buyPrice: 45, sellPrice: 60);
+    expect(work.workspaceCatalogueItems.single.stock, 20);
+    expect(work.workspaceCatalogueItems.single.sellingPrice, 60);
+    expect(work.workspaceCatalogueItems.single.publicListing, isFalse);
+  });
+
+  for (final publish in [false, true]) {
+    test(
+      'S09 setup publication requires explicit choice and successful save $publish',
+      () async {
+        final gateway = ReviewWorkGateway()..failSetup = true;
+        final work = WorkSession(gateway: gateway)
+          ..selectProfile('retailer-grocery')
+          ..reviewCaseId = 'case-store';
+        addTearDown(work.dispose);
+        expect(await work.checkReview(), isTrue);
+        work.addRetailerProduct();
+        work.saveRetailerProduct(quantity: 10, buyPrice: 40, sellPrice: 50);
+        work.setRetailerFulfilment(homeDelivery: true, storeCollection: false);
+        work.setRetailerPublishAfterSetup(publish);
+        expect(await work.finishRetailerSetup(), isFalse);
+        expect(work.workspaceCatalogueItems.single.publicListing, isFalse);
+        expect(work.workspaceVisibleToCustomers, isFalse);
+        expect(await work.finishRetailerSetup(), isTrue);
+        expect(work.workspaceCatalogueItems.single.publicListing, publish);
+        expect(work.workspaceVisibleToCustomers, publish);
+        expect(work.workspaceAcceptingOrders, publish);
+      },
+    );
+  }
+
   WorkSession application({
     WorkGateway? gateway,
     WorkPendingProofStore? store,

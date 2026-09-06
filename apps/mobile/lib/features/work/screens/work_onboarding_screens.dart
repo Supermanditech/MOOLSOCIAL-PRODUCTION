@@ -4147,11 +4147,13 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
     super.dispose();
   }
 
-  void _saveFields() => widget.session.saveRetailerProduct(
-    quantity: int.tryParse(_quantity.text) ?? 0,
-    buyPrice: int.tryParse(_buy.text) ?? 0,
-    sellPrice: int.tryParse(_sell.text) ?? 0,
-  );
+  void _saveFields({bool updateCatalogue = true}) =>
+      widget.session.saveRetailerProduct(
+        quantity: int.tryParse(_quantity.text) ?? 0,
+        buyPrice: int.tryParse(_buy.text) ?? 0,
+        sellPrice: int.tryParse(_sell.text) ?? 0,
+        updateCatalogue: updateCatalogue,
+      );
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -4163,7 +4165,7 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
           workspaceMasterCatalogue.first;
       void openSection(String section) {
         FocusManager.instance.primaryFocus?.unfocus();
-        _saveFields();
+        _saveFields(updateCatalogue: false);
         context.go('/app/work/workspace/dashboard?section=$section');
       }
 

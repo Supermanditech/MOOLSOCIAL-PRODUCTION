@@ -85,6 +85,8 @@ class _WorkWorkspaceDashboardScreenState
   bool _procurementReady = false;
   _WorkspaceOperation? _procurementReturnOperation;
   String? _procurementProductId;
+  bool _directFilterApplied = false;
+  String? _filterBeforeDirect;
   WorkspaceOrderRecord? _reviewedOrder;
 
   @override
@@ -586,9 +588,34 @@ class _WorkWorkspaceDashboardScreenState
                   unawaited(_counterKey.currentState?._scanProduct());
                   return;
                 }
-                _showOperation(_WorkspaceOperation.catalogue);
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) unawaited(_catalogueKey.currentState?._scan());
+                final origin = (
+                  view: _view,
+                  operation: _operation,
+                  returnView: _operationReturnView,
+                  returnOperation: _operationReturnOperation,
+                  workspaceId: session.activeWorkspace?.id,
+                );
+                _showOperation(
+                  _WorkspaceOperation.catalogue,
+                  retainDirectFilter: true,
+                );
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  if (!mounted) return;
+                  final scanned = await _catalogueKey.currentState?._scan();
+                  if (mounted && scanned == true) _releaseDirectFilter();
+                  if (!mounted ||
+                      scanned != false ||
+                      session.activeWorkspace?.id != origin.workspaceId ||
+                      _view != _WorkspaceControlView.operation ||
+                      _operation != _WorkspaceOperation.catalogue) {
+                    return;
+                  }
+                  setState(() {
+                    _view = origin.view;
+                    _operation = origin.operation;
+                    _operationReturnView = origin.returnView;
+                    _operationReturnOperation = origin.returnOperation;
+                  });
                 });
               },
               onSettings: () => _showStoreSignals(context),
@@ -754,6 +781,7 @@ class _WorkWorkspaceDashboardScreenState
 
   void _showDashboard() {
     _searchFocus.unfocus();
+    _releaseDirectFilter();
     setState(() {
       _reviewedOrder = null;
       _view = _WorkspaceControlView.dashboard;
@@ -856,7 +884,10 @@ class _WorkWorkspaceDashboardScreenState
     setState(() => _view = _WorkspaceControlView.alerts);
   }
 
-  void _showOperation(_WorkspaceOperation operation) {
+  void _showOperation(
+    _WorkspaceOperation operation, {
+    bool retainDirectFilter = false,
+  }) {
     _searchFocus.unfocus();
     if (operation == _WorkspaceOperation.paidWork) {
       final workspaceId = session.activeWorkspace?.id;
@@ -868,8 +899,14 @@ class _WorkWorkspaceDashboardScreenState
     }
     session.clearMessages();
     if (operation == _WorkspaceOperation.direct) {
+      if (!_directFilterApplied) {
+        _filterBeforeDirect = widget.procurementSession.selectedFilter;
+      }
       widget.procurementSession.openDestination(BuyV2Destination.wholesale);
       widget.procurementSession.chooseFilter('manufacturer');
+      _directFilterApplied = true;
+    } else if (!retainDirectFilter) {
+      _releaseDirectFilter();
     }
     setState(() {
       if (_view == _WorkspaceControlView.status) {
@@ -908,6 +945,7 @@ class _WorkWorkspaceDashboardScreenState
   }) {
     _searchFocus.unfocus();
     session.clearMessages();
+    if (returnOperation != _WorkspaceOperation.direct) _releaseDirectFilter();
     setState(() {
       _procurementReturnOperation = returnOperation;
       _procurementProductId = productId;
@@ -934,6 +972,15 @@ class _WorkWorkspaceDashboardScreenState
         _view = _WorkspaceControlView.operation;
       }
     });
+  }
+
+  void _releaseDirectFilter() {
+    if (!_directFilterApplied) return;
+    _directFilterApplied = false;
+    if (widget.procurementSession.selectedFilter == 'manufacturer') {
+      widget.procurementSession.chooseFilter(_filterBeforeDirect);
+    }
+    _filterBeforeDirect = null;
   }
 
   bool _isNestedWorkspaceOperation(_WorkspaceOperation operation) => const {
@@ -7077,9 +7124,9 @@ class _WorkspaceCatalogueSurfaceState
     if (mounted) setState(() {});
   }
 
-  Future<void> _scan() async {
+  Future<bool> _scan() async {
     final code = await showBuyV2ProductScanner(context);
-    if (!mounted || code == null || code.trim().isEmpty) return;
+    if (!mounted || code == null || code.trim().isEmpty) return false;
     final normalized = code.trim().toLowerCase();
     final products = [
       ...widget.session.workspaceCatalogueItems,
@@ -7094,6 +7141,7 @@ class _WorkspaceCatalogueSurfaceState
         )
         .firstOrNull;
     await _edit(product ?? _blankProduct(barcode: code.trim()));
+    return true;
   }
 
   Future<void> _changePrice(WorkspaceCatalogueItem product) async {

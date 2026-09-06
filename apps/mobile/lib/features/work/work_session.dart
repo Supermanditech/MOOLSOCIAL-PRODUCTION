@@ -3559,7 +3559,9 @@ class WorkSession extends ChangeNotifier {
   void addRetailerProduct() {
     retailerProductAdded = true;
     if (workspaceCatalogueItems.isEmpty) {
-      workspaceCatalogueItems.add(workspaceMasterCatalogue.first);
+      workspaceCatalogueItems.add(
+        workspaceMasterCatalogue.first.copyWith(publicListing: false),
+      );
     }
     clearMessages();
     notifyListeners();
@@ -3569,21 +3571,22 @@ class WorkSession extends ChangeNotifier {
     required int quantity,
     required int buyPrice,
     required int sellPrice,
+    bool updateCatalogue = true,
   }) {
     retailerQuantity = quantity;
     retailerBuyPrice = buyPrice;
     retailerSellPrice = sellPrice;
-    if (workspaceCatalogueItems.isEmpty) {
-      workspaceCatalogueItems.add(workspaceMasterCatalogue.first);
+    if (updateCatalogue &&
+        retailerProductAdded &&
+        workspaceCatalogueItems.isNotEmpty) {
+      workspaceCatalogueItems[0] = workspaceCatalogueItems.first.copyWith(
+        stock: quantity,
+        purchasePrice: buyPrice,
+        sellingPrice: sellPrice,
+        unitPrice: '₹$sellPrice/${workspaceCatalogueItems.first.pack}',
+        available: quantity > 0,
+      );
     }
-    workspaceCatalogueItems[0] = workspaceCatalogueItems.first.copyWith(
-      stock: quantity,
-      purchasePrice: buyPrice,
-      sellingPrice: sellPrice,
-      unitPrice: '₹$sellPrice/${workspaceCatalogueItems.first.pack}',
-      available: quantity > 0,
-      publicListing: true,
-    );
     clearMessages();
     notifyListeners();
   }
@@ -3794,6 +3797,11 @@ class WorkSession extends ChangeNotifier {
         );
         retailerSetupSaved = true;
         reviewStage = WorkReviewStage.live;
+        if (retailerPublishAfterSetup && workspaceCatalogueItems.isNotEmpty) {
+          workspaceCatalogueItems[0] = workspaceCatalogueItems.first.copyWith(
+            publicListing: true,
+          );
+        }
         workspaceVisibleToCustomers = retailerPublishAfterSetup;
         workspaceAcceptingOrders = retailerPublishAfterSetup;
         workspaceStoreState = retailerPublishAfterSetup
