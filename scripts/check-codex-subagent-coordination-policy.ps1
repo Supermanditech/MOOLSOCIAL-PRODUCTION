@@ -1676,6 +1676,12 @@ if ($ProductionLane -ceq 'baseline') {
         'docs/quality/cursor-buy-redmi-fixes-v1-20260905/scope-state.json',
         'scripts/check-codex-subagent-coordination-policy.ps1'
       )
+      $r664MenuAdmissionParent = '89c7970c77629b615a6cb08c9b51946fedcb8cea'
+      & git -C $root merge-base --is-ancestor $r664MenuAdmissionParent $head
+      $r664MenuAdmissionContext = $LASTEXITCODE -eq 0
+      $r664LegacyFreezeHead = if ($r664MenuAdmissionContext) {
+        $r664MenuAdmissionParent
+      } else { $head }
       & git -C $root merge-base --is-ancestor $r66AmendmentParent $head
       Assert-Coordination ($LASTEXITCODE -eq 0) `
         'R66 owner amendment requires its exact preserved implementation parent.'
@@ -1879,8 +1885,12 @@ if ($ProductionLane -ceq 'baseline') {
             'Redmi admission cannot rewrite earlier coordination history.'
           $r66ReviewPolicyBefore = Get-R66Utf8GitJson `
             $r66ReviewAdmissionParent $r66ReviewAdmissionOwners[0]
-          $r66ReviewPolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
-            (Join-Path $root $r66ReviewAdmissionOwners[0]) | ConvertFrom-Json
+          $r66ReviewPolicyAfter = if ($r664MenuAdmissionContext) {
+            Get-R66Utf8GitJson $r664MenuAdmissionParent $r66ReviewAdmissionOwners[0]
+          } else {
+            Get-Content -Raw -Encoding UTF8 -LiteralPath `
+              (Join-Path $root $r66ReviewAdmissionOwners[0]) | ConvertFrom-Json
+          }
           $r66ReviewPrimaryClaims = @($r66ReviewPolicyAfter.activeClaims | Where-Object {
             $_.task -ceq '/root'
           })
@@ -1898,13 +1908,26 @@ if ($ProductionLane -ceq 'baseline') {
             ($r66ReviewPolicyAfter | ConvertTo-Json -Depth 100 -Compress)
           ) 'Redmi admission changed another claim or policy field.'
           $r66ReviewManifestHash = 'C23DD7B871D174DCF50A9200C80382FE8D24C067CD1C4CC1CF7E7AAADF14EF89'
-          Assert-Coordination (
-            (Get-Sha256 (Join-Path $root $r66ReviewAdmissionOwners[1])) -ceq $r66ReviewManifestHash
-          ) 'Redmi review admission manifest changed.'
+          if ($r664MenuAdmissionContext) {
+            $r66ReviewManifestBlob = @(& git -C $root rev-parse `
+                "${r664MenuAdmissionParent}:$($r66ReviewAdmissionOwners[1])")
+            Assert-Coordination ($LASTEXITCODE -eq 0 -and
+              $r66ReviewManifestBlob.Count -eq 1 -and
+              [string]$r66ReviewManifestBlob[0] -ceq 'e059649e9371a19f3d9871fd978170f8c53694b2') `
+              'Historical Redmi review admission manifest changed.'
+          } else {
+            Assert-Coordination (
+              (Get-Sha256 (Join-Path $root $r66ReviewAdmissionOwners[1])) -ceq $r66ReviewManifestHash
+            ) 'Redmi review admission manifest changed.'
+          }
           $r66ReviewScopeBefore = Get-R66Utf8GitJson `
             $r66ReviewAdmissionParent $r66ReviewAdmissionOwners[2]
-          $r66ReviewScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
-            (Join-Path $root $r66ReviewAdmissionOwners[2]) | ConvertFrom-Json
+          $r66ReviewScopeAfter = if ($r664MenuAdmissionContext) {
+            Get-R66Utf8GitJson $r664MenuAdmissionParent $r66ReviewAdmissionOwners[2]
+          } else {
+            Get-Content -Raw -Encoding UTF8 -LiteralPath `
+              (Join-Path $root $r66ReviewAdmissionOwners[2]) | ConvertFrom-Json
+          }
           Assert-Coordination (
             $r66ReviewScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq
             $r66ReviewManifestHash
@@ -1996,10 +2019,14 @@ if ($ProductionLane -ceq 'baseline') {
                 (@($r66SubjectCommittedOwners | Sort-Object) -join '|') -ceq
                 (@($r66SubjectOwners | Sort-Object) -join '|')) `
                 'R66 subject repair changed an unexpected owner.'
-              & git -C $root diff --quiet $r66SubjectCommit -- $r66SubjectGate
+              if ($r664MenuAdmissionContext) {
+                & git -C $root diff --quiet $r66SubjectCommit $r664LegacyFreezeHead -- $r66SubjectGate
+              } else {
+                & git -C $root diff --quiet $r66SubjectCommit -- $r66SubjectGate
+              }
               Assert-Coordination ($LASTEXITCODE -eq 0) 'R66 repaired subject gate changed after its checkpoint.'
               $r66SubjectLaterHistory = @(& git -C $root log --format=%H `
-                  "${r66SubjectCommit}..$head" -- $r66SubjectGate)
+                  "${r66SubjectCommit}..$r664LegacyFreezeHead" -- $r66SubjectGate)
               Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66SubjectLaterHistory.Count -eq 0) `
                 'R66 subject repair cannot be replayed or revised.'
             }
@@ -2007,12 +2034,105 @@ if ($ProductionLane -ceq 'baseline') {
             # coordination, policy, scope, manifest and Social owners stay frozen here.
             $r66FreezeOwners = @($r66FreezeOwners | Where-Object { $_ -cne $r66SubjectGate })
           }
-          & git -C $root diff --quiet $r66FreezeCommit -- @r66FreezeOwners
+          if ($r664MenuAdmissionContext) {
+            & git -C $root diff --quiet $r66FreezeCommit $r664LegacyFreezeHead -- @r66FreezeOwners
+          } else {
+            & git -C $root diff --quiet $r66FreezeCommit -- @r66FreezeOwners
+          }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'R66 coordination blobs changed after admission.'
           $r66LaterCoordination = @(& git -C $root log --format=%H `
-              "${r66FreezeCommit}..$head" -- @r66FreezeOwners)
+              "${r66FreezeCommit}..$r664LegacyFreezeHead" -- @r66FreezeOwners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66LaterCoordination.Count -eq 0) `
             'R66 coordination amendment cannot be replayed or revised by later feature commits.'
+        }
+      }
+      if ($r664MenuAdmissionContext) {
+        # One founder-authorized shared menu owner, with the prior freezes
+        # proven through its exact parent and the new admission frozen below.
+        $r664MenuOwners = @(
+          'config/codex-subagent-coordination-policy.json',
+          'docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md',
+          'docs/quality/cursor-buy-redmi-fixes-v1-20260905/scope-state.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1'
+        )
+        $r664MenuOwner = 'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart'
+        $r664MenuSubject =
+          'ui(buy-redmi-fixes-v1-20260905): admit landscape Mool menu repair'
+        $r664MenuPolicyBefore = Get-R66Utf8GitJson $r664MenuAdmissionParent $r664MenuOwners[0]
+        $r664MenuPolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
+          (Join-Path $root $r664MenuOwners[0]) | ConvertFrom-Json
+        $r664MenuClaims = @($r664MenuPolicyAfter.activeClaims | Where-Object {
+          $_.task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905'
+        })
+        Assert-Coordination ($r664MenuClaims.Count -eq 1) 'R664 menu claim is ambiguous.'
+        $r664MenuClaim = $r664MenuClaims[0]
+        Assert-Coordination ($r664MenuClaim.owners.Count -eq 42 -and
+          @($r664MenuClaim.owners | Where-Object { $_ -ceq $r664MenuOwner }).Count -eq 1) `
+          'R664 menu admission must add exactly its single shared navigation owner.'
+        $r664MenuClaim.owners = @($r664MenuClaim.owners | Where-Object { $_ -cne $r664MenuOwner })
+        Assert-Coordination (
+          ($r664MenuPolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r664MenuPolicyAfter | ConvertTo-Json -Depth 100 -Compress)
+        ) 'R664 menu admission changed another claim or policy field.'
+        $r664MenuManifestHash = '998678329583C21D9C02E85A1DE3CA085DCC3430140D14D27F47EA2729E41F42'
+        Assert-Coordination (
+          (Get-Sha256 (Join-Path $root $r664MenuOwners[1])) -ceq $r664MenuManifestHash
+        ) 'R664 menu admission manifest differs from its reviewed owner scope.'
+        $r664MenuScopeBefore = Get-R66Utf8GitJson $r664MenuAdmissionParent $r664MenuOwners[2]
+        $r664MenuScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
+          (Join-Path $root $r664MenuOwners[2]) | ConvertFrom-Json
+        Assert-Coordination (
+          $r664MenuScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq
+            $r664MenuManifestHash
+        ) 'R664 menu scope is not bound to its admission manifest.'
+        $r664MenuScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 =
+          $r664MenuScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+        Assert-Coordination (
+          ($r664MenuScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r664MenuScopeAfter | ConvertTo-Json -Depth 100 -Compress)
+        ) 'R664 menu admission changed execution authority beyond its manifest binding.'
+        $r664MenuUnchangedOwners = @($r66FreezeOwners | Where-Object { $_ -cnotin $r664MenuOwners })
+        if ($r664MenuUnchangedOwners.Count -gt 0) {
+          & git -C $root diff --quiet $r664MenuAdmissionParent -- @r664MenuUnchangedOwners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'R664 menu admission changed another frozen owner.'
+          $r664MenuUnchangedHistory = @(& git -C $root log --format=%H `
+              "${r664MenuAdmissionParent}..$head" -- @r664MenuUnchangedOwners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r664MenuUnchangedHistory.Count -eq 0) `
+            'R664 menu admission cannot unfreeze or revise unrelated coordination owners.'
+        }
+        if ($head -ceq $r664MenuAdmissionParent) {
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) `
+            'Pending R664 menu admission is not a handoff or acceptance.'
+          $r664MenuDirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@($r664MenuDirty | Sort-Object) -join '|') -ceq
+            (@($r664MenuOwners | Sort-Object) -join '|')) `
+            'Pending R664 menu admission must change exactly four coordination owners.'
+        } else {
+          $r664MenuFollowing = @(& git -C $root rev-list --reverse --ancestry-path `
+              "${r664MenuAdmissionParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r664MenuFollowing.Count -gt 0) `
+            'R664 menu admission ancestry lookup failed.'
+          $r664MenuCommit = [string]$r664MenuFollowing[0]
+          $r664MenuParents = @(& git -C $root show -s --format=%P $r664MenuCommit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r664MenuParents.Count -eq 1 -and
+            [string]$r664MenuParents[0] -ceq $r664MenuAdmissionParent) `
+            'R664 menu admission requires its exact single parent.'
+          $r664MenuCommittedSubject = @(& git -C $root show -s --format=%s $r664MenuCommit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r664MenuCommittedSubject.Count -eq 1 -and
+            [string]$r664MenuCommittedSubject[0] -ceq $r664MenuSubject) `
+            'R664 menu admission subject changed.'
+          $r664MenuCommittedOwners = @(& git -C $root diff-tree --no-commit-id --name-only -r $r664MenuCommit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@($r664MenuCommittedOwners | Sort-Object) -join '|') -ceq
+            (@($r664MenuOwners | Sort-Object) -join '|')) `
+            'R664 menu admission changed a runtime, test, evidence or unexpected owner.'
+          & git -C $root diff --quiet $r664MenuCommit -- @r664MenuOwners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'R664 menu coordination changed after admission.'
+          $r664MenuLaterHistory = @(& git -C $root log --format=%H `
+              "${r664MenuCommit}..$head" -- @r664MenuOwners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r664MenuLaterHistory.Count -eq 0) `
+            'R664 menu admission cannot be replayed or revised by later feature commits.'
         }
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {

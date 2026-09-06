@@ -50,6 +50,7 @@
       "task": "/root/cursor_buy_redmi_fixes_v1_20260905",
       "role": "subagent",
       "owners": [
+        "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
