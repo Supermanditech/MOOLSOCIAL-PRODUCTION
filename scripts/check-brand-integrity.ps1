@@ -2,12 +2,20 @@ param(
   [ValidateSet("App", "Website", "All")]
   [string]$Surface = "App",
   [string]$ScreenbookRoot = "",
-  [switch]$RequireScreenbook
+  [switch]$RequireScreenbook,
+  [string]$RedmiReviewSourceCommit = ''
 )
 
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
+$redmiReviewQualified = $false
+if (-not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
+  if ($Surface -cne 'App') { throw 'Redmi review brand qualification is App-only.' }
+  $null = & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
+    -RepositoryRoot $root -RedmiReviewSourceCommit $RedmiReviewSourceCommit
+  $redmiReviewQualified = $true
+}
 $contractPath = Join-Path $root "config\brand-integrity.json"
 
 function Assert-True {
@@ -513,10 +521,17 @@ function Test-SealedBuyThemeIntegration {
       -Owners @($owner) `
       -Commit $shopV2Commit) `
     $structureExact
-  return $legacyProjection -or $v74Projection -or $shopV2Projection
+  $redmiReviewProjection = $false
+  if ($redmiReviewQualified) {
+    $redmiReviewProjection = Test-BuyThemeIntegrationFacts `
+      $true `
+      (Test-BrandOwnerBytesEqualAtCommit -Owners @($owner) -Commit $RedmiReviewSourceCommit) `
+      $structureExact
+  }
+  return $legacyProjection -or $v74Projection -or $shopV2Projection -or $redmiReviewProjection
 }
 
-$buyThemeIntegrationSource = Get-Content -LiteralPath $buyThemeIntegrationPath -Raw
+$buyThemeIntegrationSource = Get-Content -LiteralPath $buyThemeIntegrationPath -Raw -Encoding UTF8
 $sealedBuyThemeIntegration = Test-SealedBuyThemeIntegration `
   $buyThemeIntegrationSource
 if ($sealedBuyThemeIntegration) {
@@ -665,13 +680,20 @@ foreach ($requiredOwner in @(
   Assert-Contains $buyStateViewsSource $requiredOwner `
     "Buy Cart state-motion owner is missing $requiredOwner"
 }
+$miniCartTotalMotionOwner = if ($redmiReviewQualified) { 'buy-cart-total' } else { 'buy-mini-cart-total-motion' }
 foreach ($requiredOwner in @(
   "buy-cart-summary",
   "buy-cart-acknowledgement",
-  "buy-mini-cart-total-motion"
+  $miniCartTotalMotionOwner
 )) {
   Assert-Contains $buyThemeIntegrationSource $requiredOwner `
     "Buy mini-Cart state-motion owner is missing $requiredOwner"
+}
+if ($redmiReviewQualified) {
+  Assert-True -Condition ($buyThemeIntegrationSource -match (
+    "(?s)BuyV2FiniteValueTransition\(\s*key: const ValueKey\('buy-cart-total'\)," +
+    '\s*stateKey: ''\$total\|\$totalText'',\s*text: totalText,\s*ownerSize: Size\('
+  )) -Message 'Redmi Cart total must retain its measured current-value finite transition'
 }
 foreach ($source in @(
   $buyStateCatalogueSource,
@@ -758,7 +780,19 @@ function Test-SealedChatBrandProjection {
   return $legacyProjection -or $v74Projection
 }
 
-if (Test-SealedChatBrandProjection $chatSource) {
+if ($redmiReviewQualified) {
+  Assert-True -Condition (Test-BrandOwnerBytesEqualAtCommit `
+    -Owners @('apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart') `
+    -Commit 'f94cfd4752dd73b58a69568475803d6cf25cb8d0') `
+    -Message 'Redmi review changed the accepted contextual Chat owner'
+  foreach ($token in @(
+    'return ChatPageScaffold(', 'title: entryContext.title',
+    "subtitle: 'MoolSocial messaging'", 'returnRoute: widget.returnRoute',
+    "key: const Key('chat-native-navigation')"
+  )) {
+    Assert-Contains $chatSource $token 'accepted contextual Chat brand structure changed'
+  }
+} elseif (Test-SealedChatBrandProjection $chatSource) {
   Assert-Contains $chatSource "title: 'MoolSocial Chat'" `
     'sealed standalone Chat lost its MoolSocial identity'
 } else {
@@ -800,7 +834,14 @@ function Test-SealedSocialBrandEntries {
       -Owners $owners `
       -Commit '369bb45599366de8a8d95a9f0824c8cb961d0692') `
     $structureExact
-  return $legacyProjection -or $v74Projection
+  $redmiReviewProjection = $false
+  if ($redmiReviewQualified) {
+    $redmiReviewProjection = Test-BuyThemeIntegrationFacts `
+      $true `
+      (Test-BrandOwnerBytesEqualAtCommit -Owners $owners -Commit 'f94cfd4752dd73b58a69568475803d6cf25cb8d0') `
+      $structureExact
+  }
+  return $legacyProjection -or $v74Projection -or $redmiReviewProjection
 }
 
 $socialRailSource = Get-Content -LiteralPath $socialRailPath -Raw

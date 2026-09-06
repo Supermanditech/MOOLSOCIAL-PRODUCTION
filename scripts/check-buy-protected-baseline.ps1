@@ -1,6 +1,7 @@
 param(
   [string]$RepositoryRoot = "",
-  [string]$BaselinePath = ""
+  [string]$BaselinePath = "",
+  [string]$RedmiReviewSourceCommit = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -244,6 +245,55 @@ function Test-SealedBuyOverlay {
     $v74OverlayAccepted -or
     $shopV2OverlayAccepted
   )
+}
+
+function Test-RedmiReviewBuySource {
+  param([string]$SourceCommit, [string[]]$CurrentOwners)
+  # This is an unaccepted, locally tested review source, never a replacement baseline.
+  $qualifiedSource = 'd07559609ffad7371a6a98d765d4fefa186dc065'
+  $acceptedBase = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
+  if ($SourceCommit -cne $qualifiedSource) { return $false }
+  $branch = @(& git -C $root branch --show-current)
+  if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
+      [string]$branch[0] -cne 'work/cursor-ui/buy-redmi-fixes-v1-20260905') { return $false }
+  & git -C $root merge-base --is-ancestor $acceptedBase $SourceCommit
+  if ($LASTEXITCODE -ne 0) { return $false }
+  & git -C $root merge-base --is-ancestor $SourceCommit HEAD
+  if ($LASTEXITCODE -ne 0) { return $false }
+  $acceptedOwners = @(Get-SealedBuyOverlayInventory $acceptedBase)
+  if ($acceptedOwners.Count -ne 51 -or
+      (@($CurrentOwners | Sort-Object) -join '|') -cne ($acceptedOwners -join '|')) { return $false }
+  if (-not (Test-SealedBuyOverlayCandidate $CurrentOwners $SourceCommit $true)) { return $false }
+  $boundaryRoots = @('apps/mobile/lib','apps/mobile/android','apps/mobile/ios','backend','contracts')
+  $expectedDelta = @(
+    'apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart',
+    'apps/mobile/lib/features/buy/buy_v2_session.dart',
+    'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+    'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+    'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart',
+    'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+    'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart'
+  )
+  $sourceDelta = @(& git -C $root diff --name-only $acceptedBase $SourceCommit -- @boundaryRoots)
+  if ($LASTEXITCODE -ne 0 -or
+      (@($sourceDelta | Sort-Object) -join '|') -cne ($expectedDelta -join '|')) { return $false }
+  & git -C $root diff --quiet $SourceCommit -- @boundaryRoots
+  if ($LASTEXITCODE -ne 0) { return $false }
+  $untracked = @(& git -C $root ls-files --others --exclude-standard -- @boundaryRoots)
+  if ($LASTEXITCODE -ne 0 -or $untracked.Count -ne 0) { return $false }
+  return $true
+}
+
+if (-not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
+  if (-not [string]::IsNullOrWhiteSpace($BaselinePath) -or
+      -not (Test-RedmiReviewBuySource $RedmiReviewSourceCommit $relativeFiles)) {
+    throw 'Redmi review source qualification rejected: exact branch, ancestry, inventory and source boundary are required.'
+  }
+  Write-Output (
+    "Protected Buy Redmi review qualification passed: source=$RedmiReviewSourceCommit; " +
+    "runtimeFiles=$($relativeFiles.Count); acceptedBaseline=false; productionPromotion=false."
+  )
+  return
 }
 
 $sealedOverlayAccepted = Test-SealedBuyOverlay $relativeFiles
