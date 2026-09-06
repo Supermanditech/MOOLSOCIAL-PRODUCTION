@@ -1,6 +1,6 @@
 # r66.4 prebuild validation
 
-Final tested product is unchanged from748d0b4a4b9ca97f456f5fe554ef32affff1ca6c except the explicitly authorized one-line Purchase order reference hint. No Work/Buy functional behavior, Cursor worktree or shared baseline changed. Git source seal/remote readback will be appended before one-build authorization.
+Final tested product is unchanged from748d0b4a4b9ca97f456f5fe554ef32affff1ca6c except the explicitly authorized one-line Purchase order reference hint. No Work/Buy functional behavior, Cursor worktree or shared baseline changed. Source sealed at541597205dddbc3d3e9b51120f53b3530d5d68a6, parent748d0b4a4b9ca97f456f5fe554ef32affff1ca6c, branchwork/codex-ui/codex-oppo-review-v1-20260905. Exact13-owner pre_commit passed; commit and push succeeded; origin readback exactly matched the full40-character HEAD with zero dirty records. Only candidate/evidence metadata is now activated for one guarded build; no product/test/source-manifest changes occur after the seal.
 
 Both complete33-suite connected cycles passed742 tests/83 intentional skips/0 failures, with zero-issue analysis and passing customer-copy check. Focused payment/session tests passed74/1 intentional skip/0 failures. Full commands, files and hashes are in local-validation.md. Existing startup/configuration recovery tests pass; historical startup incidents remain registered. Protected-reference and capture-only skips remain explicit, not device passes.
 

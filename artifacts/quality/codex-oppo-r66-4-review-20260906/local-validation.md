@@ -68,6 +68,6 @@ All under C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905:
 
 ## Qualification limits
 
-The first build-control call failed closed on historical evidence discovery because the preserved archive parameter was omitted. Its complete output remains in oppo-r66-4-build-controls.log; it is not a product failure or passing qualification. Existing archive support is used for the retry; no checker behavior is changed. Unavailable truncated read-only configuration/power output is not evidence.
+The first build-control call failed closed on historical evidence discovery because the preserved archive parameter was omitted. Its complete output remains in oppo-r66-4-build-controls.log; it is not a product failure or passing qualification. Existing archive support is used for the retry; no checker behavior is changed. Unavailable truncated read-only configuration/power output is not evidence. A later read-only motion-checker lookup omitted the filename suffix; the existing REG4516 read-path incident applies. The canonical APK gate and rg inventory identified check-buy-premium-motion-policy-state.ps1 before any machine-gate attempt; no new script or gate behavior was added.
 
 REG4517-4520 Work fixes are included by ancestry, not implemented twice. Production submission/publication/payment/rider/GPS services, native provider completion, physical large-text replay and founder appearance acceptance remain separate pending checks. No real charge, customer message, deployment or integration is claimed.
