@@ -91,6 +91,70 @@ void main() {
     },
   );
 
+  test('large Store amounts retain the full eligible balance', () {
+    final session = liveSession()
+      ..workspacePlatformAdjustments = 100
+      ..workspaceDeliveryAdjustments = 200
+      ..workspaceRefunds = 300
+      ..workspaceTaxWithheld = 400;
+    for (final amount in [
+      0,
+      1,
+      999,
+      10000000,
+      1000000000,
+      2147483647,
+      2147483648,
+      2147483649,
+      9990000000,
+      10000000000,
+      100000000000,
+    ]) {
+      session.workspaceSettlementBalance = amount + 1000;
+      expect(session.workspaceSettlementEligible, amount, reason: '$amount');
+      expect(session.workspaceSettlementBalance, amount + 1000);
+    }
+    session.workspaceSettlementBalance = 999;
+    expect(session.workspaceSettlementEligible, 0);
+  });
+
+  test('large Store amounts preserve partial settlement remainder', () async {
+    final gateway = ReviewWorkGateway();
+    final session = liveSession(gateway)
+      ..workspaceSettlementBalance = 10000000000;
+    await session.requestWorkspaceSettlement(amount: 10000000);
+    expect(gateway.settlementCalls, 1);
+    expect(session.workspaceSettlementRequested, 10000000);
+    expect(session.workspaceSettlementBalance, 9990000000);
+    expect(session.workspaceSettlementEligible, 9990000000);
+  });
+
+  test('large Store amounts preserve group purchase savings and balance', () {
+    const group = WorkspaceGroupBuy(
+      id: 'range-test',
+      productName: 'Commodity',
+      specification: 'Per kg',
+      leadRetailer: 'Test store',
+      confirmedRetailers: ['Test store'],
+      targetQuantity: 1000000,
+      securedQuantity: 1000000,
+      unitLabel: 'kg',
+      regularUnitPrice: 200000,
+      groupUnitPrice: 100000,
+      facilitationFee: 123,
+      deliveryFee: 456,
+      confirmationAmount: 10000000,
+      closingLabel: 'Tomorrow',
+      storeDeliveryLabel: 'After confirmation',
+      paymentConfirmed: false,
+    );
+    expect(group.goodsValue, 100000000000);
+    expect(group.deliveredTotal, 100000000579);
+    expect(group.netSaving, 99999999421);
+    expect(group.balanceDue, 99990000579);
+    expect(group.paymentConfirmed, isFalse);
+  });
+
   test('settlement uses only the eligible completed-sale balance', () async {
     final gateway = ReviewWorkGateway();
     final session = liveSession(gateway)

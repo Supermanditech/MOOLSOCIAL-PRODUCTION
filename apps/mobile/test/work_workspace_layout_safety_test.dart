@@ -30,6 +30,42 @@ void main() {
   const captureStoreLiveEvidence = bool.fromEnvironment(
     'MOOL_CAPTURE_WORK_STORE_LIVE_V1',
   );
+  void expectExactMoneyVisible(WidgetTester tester, Finder amounts) {
+    expect(amounts, findsWidgets);
+    for (final element in amounts.evaluate()) {
+      final target = find.byElementPredicate(
+        (candidate) => candidate == element,
+      );
+      expect(
+        find.ancestor(
+          of: target,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is SingleChildScrollView &&
+                widget.scrollDirection == Axis.horizontal,
+          ),
+        ),
+        findsNothing,
+        reason:
+            'The complete supported amount must be visible without sideways scrolling',
+      );
+      final paragraph = element.renderObject! as RenderParagraph;
+      final value = (element.widget as Text).data!;
+      final boxes = paragraph.getBoxesForSelection(
+        TextSelection(baseOffset: 0, extentOffset: value.length),
+      );
+      expect(boxes, hasLength(1));
+      expect(boxes.single.left, greaterThanOrEqualTo(-.5));
+      expect(boxes.single.right, lessThanOrEqualTo(paragraph.size.width + .5));
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(tester.getTopLeft(target).dx, greaterThanOrEqualTo(-.5));
+      expect(
+        tester.getTopRight(target).dx,
+        lessThanOrEqualTo(tester.view.physicalSize.width + .5),
+      );
+    }
+  }
+
   Future<void> mount(
     WidgetTester tester, {
     required String route,
@@ -226,6 +262,373 @@ void main() {
     (width: 320.0, height: 640.0, scale: 2.0),
   ]) {
     final suffix = '${display.width.toInt()}-${display.scale}';
+    testWidgets('S09 money live figures $suffix', (tester) async {
+      final work = liveStore();
+      final semantics = tester.ensureSemantics();
+      try {
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        final sales = find.byKey(const Key('work-pulse-sales'));
+        final originalTop = tester.getTopLeft(sales).dy;
+        final originalHeight = tester.getSize(sales).height;
+        for (final value in [
+          (0, '₹0', '₹0'),
+          (999, '₹999', '₹999'),
+          (99999, '₹99,999', '₹99,999'),
+          (100000, '₹1 lakh', '₹1,00,000'),
+          (9999999, '≈₹99.99 lakh', '₹99,99,999'),
+          (10000000, '₹1 cr', '₹1,00,00,000'),
+          (1000000000, '₹100 cr', '₹1,00,00,00,000'),
+          (9990000000, '₹999 cr', '₹9,99,00,00,000'),
+          (10000000000, '₹1,000 cr', '₹10,00,00,00,000'),
+          (100000000000, '₹10,000 cr', '₹1,00,00,00,00,000'),
+          (-10000000000, '₹-1,000 cr', '₹-10,00,00,00,000'),
+          (10000000001, '≈₹1,000 cr', '₹10,00,00,00,001'),
+        ]) {
+          work.workspaceSalesToday = value.$1;
+          work.setWorkspaceMoneyPeriod('Today');
+          await tester.pumpAndSettle();
+          final amount = find.descendant(
+            of: sales,
+            matching: find.text(value.$2),
+          );
+          expect(amount, findsOneWidget);
+          final paragraph = tester.renderObject<RenderParagraph>(amount);
+          expect(paragraph.didExceedMaxLines, isFalse, reason: value.$2);
+          final digits = RegExp(r'-?[\d,]+').firstMatch(value.$2)!;
+          expect(
+            paragraph.getBoxesForSelection(
+              TextSelection(baseOffset: digits.start, extentOffset: digits.end),
+            ),
+            hasLength(1),
+            reason: 'The digits must stay together: ${value.$2}',
+          );
+          expect(
+            tester.widget<Text>(amount).style!.fontSize,
+            greaterThanOrEqualTo(14),
+          );
+          expect(
+            paragraph.textScaler.scale(17),
+            closeTo(17 * display.scale, .01),
+          );
+          expect(
+            find.bySemanticsLabel(
+              'View statement, Sales today, ${value.$3} in store records',
+            ),
+            findsOneWidget,
+          );
+          expect(tester.getTopLeft(sales).dy, closeTo(originalTop, .1));
+          expect(
+            tester.getSize(sales).height,
+            closeTo(originalHeight, .1),
+            reason: 'Live totals must not move the financial action area',
+          );
+          expect(work.workspaceSalesToday, value.$1);
+          expect(tester.takeException(), isNull);
+        }
+        await captureStoreView(tester, 'r665-money-live-$suffix');
+        expect(work.workspaceOrders, isEmpty);
+        expect(work.workspaceSettlementRequested, 0);
+      } finally {
+        semantics.dispose();
+      }
+    });
+
+    for (final destination in [
+      ('work-pulse-sales', 'work-store-statement'),
+      ('work-pulse-dues', 'work-store-dues'),
+      ('work-pulse-settlement', 'work-money-destination'),
+    ]) {
+      testWidgets('S09 money destination ${destination.$2} $suffix', (
+        tester,
+      ) async {
+        final work = storeViewFixture()
+          ..workspaceSalesToday = 10000000000
+          ..workspaceSettlementBalance = 10000000000
+          ..workspaceOrderAmount = '10000000000';
+        for (var index = 0; index < work.workspaceOrders.length; index++) {
+          work.workspaceOrders[index] = work.workspaceOrders[index].copyWith(
+            amount: 10000000000,
+          );
+        }
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        expect(tester.takeException(), isNull);
+        final action = find.byKey(Key(destination.$1));
+        await reveal(tester, action);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(find.byKey(Key(destination.$2)), findsOneWidget);
+        final amounts = find.text('₹10,00,00,00,000');
+        expect(amounts, findsWidgets);
+        expectExactMoneyVisible(tester, amounts);
+        for (final element in amounts.evaluate()) {
+          final paragraph = element.renderObject! as RenderParagraph;
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final boxes = paragraph.getBoxesForSelection(
+            const TextSelection(baseOffset: 0, extentOffset: 15),
+          );
+          expect(
+            boxes,
+            hasLength(1),
+            reason: 'Do not split the amount across lines',
+          );
+          expect(
+            paragraph.textScaler.scale(14),
+            closeTo(14 * display.scale, .01),
+          );
+        }
+        if (destination.$2 != 'work-money-destination') {
+          await reveal(tester, amounts.first);
+        }
+        await captureStoreView(tester, 'r665-money-${destination.$2}-$suffix');
+        if (destination.$2 == 'work-money-destination') {
+          final request = find.byKey(
+            const Key('work-money-request-settlement'),
+          );
+          await reveal(tester, request);
+          await tester.tap(request);
+          await tester.pumpAndSettle();
+          final field = find.byKey(const Key('work-settlement-request-amount'));
+          await reveal(tester, field);
+          final editable = find.descendant(
+            of: field,
+            matching: find.byType(EditableText),
+          );
+          expect(
+            tester.widget<EditableText>(editable).controller.text,
+            '10000000000',
+          );
+          await tester.enterText(field, '9999999999');
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<EditableText>(editable).controller.text,
+            '9999999999',
+          );
+          expect(find.text('₹9,99,99,99,999'), findsOneWidget);
+          expectExactMoneyVisible(tester, find.text('₹9,99,99,99,999'));
+          tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+          await tester.pumpAndSettle();
+          final confirm = find.byKey(const Key('work-settlement-confirm'));
+          await reveal(tester, confirm);
+          expect(confirm.hitTestable(), findsOneWidget);
+          expect(tester.getSize(confirm).height, greaterThanOrEqualTo(48));
+          await captureStoreView(tester, 'r665-money-payout-keyboard-$suffix');
+          tester.testTextInput.hide();
+          tester.view.viewInsets = FakeViewPadding.zero;
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-money-destination')),
+            findsOneWidget,
+          );
+          await reveal(tester, find.text('Recorded sales'));
+          final sale = find.text('APP-1043');
+          await reveal(tester, sale);
+          expectExactMoneyVisible(tester, find.text('₹10,00,00,00,000'));
+          await captureStoreView(tester, 'r665-money-recorded-sales-$suffix');
+        }
+        expect(
+          work.workspaceOrders.map((order) => order.amount),
+          everyElement(10000000000),
+        );
+        expect(work.workspaceSettlementEligible, 10000000000);
+        expect(work.workspaceSettlementRequested, 0);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final surface in ['invoice', 'group', 'credit']) {
+      testWidgets('S09 money $surface details $suffix', (tester) async {
+        final work = liveStore();
+        if (surface == 'invoice') {
+          work.workspaceInvoices.add(
+            WorkspaceCustomerInvoice(
+              id: 'INV-RANGE',
+              orderId: 'ORDER-RANGE',
+              customer: 'Customer',
+              items: 'Goods supplied',
+              amount: 10000000000,
+              payment: 'Payment due',
+              issuedAt: DateTime.now(),
+            ),
+          );
+        } else if (surface == 'group') {
+          work.activeGroupBuy = const WorkspaceGroupBuy(
+            id: 'GROUP-RANGE',
+            productName: 'Onions',
+            specification: 'Fresh onions per kg',
+            leadRetailer: 'Test store',
+            confirmedRetailers: ['Test store'],
+            targetQuantity: 1000000000,
+            securedQuantity: 1000000000,
+            unitLabel: 'kg',
+            regularUnitPrice: 20,
+            groupUnitPrice: 10,
+            facilitationFee: 0,
+            deliveryFee: 0,
+            confirmationAmount: 0,
+            closingLabel: 'Tomorrow',
+            storeDeliveryLabel: 'After confirmation',
+            paymentConfirmed: false,
+          );
+        } else {
+          work.workspaceSettlementBalance = 10000000000;
+          work.workspaceRefunds = -1000000000;
+        }
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        final action = find.byKey(
+          Key(switch (surface) {
+            'invoice' => 'work-invoice-open',
+            'group' => 'work-quick-group-buy',
+            _ => 'work-pulse-settlement',
+          }),
+        );
+        await reveal(tester, action);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        final amount = find.text(
+          surface == 'credit' ? '+ ₹1,00,00,00,000' : '₹10,00,00,00,000',
+        );
+        for (
+          var scroll = 0;
+          scroll < 30 && amount.evaluate().isEmpty;
+          scroll++
+        ) {
+          final vertical = find.byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          );
+          await tester.drag(vertical.last, const Offset(0, -160));
+          await tester.pumpAndSettle();
+        }
+        expect(amount, findsWidgets);
+        await reveal(tester, amount.first);
+        expectExactMoneyVisible(tester, amount);
+        final paragraph = tester.renderObject<RenderParagraph>(amount.first);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final value = tester.widget<Text>(amount.first).data!;
+        final number = RegExp(r'[\d,]+').firstMatch(value)!;
+        expect(
+          paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: number.start, extentOffset: number.end),
+          ),
+          hasLength(1),
+        );
+        await captureStoreView(tester, 'r665-money-$surface-$suffix');
+        expect(work.workspaceSettlementRequested, 0);
+        if (surface == 'invoice') {
+          expect(work.workspaceInvoices.single.amount, 10000000000);
+          expect(work.workspaceInvoices.single.sharedChannels, isEmpty);
+        } else if (surface == 'group') {
+          expect(work.activeGroupBuy!.goodsValue, 10000000000);
+          expect(work.activeGroupBuy!.balanceDue, 10000000000);
+          expect(work.activeGroupBuy!.paymentConfirmed, isFalse);
+        } else {
+          expect(work.workspaceSettlementEligible, 11000000000);
+          expect(work.workspaceRefunds, -1000000000);
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('S09 money counter bill $suffix', (tester) async {
+      final work = liveStore();
+      final product = work.workspaceCatalogueItems.first.copyWith(
+        sellingPrice: 1000000000,
+        mrp: 1000000000,
+        purchasePrice: 900000000,
+        stock: 20,
+      );
+      work.workspaceCatalogueItems[0] = product;
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.width, display.height),
+        textScale: display.scale,
+      );
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-sale-customer')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('work-order-customer')),
+        '9829012345',
+      );
+      await tester.tap(find.byKey(const Key('work-sale-customer-confirm')));
+      await tester.pumpAndSettle();
+      final add = find.byKey(Key('work-order-add-${product.id}'));
+      for (var count = 0; count < 10; count++) {
+        await reveal(tester, add);
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+      }
+      expect(work.workspaceOrderTotal, 10000000000);
+      final total = find.descendant(
+        of: find.byKey(const Key('work-sale-total-bar')),
+        matching: find.text('₹10,00,00,00,000'),
+      );
+      expect(total, findsOneWidget);
+      expectExactMoneyVisible(tester, total);
+      final quantity = find.descendant(
+        of: find.byKey(const Key('work-sale-product-oil-fortune-1l')),
+        matching: find.text('10'),
+      );
+      expect(quantity, findsOneWidget);
+      expect(
+        tester
+            .renderObject<RenderParagraph>(quantity)
+            .getBoxesForSelection(
+              const TextSelection(baseOffset: 0, extentOffset: 2),
+            ),
+        hasLength(1),
+      );
+      expect(
+        tester.renderObject<RenderParagraph>(total).didExceedMaxLines,
+        isFalse,
+      );
+      await captureStoreView(tester, 'r665-money-counter-total-$suffix');
+      final review = find.byKey(const Key('work-order-review'));
+      await reveal(tester, review);
+      await tester.tap(review);
+      await tester.pumpAndSettle();
+      final summary = find.byKey(const Key('work-order-review-summary'));
+      final reviewAmount = find.descendant(
+        of: summary,
+        matching: find.text('₹10,00,00,00,000'),
+      );
+      await reveal(tester, reviewAmount);
+      expectExactMoneyVisible(tester, reviewAmount);
+      expect(
+        tester.renderObject<RenderParagraph>(reviewAmount).didExceedMaxLines,
+        isFalse,
+      );
+      await captureStoreView(tester, 'r665-money-counter-review-$suffix');
+      expect(work.workspaceOrderTotal, 10000000000);
+      expect(work.workspaceCatalogueItems.first.stock, 20);
+      expect(work.workspaceOrders, isEmpty);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
     for (final hasOrder in [false, true]) {
       testWidgets('S09 rail word fit $hasOrder $suffix', (tester) async {
         final work = hasOrder ? storeViewFixture() : liveStore();
@@ -285,10 +688,7 @@ void main() {
           await checkWords(clock, tester.widget<Text>(clock).data!);
           await captureStoreView(tester, 'r665-rail-order-controls-$suffix');
         } else {
-          await checkWords(
-            find.text('Ready for orders'),
-            'Ready for orders',
-          );
+          await checkWords(find.text('Ready for orders'), 'Ready for orders');
         }
         final labels = [
           ('work-pulse-sales', 'View statement'),
@@ -6095,7 +6495,13 @@ void main() {
     expect(work.activeGroupBuy?.balanceDue, 200);
     await reveal(tester, find.text('Confirmation payment recorded'));
     expect(find.text('Confirmation payment recorded'), findsOneWidget);
-    expect(find.text('₹3920'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('work-group-value-Confirmation amount')),
+        matching: find.text('₹3,920'),
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining('Awaiting stock confirmation'), findsOneWidget);
     expect(
       find.byKey(const Key('work-group-buy-next-action')),

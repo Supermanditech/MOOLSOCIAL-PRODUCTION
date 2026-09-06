@@ -632,14 +632,15 @@ class WorkSession extends ChangeNotifier {
   WorkspaceCustomerInvoice? get latestWorkspaceInvoice =>
       workspaceInvoices.firstOrNull;
 
-  int get workspaceSettlementEligible =>
-      (workspaceSettlementBalance -
-              workspacePlatformAdjustments -
-              workspaceDeliveryAdjustments -
-              workspaceRefunds -
-              workspaceTaxWithheld)
-          .clamp(0, 1 << 31)
-          .toInt();
+  int get workspaceSettlementEligible {
+    final balance =
+        workspaceSettlementBalance -
+        workspacePlatformAdjustments -
+        workspaceDeliveryAdjustments -
+        workspaceRefunds -
+        workspaceTaxWithheld;
+    return balance < 0 ? 0 : balance;
+  }
 
   String get workspaceOrderRemainingLabel {
     final deadline = workspaceOrderActionDeadline;
@@ -1720,9 +1721,8 @@ class WorkSession extends ChangeNotifier {
       );
       final accepted = result.acceptedAmount.clamp(0, requestedAmount).toInt();
       workspaceSettlementRequested += accepted;
-      workspaceSettlementBalance = (workspaceSettlementBalance - accepted)
-          .clamp(0, 1 << 31)
-          .toInt();
+      final remaining = workspaceSettlementBalance - accepted;
+      workspaceSettlementBalance = remaining < 0 ? 0 : remaining;
       workspaceSettlementReference = result.reference;
       _recordWorkspaceActivity(
         'Settlement ${result.reference} requested for ₹$accepted.',

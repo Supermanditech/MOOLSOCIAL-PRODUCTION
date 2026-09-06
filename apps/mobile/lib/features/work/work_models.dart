@@ -608,8 +608,15 @@ class WorkspaceGroupBuy {
   int get goodsValue => groupUnitPrice * securedQuantity;
   int get deliveredTotal => goodsValue + facilitationFee + deliveryFee;
   int get referenceTotal => regularUnitPrice * securedQuantity;
-  int get netSaving => (referenceTotal - deliveredTotal).clamp(0, 1 << 31);
-  int get balanceDue => (deliveredTotal - confirmationAmount).clamp(0, 1 << 31);
+  int get netSaving {
+    final saving = referenceTotal - deliveredTotal;
+    return saving < 0 ? 0 : saving;
+  }
+
+  int get balanceDue {
+    final balance = deliveredTotal - confirmationAmount;
+    return balance < 0 ? 0 : balance;
+  }
 }
 
 class WorkspaceGroupBuyParticipant {

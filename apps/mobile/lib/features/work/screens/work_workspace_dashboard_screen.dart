@@ -35,6 +35,162 @@ String _formatStoreAmount(int value) {
   return '${negative ? '-' : ''}${groups.join(',')},$tail';
 }
 
+String _storeSummaryAmount(String exact) {
+  final amount = int.tryParse(exact.replaceAll('₹', '').replaceAll(',', ''));
+  if (amount == null || amount.abs() < 100000) return exact;
+  final magnitude = amount.abs();
+  final divisor = magnitude >= 10000000 ? 10000000 : 100000;
+  final unit = magnitude >= 10000000 ? 'cr' : 'lakh';
+  final whole = magnitude ~/ divisor;
+  final fraction = (magnitude % divisor) ~/ (divisor ~/ 100);
+  final approximate = magnitude % (divisor ~/ 100) != 0;
+  final decimals = fraction == 0
+      ? ''
+      : '.${fraction.toString().padLeft(2, '0')}';
+  return '${approximate ? '≈' : ''}₹${amount < 0 ? '-' : ''}${_formatStoreAmount(whole)}$decimals $unit';
+}
+
+String _storeAdjustmentAmount(int value) =>
+    '${value < 0 ? '+' : '−'} ₹${_formatStoreAmount(value.abs())}';
+
+class _StoreMoneyText extends StatefulWidget {
+  const _StoreMoneyText(
+    this.value, {
+    this.style,
+    this.textAlign = TextAlign.start,
+    this.summary = false,
+  });
+  final String value;
+  final TextStyle? style;
+  final TextAlign textAlign;
+  final bool summary;
+
+  @override
+  State<_StoreMoneyText> createState() => _StoreMoneyTextState();
+}
+
+class _StoreMoneyTextState extends State<_StoreMoneyText> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final display = widget.summary
+        ? _storeSummaryAmount(widget.value)
+        : widget.value;
+    final style = DefaultTextStyle.of(context).style
+        .merge(widget.style)
+        .copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: display, style: style),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        var effectiveStyle = style;
+        if (constraints.hasBoundedWidth &&
+            constraints.maxWidth > 0 &&
+            painter.width > constraints.maxWidth) {
+          final originalSize = style.fontSize ?? 14;
+          final minimumSize = originalSize < 14 ? originalSize : 14.0;
+          final fittedSize =
+              (originalSize * constraints.maxWidth / painter.width * .98)
+                  .clamp(minimumSize, originalSize)
+                  .toDouble();
+          effectiveStyle = style.copyWith(fontSize: fittedSize);
+          painter.text = TextSpan(text: display, style: effectiveStyle);
+          painter.layout();
+        }
+        final needsScroll =
+            constraints.hasBoundedWidth && painter.width > constraints.maxWidth;
+        painter.dispose();
+        final text = Text(
+          display,
+          style: effectiveStyle,
+          softWrap: false,
+          maxLines: 1,
+          textAlign: widget.textAlign,
+        );
+        return Tooltip(
+          message: widget.value,
+          excludeFromSemantics: true,
+          child: Semantics(
+            label: widget.value,
+            excludeSemantics: true,
+            child: needsScroll
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Scrollbar(
+                      controller: _scroll,
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        controller: _scroll,
+                        scrollDirection: Axis.horizontal,
+                        child: text,
+                      ),
+                    ),
+                  )
+                : text,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StoreMoneyLine extends StatelessWidget {
+  const _StoreMoneyLine({
+    required this.leading,
+    required this.value,
+    this.style,
+  });
+  final Widget leading;
+  final String value;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: value,
+          style: DefaultTextStyle.of(context).style.merge(style),
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final stacked =
+          painter.width + 12 > constraints.maxWidth * .5 ||
+          MediaQuery.textScalerOf(context).scale(11) > 16;
+      painter.dispose();
+      final amount = _StoreMoneyText(
+        value,
+        style: style,
+        textAlign: TextAlign.end,
+      );
+      return stacked
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [leading, const SizedBox(height: 6), amount],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: leading),
+                const SizedBox(width: 12),
+                Flexible(child: amount),
+              ],
+            );
+    },
+  );
+}
+
 class WorkWorkspaceDashboardScreen extends StatefulWidget {
   const WorkWorkspaceDashboardScreen({
     required this.session,
@@ -2386,23 +2542,37 @@ class _StorePulseMetric extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Flexible(
-                        child: AnimatedSwitcher(
-                          duration: MediaQuery.disableAnimationsOf(context)
-                              ? Duration.zero
-                              : const Duration(milliseconds: 180),
-                          child: FittedBox(
-                            key: ValueKey(value),
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              value,
-                              maxLines: 1,
-                              style: TextStyle(
-                                color: accent,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures(),
-                                ],
+                        child: SizedBox(
+                          height: MediaQuery.textScalerOf(context).scale(28),
+                          child: Center(
+                            child: AnimatedSwitcher(
+                              duration: MediaQuery.disableAnimationsOf(context)
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 180),
+                              child: Tooltip(
+                                key: ValueKey(value),
+                                message: value,
+                                child: Text(
+                                  _storeSummaryAmount(value),
+                                  maxLines: 2,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: accent,
+                                    fontSize:
+                                        _storeSummaryAmount(value) == value &&
+                                            MediaQuery.textScalerOf(
+                                                  context,
+                                                ).scale(1) <=
+                                                1.2
+                                        ? 17
+                                        : 14,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -2573,46 +2743,45 @@ class _StoreRecentSale extends StatelessWidget {
               onTap: onOpen,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.receipt_long_outlined,
-                      color: MoolColors.navy,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            order.customer.split('·').first.trim(),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            order.payment,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: MoolColors.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '₹${_formatStoreAmount(order.amount)}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                child: _StoreMoneyLine(
+                  value: '₹${_formatStoreAmount(order.amount)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: MoolColors.navy,
+                  ),
+                  leading: Row(
+                    children: [
+                      const Icon(
+                        Icons.receipt_long_outlined,
                         color: MoolColors.navy,
+                        size: 18,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              order.customer.split('·').first.trim(),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              order.payment,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: MoolColors.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -2731,8 +2900,8 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                       ],
                     ),
                   SizedBox(height: compact ? 0 : 14),
-                  _StoreScaledPair(
-                    first: Text(
+                  _StoreMoneyLine(
+                    leading: Text(
                       session.workspaceOrderCustomer.split('·').first.trim(),
                       style: TextStyle(
                         fontSize: compact ? 14 : 18,
@@ -2741,18 +2910,13 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                         color: const Color(0xFF141633),
                       ),
                     ),
-                    second: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        amount,
-                        style: TextStyle(
-                          fontSize: compact ? 18 : 24,
-                          height: 1.15,
-                          fontWeight: FontWeight.w800,
-                          color: MoolColors.navy,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
+                    value: amount,
+                    style: TextStyle(
+                      fontSize: compact ? 18 : 24,
+                      height: 1.15,
+                      fontWeight: FontWeight.w800,
+                      color: MoolColors.navy,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                   const SizedBox(height: 7),
@@ -2873,16 +3037,18 @@ class _StoreScaledPair extends StatelessWidget {
     this.flexibleFirst = true,
     this.flexibleSecond = true,
     this.expandSecond = false,
+    this.forceStack = false,
     this.crossAxisAlignment = CrossAxisAlignment.start,
   });
   final Widget first, second;
   final double gap;
   final bool flexibleFirst, flexibleSecond, expandSecond;
+  final bool forceStack;
   final CrossAxisAlignment crossAxisAlignment;
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.textScalerOf(context).scale(11) > 16) {
+    if (forceStack || MediaQuery.textScalerOf(context).scale(11) > 16) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -3093,7 +3259,7 @@ class _StoreOrderDetails extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
+                      _StoreMoneyText(
                         '₹${_formatStoreAmount(order.amount)}',
                         style: const TextStyle(
                           fontSize: 22,
@@ -3645,8 +3811,9 @@ class _InvoiceReadyActivityCard extends StatelessWidget {
                 style: const TextStyle(color: MoolColors.muted, fontSize: 12),
               ),
               const Divider(height: 20),
-              Text(
+              _StoreMoneyText(
                 '₹${_formatStoreAmount(invoice.amount)}',
+                summary: true,
                 style: const TextStyle(
                   color: MoolColors.navy,
                   fontSize: 25,
@@ -3732,7 +3899,11 @@ Future<void> _showWorkspaceInvoiceSheet(
                 ),
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: EdgeInsets.all(
+                    MediaQuery.textScalerOf(sheetContext).scale(1) > 1.5
+                        ? 8
+                        : 14,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF4F6FF),
                     borderRadius: BorderRadius.circular(18),
@@ -3740,8 +3911,8 @@ Future<void> _showWorkspaceInvoiceSheet(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '₹${invoice.amount}',
+                      _StoreMoneyText(
+                        '₹${_formatStoreAmount(invoice.amount)}',
                         style: const TextStyle(
                           color: MoolColors.navy,
                           fontSize: 28,
@@ -4327,8 +4498,9 @@ class _MoneyActivityCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              Text(
+              _StoreMoneyText(
                 '₹${_formatStoreAmount(session.workspaceSettlementBalance)}',
+                summary: true,
                 style: const TextStyle(
                   color: MoolColors.navy,
                   fontSize: 28,
@@ -4407,44 +4579,70 @@ class _GroupBulkActivityCard extends StatelessWidget {
               style: const TextStyle(color: MoolColors.muted),
             ),
             const SizedBox(height: 12),
-            Center(
-              child: SizedBox(
-                width: 118,
-                height: 118,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CircularProgressIndicator(
-                      value: progress.clamp(0.0, 1.0),
-                      strokeWidth: 12,
-                      backgroundColor: const Color(0xFFE7EBF8),
-                      color: MoolColors.orange,
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '${groupBuy.securedQuantity}',
-                          style: const TextStyle(
-                            color: MoolColors.navy,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        Text(
-                          'of ${groupBuy.targetQuantity} ${groupBuy.unitLabel}',
-                          style: const TextStyle(
-                            color: MoolColors.muted,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+            if (MediaQuery.textScalerOf(context).scale(1) > 1.2 ||
+                groupBuy.securedQuantity.toString().length > 6 ||
+                groupBuy.targetQuantity.toString().length > 6) ...[
+              LinearProgressIndicator(
+                value: progress.clamp(0.0, 1.0),
+                backgroundColor: const Color(0xFFE7EBF8),
+                color: MoolColors.orange,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Confirmed',
+                style: TextStyle(color: MoolColors.muted),
+              ),
+              _StoreMoneyText(
+                '${groupBuy.securedQuantity} ${groupBuy.unitLabel}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: MoolColors.navy,
                 ),
               ),
-            ),
+              _StoreMoneyText(
+                'of ${groupBuy.targetQuantity} ${groupBuy.unitLabel}',
+                style: const TextStyle(fontSize: 12, color: MoolColors.muted),
+              ),
+            ] else
+              Center(
+                child: SizedBox(
+                  width: 118,
+                  height: 118,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        value: progress.clamp(0.0, 1.0),
+                        strokeWidth: 12,
+                        backgroundColor: const Color(0xFFE7EBF8),
+                        color: MoolColors.orange,
+                      ),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${groupBuy.securedQuantity}',
+                            style: const TextStyle(
+                              color: MoolColors.navy,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          Text(
+                            'of ${groupBuy.targetQuantity} ${groupBuy.unitLabel}',
+                            style: const TextStyle(
+                              color: MoolColors.muted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -6310,43 +6508,40 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 12, 4),
-          child: Row(
-            children: [
-              const Expanded(
+          child: _StoreScaledPair(
+            flexibleSecond: false,
+            first: const Text(
+              'Store statement',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: MoolColors.navy,
+              ),
+            ),
+            second: PopupMenuButton<String>(
+              key: const Key('work-statement-period'),
+              tooltip: 'Statement period',
+              onSelected: session.setWorkspaceMoneyPeriod,
+              itemBuilder: (_) => [
+                for (final period in [
+                  'Today',
+                  'Week',
+                  'Month',
+                  'Financial year',
+                ])
+                  PopupMenuItem(value: period, child: Text(period)),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.all(12),
                 child: Text(
-                  'Store statement',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
+                  session.workspaceMoneyPeriod,
+                  style: const TextStyle(
                     color: MoolColors.navy,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              PopupMenuButton<String>(
-                key: const Key('work-statement-period'),
-                tooltip: 'Statement period',
-                onSelected: session.setWorkspaceMoneyPeriod,
-                itemBuilder: (_) => [
-                  for (final period in [
-                    'Today',
-                    'Week',
-                    'Month',
-                    'Financial year',
-                  ])
-                    PopupMenuItem(value: period, child: Text(period)),
-                ],
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(
-                    session.workspaceMoneyPeriod,
-                    style: const TextStyle(
-                      color: MoolColors.navy,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
         Expanded(
@@ -6368,60 +6563,59 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                 for (final order in orders) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 42,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0F3FF),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${order.createdAt.day}\n${order.createdAt.month}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: MoolColors.navy,
+                    child: _StoreMoneyLine(
+                      value: '₹${_formatStoreAmount(order.amount)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: MoolColors.navy,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      leading: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 42,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F3FF),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${order.createdAt.day}\n${order.createdAt.month}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: MoolColors.navy,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                order.customer,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  order.customer,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${order.id} · ${order.payment}\n${order.stage}',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  height: 1.4,
-                                  color: MoolColors.muted,
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${order.id} · ${order.payment}\n${order.stage}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    height: 1.4,
+                                    color: MoolColors.muted,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '₹${_formatStoreAmount(order.amount)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: MoolColors.navy,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   const Divider(height: 1),
@@ -6445,26 +6639,36 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                for (final book in ['Sales', 'Purchases', 'Expenses'])
-                  Expanded(
-                    child: TextButton(
-                      key: Key('work-statement-${book.toLowerCase()}'),
-                      onPressed: _book == book
-                          ? null
-                          : () => setState(() => _book = book),
-                      style: TextButton.styleFrom(
-                        backgroundColor: _book == book
-                            ? const Color(0xFFECEFFF)
-                            : null,
-                        disabledForegroundColor: MoolColors.navy,
-                        minimumSize: const Size(48, 48),
-                      ),
-                      child: Text(book, style: const TextStyle(fontSize: 12)),
-                    ),
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      for (final book in ['Sales', 'Purchases', 'Expenses'])
+                        TextButton(
+                          key: Key('work-statement-${book.toLowerCase()}'),
+                          onPressed: _book == book
+                              ? null
+                              : () => setState(() => _book = book),
+                          style: TextButton.styleFrom(
+                            backgroundColor: _book == book
+                                ? const Color(0xFFECEFFF)
+                                : null,
+                            disabledForegroundColor: MoolColors.navy,
+                            minimumSize: const Size(48, 48),
+                          ),
+                          child: Text(
+                            book,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
+                ),
+              ),
             ),
           ),
         ),
@@ -6543,39 +6747,29 @@ class _StoreDuesSurface extends StatelessWidget {
                 'Unpaid invoices will appear here. Paid purchases remain in your statement.',
           ),
         for (final customer in customers) ...[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      customer.name,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      customer.mobile,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: MoolColors.muted,
-                      ),
-                    ),
-                  ],
+          _StoreMoneyLine(
+            leading: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  customer.name,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              Text(
-                '₹${_formatStoreAmount(customer.amountDue)}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: MoolColors.navy,
+                Text(
+                  customer.mobile,
+                  style: const TextStyle(fontSize: 12, color: MoolColors.muted),
                 ),
-              ),
-            ],
+              ],
+            ),
+            value: '₹${_formatStoreAmount(customer.amountDue)}',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: MoolColors.navy,
+            ),
           ),
           const SizedBox(height: 10),
           for (final order in customer.orders.where(
@@ -6584,8 +6778,8 @@ class _StoreDuesSurface extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: _ProductPreviewLine(
-                label: order.id,
-                value: '₹${order.amount} · ${order.payment}',
+                label: '${order.id} · ${order.payment}',
+                value: '₹${_formatStoreAmount(order.amount)}',
               ),
             ),
           Align(
@@ -10341,23 +10535,29 @@ class _ProductPreviewLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 6),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(label, style: const TextStyle(color: MoolColors.muted)),
-        ),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
+    child: value.contains('₹')
+        ? _StoreMoneyLine(
+            leading: Text(
+              label,
+              style: const TextStyle(color: MoolColors.muted),
+            ),
+            value: value,
             style: const TextStyle(
               color: MoolColors.ink,
               fontWeight: FontWeight.w900,
             ),
+          )
+        : _StoreScaledPair(
+            first: Text(label, style: const TextStyle(color: MoolColors.muted)),
+            second: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                color: MoolColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
-        ),
-      ],
-    ),
   );
 }
 
@@ -11082,22 +11282,20 @@ class _GroupBuyReviewLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final rupees = value.startsWith('₹')
+        ? int.tryParse(value.substring(1))
+        : null;
     return Padding(
+      key: ValueKey('work-group-value-$label'),
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(label, style: const TextStyle(color: MoolColors.muted)),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: strong ? 17 : 14,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
+      child: _StoreMoneyLine(
+        leading: Text(label, style: const TextStyle(color: MoolColors.muted)),
+        value: rupees == null ? value : '₹${_formatStoreAmount(rupees)}',
+        style: TextStyle(
+          color: MoolColors.ink,
+          fontSize: strong ? 17 : 14,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
@@ -13047,6 +13245,13 @@ class _MoneyDestinationSurface extends StatelessWidget {
           (order) => order.stage != 'Completed' && order.stage != 'Cancelled',
         )
         .fold<int>(0, (total, order) => total + order.amount);
+    final largeFigures =
+        MediaQuery.textScalerOf(context).scale(11) > 16 ||
+        [
+          session.workspaceSalesToday,
+          pendingFulfilment,
+          session.workspaceSettlementRequested,
+        ].any((amount) => amount.abs() >= 10000000);
     final settlementActivity = session.workspaceActivity
         .where(
           (entry) =>
@@ -13071,62 +13276,66 @@ class _MoneyDestinationSurface extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Row(
+          _StoreScaledPair(
             crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Text(
-                  '₹${_formatStoreAmount(session.workspaceSettlementEligible)}',
-                  style: const TextStyle(
-                    color: MoolColors.navy,
-                    fontSize: 28,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+            forceStack: session.workspaceSettlementEligible >= 10000000,
+            first: _StoreMoneyText(
+              '₹${_formatStoreAmount(session.workspaceSettlementEligible)}',
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontSize: 28,
+                height: 1,
+                fontWeight: FontWeight.w900,
               ),
-              Flexible(
-                child: FilledButton.icon(
-                  key: const Key('work-money-request-settlement'),
-                  onPressed:
-                      session.workspaceSettlementEligible > 0 && !session.busy
-                      ? () => _showWorkspaceSettlementReview(context, session)
-                      : null,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: MoolColors.navy,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    minimumSize: const Size(48, 48),
-                  ),
-                  icon: const Icon(Icons.account_balance_outlined, size: 18),
-                  label: const Text(
-                    'Review payout',
-                    textAlign: TextAlign.center,
-                  ),
+            ),
+            second: FilledButton.icon(
+              key: const Key('work-money-request-settlement'),
+              onPressed:
+                  session.workspaceSettlementEligible > 0 && !session.busy
+                  ? () => _showWorkspaceSettlementReview(context, session)
+                  : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: MoolColors.navy,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
                 ),
+                minimumSize: const Size(48, 48),
               ),
-            ],
+              icon: const Icon(Icons.account_balance_outlined, size: 18),
+              label: const Text('Review payout', textAlign: TextAlign.center),
+            ),
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              _MoneyDestinationFact(
-                label: 'Sales today',
-                value: '₹${_formatStoreAmount(session.workspaceSalesToday)}',
-              ),
-              _MoneyDestinationFact(
-                label: 'Sales awaiting completion',
-                value: '₹$pendingFulfilment',
-              ),
-              _MoneyDestinationFact(
-                label: 'Settlement requested',
-                value: '₹${session.workspaceSettlementRequested}',
-              ),
-            ],
-          ),
+          if (largeFigures)
+            for (final fact in [
+              ('Sales today', session.workspaceSalesToday),
+              ('Sales awaiting completion', pendingFulfilment),
+              ('Settlement requested', session.workspaceSettlementRequested),
+            ])
+              _MoneyDestinationLine(
+                label: fact.$1,
+                value: '₹${_formatStoreAmount(fact.$2)}',
+              )
+          else
+            Row(
+              children: [
+                _MoneyDestinationFact(
+                  label: 'Sales today',
+                  value: '₹${_formatStoreAmount(session.workspaceSalesToday)}',
+                ),
+                _MoneyDestinationFact(
+                  label: 'Sales awaiting completion',
+                  value: '₹${_formatStoreAmount(pendingFulfilment)}',
+                ),
+                _MoneyDestinationFact(
+                  label: 'Settlement requested',
+                  value:
+                      '₹${_formatStoreAmount(session.workspaceSettlementRequested)}',
+                ),
+              ],
+            ),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -13188,7 +13397,9 @@ class _MoneyDestinationSurface extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(
+              MediaQuery.textScalerOf(context).scale(1) > 1.5 ? 8 : 16,
+            ),
             decoration: BoxDecoration(
               color: const Color(0xFFF4F6FC),
               borderRadius: BorderRadius.circular(22),
@@ -13202,22 +13413,23 @@ class _MoneyDestinationSurface extends StatelessWidget {
                 ),
                 _MoneyDestinationLine(
                   label: 'MoolSocial fees',
-                  value:
-                      '− ₹${_formatStoreAmount(session.workspacePlatformAdjustments)}',
+                  value: _storeAdjustmentAmount(
+                    session.workspacePlatformAdjustments,
+                  ),
                 ),
                 _MoneyDestinationLine(
                   label: 'Delivery adjustments',
-                  value:
-                      '− ₹${_formatStoreAmount(session.workspaceDeliveryAdjustments)}',
+                  value: _storeAdjustmentAmount(
+                    session.workspaceDeliveryAdjustments,
+                  ),
                 ),
                 _MoneyDestinationLine(
                   label: 'Refunds and holds',
-                  value: '− ₹${_formatStoreAmount(session.workspaceRefunds)}',
+                  value: _storeAdjustmentAmount(session.workspaceRefunds),
                 ),
                 _MoneyDestinationLine(
                   label: 'Tax withheld',
-                  value:
-                      '− ₹${_formatStoreAmount(session.workspaceTaxWithheld)}',
+                  value: _storeAdjustmentAmount(session.workspaceTaxWithheld),
                 ),
                 _MoneyDestinationLine(
                   label: 'Balance after adjustments',
@@ -13254,12 +13466,18 @@ class _MoneyDestinationSurface extends StatelessWidget {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 dense: true,
-                leading: const Icon(
-                  Icons.point_of_sale_outlined,
-                  color: MoolColors.muted,
-                ),
-                title: Text(
-                  '${order.id} · ₹${order.amount}',
+                title: _StoreMoneyLine(
+                  leading: Row(
+                    children: [
+                      const Icon(
+                        Icons.point_of_sale_outlined,
+                        color: MoolColors.muted,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(order.id)),
+                    ],
+                  ),
+                  value: '₹${_formatStoreAmount(order.amount)}',
                   style: const TextStyle(
                     color: MoolColors.navy,
                     fontWeight: FontWeight.w900,
@@ -13401,9 +13619,13 @@ Future<void> _showWorkspaceSettlementReview(
                       value:
                           '₹${_formatStoreAmount(session.workspaceTaxWithheld)}',
                     ),
-                    _ProductPreviewLine(
-                      label: 'Net payout requested',
-                      value: '₹${controller.text.trim()}',
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: controller,
+                      builder: (context, input, _) => _ProductPreviewLine(
+                        label: 'Net payout requested',
+                        value:
+                            '₹${_formatStoreAmount(int.tryParse(input.text.trim()) ?? 0)}',
+                      ),
                     ),
                     _ProductPreviewLine(
                       label: 'Expected by',
@@ -13502,26 +13724,16 @@ class _MoneyDestinationLine extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(color: MoolColors.muted, fontSize: 12),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: MoolColors.navy,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
+      child: _StoreMoneyLine(
+        leading: Text(
+          label,
+          style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+        ),
+        value: value,
+        style: const TextStyle(
+          color: MoolColors.navy,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
@@ -15989,61 +16201,55 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
               color: Colors.white,
               border: Border(top: BorderSide(color: Color(0xFFE9EDF5))),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$_selectedUnits ${_selectedUnits == 1 ? 'unit' : 'units'}',
-                        style: const TextStyle(
-                          color: MoolColors.muted,
-                          fontSize: 12,
-                        ),
-                      ),
-                      Text(
-                        '₹${_formatStoreAmount(widget.session.workspaceOrderTotal)}',
-                        style: const TextStyle(
-                          color: MoolColors.navy,
-                          fontSize: 23,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: FilledButton(
-                    key: const Key('work-order-review'),
-                    onPressed: _selectedUnits == 0
-                        ? null
-                        : validPhone
-                        ? _review
-                        : _editCustomer,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      _selectedUnits == 0
-                          ? 'Review bill'
-                          : validPhone
-                          ? 'Review bill'
-                          : 'Add customer',
-                      textAlign: TextAlign.center,
+            child: _StoreScaledPair(
+              forceStack: widget.session.workspaceOrderTotal >= 10000000,
+              first: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$_selectedUnits ${_selectedUnits == 1 ? 'unit' : 'units'}',
+                    style: const TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 12,
                     ),
                   ),
+                  _StoreMoneyText(
+                    '₹${_formatStoreAmount(widget.session.workspaceOrderTotal)}',
+                    style: const TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 23,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              second: FilledButton(
+                key: const Key('work-order-review'),
+                onPressed: _selectedUnits == 0
+                    ? null
+                    : validPhone
+                    ? _review
+                    : _editCustomer,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-              ],
+                child: Text(
+                  _selectedUnits == 0
+                      ? 'Review bill'
+                      : validPhone
+                      ? 'Review bill'
+                      : 'Add customer',
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ),
           ),
         ],
@@ -16195,30 +16401,22 @@ class _SaleProductTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  product.title,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontSize: 14,
-                    height: 1.25,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+          _StoreMoneyLine(
+            leading: Text(
+              product.title,
+              style: const TextStyle(
+                color: MoolColors.ink,
+                fontSize: 14,
+                height: 1.25,
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(width: 12),
-              Text(
-                '₹${_formatStoreAmount(product.sellingPrice)}',
-                style: const TextStyle(
-                  color: MoolColors.navy,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
+            ),
+            value: '₹${_formatStoreAmount(product.sellingPrice)}',
+            style: const TextStyle(
+              color: MoolColors.navy,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 4),
           Row(
@@ -16244,13 +16442,14 @@ class _SaleProductTile extends StatelessWidget {
                           session.adjustWorkspaceOrderQuantity(product.id, -1),
                 icon: const Icon(Icons.remove_rounded, size: 20),
               ),
-              SizedBox(
-                width: 26,
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 26),
                 child: Semantics(
                   liveRegion: false,
                   label: '${product.title}, $quantity selected',
                   child: Text(
                     '$quantity',
+                    softWrap: false,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: MoolColors.navy,
@@ -16342,28 +16541,22 @@ class _OrderReviewSummary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  customer,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+          _StoreMoneyLine(
+            leading: Text(
+              customer,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: MoolColors.ink,
+                fontWeight: FontWeight.w900,
               ),
-              Text(
-                '₹${_formatStoreAmount(amount)}',
-                style: const TextStyle(
-                  color: MoolColors.navy,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
+            ),
+            value: '₹${_formatStoreAmount(amount)}',
+            style: const TextStyle(
+              color: MoolColors.navy,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           Text(
             '$source order · $units ${units == 1 ? 'unit' : 'units'}',
