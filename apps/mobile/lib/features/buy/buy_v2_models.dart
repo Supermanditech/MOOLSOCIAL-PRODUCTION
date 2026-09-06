@@ -928,13 +928,13 @@ abstract final class BuyV2Catalogue {
       caseSensitive: false,
     ).firstMatch(value);
     if (minutes != null) {
-      return 'Delivered in ${minutes.group(1)} min';
+      return 'Delivery in ${minutes.group(1)} min';
     }
     if (RegExp(
       r'^(today|tomorrow)\s+by\s+',
       caseSensitive: false,
     ).hasMatch(value)) {
-      return 'Delivered ${value.toLowerCase()}';
+      return 'Delivery ${value.toLowerCase()}';
     }
     return value;
   }

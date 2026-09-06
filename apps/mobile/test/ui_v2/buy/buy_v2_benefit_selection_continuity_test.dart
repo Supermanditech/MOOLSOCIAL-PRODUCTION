@@ -173,6 +173,28 @@ void main() {
         );
         natural.dispose();
       }
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-payment')),
+      );
+      await tester.pumpAndSettle();
+      final confirmation = find.byKey(
+        const ValueKey('buy-checkout-confirm-benefits'),
+      );
+      await tester.ensureVisible(confirmation);
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Coupon saving −₹300 included'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Pending confirmation'), findsOneWidget);
+      expect(session.checkoutAmountDueNow, 3180);
+      for (final element
+          in find
+              .descendant(of: confirmation, matching: find.byType(RichText))
+              .evaluate()) {
+        final paragraph = element.renderObject! as RenderParagraph;
+        expect(paragraph.didExceedMaxLines, isFalse);
+      }
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });

@@ -1616,16 +1616,15 @@ class BuyV2Session extends ChangeNotifier {
           product.categoryId == category;
       final matchesFilter = switch (selectedFilter) {
         'fast' => switch (filterDestination) {
-          BuyV2Destination.shop => product.deliveryPromise.contains(
-            'Delivered in',
-          ),
+          BuyV2Destination.shop =>
+            fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal,
           BuyV2Destination.wholesale => product.origin.toLowerCase().contains(
             'jodhpur',
           ),
           BuyV2Destination.medicine => !product.requiresPrescription,
           BuyV2Destination.orders => false,
         },
-        'today' => product.deliveryPromise.contains('Delivered in'),
+        'today' => fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal,
         'lowest' =>
           product.badge.toLowerCase().contains('lowest') ||
               product.badge.contains('off'),
@@ -4764,6 +4763,12 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> restoreShoppingAlerts() async {
+    // A target route hydrates the shared session too. Keep the originating
+    // collection stable until its visit ends; an explicit later refresh can
+    // publish a new authoritative snapshot.
+    if (hasShoppingAlertReturnOrigin) {
+      return shoppingAlertsState == BuyV2ShoppingAlertsState.ready;
+    }
     if (shoppingAlertsBusy) return false;
     shoppingAlertsBusy = true;
     shoppingAlertsState = BuyV2ShoppingAlertsState.loading;

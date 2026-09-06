@@ -107,6 +107,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   bool _quickTrackerHidden = false;
   bool _quickTrackerSoundOnArrival = false;
   Offset? _miniCartPosition;
+  final _landscapeCatalogueKey = GlobalKey<NestedScrollViewState>();
+  final _landscapeCatalogueOffsets = <String, (double, double)>{};
+  String? _landscapeCatalogueIdentity;
   String? _presentedQuickOrderId;
   BuyV2OrderStatus? _presentedQuickOrderStatus;
   final Map<BuyV2Destination, BuyV2Product> _storeBrowseAnchors = {};
@@ -501,7 +504,14 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
               FocusScope.of(context).unfocus();
               setState(() => _searchOpen = false);
             } else if (session.canHandleBack) {
-              session.goBack();
+              if (_offersActive &&
+                  session.view == BuyV2View.product &&
+                  !session.canReturnToComparedProduct &&
+                  !session.canReturnToShoppingAlerts) {
+                _openOffers();
+              } else {
+                session.goBack();
+              }
             } else if (widget.onExit case final onExit?) {
               onExit();
             } else {
@@ -632,15 +642,59 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     required List<Widget> header,
     required Widget body,
   }) {
+    final previous = _landscapeCatalogueKey.currentState;
+    final previousIdentity = _landscapeCatalogueIdentity;
+    if (previous != null &&
+        previousIdentity != null &&
+        previous.outerController.positions.length == 1 &&
+        previous.innerController.positions.length == 1) {
+      _landscapeCatalogueOffsets[previousIdentity] = (
+        previous.outerController.offset,
+        previous.innerController.offset,
+      );
+    }
     if (scrollHeader) {
+      final session = widget.session;
+      final identity =
+          '${session.destination.name}-'
+          '${session.selectedCategoryId}-${session.saleTypeSignature}-'
+          '${session.showingSavedProducts}';
+      final restore = _landscapeCatalogueIdentity != identity;
+      _landscapeCatalogueIdentity = identity;
+      final offsets = _landscapeCatalogueOffsets[identity];
+      if (restore && offsets != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final state = _landscapeCatalogueKey.currentState;
+          if (!mounted ||
+              _landscapeCatalogueIdentity != identity ||
+              state == null ||
+              state.outerController.positions.length != 1 ||
+              state.innerController.positions.length != 1) {
+            return;
+          }
+          state.outerController.jumpTo(
+            offsets.$1.clamp(
+              0.0,
+              state.outerController.position.maxScrollExtent,
+            ),
+          );
+          state.innerController.jumpTo(
+            offsets.$2.clamp(
+              0.0,
+              state.innerController.position.maxScrollExtent,
+            ),
+          );
+        });
+      }
       return NestedScrollView(
-        key: const PageStorageKey('buy-landscape-catalogue-scroll'),
+        key: _landscapeCatalogueKey,
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverToBoxAdapter(child: Column(children: header)),
         ],
         body: body,
       );
     }
+    _landscapeCatalogueIdentity = null;
     return Column(
       children: [
         ...header,
@@ -2059,6 +2113,7 @@ class _BuyMiniCartBar extends StatefulWidget {
 class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
   static const _edgeInset = 8.0;
   Offset? _position;
+  bool _dragging = false;
 
   @override
   void initState() {
@@ -2168,7 +2223,7 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
             cartSize,
           );
           final owner = context.findAncestorRenderObjectOfType<RenderBox>();
-          if (_position == null &&
+          if (!_dragging &&
               avoidance != null &&
               owner is RenderBox &&
               owner.hasSize) {
@@ -2183,6 +2238,7 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
 
           void move(DragUpdateDetails details) {
             setState(() {
+              _dragging = true;
               _position = _clampPosition(
                 (_position ?? currentPosition) + details.delta,
                 available,
@@ -2193,6 +2249,7 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
 
           void finishMove() {
             final position = _position ?? currentPosition;
+            setState(() => _dragging = false);
             widget.onPositionChanged(position);
             HapticFeedback.selectionClick();
           }

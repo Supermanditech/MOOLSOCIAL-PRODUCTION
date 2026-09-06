@@ -1093,7 +1093,14 @@ class BuyV2ShoppingIntentBar extends StatelessWidget {
         .length;
     if (monthly &&
         (session.destination != BuyV2Destination.shop ||
-            (session.view == BuyV2View.cart && basketCartProducts == 0))) {
+            (session.view != BuyV2View.catalogue &&
+                session.view != BuyV2View.cart &&
+                session.view != BuyV2View.checkout) ||
+            (session.view == BuyV2View.checkout &&
+                !session.checkoutDestinations.contains(
+                  BuyV2Destination.shop,
+                )) ||
+            (session.view != BuyV2View.catalogue && basketCartProducts == 0))) {
       return const SizedBox.shrink();
     }
     final basketGroup = session.shopSaleType == BuyV2ShopSaleType.quickDelivery
@@ -1102,8 +1109,8 @@ class BuyV2ShoppingIntentBar extends StatelessWidget {
     final (title, detail, icon) = switch (intent) {
       BuyV2ShoppingIntent.monthlyBasket => (
         'Monthly basket',
-        session.view == BuyV2View.cart
-            ? '$basketCartProducts of 12 basket products in Shop Cart'
+        session.view != BuyV2View.catalogue
+            ? '$basketCartProducts of 12 basket products in Shop ${session.view == BuyV2View.checkout ? 'order' : 'Cart'}'
             : '${session.catalogueSaleTypeProducts.length} of 12 basket products · $basketGroup',
         Icons.shopping_basket_outlined,
       ),
@@ -3196,6 +3203,20 @@ Future<void> _showBuyV2DeliveryFilter(
   });
 }
 
+String _shoppingAlertDetail(BuyV2ShoppingAlert alert, BuyV2Session session) {
+  final order = session.orders
+      .where((order) => order.id == alert.orderId)
+      .firstOrNull;
+  if (order == null ||
+      order.status == BuyV2OrderStatus.delivered ||
+      order.promise.isEmpty ||
+      !alert.detail.endsWith(order.promise)) {
+    return alert.detail;
+  }
+  return '${alert.detail.substring(0, alert.detail.length - order.promise.length)}'
+      '${buyV2OrderPromiseSummary(order)}';
+}
+
 Future<void> _confirmClearBuyV2RecentlyViewed(
   BuildContext context,
   BuyV2Session session,
@@ -3339,14 +3360,19 @@ Future<void> showBuyV2ShoppingAlerts(
                   for (final alert in session.shoppingAlerts) ...[
                     Semantics(
                       button: router != null,
-                      label: [alert.title, alert.detail, alert.updatedLabel]
-                          .map(
-                            (value) => value.trim().replaceFirst(
-                              RegExp(r'[.!?]+$'),
-                              '',
-                            ),
-                          )
-                          .join('. '),
+                      label:
+                          [
+                                alert.title,
+                                _shoppingAlertDetail(alert, session),
+                                alert.updatedLabel,
+                              ]
+                              .map(
+                                (value) => value.trim().replaceFirst(
+                                  RegExp(r'[.!?]+$'),
+                                  '',
+                                ),
+                              )
+                              .join('. '),
                       child: InkWell(
                         key: ValueKey('buy-shopping-alert-${alert.id}'),
                         onTap: router == null ? null : () => openAlert(alert),
@@ -3384,7 +3410,7 @@ Future<void> showBuyV2ShoppingAlerts(
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      alert.detail,
+                                      _shoppingAlertDetail(alert, session),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: sheetContext.buyMeta,
@@ -6027,34 +6053,37 @@ class _SavedDecisionShelf extends StatelessWidget {
               !session.isPrescriptionApproved(product.id),
         );
     final expandedHeader = MediaQuery.textScalerOf(context).scale(1) > 1.3;
-    final clearAction = TextButton(
-      key: const ValueKey('buy-saved-clear'),
-      onPressed: () => _confirmClearSaved(
-        context,
-        session,
-        destination,
-        savedTitle,
-        productLabel,
-        products.length,
-      ),
-      style: TextButton.styleFrom(
-        foregroundColor: BuyV2Colors.muted,
-        padding: const EdgeInsets.symmetric(horizontal: 5),
-        visualDensity: VisualDensity.compact,
-        textStyle: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800),
-      ),
-      child: const Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Changed your mind?'),
-          Text(
-            'Clear list',
-            style: TextStyle(
-              color: BuyV2Colors.navy,
-              fontWeight: FontWeight.w900,
+    final clearAction = BuyV2CartAvoidanceRegion(
+      child: TextButton(
+        key: const ValueKey('buy-saved-clear'),
+        onPressed: () => _confirmClearSaved(
+          context,
+          session,
+          destination,
+          savedTitle,
+          productLabel,
+          products.length,
+        ),
+        style: TextButton.styleFrom(
+          foregroundColor: BuyV2Colors.muted,
+          padding: const EdgeInsets.symmetric(horizontal: 5),
+          minimumSize: const Size(44, 44),
+          visualDensity: VisualDensity.compact,
+          textStyle: const TextStyle(fontSize: 8, fontWeight: FontWeight.w800),
+        ),
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Changed your mind?'),
+            Text(
+              'Clear list',
+              style: TextStyle(
+                color: BuyV2Colors.navy,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
 
@@ -7156,12 +7185,23 @@ class _RecentlyViewedCard extends StatelessWidget {
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(7),
-                      child: BuyV2ProductPackshot(
-                        key: ValueKey(
-                          'buy-recently-viewed-packshot-${product.id}',
+                      child: Center(
+                        child: AspectRatio(
+                          aspectRatio:
+                              BuyV2ProductPackshot.resolveMedia(
+                                    product,
+                                  )?.assetPath ==
+                                  BuyV2ProductPackshot.productAtlasPath
+                              ? 9 / 8
+                              : 1,
+                          child: BuyV2ProductPackshot(
+                            key: ValueKey(
+                              'buy-recently-viewed-packshot-${product.id}',
+                            ),
+                            product: product,
+                            borderRadius: 11,
+                          ),
                         ),
-                        product: product,
-                        borderRadius: 11,
                       ),
                     ),
                   ),
@@ -7948,7 +7988,7 @@ class BuyV2ProductCard extends StatelessWidget {
                                                     : '${facts.partner} · '
                                                           '${_compactDeliveryPromise(facts.deliveryPromise)}'
                                               : cataloguePromise,
-                                          maxLines: compact ? 3 : 2,
+                                          maxLines: null,
                                           overflow: compact
                                               ? TextOverflow.clip
                                               : TextOverflow.ellipsis,

@@ -234,8 +234,13 @@ String buyV2BuyerDeliveryPromise(BuyV2ProductFactsSnapshot facts) {
 String buyV2BuyerDeliveryPromiseSource(String value) {
   final source = value.trim();
   final normalized = source.toLowerCase();
-  if (normalized.startsWith('delivered ') ||
-      normalized.startsWith('delivery ') ||
+  if (normalized.startsWith('delivered ')) {
+    return source.replaceFirst(
+      RegExp(r'^delivered\b', caseSensitive: false),
+      'Delivery',
+    );
+  }
+  if (normalized.startsWith('delivery ') ||
       normalized.contains('delivery schedule')) {
     return source;
   }
@@ -243,7 +248,7 @@ String buyV2BuyerDeliveryPromiseSource(String value) {
     r'(\d+)\s*(?:min|minute)s?',
     caseSensitive: false,
   ).firstMatch(source);
-  if (minutes != null) return 'Delivered in ${minutes.group(1)} min';
+  if (minutes != null) return 'Delivery in ${minutes.group(1)} min';
   final longerDuration = RegExp(
     r'(\d+)\s*(hour|day)s?',
     caseSensitive: false,
@@ -251,7 +256,7 @@ String buyV2BuyerDeliveryPromiseSource(String value) {
   if (longerDuration != null) {
     final amount = longerDuration.group(1)!;
     final unit = longerDuration.group(2)!.toLowerCase();
-    return 'Delivered in $amount $unit${amount == '1' ? '' : 's'}';
+    return 'Delivery in $amount $unit${amount == '1' ? '' : 's'}';
   }
   return 'Delivery $source';
 }
@@ -273,11 +278,8 @@ String buyV2OrderPromiseSummary(BuyV2Order order) {
     promisedByLabel: order.promisedByLabel,
   );
   return order.status == BuyV2OrderStatus.delivered
-      ? summary
-      : summary.replaceFirst(
-          RegExp(r'^Delivered\b', caseSensitive: false),
-          'Delivery',
-        );
+      ? summary.replaceFirst(RegExp(r'^Delivery\b'), 'Delivered')
+      : summary;
 }
 
 String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>

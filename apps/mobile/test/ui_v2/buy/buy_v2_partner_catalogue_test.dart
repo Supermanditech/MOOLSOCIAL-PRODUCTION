@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -86,6 +87,35 @@ void main() {
         await tester.pumpAndSettle();
         final sheet = find.byKey(ValueKey('$prefix-sheet-$id'));
         expect(sheet, findsOneWidget);
+        void expectCompleteRiceEta(Finder owner) {
+          if (id != 'w-rice-50kg') return;
+          final promises = find.descendant(
+            of: find.descendant(
+              of: owner,
+              matching: find.byKey(ValueKey('buy-product-$id')),
+            ),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is RichText &&
+                  widget.text.toPlainText().contains('5:00'),
+            ),
+          );
+          expect(promises, findsOneWidget);
+          final paragraph = tester.renderObject<RenderParagraph>(promises);
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final natural = TextPainter(
+            text: paragraph.text,
+            textDirection: paragraph.textDirection,
+            textScaler: paragraph.textScaler,
+          )..layout(maxWidth: paragraph.size.width);
+          expect(
+            paragraph.size.height + .1,
+            greaterThanOrEqualTo(natural.height),
+          );
+          natural.dispose();
+        }
+
+        expectCompleteRiceEta(sheet);
         expect(
           find.descendant(
             of: sheet,
@@ -99,6 +129,7 @@ void main() {
         await tester.pumpAndSettle();
         final full = find.byKey(ValueKey('$prefix-full-catalogue-list'));
         expect(full, findsOneWidget);
+        expectCompleteRiceEta(full);
         final card = find.descendant(
           of: full,
           matching: find.byKey(ValueKey('buy-product-$id')),

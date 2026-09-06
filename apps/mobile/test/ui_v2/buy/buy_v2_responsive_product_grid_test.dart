@@ -613,13 +613,22 @@ void main() {
       matching: find.byKey(ValueKey('buy-add-shell-${products[0].id}')),
     );
     expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
-    final completePromise = tester.widget<Text>(
+    final completePromise = tester.renderObject<RenderParagraph>(
       find
           .descendant(of: firstCard, matching: find.textContaining('10:30'))
           .first,
     );
-    expect(completePromise.maxLines, 3);
-    expect(completePromise.overflow, TextOverflow.clip);
+    expect(completePromise.didExceedMaxLines, isFalse);
+    final fullPromise = TextPainter(
+      text: completePromise.text,
+      textDirection: completePromise.textDirection,
+      textScaler: completePromise.textScaler,
+    )..layout(maxWidth: completePromise.size.width);
+    expect(
+      completePromise.size.height + 0.1,
+      greaterThanOrEqualTo(fullPromise.height),
+    );
+    fullPromise.dispose();
     final oneDayCard = find.byKey(ValueKey('buy-product-${products[2].id}'));
     expect(
       find.descendant(of: oneDayCard, matching: find.textContaining('1 day')),

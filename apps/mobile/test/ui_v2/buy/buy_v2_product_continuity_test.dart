@@ -153,7 +153,11 @@ void main() {
                 )
                 .first,
           );
-          await tester.tap(returnAction);
+          if (offers) {
+            await tester.binding.handlePopRoute();
+          } else {
+            await tester.tap(returnAction);
+          }
           await tester.pumpAndSettle();
           expect(session.view, BuyV2View.catalogue);
           expect(session.destination, BuyV2Destination.shop);

@@ -3,6 +3,7 @@ import 'dart:ui' show ImageByteFormat;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -10,6 +11,7 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 void main() {
@@ -299,6 +301,17 @@ void main() {
           );
           expect(clearLabel.text.style?.fontFamily, isNotNull);
           expect(tester.getSize(card).height, greaterThanOrEqualTo(44));
+          final media = BuyV2ProductPackshot.resolveMedia(product)!;
+          final png = await rootBundle.load(media.assetPath);
+          final sourceCellRatio =
+              (png.getUint32(16) / 4) / (png.getUint32(20) / 3);
+          final packshot = tester.getSize(
+            find.byKey(ValueKey('buy-recently-viewed-packshot-$productId')),
+          );
+          expect(
+            packshot.width / packshot.height,
+            closeTo(sourceCellRatio, .001),
+          );
           expect(tester.takeException(), isNull);
           await capture(tester, '$productId-$width-text2');
           await tester.tap(card);

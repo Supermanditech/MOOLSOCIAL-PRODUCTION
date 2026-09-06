@@ -7173,6 +7173,9 @@ class _CheckoutConfirmStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final address = session.selectedAddressOrNull;
     final groups = session.checkoutFulfilmentGroups;
+    final selectedBenefits = session.selectedCartBenefitsFor(
+      session.checkoutDestinations,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -7250,6 +7253,33 @@ class _CheckoutConfirmStage extends StatelessWidget {
           action: 'Change',
           onTap: () => session.showCheckoutStep(BuyV2CheckoutStep.payment),
         ),
+        if (selectedBenefits.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            key: const ValueKey('buy-checkout-confirm-benefits'),
+            padding: const EdgeInsets.all(12),
+            decoration: buyV2CardDecoration(radius: 15),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Coupons and payment offers', style: context.buyBody),
+                for (final benefit in selectedBenefits) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '${benefit.title} · ${_cartBenefitSponsorLabel(benefit)}',
+                    style: context.buyBody,
+                  ),
+                  Text(
+                    benefit.kind == BuyV2CartBenefitKind.paymentOffer
+                        ? _paymentOfferStatus(session, benefit)
+                        : 'Coupon saving −${buyV2Money(session.couponSavingForDestination(benefit.destination))} included in this total.',
+                    style: context.buyMeta,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -16839,178 +16869,183 @@ class _OrderCard extends StatelessWidget {
       session.openTracking(order.id);
     }
 
-    return BuyV2IntentDepth(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          key: ValueKey('buy-order-card-${order.id}'),
-          onTap: activatePrimaryAction,
-          borderRadius: BorderRadius.circular(13),
-          child: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: buyV2CardDecoration(radius: 13),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const BuyV2TricolourLine(height: 2),
-                const SizedBox(height: 5),
-                Row(
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: order.destination == BuyV2Destination.wholesale
-                            ? BuyV2Colors.navy
-                            : BuyV2Colors.orange,
-                        borderRadius: BorderRadius.circular(9),
+    return BuyV2CartAvoidanceRegion(
+      child: BuyV2IntentDepth(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: ValueKey('buy-order-card-${order.id}'),
+            onTap: activatePrimaryAction,
+            borderRadius: BorderRadius.circular(13),
+            child: Container(
+              padding: const EdgeInsets.all(7),
+              decoration: buyV2CardDecoration(radius: 13),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const BuyV2TricolourLine(height: 2),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: order.destination == BuyV2Destination.wholesale
+                              ? BuyV2Colors.navy
+                              : BuyV2Colors.orange,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(
+                          order.destination.label[0],
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ),
-                      child: Text(
-                        order.destination.label[0],
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              order.id,
+                              style: context.buyMeta.copyWith(fontSize: 8),
+                            ),
+                            Text(order.title, style: context.buyBody),
+                            Text(
+                              order.itemSummary,
+                              style: context.buyMeta.copyWith(fontSize: 8),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        buyV2Money(order.total),
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: BuyV2Colors.navy,
+                          fontSize: 13,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 7),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            order.id,
-                            style: context.buyMeta.copyWith(fontSize: 8),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _trackingStatusLabel(order.status),
+                          style: const TextStyle(
+                            color: BuyV2Colors.green,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
                           ),
-                          Text(order.title, style: context.buyBody),
-                          Text(
-                            order.itemSummary,
-                            style: context.buyMeta.copyWith(fontSize: 8),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                    Text(
-                      buyV2Money(order.total),
-                      style: const TextStyle(
-                        color: BuyV2Colors.navy,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _trackingStatusLabel(order.status),
+                      Text(
+                        '${(order.progress * 100).round()}%',
                         style: const TextStyle(
-                          color: BuyV2Colors.green,
+                          color: BuyV2Colors.navy,
                           fontSize: 8,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                    ),
-                    Text(
-                      '${(order.progress * 100).round()}%',
-                      style: const TextStyle(
-                        color: BuyV2Colors.navy,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  _orderPromiseSummary(order),
-                  style: const TextStyle(
-                    color: BuyV2Colors.ink,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
+                    ],
                   ),
-                ),
-                if (order.updatedDeliveryEstimate case final estimate?)
                   Text(
-                    'Delayed · new estimate $estimate',
-                    style: context.buyMeta.copyWith(
-                      color: BuyV2Colors.orange,
-                      fontSize: 8,
+                    _orderPromiseSummary(order),
+                    style: const TextStyle(
+                      color: BuyV2Colors.ink,
+                      fontSize: 10,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(5),
-                  child: BuyV2HonestProgressIndicator(
-                    ownerId: order.id,
-                    progress: order.progress,
-                    statusLabel: _trackingStatusLabel(order.status),
-                    isComplete: order.status == BuyV2OrderStatus.delivered,
-                    minHeight: 4,
-                    backgroundColor: const Color(0xFFE3E5EE),
-                    valueColor: BuyV2Colors.green,
-                    indicatorKey: ValueKey('buy-order-progress-${order.id}'),
+                  if (order.updatedDeliveryEstimate case final estimate?)
+                    Text(
+                      'Delayed · new estimate $estimate',
+                      style: context.buyMeta.copyWith(
+                        color: BuyV2Colors.orange,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(5),
+                    child: BuyV2HonestProgressIndicator(
+                      ownerId: order.id,
+                      progress: order.progress,
+                      statusLabel: _trackingStatusLabel(order.status),
+                      isComplete: order.status == BuyV2OrderStatus.delivered,
+                      minHeight: 4,
+                      backgroundColor: const Color(0xFFE3E5EE),
+                      valueColor: BuyV2Colors.green,
+                      indicatorKey: ValueKey('buy-order-progress-${order.id}'),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${order.partner} · ${order.partnerType}',
-                  style: context.buyMeta.copyWith(fontSize: 8),
-                ),
-                const SizedBox(height: 6),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final stackActions =
-                        constraints.maxWidth < 270 ||
-                        MediaQuery.textScalerOf(context).scale(10) > 12;
-                    final invoiceAction = SizedBox(
-                      height: 44,
-                      child: OutlinedButton.icon(
-                        key: ValueKey('buy-order-invoice-${order.id}'),
-                        onPressed: () => showBuyV2InvoicePage(
-                          context,
-                          order: order,
-                          downloader: invoiceDownloader,
+                  const SizedBox(height: 4),
+                  Text(
+                    '${order.partner} · ${order.partnerType}',
+                    style: context.buyMeta.copyWith(fontSize: 8),
+                  ),
+                  const SizedBox(height: 6),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stackActions =
+                          constraints.maxWidth < 270 ||
+                          MediaQuery.textScalerOf(context).scale(10) > 12;
+                      final invoiceAction = SizedBox(
+                        height: 44,
+                        child: OutlinedButton.icon(
+                          key: ValueKey('buy-order-invoice-${order.id}'),
+                          onPressed: () => showBuyV2InvoicePage(
+                            context,
+                            order: order,
+                            downloader: invoiceDownloader,
+                          ),
+                          icon: const Icon(
+                            Icons.receipt_long_outlined,
+                            size: 17,
+                          ),
+                          label: const Text('Invoice'),
                         ),
-                        icon: const Icon(Icons.receipt_long_outlined, size: 17),
-                        label: const Text('Invoice'),
-                      ),
-                    );
-                    final primaryAction = SizedBox(
-                      height: 44,
-                      child: FilledButton(
-                        key: ValueKey('buy-order-primary-${order.id}'),
-                        onPressed: activatePrimaryAction,
-                        child: Text(
-                          order.status == BuyV2OrderStatus.delivered
-                              ? 'View order'
-                              : 'Track order',
+                      );
+                      final primaryAction = SizedBox(
+                        height: 44,
+                        child: FilledButton(
+                          key: ValueKey('buy-order-primary-${order.id}'),
+                          onPressed: activatePrimaryAction,
+                          child: Text(
+                            order.status == BuyV2OrderStatus.delivered
+                                ? 'View order'
+                                : 'Track order',
+                          ),
                         ),
-                      ),
-                    );
-                    if (stackActions) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                      );
+                      if (stackActions) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            invoiceAction,
+                            const SizedBox(height: 6),
+                            primaryAction,
+                          ],
+                        );
+                      }
+                      return Row(
                         children: [
-                          invoiceAction,
-                          const SizedBox(height: 6),
-                          primaryAction,
+                          Expanded(child: invoiceAction),
+                          const SizedBox(width: 6),
+                          Expanded(child: primaryAction),
                         ],
                       );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(child: invoiceAction),
-                        const SizedBox(width: 6),
-                        Expanded(child: primaryAction),
-                      ],
-                    );
-                  },
-                ),
-              ],
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),

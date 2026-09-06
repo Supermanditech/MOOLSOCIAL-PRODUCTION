@@ -2030,7 +2030,7 @@ void main() {
         addTearDown(session.dispose);
         addTearDown(core.dispose);
         final product = session.product(testCase.productId);
-        expect(product.deliveryPromise, 'Delivered in ${testCase.minutes} min');
+        expect(product.deliveryPromise, 'Delivery in ${testCase.minutes} min');
         await tester.pumpWidget(app(session));
         await tester.pumpAndSettle();
         final selector = find.byKey(
@@ -2064,12 +2064,12 @@ void main() {
             PageStorageKey('buy-product-${product.id}'),
           ),
         );
-        expect(find.text('Delivered in ${testCase.minutes} min'), findsWidgets);
+        expect(find.text('Delivery in ${testCase.minutes} min'), findsWidgets);
         expect(session.addProduct(product.id), isTrue);
         session.openCart();
         await tester.pumpAndSettle();
         expect(
-          find.textContaining('Delivered in ${testCase.minutes} min'),
+          find.textContaining('Delivery in ${testCase.minutes} min'),
           findsOneWidget,
         );
         expect(session.quantityFor(product.id), 1);
@@ -2113,7 +2113,7 @@ void main() {
           scrollable: productScrollable,
         );
 
-        expect(find.text('Delivered in ${testCase.minutes} min'), findsWidgets);
+        expect(find.text('Delivery in ${testCase.minutes} min'), findsWidgets);
         expect(find.textContaining(product.seller), findsWidgets);
         expect(
           find.byKey(ValueKey('buy-shop-seller-action-${product.id}')),
@@ -2130,7 +2130,7 @@ void main() {
         session.openCart();
         await tester.pumpAndSettle();
         expect(
-          find.textContaining('Delivered in ${testCase.minutes} min'),
+          find.textContaining('Delivery in ${testCase.minutes} min'),
           findsOneWidget,
         );
         expect(find.text(product.seller), findsNothing);
@@ -4214,11 +4214,11 @@ void main() {
 
       expect(find.text('Deliveries'), findsOneWidget);
       expect(
-        find.textContaining('Delivered in 5 min · by 6:35 PM'),
+        find.textContaining('Delivery in 5 min · by 6:35 PM'),
         findsOneWidget,
       );
       expect(
-        find.textContaining('Delivered in 1 day · by tomorrow 4:00 PM'),
+        find.textContaining('Delivery in 1 day · by tomorrow 4:00 PM'),
         findsOneWidget,
       );
       expect(find.text(shop.seller), findsNothing);
@@ -4286,11 +4286,11 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.text('Previous · Delivered in 5 min · by 6:35 PM'),
+      find.text('Previous · Delivery in 5 min · by 6:35 PM'),
       findsOneWidget,
     );
     expect(
-      find.text('Updated · Delivered in 10 min · by 6:40 PM'),
+      find.text('Updated · Delivery in 10 min · by 6:40 PM'),
       findsOneWidget,
     );
     expect(session.confirmedOrders, isEmpty);
@@ -4771,6 +4771,23 @@ void main() {
     session.openCart(scope: BuyV2CartScope.shop);
     await tester.pumpAndSettle();
     expect(find.text('Monthly basket'), findsOneWidget);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Review order'));
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.checkout);
+    for (final step in BuyV2CheckoutStep.values) {
+      session.showCheckoutStep(step);
+      await tester.pumpAndSettle();
+      expect(session.checkoutScope, BuyV2CartScope.wholesale);
+      expect(
+        find.byKey(const ValueKey('buy-shopping-intent-bar')),
+        findsNothing,
+      );
+    }
+    session.openCart(scope: BuyV2CartScope.shop);
+    await tester.pumpAndSettle();
+    expect(find.text('Monthly basket'), findsOneWidget);
     expect(session.clearCartScope(BuyV2CartScope.shop), isTrue);
     await tester.pumpAndSettle();
     expect(session.quantityFor('w-notebook'), wholesaleQuantity);
@@ -4780,6 +4797,102 @@ void main() {
     expect(session.catalogueSaleTypeProducts, isNotEmpty);
     expect(find.byKey(const ValueKey('buy-shopping-intent-bar')), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  for (final saved in [false, true]) {
+    // Follow-up device cases preserve a manually moved Cart across actions.
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'R66 R2 Cart clears retained actions saved=$saved scale=$scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          session.addProduct('w-notebook');
+          if (saved) session.addProduct('s-tomato');
+          await tester.pumpWidget(app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          if (saved) {
+            session.toggleSaved('s-tomato');
+            session.showSavedProducts(true);
+          } else {
+            session.openOrders();
+            session.showOrdersTab(BuyV2OrdersTab.delivered);
+          }
+          await tester.pumpAndSettle();
+          final order = session.orders.firstWhere(
+            (order) => order.status == BuyV2OrderStatus.delivered,
+          );
+          final action = find.byKey(
+            ValueKey(
+              saved ? 'buy-saved-clear' : 'buy-order-primary-${order.id}',
+            ),
+          );
+          await tester.ensureVisible(action);
+          await tester.pumpAndSettle();
+          final cart = find.byKey(const ValueKey('buy-compact-cart-indicator'));
+          await tester.dragFrom(
+            tester.getCenter(cart),
+            tester.getCenter(action) - tester.getCenter(cart),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.getRect(cart).overlaps(tester.getRect(action)),
+            isFalse,
+          );
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          if (saved) {
+            expect(
+              find.byKey(const ValueKey('buy-saved-clear-sheet')),
+              findsOneWidget,
+            );
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+          } else {
+            expect(session.selectedOrderOrNull?.id, order.id);
+            expect(session.view, BuyV2View.tracking);
+          }
+          expect(session.quantityFor('w-notebook'), 1);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+  }
+
+  test('R66 R2 catalogue promises describe future delivery', () {
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    expect(session.product('s-tomato').deliveryPromise, 'Delivery in 12 min');
+    expect(buyV2BuyerDeliveryPromiseSource('5 minutes'), 'Delivery in 5 min');
+    expect(buyV2BuyerDeliveryPromiseSource('1 day'), 'Delivery in 1 day');
+    expect(
+      buyV2BuyerDeliveryPromiseSource('Delivered in 12 min'),
+      'Delivery in 12 min',
+    );
+    for (final product in BuyV2Catalogue.products) {
+      expect(product.deliveryPromise.startsWith('Delivered'), isFalse);
+    }
+    session.chooseFilter('fast');
+    expect(session.visibleProducts.map((p) => p.id), contains('s-tomato'));
+    expect(
+      session.orders
+          .where((o) => o.status == BuyV2OrderStatus.delivered)
+          .every((o) => o.promise.startsWith('Delivered')),
+      isTrue,
+    );
+    for (final order in session.orders.where(
+      (o) => o.status == BuyV2OrderStatus.delivered,
+    )) {
+      expect(buyV2OrderPromiseSummary(order).startsWith('Delivered'), isTrue);
+    }
   });
 
   for (final missingCatalogue in [true, false]) {
@@ -5040,6 +5153,12 @@ void main() {
             tester,
             '${destination.name}-$textScale-product-facts',
           );
+          final nestedBefore = tester.state<NestedScrollViewState>(
+            find.byType(NestedScrollView),
+          );
+          final outerOffset = nestedBefore.outerController.offset;
+          final innerOffset = nestedBefore.innerController.offset;
+          final factsTop = tester.getRect(facts).top;
           await tester.tap(miniCart);
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull, reason: 'landscape Cart');
@@ -5080,6 +5199,13 @@ void main() {
           expect(session.view, BuyV2View.catalogue);
           expect(session.destination, destination);
           expect(session.quantityFor(product.id), product.minimumOrder);
+
+          final nestedAfter = tester.state<NestedScrollViewState>(
+            find.byType(NestedScrollView),
+          );
+          expect(nestedAfter.outerController.offset, closeTo(outerOffset, 1));
+          expect(nestedAfter.innerController.offset, closeTo(innerOffset, 1));
+          expect(tester.getRect(facts).top, closeTo(factsTop, 1));
 
           final search = find.byKey(const ValueKey('buy-search-control'));
           await tester.scrollUntilVisible(search, -160, scrollable: scrollable);

@@ -78,6 +78,8 @@ void main() {
         final alertsPosition = Scrollable.of(tester.element(alertRow)).position;
         final alertsOffset = alertsPosition.pixels;
         expect(alertsOffset, greaterThan(0));
+        final loadsBeforeVisit = adapter.calls;
+        final alertsBeforeVisit = session.shoppingAlerts;
         for (var visit = 0; visit < 2; visit++) {
           await tester.tap(alertRow);
           await tester.pumpAndSettle();
@@ -96,6 +98,8 @@ void main() {
             findsOneWidget,
           );
           expect(alertsPosition.pixels, alertsOffset);
+          expect(adapter.calls, loadsBeforeVisit);
+          expect(session.shoppingAlerts, alertsBeforeVisit);
           expect(session.view, BuyV2View.catalogue);
           expect(session.destination, BuyV2Destination.orders);
           expect(session.ordersTab, BuyV2OrdersTab.delivered);
@@ -420,6 +424,7 @@ Future<GoRouter> _mountAlertRouter(
 }
 
 final class _AlertsAdapter implements BuyV2ShoppingAlertsAdapter {
+  int calls = 0;
   BuyV2ShoppingAlertsSnapshot snapshot = const BuyV2ShoppingAlertsSnapshot(
     state: BuyV2ShoppingAlertsState.unavailable,
     sourceId: 'shopping-alert-service',
@@ -428,5 +433,8 @@ final class _AlertsAdapter implements BuyV2ShoppingAlertsAdapter {
   @override
   Future<BuyV2ShoppingAlertsSnapshot> load(
     BuyV2ShoppingAlertsRequest request,
-  ) async => snapshot;
+  ) async {
+    calls++;
+    return snapshot;
+  }
 }
