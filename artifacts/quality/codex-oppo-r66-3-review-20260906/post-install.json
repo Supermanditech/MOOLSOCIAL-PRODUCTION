@@ -1,0 +1,18 @@
+{
+  "candidate": "UAW-CODEX-OPPO-R66.3-REVIEW-20260906",
+  "sourceHead": "f2345edc487fc4cf9b22293a35e673384a139ef7",
+  "serial": "2b3e0f71",
+  "model": "CPH2375",
+  "package": "com.moolsocial.app.runtime",
+  "versionCode": 2026090602,
+  "versionName": "1.0.0-r66.3-runtime",
+  "install": "update_install_r_no_clear_no_uninstall",
+  "installedSha256": "E32C6BB437D8D810A46F943A295B12BFDF24724660C711CD6B2C224DAAC879DB",
+  "localSha256": "E32C6BB437D8D810A46F943A295B12BFDF24724660C711CD6B2C224DAAC879DB",
+  "apkBytes": 209504165,
+  "verifiedUtc": "2026-09-06T01:47:36.2104345Z",
+  "deviceJourneys": "native_round_complete_five_children_found",
+  "childFixes": "local_source_only_successor_apk_and_native_replay_pending",
+  "founderAppearance": "pending",
+  "backendQualification": "not_claimed_review_gateway"
+}

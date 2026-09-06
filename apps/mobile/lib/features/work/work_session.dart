@@ -47,6 +47,8 @@ class WorkSession extends ChangeNotifier {
   int _pendingProofGeneration = 0;
   bool _hasRecoveredDraft = false;
   bool recoveredDocumentStep = false;
+  String? documentRecoveryMessage;
+  String? _documentRecoveryProofId;
   bool _disposed = false;
   bool busy = false;
   String? errorMessage;
@@ -1183,6 +1185,16 @@ class WorkSession extends ChangeNotifier {
   }
 
   WorkspaceCustomerInvoice? completeWorkspaceCounterSale() {
+    final completedInvoice = workspaceInvoices
+        .where((invoice) => invoice.orderId == currentWorkspaceOrderId)
+        .firstOrNull;
+    if (completedInvoice != null) return completedInvoice;
+    if (workspaceOrderQuantities.isEmpty ||
+        workspaceOrderCustomer.trim().isEmpty ||
+        workspaceOrderTotal <= 0) {
+      showError('Add a customer and products before creating the invoice.');
+      return null;
+    }
     var order = _ensureCurrentOrderRecord();
     if (!order.stockReserved) {
       if (!_reserveOrderStock(order)) return null;
@@ -1194,7 +1206,8 @@ class WorkSession extends ChangeNotifier {
     final completed = order.copyWith(stage: 'Completed', stockReserved: true);
     if (index >= 0) workspaceOrders[index] = completed;
     workspaceSalesToday += order.amount;
-    workspaceSettlementBalance += order.amount;
+    // A counter invoice records a sale, not money collected by MoolSocial.
+    // Settlement remains the authoritative balance supplied for the Store.
     workspaceCompletedSalesCount++;
     final invoice = _createInvoice(completed);
     showNotice('Sale completed. Invoice ${invoice.id} is ready to send.');
@@ -1259,6 +1272,12 @@ class WorkSession extends ChangeNotifier {
     required String payment,
     required String address,
   }) {
+    if (workspaceInvoices.any(
+      (invoice) => invoice.orderId == currentWorkspaceOrderId,
+    )) {
+      showNotice('This sale is complete. Start a new bill for another sale.');
+      return;
+    }
     workspaceOrderCustomer = customer.trim();
     workspaceOrderSource = source;
     workspaceOrderFulfilment = fulfilment;
@@ -2123,6 +2142,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   void startAnotherWork() {
+    documentRecoveryMessage = _documentRecoveryProofId = null;
     selectedFamilyId = null;
     selectedProfile = null;
     alternateMobile = '';
@@ -2153,6 +2173,9 @@ class WorkSession extends ChangeNotifier {
   }
 
   void selectFamily(String familyId) {
+    if (selectedFamilyId != familyId) {
+      documentRecoveryMessage = _documentRecoveryProofId = null;
+    }
     selectedFamilyId = familyId;
     selectedProfile = null;
     clearMessages();
@@ -2164,6 +2187,7 @@ class WorkSession extends ChangeNotifier {
       (profile) => profile.id == profileId,
     );
     if (selectedProfile?.id != nextProfile.id) {
+      documentRecoveryMessage = _documentRecoveryProofId = null;
       addedProofs.removeWhere((id, _) => id != 'personal-kyc');
       declarationAccepted = false;
     }
@@ -2173,6 +2197,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   void changeFamily() {
+    documentRecoveryMessage = _documentRecoveryProofId = null;
     selectedFamilyId = null;
     selectedProfile = null;
     clearMessages();
@@ -2381,13 +2406,13 @@ class WorkSession extends ChangeNotifier {
       WorkContactChannel.alternateMobile => alternateOtpSent,
     };
     if (!sent) {
-      errorMessage = 'Send the OTP before verification.';
+      errorMessage = 'Send a code before confirming this contact.';
       notifyListeners();
       return false;
     }
     final normalizedCode = code.replaceAll(RegExp(r'\D'), '');
     if (normalizedCode.length != 6) {
-      errorMessage = 'Enter the complete 6-digit OTP.';
+      errorMessage = 'Enter all 6 digits of the code.';
       notifyListeners();
       return false;
     }
@@ -2582,6 +2607,7 @@ class WorkSession extends ChangeNotifier {
         reviewCaseId = reviewReason = null;
         reviewCorrectionDraft = false;
         recoveredDocumentStep = false;
+        documentRecoveryMessage = _documentRecoveryProofId = null;
         _hasRecoveredDraft = false;
       }
     }
@@ -2677,6 +2703,15 @@ class WorkSession extends ChangeNotifier {
       _pendingProofRoute = true;
       noticeMessage =
           'Your details are restored. Add or review your documents to continue.';
+      if (allowed.contains(proofId)) {
+        final label = selectedWorkspaceDocuments
+            .firstWhere((document) => document.id == proofId)
+            .label;
+        _documentRecoveryProofId = proofId;
+        documentRecoveryMessage =
+            'Your details are saved. Please add $label again.';
+        noticeMessage = null;
+      }
       if (allowed.contains(proofId) &&
           proofPicker is WorkRecoverableProofPicker) {
         final proof = await (proofPicker as WorkRecoverableProofPicker).recover(
@@ -2688,17 +2723,20 @@ class WorkSession extends ChangeNotifier {
           if (!current()) return;
           addedProofs[proofId] = reference;
           pickedProofs[proofId] = proof;
+          documentRecoveryMessage = _documentRecoveryProofId = null;
           noticeMessage = 'Document restored. Review it before submitting.';
         }
       }
       if (current()) await store.clear(scope);
     } on WorkGatewayException catch (error) {
       if (current()) {
+        documentRecoveryMessage = null;
         errorMessage = error.message;
         noticeMessage = null;
       }
     } on Object {
       if (current()) {
+        documentRecoveryMessage = null;
         errorMessage =
             'Your document could not be restored. Please add it again.';
         noticeMessage = null;
@@ -2735,6 +2773,9 @@ class WorkSession extends ChangeNotifier {
       }
       addedProofs[proofId] = reference;
       pickedProofs[proofId] = proof;
+      if (_documentRecoveryProofId == proofId) {
+        documentRecoveryMessage = _documentRecoveryProofId = null;
+      }
       declarationAccepted = false;
       noticeMessage = 'Document received. You can review it before submission.';
       return true;

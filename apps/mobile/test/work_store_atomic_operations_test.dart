@@ -151,9 +151,96 @@ void main() {
     expect(invoice, isNotNull);
     expect(session.workspaceCatalogueItems.single.stock, 8);
     expect(session.workspaceSalesToday, 550);
-    expect(session.workspaceSettlementBalance, 550);
+    expect(session.workspaceSettlementBalance, 0);
     session.markWorkspaceInvoiceShared(invoice!.id, 'MoolSocial Chat');
     expect(session.latestWorkspaceInvoice?.needsCustomerHandoff, isFalse);
+  });
+
+  test('completed counter sale cannot reopen or post its totals twice', () {
+    final session = liveSession();
+    session.addOrUpdateWorkspaceProduct(_product(stock: 10));
+    session.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop');
+    session.adjustWorkspaceOrderQuantity('atta-5kg', 2);
+    void save() => session.saveWorkspaceOrderDraft(
+      customer: '9829012321',
+      source: 'Counter',
+      fulfilment: 'At the shop',
+      payment: 'UPI',
+      address: '',
+    );
+    save();
+    final first = session.completeWorkspaceCounterSale()!;
+    final movementCount = session.workspaceStockMovements.length;
+    save();
+    expect(session.completeWorkspaceCounterSale(), same(first));
+    expect(session.currentWorkspaceOrder!.stage, 'Completed');
+    expect(session.workspaceInvoices, hasLength(1));
+    expect(session.workspaceCompletedSalesCount, 1);
+    expect(session.workspaceSalesToday, 550);
+    expect(session.workspaceSettlementBalance, 0);
+    expect(session.workspaceCatalogueItems.single.stock, 8);
+    expect(session.workspaceStockMovements, hasLength(movementCount));
+
+    session.startNewWorkspaceOrder();
+    expect(session.completeWorkspaceCounterSale(), isNull);
+    expect(session.workspaceOrders, hasLength(1));
+    expect(session.workspaceInvoices.single, same(first));
+    expect(session.workspaceSalesToday, 550);
+  });
+
+  for (final payment in [
+    'Cash',
+    'UPI',
+    'Pay request',
+    'On delivery',
+    'Customer due',
+  ]) {
+    test(
+      'recording a $payment counter invoice does not create settlement funds',
+      () {
+        final session = liveSession()..workspaceSettlementBalance = 700;
+        session.addOrUpdateWorkspaceProduct(_product(stock: 10));
+        session.prepareWorkspaceOrder(
+          source: 'Counter',
+          fulfilment: 'At the shop',
+        );
+        session.adjustWorkspaceOrderQuantity('atta-5kg', 1);
+        session.saveWorkspaceOrderDraft(
+          customer: '9829012321',
+          source: 'Counter',
+          fulfilment: 'At the shop',
+          payment: payment,
+          address: '',
+        );
+        final invoice = session.completeWorkspaceCounterSale()!;
+        expect(invoice.payment, payment);
+        expect(session.workspaceSalesToday, 275);
+        expect(session.workspaceSettlementBalance, 700);
+        expect(session.workspaceSettlementEligible, 700);
+        expect(session.workspaceCatalogueItems.single.stock, 9);
+      },
+    );
+  }
+
+  test('failed counter completion retains its draft without an invoice', () {
+    final session = liveSession();
+    session.addOrUpdateWorkspaceProduct(_product(stock: 1));
+    session.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop');
+    session.workspaceOrderQuantities['atta-5kg'] = 2;
+    session.saveWorkspaceOrderDraft(
+      customer: '9829012321',
+      source: 'Counter',
+      fulfilment: 'At the shop',
+      payment: 'Cash',
+      address: '',
+    );
+    expect(session.completeWorkspaceCounterSale(), isNull);
+    expect(session.workspaceOrderCustomer, '9829012321');
+    expect(session.workspaceOrderQuantities['atta-5kg'], 2);
+    expect(session.workspaceInvoices, isEmpty);
+    expect(session.workspaceCompletedSalesCount, 0);
+    expect(session.workspaceSalesToday, 0);
+    expect(session.workspaceCatalogueItems.single.stock, 1);
   });
 
   test('Store configuration persists delivery staff and counter controls', () {

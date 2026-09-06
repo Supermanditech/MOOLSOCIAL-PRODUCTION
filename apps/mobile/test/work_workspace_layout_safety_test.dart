@@ -1595,6 +1595,170 @@ void main() {
     },
   );
 
+  for (final width in [360.0, 320.0]) {
+    for (final contact in [
+      'work-primary-contact',
+      'work-contact-email',
+      'work-alternate-contact',
+    ]) {
+      testWidgets('incorrect $contact code retains retry above IME at $width', (
+        tester,
+      ) async {
+        final work = selectedRetailer()
+          ..primaryMobile = '9999999901'
+          ..contactEmail = 'review.owner@example.com'
+          ..alternateMobile = '9999999902';
+        final height = width == 360 ? 806.0 : 568.0;
+        final inset = width == 360 ? 330.0 : 244.0;
+        await mount(
+          tester,
+          route: '/app/work/workspace/contact',
+          work: work,
+          viewport: Size(width, height),
+          textScale: width == 360 ? 1 : 1.4,
+        );
+        final send = find.byKey(Key('$contact-send-otp'));
+        await reveal(tester, send);
+        await tester.tap(send);
+        await tester.pumpAndSettle();
+        tester.view.viewInsets = FakeViewPadding(bottom: inset);
+        final otp = find.byKey(Key('$contact-otp'));
+        await tester.enterText(otp, '00');
+        await tester.pumpAndSettle();
+        final confirm = find.byKey(Key('$contact-confirm-otp'));
+        await reveal(tester, confirm);
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        expect(work.errorMessage, 'Enter all 6 digits of the code.');
+        expect(confirm.hitTestable(), findsOneWidget);
+        expect(
+          tester.getBottomRight(confirm).dy,
+          lessThanOrEqualTo(height - inset),
+        );
+        await tester.enterText(otp, '000000');
+        await tester.pumpAndSettle();
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        // No test-side scrolling after the error: the screen must expose retry.
+        expect(work.errorMessage, 'That code does not match. Try again.');
+        expect(find.byKey(const Key('work-error')), findsOneWidget);
+        expect(confirm.hitTestable(), findsOneWidget);
+        expect(tester.getSize(confirm).height, greaterThanOrEqualTo(48));
+        expect(
+          tester.getBottomRight(confirm).dy,
+          lessThanOrEqualTo(height - inset),
+        );
+        expect(tester.widget<TextField>(otp).focusNode!.hasFocus, isTrue);
+        expect(find.byKey(const Key('work-contact-continue')), findsNothing);
+        expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+        await captureStoreView(tester, '35-$contact-error-${width.toInt()}');
+        await tester.enterText(otp, '123456');
+        await tester.pumpAndSettle();
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(work.errorMessage, isNull);
+        expect(
+          contact == 'work-primary-contact'
+              ? work.primaryMobileVerified
+              : contact == 'work-contact-email'
+              ? work.contactEmailVerified
+              : work.alternateVerified,
+          isTrue,
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets(
+    'missing recovered photo has persistent document-specific guidance',
+    (tester) async {
+      final work = selectedRetailer()
+        ..recoveredDocumentStep = true
+        ..workName = 'Review Kirana'
+        ..documentRecoveryMessage =
+            'Your details are saved. Please add Account owner identity again.';
+      await mount(tester, route: '/app/work/workspace/proof', work: work);
+      await tester.pump(const Duration(seconds: 3));
+      final guidance = find.byKey(const Key('work-document-recovery-guidance'));
+      expect(guidance, findsOneWidget);
+      expect(
+        tester.widget<Text>(guidance).data,
+        contains('Account owner identity'),
+      );
+      expect(work.addedProofs, isEmpty);
+      expect(
+        find.byKey(const Key('work-add-proof-personal-kyc')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-notice')), findsNothing);
+      await captureStoreView(tester, '36-recovered-photo-retry');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final width in [360.0, 320.0]) {
+    testWidgets(
+      'review gives long unbroken contact values full width at $width',
+      (tester) async {
+        final work = selectedRetailer()
+          ..recoveredDocumentStep = true
+          ..primaryMobile = '9999999901'
+          ..primaryMobileVerified = true
+          ..contactEmail = 'review.owner@example.com'
+          ..contactEmailVerified = true
+          ..workName = 'Review Kirana'
+          ..authorizedPersonName = 'Review Owner'
+          ..businessRelationship = 'Owner'
+          ..workArea = 'Jodhpur'
+          ..primaryActivity = 'Grocery retail';
+        await mount(
+          tester,
+          route: '/app/work/workspace/proof',
+          work: work,
+          viewport: Size(width, 806),
+          textScale: width == 360 ? 1 : 1.4,
+        );
+        await tester.tap(find.text('Review your information'));
+        await tester.pumpAndSettle();
+        final email = find.byKey(const Key('work-review-value-Email'));
+        await reveal(tester, email);
+        final displayed = tester.widget<Text>(email);
+        expect(
+          displayed.data!.replaceAll('\u200b', ''),
+          'review.owner@example.com',
+        );
+        expect(displayed.semanticsLabel, 'review.owner@example.com');
+        expect(work.contactEmail, 'review.owner@example.com');
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: email, matching: find.byType(RichText)),
+        );
+        final domainBoxes = paragraph.getBoxesForSelection(
+          TextSelection(
+            baseOffset: displayed.data!.indexOf('@'),
+            extentOffset: displayed.data!.length,
+          ),
+        );
+        expect(
+          domainBoxes,
+          hasLength(1),
+          reason: 'Keep the domain on one readable line',
+        );
+        expect(
+          tester.widget<Text>(email).overflow,
+          isNot(TextOverflow.ellipsis),
+        );
+        expect(tester.getSize(email).width, greaterThan(width * .7));
+        expect(tester.getRect(email).right, lessThanOrEqualTo(width - 16));
+        await captureStoreView(
+          tester,
+          '37-review-long-contact-${width.toInt()}',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('Store edge and finance expose operable semantic buttons', (
     tester,
   ) async {
@@ -4354,6 +4518,47 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-grow-destination')), findsOne);
   });
+
+  testWidgets(
+    'created counter invoice leaves an empty bill and safe Store return',
+    (tester) async {
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      await enterSaleCustomer(tester, '9829012345');
+      await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
+      await tester.pumpAndSettle();
+      final stockBefore = work.workspaceCatalogueItems
+          .firstWhere((item) => item.id == 'oil-fortune-1l')
+          .stock;
+      await tester.tap(find.byKey(const Key('work-order-review')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-order-save')));
+      await tester.pumpAndSettle();
+      expect(find.text('Send customer invoice'), findsOneWidget);
+      expect(work.workspaceInvoices, hasLength(1));
+      expect(work.workspaceOrderCustomer, isEmpty);
+      expect(work.workspaceOrderQuantities, isEmpty);
+      expect(
+        work.workspaceCatalogueItems
+            .firstWhere((item) => item.id == 'oil-fortune-1l')
+            .stock,
+        stockBefore - 1,
+      );
+      await tester.tap(find.byTooltip('Close invoice'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add customer'), findsOneWidget);
+      expect(find.text('Review bill'), findsNothing);
+      await tester.tap(find.byKey(const Key('work-store-home')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-order-discard-dialog')), findsNothing);
+      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+      expect(work.workspaceInvoices, hasLength(1));
+      expect(work.workspaceCompletedSalesCount, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('drafted sale has explicit keep or discard recovery', (
     tester,

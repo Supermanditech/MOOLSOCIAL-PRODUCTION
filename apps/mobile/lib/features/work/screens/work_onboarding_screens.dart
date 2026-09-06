@@ -460,7 +460,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                           onSubmitted: (_) => _areaFocus.requestFocus(),
                           decoration: const InputDecoration(
                             labelText: 'Business, profession or service',
-                            hintText: 'For example, furniture repair',
+                            hintText: 'Furniture repair',
                           ),
                         ),
                         const SizedBox(height: MoolSpacing.sm),
@@ -497,7 +497,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                             onSubmitted: (_) => _areaFocus.requestFocus(),
                             decoration: const InputDecoration(
                               labelText: 'Describe your activity',
-                              hintText: 'For example, handloom repair',
+                              hintText: 'Handloom repair',
                             ),
                           ),
                         ],
@@ -511,7 +511,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                           scrollPadding: const EdgeInsets.only(bottom: 120),
                           decoration: const InputDecoration(
                             labelText: 'City or service area',
-                            hintText: 'For example, Jodhpur',
+                            hintText: 'Jodhpur',
                           ),
                         ),
                       ],
@@ -1947,6 +1947,23 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                     widget.session.saveBusinessRelationship(value ?? ''),
               ),
             ] else if (_step == 1) ...[
+              if (widget.session.documentRecoveryMessage
+                  case final message?) ...[
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    message,
+                    key: const Key('work-document-recovery-guidance'),
+                    style: const TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 12,
+                      height: 1.4,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: MoolSpacing.sm),
+              ],
               const WorkSectionTitle(
                 title: 'Documents',
                 detail: 'Add now or continue and provide them during review',
@@ -2878,38 +2895,63 @@ class _ReviewRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const labelStyle = TextStyle(
+      color: MoolColors.muted,
+      fontSize: 12,
+      height: 1.4,
+      fontWeight: FontWeight.w700,
+    );
+    const valueStyle = TextStyle(
+      color: MoolColors.ink,
+      fontSize: 13,
+      height: 1.4,
+      fontWeight: FontWeight.w700,
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: MoolSpacing.xs),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 4,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: MoolColors.muted,
-                fontSize: 12,
-                height: 1.4,
-                fontWeight: FontWeight.w700,
-              ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final painter = TextPainter(
+            text: TextSpan(
+              text: value,
+              style: DefaultTextStyle.of(context).style.merge(valueStyle),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 6,
-            child: Text(
-              value,
-              textAlign: TextAlign.start,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 13,
-                height: 1.4,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+            maxLines: 2,
+          )..layout(maxWidth: (constraints.maxWidth - 12) * .6);
+          final needsFullWidth =
+              painter.didExceedMaxLines ||
+              (!value.contains(RegExp(r'\s')) &&
+                  painter.computeLineMetrics().length > 1);
+          painter.dispose();
+          final labelText = Text(label, style: labelStyle);
+          final valueText = Text(
+            needsFullWidth && value.contains('@')
+                ? value.replaceFirst('@', '\u200b@')
+                : value,
+            semanticsLabel: value,
+            key: Key('work-review-value-$label'),
+            textAlign: TextAlign.start,
+            softWrap: true,
+            overflow: TextOverflow.clip,
+            style: valueStyle,
+          );
+          if (needsFullWidth) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [labelText, const SizedBox(height: 4), valueText],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 4, child: labelText),
+              const SizedBox(width: 12),
+              Expanded(flex: 6, child: valueText),
+            ],
+          );
+        },
       ),
     );
   }

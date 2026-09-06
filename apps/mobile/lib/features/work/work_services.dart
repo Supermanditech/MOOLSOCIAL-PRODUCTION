@@ -978,9 +978,7 @@ class ReviewWorkGateway implements WorkGateway {
     lastOtpValue = value;
     await _wait();
     if (code != '123456') {
-      throw const WorkGatewayException(
-        'Enter the 6-digit OTP sent to this contact.',
-      );
+      throw const WorkGatewayException('That code does not match. Try again.');
     }
   }
 

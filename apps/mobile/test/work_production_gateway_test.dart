@@ -62,6 +62,56 @@ void main() {
     },
   );
 
+  test(
+    'empty lost-photo result keeps a named retry until the document is added',
+    () async {
+      final empty = Completer<WorkPickedProof?>()..complete(null);
+      final store = _PendingProofMemory()..draft = _cameraDraft();
+      final picker = _RecoveryPicker(delayedRecovery: empty);
+      final work = WorkSession(pendingProofStore: store, proofPicker: picker);
+      addTearDown(work.dispose);
+      expect(await work.recoverPendingProof(accountReady: true), isTrue);
+      expect(work.workName, 'Review Kirana');
+      expect(work.documentRecoveryMessage, contains('Shop address document'));
+      expect(work.documentRecoveryMessage, contains('again'));
+      expect(work.noticeMessage, isNull);
+      expect(work.pickedProofs, isEmpty);
+      expect(work.hasVerifiedWorkspace, isFalse);
+      work.dismissMessages();
+      expect(work.documentRecoveryMessage, isNotNull);
+      expect(
+        await work.addProof('shop-front', WorkProofSource.camera),
+        isFalse,
+      );
+      expect(work.documentRecoveryMessage, isNotNull);
+      picker.nextPick = _cameraProof();
+      expect(await work.addProof('shop-front', WorkProofSource.camera), isTrue);
+      expect(work.documentRecoveryMessage, isNull);
+      expect(work.pickedProofs['shop-front']?.fileName, 'Camera photo.jpg');
+    },
+  );
+
+  for (final change in ['account', 'workspace']) {
+    test('recovery retry guidance cannot leak into another $change', () async {
+      final empty = Completer<WorkPickedProof?>()..complete(null);
+      final store = _PendingProofMemory()..draft = _cameraDraft();
+      final work = WorkSession(
+        pendingProofStore: store,
+        proofPicker: _RecoveryPicker(delayedRecovery: empty),
+      );
+      addTearDown(work.dispose);
+      expect(await work.recoverPendingProof(accountReady: true), isTrue);
+      expect(work.documentRecoveryMessage, isNotNull);
+      if (change == 'account') {
+        store.accountScope = 'another-account';
+        expect(await work.recoverPendingProof(accountReady: true), isFalse);
+      } else {
+        work.startAnotherWork();
+      }
+      expect(work.documentRecoveryMessage, isNull);
+    });
+  }
+
   test('expired camera checkpoint cannot restore an old application', () async {
     final store = _PendingProofMemory()
       ..draft = _cameraDraft()
@@ -1024,11 +1074,12 @@ class _RecoveryPicker implements WorkRecoverableProofPicker {
   });
   final bool failRecovery;
   final Completer<WorkPickedProof?>? pendingPick, delayedRecovery;
+  WorkPickedProof? nextPick;
   int recoveries = 0, picks = 0;
   @override
   Future<WorkPickedProof?> pick(WorkProofSource source) async {
     picks++;
-    return pendingPick == null ? null : await pendingPick!.future;
+    return pendingPick == null ? nextPick : await pendingPick!.future;
   }
 
   @override

@@ -1,6 +1,6 @@
 # r66.3 prebuild validation
 
-Local source qualification is complete. Source seal and one-build activation are pending; no build is authorized by this intermediate record.
+Source sealed at f2345edc487fc4cf9b22293a35e673384a139ef7 on work/codex-ui/codex-oppo-review-v1-20260905, parent595353d7fd74a29a60a86c8f15c0ff0a606643da. Atomic source/evidence commit passed pre_commit, was pushed and matched the exact origin readback. Preservation digest at the seal: zero bytes, zero records, zero stderr, exit0. Only this candidate machine state and this evidence record are then activated for one guarded r66.3 RuntimeUiReview/debug build. No product/test changes after either final cycle.
 
 The six-suite local capture replay passed 232 tests with 70 intentional capture-only skips. Both final connected 33-suite cycles passed 701 tests with 83 capture-only skips and zero failures. Full Flutter analysis is zero issues. Format check: ten changed Dart owners, zero formatting changes. Actual pre-dashboard and Dashboard/first-tap, keyboard and large-text PNGs were reviewed. Commands, complete file list, failed attempts, hashes and protected-reference disposition are in local-validation.md.
 

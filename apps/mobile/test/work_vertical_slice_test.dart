@@ -327,10 +327,7 @@ void main() {
 
       await enter(tester, const Key('work-alternate-contact-otp'), '000000');
       await tapVisible(tester, const Key('work-alternate-contact-confirm-otp'));
-      expect(
-        find.text('Enter the 6-digit OTP sent to this contact.'),
-        findsOneWidget,
-      );
+      expect(find.text('That code does not match. Try again.'), findsOneWidget);
       await enter(tester, const Key('work-alternate-contact-otp'), '123456');
       await tapVisible(tester, const Key('work-alternate-contact-confirm-otp'));
       expect(work.alternateVerified, isTrue);

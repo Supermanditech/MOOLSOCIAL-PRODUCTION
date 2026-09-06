@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "source_qualified_pending_git_seal",
-  "buildAuthorization": "not_authorized_until_qualification",
+  "machineState": "installed_native_review_children_found",
+  "buildAuthorization": "consumed",
   "preBuildValidation": {
-    "state": "pending",
+    "state": "passed",
     "evidence": "artifacts/quality/codex-oppo-r66-3-review-20260906/prebuild-validation.md"
   },
   "candidate": {
@@ -14,7 +14,7 @@
     "buildMode": "debug",
     "gateProfile": "uaw_runtime_ui_review_debug",
     "branch": "work/codex-ui/codex-oppo-review-v1-20260905",
-    "head": "pending-source-seal"
+    "head": "f2345edc487fc4cf9b22293a35e673384a139ef7"
   },
   "source": {
     "manifestPath": "artifacts/quality/codex-oppo-r66-3-review-20260906/source-manifest.txt",
@@ -33,7 +33,7 @@
   "preBuildGates": [
     {
       "id": "branch-head",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-3-review-20260906/prebuild-validation.md"
       ]
@@ -103,7 +103,7 @@
     },
     {
       "id": "clean-state-regression",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-3-review-20260906/prebuild-validation.md"
       ]
@@ -148,19 +148,37 @@
   "postBuildGates": [
     {
       "id": "apk-integrity",
-      "state": "pending"
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-3-review-20260906/uaw-codex-oppo-r66.3-review-20260906-build-provenance.txt"
+      ]
     },
     {
       "id": "oppo-install",
-      "state": "pending"
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-3-review-20260906/post-install.json"
+      ]
     },
     {
       "id": "oppo-real-user-review",
-      "state": "pending"
+      "state": "failed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-3-review-20260906/device-review.md"
+      ]
     },
     {
       "id": "founder-review",
       "state": "pending"
     }
-  ]
+  ],
+  "buildResult": {
+    "state": "passed",
+    "sourceHead": "f2345edc487fc4cf9b22293a35e673384a139ef7",
+    "apk": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905\\artifacts\\device\\codex-oppo-r66-3-review-20260906\\uaw-codex-oppo-r66.3-review-20260906-device-review-debug.apk",
+    "bytes": 209504165,
+    "sha256": "E32C6BB437D8D810A46F943A295B12BFDF24724660C711CD6B2C224DAAC879DB",
+    "runtimePackage": "com.moolsocial.app.runtime",
+    "log": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-POST-UI-AUDIT-20260905\\oppo-r66-3-guarded-build.log"
+  }
 }

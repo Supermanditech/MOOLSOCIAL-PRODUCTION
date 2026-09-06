@@ -35,10 +35,22 @@ class _WorkWorkspaceContactScreenState
   final FocusNode _primaryOtpFocus = FocusNode();
   final FocusNode _emailOtpFocus = FocusNode();
   final FocusNode _alternateOtpFocus = FocusNode();
+  final GlobalKey _primaryCodeActions = GlobalKey();
+  final GlobalKey _emailCodeActions = GlobalKey();
+  final GlobalKey _alternateCodeActions = GlobalKey();
 
-  void _focusCode(FocusNode node) {
+  void _focusCode(FocusNode node, GlobalKey actions) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) node.requestFocus();
+      if (!mounted) return;
+      node.requestFocus();
+      final target = actions.currentContext;
+      if (target != null) {
+        Scrollable.ensureVisible(
+          target,
+          alignment: 1,
+          duration: MoolMotion.accessible(context, MoolMotion.standard),
+        );
+      }
     });
   }
 
@@ -185,6 +197,7 @@ class _WorkWorkspaceContactScreenState
                       controller: _primaryMobile,
                       otpController: _primaryOtp,
                       otpFocusNode: _primaryOtpFocus,
+                      codeActionsKey: _primaryCodeActions,
                       keyboardType: TextInputType.phone,
                       prefixText: '+91 ',
                       confirmed: session.primaryMobileVerified,
@@ -201,11 +214,14 @@ class _WorkWorkspaceContactScreenState
                       onSend: () async {
                         await session.sendPrimaryMobileOtp(_primaryMobile.text);
                         if (session.primaryMobileOtpSent) {
-                          _focusCode(_primaryOtpFocus);
+                          _focusCode(_primaryOtpFocus, _primaryCodeActions);
                         }
                       },
                       onVerify: () async {
                         await session.verifyPrimaryMobileOtp(_primaryOtp.text);
+                        if (!session.primaryMobileVerified) {
+                          _focusCode(_primaryOtpFocus, _primaryCodeActions);
+                        }
                       },
                       onChange: () {
                         session.changePrimaryMobile();
@@ -223,6 +239,7 @@ class _WorkWorkspaceContactScreenState
                       controller: _email,
                       otpController: _emailOtp,
                       otpFocusNode: _emailOtpFocus,
+                      codeActionsKey: _emailCodeActions,
                       keyboardType: TextInputType.emailAddress,
                       confirmed: session.contactEmailVerified,
                       otpSent: session.contactEmailOtpSent,
@@ -238,11 +255,14 @@ class _WorkWorkspaceContactScreenState
                       onSend: () async {
                         await session.sendContactEmailOtp(_email.text);
                         if (session.contactEmailOtpSent) {
-                          _focusCode(_emailOtpFocus);
+                          _focusCode(_emailOtpFocus, _emailCodeActions);
                         }
                       },
                       onVerify: () async {
                         await session.verifyContactEmailOtp(_emailOtp.text);
+                        if (!session.contactEmailVerified) {
+                          _focusCode(_emailOtpFocus, _emailCodeActions);
+                        }
                       },
                       onChange: () {
                         session.changeContactEmail();
@@ -260,6 +280,7 @@ class _WorkWorkspaceContactScreenState
                       controller: _alternate,
                       otpController: _alternateOtp,
                       otpFocusNode: _alternateOtpFocus,
+                      codeActionsKey: _alternateCodeActions,
                       keyboardType: TextInputType.phone,
                       prefixText: '+91 ',
                       confirmed: session.alternateVerified,
@@ -280,11 +301,14 @@ class _WorkWorkspaceContactScreenState
                         }
                         await session.sendAlternateOtp(_alternate.text);
                         if (session.alternateOtpSent) {
-                          _focusCode(_alternateOtpFocus);
+                          _focusCode(_alternateOtpFocus, _alternateCodeActions);
                         }
                       },
                       onVerify: () async {
                         await session.verifyAlternateOtp(_alternateOtp.text);
+                        if (!session.alternateVerified) {
+                          _focusCode(_alternateOtpFocus, _alternateCodeActions);
+                        }
                       },
                       onChange: () {
                         session.removeAlternateMobile();
@@ -391,6 +415,7 @@ class _ContactVerificationCard extends StatelessWidget {
     required this.controller,
     required this.otpController,
     required this.otpFocusNode,
+    required this.codeActionsKey,
     required this.keyboardType,
     required this.confirmed,
     required this.otpSent,
@@ -406,6 +431,7 @@ class _ContactVerificationCard extends StatelessWidget {
   final bool requiredContact, confirmed, otpSent, busy;
   final TextEditingController controller, otpController;
   final FocusNode otpFocusNode;
+  final GlobalKey codeActionsKey;
   final TextInputType keyboardType;
   final String? prefixText;
   final VoidCallback onSend, onVerify, onChange;
@@ -501,6 +527,7 @@ class _ContactVerificationCard extends StatelessWidget {
             },
           ),
           Wrap(
+            key: codeActionsKey,
             spacing: 12,
             alignment: WrapAlignment.end,
             crossAxisAlignment: WrapCrossAlignment.center,
