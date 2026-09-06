@@ -206,13 +206,15 @@ void main() {
   }
 
   for (final channel in WorkContactChannel.values) {
+    // Channel-specific regressions keep the actual signed-in phone separate
+    // from a new contact that still needs its own OTP.
     for (final operation in ['send', 'verify']) {
       testWidgets('S03 contact leaving during $operation is safe $channel', (
         tester,
       ) async {
         final work = WorkSession()
           ..selectProfile('retailer-grocery')
-          ..primaryMobile = '9829012321'
+          ..primaryMobile = '9876501234'
           ..contactEmail = 'asha@example.com'
           ..alternateMobile = '9876543210';
         final key = switch (channel) {
@@ -254,6 +256,69 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+  }
+
+  for (final display in [
+    (width: 412.0, height: 915.0, scale: 1.0),
+    (width: 320.0, height: 568.0, scale: 1.4),
+    (width: 320.0, height: 568.0, scale: 2.0),
+  ]) {
+    testWidgets(
+      'S03 draft cold restart restores real contact fields ${display.scale}',
+      (tester) async {
+        final store = _ContactDraftFixtureStore();
+        final beforeRestart = WorkSession(contactDraftStore: store);
+        await beforeRestart.recoverPendingProof(accountReady: true);
+        beforeRestart.selectProfile('retailer-grocery');
+        beforeRestart.savePersonName('Asha Store Owner');
+        beforeRestart.editWorkspaceContact(
+          WorkContactChannel.primaryMobile,
+          '9829012321',
+        );
+        beforeRestart.editWorkspaceContact(WorkContactChannel.email, 'store@');
+        beforeRestart.saveDetails(
+          name: 'Sharma Stores',
+          area: 'Jaipur',
+          activity: 'Groceries',
+        );
+        await beforeRestart.flushContactDraft();
+        beforeRestart.dispose();
+        final restored = WorkSession(contactDraftStore: store);
+        await mount(
+          tester,
+          route: '/app/work/workspace/contact',
+          work: restored,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        expect(restored.authorizedPersonName, 'Asha Store Owner');
+        expect(restored.workName, 'Sharma Stores');
+        expect(restored.primaryMobileVerified, isTrue);
+        expect(restored.contactEmailVerified, isFalse);
+        await captureStoreView(
+          tester,
+          'r665-contact-restored-first-${display.scale}',
+        );
+        final phone = find.byKey(const Key('work-primary-contact-field'));
+        await reveal(tester, phone);
+        expect(tester.widget<TextField>(phone).controller!.text, '9829012321');
+        expect(tester.widget<TextField>(phone).readOnly, isTrue);
+        final email = find.byKey(const Key('work-contact-email-field'));
+        await reveal(tester, email);
+        expect(tester.widget<TextField>(email).controller!.text, 'store@');
+        expect(tester.widget<TextField>(email).readOnly, isFalse);
+        await tester.enterText(email, '');
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(email).controller!.text, isEmpty);
+        expect(restored.contactEmail, isEmpty);
+        await captureStoreView(
+          tester,
+          'r665-contact-restored-edit-${display.scale}',
+        );
+        expect(tester.takeException(), isNull);
+        await restored.flushContactDraft();
+      },
+    );
   }
 
   for (final display in [
@@ -2891,7 +2956,7 @@ void main() {
     tester,
   ) async {
     final work = selectedRetailer()
-      ..primaryMobile = '9829012321'
+      ..primaryMobile = '9876501234'
       ..primaryMobileVerified = false
       ..primaryMobileOtpSent = true;
     await mount(tester, route: '/app/work/workspace/contact', work: work);
@@ -2909,7 +2974,7 @@ void main() {
       find.byKey(const Key('work-primary-contact-otp')),
     );
     expect(code.maxLength, 6);
-    expect(code.decoration?.helperText, 'Sent to 9829012321');
+    expect(code.decoration?.helperText, 'Sent to 9876501234');
     expect(tester.takeException(), isNull);
   });
 
@@ -6895,4 +6960,21 @@ void main() {
       );
     },
   );
+}
+
+class _ContactDraftFixtureStore implements WorkPendingProofStore {
+  @override
+  String get accountScope => 'review-draft-account';
+  Map<String, Object?>? value;
+  @override
+  Future<Map<String, Object?>?> read(String scope) async => value;
+  @override
+  Future<void> save(String scope, Map<String, Object?> draft) async {
+    value = Map.of(draft);
+  }
+
+  @override
+  Future<void> clear(String scope) async {
+    value = null;
+  }
 }

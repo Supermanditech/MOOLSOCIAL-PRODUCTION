@@ -10,7 +10,15 @@ class WorkSession extends ChangeNotifier {
     WorkGateway? gateway,
     WorkProofPicker? proofPicker,
     WorkPendingProofStore? pendingProofStore,
+    WorkPendingProofStore? contactDraftStore,
   }) : gateway = gateway ?? ReviewWorkGateway(),
+       contactDraftStore =
+           contactDraftStore ??
+           (kDebugMode &&
+                   const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+                   const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')
+               ? SecureWorkPendingProofStore.contactDraft(reviewOnly: true)
+               : null),
        pendingProofStore =
            pendingProofStore ??
            (kDebugMode &&
@@ -30,7 +38,13 @@ class WorkSession extends ChangeNotifier {
     WorkGateway? gateway,
     WorkProofPicker? proofPicker,
     WorkPendingProofStore? pendingProofStore,
+    WorkPendingProofStore? contactDraftStore,
   }) : gateway = gateway ?? buildWorkGateway(),
+       contactDraftStore =
+           contactDraftStore ??
+           (proofPicker == null || proofPicker is NativeWorkProofPicker
+               ? SecureWorkPendingProofStore.contactDraft()
+               : null),
        pendingProofStore =
            pendingProofStore ??
            (proofPicker == null || proofPicker is NativeWorkProofPicker
@@ -41,6 +55,15 @@ class WorkSession extends ChangeNotifier {
   final WorkGateway gateway;
   final WorkProofPicker proofPicker;
   final WorkPendingProofStore? pendingProofStore;
+  final WorkPendingProofStore? contactDraftStore;
+  String? _contactDraftScope;
+  bool _contactDraftScopeKnown = false;
+  Future<void>? _contactDraftRecovery;
+  Future<void>? _contactDraftWrite;
+  ({String scope, Map<String, Object?> draft})? _queuedContactDraft;
+  int _contactDraftRevision = 0;
+  final Set<String> _editedDraftFields = {};
+  String? contactDraftMessage;
   String? _pendingProofScope;
   Future<void>? _pendingProofRecovery;
   bool _pendingProofRoute = false;
@@ -2186,6 +2209,7 @@ class WorkSession extends ChangeNotifier {
     }
     selectedFamilyId = familyId;
     selectedProfile = null;
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
   }
@@ -2200,6 +2224,7 @@ class WorkSession extends ChangeNotifier {
       declarationAccepted = false;
     }
     selectedProfile = nextProfile;
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
   }
@@ -2208,16 +2233,20 @@ class WorkSession extends ChangeNotifier {
     documentRecoveryMessage = _documentRecoveryProofId = null;
     selectedFamilyId = null;
     selectedProfile = null;
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
   }
 
   void hydrateAccountSnapshot(WorkAccountSnapshot snapshot) {
     accountDisplayName = snapshot.displayName.trim();
-    if (authorizedPersonName.isEmpty) authorizedPersonName = accountDisplayName;
+    if (authorizedPersonName.isEmpty &&
+        !_editedDraftFields.contains('personName')) {
+      authorizedPersonName = accountDisplayName;
+    }
     connectedProviderLabel = snapshot.providerLabel.trim();
     connectedProviderAccount = snapshot.providerAccount.trim();
-    if (primaryMobile.isEmpty) {
+    if (primaryMobile.isEmpty && !_editedDraftFields.contains('phone')) {
       final digits = snapshot.mobile.replaceAll(RegExp(r'\D'), '');
       final normalized = digits.length > 10
           ? digits.substring(digits.length - 10)
@@ -2227,12 +2256,26 @@ class WorkSession extends ChangeNotifier {
         primaryMobileVerified = snapshot.mobileConfirmed;
       }
     }
-    if (contactEmail.isEmpty) {
+    if (contactEmail.isEmpty && !_editedDraftFields.contains('email')) {
       final normalized = snapshot.email.trim().toLowerCase();
       if (_validEmail(normalized)) {
         contactEmail = normalized;
         contactEmailVerified = snapshot.emailConfirmed;
       }
+    }
+    final phone = snapshot.mobile.replaceAll(RegExp(r'\D'), '');
+    final accountPhone = phone.length > 10
+        ? phone.substring(phone.length - 10)
+        : phone;
+    if (primaryMobile.isNotEmpty &&
+        primaryMobile == accountPhone &&
+        snapshot.mobileConfirmed) {
+      primaryMobileVerified = true;
+    }
+    if (contactEmail.isNotEmpty &&
+        contactEmail == snapshot.email.trim().toLowerCase() &&
+        snapshot.emailConfirmed) {
+      contactEmailVerified = true;
     }
   }
 
@@ -2242,14 +2285,172 @@ class WorkSession extends ChangeNotifier {
       (alternateMobile.isEmpty || alternateVerified);
 
   void savePersonName(String value) {
+    _editedDraftFields.add('personName');
     if (authorizedPersonName != value.trim()) declarationAccepted = false;
     authorizedPersonName = value.trim();
+    _queueContactDraft();
   }
 
   void saveBusinessRelationship(String value) {
     if (businessRelationship != value) declarationAccepted = false;
     businessRelationship = value;
+    _queueContactDraft();
     notifyListeners();
+  }
+
+  void _queueContactDraft() {
+    final store = contactDraftStore;
+    final scope = store?.accountScope;
+    if (store == null || scope == null || _disposed) return;
+    if (_contactDraftScopeKnown && scope != _contactDraftScope) return;
+    _contactDraftScopeKnown = true;
+    _contactDraftScope = scope;
+    _contactDraftRevision++;
+    _queuedContactDraft = (
+      scope: scope,
+      draft: {
+        'version': 1,
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+        'profileId': selectedProfile?.id,
+        'personName': authorizedPersonName,
+        'relationship': businessRelationship,
+        'phone': primaryMobile,
+        'email': contactEmail,
+        'alternate': alternateMobile,
+        'name': workName,
+        'area': workArea,
+        'activity': primaryActivity,
+        'editedFields': _editedDraftFields.toList(),
+      },
+    );
+    unawaited(flushContactDraft());
+  }
+
+  /// Coalesces edits without blocking typing. Verification secrets are excluded.
+  void retryContactDraftSave() => _queueContactDraft();
+
+  Future<void> flushContactDraft() {
+    if (_contactDraftWrite != null) return _contactDraftWrite!;
+    if (_queuedContactDraft == null || contactDraftStore == null) {
+      return Future.value();
+    }
+    return _contactDraftWrite = _drainContactDraft().whenComplete(() {
+      _contactDraftWrite = null;
+      if (_queuedContactDraft != null) unawaited(flushContactDraft());
+    });
+  }
+
+  Future<void> _drainContactDraft() async {
+    final store = contactDraftStore!;
+    while (_queuedContactDraft != null) {
+      final pending = _queuedContactDraft!;
+      _queuedContactDraft = null;
+      try {
+        await store.save(pending.scope, pending.draft);
+        if (pending.scope == store.accountScope &&
+            contactDraftMessage != null) {
+          contactDraftMessage = null;
+          notifyListeners();
+        }
+      } on Object {
+        if (!_disposed && pending.scope == store.accountScope) {
+          contactDraftMessage =
+              'Your changes could not be saved on this phone. Keep this page open and try again.';
+          notifyListeners();
+        }
+      }
+    }
+  }
+
+  Future<void> _recoverContactDraft(bool accountReady) async {
+    final store = contactDraftStore;
+    if (store == null) return;
+    final scope = accountReady ? store.accountScope : null;
+    if (!_contactDraftScopeKnown || scope != _contactDraftScope) {
+      if (_contactDraftScopeKnown) {
+        authorizedPersonName = businessRelationship = '';
+        accountDisplayName = connectedProviderLabel = connectedProviderAccount =
+            '';
+        workName = workArea = primaryActivity = '';
+        primaryMobile = contactEmail = alternateMobile = '';
+        primaryMobileVerified = contactEmailVerified = alternateVerified =
+            false;
+        primaryMobileOtpSent = contactEmailOtpSent = alternateOtpSent = false;
+        selectedProfile = null;
+        selectedFamilyId = null;
+        addedProofs.clear();
+        pickedProofs.clear();
+        submittedProfile = null;
+        reviewCaseId = workspaceId = reviewReason = null;
+        remoteReviewStatus = null;
+        reviewCorrectionDraft = false;
+        reviewStage = WorkReviewStage.none;
+        declarationAccepted = false;
+        _contactEditOrigins.clear();
+        _editedDraftFields.clear();
+        for (final channel in WorkContactChannel.values) {
+          _invalidateContactChallenge(channel);
+        }
+      }
+      _contactDraftScopeKnown = true;
+      _contactDraftScope = scope;
+      _contactDraftRevision++;
+      _queuedContactDraft = null;
+      _contactDraftRecovery = null;
+      contactDraftMessage = null;
+    }
+    if (scope == null) return;
+    final revision = _contactDraftRevision;
+    _contactDraftRecovery ??= _readContactDraft(store, scope, revision);
+    await _contactDraftRecovery;
+  }
+
+  Future<void> _readContactDraft(
+    WorkPendingProofStore store,
+    String scope,
+    int revision,
+  ) async {
+    bool current() =>
+        !_disposed &&
+        scope == store.accountScope &&
+        scope == _contactDraftScope &&
+        revision == _contactDraftRevision;
+    try {
+      final draft = await store.read(scope);
+      if (draft == null || !current() || draft['version'] != 1) return;
+      final savedAt = DateTime.tryParse(draft['savedAt'] as String? ?? '');
+      if (savedAt == null ||
+          DateTime.now().difference(savedAt).isNegative ||
+          DateTime.now().difference(savedAt) > const Duration(days: 30)) {
+        return;
+      }
+      String field(String key) =>
+          draft[key] is String ? draft[key] as String : '';
+      authorizedPersonName = field('personName');
+      businessRelationship = field('relationship');
+      primaryMobile = field('phone');
+      contactEmail = field('email');
+      alternateMobile = field('alternate');
+      workName = field('name');
+      workArea = field('area');
+      primaryActivity = field('activity');
+      if (draft['editedFields'] case final List fields) {
+        _editedDraftFields.addAll(fields.whereType<String>());
+      }
+      selectedProfile = workProfiles
+          .where((p) => p.id == draft['profileId'])
+          .firstOrNull;
+      selectedFamilyId = selectedProfile?.familyId;
+      // Local draft flags are not authority for identity or Workspace approval.
+      primaryMobileVerified = contactEmailVerified = alternateVerified = false;
+      primaryMobileOtpSent = contactEmailOtpSent = alternateOtpSent = false;
+      declarationAccepted = false;
+    } on Object {
+      if (current()) {
+        contactDraftMessage =
+            'Saved details could not be restored. Please enter your details to continue.';
+      }
+    }
   }
 
   String workspaceContactValue(WorkContactChannel channel) => switch (channel) {
@@ -2267,6 +2468,9 @@ class WorkSession extends ChangeNotifier {
 
   bool isEditingWorkspaceContact(WorkContactChannel channel) =>
       _contactEditOrigins.containsKey(channel);
+
+  String? get _contactAccountScope =>
+      contactDraftStore?.accountScope ?? pendingProofStore?.accountScope;
 
   void _invalidateContactChallenge(WorkContactChannel channel) {
     _contactRevisions[channel] = (_contactRevisions[channel] ?? 0) + 1;
@@ -2287,7 +2491,7 @@ class WorkSession extends ChangeNotifier {
       () => (
         value: workspaceContactValue(channel),
         verified: workspaceContactVerified(channel),
-        scope: pendingProofStore?.accountScope,
+        scope: _contactAccountScope,
       ),
     );
     _invalidateContactChallenge(channel);
@@ -2299,7 +2503,7 @@ class WorkSession extends ChangeNotifier {
     final original = _contactEditOrigins.remove(channel);
     if (original == null) return;
     _invalidateContactChallenge(channel);
-    if (original.scope != pendingProofStore?.accountScope) {
+    if (original.scope != _contactAccountScope) {
       editWorkspaceContact(channel, '');
       errorMessage = 'Sign in again to confirm your contact details.';
       notifyListeners();
@@ -2319,6 +2523,11 @@ class WorkSession extends ChangeNotifier {
   }
 
   void editWorkspaceContact(WorkContactChannel channel, String value) {
+    _editedDraftFields.add(switch (channel) {
+      WorkContactChannel.primaryMobile => 'phone',
+      WorkContactChannel.email => 'email',
+      WorkContactChannel.alternateMobile => 'alternate',
+    });
     final normalized = channel == WorkContactChannel.email
         ? value.trim().toLowerCase()
         : value.replaceAll(RegExp(r'\D'), '');
@@ -2327,7 +2536,10 @@ class WorkSession extends ChangeNotifier {
       WorkContactChannel.email => contactEmail,
       WorkContactChannel.alternateMobile => alternateMobile,
     };
-    if (normalized == previous) return;
+    if (normalized == previous) {
+      _queueContactDraft();
+      return;
+    }
     _contactRevisions[channel] = (_contactRevisions[channel] ?? 0) + 1;
     declarationAccepted = false;
     switch (channel) {
@@ -2344,6 +2556,7 @@ class WorkSession extends ChangeNotifier {
         alternateOtpSent = false;
         alternateVerified = false;
     }
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
   }
@@ -2460,12 +2673,12 @@ class WorkSession extends ChangeNotifier {
     required VoidCallback onSent,
   }) {
     final revision = _contactRevisions[channel] ?? 0;
-    final scope = pendingProofStore?.accountScope;
+    final scope = _contactAccountScope;
     return _runBool(() async {
       await gateway.sendContactOtp(channel: channel, value: value);
       if (_disposed ||
           revision != (_contactRevisions[channel] ?? 0) ||
-          scope != pendingProofStore?.accountScope ||
+          scope != _contactAccountScope ||
           workspaceContactValue(channel) != value) {
         throw const WorkGatewayException(
           'Contact changed. Request a new code.',
@@ -2498,7 +2711,7 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     final revision = _contactRevisions[channel] ?? 0;
-    final scope = pendingProofStore?.accountScope;
+    final scope = _contactAccountScope;
     return _runBool(() async {
       await gateway.verifyContactOtp(
         channel: channel,
@@ -2507,7 +2720,7 @@ class WorkSession extends ChangeNotifier {
       );
       if (_disposed ||
           revision != (_contactRevisions[channel] ?? 0) ||
-          scope != pendingProofStore?.accountScope ||
+          scope != _contactAccountScope ||
           workspaceContactValue(channel) != value) {
         throw const WorkGatewayException(
           'Contact changed. Request a new code.',
@@ -2619,6 +2832,7 @@ class WorkSession extends ChangeNotifier {
     workName = name.trim();
     workArea = area.trim();
     primaryActivity = activity.trim();
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
   }
@@ -2687,7 +2901,10 @@ class WorkSession extends ChangeNotifier {
   /// account. This does not restore sign-in, OTP secrets or approval authority.
   Future<bool> recoverPendingProof({required bool accountReady}) async {
     final store = pendingProofStore;
-    if (store == null) return false;
+    if (store == null) {
+      await _recoverContactDraft(accountReady);
+      return false;
+    }
     final scope = accountReady ? store.accountScope : null;
     if (_pendingProofScope != scope) {
       _pendingProofGeneration++;
@@ -2711,6 +2928,7 @@ class WorkSession extends ChangeNotifier {
         _hasRecoveredDraft = false;
       }
     }
+    await _recoverContactDraft(accountReady);
     if (scope == null) return false;
     final generation = _pendingProofGeneration;
     _pendingProofRecovery ??= _restorePendingDocument(store, scope, generation);
@@ -2771,11 +2989,17 @@ class WorkSession extends ChangeNotifier {
       contactEmail = field('email');
       alternateMobile = field('alternate');
       primaryMobileVerified =
-          primaryMobile.isNotEmpty && draft['phoneConfirmed'] == true;
+          gateway is ReviewWorkGateway &&
+          primaryMobile.isNotEmpty &&
+          draft['phoneConfirmed'] == true;
       contactEmailVerified =
-          contactEmail.isNotEmpty && draft['emailConfirmed'] == true;
+          gateway is ReviewWorkGateway &&
+          contactEmail.isNotEmpty &&
+          draft['emailConfirmed'] == true;
       alternateVerified =
-          alternateMobile.isNotEmpty && draft['alternateConfirmed'] == true;
+          gateway is ReviewWorkGateway &&
+          alternateMobile.isNotEmpty &&
+          draft['alternateConfirmed'] == true;
       primaryMobileOtpSent = contactEmailOtpSent = alternateOtpSent = false;
       declarationAccepted = false;
       final proofId = field('proofId');

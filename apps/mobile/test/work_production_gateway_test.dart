@@ -13,6 +13,251 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 
 void main() {
+  test(
+    'S03 draft serial writes retain the latest edit while storage is busy',
+    () async {
+      final store = _SlowWriteDraftMemory();
+      final work = WorkSession(contactDraftStore: store);
+      await work.recoverPendingProof(accountReady: true);
+      work.savePersonName('A');
+      work.savePersonName('Asha');
+      work.savePersonName('Asha Sharma');
+      final flush = work.flushContactDraft();
+      expect(store.writes, 1);
+      store.firstWrite.complete();
+      await flush;
+      expect(store.writes, 2);
+      expect(store.draft!['personName'], 'Asha Sharma');
+      work.dispose();
+    },
+  );
+
+  test('S03 draft late read from a signed-out account is discarded', () async {
+    final store = _DelayedDraftMemory();
+    final work = WorkSession(contactDraftStore: store);
+    addTearDown(work.dispose);
+    final reading = work.recoverPendingProof(accountReady: true);
+    store.accountScope = null;
+    await work.recoverPendingProof(accountReady: false);
+    store.readResult.complete({
+      'version': 1,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+      'personName': 'Previous account',
+    });
+    await reading;
+    expect(work.authorizedPersonName, isEmpty);
+    expect(work.primaryMobileVerified, isFalse);
+  });
+
+  test(
+    'S03 draft restores incomplete inputs without OTP or approval claims',
+    () async {
+      final store = _PendingProofMemory();
+      final work = WorkSession(contactDraftStore: store);
+      await work.recoverPendingProof(accountReady: true);
+      work.selectProfile('retailer-grocery');
+      work.savePersonName('Asha Sharma');
+      work.saveBusinessRelationship('Owner');
+      work.editWorkspaceContact(WorkContactChannel.primaryMobile, '9829');
+      work.editWorkspaceContact(WorkContactChannel.email, 'asha@');
+      work.editWorkspaceContact(WorkContactChannel.alternateMobile, '9876');
+      work.saveDetails(
+        name: 'Sharma Stores',
+        area: 'Jaipur',
+        activity: 'Groceries',
+      );
+      await work.flushContactDraft();
+      work.dispose();
+      final restored = WorkSession(contactDraftStore: store);
+      addTearDown(restored.dispose);
+      expect(await restored.recoverPendingProof(accountReady: true), isFalse);
+      expect(restored.selectedProfile?.id, 'retailer-grocery');
+      expect(restored.authorizedPersonName, 'Asha Sharma');
+      expect(restored.businessRelationship, 'Owner');
+      expect(restored.primaryMobile, '9829');
+      expect(restored.contactEmail, 'asha@');
+      expect(restored.alternateMobile, '9876');
+      expect(restored.workName, 'Sharma Stores');
+      expect(restored.workArea, 'Jaipur');
+      expect(restored.primaryActivity, 'Groceries');
+      expect(restored.workspaceContactsReady, isFalse);
+      expect(restored.primaryMobileOtpSent, isFalse);
+      expect(restored.declarationAccepted, isFalse);
+      expect(restored.reviewCaseId, isNull);
+      expect(
+        store.draft!.keys.any(
+          (key) => RegExp(
+            'otp|token|confirmed|approval',
+            caseSensitive: false,
+          ).hasMatch(key),
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'S03 draft retains deliberate clears through late hydration and restart',
+    () async {
+      const snapshot = WorkAccountSnapshot(
+        displayName: 'Asha',
+        email: 'asha@example.com',
+        mobile: '+919829012321',
+        mobileConfirmed: true,
+        emailConfirmed: true,
+      );
+      final store = _PendingProofMemory();
+      final work = WorkSession(contactDraftStore: store);
+      await work.recoverPendingProof(accountReady: true);
+      work.hydrateAccountSnapshot(snapshot);
+      work.savePersonName('');
+      work.editWorkspaceContact(WorkContactChannel.primaryMobile, '');
+      work.editWorkspaceContact(WorkContactChannel.email, '');
+      work.hydrateAccountSnapshot(snapshot);
+      expect(work.authorizedPersonName, isEmpty);
+      expect(work.primaryMobile, isEmpty);
+      expect(work.contactEmail, isEmpty);
+      await work.flushContactDraft();
+      work.dispose();
+      final restored = WorkSession(contactDraftStore: store);
+      addTearDown(restored.dispose);
+      await restored.recoverPendingProof(accountReady: true);
+      restored.hydrateAccountSnapshot(snapshot);
+      expect(restored.authorizedPersonName, isEmpty);
+      expect(restored.primaryMobile, isEmpty);
+      expect(restored.contactEmail, isEmpty);
+      expect(restored.workspaceContactsReady, isFalse);
+    },
+  );
+
+  test(
+    'S03 draft reconciles only exact authoritative contact confirmations',
+    () async {
+      final store = _PendingProofMemory();
+      final work = WorkSession(contactDraftStore: store);
+      await work.recoverPendingProof(accountReady: true);
+      work.editWorkspaceContact(WorkContactChannel.primaryMobile, '9829012321');
+      work.editWorkspaceContact(WorkContactChannel.email, 'asha@example.com');
+      await work.flushContactDraft();
+      work.dispose();
+      // Even tampered flags cannot grant confirmation.
+      store.draft!['phoneConfirmed'] = true;
+      store.draft!['emailConfirmed'] = true;
+      final restored = WorkSession(contactDraftStore: store);
+      addTearDown(restored.dispose);
+      await restored.recoverPendingProof(accountReady: true);
+      expect(restored.workspaceContactsReady, isFalse);
+      restored.hydrateAccountSnapshot(
+        const WorkAccountSnapshot(
+          mobile: '+919829012321',
+          mobileConfirmed: true,
+          email: 'another@example.com',
+          emailConfirmed: true,
+        ),
+      );
+      expect(restored.primaryMobileVerified, isTrue);
+      expect(restored.contactEmailVerified, isFalse);
+      restored.hydrateAccountSnapshot(
+        const WorkAccountSnapshot(
+          email: 'ASHA@example.com',
+          emailConfirmed: true,
+        ),
+      );
+      expect(restored.workspaceContactsReady, isTrue);
+    },
+  );
+
+  test(
+    'S03 draft account switch clears edited inputs and pending confirmation',
+    () async {
+      final store = _PendingProofMemory();
+      final work = WorkSession(contactDraftStore: store);
+      addTearDown(work.dispose);
+      await work.recoverPendingProof(accountReady: true);
+      work.savePersonName('First account');
+      work.selectProfile('retailer-grocery');
+      work.editWorkspaceContact(WorkContactChannel.primaryMobile, '9829012321');
+      work.primaryMobileVerified = true;
+      work.beginWorkspaceContactEdit(WorkContactChannel.primaryMobile);
+      await work.flushContactDraft();
+      store.accountScope = 'second-account';
+      await work.recoverPendingProof(accountReady: true);
+      work.cancelWorkspaceContactEdit(WorkContactChannel.primaryMobile);
+      expect(work.authorizedPersonName, isEmpty);
+      expect(work.primaryMobile, isEmpty);
+      expect(work.primaryMobileVerified, isFalse);
+      expect(work.selectedProfile, isNull);
+      expect(
+        work.isEditingWorkspaceContact(WorkContactChannel.primaryMobile),
+        isFalse,
+      );
+    },
+  );
+
+  test('S03 draft delayed read cannot overwrite typing', () async {
+    final store = _DelayedDraftMemory();
+    final work = WorkSession(contactDraftStore: store);
+    addTearDown(work.dispose);
+    final recovery = work.recoverPendingProof(accountReady: true);
+    work.savePersonName('Current typing');
+    store.readResult.complete({
+      'version': 1,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+      'personName': 'Old draft',
+    });
+    await recovery;
+    expect(work.authorizedPersonName, 'Current typing');
+    await work.flushContactDraft();
+  });
+
+  test(
+    'S03 draft unavailable storage is honest and leaves typing usable',
+    () async {
+      final store = _FailedDraftMemory();
+      final work = WorkSession(contactDraftStore: store);
+      addTearDown(work.dispose);
+      await work.recoverPendingProof(accountReady: true);
+      work.savePersonName('Asha');
+      work.savePersonName('Asha Sharma');
+      await work.flushContactDraft();
+      expect(work.authorizedPersonName, 'Asha Sharma');
+      expect(work.contactDraftMessage, contains('could not be saved'));
+      expect(work.busy, isFalse);
+    },
+  );
+
+  test('S03 draft does not consume the document picker checkpoint', () async {
+    final contacts = _PendingProofMemory();
+    final proof = _PendingProofMemory()..draft = _cameraDraft();
+    final work = WorkSession(
+      contactDraftStore: contacts,
+      pendingProofStore: proof,
+      proofPicker: _RecoveryPicker(),
+    );
+    addTearDown(work.dispose);
+    expect(await work.recoverPendingProof(accountReady: true), isTrue);
+    expect(work.authorizedPersonName, _cameraDraft()['personName']);
+    expect(proof.draft, isNull);
+    expect(work.recoveredDocumentStep, isTrue);
+  });
+
+  test(
+    'S03 production document recovery cannot trust saved confirmation flags',
+    () async {
+      final proof = _PendingProofMemory()..draft = _cameraDraft();
+      final work = WorkSession(
+        gateway: UnavailableWorkGateway(),
+        pendingProofStore: proof,
+        proofPicker: ReviewWorkProofPicker(),
+      );
+      addTearDown(work.dispose);
+      expect(await work.recoverPendingProof(accountReady: true), isTrue);
+      expect(work.primaryMobileVerified, isFalse);
+      expect(work.contactEmailVerified, isFalse);
+      expect(work.alternateVerified, isFalse);
+    },
+  );
+
   for (final channel in WorkContactChannel.values) {
     String replacement() => channel == WorkContactChannel.email
         ? 'replacement@example.com'
@@ -1375,6 +1620,29 @@ class _PendingProofMemory implements WorkPendingProofStore {
   Future<void> clear(String scope) async {
     if (scope == savedScope && scope == accountScope) draft = null;
   }
+}
+
+class _DelayedDraftMemory extends _PendingProofMemory {
+  final readResult = Completer<Map<String, Object?>?>();
+  @override
+  Future<Map<String, Object?>?> read(String scope) => readResult.future;
+}
+
+class _SlowWriteDraftMemory extends _PendingProofMemory {
+  final firstWrite = Completer<void>();
+  int writes = 0;
+  @override
+  Future<void> save(String scope, Map<String, Object?> value) async {
+    writes++;
+    if (writes == 1) await firstWrite.future;
+    await super.save(scope, value);
+  }
+}
+
+class _FailedDraftMemory extends _PendingProofMemory {
+  @override
+  Future<void> save(String scope, Map<String, Object?> value) async =>
+      throw StateError('Storage unavailable');
 }
 
 class _BoundedProofFile extends XFile {

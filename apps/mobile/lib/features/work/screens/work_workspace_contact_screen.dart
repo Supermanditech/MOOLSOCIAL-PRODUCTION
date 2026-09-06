@@ -213,6 +213,23 @@ class _WorkWorkspaceContactScreenState
                           'Saved details appear below. Confirm new or changed contacts.',
                     ),
                     const SizedBox(height: MoolSpacing.sm),
+                    if (session.contactDraftMessage case final String message)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: MoolSpacing.sm),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              message,
+                              key: const Key('work-contact-draft-message'),
+                            ),
+                            TextButton(
+                              onPressed: session.retryContactDraftSave,
+                              child: const Text('Save details'),
+                            ),
+                          ],
+                        ),
+                      ),
                     TextField(
                       key: const Key('work-person-name'),
                       controller: _name,

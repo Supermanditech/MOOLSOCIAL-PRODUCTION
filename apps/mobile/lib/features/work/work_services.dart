@@ -63,8 +63,12 @@ abstract interface class WorkPendingProofStore {
 }
 
 class SecureWorkPendingProofStore implements WorkPendingProofStore {
-  SecureWorkPendingProofStore({this.reviewOnly = false});
+  SecureWorkPendingProofStore({this.reviewOnly = false})
+    : _contactDraft = false;
+  SecureWorkPendingProofStore.contactDraft({this.reviewOnly = false})
+    : _contactDraft = true;
   final bool reviewOnly;
+  final bool _contactDraft;
   static const _storage = FlutterSecureStorage();
   bool get _review =>
       reviewOnly &&
@@ -74,6 +78,10 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
   String get _key => _review
       ? 'moolsocial.workspace.pending-proof.review.v1'
       : 'moolsocial.workspace.pending-proof.v1';
+
+  String _scopedKey(String scope) => _contactDraft
+      ? 'moolsocial.workspace.contact-draft.${_review ? 'review.' : ''}v1.${Uri.encodeComponent(scope)}'
+      : _key;
 
   @override
   String? get accountScope {
@@ -89,7 +97,7 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
   Future<Map<String, Object?>?> read(String scope) async {
     if (scope != accountScope) return null;
     final value = await _storage
-        .read(key: _key)
+        .read(key: _scopedKey(scope))
         .timeout(const Duration(seconds: 10));
     if (value == null || scope != accountScope) return null;
     final decoded = jsonDecode(value);
@@ -109,14 +117,19 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
       );
     }
     await _storage
-        .write(key: _key, value: jsonEncode({'scope': scope, 'draft': draft}))
+        .write(
+          key: _scopedKey(scope),
+          value: jsonEncode({'scope': scope, 'draft': draft}),
+        )
         .timeout(const Duration(seconds: 10));
   }
 
   @override
   Future<void> clear(String scope) async {
     if (await read(scope) != null && scope == accountScope) {
-      await _storage.delete(key: _key).timeout(const Duration(seconds: 10));
+      await _storage
+          .delete(key: _scopedKey(scope))
+          .timeout(const Duration(seconds: 10));
     }
   }
 }
