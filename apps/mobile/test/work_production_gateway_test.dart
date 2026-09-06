@@ -5,6 +5,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
@@ -12,6 +13,85 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 
 void main() {
+  for (final source in [WorkProofSource.upload, WorkProofSource.cloudDrive]) {
+    for (final extension in ['pdf', 'jpg', 'jpeg', 'png', 'webp']) {
+      test(
+        'native $source preserves selected $extension bytes and name',
+        () async {
+          final bytes = Uint8List.fromList([1, 2, 3, 4]);
+          final picker = NativeWorkProofPicker(
+            documentPicker: () async =>
+                XFile.fromData(bytes, path: 'business-proof.$extension'),
+          );
+          final proof = await picker.pick(source);
+          expect(proof!.fileName, 'business-proof.$extension');
+          expect(proof.bytes, orderedEquals(bytes));
+          expect(proof.contentType, switch (extension) {
+            'pdf' => 'application/pdf',
+            'jpg' || 'jpeg' => 'image/jpeg',
+            _ => 'image/$extension',
+          });
+        },
+      );
+    }
+    test('native $source cancellation leaves no document', () async {
+      final picker = NativeWorkProofPicker(documentPicker: () async => null);
+      expect(await picker.pick(source), isNull);
+    });
+  }
+  for (final length in [0, 10 * 1024 * 1024 + 1]) {
+    test(
+      'native document rejects size $length before opening its stream',
+      () async {
+        final file = _BoundedProofFile(length: length);
+        final picker = NativeWorkProofPicker(documentPicker: () async => file);
+        await expectLater(
+          picker.pick(WorkProofSource.upload),
+          throwsA(
+            isA<WorkGatewayException>().having(
+              (error) => error.message,
+              'message',
+              contains('10 MB'),
+            ),
+          ),
+        );
+        expect(file.opens, 0);
+      },
+    );
+  }
+  test(
+    'native document stops a growing or misreported stream at10MB',
+    () async {
+      final file = _BoundedProofFile(
+        length: 1,
+        chunks: [
+          Uint8List(6 * 1024 * 1024),
+          Uint8List(6 * 1024 * 1024),
+          Uint8List(1),
+        ],
+      );
+      final picker = NativeWorkProofPicker(documentPicker: () async => file);
+      await expectLater(
+        picker.pick(WorkProofSource.cloudDrive),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(file.emitted, 2);
+    },
+  );
+  test('native document read failure returns retry guidance', () async {
+    final file = _BoundedProofFile(length: 1, failRead: true);
+    final picker = NativeWorkProofPicker(documentPicker: () async => file);
+    await expectLater(
+      picker.pick(WorkProofSource.cloudDrive),
+      throwsA(
+        isA<WorkGatewayException>().having(
+          (error) => error.message,
+          'message',
+          contains('could not be read'),
+        ),
+      ),
+    );
+  });
   test(
     'interrupted camera restores only the account-scoped document draft once',
     () async {
@@ -348,8 +428,28 @@ void main() {
       expect(work.unsupportedWorkspace, 'Furniture repair');
       expect(work.noticeMessage, isNull);
       expect(work.errorMessage, contains('cannot be sent yet'));
+      expect(work.errorMessage, contains('Your details are still here.'));
+      expect(work.errorMessage, isNot(contains('saved on this device')));
+      expect(work.unsupportedFamily, 'Other');
+      expect(work.unsupportedArea, 'Jodhpur');
+      expect(work.unsupportedOtherActivity, 'Furniture repairs');
     },
   );
+  test('production offer cannot claim publication without acknowledgement', () {
+    final work = WorkSession.production(gateway: UnavailableWorkGateway());
+    addTearDown(work.dispose);
+    work.addWorkspaceOffer(
+      title: 'Monthly essentials',
+      detail: 'Save on selected groceries.',
+      validUntil: DateTime.now().add(const Duration(days: 7)),
+      productId: 'oil-fortune-1l',
+      orderCap: 50,
+    );
+    expect(work.workspaceOffers, isEmpty);
+    expect(work.noticeMessage, isNull);
+    expect(work.errorMessage, contains('not available yet'));
+  });
+
   test('release app defaults to the fail-closed production Work session', () {
     final source = File('lib/main.dart').readAsStringSync();
     expect(source, contains('workSession: WorkSession.production(),'));
@@ -1064,6 +1164,38 @@ class _PendingProofMemory implements WorkPendingProofStore {
   Future<void> clear(String scope) async {
     if (scope == savedScope && scope == accountScope) draft = null;
   }
+}
+
+class _BoundedProofFile extends XFile {
+  _BoundedProofFile({
+    required int length,
+    this.chunks = const [],
+    this.failRead = false,
+  }) : reportedLength = length,
+       super('business-proof.pdf');
+  final int reportedLength;
+  final List<Uint8List> chunks;
+  final bool failRead;
+  int opens = 0, emitted = 0;
+  @override
+  String get name => 'business-proof.pdf';
+  @override
+  Future<int> length() async => reportedLength;
+  @override
+  Stream<Uint8List> openRead([int? start, int? end]) async* {
+    opens++;
+    if (failRead) {
+      throw const FileSystemException('Could not read selected file');
+    }
+    for (final chunk in chunks) {
+      emitted++;
+      yield chunk;
+    }
+  }
+
+  @override
+  Future<Uint8List> readAsBytes() =>
+      throw StateError('Unbounded read must not run');
 }
 
 class _RecoveryPicker implements WorkRecoverableProofPicker {

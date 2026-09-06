@@ -3803,6 +3803,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-pending-draft-card')), findsOne);
     expect(find.textContaining('INV-'), findsWidgets);
+    expect(work.latestWorkspaceInvoice!.needsCustomerHandoff, isTrue);
+    expect(work.latestWorkspaceInvoice!.sharedChannels, isEmpty);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+    expect(work.latestWorkspaceInvoice!.needsCustomerHandoff, isTrue);
+    expect(work.workspaceInvoices, hasLength(1));
   });
 
   testWidgets('live App order appears in customer statement', (tester) async {
@@ -4559,6 +4566,113 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final outcome in ['opened', 'unavailable', 'error', 'invalid-number']) {
+    testWidgets('invoice WhatsApp $outcome never claims message completion', (
+      tester,
+    ) async {
+      final work = liveStore();
+      const channel = MethodChannel('plugins.flutter.io/url_launcher');
+      final launches = <Uri>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        if (call.method != 'launch') return false;
+        launches.add(Uri.parse((call.arguments as Map)['url'] as String));
+        if (outcome == 'error') throw PlatformException(code: 'launch_failed');
+        return outcome == 'opened';
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        ),
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(320, 568),
+        textScale: 1.4,
+      );
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      await enterSaleCustomer(tester, '9829012345');
+      await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
+      await tester.pumpAndSettle();
+      await reveal(tester, find.byKey(const Key('work-order-review')));
+      await tester.tap(find.byKey(const Key('work-order-review')));
+      await tester.pumpAndSettle();
+      await reveal(tester, find.byKey(const Key('work-order-save')));
+      await tester.tap(find.byKey(const Key('work-order-save')));
+      await tester.pumpAndSettle();
+      var invoice = work.latestWorkspaceInvoice!;
+      if (outcome == 'invalid-number') {
+        await reveal(tester, find.byTooltip('Close invoice'));
+        await tester.tap(find.byTooltip('Close invoice'));
+        await tester.pumpAndSettle();
+        invoice = WorkspaceCustomerInvoice(
+          id: invoice.id,
+          orderId: invoice.orderId,
+          customer: 'Rakesh',
+          items: invoice.items,
+          amount: invoice.amount,
+          payment: invoice.payment,
+          issuedAt: invoice.issuedAt,
+        );
+        work.workspaceInvoices[0] = invoice;
+        await tester.tap(find.byKey(const Key('work-store-home')));
+        await tester.pumpAndSettle();
+        await reveal(tester, find.byKey(const Key('work-invoice-open')));
+        await tester.tap(find.byKey(const Key('work-invoice-open')));
+        await tester.pumpAndSettle();
+      }
+      final whatsapp = find.byKey(const Key('work-invoice-share-whatsapp'));
+      await reveal(tester, whatsapp);
+      await tester.tap(whatsapp);
+      await tester.pumpAndSettle();
+      expect(work.latestWorkspaceInvoice!.sharedChannels, isEmpty);
+      expect(work.latestWorkspaceInvoice!.needsCustomerHandoff, isTrue);
+      expect(work.workspaceInvoices, hasLength(1));
+      if (outcome == 'invalid-number') {
+        expect(launches, isEmpty);
+      } else {
+        expect(launches, hasLength(1));
+        expect(launches.single.host, 'wa.me');
+        expect(launches.single.path, '/919829012345');
+        expect(launches.single.queryParameters['text'], contains(invoice.id));
+        expect(
+          launches.single.queryParameters['text'],
+          contains(invoice.items),
+        );
+        expect(
+          launches.single.queryParameters['text'],
+          contains('₹${invoice.amount}'),
+        );
+      }
+      if (outcome != 'opened') {
+        expect(
+          find.byKey(const Key('work-invoice-share-error')),
+          findsOneWidget,
+        );
+        await reveal(tester, find.byKey(const Key('work-invoice-share-chat')));
+        expect(
+          find.byKey(const Key('work-invoice-share-chat')).hitTestable(),
+          findsOneWidget,
+        );
+        await captureStoreView(tester, '38-invoice-$outcome-320');
+        await reveal(tester, find.byTooltip('Close invoice'));
+        await tester.tap(find.byTooltip('Close invoice'));
+        await tester.pumpAndSettle();
+        expect(find.byTooltip('Close invoice'), findsNothing);
+      }
+      await tester.tap(find.byKey(const Key('work-store-home')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+      expect(work.latestWorkspaceInvoice!.needsCustomerHandoff, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('drafted sale has explicit keep or discard recovery', (
     tester,

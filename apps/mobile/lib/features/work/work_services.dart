@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -121,23 +122,48 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
 }
 
 class NativeWorkProofPicker implements WorkRecoverableProofPicker {
-  NativeWorkProofPicker({ImagePicker? imagePicker})
+  NativeWorkProofPicker({ImagePicker? imagePicker, this.documentPicker})
     : _imagePicker = imagePicker ?? ImagePicker();
 
   final ImagePicker _imagePicker;
+  final Future<XFile?> Function()? documentPicker;
+  static const _maxProofBytes = 10 * 1024 * 1024;
+
+  Future<Uint8List> _readDocument(XFile file) async {
+    final reportedLength = await file.length();
+    if (reportedLength <= 0 || reportedLength > _maxProofBytes) {
+      throw const WorkGatewayException('Choose a document up to 10 MB.');
+    }
+    final bytes = BytesBuilder(copy: false);
+    await for (final chunk in file.openRead()) {
+      if (bytes.length + chunk.length > _maxProofBytes) {
+        throw const WorkGatewayException('Choose a document up to 10 MB.');
+      }
+      bytes.add(chunk);
+    }
+    return bytes.takeBytes();
+  }
 
   @override
   Future<WorkPickedProof?> pick(WorkProofSource source) async {
     try {
       if (source == WorkProofSource.upload ||
           source == WorkProofSource.cloudDrive) {
-        final file = await FilePicker.pickFile(
-          type: FileType.custom,
-          allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
-        );
+        XFile? file;
+        String? selectedName;
+        if (documentPicker != null) {
+          file = await documentPicker!();
+        } else {
+          final selected = await FilePicker.pickFile(
+            type: FileType.custom,
+            allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+          );
+          file = selected?.xFile;
+          selectedName = selected?.name;
+        }
         if (file == null) return null;
-        final bytes = await file.readAsBytes();
-        return _validateProof(file.name, bytes);
+        final bytes = await _readDocument(file);
+        return _validateProof(selectedName ?? file.name, bytes);
       }
       final image = await _imagePicker.pickImage(
         source: source == WorkProofSource.camera
@@ -175,7 +201,7 @@ class NativeWorkProofPicker implements WorkRecoverableProofPicker {
     XFile image,
     WorkProofSource source,
   ) async {
-    final proof = _validateProof(image.name, await image.readAsBytes());
+    final proof = _validateProof(image.name, await _readDocument(image));
     if (source != WorkProofSource.camera) return proof;
     return WorkPickedProof(
       fileName: 'Camera photo.${proof.fileName.split('.').last.toLowerCase()}',

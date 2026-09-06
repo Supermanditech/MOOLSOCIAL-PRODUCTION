@@ -1683,6 +1683,12 @@ class WorkSession extends ChangeNotifier {
     String audience = 'Customers who allow Store offers',
     int orderCap = 0,
   }) {
+    if (gateway is! ReviewWorkGateway) {
+      showError(
+        'Offer publishing is not available yet. Your details are still here.',
+      );
+      return;
+    }
     workspaceOffers.insert(
       0,
       WorkspaceStoreOffer(
@@ -2506,7 +2512,7 @@ class WorkSession extends ChangeNotifier {
     if (gateway is! ReviewWorkGateway) {
       unsupportedRequestSent = false;
       errorMessage =
-          'This request cannot be sent yet. Your details remain saved on this device.';
+          'This request cannot be sent yet. Your details are still here.';
       noticeMessage = null;
       notifyListeners();
       return false;

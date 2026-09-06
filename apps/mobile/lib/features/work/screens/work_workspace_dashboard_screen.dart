@@ -3470,131 +3470,172 @@ Future<void> _showWorkspaceInvoiceSheet(
 ) async {
   final returnRoute = GoRouterState.of(context).uri.toString();
   final router = GoRouter.of(context);
+  final message =
+      '${invoice.id} from ${session.activeWorkspace?.name ?? session.workName}\n'
+      '${invoice.items}\nTotal ₹${invoice.amount} · ${invoice.payment}';
+  String? shareError;
+  var openingWhatsApp = false;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (sheetContext) => SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Send customer invoice',
-                      style: TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 21,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Close invoice',
-                    onPressed: () => Navigator.of(sheetContext).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              Text(
-                '${invoice.id} · ${invoice.customer}',
-                style: const TextStyle(color: MoolColors.muted),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF4F6FF),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (sheetContext, updateSheet) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      '₹${invoice.amount}',
-                      style: const TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
+                    const Expanded(
+                      child: Text(
+                        'Send customer invoice',
+                        style: TextStyle(
+                          color: MoolColors.navy,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
-                    Text(invoice.items),
-                    Text(
-                      invoice.payment,
-                      style: const TextStyle(color: MoolColors.muted),
+                    IconButton(
+                      tooltip: 'Close invoice',
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      icon: const Icon(Icons.close_rounded),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Choose the channel approved by the customer. Their purchase stays connected to your Store for repeat orders.',
-                style: TextStyle(color: MoolColors.muted, height: 1.35),
-              ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                key: const Key('work-invoice-share-chat'),
-                onPressed: () {
-                  Navigator.of(sheetContext).pop();
-                  session.markWorkspaceInvoiceShared(
-                    invoice.id,
-                    'MoolSocial Chat',
-                  );
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    router.push(
-                      Uri(
-                        path: '/app/chat/inbox',
-                        queryParameters: {
-                          'type': 'business',
-                          'return': returnRoute,
-                          'recipient': invoice.customer,
-                          'draft':
-                              '${invoice.id} · ₹${invoice.amount} · ${invoice.items}',
-                        },
-                      ).toString(),
-                    );
-                  });
-                },
-                icon: const Icon(Icons.chat_bubble_outline_rounded),
-                label: const Text('Send in MoolSocial Chat'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                key: const Key('work-invoice-share-whatsapp'),
-                onPressed: () async {
-                  final digits = invoice.customer.replaceAll(RegExp(r'\D'), '');
-                  final mobile = digits.length == 10 ? '91$digits' : digits;
-                  final message = Uri.encodeComponent(
-                    '${invoice.id} from ${session.activeWorkspace?.name ?? session.workName}\n'
-                    '${invoice.items}\nTotal ₹${invoice.amount} · ${invoice.payment}\n'
-                    'Keep this invoice and join MoolSocial for repeat orders, savings and delivery updates.',
-                  );
-                  final opened =
-                      mobile.isNotEmpty &&
-                      await launchUrl(
-                        Uri.parse('https://wa.me/$mobile?text=$message'),
-                        mode: LaunchMode.externalApplication,
+                Text(
+                  '${invoice.id} · ${invoice.customer}',
+                  style: const TextStyle(color: MoolColors.muted),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4F6FF),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '₹${invoice.amount}',
+                        style: const TextStyle(
+                          color: MoolColors.navy,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(invoice.items),
+                      Text(
+                        invoice.payment,
+                        style: const TextStyle(color: MoolColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Choose the customer’s preferred channel, then send the invoice there.',
+                  style: TextStyle(color: MoolColors.muted, height: 1.35),
+                ),
+                if (shareError != null) ...[
+                  const SizedBox(height: 8),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      shareError!,
+                      key: const Key('work-invoice-share-error'),
+                      style: const TextStyle(color: MoolColors.navy),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  key: const Key('work-invoice-share-chat'),
+                  onPressed: () {
+                    Navigator.of(sheetContext).pop();
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      router.push(
+                        Uri(
+                          path: '/app/chat/inbox',
+                          queryParameters: {
+                            'type': 'business',
+                            'return': returnRoute,
+                            'recipient': invoice.customer,
+                            'draft': message,
+                          },
+                        ).toString(),
                       );
-                  if (opened) {
-                    session.markWorkspaceInvoiceShared(invoice.id, 'WhatsApp');
-                    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-                  } else {
-                    session.showError(
-                      'WhatsApp could not open. Send this invoice through MoolSocial Chat.',
-                    );
-                  }
-                },
-                icon: const Icon(Icons.send_outlined),
-                label: const Text('Send on WhatsApp'),
-              ),
-            ],
+                    });
+                  },
+                  icon: const Icon(Icons.chat_bubble_outline_rounded),
+                  label: const Text('Send in MoolSocial Chat'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const Key('work-invoice-share-whatsapp'),
+                  onPressed: openingWhatsApp
+                      ? null
+                      : () async {
+                          final digits = invoice.customer.replaceAll(
+                            RegExp(r'\D'),
+                            '',
+                          );
+                          final mobile = digits.length == 10
+                              ? '91$digits'
+                              : digits;
+                          if (!RegExp(r'^91[6-9]\d{9}$').hasMatch(mobile)) {
+                            updateSheet(() {
+                              shareError =
+                                  'This invoice needs a valid customer phone number for WhatsApp. You can send it in MoolSocial Chat.';
+                            });
+                            return;
+                          }
+                          updateSheet(() {
+                            shareError = null;
+                            openingWhatsApp = true;
+                          });
+                          try {
+                            final opened = await launchUrl(
+                              Uri.https('wa.me', '/$mobile', {'text': message}),
+                              mode: LaunchMode.externalApplication,
+                            );
+                            if (!sheetContext.mounted) return;
+                            if (opened) {
+                              Navigator.of(sheetContext).pop();
+                              session.showNotice(
+                                'Invoice opened in WhatsApp. Complete sending it there.',
+                              );
+                            } else {
+                              updateSheet(() {
+                                shareError =
+                                    'WhatsApp could not open. Try again or use MoolSocial Chat.';
+                              });
+                            }
+                          } on Object {
+                            if (sheetContext.mounted) {
+                              updateSheet(() {
+                                shareError =
+                                    'WhatsApp could not open. Try again or use MoolSocial Chat.';
+                              });
+                            }
+                          } finally {
+                            if (sheetContext.mounted) {
+                              updateSheet(() => openingWhatsApp = false);
+                            }
+                          }
+                        },
+                  icon: const Icon(Icons.send_outlined),
+                  label: const Text('Send on WhatsApp'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

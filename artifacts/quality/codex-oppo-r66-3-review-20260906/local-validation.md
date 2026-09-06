@@ -109,3 +109,77 @@ Earlier 713/83 and 721/83 passing cycles predate the last copy changes and are n
 The pre-copy qualified cycle1 passed721/83; cycle2 has no completion result and ends at473/81 after intentional interruption for the copy corrections. Its expired session and truncated orchestration output are not inferred as passes. The readback recovered the actual files and binding; a new implementation gate explicitly passed4487 entries/62 claims/exit0. All prior logs, PNGs and manifests remain preserved. No unavailable output is reconstructed.
 
 REG-4516/4505 output-limit recurrence during final read-only evidence inspection: Select-Object -First 1 selected the complete manifest wrapper rather than its first file, causing a truncated display of two inventories. This command wrote nothing, changed no source/registry and did not affect the separately redirected test logs. The display is excluded as inventory verification; use only explicit file-property iteration and emit the checked count/mismatch count. The ongoing source-frozen cycles are not rerun or interrupted for this non-mutating display failure.
+
+## Pending-journey child checkpoint — preparation for r66.4, not an APK
+
+Founder asked to continue the remaining Workspace and Store journeys and prepare a successor OPPO review. Four confirmed Work-owned findings are corrected from source base 3713d4325f8acac46eba9d1123afcd3b8d09bf39: REG-4517 invoice drafts/launcher success no longer mean sent; REG-4518 document reads enforce the 10 MB bound before and during reading; REG-4519 local Store offers cannot claim production publication without acknowledgement; REG-4520 an in-memory unsupported-workspace draft no longer claims durable device storage.
+
+Exact functional owners: apps/mobile/lib/features/work/work_services.dart, work_session.dart, screens/work_workspace_dashboard_screen.dart; apps/mobile/test/work_production_gateway_test.dart and work_workspace_layout_safety_test.dart. The registry and existing binding changes are mechanical support for these children only. No gate code, dependency/generated metadata, Buy source/test, global Chat/Profile, Android, backend or integration owner changed.
+
+### Frozen-source qualification
+
+Both final connected cycles passed 742 tests, 83 intentional evidence-capture skips, 0 failures and exit0; durations 5m10s and5m46s. Full Flutter analysis passed with zero issues/exit0. Five Dart owners passed no-write formatting. All five frozen hashes matched after both cycles. Source manifest: external oppo-r66-4-qualified-source.json, SHA-256 A32B65F449714B45DC2DD593CDC8C2F83DDB9E4698F95EC9DA80D7182D96889A.
+
+The exact command remained flutter test --no-pub --concurrency=1 --reporter expanded --exclude-tags protected-reference, repeated twice with the same33-file list:
+- test/ui_v2/profile/global_help_support_v2_test.dart
+- test/ui_v2/profile/global_privacy_preferences_v2_test.dart
+- test/ui_v2/profile/global_security_v2_test.dart
+- test/ui_v2/work/work_main_v2_test.dart
+- test/ui_v2/work/work_opportunity_home_c24g_test.dart
+- test/work_production_gateway_test.dart
+- test/work_store_atomic_operations_test.dart
+- test/work_vertical_slice_test.dart
+- test/work_workspace_layout_safety_test.dart
+- test/global_contextual_chat_shell_test.dart
+- test/chat_flow_test.dart
+- test/chat_settings_hub_test.dart
+- test/chat_production_gateway_test.dart
+- test/ui_v2/universal/mool_domain_action_catalogue_c25b_test.dart
+- test/ui_v2/universal/mool_six_domain_route_projection_c25e_test.dart
+- test/ui_v2/universal/uaw_r08_personal_book_exposure_test.dart
+- test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart
+- test/ui_v2/universal/uaw_personal_social_work_route_compatibility_test.dart
+- test/ui_v2/universal/uaw_personal_mvp_eat_ride_book_work_adaptive_conformance_c20e_test.dart
+- test/ui_v2/universal/uaw_personal_mvp_global_navigation_motion_containment_c10e_test.dart
+- test/core/design/mool_motion_primitives_test.dart
+- test/universal_intent_completion_test.dart
+- test/android_review_share_contract_test.dart
+- test/ui_v2/buy/buy_v2_router_test.dart
+- test/ui_v2/buy/buy_v2_screen_test.dart
+- test/ui_v2/buy/buy_v2_session_test.dart
+- test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart
+- test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart
+- test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart
+- test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart
+- test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart
+- test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_location_test.dart
+- test/release_runtime_configuration_test.dart
+
+Focused run3:23 passed/2 intentional evidence skips/0 failed. The final cycles also include the later unsupported-request copy assertions. Invoice tests cover Chat draft and native Back, WhatsApp open/false/error/malformed legacy recipient, full message data, outstanding send status and no repeated bill/stock mutation. Document tests cover both file/Drive sources and five extension forms, cancellation, empty/oversized declared length, growing or misreported streams and read failure. Review-only fixtures are not real provider or document-verification proof.
+
+Fresh visual command: flutter test --no-pub --concurrency=1 --reporter expanded --exclude-tags protected-reference --name '^Store Review|^invoice WhatsApp' --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=store-dashboard-first-tap-local-review-20260906-v39 --update-goldens test/work_workspace_layout_safety_test.dart. It passed40 tests and produced14 new external PNGs without changing any protected reference. The three new invoice fallback renders were inspected at320x568/140% text; compact requirement selector and keyboard renders were also inspected. At enlarged text the invoice body scrolls; Close must be revealed before tapping, and native Back remains available. No new physical-device result is claimed. Manifest oppo-r66-4-pending-visual-sha256.json SHA-256315848B5E9E29FA04FCA0DFAD4242F06479AC50DE5565C2B5A51735D477D683B.
+
+Existing approved-UI locks,18 accepted/2 excluded commit coverage, regression memory at4491 and implementation coordination gates passed. Final pre_commit and remote readback are required to seal this checkpoint.
+
+### Evidence hashes
+
+All files below are retained under C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905.
+
+| File | SHA-256 |
+| --- | --- |
+| oppo-r66-4-qualified-connected1.log | 322CF3C36114C73E53EDD8DF1D0B4E84FB516E967674A3C5D3FBCA53338D9580 |
+| oppo-r66-4-qualified-connected2.log | 6A051773B642147794C541882B0085CA8ECB5F3296A973DA32A8ACE262D797A4 |
+| oppo-r66-4-qualified-analysis.log | 00233210BDCBE2087398AD261E552BC7CDA2BCD6DE569BC5E8622872C7352EEE |
+| oppo-r66-4-pending-focused3.log | ABF33ED0929B1AAF9332419CB2B9D67A9045A791113C984B7F3CF926174B5209 |
+| oppo-r66-4-pending-visual.log | 7258791FEBCD906A65B36B1AAAB19DCE9487EF72EC8F3DCD6449EF5B5036D388 |
+| oppo-r66-4-pending-copy.log | 920BE87837730B2E371B1F661D9D6357BF1F5F63480AAC6AFF8AA4E359744143 |
+
+Preserved failed attempts: focused1 compiled no tests because PlatformFile/XFile types were mixed. Focused2 returned9 passes/2 skips/13 failures: ten native IO fixtures incorrectly used ignored XFile.name; two tests tried leaving beneath an unclosed scrolled invoice sheet; one correctly failed the phone-input validation before creating a malformed-recipient invoice. These were corrected at their proper fixture boundaries, not by suppressing hit-test failures. Focused3 passed. First analysis had three mechanical issues; its combined cycle was stopped at173 passes/13 skips and exit1, not qualification. The initial formatter used a wrong relative working directory and formatted no files; the root-level no-write check caught the remaining constructor formatting. Correct formatting, final analysis and both source-frozen cycles above replaced those attempts.
+
+### Remaining authority and service boundaries
+
+The complete requested journey inventory is external pending-workspace-journeys-r66-4-20260906.md. Existing unsupported-request, all-profile dashboard, order/pickup/delivery, hosted Buy procurement, group-buy and requirement UI tests do not prove live backend completion. Actual unsupported-workspace submission, group-buy payment, service pricing and promotion publication remain unavailable in the current backend. No invented endpoint, success receipt, published Store link, customer message, payment or deployment was added.
+
+The global customer-copy checker was rerun and still returns exactly the inherited Cursor-owned buy_v2_views.dart:6987 hint For example, PO-2026-184. Suggested correction is PO-2026-184. Its failed result is not waived. Founder was asked asynchronously for a one-line isolated Codex ownership exception; no reply or transfer is assumed. APK qualification remains held.
+
+OPPO remains r66.3 from f2345edc487fc4cf9b22293a35e673384a139ef7, code2026090602, APK SHA-256 E32C6BB437D8D810A46F943A295B12BFDF24724660C711CD6B2C224DAAC879DB. The3713 children and this checkpoint still require a separately versioned APK and physical replay. No r66.4 candidate was registered, built or installed, and the shared baseline/Cursor worktree remains unchanged.

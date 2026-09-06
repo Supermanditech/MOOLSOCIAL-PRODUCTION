@@ -10,6 +10,52 @@
   },
   "entries": [
     {
+      "id": "REG-20260906-4520-WORK-REQUEST-MEMORY-DRAFT-CLAIMS-DEVICE-SAVE",
+      "status": "confirmed_owned_child_in_progress",
+      "appliesTo": ["primary", "work", "testing", "copy"],
+      "mistake": "Unsupported Workspace request failure says details remain saved on this device, but the four request fields are retained only in WorkSession memory.",
+      "rootCause": "Temporary screen-session retention is described as durable device persistence.",
+      "prevention": "Say the details are still here, preserve the entered values and retry behavior, and assert the error never claims a durable save or successful submission. Do not invent a submission backend.",
+      "gates": ["apps/mobile/test/work_production_gateway_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-3-review-20260906/local-validation.md"]
+    },
+    {
+      "id": "REG-20260906-4519-WORK-OFFER-LOCAL-INSERT-FALSE-PUBLISHED",
+      "status": "confirmed_owned_child_in_progress",
+      "appliesTo": ["primary", "work", "testing"],
+      "mistake": "addWorkspaceOffer marks a local offer active and tells customers it is published without an authoritative publication acknowledgement.",
+      "rootCause": "Local insertion and a fire-and-forget operations save are treated as successful publication; the current backend has no supported offer-publication operation.",
+      "prevention": "Prevent production success and active-offer mutation without a service acknowledgement. Retain the entered offer for retry and explicit unavailable guidance. Keep review-only simulation separate; do not invent a backend endpoint, delivery receipt or paid publication.",
+      "gates": ["apps/mobile/test/work_production_gateway_test.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-3-review-20260906/local-validation.md"]
+    },
+    {
+      "id": "REG-20260906-4518-WORK-DOCUMENT-SIZE-CHECK-AFTER-UNBOUNDED-READ",
+      "status": "confirmed_owned_child_in_progress",
+      "appliesTo": ["primary", "work", "testing", "documents"],
+      "mistake": "NativeWorkProofPicker reads the complete selected file into memory before enforcing the advertised10MB limit. A large local or Drive document can exhaust memory before the recovery UI appears.",
+      "rootCause": "The existing byte validator runs only after readAsBytes completes.",
+      "implementationIncident": "The first focused run stopped at compilation with zero executed tests: file_picker 12.1.2 returns PlatformFile while the injected picker returns XFile. Adapt the verified PlatformFile.xFile API explicitly before rerunning. The subsequent broad read output was truncated; retain the available compile log and use bounded exact API reads, not reconstructed output.",
+      "fixtureIncident": "Focused run2 retained 9 passes, 2 evidence skips and 13 failures. Ten document cases supplied XFile.fromData name, which the native IO implementation explicitly ignores; set the fixture path instead. The actual native picker separately preserves PlatformFile.name. Repeated bounded-output truncations remain excluded rather than reconstructed; project only exact error lines.",
+      "analysisIncident": "Focused run3 passed23 with2 capture skips. Full analysis found an initializing-formal lint, indirect deprecated BytesBuilder export and missing test braces. The first combined cycle was stopped at173 passes/13 skips, exit1, before qualification; preserve it and rerun both cycles after these mechanical corrections. No product test failed in the stopped run.",
+      "formatInvocationIncident": "The first formatter retry used repository-relative owners from the mobile working directory, found no files and therefore formatted nothing. Analysis independently passed with zero issues. An exact repository-root no-write check then identified the service constructor formatting change. Apply formatting to that exact owner from the repository root and rerun final analysis and both cycles; do not count the zero-file formatter as a pass.",
+      "prevention": "Check reported length before reading, cap the actual stream as well, preserve PDF/JPEG/PNG/WebP support, cancellation and cloud-provider native selection, and test oversize, empty, misleading length and read failures without live cloud credentials.",
+      "gates": ["apps/mobile/test/work_production_gateway_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-3-review-20260906/local-validation.md"]
+    },
+    {
+      "id": "REG-20260906-4517-WORK-INVOICE-DRAFT-OPEN-FALSE-SHARED",
+      "status": "confirmed_owned_child_in_progress",
+      "appliesTo": ["primary", "work", "testing", "sharing"],
+      "mistake": "The Store invoice sheet marks an invoice shared before opening a MoolSocial Chat draft, and again when WhatsApp merely launches. Cancellation or unsent drafts therefore remove the outstanding invoice action without evidence of sending.",
+      "rootCause": "Navigation and external launcher success are treated as a customer-message completion receipt.",
+      "fixtureIncident": "Focused run2 passed the opened draft and existing Chat case. Two error cases tapped Store beneath a still-open invoice sheet after the close control scrolled away; reveal and assert the close action before tapping. The malformed-recipient case was correctly blocked by customer validation, so exercise it from a retained legacy invoice instead. Never suppress missed-hit warnings.",
+      "prevention": "Keep invoice history and the outstanding send action unchanged when opening/cancelling a draft. Use existing contextual Chat routing and include an exact published Store link only when supplied. Never claim external delivery without confirmation; cover cancellation, missing recipient, launcher failure and exact Store return. Do not alter Cursor source, private accounts or live services.",
+      "readReconstructionIncident": "Read-only searches guessed nonexistent functions, apps/functions, packages and ui_v2/chat directories and returned exit1. No implementation or test followed those failed searches. Discover actual directories and literal files before repeating the bounded search. Earlier release-document truncation and guessed review-config reads are retained as the same read-boundary recurrence; do not claim unavailable output as evidence.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart", "apps/mobile/test/work_store_atomic_operations_test.dart"],
+      "evidence": ["artifacts/quality/codex-oppo-r66-3-review-20260906/local-validation.md"]
+    },
+    {
       "id": "REG-20260906-4516-WORK-CUSTOMER-COPY-ESCAPED-FIRST-REVIEW",
       "toolOutputRecovery": "The stop/register/bind/gate/three-hint orchestration returned output exceeding model context. A later overly broad AGENTS reconstruction was also truncated. Neither missing output is qualification evidence. Bounded readback confirmed registry4487/hash58A69988, matching binding, all three onboarding hints changed and the combined session no longer existed; its second log ends at473 passes/81 skips without completion, so it remains stopped and excluded. A fresh implementation gate explicitly passed with exit0 and62 claims. Use independent bounded owner reads and wait for full exit metadata; do not infer a prior gate result from changed files.",
       "status": "confirmed_owned_copy_child_correction_in_progress_cursor_dependency_held",
