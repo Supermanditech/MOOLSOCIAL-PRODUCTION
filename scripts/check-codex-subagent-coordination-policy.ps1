@@ -72,6 +72,47 @@ function Get-Sha256([string]$Path) {
   return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
 }
 
+function Test-R66HistoricalCommitSubject([string]$Commit, [string]$Subject) {
+  # R66-BUILD-003: retain two pushed label mistakes without rewriting history.
+  # This is not an alternative prefix for any other task or future commit.
+  if ($AgentRole -cne 'subagent' -or
+      $AgentTask -cne '/root/cursor_buy_redmi_fixes_v1_20260905' -or
+      $ProductionLane -cne 'cursor_ui' -or
+      $ProductionWorkId -cne 'buy-redmi-fixes-v1-20260905' -or
+      $ProductionTicketId -cne 'UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905') {
+    return $false
+  }
+  $dispositions = @(
+    @{
+      commit = 'be647d41d845b3f55c67603236696ef29ce81cdc'
+      parent = 'd119c85eccc85af99c86c32ae526f57421855ff3'
+      subject = 'chore(buy-redmi-fixes-v1-20260905): qualify tested r66.3 review source'
+      owners = @(
+        'docs/quality/cursor-buy-redmi-fixes-v1-20260905/RESULTS.md',
+        'scripts/check-buy-protected-baseline.ps1'
+      )
+    },
+    @{
+      commit = 'ba7f7d382bdab771ee05cd94ea2963b6421c44ad'
+      parent = 'be647d41d845b3f55c67603236696ef29ce81cdc'
+      subject = 'docs(buy-redmi-fixes-v1-20260905): seal r66.3 local qualification'
+      owners = @('docs/quality/cursor-buy-redmi-fixes-v1-20260905/RESULTS.md')
+    }
+  )
+  $matches = @($dispositions | Where-Object {
+    $_.commit -ceq $Commit -and $_.subject -ceq $Subject
+  })
+  if ($matches.Count -ne 1) { return $false }
+  $disposition = $matches[0]
+  $parents = @(& git -C $root show -s --format=%P $Commit)
+  if ($LASTEXITCODE -ne 0 -or $parents.Count -ne 1 -or
+      [string]$parents[0] -cne $disposition.parent) { return $false }
+  $owners = @(& git -C $root diff-tree --no-commit-id --name-only -r $Commit)
+  return ($LASTEXITCODE -eq 0 -and
+    (@($owners | Sort-Object) -join '|') -ceq
+    (@($disposition.owners | Sort-Object) -join '|'))
+}
+
 function Get-R66Utf8GitJson([string]$Commit, [string]$Owner) {
   Assert-Coordination ($Commit -cmatch '^[0-9a-f]{40}$' -and
     $Owner -cmatch '^[A-Za-z0-9_./-]+$' -and -not $root.Contains('"')) `
@@ -1910,6 +1951,62 @@ if ($ProductionLane -ceq 'baseline') {
           $r66CoordinationOwners = @($r66FreezeOwners) + $r66ReviewGates
         }
         if ($null -ne $r66FreezeCommit) {
+          $r66SubjectRepairParent = 'ba7f7d382bdab771ee05cd94ea2963b6421c44ad'
+          & git -C $root merge-base --is-ancestor $r66SubjectRepairParent $head
+          if ($LASTEXITCODE -eq 0) {
+            $r66SubjectGate = 'scripts/check-codex-subagent-coordination-policy.ps1'
+            $r66SubjectOwners = @(
+              'docs/quality/cursor-buy-redmi-fixes-v1-20260905/RESULTS.md',
+              $r66SubjectGate
+            )
+            $r66SubjectRepairSubject =
+              'ui(buy-redmi-fixes-v1-20260905): register exact historical checkpoint label dispositions'
+            & git -C $root diff --quiet $r66FreezeCommit $r66SubjectRepairParent -- @r66FreezeOwners
+            Assert-Coordination ($LASTEXITCODE -eq 0) 'R66 subject repair changed earlier frozen blobs.'
+            $r66SubjectPriorHistory = @(& git -C $root log --format=%H `
+                "${r66FreezeCommit}..$r66SubjectRepairParent" -- @r66FreezeOwners)
+            Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66SubjectPriorHistory.Count -eq 0) `
+              'R66 subject repair cannot revise earlier frozen history.'
+            if ($head -ceq $r66SubjectRepairParent) {
+              Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) `
+                'Pending R66 subject repair is not a handoff or acceptance.'
+              $r66SubjectDirty = @(& git -C $root diff HEAD --name-only)
+              Assert-Coordination (
+                $LASTEXITCODE -eq 0 -and
+                (@($r66SubjectDirty | Sort-Object) -join '|') -ceq
+                (@($r66SubjectOwners | Sort-Object) -join '|')
+              ) 'Pending R66 subject repair must change only its gate and results.'
+            } else {
+              $r66SubjectFollowing = @(& git -C $root rev-list --reverse --ancestry-path `
+                  "${r66SubjectRepairParent}..$head")
+              Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66SubjectFollowing.Count -gt 0) `
+                'R66 subject repair ancestry lookup failed.'
+              $r66SubjectCommit = [string]$r66SubjectFollowing[0]
+              $r66SubjectParents = @(& git -C $root show -s --format=%P $r66SubjectCommit)
+              Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66SubjectParents.Count -eq 1 -and
+                [string]$r66SubjectParents[0] -ceq $r66SubjectRepairParent) `
+                'R66 subject repair requires its exact single parent.'
+              $r66SubjectText = @(& git -C $root show -s --format=%s $r66SubjectCommit)
+              Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66SubjectText.Count -eq 1 -and
+                [string]$r66SubjectText[0] -ceq $r66SubjectRepairSubject) `
+                'R66 subject repair commit subject changed.'
+              $r66SubjectCommittedOwners = @(& git -C $root diff-tree --no-commit-id `
+                  --name-only -r $r66SubjectCommit)
+              Assert-Coordination ($LASTEXITCODE -eq 0 -and
+                (@($r66SubjectCommittedOwners | Sort-Object) -join '|') -ceq
+                (@($r66SubjectOwners | Sort-Object) -join '|')) `
+                'R66 subject repair changed an unexpected owner.'
+              & git -C $root diff --quiet $r66SubjectCommit -- $r66SubjectGate
+              Assert-Coordination ($LASTEXITCODE -eq 0) 'R66 repaired subject gate changed after its checkpoint.'
+              $r66SubjectLaterHistory = @(& git -C $root log --format=%H `
+                  "${r66SubjectCommit}..$head" -- $r66SubjectGate)
+              Assert-Coordination ($LASTEXITCODE -eq 0 -and $r66SubjectLaterHistory.Count -eq 0) `
+                'R66 subject repair cannot be replayed or revised.'
+            }
+            # The one separately verified gate is frozen above; all other
+            # coordination, policy, scope, manifest and Social owners stay frozen here.
+            $r66FreezeOwners = @($r66FreezeOwners | Where-Object { $_ -cne $r66SubjectGate })
+          }
           & git -C $root diff --quiet $r66FreezeCommit -- @r66FreezeOwners
           Assert-Coordination ($LASTEXITCODE -eq 0) 'R66 coordination blobs changed after admission.'
           $r66LaterCoordination = @(& git -C $root log --format=%H `
@@ -2968,7 +3065,8 @@ if ($ProductionLane -ceq 'baseline') {
       $subjectOutput = @(& git -C $root show -s --format='%s' $featureCommit)
       Assert-Coordination (
         $LASTEXITCODE -eq 0 -and $subjectOutput.Count -eq 1 -and
-        [string]$subjectOutput[0] -cmatch $subjectPattern
+        ([string]$subjectOutput[0] -cmatch $subjectPattern -or
+          (Test-R66HistoricalCommitSubject $featureCommit ([string]$subjectOutput[0])))
       ) "production feature commit subject is not atomic: $featureCommit"
     }
     if ($ProductionLane -ceq 'integration_repair') {
