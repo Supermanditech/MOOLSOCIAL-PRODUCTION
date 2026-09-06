@@ -1703,6 +1703,8 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   int _step = 0;
   bool _correctionMode = false;
   bool _reviewEditMode = false;
+  bool _showDeclarationError = false;
+  final GlobalKey _declarationAnchor = GlobalKey();
   String? _correctionInstruction;
   late final TextEditingController _name = TextEditingController(
     text: widget.session.workName,
@@ -1930,6 +1932,23 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                 : 'Submit for review',
             busy: widget.session.busy,
             onPressed: () async {
+              if (!widget.session.declarationAccepted) {
+                widget.session.clearMessages();
+                setState(() => _showDeclarationError = true);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  final target = _declarationAnchor.currentContext;
+                  if (!mounted || target == null) return;
+                  Scrollable.ensureVisible(
+                    target,
+                    alignment: 1,
+                    duration: MoolMotion.accessible(
+                      context,
+                      MoolMotion.standard,
+                    ),
+                  );
+                });
+                return;
+              }
               final submitted = await widget.session.submitProfile();
               if (submitted && mounted) {
                 _resetScroll();
@@ -2101,132 +2120,49 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                       detail: 'Check your Workspace details and documents',
                     ),
                     const SizedBox(height: MoolSpacing.sm),
-                    WorkCard(
-                      child: Column(
-                        children: [
-                          _ReviewRow(
-                            label: 'Workspace',
-                            value:
-                                widget.session.selectedProfile?.label ??
-                                'Not selected',
-                          ),
-                          _ReviewRow(
-                            label: 'Business name',
-                            value: widget.session.workName,
-                          ),
-                          _ReviewRow(
-                            label: 'Your name',
-                            value: widget.session.authorizedPersonName,
-                          ),
-                          _ReviewRow(
-                            label: 'Contact',
-                            value: widget.session.primaryMobile,
-                          ),
-                          _ReviewRow(
-                            label: 'Email',
-                            value: widget.session.contactEmail,
-                          ),
-                          if (widget.session.alternateMobile.isNotEmpty)
-                            _ReviewRow(
-                              label: 'Alternate',
-                              value: widget.session.alternateMobile,
-                            ),
-                          if (widget.session.businessRelationship.isNotEmpty)
-                            _ReviewRow(
-                              label: 'Business relationship',
-                              value: widget.session.businessRelationship,
-                            ),
-                          _ReviewRow(
-                            label: 'Area',
-                            value: widget.session.workArea,
-                          ),
-                          _ReviewRow(
-                            label: 'Activity',
-                            value: widget.session.primaryActivity,
-                          ),
-                          _ReviewRow(
-                            label: 'Documents',
-                            value: '${widget.session.addedProofs.length} added',
-                          ),
-                          for (final proof
-                              in widget.session.selectedWorkspaceDocuments)
-                            if (widget.session.addedProofs.containsKey(
-                              proof.id,
-                            ))
-                              _ReviewRow(
-                                label: proof.label,
-                                value:
-                                    widget
-                                        .session
-                                        .pickedProofs[proof.id]
-                                        ?.fileName ??
-                                    'Document attached',
-                              ),
-                        ],
-                      ),
-                    ),
+                    _buildReviewSummary(context),
                     const SizedBox(height: MoolSpacing.sm),
-                    Wrap(
-                      key: const Key('work-review-corrections'),
-                      spacing: 12,
+                    Column(
+                      key: _declarationAnchor,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        TextButton.icon(
-                          key: const Key('work-review-edit-details'),
-                          icon: const Icon(Icons.edit_outlined, size: 18),
-                          label: const Text('Edit details'),
-                          onPressed: () {
-                            widget.session.setDeclaration(false);
-                            _resetScroll();
-                            setState(() {
-                              _step = 0;
-                              _reviewEditMode = true;
-                            });
-                          },
-                        ),
-                        TextButton.icon(
-                          key: const Key('work-review-edit-documents'),
-                          icon: const Icon(
-                            Icons.upload_file_outlined,
-                            size: 18,
+                        CheckboxListTile(
+                          key: const Key('work-declaration'),
+                          value: widget.session.declarationAccepted,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text(
+                            'These details are correct and I am authorized to provide them.',
+                            style: TextStyle(
+                              color: MoolColors.ink,
+                              fontSize: 12,
+                              height: 1.4,
+                            ),
                           ),
-                          label: const Text('Edit documents'),
-                          onPressed: () {
-                            widget.session.setDeclaration(false);
-                            _resetScroll();
-                            setState(() {
-                              _step = 1;
-                              _reviewEditMode = true;
-                            });
+                          onChanged: (value) {
+                            widget.session.setDeclaration(value ?? false);
+                            if (value == true) {
+                              setState(() => _showDeclarationError = false);
+                            }
                           },
                         ),
-                        TextButton.icon(
-                          key: const Key('work-review-edit-contact'),
-                          icon: const Icon(Icons.person_outline, size: 18),
-                          label: const Text('Edit contact'),
-                          onPressed: () {
-                            widget.session.setDeclaration(false);
-                            context.push(
-                              '/app/work/workspace/contact?return=review',
-                            );
-                          },
-                        ),
+                        if (_showDeclarationError)
+                          Semantics(
+                            liveRegion: true,
+                            child: const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                              child: Text(
+                                'Confirm that these details are correct before submitting.',
+                                key: Key('work-review-declaration-guidance'),
+                                style: TextStyle(
+                                  color: MoolColors.ink,
+                                  fontSize: 12,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
-                    ),
-                    CheckboxListTile(
-                      key: const Key('work-declaration'),
-                      value: widget.session.declarationAccepted,
-                      contentPadding: EdgeInsets.zero,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      title: const Text(
-                        'These details are correct and I am authorized to provide them.',
-                        style: TextStyle(
-                          color: MoolColors.ink,
-                          fontSize: 12,
-                          height: 1.4,
-                        ),
-                      ),
-                      onChanged: (value) =>
-                          widget.session.setDeclaration(value ?? false),
                     ),
                   ],
                 ),
@@ -2244,7 +2180,99 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
     );
   }
 
+  void _editReviewSection(int step) {
+    widget.session.setDeclaration(false);
+    _resetScroll();
+    setState(() {
+      _step = step;
+      _reviewEditMode = true;
+      _showDeclarationError = false;
+    });
+  }
+
+  Widget _buildReviewSummary(BuildContext context) {
+    final session = widget.session;
+    return Container(
+      key: const Key('work-review-corrections'),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x22000080)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ReviewSection(
+            title: 'Business details',
+            editKey: 'work-review-edit-details',
+            onEdit: () => _editReviewSection(0),
+            children: [
+              _ReviewRow(
+                label: 'Workspace',
+                value: session.selectedProfile?.label ?? 'Not selected',
+              ),
+              _ReviewRow(label: 'Business name', value: session.workName),
+              if (session.businessRelationship.isNotEmpty)
+                _ReviewRow(
+                  label: 'Business relationship',
+                  value: session.businessRelationship,
+                ),
+              _ReviewRow(label: 'Area', value: session.workArea),
+              _ReviewRow(label: 'Activity', value: session.primaryActivity),
+            ],
+          ),
+          const Divider(height: 1),
+          _ReviewSection(
+            title: 'Contact details',
+            editKey: 'work-review-edit-contact',
+            onEdit: () {
+              session.setDeclaration(false);
+              setState(() => _showDeclarationError = false);
+              context.push('/app/work/workspace/contact?return=review');
+            },
+            children: [
+              _ReviewRow(
+                label: 'Your name',
+                value: session.authorizedPersonName,
+              ),
+              _ReviewRow(label: 'Contact', value: session.primaryMobile),
+              _ReviewRow(label: 'Email', value: session.contactEmail),
+              if (session.alternateMobile.isNotEmpty)
+                _ReviewRow(label: 'Alternate', value: session.alternateMobile),
+            ],
+          ),
+          const Divider(height: 1),
+          _ReviewSection(
+            title: 'Documents',
+            editKey: 'work-review-edit-documents',
+            onEdit: () => _editReviewSection(1),
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  session.addedProofs.isEmpty
+                      ? 'No documents added. You can add them later.'
+                      : '${session.addedProofs.length} attached',
+                  style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+                ),
+              ),
+              for (final proof in session.selectedWorkspaceDocuments)
+                if (session.addedProofs.containsKey(proof.id))
+                  _ReviewDocument(
+                    proof: proof,
+                    file: session.pickedProofs[proof.id],
+                    onView: () => _showDocument(context, proof),
+                  ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showDocument(BuildContext context, WorkProofRequirement proof) {
+    final bottomInset = _workViewBottomInset(context);
     final file = widget.session.pickedProofs[proof.id];
     final format = file?.contentType == 'application/pdf' ? 'PDF' : 'Image';
     return showModalBottomSheet<void>(
@@ -2252,6 +2280,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
       isScrollControlled: true,
       useSafeArea: true,
       builder: (sheetContext) => SafeArea(
+        minimum: EdgeInsets.only(bottom: bottomInset),
         child: ConstrainedBox(
           constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(sheetContext).height * .75,
@@ -2975,6 +3004,130 @@ class _ProofCard extends StatelessWidget {
   );
 }
 
+class _ReviewSection extends StatelessWidget {
+  const _ReviewSection({
+    required this.title,
+    required this.editKey,
+    required this.onEdit,
+    required this.children,
+  });
+
+  final String title;
+  final String editKey;
+  final VoidCallback onEdit;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Tooltip(
+              message: 'Edit ${title.toLowerCase()}',
+              child: TextButton.icon(
+                key: Key(editKey),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(64, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: const Text('Edit'),
+              ),
+            ),
+          ],
+        ),
+        ...children,
+      ],
+    ),
+  );
+}
+
+class _ReviewDocument extends StatelessWidget {
+  const _ReviewDocument({
+    required this.proof,
+    required this.file,
+    required this.onView,
+  });
+
+  final WorkProofRequirement proof;
+  final WorkPickedProof? file;
+  final VoidCallback onView;
+
+  @override
+  Widget build(BuildContext context) {
+    final format = file?.contentType == 'application/pdf' ? 'PDF' : 'Image';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  proof.label,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 12,
+                    height: 1.4,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (file != null)
+                Tooltip(
+                  message: 'View ${proof.label.toLowerCase()}',
+                  child: TextButton(
+                    key: Key('work-review-view-${proof.id}'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(56, 48),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    onPressed: onView,
+                    child: const Text('View'),
+                  ),
+                ),
+            ],
+          ),
+          Text(
+            file?.fileName ?? 'Document attached',
+            key: Key('work-review-file-${proof.id}'),
+            softWrap: true,
+            style: const TextStyle(
+              color: MoolColors.ink,
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+          if (file != null)
+            Text(
+              '$format · ${(file!.bytes.length / 1024).ceil()} KB',
+              style: const TextStyle(
+                color: MoolColors.muted,
+                fontSize: 11,
+                height: 1.4,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ReviewRow extends StatelessWidget {
   const _ReviewRow({required this.label, required this.value});
 
@@ -3008,7 +3161,24 @@ class _ReviewRow extends StatelessWidget {
             textScaler: MediaQuery.textScalerOf(context),
             maxLines: 2,
           )..layout(maxWidth: (constraints.maxWidth - 12) * .6);
+          final labelPainter = TextPainter(
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+          );
+          var labelWordTooWide = false;
+          for (final word in label.split(' ')) {
+            labelPainter.text = TextSpan(
+              text: word,
+              style: DefaultTextStyle.of(context).style.merge(labelStyle),
+            );
+            labelPainter.layout();
+            if (labelPainter.width > (constraints.maxWidth - 12) * .4) {
+              labelWordTooWide = true;
+            }
+          }
+          labelPainter.dispose();
           final needsFullWidth =
+              labelWordTooWide ||
               painter.didExceedMaxLines ||
               (!value.contains(RegExp(r'\s')) &&
                   painter.computeLineMetrics().length > 1);

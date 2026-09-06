@@ -516,6 +516,167 @@ void main() {
     }
   }
 
+  for (final display in [
+    (width: 412.0, height: 915.0, scale: 1.0),
+    (width: 320.0, height: 568.0, scale: 1.4),
+    (width: 320.0, height: 568.0, scale: 2.0),
+  ]) {
+    testWidgets(
+      'OPPO S06 inline review corrections ${display.width} ${display.scale}',
+      (tester) async {
+        final gateway = ReviewWorkGateway()
+          ..reviewResultStatus = WorkRemoteReviewStatus.pending;
+        final work = WorkSession(gateway: gateway)
+          ..selectProfile('retailer-grocery')
+          ..recoveredDocumentStep = true
+          ..saveDetails(
+            name: 'Mahadev Traders',
+            area: 'Sardarpura, Jodhpur',
+            activity: 'Groceries and household essentials',
+          )
+          ..authorizedPersonName = 'Asha Sharma'
+          ..businessRelationship = 'Authorized representative'
+          ..primaryMobile = '9829012321'
+          ..contactEmail = 'review.owner@example.com'
+          ..primaryMobileVerified = true
+          ..contactEmailVerified = true;
+        await mount(
+          tester,
+          route: '/app/work/workspace/proof',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        await tester.runAsync(
+          () => work.addProof('payout-bank-account', WorkProofSource.upload),
+        );
+        await tester.pumpAndSettle();
+        Future<void> tap(String key) async {
+          final action = find.byKey(Key(key));
+          await reveal(tester, action);
+          expect(action.hitTestable(), findsOneWidget);
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+        }
+
+        await tap('work-proof-review');
+        final summary = find.byKey(const Key('work-review-corrections'));
+        expect(find.text('Edit details'), findsNothing);
+        expect(find.text('Edit documents'), findsNothing);
+        expect(find.text('Edit contact'), findsNothing);
+        for (final key in [
+          'work-review-edit-details',
+          'work-review-edit-contact',
+          'work-review-edit-documents',
+        ]) {
+          final edit = find.byKey(Key(key));
+          expect(find.descendant(of: summary, matching: edit), findsOneWidget);
+          expect(tester.getSize(edit).height, greaterThanOrEqualTo(48));
+          expect(
+            find.descendant(of: edit, matching: find.text('Edit')),
+            findsOneWidget,
+          );
+        }
+        await captureStoreView(
+          tester,
+          'r665-review-first-${display.width.toInt()}-${display.scale}',
+        );
+        final file = find.byKey(
+          const Key('work-review-file-payout-bank-account'),
+        );
+        await reveal(tester, file);
+        expect(
+          tester.widget<Text>(file).data,
+          work.pickedProofs['payout-bank-account']!.fileName,
+        );
+        expect(
+          tester.widget<Text>(file).overflow,
+          isNot(TextOverflow.ellipsis),
+        );
+        expect(find.text('1 attached'), findsOneWidget);
+        await captureStoreView(
+          tester,
+          'r665-review-documents-${display.width.toInt()}-${display.scale}',
+        );
+        await tap('work-review-view-payout-bank-account');
+        expect(find.text('review-proof.pdf'), findsWidgets);
+        expect(
+          find.text(
+            'PDF attached. You can check the original file on your device or choose a replacement.',
+          ),
+          findsOneWidget,
+        );
+        await reveal(tester, find.text('Close'));
+        expect(find.text('Close').hitTestable(), findsOneWidget);
+        expect(
+          tester.getRect(find.text('Close')).bottom,
+          lessThanOrEqualTo(display.height - 44),
+        );
+        await captureStoreView(
+          tester,
+          'r665-review-preview-${display.width.toInt()}-${display.scale}',
+        );
+        await tester.tap(find.text('Close'));
+        await tester.pumpAndSettle();
+        expect(summary, findsOneWidget);
+        await tester.drag(
+          find.byKey(const Key('work-proof-screen')),
+          const Offset(0, 3000),
+        );
+        await tester.pumpAndSettle();
+        await tap('work-submit-profile');
+        final guidance = find.byKey(
+          const Key('work-review-declaration-guidance'),
+        );
+        expect(guidance.hitTestable(), findsOneWidget);
+        final declaration = find.byKey(const Key('work-declaration'));
+        expect(declaration.hitTestable(), findsOneWidget);
+        expect(
+          tester.getRect(guidance).bottom,
+          lessThanOrEqualTo(
+            tester.getRect(find.byKey(const Key('work-sticky-action-bar'))).top,
+          ),
+        );
+        expect(work.errorMessage, isNull);
+        expect(work.reviewCaseId, isNull);
+        expect(gateway.lastSubmission, isNull);
+        expect(work.declarationAccepted, isFalse);
+        await captureStoreView(
+          tester,
+          'r665-review-confirmation-${display.width.toInt()}-${display.scale}',
+        );
+        await tap('work-declaration');
+        expect(guidance, findsNothing);
+        expect(work.declarationAccepted, isTrue);
+        await tap('work-review-edit-details');
+        expect(work.declarationAccepted, isFalse);
+        await reveal(tester, find.byKey(const Key('work-name')));
+        await tester.enterText(
+          find.byKey(const Key('work-name')),
+          'Mahadev Daily Store',
+        );
+        await tap('work-details-continue');
+        expect(summary, findsOneWidget);
+        expect(find.text('Mahadev Daily Store'), findsOneWidget);
+        await tap('work-review-edit-documents');
+        await tap('work-back');
+        expect(summary, findsOneWidget);
+        expect(
+          work.pickedProofs['payout-bank-account']!.fileName,
+          'review-proof.pdf',
+        );
+        await tap('work-review-edit-contact');
+        expect(find.text('Save and return'), findsOneWidget);
+        await tap('work-contact-continue');
+        expect(summary, findsOneWidget);
+        expect(work.primaryMobileVerified, isTrue);
+        expect(work.contactEmailVerified, isTrue);
+        expect(gateway.lastSubmission, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final page in [
     'choose',
     'requirements',
@@ -2298,10 +2459,17 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-proof-review')));
       await tester.pumpAndSettle();
-      for (final label in const ['Edit details', 'Edit documents']) {
-        final text = tester.widget<Text>(find.text(label));
+      for (final key in const [
+        'work-review-edit-details',
+        'work-review-edit-documents',
+      ]) {
+        final label = find.descendant(
+          of: find.byKey(Key(key)),
+          matching: find.text('Edit'),
+        );
+        final text = tester.widget<Text>(label);
         expect(text.overflow, isNot(TextOverflow.ellipsis));
-        expect(tester.getSize(find.text(label)).height, lessThanOrEqualTo(40));
+        expect(tester.getSize(label).height, lessThanOrEqualTo(40));
       }
       final declaration = find.byKey(const Key('work-declaration'));
       await reveal(tester, declaration);

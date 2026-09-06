@@ -689,7 +689,7 @@ void main() {
 
       await tapVisible(tester, const Key('work-submit-profile'));
       expect(
-        find.text('Confirm the declaration before submission.'),
+        find.text('Confirm that these details are correct before submitting.'),
         findsOneWidget,
       );
       await tapVisible(tester, const Key('work-declaration'));

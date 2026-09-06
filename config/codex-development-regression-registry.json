@@ -10,6 +10,17 @@
   },
   "entries": [
     {
+      "id": "REG-20260906-4526-WORK-PROOF-PREVIEW-ANDROID-BOTTOM-CLEARANCE",
+      "status": "confirmed_local_preview_child_in_progress",
+      "appliesTo": ["primary", "work", "testing", "accessibility"],
+      "mistake": "After correctly scrolling the existing proof preview, all three S06 viewport tests find Close below the safe Android bottom boundary; at320x568/200% its text ends541px versus safe524px with44px view padding.",
+      "rootCause": "The reused preview relies on modal MediaQuery padding alone rather than retaining the outer view bottom inset, which other Work sheets already protect. This is a local layout reproduction, not a new physical-device qualification.",
+      "prevention": "Capture the existing _workViewBottomInset before opening the preview and supply it as the inner SafeArea minimum. Preserve the existing preview, scroll, Close/Replace and exact return; test actual Close hitability and bottom clearance at412/100%,320/140% and320/200% from Review before native replay.",
+      "diagnosticEvidence": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/r665-s06-focused-attempt3.log; SHA2563835E32AA97B5C71943471E3443133EE4FEC753337C11378EA0E23363EF2923C; exit1;1 passed/3 failed. Existing S05/S06 child scope; no extra parent ticket.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "evidence": ["config/codex-development-regression-registry.json", "apps/mobile/lib/features/work/screens/work_onboarding_screens.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"]
+    },
+    {
       "id": "REG-20260906-4525-WORK-PRECOMMIT-CLAIM-OMITTED-INDEX",
       "status": "confirmed_invocation_correction",
       "appliesTo": ["primary", "git", "testing"],
@@ -34,6 +45,7 @@
     },
     {
       "id": "REG-20260906-4523-WORK-HEADER-TEST-LAZY-CONTACT-FIELD",
+      "reviewRecurrence20260906": "The S06 320/200% test tapped the preview's Close at y609 on a568px viewport without first scrolling its supported scroll area; later dashboard taps were blocked by the still-open sheet. Retain r665-s06-focused-visual-attempt2.log SHA25662C70C86342900C97A872F2779E8A489CA362F61DCE11DD382B3BB66FFDB5A03 (3passed/1failed). Reveal and assert Close is safely hit-testable, assert every S06 action before tapping, then replay the real remaining journey. Do not suppress missed-tap warnings or count the obscured Submit attempt as an application defect.",
       "status": "confirmed_test_harness_correction_in_progress",
       "appliesTo": ["primary", "work", "testing"],
       "mistake": "The new S04 focused header journey passes three normal-width cases but fails four compact cases when its test reads the name TextField before the lazy contact list has built that off-screen field.",
@@ -113,6 +125,7 @@
     },
     {
       "id": "REG-20260906-4516-WORK-CUSTOMER-COPY-ESCAPED-FIRST-REVIEW",
+      "r665S06OutputRecovery": "The S06 full-regression launch was combined with images and exceeded model context; its session ID/exit result are unavailable. The complete retained r665-s06-work-regressions.log ends259 passed/81 skipped/All tests passed (SHA2566565EC2D3F3F2CE119DDB2B3F64A97F2C2124F95FCB1BA662EE58E5AE2398847), and a read-only process check confirms no matching runner remains. Do not invent the missing exit result. Preserve that run and collect a fresh bounded verification with session and final exit metadata before Git qualification. A subsequent oversized registry/source read was also truncated; no missing content is treated as inspected. Keep scalar command results separate from images and project only the exact required registry entry.",
       "r664QualificationIncidents": "Read-only Flutter configuration/power output was truncated and is unavailable; it is not qualification evidence. Both independent frozen-source test cycles finished successfully. The r66.4 public-auth build-control call then correctly stopped at historical REG-3955 evidence lookup because EvidenceArchiveRoot was omitted. Preserve oppo-r66-4-build-controls.log; use the existing validated archive parameter via script-scoped PowerShell default parameter binding for nested calls. Do not alter gate behavior, move evidence, or build after a failed control. Recheck the complete source manifest after guarded dependency operations.",
       "r664CopyVerification": "The authorized one-line Buy hint correction preserves all other file content, label, callback, limits and payment behavior. Customer-copy gate and full analysis passed; two complete connected33-suite cycles each passed742 with83 intentional skips and0 failures. APK and native qualification remain separate pending gates.",
       "founderAuthorizedCorrection": "Founder explicitly authorized the isolated Codex placeholder correction on 2026-09-06 subject to no side effects: change only buy_v2_views.dart Purchase order reference hint from For example, PO-2026-184 to PO-2026-184. Transfer only this exact owner in this branch, preserve Cursor worktree and every other Buy byte, and rerun copy, Purchase Order, combined tests and analysis before the successor review APK. No backend or publication authority is implied.",
@@ -3964,6 +3977,7 @@
     },
     {
       "id": "REG-20260807-173-CONST-SEMANTICS-CONSTRUCTOR-ASSUMED",
+      "recurrence20260906": "S06 local confirmation guidance repeated const Semantics; focused compilation stopped before any tests or images. Retain r665-s06-focused-visual-attempt1.log SHA256452CD7137978D839259BE9A69A7E723DFE513D15EB55F9053D816D0E1E5624BC under MOOLSOCIAL-POST-UI-AUDIT-20260905. Remove const only from Semantics and keep the static leaf constant; require focused compilation and the complete review regressions. Do not call the two suite-load failures two product defects.",
       "status": "resolved_gate_active",
       "appliesTo": [
         "implementation",
