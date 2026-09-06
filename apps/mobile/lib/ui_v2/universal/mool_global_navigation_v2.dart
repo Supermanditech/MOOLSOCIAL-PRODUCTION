@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -1446,14 +1447,32 @@ class _MoolConnectedActionNavigatorState
                 ),
                 borderRadius: radius,
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(
-                  MoolLocalNavigationTokens.switcherPadding,
-                ),
-                child: MoolMainDomainMenu(
-                  selectedFamilyId: widget.initialFamilyId,
-                  keyPrefix: 'mool-navigator',
-                  onOpenFamily: widget.onOpenFamily,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (notification is ScrollStartNotification) _dragDy = 0;
+                  if (notification is OverscrollNotification &&
+                      notification.dragDetails != null &&
+                      notification.overscroll < 0) {
+                    _dragDy -= notification.overscroll;
+                    if (_dragDy > 24) {
+                      _dragDy = 0;
+                      widget.onDismiss();
+                    }
+                  }
+                  return false;
+                },
+                child: SingleChildScrollView(
+                  key: const Key('mool-connected-action-navigator-scroll'),
+                  primary: false,
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.all(
+                    MoolLocalNavigationTokens.switcherPadding,
+                  ),
+                  child: MoolMainDomainMenu(
+                    selectedFamilyId: widget.initialFamilyId,
+                    keyPrefix: 'mool-navigator',
+                    onOpenFamily: widget.onOpenFamily,
+                  ),
                 ),
               ),
             ),
@@ -1501,7 +1520,6 @@ class MoolGlobalNavigationV2 extends StatefulWidget {
 class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
     with SingleTickerProviderStateMixin {
   final OverlayPortalController _overlayController = OverlayPortalController();
-  final LayerLink _launcherLink = LayerLink();
   late final AnimationController _switcherController;
   LocalHistoryEntry? _historyEntry;
   bool _isOpen = false;
@@ -1633,7 +1651,49 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
     );
   }
 
-  Widget _buildEmbeddedSwitcher(BuildContext context) {
+  Widget _buildEmbeddedSwitcher(
+    BuildContext context,
+    OverlayChildLayoutInfo info,
+  ) {
+    final media = MediaQuery.of(context);
+    final view = View.of(context);
+    final systemPadding = EdgeInsets.fromViewPadding(
+      view.viewPadding,
+      view.devicePixelRatio,
+    );
+    final safeTop = math.max(media.viewPadding.top, systemPadding.top);
+    final safeLeft = math.max(media.viewPadding.left, systemPadding.left);
+    final safeRight = math.max(media.viewPadding.right, systemPadding.right);
+    final safeBottom = math.max(media.viewPadding.bottom, systemPadding.bottom);
+    final keyboard = math.max(
+      media.viewInsets.bottom,
+      view.viewInsets.bottom / view.devicePixelRatio,
+    );
+    final launcher = MatrixUtils.transformRect(
+      info.childPaintTransform,
+      Offset.zero & info.childSize,
+    );
+    final width = math.min(
+      MoolLocalNavigationTokens.switcherWidth,
+      math.max(0.0, info.overlaySize.width - safeLeft - safeRight),
+    );
+    final desiredLeft = widget.compact && widget.compactOverlayAlignEnd
+        ? launcher.right - width
+        : launcher.left;
+    final left = desiredLeft
+        .clamp(
+          safeLeft,
+          math.max(safeLeft, info.overlaySize.width - safeRight - width),
+        )
+        .toDouble();
+    final menuBottom = math.max(
+      safeTop,
+      math.min(
+        launcher.top - 2,
+        info.overlaySize.height - math.max(safeBottom, keyboard),
+      ),
+    );
+    final availableHeight = math.max(0.0, menuBottom - safeTop);
     final initialFamilyId =
         moolActionFamilies.any((family) => family.id == widget.activeId)
         ? widget.activeId
@@ -1654,16 +1714,10 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
               child: const ColoredBox(color: Colors.transparent),
             ),
           ),
-          CompositedTransformFollower(
-            link: _launcherLink,
-            showWhenUnlinked: false,
-            targetAnchor: widget.compact && widget.compactOverlayAlignEnd
-                ? Alignment.topRight
-                : Alignment.topLeft,
-            followerAnchor: widget.compact && widget.compactOverlayAlignEnd
-                ? Alignment.bottomRight
-                : Alignment.bottomLeft,
-            offset: const Offset(0, -2),
+          Positioned(
+            left: left,
+            bottom: info.overlaySize.height - menuBottom,
+            width: width,
             child: FadeTransition(
               opacity: progress,
               child: SlideTransition(
@@ -1675,8 +1729,8 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
                   key: const Key('moolsocial-main-menu-arrival-motion'),
                   alignment: Alignment.bottomLeft,
                   scale: Tween<double>(begin: .96, end: 1).animate(progress),
-                  child: SizedBox(
-                    width: MoolLocalNavigationTokens.switcherWidth,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: availableHeight),
                     child: MoolConnectedActionNavigator(
                       initialFamilyId: initialFamilyId,
                       onOpenFamily: _openFamily,
@@ -1712,8 +1766,9 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
           _openConnectedNavigator();
         }
       },
-      child: CompositedTransformTarget(
-        link: _launcherLink,
+      child: OverlayPortal.overlayChildLayoutBuilder(
+        controller: _overlayController,
+        overlayChildBuilder: _buildEmbeddedSwitcher,
         child: _MoolHomeLauncher(
           compact: widget.compact,
           expandedCell: widget.compactExpanded,
@@ -1758,17 +1813,12 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
               ),
             ),
           );
-    final portal = OverlayPortal(
-      controller: _overlayController,
-      overlayChildBuilder: _buildEmbeddedSwitcher,
-      child: anchoredLauncher,
-    );
     if (Router.maybeOf<Object?>(context)?.backButtonDispatcher == null) {
-      return portal;
+      return anchoredLauncher;
     }
     return BackButtonListener(
       onBackButtonPressed: _handleBackButton,
-      child: portal,
+      child: anchoredLauncher,
     );
   }
 }

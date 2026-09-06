@@ -12,6 +12,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
+import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
 
 class _R66StoreStatusSession extends BuyV2Session {
   _R66StoreStatusSession({required super.core, required this.quiet}) {
@@ -50,6 +51,7 @@ void main() {
     double textScale = 1,
     bool reducedMotion = false,
     EdgeInsets safeArea = EdgeInsets.zero,
+    ValueChanged<PersonalMoolActionSpec>? onOpenMainAction,
   }) {
     return RepaintBoundary(
       key: const ValueKey('r66-cart-feedback-capture'),
@@ -71,6 +73,7 @@ void main() {
           initialDestination: session.destination,
           initialView: session.view,
           initialCartScope: session.cartScope,
+          onOpenMainAction: onOpenMainAction,
         ),
       ),
     );
@@ -127,6 +130,251 @@ void main() {
         (product) =>
             product.destination == destination && !product.requiresPrescription,
       );
+
+  for (final size in [const Size(360, 800), const Size(800, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R664 Mool menu stays inside safe area at $size / $scale', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('w-notebook'), isTrue);
+        session.openDestination(BuyV2Destination.medicine);
+        final opened = <String>[];
+        void recordAction(PersonalMoolActionSpec action) =>
+            opened.add(action.id);
+        const safe = EdgeInsets.fromLTRB(12, 24, 12, 16);
+        await tester.pumpWidget(
+          app(
+            session,
+            size: size,
+            textScale: scale,
+            safeArea: safe,
+            onOpenMainAction: recordAction,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final launcher = find.byKey(const Key('mool-compact-launcher'));
+        final menu = find.byKey(const Key('mool-connected-action-navigator'));
+        void expectBounds(Size viewport) {
+          final rect = tester.getRect(menu);
+          expect(rect.top, greaterThanOrEqualTo(safe.top));
+          expect(rect.left, greaterThanOrEqualTo(safe.left));
+          expect(rect.right, lessThanOrEqualTo(viewport.width - safe.right));
+          expect(rect.bottom, lessThanOrEqualTo(viewport.height - safe.bottom));
+        }
+
+        Future<void> openMenu() async {
+          await tester.tap(launcher);
+          await tester.pumpAndSettle();
+          expect(menu, findsOneWidget);
+        }
+
+        await openMenu();
+        final label = 'r664-menu-${size.width}-${size.height}-$scale';
+        await capture(tester, '$label-open');
+        expectBounds(size);
+        final scrollable = find.descendant(
+          of: menu,
+          matching: find.byType(Scrollable),
+        );
+        if (size.height < 400) {
+          expect(scrollable, findsOneWidget);
+          final scroll = tester.state<ScrollableState>(scrollable).position;
+          expect(scroll.maxScrollExtent, greaterThan(0));
+          await tester.drag(menu, const Offset(0, -120));
+          await tester.pumpAndSettle();
+          expect(menu, findsOneWidget);
+          expect(scroll.pixels, greaterThan(0));
+          await capture(tester, '$label-scrolled');
+        }
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(menu, findsNothing);
+        expect(session.destination, BuyV2Destination.medicine);
+        expect(opened, isEmpty);
+        await openMenu();
+        await tester.tapAt(Offset(size.width - safe.right - 20, safe.top + 20));
+        await tester.pumpAndSettle();
+        expect(menu, findsNothing);
+        await openMenu();
+        await tester.drag(menu, const Offset(0, 70));
+        await tester.pumpAndSettle();
+        expect(menu, findsNothing);
+        expect(opened, isEmpty);
+        for (final family in moolActionFamilies.reversed) {
+          await openMenu();
+          final choice = find.byKey(
+            ValueKey('mool-navigator-family-${family.id}'),
+          );
+          await tester.ensureVisible(choice);
+          await tester.pumpAndSettle();
+          final choiceRect = tester.getRect(choice);
+          final menuRect = tester.getRect(menu);
+          expect(choiceRect.top, greaterThanOrEqualTo(menuRect.top));
+          expect(choiceRect.bottom, lessThanOrEqualTo(menuRect.bottom));
+          expect(choice.hitTestable(), findsOneWidget);
+          expect(choiceRect.height, greaterThanOrEqualTo(44));
+          final text = find.descendant(
+            of: choice,
+            matching: find.text(family.label),
+          );
+          expect(
+            tester.renderObject<RenderParagraph>(text).didExceedMaxLines,
+            isFalse,
+          );
+          await tester.tap(choice);
+          await tester.pumpAndSettle();
+          expect(menu, findsNothing);
+          if (family.id == 'buy') {
+            expect(session.destination, BuyV2Destination.shop);
+            session.openDestination(BuyV2Destination.medicine);
+            await tester.pumpAndSettle();
+          } else {
+            expect(opened.last, family.id);
+            expect(session.destination, BuyV2Destination.medicine);
+          }
+          expect(session.quantityFor('w-notebook'), 1);
+          expect(tester.takeException(), isNull);
+        }
+        if (size.height > size.width) {
+          await openMenu();
+          const landscape = Size(800, 360);
+          tester.view.physicalSize = landscape;
+          await tester.pumpWidget(
+            app(
+              session,
+              size: landscape,
+              textScale: scale,
+              safeArea: safe,
+              onOpenMainAction: recordAction,
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(menu, findsOneWidget);
+          expectBounds(landscape);
+          await capture(tester, '$label-rotated');
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(menu, findsNothing);
+          expect(session.destination, BuyV2Destination.medicine);
+          expect(session.quantityFor('w-notebook'), 1);
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final compact in [false, true]) {
+    for (final size in [const Size(320, 568), const Size(800, 360)]) {
+      testWidgets('R664 standalone Mool bounds $size compact=$compact', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final opened = <String>[];
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: const ValueKey('r66-cart-feedback-capture'),
+            child: MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  padding: const EdgeInsets.fromLTRB(12, 24, 12, 16),
+                  viewPadding: const EdgeInsets.fromLTRB(12, 24, 12, 16),
+                  viewInsets: const EdgeInsets.only(bottom: 120),
+                  textScaler: const TextScaler.linear(2),
+                ),
+                child: child!,
+              ),
+              home: Scaffold(
+                body: const ColoredBox(
+                  color: Color(0xFFF5F7FC),
+                  child: SizedBox.expand(),
+                ),
+                bottomNavigationBar: Align(
+                  alignment: Alignment.bottomRight,
+                  heightFactor: 1,
+                  child: SizedBox(
+                    width: compact ? 60 : size.width,
+                    child: MoolGlobalNavigationV2(
+                      activeId: 'book',
+                      onOpenMool: null,
+                      onOpenAction: (action) => opened.add(action.id),
+                      onOpenChat: null,
+                      compact: compact,
+                      compactOverlayAlignEnd: true,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final launcher = find.byKey(
+          Key(compact ? 'mool-compact-launcher' : 'mool-home-launcher'),
+        );
+        final menu = find.byKey(const Key('mool-connected-action-navigator'));
+        if (!compact) {
+          final label = find.descendant(
+            of: launcher,
+            matching: find.text('Mool'),
+          );
+          final labelRect = tester.getRect(label);
+          final launcherRect = tester.getRect(launcher);
+          final paragraph = tester.renderObject<RenderParagraph>(label);
+          expect(launcherRect.size, const Size(64, 56));
+          expect(labelRect.left, greaterThanOrEqualTo(launcherRect.left));
+          expect(labelRect.right, lessThanOrEqualTo(launcherRect.right));
+          expect(labelRect.bottom, lessThanOrEqualTo(launcherRect.bottom));
+          expect(paragraph.didExceedMaxLines, isFalse);
+          expect(
+            paragraph.getBoxesForSelection(
+              const TextSelection(baseOffset: 0, extentOffset: 4),
+            ),
+            hasLength(1),
+          );
+          expect(MediaQuery.textScalerOf(tester.element(label)).scale(10), 20);
+        }
+        for (final family in moolActionFamilies.reversed) {
+          await tester.tap(launcher);
+          await tester.pumpAndSettle();
+          final rect = tester.getRect(menu);
+          expect(rect.top, greaterThanOrEqualTo(24));
+          expect(rect.left, greaterThanOrEqualTo(12));
+          expect(rect.right, lessThanOrEqualTo(size.width - 12));
+          expect(rect.bottom, lessThanOrEqualTo(size.height - 120));
+          final row = find.byKey(
+            ValueKey('mool-navigator-family-${family.id}'),
+          );
+          await tester.ensureVisible(row);
+          await tester.pumpAndSettle();
+          final rowRect = tester.getRect(row);
+          expect(rowRect.top, greaterThanOrEqualTo(rect.top));
+          expect(rowRect.bottom, lessThanOrEqualTo(rect.bottom));
+          if (family == moolActionFamilies.last) {
+            await capture(
+              tester,
+              'r664-menu-standalone-${size.width}-${size.height}-$compact',
+            );
+          }
+          await tester.tap(row);
+          await tester.pumpAndSettle();
+          expect(opened.last, family.id);
+          expect(menu, findsNothing);
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   for (final size in [
     const Size(360, 800),
