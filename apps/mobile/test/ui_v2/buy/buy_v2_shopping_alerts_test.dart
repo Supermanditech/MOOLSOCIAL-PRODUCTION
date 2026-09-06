@@ -11,6 +11,8 @@ import 'package:moolsocial/features/buy/buy_v2_shopping_alerts.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -80,6 +82,10 @@ void main() {
         expect(alertsOffset, greaterThan(0));
         final loadsBeforeVisit = adapter.calls;
         final alertsBeforeVisit = session.shoppingAlerts;
+        await captureR66Visual(
+          tester,
+          '033-before-system-$systemBack-text-$textScale',
+        );
         for (var visit = 0; visit < 2; visit++) {
           await tester.tap(alertRow);
           await tester.pumpAndSettle();
@@ -100,6 +106,10 @@ void main() {
           expect(alertsPosition.pixels, alertsOffset);
           expect(adapter.calls, loadsBeforeVisit);
           expect(session.shoppingAlerts, alertsBeforeVisit);
+          await captureR66Visual(
+            tester,
+            '033-return-$visit-system-$systemBack-text-$textScale',
+          );
           expect(session.view, BuyV2View.catalogue);
           expect(session.destination, BuyV2Destination.orders);
           expect(session.ordersTab, BuyV2OrdersTab.delivered);
@@ -416,6 +426,7 @@ Future<GoRouter> _mountAlertRouter(
     MaterialApp.router(
       debugShowCheckedModeBanner: false,
       theme: MoolTheme.light(),
+      builder: (context, child) => r66VisualCaptureRoot(child!),
       routerConfig: router,
     ),
   );

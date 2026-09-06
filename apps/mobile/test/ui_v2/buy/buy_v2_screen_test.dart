@@ -20,6 +20,63 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_scanner.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
+Widget r66VisualCaptureRoot(Widget child) =>
+    const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')
+    ? RepaintBoundary(key: const ValueKey('r66-cart-capture'), child: child)
+    : child;
+
+Future<void> captureR66Visual(WidgetTester tester, String label) async {
+  if (!const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) return;
+  // Real asset decoding runs outside the widget test's fake clock. Wait for
+  // the mounted assets, then settle their existing decoded-frame transitions.
+  final images = find.byType(Image).evaluate().toList();
+  await tester.runAsync(() async {
+    for (final element in images) {
+      if (!element.mounted) continue;
+      final provider = (element.widget as Image).image;
+      ImageProvider source = provider;
+      while (source is ResizeImage) {
+        source = source.imageProvider;
+      }
+      if (source is! AssetImage) continue;
+      Object? decodeError;
+      await precacheImage(
+        provider,
+        element,
+        onError: (error, stack) {
+          decodeError = error;
+        },
+      );
+      if (decodeError != null) throw StateError('Asset decode: $decodeError');
+    }
+  });
+  await tester.pumpAndSettle();
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('r66-cart-capture')),
+  );
+  await tester.runAsync(() async {
+    final directory = Directory(
+      const String.fromEnvironment(
+        'BUY_R663_VISUAL_DIRECTORY',
+        defaultValue: 'build/r66-3-local-visual-20260906',
+      ),
+    );
+    await directory.create(recursive: true);
+    final output = File('${directory.path}/$label.png');
+    if (await output.exists()) {
+      throw StateError('Visual capture already exists');
+    }
+    final image = await boundary.toImage(pixelRatio: 2);
+    try {
+      final bytes = await image.toByteData(format: ImageByteFormat.png);
+      if (bytes == null) throw StateError('Visual capture encoding failed');
+      await output.writeAsBytes(bytes.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
+  });
+}
+
 final _forbiddenBuyCopy = RegExp(
   r'\b(?:production|prototype|founder review|review build|sample|example|demo|'
   r'mock|placeholder|working note|internal plan|implementation|workflow|'
@@ -160,7 +217,7 @@ void main() {
                   key: const ValueKey('r66-cart-capture'),
                   child: child!,
                 )
-              : child!,
+              : r66VisualCaptureRoot(child!),
         );
       },
       home: BuyV2Screen(
@@ -2950,6 +3007,22 @@ void main() {
           session.openDestination(BuyV2Destination.wholesale);
           await tester.pumpAndSettle();
           await _captureR66Cart(tester, 'root-inr$total-text$scale');
+          final cartRect = tester.getRect(
+            find.byKey(const ValueKey('buy-mini-cart-drag-handle')),
+          );
+          final contentRect = tester.getRect(
+            find.byKey(const ValueKey('buy-cart-content-viewport')),
+          );
+          for (final promotion in find.byType(BuyV2PromotionCard).evaluate()) {
+            final visible = tester
+                .getRect(
+                  find.byElementPredicate((element) => element == promotion),
+                )
+                .intersect(contentRect);
+            if (visible.width > 0 && visible.height > 0) {
+              expect(cartRect.overlaps(visible), isFalse);
+            }
+          }
           for (final key in ['buy-cart-summary', 'buy-cart-total']) {
             final value = tester.widget<BuyV2FiniteValueTransition>(
               find.byKey(ValueKey(key)),
@@ -2999,7 +3072,7 @@ void main() {
                         key: const ValueKey('r66-cart-capture'),
                         child: child!,
                       )
-                    : child!,
+                    : r66VisualCaptureRoot(child!),
               ),
               home: Scaffold(
                 body: Align(
@@ -4784,6 +4857,7 @@ void main() {
         find.byKey(const ValueKey('buy-shopping-intent-bar')),
         findsNothing,
       );
+      await captureR66Visual(tester, '032-wholesale-checkout-${step.name}');
     }
     session.openCart(scope: BuyV2CartScope.shop);
     await tester.pumpAndSettle();
@@ -4844,6 +4918,7 @@ void main() {
             tester.getRect(cart).overlaps(tester.getRect(action)),
             isFalse,
           );
+          await captureR66Visual(tester, '004-action-saved-$saved-text-$scale');
           await tester.tap(action);
           await tester.pumpAndSettle();
           if (saved) {
@@ -4865,6 +4940,146 @@ void main() {
     }
   }
 
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+    BuyV2Destination.medicine,
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'R66 R3 Cart permits Save and Remove ${destination.name} $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(800, 360);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          session.addProduct('w-notebook');
+          await tester.pumpWidget(app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          session.openDestination(destination);
+          final product = session.visibleProducts.first;
+          expect(session.addProduct(product.id), isTrue);
+          await tester.pumpAndSettle();
+          for (final remove in [false, true]) {
+            if (remove) session.showSavedProducts(true);
+            await tester.pumpAndSettle();
+            final actions = find.byKey(ValueKey('buy-save-${product.id}'));
+            final action = actions.first;
+            final scrollable = find
+                .descendant(
+                  of: find.byType(BuyV2CatalogueView),
+                  matching: find.byWidgetPredicate(
+                    (widget) =>
+                        widget is Scrollable &&
+                        widget.axisDirection == AxisDirection.down,
+                  ),
+                )
+                .first;
+            await tester.drag(scrollable, const Offset(0, -240));
+            await tester.pumpAndSettle();
+            for (var attempt = 0; attempt < 40; attempt += 1) {
+              if (actions.evaluate().isEmpty) {
+                await tester.drag(scrollable, const Offset(0, -60));
+                await tester.pumpAndSettle();
+                continue;
+              }
+              final rect = tester.getRect(action);
+              final viewport = tester.getRect(
+                find.byKey(const ValueKey('buy-cart-content-viewport')),
+              );
+              final toolbarBottom = tester
+                  .getRect(find.byKey(const ValueKey('buy-catalogue-toolbar')))
+                  .bottom;
+              final top = toolbarBottom > viewport.top
+                  ? toolbarBottom
+                  : viewport.top;
+              final bottom = viewport.bottom;
+              if (rect.top >= top && rect.bottom <= bottom) break;
+              await tester.drag(
+                scrollable,
+                Offset(0, rect.top < top ? 60 : -60),
+              );
+              await tester.pumpAndSettle();
+            }
+            expect(
+              action.hitTestable(),
+              findsOneWidget,
+              reason: 'Reveal the action below the sticky catalogue controls',
+            );
+            final cart = find.byKey(
+              const ValueKey('buy-compact-cart-indicator'),
+            );
+            final scrollBeforeDrag = tester
+                .state<ScrollableState>(scrollable)
+                .position
+                .pixels;
+            await tester.dragFrom(
+              tester.getCenter(cart),
+              tester.getCenter(action) - tester.getCenter(cart),
+            );
+            await tester.pumpAndSettle();
+            expect(
+              tester.state<ScrollableState>(scrollable).position.pixels,
+              closeTo(scrollBeforeDrag, .01),
+              reason: 'Dragging Cart must not scroll the catalogue beneath it',
+            );
+            expect(action.hitTestable(), findsOneWidget);
+            final contentBounds = tester.getRect(
+              find.byKey(const ValueKey('buy-cart-content-viewport')),
+            );
+            for (final region
+                in find.byType(BuyV2CartAvoidanceRegion).evaluate()) {
+              final box = region.renderObject! as RenderBox;
+              if (!box.hasSize) continue;
+              final visible = (box.localToGlobal(Offset.zero) & box.size)
+                  .intersect(contentBounds);
+              if (visible.isEmpty) continue;
+              expect(
+                tester.getRect(cart).overlaps(visible),
+                isFalse,
+                reason:
+                    'Cart must clear every visible registered fact and action',
+              );
+            }
+            await captureR66Visual(
+              tester,
+              '004-r3-${destination.name}-remove-$remove-text-$scale',
+            );
+            final overlapped = tester
+                .getRect(cart)
+                .overlaps(tester.getRect(action));
+            expect(
+              tester
+                  .getRect(cart)
+                  .overlaps(
+                    tester.getRect(
+                      find.byKey(const ValueKey('buy-catalogue-toolbar')),
+                    ),
+                  ),
+              isFalse,
+            );
+            await tester.tapAt(tester.getCenter(action));
+            await tester.pumpAndSettle();
+            expect(
+              session.isSaved(product.id),
+              !remove,
+              reason:
+                  'The visible Save/Remove tap must reach the product action',
+            );
+            expect(session.view, BuyV2View.catalogue);
+            expect(overlapped, isFalse);
+            expect(session.quantityFor('w-notebook'), 1);
+            expect(tester.takeException(), isNull);
+          }
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+  }
+
   test('R66 R2 catalogue promises describe future delivery', () {
     final core = BuySession();
     final session = BuyV2Session(core: core);
@@ -4873,6 +5088,13 @@ void main() {
     expect(session.product('s-tomato').deliveryPromise, 'Delivery in 12 min');
     expect(buyV2BuyerDeliveryPromiseSource('5 minutes'), 'Delivery in 5 min');
     expect(buyV2BuyerDeliveryPromiseSource('1 day'), 'Delivery in 1 day');
+    for (final dispatch in ['Dispatch in one day', 'Dispatch in 2 days']) {
+      expect(
+        buyV2BuyerDeliveryPromiseSource(dispatch),
+        dispatch,
+        reason: 'Dispatch must not become an arrival promise',
+      );
+    }
     expect(
       buyV2BuyerDeliveryPromiseSource('Delivered in 12 min'),
       'Delivery in 12 min',
@@ -5153,6 +5375,30 @@ void main() {
             tester,
             '${destination.name}-$textScale-product-facts',
           );
+          if (destination == BuyV2Destination.wholesale) {
+            final eta = find
+                .descendant(of: facts, matching: find.byType(RichText))
+                .last;
+            expect(
+              tester.renderObject<RenderParagraph>(eta).text.toPlainText(),
+              contains(
+                RegExp(r'day|min|dispatch|delivery', caseSensitive: false),
+              ),
+            );
+            await tester.scrollUntilVisible(eta, 60, scrollable: scrollable);
+            await tester.pumpAndSettle();
+            final visibleContent = tester.getRect(
+              find.byKey(const ValueKey('buy-cart-content-viewport')),
+            );
+            final etaRect = tester.getRect(eta);
+            expect(etaRect.top, greaterThanOrEqualTo(visibleContent.top));
+            expect(etaRect.bottom, lessThanOrEqualTo(visibleContent.bottom));
+            expect(tester.getRect(miniCart).overlaps(etaRect), isFalse);
+            await _captureR66Landscape(
+              tester,
+              '${destination.name}-$textScale-delivery-visible',
+            );
+          }
           final nestedBefore = tester.state<NestedScrollViewState>(
             find.byType(NestedScrollView),
           );
@@ -7107,6 +7353,9 @@ void main() {
 }
 
 Future<void> _captureR66Landscape(WidgetTester tester, String label) async {
+  if (const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) {
+    return captureR66Visual(tester, '001-$label');
+  }
   if (!const bool.fromEnvironment('BUY_R66_LANDSCAPE_CAPTURE')) return;
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(const ValueKey('r66-cart-capture')),
@@ -7130,6 +7379,9 @@ Future<void> _captureR66Landscape(WidgetTester tester, String label) async {
 }
 
 Future<void> _captureR66MonthlyBasket(WidgetTester tester, String label) async {
+  if (const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) {
+    return captureR66Visual(tester, '032-$label');
+  }
   if (!const bool.fromEnvironment('BUY_R66_MONTHLY_BASKET_CAPTURE')) return;
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(const ValueKey('r66-cart-capture')),
@@ -7156,6 +7408,9 @@ Future<void> _captureR66MonthlyBasket(WidgetTester tester, String label) async {
 
 // Display geometry only; real session arithmetic is covered by connected tests.
 Future<void> _captureR66Cart(WidgetTester tester, String label) async {
+  if (const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) {
+    return captureR66Visual(tester, 'cart-$label');
+  }
   if (!const bool.fromEnvironment('BUY_R66_CART_CAPTURE')) return;
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(const ValueKey('r66-cart-capture')),

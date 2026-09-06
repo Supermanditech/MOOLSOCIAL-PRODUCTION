@@ -7,6 +7,8 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -89,6 +91,34 @@ void main() {
         expect(sheet, findsOneWidget);
         void expectCompleteRiceEta(Finder owner) {
           if (id != 'w-rice-50kg') return;
+          final unitPrice = find.descendant(
+            of: find.descendant(
+              of: owner,
+              matching: find.byKey(ValueKey('buy-product-$id')),
+            ),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is RichText &&
+                  widget.text.toPlainText() == product.unitPrice,
+            ),
+          );
+          expect(unitPrice, findsOneWidget);
+          final unitParagraph = tester.renderObject<RenderParagraph>(unitPrice);
+          expect(
+            unitParagraph.didExceedMaxLines,
+            isFalse,
+            reason: 'Supplier unit price must remain complete at enlarged text',
+          );
+          final unitNatural = TextPainter(
+            text: unitParagraph.text,
+            textDirection: unitParagraph.textDirection,
+            textScaler: unitParagraph.textScaler,
+          )..layout(maxWidth: unitParagraph.size.width);
+          expect(
+            unitParagraph.size.height + .1,
+            greaterThanOrEqualTo(unitNatural.height),
+          );
+          unitNatural.dispose();
           final promises = find.descendant(
             of: find.descendant(
               of: owner,
@@ -116,6 +146,9 @@ void main() {
         }
 
         expectCompleteRiceEta(sheet);
+        if (id == 'w-rice-50kg') {
+          await captureR66Visual(tester, '025-rice-preview-text-$scale');
+        }
         expect(
           find.descendant(
             of: sheet,
@@ -125,11 +158,28 @@ void main() {
         );
         final viewAll = find.byKey(ValueKey('$prefix-view-more-$id'));
         await tester.ensureVisible(viewAll);
+        final viewAllLabel = find.descendant(
+          of: viewAll,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is RichText &&
+                widget.text.toPlainText().contains('View all'),
+          ),
+        );
+        expect(viewAllLabel, findsOneWidget);
+        expect(
+          tester.renderObject<RenderParagraph>(viewAllLabel).didExceedMaxLines,
+          isFalse,
+          reason: 'The complete View all label must be visible',
+        );
         await tester.tap(viewAll);
         await tester.pumpAndSettle();
         final full = find.byKey(ValueKey('$prefix-full-catalogue-list'));
         expect(full, findsOneWidget);
         expectCompleteRiceEta(full);
+        if (id == 'w-rice-50kg') {
+          await captureR66Visual(tester, '025-rice-full-text-$scale');
+        }
         final card = find.descendant(
           of: full,
           matching: find.byKey(ValueKey('buy-product-$id')),
@@ -672,7 +722,7 @@ Widget _app(BuyV2Session session, {double textScale = 1}) => MaterialApp(
     data: MediaQuery.of(
       context,
     ).copyWith(textScaler: TextScaler.linear(textScale)),
-    child: child!,
+    child: r66VisualCaptureRoot(child!),
   ),
   home: BuyV2Screen(
     session: session,

@@ -18,8 +18,15 @@ String buyV2Money(num value) => _buyV2Currency.format(value);
 
 /// Layout-only exclusions for the default floating cart, scoped to one surface.
 class BuyV2CartAvoidanceScope extends StatefulWidget {
-  const BuyV2CartAvoidanceScope({super.key, required this.child});
+  const BuyV2CartAvoidanceScope({
+    super.key,
+    required this.child,
+    this.navigationIdentity,
+    this.cartVisible = true,
+  });
   final Widget child;
+  final Object? navigationIdentity;
+  final bool cartVisible;
 
   static BuyV2CartAvoidanceLayout? of(BuildContext context) => context
       .dependOnInheritedWidgetOfExactType<_BuyV2CartAvoidanceOwner>()
@@ -32,6 +39,28 @@ class BuyV2CartAvoidanceScope extends StatefulWidget {
 
 class _BuyV2CartAvoidanceScopeState extends State<BuyV2CartAvoidanceScope> {
   final layout = BuyV2CartAvoidanceLayout();
+  Object? _suspendedIdentity;
+  double _suspendedDockHeight = 0;
+
+  @override
+  void didUpdateWidget(BuyV2CartAvoidanceScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.cartVisible && !widget.cartVisible) {
+      _suspendedIdentity = oldWidget.navigationIdentity;
+      _suspendedDockHeight = layout.dockHeight;
+      layout.resetDock();
+    } else if (!oldWidget.cartVisible && widget.cartVisible) {
+      layout._setDockHeight(
+        _suspendedIdentity == widget.navigationIdentity
+            ? _suspendedDockHeight
+            : 0,
+      );
+      _suspendedIdentity = null;
+      _suspendedDockHeight = 0;
+    } else if (oldWidget.navigationIdentity != widget.navigationIdentity) {
+      layout.resetDock();
+    }
+  }
 
   @override
   void dispose() {
@@ -72,6 +101,30 @@ class BuyV2CartAvoidanceRegion extends StatefulWidget {
   @override
   State<BuyV2CartAvoidanceRegion> createState() =>
       _BuyV2CartAvoidanceRegionState();
+}
+
+/// Keeps the content scrollable above a separately parked Cart when the
+/// visible decision regions leave no unobstructed floating position.
+class BuyV2CartAvoidanceViewport extends StatelessWidget {
+  const BuyV2CartAvoidanceViewport({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final layout = BuyV2CartAvoidanceScope.of(context);
+    if (layout == null) return child;
+    return AnimatedBuilder(
+      animation: layout,
+      child: child,
+      builder: (context, child) => Padding(
+        padding: EdgeInsets.only(bottom: layout.dockHeight),
+        child: ClipRect(
+          key: const ValueKey('buy-cart-content-viewport'),
+          child: child,
+        ),
+      ),
+    );
+  }
 }
 
 class _BuyV2CartAvoidanceRegionState extends State<BuyV2CartAvoidanceRegion> {
@@ -115,6 +168,18 @@ class BuyV2CartAvoidanceLayout extends ChangeNotifier {
   final _regions = <BuildContext>{};
   bool _pending = false;
   bool _disposed = false;
+  double _dockHeight = 0;
+  Size? _available;
+
+  double get dockHeight => _dockHeight;
+
+  void resetDock() => _setDockHeight(0);
+
+  void _setDockHeight(double height) {
+    if (_dockHeight == height) return;
+    _dockHeight = height;
+    schedule();
+  }
 
   void schedule() {
     if (_pending || _disposed) return;
@@ -128,6 +193,18 @@ class BuyV2CartAvoidanceLayout extends ChangeNotifier {
 
   Offset place(Offset preferred, Size cart, Size available, RenderBox owner) {
     const edge = 8.0;
+    if (_available != available) {
+      _available = available;
+      resetDock();
+    }
+    final dockPosition = Offset(
+      (available.width - cart.width - edge).clamp(edge, double.infinity),
+      (available.height - cart.height - edge).clamp(edge, double.infinity),
+    );
+    if (_dockHeight > 0) {
+      _setDockHeight(cart.height + edge * 2);
+      return dockPosition;
+    }
     final viewport = Offset.zero & available;
     final obstacles = <Rect>[];
     for (final region in _regions) {
@@ -175,7 +252,9 @@ class BuyV2CartAvoidanceLayout extends ChangeNotifier {
         }
       }
     }
-    return best ?? preferred;
+    if (best != null) return best;
+    _setDockHeight(cart.height + edge * 2);
+    return dockPosition;
   }
 
   @override
@@ -213,6 +292,51 @@ Size buyV2ValueTextSize(
   return size;
 }
 
+/// Keeps an identity readable when enlarged text needs the full row width.
+class BuyV2AdaptiveIdentityRow extends StatelessWidget {
+  const BuyV2AdaptiveIdentityRow({
+    super.key,
+    required this.leading,
+    required this.body,
+    this.trailing,
+    this.spacing = 8,
+  });
+
+  final Widget leading;
+  final Widget body;
+  final Widget? trailing;
+  final double spacing;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (MediaQuery.textScalerOf(context).scale(1) > 1.4 &&
+          constraints.maxWidth < 480) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: [leading, const Spacer(), ?trailing]),
+            SizedBox(height: spacing),
+            body,
+          ],
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          leading,
+          SizedBox(width: spacing),
+          Expanded(child: body),
+          if (trailing case final action?) ...[
+            SizedBox(width: spacing),
+            action,
+          ],
+        ],
+      );
+    },
+  );
+}
+
 /// Converts the server-owned delivery fact into one compact buyer promise.
 ///
 /// Google route duration is only one upstream input. This presentation helper
@@ -241,6 +365,7 @@ String buyV2BuyerDeliveryPromiseSource(String value) {
     );
   }
   if (normalized.startsWith('delivery ') ||
+      normalized.startsWith('dispatch') ||
       normalized.contains('delivery schedule')) {
     return source;
   }

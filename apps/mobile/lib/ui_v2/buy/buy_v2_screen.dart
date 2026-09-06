@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -570,34 +571,47 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                           _buildDeliveryStatus(session, setState),
                         ],
                         body: BuyV2CartAvoidanceScope(
+                          cartVisible:
+                              !keyboardVisible && _showsMiniCart(session),
+                          navigationIdentity: (
+                            session.view,
+                            session.destination,
+                            _offersActive,
+                            session.showingSavedProducts,
+                            session.view == BuyV2View.product
+                                ? session.selectedProduct?.id
+                                : null,
+                          ),
                           child: Stack(
                             key: const ValueKey('buy-navigation-overlay-stack'),
                             children: [
                               Positioned.fill(
-                                child: _BuyNavigationSurfaceOwner(
-                                  key: ObjectKey(session),
-                                  stateKey: session.navigationMotionSequence,
-                                  direction: _surfaceMotionDirection,
-                                  child: _BuyExpandCollapseOwner(
-                                    key: ValueKey(
-                                      _searchOpen &&
-                                              session.destination !=
-                                                  BuyV2Destination.orders
-                                          ? 'buy-search-owner-motion-search'
-                                          : 'buy-search-owner-motion-primary',
+                                child: BuyV2CartAvoidanceViewport(
+                                  child: _BuyNavigationSurfaceOwner(
+                                    key: ObjectKey(session),
+                                    stateKey: session.navigationMotionSequence,
+                                    direction: _surfaceMotionDirection,
+                                    child: _BuyExpandCollapseOwner(
+                                      key: ValueKey(
+                                        _searchOpen &&
+                                                session.destination !=
+                                                    BuyV2Destination.orders
+                                            ? 'buy-search-owner-motion-search'
+                                            : 'buy-search-owner-motion-primary',
+                                      ),
+                                      child:
+                                          _storeProductRouteDepth > 0 &&
+                                              session.view != BuyV2View.product
+                                          ? const SizedBox.expand()
+                                          : _searchOpen &&
+                                                !_offersActive &&
+                                                session.destination !=
+                                                    BuyV2Destination.orders
+                                          ? BuyV2SearchResultsView(
+                                              session: session,
+                                            )
+                                          : _currentView(session),
                                     ),
-                                    child:
-                                        _storeProductRouteDepth > 0 &&
-                                            session.view != BuyV2View.product
-                                        ? const SizedBox.expand()
-                                        : _searchOpen &&
-                                              !_offersActive &&
-                                              session.destination !=
-                                                  BuyV2Destination.orders
-                                        ? BuyV2SearchResultsView(
-                                            session: session,
-                                          )
-                                        : _currentView(session),
                                   ),
                                 ),
                               ),
@@ -2093,6 +2107,19 @@ class _BuySearchBand extends StatelessWidget {
   }
 }
 
+class _BuyCartPanGestureRecognizer extends PanGestureRecognizer {
+  @override
+  bool hasSufficientGlobalDistanceToAccept(
+    PointerDeviceKind pointerDeviceKind,
+    double? deviceTouchSlop,
+  ) {
+    // Compete at the enclosing scrollable's threshold while retaining both
+    // movement axes. A vertical Cart drag must not scroll the page beneath it.
+    return globalDistanceMoved.abs() >
+        computeHitSlop(pointerDeviceKind, gestureSettings);
+  }
+}
+
 class _BuyMiniCartBar extends StatefulWidget {
   const _BuyMiniCartBar({
     required this.session,
@@ -2269,12 +2296,19 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
                   button: true,
                   liveRegion: true,
                   onTap: activate,
-                  child: GestureDetector(
+                  child: RawGestureDetector(
                     key: const ValueKey('buy-mini-cart-drag-handle'),
                     behavior: HitTestBehavior.opaque,
-                    onPanUpdate: move,
-                    onPanEnd: (_) => finishMove(),
-                    onPanCancel: finishMove,
+                    gestures: {
+                      _BuyCartPanGestureRecognizer:
+                          GestureRecognizerFactoryWithHandlers<
+                            _BuyCartPanGestureRecognizer
+                          >(_BuyCartPanGestureRecognizer.new, (recognizer) {
+                            recognizer.onUpdate = move;
+                            recognizer.onEnd = (_) => finishMove();
+                            recognizer.onCancel = finishMove;
+                          }),
+                    },
                     child: SizedBox(
                       width: cartWidth,
                       height: cartHeight,

@@ -14,6 +14,8 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -26,7 +28,7 @@ void main() {
             key: const ValueKey('r66-recent-review-capture'),
             child: child!,
           )
-        : child!,
+        : r66VisualCaptureRoot(child!),
     home: BuyV2Screen(
       session: session,
       initialDestination: session.destination,
@@ -36,6 +38,9 @@ void main() {
   );
 
   Future<void> capture(WidgetTester tester, String name) async {
+    if (const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) {
+      return captureR66Visual(tester, '030-$name');
+    }
     if (!const bool.fromEnvironment('BUY_R66_RECENT_CAPTURE')) return;
     final boundary = tester.renderObject<RenderRepaintBoundary>(
       find.byKey(const ValueKey('r66-recent-review-capture')),

@@ -1,12 +1,13 @@
-import 'dart:ui' show SemanticsAction;
-
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +26,7 @@ void main() {
             disableAnimations: disableAnimations,
             textScaler: TextScaler.linear(textScale),
           ),
-          child: child!,
+          child: r66VisualCaptureRoot(child!),
         );
       },
       home: BuyV2Screen(session: session),
@@ -80,6 +81,46 @@ void main() {
           await tester.tap(sourceCard);
           await tester.pumpAndSettle();
           expect(session.selectedProductId, sourceId);
+          final product = session.product(sourceId);
+          final packFacts = find.text('${product.pack} · ${product.unitPrice}');
+          final heroPrice = find.byKey(
+            ValueKey('buy-product-hero-price-$sourceId'),
+          );
+          await tester.scrollUntilVisible(
+            heroPrice,
+            160,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-$sourceId')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          final viewport = tester.getRect(
+            find.byKey(const ValueKey('buy-cart-content-viewport')),
+          );
+          final priceAndPack = tester
+              .getRect(heroPrice)
+              .expandToInclude(tester.getRect(packFacts));
+          expect(priceAndPack.top, greaterThanOrEqualTo(viewport.top));
+          expect(priceAndPack.bottom, lessThanOrEqualTo(viewport.bottom));
+          final paragraph = tester.renderObject<RenderParagraph>(packFacts);
+          final natural = TextPainter(
+            text: paragraph.text,
+            textDirection: paragraph.textDirection,
+            textScaler: paragraph.textScaler,
+          )..layout(maxWidth: paragraph.size.width);
+          expect(paragraph.didExceedMaxLines, isFalse);
+          expect(
+            paragraph.size.height + .1,
+            greaterThanOrEqualTo(natural.height),
+          );
+          natural.dispose();
+          await captureR66Visual(
+            tester,
+            '025-detail-offers-$offers-text-$scale',
+          );
           final compare = find.text('Compare');
           await tester.scrollUntilVisible(
             compare,
@@ -91,8 +132,43 @@ void main() {
                 )
                 .first,
           );
+          await tester.pumpAndSettle();
+          final compareAction = find.byKey(
+            ValueKey('buy-product-action-compare-$sourceId'),
+          );
+          final quickActions = find.byKey(
+            ValueKey('buy-product-quick-actions-$sourceId'),
+          );
+          for (final text
+              in find
+                  .descendant(of: quickActions, matching: find.byType(RichText))
+                  .evaluate()) {
+            final paragraph = text.renderObject! as RenderParagraph;
+            expect(
+              paragraph.didExceedMaxLines,
+              isFalse,
+              reason: paragraph.text.toPlainText(),
+            );
+          }
+          await captureR66Visual(
+            tester,
+            '034-compare-action-offers-$offers-text-$scale',
+          );
+          expect(
+            tester
+                .getRect(
+                  find.byKey(const ValueKey('buy-compact-cart-indicator')),
+                )
+                .overlaps(tester.getRect(compareAction)),
+            isFalse,
+          );
           await tester.tap(compare);
           await tester.pumpAndSettle();
+          expect(
+            session.view,
+            BuyV2View.product,
+            reason: 'Compare must open comparison without entering Cart',
+          );
           final alternate = find.byKey(
             ValueKey('buy-product-compare-view-$alternateId'),
           );
@@ -130,6 +206,8 @@ void main() {
                 .first,
           );
           expect(tester.getSize(comparedBack).height, greaterThanOrEqualTo(44));
+          await tester.pumpAndSettle();
+          expect(comparedBack.hitTestable(), findsOneWidget);
           if (scale == 2) {
             await tester.tap(comparedBack);
           } else {
@@ -153,7 +231,26 @@ void main() {
                 )
                 .first,
           );
+          await tester.pumpAndSettle();
+          if (returnAction.hitTestable().evaluate().isEmpty) {
+            await tester.ensureVisible(returnAction);
+            await tester.pumpAndSettle();
+          }
+          expect(returnAction.hitTestable(), findsOneWidget);
           if (offers) {
+            final badge = find.descendant(
+              of: find.byKey(ValueKey('buy-product-gallery-badge-$sourceId')),
+              matching: find.byType(RichText),
+            );
+            expect(
+              tester.renderObject<RenderParagraph>(badge).didExceedMaxLines,
+              isFalse,
+              reason: 'Show the complete commercial gallery badge',
+            );
+            await captureR66Visual(
+              tester,
+              '034-source-before-back-text-$scale',
+            );
             await tester.binding.handlePopRoute();
           } else {
             await tester.tap(returnAction);
@@ -176,6 +273,10 @@ void main() {
             find.byKey(const ValueKey('buy-offers-publisher-summary')),
             offers ? findsOneWidget : findsNothing,
           );
+          if (offers) {
+            await tester.pumpAndSettle();
+            await captureR66Visual(tester, '034-offers-after-back-text-$scale');
+          }
           expect(tester.takeException(), isNull);
         },
       );

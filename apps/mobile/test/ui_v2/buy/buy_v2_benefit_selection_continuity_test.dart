@@ -8,6 +8,8 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -25,7 +27,7 @@ void main() {
             textScaler: TextScaler.linear(textScale),
             disableAnimations: reducedMotion,
           ),
-          child: child!,
+          child: r66VisualCaptureRoot(child!),
         );
       },
       home: BuyV2Screen(
@@ -188,6 +190,7 @@ void main() {
       );
       expect(find.textContaining('Pending confirmation'), findsOneWidget);
       expect(session.checkoutAmountDueNow, 3180);
+      await captureR66Visual(tester, '027-final-benefits-text-$scale');
       for (final element
           in find
               .descendant(of: confirmation, matching: find.byType(RichText))

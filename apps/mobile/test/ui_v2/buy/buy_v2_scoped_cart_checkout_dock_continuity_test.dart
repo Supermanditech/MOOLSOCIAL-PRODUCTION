@@ -219,15 +219,24 @@ void main() {
               isFalse,
             );
             await tester.pumpAndSettle();
+            final contentViewport = find.byKey(
+              const ValueKey('buy-cart-content-viewport'),
+            );
+            void expectVisibleClear(Finder target) {
+              final rect = tester
+                  .getRect(target)
+                  .intersect(tester.getRect(contentViewport));
+              if (rect.width > 0 && rect.height > 0) {
+                expect(tester.getRect(cart).overlaps(rect), isFalse);
+              }
+            }
+
             void expectRegionsClear() {
               for (final region
                   in find.byType(BuyV2CartAvoidanceRegion).evaluate()) {
-                final rect = tester.getRect(
+                expectVisibleClear(
                   find.byElementPredicate((element) => element == region),
                 );
-                if (rect.overlaps(tester.getRect(overlay))) {
-                  expect(tester.getRect(cart).overlaps(rect), isFalse);
-                }
               }
             }
 
@@ -237,6 +246,7 @@ void main() {
               '$id-$scale-$mixed-default',
               obstruction: true,
             );
+            expect(increase.hitTestable(), findsOneWidget);
             await tester.tapAt(tester.getCenter(increase));
             await tester.pumpAndSettle();
             expect(session.view, BuyV2View.product);
@@ -250,19 +260,26 @@ void main() {
                 ),
               );
               await tester.pumpAndSettle();
-              expect(
-                tester.getRect(cart).overlaps(tester.getRect(increase)),
-                isFalse,
-              );
+              expectVisibleClear(increase);
               expectRegionsClear();
             }
             final beforeDrag = tester.getTopLeft(cart);
-            await tester.drag(cart, const Offset(-48, -110));
+            final productOffset = scroll.position.pixels;
+            final drag = await tester.startGesture(tester.getCenter(cart));
+            await drag.moveBy(const Offset(-12, -28));
+            await tester.pump();
+            await drag.moveBy(const Offset(-36, -82));
+            await tester.pump();
+            final held = tester.getTopLeft(cart);
+            expect(held.dx, lessThan(beforeDrag.dx - 25));
+            expect(held.dy, lessThan(beforeDrag.dy - 75));
+            expect(scroll.position.pixels, closeTo(productOffset, .01));
+            await drag.up();
             await tester.pumpAndSettle();
             final dragged = tester.getTopLeft(cart);
-            expect(dragged.dx, lessThan(beforeDrag.dx - 25));
-            expect(dragged.dy, lessThan(beforeDrag.dy - 75));
-            final productOffset = scroll.position.pixels;
+            expectVisibleClear(increase);
+            expectRegionsClear();
+            expect(scroll.position.pixels, closeTo(productOffset, .01));
             await tester.tap(cart);
             await tester.pumpAndSettle();
             expect(session.view, BuyV2View.cart);

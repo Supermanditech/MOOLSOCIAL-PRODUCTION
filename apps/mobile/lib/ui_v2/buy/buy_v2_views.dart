@@ -558,148 +558,151 @@ class BuyV2ProductView extends StatelessWidget {
               BuyV2FiniteIncomingTransition(
                 key: ValueKey('buy-product-title-reveal-${product.id}'),
                 stateKey: 'buy-product-title-${product.id}',
-                child: Container(
-                  key: ValueKey('buy-product-purchase-hero-${product.id}'),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFFF8EE), Color(0xFFF4F7FF)],
+                child: BuyV2CartAvoidanceRegion(
+                  child: Container(
+                    key: ValueKey('buy-product-purchase-hero-${product.id}'),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFF8EE), Color(0xFFF4F7FF)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: BuyV2Colors.line),
                     ),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: BuyV2Colors.line),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
                               shop
                                   ? product.brand
                                   : '${product.brand} · ${_sellerTypeLabel(product.sellerType)}',
                               style: context.buyEyebrow.copyWith(fontSize: 8),
                             ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  facts.orderabilityLabel
-                                      .toLowerCase()
-                                      .contains('available')
-                                  ? BuyV2Colors.softGreen
-                                  : BuyV2Colors.softOrange,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              facts.orderabilityLabel,
-                              style: context.buyMeta.copyWith(
-                                color: BuyV2Colors.green,
-                                fontWeight: FontWeight.w900,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    facts.orderabilityLabel
+                                        .toLowerCase()
+                                        .contains('available')
+                                    ? BuyV2Colors.softGreen
+                                    : BuyV2Colors.softOrange,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                facts.orderabilityLabel,
+                                style: context.buyMeta.copyWith(
+                                  color: BuyV2Colors.green,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        product.title,
-                        key: ValueKey('buy-product-title-${product.id}'),
-                        style: context.buyTitle.copyWith(fontSize: 20),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        product.composition ?? product.variant,
-                        maxLines: 3,
-                        overflow: TextOverflow.clip,
-                        style: context.buyBody.copyWith(fontSize: 10),
-                      ),
-                      const SizedBox(height: 7),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            buyV2Money(facts.price),
-                            key: ValueKey(
-                              'buy-product-hero-price-${product.id}',
-                            ),
-                            style: context.buyTitle.copyWith(
-                              color: BuyV2Colors.navy,
-                              fontSize: 25,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '${product.pack} · ${product.unitPrice}',
-                              maxLines: 2,
-                              overflow: TextOverflow.clip,
-                              style: context.buyMeta.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      _ProductHeroFact(
-                        key: ValueKey('buy-product-hero-store-${product.id}'),
-                        icon: Icons.storefront_outlined,
-                        value:
-                            '${facts.partner} · ${_sellerTypeLabel(product.sellerType)}',
-                      ),
-                      const SizedBox(height: 5),
-                      _ProductHeroFact(
-                        key: ValueKey(
-                          'buy-product-hero-delivery-${product.id}',
+                          ],
                         ),
-                        icon: product.destination == BuyV2Destination.wholesale
-                            ? Icons.local_shipping_outlined
-                            : Icons.schedule_rounded,
-                        value: buyerPromise,
-                        color: BuyV2Colors.green,
-                      ),
-                      if (wholesale) ...[
                         const SizedBox(height: 5),
+                        Text(
+                          product.title,
+                          key: ValueKey('buy-product-title-${product.id}'),
+                          style: context.buyTitle.copyWith(fontSize: 20),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          product.composition ?? product.variant,
+                          maxLines: 3,
+                          overflow: TextOverflow.clip,
+                          style: context.buyBody.copyWith(fontSize: 10),
+                        ),
+                        const SizedBox(height: 7),
+                        BuyV2CartAvoidanceRegion(
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.end,
+                            children: [
+                              Text(
+                                buyV2Money(facts.price),
+                                key: ValueKey(
+                                  'buy-product-hero-price-${product.id}',
+                                ),
+                                style: context.buyTitle.copyWith(
+                                  color: BuyV2Colors.navy,
+                                  fontSize: 25,
+                                ),
+                              ),
+                              Text(
+                                '${product.pack} · ${product.unitPrice}',
+                                style: context.buyMeta.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         _ProductHeroFact(
-                          icon: Icons.inventory_2_outlined,
+                          key: ValueKey('buy-product-hero-store-${product.id}'),
+                          icon: Icons.storefront_outlined,
                           value:
-                              'Minimum order · ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'}',
+                              '${facts.partner} · ${_sellerTypeLabel(product.sellerType)}',
                         ),
-                      ],
-                      if (returnSummary case final returnPolicy?) ...[
                         const SizedBox(height: 5),
                         _ProductHeroFact(
-                          icon: Icons.assignment_return_outlined,
-                          value: returnPolicy,
-                        ),
-                      ],
-                      if (!automaticFulfilment ||
-                          (shop && offerDecision!.canAdd)) ...[
-                        const SizedBox(height: 9),
-                        _ProductOwnedActionPanel(
                           key: ValueKey(
-                            'buy-product-inline-action-${product.id}',
+                            'buy-product-hero-delivery-${product.id}',
                           ),
-                          product: product,
-                          quantity: quantity,
-                          showPurchaseFacts: !shop,
-                          leadingAction: storeAction,
-                          deliveryDecision: buyerPromise,
-                          rxBlocked: rxBlocked,
-                          onAdd: addProduct,
-                          onDecrease: () => session.decrease(product.id),
-                          onIncrease: () => session.increase(product.id),
+                          icon:
+                              product.destination == BuyV2Destination.wholesale
+                              ? Icons.local_shipping_outlined
+                              : Icons.schedule_rounded,
+                          value: buyerPromise,
+                          color: BuyV2Colors.green,
                         ),
-                      ] else if (storeAction != null) ...[
-                        const SizedBox(height: 9),
-                        storeAction,
+                        if (wholesale) ...[
+                          const SizedBox(height: 5),
+                          _ProductHeroFact(
+                            icon: Icons.inventory_2_outlined,
+                            value:
+                                'Minimum order · ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'}',
+                          ),
+                        ],
+                        if (returnSummary case final returnPolicy?) ...[
+                          const SizedBox(height: 5),
+                          _ProductHeroFact(
+                            icon: Icons.assignment_return_outlined,
+                            value: returnPolicy,
+                          ),
+                        ],
+                        if (!automaticFulfilment ||
+                            (shop && offerDecision!.canAdd)) ...[
+                          const SizedBox(height: 9),
+                          _ProductOwnedActionPanel(
+                            key: ValueKey(
+                              'buy-product-inline-action-${product.id}',
+                            ),
+                            product: product,
+                            quantity: quantity,
+                            showPurchaseFacts: !shop,
+                            leadingAction: storeAction,
+                            deliveryDecision: buyerPromise,
+                            rxBlocked: rxBlocked,
+                            onAdd: addProduct,
+                            onDecrease: () => session.decrease(product.id),
+                            onIncrease: () => session.increase(product.id),
+                          ),
+                        ] else if (storeAction != null) ...[
+                          const SizedBox(height: 9),
+                          storeAction,
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -1214,23 +1217,25 @@ class _ProductHeroFact extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 17, color: color),
-        const SizedBox(width: 7),
-        Expanded(
-          child: Text(
-            value,
-            style: context.buyBody.copyWith(
-              color: color,
-              fontSize: 10,
-              height: 1.25,
-              fontWeight: FontWeight.w800,
+    return BuyV2CartAvoidanceRegion(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 17, color: color),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              value,
+              style: context.buyBody.copyWith(
+                color: color,
+                fontSize: 10,
+                height: 1.25,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -1307,25 +1312,29 @@ class _ProductQuickActions extends StatelessWidget {
       container: true,
       label: 'Product actions for ${product.title}',
       child: Container(
-        height: accessibleActions ? 72 : 56,
         decoration: buyV2CardDecoration(
           color: BuyV2Colors.softBlue.withValues(alpha: .42),
           radius: 15,
         ),
-        child: Row(
-          children: [
-            for (final action in actions)
-              Expanded(
-                child: _ProductQuickActionButton(
-                  key: ValueKey(
-                    'buy-product-action-${action.label.toLowerCase().replaceAll(' ', '-')}-${product.id}',
+        child: LayoutBuilder(
+          builder: (context, constraints) => Wrap(
+            children: [
+              for (final action in actions)
+                SizedBox(
+                  width:
+                      constraints.maxWidth /
+                      (accessibleActions ? 2 : actions.length),
+                  child: _ProductQuickActionButton(
+                    key: ValueKey(
+                      'buy-product-action-${action.label.toLowerCase().replaceAll(' ', '-')}-${product.id}',
+                    ),
+                    icon: action.icon,
+                    label: action.label,
+                    onPressed: action.onPressed,
                   ),
-                  icon: action.icon,
-                  label: action.label,
-                  onPressed: action.onPressed,
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1346,35 +1355,37 @@ class _ProductQuickActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: label,
-      onTap: onPressed,
-      excludeSemantics: true,
-      child: InkWell(
+    return BuyV2CartAvoidanceRegion(
+      child: Semantics(
+        button: true,
+        label: label,
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(13),
-        child: SizedBox.expand(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 18, color: BuyV2Colors.navy),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: context.buyMeta.copyWith(
-                    color: BuyV2Colors.navy,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
+        excludeSemantics: true,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(13),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 18, color: BuyV2Colors.navy),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: context.buyMeta.copyWith(
+                      color: BuyV2Colors.navy,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -1498,47 +1509,39 @@ class _ProductComparisonCard extends StatelessWidget {
         color: selected ? BuyV2Colors.softBlue : Colors.white,
         radius: 15,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox.square(
-            dimension: 76,
-            child: BuyV2ProductPackshot(product: product, borderRadius: 12),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
-                ),
-                Text(product.pack, style: context.buyMeta),
-                const SizedBox(height: 4),
-                Text(
-                  '${buyV2Money(facts.price)} · ${buyV2BuyerDeliveryPromise(facts)}',
-                  style: context.buyMeta.copyWith(
-                    color: BuyV2Colors.green,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(facts.partner, style: context.buyMeta),
-              ],
+      child: BuyV2AdaptiveIdentityRow(
+        spacing: 10,
+        leading: SizedBox.square(
+          dimension: 76,
+          child: BuyV2ProductPackshot(product: product, borderRadius: 12),
+        ),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              product.title,
+              style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
             ),
-          ),
-          const SizedBox(width: 6),
-          SizedBox(
-            height: BuyV2Metrics.minimumTap,
-            child: TextButton(
-              key: ValueKey('buy-product-compare-view-${product.id}'),
-              onPressed: selected ? null : onView,
-              child: Text(selected ? 'Viewing' : 'View'),
+            Text(product.pack, style: context.buyMeta),
+            const SizedBox(height: 4),
+            Text(
+              '${buyV2Money(facts.price)} · ${buyV2BuyerDeliveryPromise(facts)}',
+              style: context.buyMeta.copyWith(
+                color: BuyV2Colors.green,
+                fontWeight: FontWeight.w800,
+              ),
             ),
+            Text(facts.partner, style: context.buyMeta),
+          ],
+        ),
+        trailing: SizedBox(
+          height: BuyV2Metrics.minimumTap,
+          child: TextButton(
+            key: ValueKey('buy-product-compare-view-${product.id}'),
+            onPressed: selected ? null : onView,
+            child: Text(selected ? 'Viewing' : 'View'),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1879,10 +1882,12 @@ class _WholesaleTradeDecisionPanelState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _WholesaleTradePriceSummary(
-            product: product,
-            facts: facts,
-            decision: decision,
+          BuyV2CartAvoidanceRegion(
+            child: _WholesaleTradePriceSummary(
+              product: product,
+              facts: facts,
+              decision: decision,
+            ),
           ),
           if (showSignal) ...[
             const SizedBox(height: 8),
@@ -2651,6 +2656,32 @@ class _ProductContinuationSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final products = session.productContinuationsFor(product);
     if (products.isEmpty) return const SizedBox.shrink();
+    final railHeight = products.fold<double>(174, (height, item) {
+      final requiredHeight =
+          101 +
+          buyV2ValueTextSize(
+            context,
+            item.title,
+            context.buyBody.copyWith(fontSize: 9, height: 1.05),
+            maxWidth: 120,
+            maxLines: null,
+          ).height +
+          buyV2ValueTextSize(
+            context,
+            item.pack,
+            context.buyMeta.copyWith(fontSize: 7.5),
+            maxWidth: 120,
+            maxLines: null,
+          ).height +
+          buyV2ValueTextSize(
+            context,
+            buyV2Money(item.price),
+            const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+            maxWidth: 102,
+            maxLines: null,
+          ).height.clamp(18, double.infinity);
+      return requiredHeight > height ? requiredHeight : height;
+    });
 
     final (title, detail) = switch (product.destination) {
       BuyV2Destination.shop => (
@@ -2688,32 +2719,7 @@ class _ProductContinuationSection extends StatelessWidget {
               container: true,
               label: '$title. $detail. Swipe horizontally for more products.',
               child: SizedBox(
-                height:
-                    (101 +
-                            buyV2ValueTextSize(
-                              context,
-                              'Ag\nAg',
-                              context.buyBody.copyWith(
-                                fontSize: 9,
-                                height: 1.05,
-                              ),
-                              maxLines: 2,
-                            ).height +
-                            buyV2ValueTextSize(
-                              context,
-                              'Ag',
-                              context.buyMeta.copyWith(fontSize: 7.5),
-                            ).height +
-                            buyV2ValueTextSize(
-                              context,
-                              'Ag',
-                              const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ).height.clamp(18, double.infinity))
-                        .clamp(174, double.infinity)
-                        .toDouble(),
+                height: railHeight,
                 child: ListView.separated(
                   key: ValueKey('buy-product-continuation-lane-${product.id}'),
                   scrollDirection: Axis.horizontal,
@@ -2775,8 +2781,6 @@ class _ProductContinuationCard extends StatelessWidget {
                     const SizedBox(height: 5),
                     Text(
                       product.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                       style: context.buyBody.copyWith(
                         fontSize: 9,
                         height: 1.05,
@@ -2785,8 +2789,6 @@ class _ProductContinuationCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       product.pack,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: context.buyMeta.copyWith(fontSize: 7.5),
                     ),
                     const Spacer(),
@@ -3160,23 +3162,27 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
             Positioned(
               left: 9,
               top: 9,
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 150),
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                decoration: BoxDecoration(
-                  color: product.requiresPrescription
-                      ? BuyV2Colors.navy
-                      : BuyV2Colors.green,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Text(
-                  product.badge,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w900,
+              child: BuyV2CartAvoidanceRegion(
+                key: ValueKey('buy-product-gallery-badge-${product.id}'),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 150),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: product.requiresPrescription
+                        ? BuyV2Colors.navy
+                        : BuyV2Colors.green,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(
+                    product.badge,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),
@@ -8508,17 +8514,24 @@ class BuyV2OrdersView extends StatelessWidget {
         ),
         if (browseProducts case final productGrid?) ...[
           const SizedBox(height: 8),
-          Semantics(
-            header: true,
-            child: Text(
-              'Browse more products',
-              style: context.buyTitle.copyWith(fontSize: 15),
+          BuyV2CartAvoidanceRegion(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    'Browse more products',
+                    style: context.buyTitle.copyWith(fontSize: 15),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Add products now without leaving your purchase history behind.',
+                  style: context.buyMeta.copyWith(fontSize: 8),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Add products now without leaving your purchase history behind.',
-            style: context.buyMeta.copyWith(fontSize: 8),
           ),
           const SizedBox(height: 4),
           productGrid,
@@ -16888,8 +16901,11 @@ class _OrderCard extends StatelessWidget {
                   Row(
                     children: [
                       Container(
-                        width: 28,
-                        height: 28,
+                        constraints: const BoxConstraints(
+                          minWidth: 28,
+                          minHeight: 28,
+                        ),
+                        padding: const EdgeInsets.all(6),
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: order.destination == BuyV2Destination.wholesale
