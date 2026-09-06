@@ -1295,9 +1295,13 @@ class WorkSession extends ChangeNotifier {
   }
 
   void retryWorkspaceDashboard() {
-    workspaceDashboardState = WorkspaceDashboardState.refreshing;
-    workspaceDashboardError = '';
-    notifyListeners();
+    // No operational-feed reader is connected yet. Application-review data
+    // cannot refresh orders, stock or payments, and a spinner is not a request.
+    setWorkspaceDashboardState(
+      WorkspaceDashboardState.failed,
+      error:
+          'Live store updates are unavailable. Your saved records are unchanged.',
+    );
   }
 
   void saveWorkspaceOrderDraft({
