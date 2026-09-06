@@ -13,6 +13,87 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 
 void main() {
+  WorkSession removableProof({WorkPendingProofStore? store}) {
+    final work = WorkSession(pendingProofStore: store)
+      ..selectProfile('retailer-grocery');
+    final id = work.selectedWorkspaceDocuments.first.id;
+    work.addedProofs[id] = 'private-proof-reference';
+    work.pickedProofs[id] = WorkPickedProof(
+      fileName: 'business-identity.pdf',
+      contentType: 'application/pdf',
+      bytes: Uint8List.fromList([1, 2, 3]),
+    );
+    return work;
+  }
+
+  test(
+    'S05 Undo restores the exact removed document without upload or approval',
+    () {
+      final work = removableProof();
+      addTearDown(work.dispose);
+      final id = work.selectedWorkspaceDocuments.first.id;
+      final file = work.pickedProofs[id];
+      work.setDeclaration(true);
+      work.removeProof(id);
+      expect(work.addedProofs, isEmpty);
+      expect(work.pickedProofs, isEmpty);
+      expect(work.declarationAccepted, isFalse);
+      expect(work.noticeMessage, isNull);
+      expect(work.removedProofName(id), 'business-identity.pdf');
+      expect(work.undoProofRemoval(id), isTrue);
+      expect(work.addedProofs[id], 'private-proof-reference');
+      expect(work.pickedProofs[id], same(file));
+      expect(work.canUndoProofRemoval(id), isFalse);
+      expect(work.undoProofRemoval(id), isFalse);
+      expect((work.gateway as ReviewWorkGateway).proofCalls, 0);
+      expect(work.hasVerifiedWorkspace, isFalse);
+    },
+  );
+
+  test('S05 Undo cannot overwrite a replacement document', () async {
+    final work = removableProof();
+    addTearDown(work.dispose);
+    final id = work.selectedWorkspaceDocuments.first.id;
+    work.removeProof(id);
+    expect(await work.addProof(id, WorkProofSource.upload), isTrue);
+    final replacement = work.addedProofs[id];
+    expect(replacement, isNot('private-proof-reference'));
+    expect(work.undoProofRemoval(id), isFalse);
+    expect(work.addedProofs[id], replacement);
+  });
+
+  test(
+    'S05 Undo is disabled during a picker or after application submission',
+    () {
+      final work = removableProof();
+      addTearDown(work.dispose);
+      final id = work.selectedWorkspaceDocuments.first.id;
+      work.removeProof(id);
+      work.busy = true;
+      expect(work.undoProofRemoval(id), isFalse);
+      work.busy = false;
+      work.reviewCaseId = 'REVIEW-CASE';
+      expect(work.undoProofRemoval(id), isFalse);
+      expect(work.addedProofs, isEmpty);
+      work.reviewCorrectionDraft = true;
+      expect(work.undoProofRemoval(id), isTrue);
+    },
+  );
+
+  test('S05 Undo cannot restore another account or business selection', () {
+    final store = _PendingProofMemory();
+    final work = removableProof(store: store);
+    addTearDown(work.dispose);
+    final id = work.selectedWorkspaceDocuments.first.id;
+    work.removeProof(id);
+    store.accountScope = 'second-account';
+    expect(work.undoProofRemoval(id), isFalse);
+    store.accountScope = 'review-account';
+    work.selectProfile('retailer-speciality');
+    expect(work.undoProofRemoval(id), isFalse);
+    expect(work.addedProofs, isEmpty);
+  });
+
   test(
     'S03 draft serial writes retain the latest edit while storage is busy',
     () async {

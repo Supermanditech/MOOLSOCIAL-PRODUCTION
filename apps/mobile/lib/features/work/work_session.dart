@@ -115,6 +115,16 @@ class WorkSession extends ChangeNotifier {
   String primaryActivity = '';
   final Map<String, String> addedProofs = <String, String>{};
   final Map<String, WorkPickedProof> pickedProofs = <String, WorkPickedProof>{};
+  final Map<
+    String,
+    ({
+      String reference,
+      WorkPickedProof? file,
+      String? profileId,
+      String? scope,
+    })
+  >
+  _removedProofs = {};
   WorkProfileSubmission? submittedProfile;
   bool declarationAccepted = false;
   WorkReviewStage reviewStage = WorkReviewStage.none;
@@ -2204,6 +2214,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   void selectFamily(String familyId) {
+    _removedProofs.clear();
     if (selectedFamilyId != familyId) {
       documentRecoveryMessage = _documentRecoveryProofId = null;
     }
@@ -2219,6 +2230,7 @@ class WorkSession extends ChangeNotifier {
       (profile) => profile.id == profileId,
     );
     if (selectedProfile?.id != nextProfile.id) {
+      _removedProofs.clear();
       documentRecoveryMessage = _documentRecoveryProofId = null;
       addedProofs.removeWhere((id, _) => id != 'personal-kyc');
       declarationAccepted = false;
@@ -2230,6 +2242,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   void changeFamily() {
+    _removedProofs.clear();
     documentRecoveryMessage = _documentRecoveryProofId = null;
     selectedFamilyId = null;
     selectedProfile = null;
@@ -2380,6 +2393,7 @@ class WorkSession extends ChangeNotifier {
         selectedFamilyId = null;
         addedProofs.clear();
         pickedProofs.clear();
+        _removedProofs.clear();
         submittedProfile = null;
         reviewCaseId = workspaceId = reviewReason = null;
         remoteReviewStatus = null;
@@ -3097,6 +3111,7 @@ class WorkSession extends ChangeNotifier {
       }
       addedProofs[proofId] = reference;
       pickedProofs[proofId] = proof;
+      _removedProofs.remove(proofId);
       if (_documentRecoveryProofId == proofId) {
         documentRecoveryMessage = _documentRecoveryProofId = null;
       }
@@ -3123,10 +3138,52 @@ class WorkSession extends ChangeNotifier {
   }
 
   void removeProof(String proofId) {
+    final reference = addedProofs[proofId];
+    if (busy ||
+        reference == null ||
+        (reviewCaseId != null && !reviewCorrectionDraft)) {
+      return;
+    }
+    _removedProofs[proofId] = (
+      reference: reference,
+      file: pickedProofs[proofId],
+      profileId: selectedProfile?.id,
+      scope: _contactAccountScope,
+    );
     addedProofs.remove(proofId);
     pickedProofs.remove(proofId);
     declarationAccepted = false;
-    showNotice('Document removed. You can add a replacement during review.');
+    clearMessages();
+    notifyListeners();
+  }
+
+  bool canUndoProofRemoval(String proofId) {
+    final removed = _removedProofs[proofId];
+    return !busy &&
+        removed != null &&
+        !addedProofs.containsKey(proofId) &&
+        removed.scope == _contactAccountScope &&
+        removed.profileId == selectedProfile?.id &&
+        selectedWorkspaceDocuments.any((proof) => proof.id == proofId) &&
+        (reviewCaseId == null || reviewCorrectionDraft);
+  }
+
+  String? removedProofName(String proofId) => canUndoProofRemoval(proofId)
+      ? _removedProofs[proofId]!.file?.fileName ??
+            selectedWorkspaceDocuments
+                .firstWhere((proof) => proof.id == proofId)
+                .label
+      : null;
+
+  bool undoProofRemoval(String proofId) {
+    if (!canUndoProofRemoval(proofId)) return false;
+    final removed = _removedProofs.remove(proofId)!;
+    addedProofs[proofId] = removed.reference;
+    if (removed.file != null) pickedProofs[proofId] = removed.file!;
+    declarationAccepted = false;
+    clearMessages();
+    notifyListeners();
+    return true;
   }
 
   void setDeclaration(bool value) {

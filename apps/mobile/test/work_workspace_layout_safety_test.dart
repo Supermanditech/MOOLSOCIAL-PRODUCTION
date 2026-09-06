@@ -277,6 +277,93 @@ void main() {
     (width: 320.0, height: 568.0, scale: 2.0),
   ]) {
     testWidgets(
+      'S05 document removal Undo stays local and safe ${display.scale}',
+      (tester) async {
+        final gateway = ReviewWorkGateway();
+        final work = WorkSession(gateway: gateway)
+          ..selectProfile('retailer-grocery')
+          ..authorizedPersonName = 'Asha Sharma'
+          ..primaryMobile = '9829012321'
+          ..primaryMobileVerified = true
+          ..contactEmail = 'asha@example.com'
+          ..contactEmailVerified = true
+          ..saveDetails(
+            name: 'Sharma Stores',
+            area: 'Jaipur',
+            activity: 'Groceries',
+          );
+        final proof = work.selectedWorkspaceDocuments.first;
+        expect(
+          await tester.runAsync(
+            () => work.addProof(proof.id, WorkProofSource.upload),
+          ),
+          isTrue,
+        );
+        final reference = work.addedProofs[proof.id];
+        final file = work.pickedProofs[proof.id];
+        work.recoveredDocumentStep = true;
+        await mount(
+          tester,
+          route: '/app/work/workspace/proof',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        final remove = find.byKey(Key('work-remove-proof-${proof.id}'));
+        await reveal(tester, remove);
+        expect(remove.hitTestable(), findsOneWidget);
+        await tester.tap(remove);
+        await tester.pumpAndSettle();
+        expect(work.addedProofs.containsKey(proof.id), isFalse);
+        expect(find.byKey(const Key('work-notice')), findsNothing);
+        final undo = find.byKey(Key('work-undo-proof-${proof.id}'));
+        await reveal(tester, undo);
+        expect(undo.hitTestable(), findsOneWidget);
+        expect(tester.getSize(undo).height, greaterThanOrEqualTo(48));
+        expect(
+          tester.getRect(undo).bottom,
+          lessThanOrEqualTo(display.height - 44),
+        );
+        expect(find.text('Removed: ${file!.fileName}'), findsOneWidget);
+        await captureStoreView(
+          tester,
+          'r665-document-removed-${display.scale}',
+        );
+        await tester.tap(undo);
+        await tester.pumpAndSettle();
+        expect(work.addedProofs[proof.id], reference);
+        expect(work.pickedProofs[proof.id], same(file));
+        expect(gateway.proofCalls, 1);
+        expect(work.declarationAccepted, isFalse);
+        expect(undo, findsNothing);
+        await reveal(tester, find.byKey(Key('work-view-proof-${proof.id}')));
+        await captureStoreView(
+          tester,
+          'r665-document-restored-${display.scale}',
+        );
+        await tester.tap(remove);
+        await tester.pumpAndSettle();
+        await reveal(tester, find.byKey(const Key('work-proof-review')));
+        await tester.tap(find.byKey(const Key('work-proof-review')));
+        await tester.pumpAndSettle();
+        expect(work.addedProofs.containsKey(proof.id), isFalse);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        await reveal(tester, undo);
+        await tester.tap(undo);
+        await tester.pumpAndSettle();
+        expect(work.addedProofs[proof.id], reference);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final display in [
+    (width: 412.0, height: 915.0, scale: 1.0),
+    (width: 320.0, height: 568.0, scale: 1.4),
+    (width: 320.0, height: 568.0, scale: 2.0),
+  ]) {
+    testWidgets(
       'S03 compact contact first view and full labels ${display.scale}',
       (tester) async {
         final work = WorkSession()

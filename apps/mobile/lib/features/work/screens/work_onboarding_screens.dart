@@ -2163,6 +2163,10 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                   onAdd: () => _showProofSource(context, proof),
                   onView: () => _showDocument(context, proof),
                   onRemove: () => widget.session.removeProof(proof.id),
+                  removedName: widget.session.removedProofName(proof.id),
+                  onUndo: widget.session.canUndoProofRemoval(proof.id)
+                      ? () => widget.session.undoProofRemoval(proof.id)
+                      : null,
                 ),
                 const SizedBox(height: MoolSpacing.xs),
               ],
@@ -3076,12 +3080,16 @@ class _ProofCard extends StatelessWidget {
     this.file,
     this.onView,
     this.onRemove,
+    this.removedName,
+    this.onUndo,
   });
   final WorkProofRequirement proof;
   final bool added;
   final WorkPickedProof? file;
   final VoidCallback onAdd;
   final VoidCallback? onView, onRemove;
+  final String? removedName;
+  final VoidCallback? onUndo;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -3114,7 +3122,11 @@ class _ProofCard extends StatelessWidget {
           ),
           const SizedBox(height: 5),
           Text(
-            added ? file?.fileName ?? 'Document attached' : proof.detail,
+            added
+                ? file?.fileName ?? 'Document attached'
+                : removedName != null
+                ? 'Removed: $removedName'
+                : proof.detail,
             style: const TextStyle(color: MoolColors.muted, fontSize: 12),
           ),
           Wrap(
@@ -3125,12 +3137,15 @@ class _ProofCard extends StatelessWidget {
                 TextButton(
                   key: Key('work-view-proof-${proof.id}'),
                   onPressed: onView,
-                  child: const Text('View'),
+                  child: Text('View', semanticsLabel: 'View ${proof.label}'),
                 ),
                 TextButton(
                   key: Key('work-replace-proof-${proof.id}'),
                   onPressed: onAdd,
-                  child: const Text('Replace'),
+                  child: Text(
+                    'Replace',
+                    semanticsLabel: 'Replace ${proof.label}',
+                  ),
                 ),
                 IconButton(
                   key: Key('work-remove-proof-${proof.id}'),
@@ -3138,12 +3153,26 @@ class _ProofCard extends StatelessWidget {
                   onPressed: onRemove,
                   icon: const Icon(Icons.delete_outline, size: 20),
                 ),
-              ] else
+              ] else ...[
+                if (onUndo != null)
+                  TextButton.icon(
+                    key: Key('work-undo-proof-${proof.id}'),
+                    onPressed: onUndo,
+                    icon: const Icon(Icons.undo_rounded, size: 18),
+                    label: Text(
+                      'Undo',
+                      semanticsLabel: 'Restore ${proof.label}',
+                    ),
+                  ),
                 TextButton(
                   key: Key('work-add-proof-${proof.id}'),
                   onPressed: onAdd,
-                  child: const Text('Add document'),
+                  child: Text(
+                    'Add document',
+                    semanticsLabel: 'Add ${proof.label}',
+                  ),
                 ),
+              ],
             ],
           ),
           const Divider(height: 1),
