@@ -1558,7 +1558,16 @@ if ($ProductionLane -ceq 'baseline') {
           'artifacts/quality/codex-oppo-r66-2-review-20260906/apk-regression-state.json',
           'artifacts/quality/codex-oppo-r66-2-review-20260906/uaw-codex-oppo-r66.2-review-20260906-build-provenance.txt',
           'artifacts/quality/codex-oppo-r66-2-review-20260906/post-install.json',
-          'artifacts/quality/codex-oppo-r66-2-review-20260906/device-review.md'
+          'artifacts/quality/codex-oppo-r66-2-review-20260906/device-review.md',
+          'artifacts/quality/codex-oppo-r66-3-review-20260906/candidate-contract.md',
+          'artifacts/quality/codex-oppo-r66-3-review-20260906/source-manifest.txt',
+          'artifacts/quality/codex-oppo-r66-3-review-20260906/local-validation.md',
+          'artifacts/quality/codex-oppo-r66-3-review-20260906/prebuild-validation.md',
+          'artifacts/quality/codex-oppo-r66-3-review-20260906/motion-disposition.md',
+          'artifacts/quality/codex-oppo-r66-3-review-20260906/apk-regression-state.json',
+          'artifacts/quality/codex-oppo-r66-3-review-20260906/uaw-codex-oppo-r66.3-review-20260906-build-provenance.txt',
+          'artifacts/quality/codex-oppo-r66-3-review-20260906/post-install.json',
+          'artifacts/quality/codex-oppo-r66-3-review-20260906/device-review.md'
         )
       )
       $workRouteContractOwner = (

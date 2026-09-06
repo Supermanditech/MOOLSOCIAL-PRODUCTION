@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4479,
-    "sha256": "CFB01BF21CF35BE4DD28A8D86E84E48F911A067A7897BAE8425F3BB6EF9DEA9D"
+    "entryCount": 4484,
+    "sha256": "E65A238C7EC5B89F6AF308F7B887F8C4BF212E92CEE0A4A75CE4C712ABEA4EA9"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -71,6 +71,15 @@
         "artifacts/quality/codex-oppo-r66-2-review-20260906/prebuild-validation.md",
         "artifacts/quality/codex-oppo-r66-2-review-20260906/motion-disposition.md",
         "artifacts/quality/codex-oppo-r66-2-review-20260906/apk-regression-state.json",
+        "artifacts/quality/codex-oppo-r66-2-review-20260906/uaw-codex-oppo-r66.2-review-20260906-build-provenance.txt",
+        "artifacts/quality/codex-oppo-r66-2-review-20260906/post-install.json",
+        "artifacts/quality/codex-oppo-r66-2-review-20260906/device-review.md",
+        "artifacts/quality/codex-oppo-r66-3-review-20260906/candidate-contract.md",
+        "artifacts/quality/codex-oppo-r66-3-review-20260906/source-manifest.txt",
+        "artifacts/quality/codex-oppo-r66-3-review-20260906/local-validation.md",
+        "artifacts/quality/codex-oppo-r66-3-review-20260906/prebuild-validation.md",
+        "artifacts/quality/codex-oppo-r66-3-review-20260906/motion-disposition.md",
+        "artifacts/quality/codex-oppo-r66-3-review-20260906/apk-regression-state.json",
         "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
         "docs/quality/UAW-CODEX-WORK-OPPORTUNITY-ROUTE-CONTRACT-V1-20260905.md",
         "config/codex-development-regression-registry.json",

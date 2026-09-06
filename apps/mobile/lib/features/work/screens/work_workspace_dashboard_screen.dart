@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,6 +12,7 @@ import '../../../core/design/mool_theme.dart';
 import '../../../ui_v2/buy/buy_v2_screen.dart';
 import '../../../ui_v2/buy/buy_v2_scanner.dart';
 import '../../../ui_v2/profile/global_profile_panel_v2.dart';
+import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../../buy/buy_v2_models.dart';
 import '../../buy/buy_v2_session.dart';
 import '../../journey01/journey_services.dart';
@@ -39,6 +41,7 @@ class WorkWorkspaceDashboardScreen extends StatefulWidget {
     required this.procurementSession,
     this.accountIdentity,
     this.accountAuthenticated = false,
+    this.initialSection,
     super.key,
   });
 
@@ -46,6 +49,7 @@ class WorkWorkspaceDashboardScreen extends StatefulWidget {
   final BuyV2Session procurementSession;
   final AuthenticatedAccountIdentity? accountIdentity;
   final bool accountAuthenticated;
+  final String? initialSection;
 
   @override
   State<WorkWorkspaceDashboardScreen> createState() =>
@@ -89,6 +93,16 @@ class _WorkWorkspaceDashboardScreenState
     _searchController = TextEditingController(
       text: session.workspaceSearchQuery,
     );
+    final section = switch (widget.initialSection) {
+      'orders' => _WorkspaceOperation.orders,
+      'sell' => _WorkspaceOperation.counterOrder,
+      'stock' => _WorkspaceOperation.catalogue,
+      _ => null,
+    };
+    if (section != null) {
+      _operation = section;
+      _view = _WorkspaceControlView.operation;
+    }
   }
 
   @override
@@ -411,9 +425,9 @@ class _WorkWorkspaceDashboardScreenState
             _WorkspaceOperation.storeLink ||
             _WorkspaceOperation.direct,
       ) =>
-        'business',
+        'store',
       (_WorkspaceControlView.status || _WorkspaceControlView.alerts, _) =>
-        'business',
+        'store',
       (_WorkspaceControlView.procurement, _) => 'stock',
       _ => 'store',
     };
@@ -423,7 +437,7 @@ class _WorkWorkspaceDashboardScreenState
         id: 'store',
         label: 'Store',
         icon: Icons.storefront_outlined,
-        onPressed: storeActiveId == 'store'
+        onPressed: _view == _WorkspaceControlView.dashboard
             ? null
             : _view == _WorkspaceControlView.status
             ? () => unawaited(_leaveSettings())
@@ -434,7 +448,9 @@ class _WorkWorkspaceDashboardScreenState
         id: 'orders',
         label: 'Orders',
         icon: Icons.receipt_long_outlined,
-        onPressed: storeActiveId == 'orders'
+        onPressed:
+            _view == _WorkspaceControlView.operation &&
+                _operation == _WorkspaceOperation.orders
             ? null
             : () => unawaited(
                 _navigateFromCounterDraft(
@@ -463,7 +479,9 @@ class _WorkWorkspaceDashboardScreenState
         id: 'stock',
         label: 'Stock',
         icon: Icons.inventory_2_outlined,
-        onPressed: storeActiveId == 'stock'
+        onPressed:
+            _view == _WorkspaceControlView.operation &&
+                _operation == _WorkspaceOperation.catalogue
             ? null
             : () => unawaited(
                 _navigateFromCounterDraft(
@@ -570,7 +588,7 @@ class _WorkWorkspaceDashboardScreenState
       },
       manageSystemBack: _view != _WorkspaceControlView.procurement,
       hideNavigationWhenKeyboardVisible: true,
-      navigationOverBody: _view == _WorkspaceControlView.procurement,
+      navigationOverBody: false,
       resizeToAvoidBottomInset: _view != _WorkspaceControlView.procurement,
       bottomAction: bottomAction,
       body: switch (_view) {
@@ -1195,11 +1213,9 @@ class _StoreProcurementSurface extends StatelessWidget {
     required this.onExit,
     required this.onDestinationChanged,
   });
-
   final BuyV2Session session;
   final AuthenticatedAccountIdentity? accountIdentity;
-  final bool accountAuthenticated;
-  final bool ready;
+  final bool accountAuthenticated, ready;
   final String? productId;
   final VoidCallback onExit;
   final ValueChanged<BuyV2Destination> onDestinationChanged;
@@ -1208,56 +1224,57 @@ class _StoreProcurementSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final keyboardVisible = media.viewInsets.bottom > 0;
+    final view = View.of(context);
+    final devicePadding = EdgeInsets.fromViewPadding(
+      view.viewPadding,
+      view.devicePixelRatio,
+    );
+    final navigationHeight =
+        MoolLocalNavigationTokens.destinationRailHeight +
+        (media.viewPadding.bottom > 2 ? media.viewPadding.bottom : 2) +
+        moolAndroidExportedSemanticsClearance(
+          viewPadding: devicePadding,
+          platform: defaultTargetPlatform,
+        );
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crop = keyboardVisible ? 116.0 : 0.0;
-        final buy = MediaQuery(
-          data: media.copyWith(
-            size: Size(media.size.width, media.size.height + crop),
-            viewInsets: keyboardVisible ? EdgeInsets.zero : media.viewInsets,
-            viewPadding: keyboardVisible
-                ? media.viewPadding.copyWith(bottom: 0)
-                : media.viewPadding,
-            padding: keyboardVisible
-                ? media.padding.copyWith(bottom: 0)
-                : media.padding,
-            textScaler: media.textScaler.clamp(
-              minScaleFactor: 1,
-              maxScaleFactor: 1,
-            ),
-          ),
-          child: BuyV2Screen(
-            key: const ValueKey('work-store-procurement-buy-host'),
-            session: session,
-            accountIdentity: accountIdentity,
-            accountAuthenticated: accountAuthenticated,
-            initialDestination: BuyV2Destination.wholesale,
-            initialView: productId == null
-                ? BuyV2View.catalogue
-                : BuyV2View.product,
-            productId: productId,
-            initialCartScope: BuyV2CartScope.wholesale,
-            onExit: onExit,
-            onDestinationChanged: onDestinationChanged,
-          ),
-        );
+        // Buy hides its own footer while typing. Keep the same subtree through
+        // every inset change; only move its unneeded footer outside the clip.
+        final crop = keyboardVisible ? 0.0 : navigationHeight;
+        final height = constraints.maxHeight + crop;
         return Stack(
           key: const Key('work-store-procurement-screen'),
           children: [
             Positioned.fill(
-              child: crop == 0
-                  ? buy
-                  : ClipRect(
-                      child: OverflowBox(
-                        alignment: Alignment.topCenter,
-                        minHeight: constraints.maxHeight + crop,
-                        maxHeight: constraints.maxHeight + crop,
-                        child: SizedBox(
-                          height: constraints.maxHeight + crop,
-                          child: buy,
-                        ),
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: Alignment.topCenter,
+                  minHeight: height,
+                  maxHeight: height,
+                  child: SizedBox(
+                    height: height,
+                    child: MediaQuery(
+                      data: media.copyWith(
+                        size: Size(media.size.width, media.size.height + crop),
+                      ),
+                      child: BuyV2Screen(
+                        key: const ValueKey('work-store-procurement-buy-host'),
+                        session: session,
+                        accountIdentity: accountIdentity,
+                        accountAuthenticated: accountAuthenticated,
+                        initialDestination: BuyV2Destination.wholesale,
+                        initialView: productId == null
+                            ? BuyV2View.catalogue
+                            : BuyV2View.product,
+                        productId: productId,
+                        initialCartScope: BuyV2CartScope.wholesale,
+                        onExit: onExit,
+                        onDestinationChanged: onDestinationChanged,
                       ),
                     ),
+                  ),
+                ),
+              ),
             ),
             if (!ready)
               const Positioned.fill(
@@ -1273,12 +1290,8 @@ class _StoreProcurementSurface extends StatelessWidget {
                           'Preparing Wholesale and Bulk',
                           style: TextStyle(
                             color: MoolColors.navy,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                           ),
-                        ),
-                        Text(
-                          'Your Store remains available while products load.',
-                          style: TextStyle(color: MoolColors.muted),
                         ),
                       ],
                     ),
@@ -1920,6 +1933,7 @@ class _StoreEdgeAction extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     button: true,
     label: detail == null ? label : '$label, $detail',
+    onTap: onTap,
     excludeSemantics: true,
     child: InkWell(
       key: Key(keyName),
@@ -2154,6 +2168,7 @@ class _StorePulseMetric extends StatelessWidget {
       child: Semantics(
         button: true,
         label: '$label, $value',
+        onTap: onTap,
         excludeSemantics: true,
         child: InkWell(
           key: Key(keyName),
@@ -2270,7 +2285,7 @@ class _StoreActivityDeck extends StatelessWidget {
     } else if (session.workspaceSettlementBalance > 0) {
       content = _MoneyActivityCard(session: session, onOpen: onMoney);
     } else {
-      content = const _StoreReadyActivity();
+      content = _StoreReadyActivity(session: session);
     }
     return Padding(
       key: const Key('work-store-activity-deck'),
@@ -4233,23 +4248,36 @@ class _DeckPrice extends StatelessWidget {
 }
 
 class _StoreReadyActivity extends StatelessWidget {
-  const _StoreReadyActivity();
+  const _StoreReadyActivity({required this.session});
+  final WorkSession session;
 
   @override
   Widget build(BuildContext context) {
+    final open =
+        session.workspaceAcceptingOrders && session.workspaceVisibleToCustomers;
+    final paused = session.workspaceStoreState == WorkspaceStoreState.paused;
+    final private =
+        session.workspaceStoreState == WorkspaceStoreState.open &&
+        !session.workspaceVisibleToCustomers;
     return SingleChildScrollView(
       key: const Key('work-activity-ready'),
       padding: const EdgeInsets.all(18),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Row(
+          Row(
             children: [
               _LiveDot(color: MoolColors.navy),
               SizedBox(width: 8),
               Text(
-                'STORE READY',
-                style: TextStyle(
+                open
+                    ? 'TAKING ORDERS'
+                    : paused
+                    ? 'PAUSED'
+                    : private
+                    ? 'PRIVATE'
+                    : 'STORE OFF',
+                style: const TextStyle(
                   color: MoolColors.navy,
                   fontSize: 11,
                   letterSpacing: .8,
@@ -4259,7 +4287,7 @@ class _StoreReadyActivity extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          const Row(
+          Row(
             children: [
               CircleAvatar(
                 radius: 22,
@@ -4272,16 +4300,24 @@ class _StoreReadyActivity extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Your store is ready',
-                      style: TextStyle(
+                      open
+                          ? 'Ready for customers'
+                          : paused
+                          ? 'Orders are paused'
+                          : private
+                          ? 'Your store is private'
+                          : 'Your store is off',
+                      style: const TextStyle(
                         color: MoolColors.ink,
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     Text(
-                      'New orders and urgent tasks will appear here.',
-                      style: TextStyle(
+                      open
+                          ? 'New orders will appear here.'
+                          : 'Manage opening and visibility in your business profile.',
+                      style: const TextStyle(
                         color: MoolColors.muted,
                         fontSize: 10.5,
                         height: 1.3,
@@ -6071,16 +6107,16 @@ class _DeskEmpty extends StatelessWidget {
   final String title, detail;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 8),
+    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 0),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 32, color: MoolColors.navy),
-        const SizedBox(height: 18),
+        Icon(icon, size: 24, color: MoolColors.navy),
+        const SizedBox(height: 10),
         Text(
           title,
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 16,
             color: MoolColors.navy,
             fontWeight: FontWeight.w800,
           ),
@@ -6264,7 +6300,7 @@ class _StoreDirectSurface extends StatelessWidget {
           .toList();
       return ListView(
         key: const Key('work-store-buy-direct'),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         children: [
           const Text(
             'Buy Direct',
@@ -6275,7 +6311,7 @@ class _StoreDirectSurface extends StatelessWidget {
             'Manufacturer prices. Delivered to your store.',
             style: TextStyle(fontSize: 14, height: 1.4, color: MoolColors.navy),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 8),
           if (products.isEmpty)
             const _DeskEmpty(
               icon: Icons.factory_outlined,
@@ -6301,7 +6337,7 @@ class _StoreDirectSurface extends StatelessWidget {
                   ).toString(),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -6316,7 +6352,7 @@ class _StoreDirectSurface extends StatelessWidget {
                       Text(
                         product.title,
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -6324,11 +6360,11 @@ class _StoreDirectSurface extends StatelessWidget {
                         '${product.pack} · Minimum ${product.minimumOrder}',
                         style: const TextStyle(fontSize: 12),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 6),
                       Text(
                         '₹${_formatStoreAmount(product.price)}',
                         style: const TextStyle(
-                          fontSize: 22,
+                          fontSize: 18,
                           color: MoolColors.navy,
                           fontWeight: FontWeight.w800,
                         ),
@@ -6340,7 +6376,7 @@ class _StoreDirectSurface extends StatelessWidget {
                           color: MoolColors.muted,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       const Text(
                         'View offer',
                         style: TextStyle(
@@ -6353,7 +6389,7 @@ class _StoreDirectSurface extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
           ],
         ],
       );
@@ -6509,9 +6545,9 @@ class _WorkspaceOperationSurface extends StatelessWidget {
                 ),
                 _DeskEmpty(
                   icon: Icons.groups_2_outlined,
-                  title: 'The next bulk opportunity will appear here',
+                  title: 'No group purchase open',
                   detail:
-                      'See the product, participating stores, quantity, complete price and closing date before you commit. No open group purchase is available for this store yet.',
+                      'New bulk offers will show the price, participating stores and closing date here.',
                 ),
               ],
             )
@@ -11138,9 +11174,13 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            _filter == 'Done'
-                                ? 'No completed order yet'
-                                : 'No ${filterLabels[_filter]!.toLowerCase()} order needs action',
+                            switch (_filter) {
+                              'Done' => 'No completed orders yet',
+                              'New' => 'No new orders',
+                              'Packing' => 'No orders awaiting packing',
+                              'Ready' => 'No orders ready for pickup',
+                              _ => 'No active orders',
+                            },
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               color: MoolColors.ink,
@@ -15081,11 +15121,20 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             child: AnimatedPadding(
               duration: const Duration(milliseconds: 180),
               padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-              child: SizedBox(
-                height: media.size.height * .72,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight:
+                      (media.size.height -
+                              media.viewInsets.bottom -
+                              media.padding.top -
+                              systemBottom -
+                              64)
+                          .clamp(120.0, double.infinity),
+                ),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
+                    Flexible(
                       child: SingleChildScrollView(
                         keyboardDismissBehavior:
                             ScrollViewKeyboardDismissBehavior.onDrag,
@@ -15095,7 +15144,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Review customer order',
+                              'Review bill',
                               style: TextStyle(
                                 color: MoolColors.ink,
                                 fontSize: 21,
@@ -15167,7 +15216,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                         ),
                         label: Text(
                           _fulfilment == 'At the shop'
-                              ? 'Complete sale & create invoice'
+                              ? 'Create invoice'
                               : _fulfilment == 'Mool delivery'
                               ? 'Create order for Mool delivery'
                               : 'Create order for my delivery',
@@ -15461,7 +15510,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '$_selectedUnits units',
+                        '$_selectedUnits ${_selectedUnits == 1 ? 'unit' : 'units'}',
                         style: const TextStyle(
                           color: MoolColors.muted,
                           fontSize: 12,
@@ -15830,7 +15879,7 @@ class _OrderReviewSummary extends StatelessWidget {
             ],
           ),
           Text(
-            '$source order · $units units',
+            '$source order · $units ${units == 1 ? 'unit' : 'units'}',
             style: const TextStyle(color: MoolColors.muted, fontSize: 10.5),
           ),
           const SizedBox(height: 7),
@@ -16644,7 +16693,9 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
       !session.dismissedWorkspaceAlerts.contains('store-paused')) {
     alerts.add((
       id: 'store-paused',
-      title: 'Your store is paused',
+      title: session.workspaceStoreState == WorkspaceStoreState.paused
+          ? 'Your store is paused'
+          : 'Your store is off',
       detail: session.workspaceReopensAt.isEmpty
           ? 'Customers cannot place new app orders until you reopen the store.'
           : 'Customers can see that ordering resumes ${session.workspaceReopensAt}.',

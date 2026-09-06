@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/core/design/mool_design_system.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
@@ -10,6 +11,16 @@ import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 
 void main() {
+  WorkSession liveStore({ReviewWorkGateway? gateway}) =>
+      WorkSession(gateway: gateway)
+        ..seedVerifiedWorkspace()
+        ..retailerSetupSaved = true
+        ..reviewStage = WorkReviewStage.live
+        ..workspaceStoreState = WorkspaceStoreState.open
+        ..workspaceAcceptingOrders = true
+        ..workspaceVisibleToCustomers = true
+        ..workspaceLastUpdatedAt = DateTime(2026, 9, 3, 8, 30);
+
   const captureStoreViewV2 = bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2');
   const captureFounderEvidence = bool.fromEnvironment(
     'MOOL_CAPTURE_WORK_STORE_1_40',
@@ -444,6 +455,24 @@ void main() {
       if (entry.$2.isNotEmpty) {
         expect(find.byKey(Key(entry.$2)), findsOneWidget);
       }
+      if (entry.$1 != 'work-quick-requirement') {
+        final expectedTab = switch (entry.$1) {
+          'work-store-orders' => 'orders',
+          'work-store-sell' => 'sell',
+          'work-store-stock' ||
+          'work-quick-buy' ||
+          'work-quick-group-buy' => 'stock',
+          _ => 'store',
+        };
+        expect(
+          tester
+              .widget<MoolLocalNavigationRail>(
+                find.byKey(const Key('work-local-navigation')),
+              )
+              .activeId,
+          expectedTab,
+        );
+      }
       expect(tester.takeException(), isNull);
       await captureStoreView(tester, entry.$3);
       // A clean first view has no submitted transaction or draft to discard.
@@ -455,6 +484,58 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'Store and Stock remain one-tap parent returns on child destinations',
+    (tester) async {
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: liveStore(),
+      );
+      await tester.tap(find.byKey(const Key('work-pulse-sales')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-store-home')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-quick-buy')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-dashboard-catalogue-screen')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('work-store-procurement-screen')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final state in WorkspaceStoreState.values) {
+    testWidgets('quiet Store distinguishes private and $state availability', (
+      tester,
+    ) async {
+      final work = liveStore()
+        ..workspaceStoreState = state
+        ..workspaceVisibleToCustomers = false
+        ..workspaceAcceptingOrders = state == WorkspaceStoreState.open;
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      expect(
+        find.text(switch (state) {
+          WorkspaceStoreState.open => 'Your store is private',
+          WorkspaceStoreState.paused => 'Orders are paused',
+          WorkspaceStoreState.off => 'Your store is off',
+        }),
+        findsOneWidget,
+      );
+      expect(find.text('Ready for customers'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -1356,26 +1437,17 @@ void main() {
     expect(storeNavigation, findsOneWidget);
     if (buyNavigation.evaluate().isNotEmpty) {
       expect(buyNavigation.hitTestable(), findsNothing);
-      final storeRect = tester.getRect(storeNavigation);
       final buyRect = tester.getRect(buyNavigation);
-      expect(storeRect.top, lessThanOrEqualTo(buyRect.bottom));
-      expect(storeRect.bottom, greaterThanOrEqualTo(buyRect.top));
+      final viewport = tester.getRect(
+        find.byKey(const Key('work-store-procurement-screen')),
+      );
+      expect(buyRect.top, greaterThanOrEqualTo(viewport.bottom - 1));
     }
   }
 
   WorkSession selectedRetailer() => WorkSession()
     ..selectFamily('products-trade')
     ..selectProfile('retailer-grocery');
-
-  WorkSession liveStore({ReviewWorkGateway? gateway}) =>
-      WorkSession(gateway: gateway)
-        ..seedVerifiedWorkspace()
-        ..retailerSetupSaved = true
-        ..reviewStage = WorkReviewStage.live
-        ..workspaceStoreState = WorkspaceStoreState.open
-        ..workspaceAcceptingOrders = true
-        ..workspaceVisibleToCustomers = true
-        ..workspaceLastUpdatedAt = DateTime(2026, 9, 3, 8, 30);
 
   WorkspaceCatalogueItem catalogueProduct(int index, {int stock = 12}) =>
       WorkspaceCatalogueItem(
@@ -1460,6 +1532,144 @@ void main() {
         ),
       );
       expect(find.byKey(const Key('work-contact-continue')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'native OTP keyboard keeps confirmation reachable and disables autocorrection',
+    (tester) async {
+      final work = selectedRetailer()..contactEmail = 'qa@example.com';
+      await mount(
+        tester,
+        route: '/app/work/workspace/contact',
+        work: work,
+        viewport: const Size(360, 806),
+        textScale: 1,
+        bottomInset: 44,
+      );
+      final send = find.byKey(const Key('work-contact-email-send-otp'));
+      await reveal(tester, send);
+      await tester.tap(send);
+      await tester.pumpAndSettle();
+      final otp = find.byKey(const Key('work-contact-email-otp'));
+      expect(tester.widget<TextField>(otp).focusNode!.hasFocus, isTrue);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.enterText(otp, '123456');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-contact-continue')), findsNothing);
+      expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+      final confirm = find.byKey(const Key('work-contact-email-confirm-otp'));
+      await reveal(tester, confirm);
+      expect(confirm.hitTestable(), findsOneWidget);
+      expect(tester.getBottomRight(confirm).dy, lessThanOrEqualTo(506));
+      for (final field in tester.widgetList<TextField>(
+        find.byType(TextField),
+      )) {
+        expect(field.autocorrect, isFalse);
+        expect(field.enableSuggestions, isFalse);
+      }
+      await tester.tap(confirm);
+      await tester.pumpAndSettle();
+      expect(work.contactEmailVerified, isTrue);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, '31-contact-confirm-native-keyboard');
+    },
+  );
+
+  testWidgets(
+    'restored document returns directly to Documents not the business form',
+    (tester) async {
+      final work = selectedRetailer()
+        ..recoveredDocumentStep = true
+        ..workName = 'Review Kirana';
+      await mount(tester, route: '/app/work/workspace/proof', work: work);
+      expect(
+        find.byKey(const Key('work-add-proof-shop-front')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-details-continue')), findsNothing);
+      expect(work.workName, 'Review Kirana');
+      expect(work.recoveredDocumentStep, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Store edge and finance expose operable semantic buttons', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: liveStore(),
+    );
+    for (final key in [
+      'work-quick-buy',
+      'work-quick-direct',
+      'work-quick-group-buy',
+      'work-pulse-sales',
+      'work-pulse-settlement',
+    ]) {
+      final finder = find.byKey(Key(key));
+      expect(finder.hitTestable(), findsOneWidget);
+      expect(
+        tester
+            .getSemantics(finder)
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+    }
+    handle.dispose();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'compact retailer setup uses actual catalogue and Store return sections',
+    (tester) async {
+      final work = liveStore()..retailerSetupSaved = false;
+      await mount(
+        tester,
+        route: '/app/work/retailer/setup',
+        work: work,
+        viewport: const Size(360, 806),
+        textScale: 1,
+      );
+      expect(find.byKey(const Key('work-global-chat')), findsNothing);
+      expect(find.byKey(const Key('work-help')), findsNothing);
+      expect(find.text('Earn Today'), findsNothing);
+      expect(
+        find.text(work.workspaceCatalogueItems.first.title),
+        findsOneWidget,
+      );
+      await captureStoreView(tester, '32-compact-retailer-setup');
+      await tester.tap(find.byKey(const Key('retailer-add-catalog-product')));
+      await tester.pumpAndSettle();
+      await reveal(tester, find.byKey(const Key('retailer-product-quantity')));
+      await tester.enterText(
+        find.byKey(const Key('retailer-product-quantity')),
+        '5',
+      );
+      await reveal(tester, find.byKey(const Key('retailer-product-buy-price')));
+      await tester.enterText(
+        find.byKey(const Key('retailer-product-buy-price')),
+        '40',
+      );
+      await tester.enterText(
+        find.byKey(const Key('retailer-product-sell-price')),
+        '55',
+      );
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final collection = find.byKey(const Key('retailer-store-collection'));
+      await reveal(tester, collection);
+      await tester.tap(collection);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('retailer-finish-setup')));
+      await tester.pumpAndSettle();
+      expect(work.retailerSetupSaved, isTrue);
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1653,7 +1863,7 @@ void main() {
       await mount(tester, route: '/app/work/retailer/setup', work: work);
       expectHeaderAndStickyAction(tester);
       final visibilityCopy = find.text(
-        'Nothing will be public after setup until you choose Open.',
+        'Your store stays off and private. Open it later from your business profile.',
       );
       await reveal(tester, visibilityCopy);
       expect(
@@ -1672,7 +1882,7 @@ void main() {
       await tester.tap(find.byKey(const Key('retailer-publish-after-setup')));
       await tester.pumpAndSettle();
       expect(work.retailerPublishAfterSetup, isTrue);
-      expect(find.text('Finish setup and open store'), findsOneWidget);
+      expect(find.text('Finish setup'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -2545,7 +2755,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
       await tester.pumpAndSettle();
-      expect(find.text('1 units'), findsOneWidget);
+      expect(find.text('1 unit'), findsOneWidget);
       expect(find.text('₹264'), findsWidgets);
 
       await tester.tap(find.byKey(const Key('work-order-review')));
@@ -2554,7 +2764,7 @@ void main() {
         find.byKey(const Key('work-order-review-summary')),
         findsOneWidget,
       );
-      expect(find.text('Phone order · 1 units'), findsOneWidget);
+      expect(find.text('Phone order · 1 unit'), findsOneWidget);
       expect(find.text('Fortune Sunflower Oil × 1'), findsOneWidget);
       expect(find.text('Create order for Mool delivery'), findsOneWidget);
       expect(
@@ -2676,7 +2886,7 @@ void main() {
         expect(tester.getRect(action).right, lessThanOrEqualTo(320));
       }
       expect(find.text('Ready for customer activity'), findsNothing);
-      expect(find.text('Your store is ready'), findsOneWidget);
+      expect(find.text('Ready for customers'), findsOneWidget);
       expect(find.text('Mahadev Fresh Mart'), findsOneWidget);
       expect(find.text('₹28,450'), findsOneWidget);
       expect(find.text('Sell'), findsOneWidget);
@@ -2824,51 +3034,60 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'Store hosts Wholesale and Bulk with one Store navigation owner',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      final work = liveStore();
-      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+  testWidgets('Store hosts Wholesale and Bulk with one Store navigation owner', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
-      await tester.tap(find.byKey(const Key('work-quick-buy')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
-      expect(
-        find.byKey(const Key('work-store-procurement-screen')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const Key('work-local-navigation')), findsOneWidget);
-      expectStoreNavigationOwnsProcurement(tester);
-      expect(
-        find.bySemanticsLabel('Store choices: Store, Orders, Sell and Stock.'),
-        findsOneWidget,
-      );
-      expect(
-        find.bySemanticsLabel('Shop choices: Wholesale, Orders and Offers.'),
-        findsNothing,
-      );
-      expect(find.text('Wholesale and Bulk'), findsWidgets);
+    await tester.tap(find.byKey(const Key('work-quick-buy')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
+    expect(
+      find.byKey(const Key('work-store-procurement-screen')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('work-local-navigation')), findsOneWidget);
+    expectStoreNavigationOwnsProcurement(tester);
+    expect(
+      find.bySemanticsLabel('Store choices: Store, Orders, Sell and Stock.'),
+      findsOneWidget,
+    );
+    final accessibleNodes = tester.semantics.simulatedAccessibilityTraversal();
+    expect(
+      accessibleNodes.any((node) => node.label.contains('Shop choices:')),
+      isFalse,
+      reason:
+          'Only the clipped footer is hidden from assistive navigation, not the Buy body.',
+    );
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('buy-search-control')))
+          .flagsCollection
+          .isHidden,
+      isFalse,
+    );
+    expect(find.text('Wholesale and Bulk'), findsWidgets);
 
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('work-store-procurement-screen')),
-        findsNothing,
-      );
-      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-store-procurement-screen')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('work-quick-buy')));
-      await tester.pumpAndSettle();
-      final storeBack = find.byKey(const Key('work-back')).hitTestable();
-      expect(storeBack, findsOneWidget);
-      await tester.tap(storeBack);
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
-      expect(tester.takeException(), isNull);
-      semantics.dispose();
-    },
-  );
+    await tester.tap(find.byKey(const Key('work-quick-buy')));
+    await tester.pumpAndSettle();
+    final storeBack = find.byKey(const Key('work-back')).hitTestable();
+    expect(storeBack, findsOneWidget);
+    await tester.tap(storeBack);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 
   testWidgets(
     'in-Store Wholesale search keeps one coherent keyboard and rail owner',
@@ -2884,22 +3103,34 @@ void main() {
       expect(search, findsOneWidget);
 
       await tester.enterText(search, 'cooking oil bulk pack');
+      final originalSearchState = tester.state(search);
       await tester.pump();
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-local-navigation')), findsNothing);
       final buyRail = find.byKey(const ValueKey('buy-local-destination-tabs'));
-      expect(buyRail, findsOneWidget);
       expect(
-        tester.getTopLeft(buyRail).dy,
-        greaterThanOrEqualTo(500),
-        reason: 'The embedded Buy rail stays behind the 300px keyboard.',
+        buyRail,
+        findsNothing,
+        reason: 'Buy already hides its own footer while typing.',
       );
+      expect(tester.state(search), same(originalSearchState));
+      expect(
+        tester.widget<TextField>(search).controller!.text,
+        'cooking oil bulk pack',
+      );
+      expect(search.hitTestable(), findsOneWidget);
+      expect(tester.getBottomRight(search).dy, lessThanOrEqualTo(500));
       expect(tester.takeException(), isNull);
 
       tester.view.viewInsets = FakeViewPadding.zero;
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-local-navigation')), findsOneWidget);
+      expect(tester.state(search), same(originalSearchState));
+      expect(
+        tester.widget<TextField>(search).controller!.text,
+        'cooking oil bulk pack',
+      );
     },
   );
 
@@ -3601,10 +3832,7 @@ void main() {
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
       await tester.tap(find.byKey(const Key('work-quick-group-buy')));
       await tester.pumpAndSettle();
-      expect(
-        find.text('The next bulk opportunity will appear here'),
-        findsOneWidget,
-      );
+      expect(find.text('No group purchase open'), findsOneWidget);
       expect(find.byKey(const Key('work-group-buy-product')), findsNothing);
       expect(
         find.byKey(const Key('work-group-buy-payment-confirmed')),

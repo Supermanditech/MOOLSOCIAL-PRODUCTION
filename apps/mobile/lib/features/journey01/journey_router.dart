@@ -325,7 +325,7 @@ GoRouter createJourneyRouter(
       launchPresentationGate,
       launchInterruptionGuard,
     ]),
-    redirect: (context, state) {
+    redirect: (context, state) async {
       final location = state.uri.path;
       final careMedicineRedirect = _careMedicineRedirect(state.uri);
       if (careMedicineRedirect != null) return careMedicineRedirect;
@@ -370,6 +370,11 @@ GoRouter createJourneyRouter(
           return location == '/verify' ? null : '/verify';
         case JourneyStage.ready:
           if (!protected) return session.readyRoute();
+          if (await workSession.recoverPendingProof(
+            accountReady: session.isAuthenticated || uiReviewOnly,
+          )) {
+            return '/app/work/workspace/proof';
+          }
           final containment = legacyPresentationForTestsOnly
               ? null
               : legacyRouteContainmentFor(state.uri);
@@ -1750,6 +1755,7 @@ GoRouter createJourneyRouter(
         path: '/app/work/workspace/dashboard',
         builder: (context, state) => WorkWorkspaceDashboardScreen(
           session: workSession,
+          initialSection: state.uri.queryParameters['section'],
           procurementSession: buyV2Session,
           accountIdentity: session.accountIdentity,
           accountAuthenticated: session.isAuthenticated,

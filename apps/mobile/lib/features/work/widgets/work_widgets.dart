@@ -193,16 +193,17 @@ class WorkPageScaffold extends StatelessWidget {
         ),
       ),
     );
-    final composedBody = navigationOverBody && showNavigation
+    final composedBody = navigationOverBody
         ? Stack(
             children: [
               Positioned.fill(child: pageBody),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: BlockSemantics(child: navigation),
-              ),
+              if (showNavigation)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: ColoredBox(color: Colors.white, child: navigation),
+                ),
             ],
           )
         : pageBody;

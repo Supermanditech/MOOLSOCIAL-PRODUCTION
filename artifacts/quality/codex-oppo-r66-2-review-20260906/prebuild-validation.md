@@ -1,3 +1,13 @@
 # r66.2 prebuild validation
 
-Pending mandatory positive controls, exact source fingerprint, final clean source checkpoint and remote equality. No build result is claimed.
+Source seal: 595353d7fd74a29a60a86c8f15c0ff0a606643da, branch work/codex-ui/codex-oppo-review-v1-20260905; atomic commit, exact origin readback, and zero staged/unstaged/untracked records at the seal. Only this candidate's machine-state and prebuild evidence are then activated for one guarded RuntimeUiReview/debug build.
+
+Both final connected cycles passed 686 tests with 83 intentional capture-only skips and zero failures. The full release-runtime behavioral suite is included explicitly. Full Flutter analysis returned zero issues. Actual local pre-dashboard and dashboard/first-tap PNGs were inspected; final compact picker, full store name and narrow acceptance/amount captures are v30. Complete commands, hashes, failed attempts and historic protected-test disposition remain in local-validation.md.
+
+Approved-commit coverage passed with 18 accepted ancestors and two rejected exclusions. Approved UI locks, positive/omitted/rejected ancestry fixtures and Android resource integrity passed again at this exact sealed HEAD. All 336 live source-manifest owners match; manifest SHA256 7327DEEC74B04B8F6FB385625CD94CEE979C9279B42A05509B776B58092BE589. Original atomic test and dependency/generated metadata remain unchanged. No Cursor source/test change, integration, Redmi or production package action occurred.
+
+Existing successor/build-wrapper controls passed with the supported archived-evidence parameter. Their locked dependency resolution restored every tracked support owner; no dependency upgrades occurred. store-r66-2-wrapper-controls1.log SHA256 42A940CA643B07DF47D60A6132D8A1016C90CFD74D2D5CB718AB883FB2D2E4DE. Earlier positive controls SHA256 18181264647C6E4500610D38E9CCF3FCBEC96FCD29EF98CF36504A0FD5DDE75C; final sealed checks are retained as store-r66-2-sealed-controls.log. All raw logs stay under C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905.
+
+Candidate: UAW-CODEX-OPPO-R66.2-REVIEW-20260906, version1.0.0-r66.2/code2026090601. Expected Android variant package com.moolsocial.app.runtime and versionName1.0.0-r66.2-runtime. Exact defines: UI_REVIEW_ONLY=true, DEVICE_REVIEW=true, USE_EMULATORS=true and this CANDIDATE_ID. No private/provider values are supplied. Native image picking is enabled only within the debug UI-review boundary; OTP/admin/payment/order fixtures are not live backend qualification.
+
+OPPO serial2b3e0f71/modelCPH2375 was detected; over112GB free. Build and device results remain pending until the actual wrapper, package checksum, installed checksum and native journeys are verified. Earlier r66.1 artifacts remain untouched. This candidate is non-promotable.

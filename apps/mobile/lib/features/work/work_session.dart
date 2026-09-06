@@ -6,22 +6,47 @@ import 'work_models.dart';
 import 'work_services.dart';
 
 class WorkSession extends ChangeNotifier {
-  WorkSession({WorkGateway? gateway, WorkProofPicker? proofPicker})
-    : gateway = gateway ?? ReviewWorkGateway(),
-      proofPicker =
-          proofPicker ??
-          (kDebugMode &&
-                  const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
-                  const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')
-              ? NativeWorkProofPicker()
-              : ReviewWorkProofPicker());
+  WorkSession({
+    WorkGateway? gateway,
+    WorkProofPicker? proofPicker,
+    WorkPendingProofStore? pendingProofStore,
+  }) : gateway = gateway ?? ReviewWorkGateway(),
+       pendingProofStore =
+           pendingProofStore ??
+           (kDebugMode &&
+                   const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+                   const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')
+               ? SecureWorkPendingProofStore(reviewOnly: true)
+               : null),
+       proofPicker =
+           proofPicker ??
+           (kDebugMode &&
+                   const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+                   const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')
+               ? NativeWorkProofPicker()
+               : ReviewWorkProofPicker());
 
-  WorkSession.production({WorkGateway? gateway, WorkProofPicker? proofPicker})
-    : gateway = gateway ?? buildWorkGateway(),
-      proofPicker = proofPicker ?? NativeWorkProofPicker();
+  WorkSession.production({
+    WorkGateway? gateway,
+    WorkProofPicker? proofPicker,
+    WorkPendingProofStore? pendingProofStore,
+  }) : gateway = gateway ?? buildWorkGateway(),
+       pendingProofStore =
+           pendingProofStore ??
+           (proofPicker == null || proofPicker is NativeWorkProofPicker
+               ? SecureWorkPendingProofStore()
+               : null),
+       proofPicker = proofPicker ?? NativeWorkProofPicker();
 
   final WorkGateway gateway;
   final WorkProofPicker proofPicker;
+  final WorkPendingProofStore? pendingProofStore;
+  String? _pendingProofScope;
+  Future<void>? _pendingProofRecovery;
+  bool _pendingProofRoute = false;
+  int _pendingProofGeneration = 0;
+  bool _hasRecoveredDraft = false;
+  bool recoveredDocumentStep = false;
   bool _disposed = false;
   bool busy = false;
   String? errorMessage;
@@ -2507,15 +2532,208 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
+  Map<String, Object?> _pendingDocumentDraft(
+    String proofId,
+    WorkProofSource source,
+  ) => {
+    'version': 1,
+    'savedAt': DateTime.now().toUtc().toIso8601String(),
+    'profileId': selectedProfile?.id,
+    'proofId': proofId,
+    'source': source.name,
+    'personName': authorizedPersonName,
+    'relationship': businessRelationship,
+    'name': workName,
+    'area': workArea,
+    'activity': primaryActivity,
+    'phone': primaryMobile,
+    'email': contactEmail,
+    'alternate': alternateMobile,
+    'phoneConfirmed': primaryMobileVerified,
+    'emailConfirmed': contactEmailVerified,
+    'alternateConfirmed': alternateVerified,
+    'proofs': Map<String, String>.of(addedProofs),
+    'caseId': reviewCaseId,
+    'reason': reviewReason,
+    'correction': reviewCorrectionDraft,
+  };
+
+  /// Resumes only the document operation owned by the currently signed-in
+  /// account. This does not restore sign-in, OTP secrets or approval authority.
+  Future<bool> recoverPendingProof({required bool accountReady}) async {
+    final store = pendingProofStore;
+    if (store == null) return false;
+    final scope = accountReady ? store.accountScope : null;
+    if (_pendingProofScope != scope) {
+      _pendingProofGeneration++;
+      _pendingProofScope = scope;
+      _pendingProofRecovery = null;
+      _pendingProofRoute = false;
+      if (_hasRecoveredDraft) {
+        selectedProfile = null;
+        selectedFamilyId = null;
+        authorizedPersonName = businessRelationship = '';
+        workName = workArea = primaryActivity = '';
+        primaryMobile = contactEmail = alternateMobile = '';
+        primaryMobileVerified = contactEmailVerified = alternateVerified =
+            false;
+        addedProofs.clear();
+        pickedProofs.clear();
+        reviewCaseId = reviewReason = null;
+        reviewCorrectionDraft = false;
+        recoveredDocumentStep = false;
+        _hasRecoveredDraft = false;
+      }
+    }
+    if (scope == null) return false;
+    final generation = _pendingProofGeneration;
+    _pendingProofRecovery ??= _restorePendingDocument(store, scope, generation);
+    await _pendingProofRecovery;
+    if (_disposed ||
+        generation != _pendingProofGeneration ||
+        scope != store.accountScope ||
+        scope != _pendingProofScope) {
+      return false;
+    }
+    final redirect = _pendingProofRoute;
+    _pendingProofRoute = false;
+    return redirect;
+  }
+
+  Future<void> _restorePendingDocument(
+    WorkPendingProofStore store,
+    String scope,
+    int generation,
+  ) async {
+    bool current() =>
+        !_disposed &&
+        generation == _pendingProofGeneration &&
+        scope == store.accountScope &&
+        scope == _pendingProofScope;
+    try {
+      final draft = await store.read(scope);
+      if (draft == null || !current()) return;
+      final timestamp = DateTime.tryParse(draft['savedAt'] as String? ?? '');
+      final age = timestamp == null
+          ? null
+          : DateTime.now().difference(timestamp);
+      final profile = workProfiles
+          .where((p) => p.id == draft['profileId'])
+          .firstOrNull;
+      final source = WorkProofSource.values
+          .where((s) => s.name == draft['source'])
+          .firstOrNull;
+      if (draft['version'] != 1 ||
+          age == null ||
+          age.isNegative ||
+          age > const Duration(hours: 24) ||
+          profile == null ||
+          source == null) {
+        await store.clear(scope);
+        return;
+      }
+      String field(String name) =>
+          draft[name] is String ? draft[name] as String : '';
+      selectedProfile = profile;
+      selectedFamilyId = profile.familyId;
+      authorizedPersonName = field('personName');
+      businessRelationship = field('relationship');
+      workName = field('name');
+      workArea = field('area');
+      primaryActivity = field('activity');
+      primaryMobile = field('phone');
+      contactEmail = field('email');
+      alternateMobile = field('alternate');
+      primaryMobileVerified =
+          primaryMobile.isNotEmpty && draft['phoneConfirmed'] == true;
+      contactEmailVerified =
+          contactEmail.isNotEmpty && draft['emailConfirmed'] == true;
+      alternateVerified =
+          alternateMobile.isNotEmpty && draft['alternateConfirmed'] == true;
+      primaryMobileOtpSent = contactEmailOtpSent = alternateOtpSent = false;
+      declarationAccepted = false;
+      final proofId = field('proofId');
+      final allowed = selectedWorkspaceDocuments.map((p) => p.id).toSet();
+      addedProofs.clear();
+      if (draft['proofs'] case final Map references) {
+        for (final entry in references.entries) {
+          if (allowed.contains(entry.key) && entry.value is String) {
+            addedProofs[entry.key as String] = entry.value as String;
+          }
+        }
+      }
+      reviewCaseId = field('caseId').isEmpty ? null : field('caseId');
+      reviewReason = field('reason').isEmpty ? null : field('reason');
+      reviewCorrectionDraft =
+          reviewCaseId != null && draft['correction'] == true;
+      remoteReviewStatus = reviewCaseId == null
+          ? null
+          : WorkRemoteReviewStatus.pending;
+      reviewStage = reviewCaseId == null
+          ? WorkReviewStage.drafting
+          : WorkReviewStage.gstPending;
+      recoveredDocumentStep = true;
+      _hasRecoveredDraft = true;
+      _pendingProofRoute = true;
+      noticeMessage =
+          'Your details are restored. Add or review your documents to continue.';
+      if (allowed.contains(proofId) &&
+          proofPicker is WorkRecoverableProofPicker) {
+        final proof = await (proofPicker as WorkRecoverableProofPicker).recover(
+          source,
+        );
+        if (!current()) return;
+        if (proof != null) {
+          final reference = await gateway.saveProof(proofId, proof);
+          if (!current()) return;
+          addedProofs[proofId] = reference;
+          pickedProofs[proofId] = proof;
+          noticeMessage = 'Document restored. Review it before submitting.';
+        }
+      }
+      if (current()) await store.clear(scope);
+    } on WorkGatewayException catch (error) {
+      if (current()) {
+        errorMessage = error.message;
+        noticeMessage = null;
+      }
+    } on Object {
+      if (current()) {
+        errorMessage =
+            'Your document could not be restored. Please add it again.';
+        noticeMessage = null;
+      }
+    }
+    if (current()) notifyListeners();
+  }
+
   Future<bool> addProof(String proofId, WorkProofSource source) async {
     if (busy) return false;
     busy = true;
     clearMessages();
     notifyListeners();
+    final store = pendingProofStore;
+    final scope = store?.accountScope;
     try {
+      if (store != null) {
+        if (scope == null) {
+          throw const WorkGatewayException(
+            'Sign in again before adding a document.',
+          );
+        }
+        await store.save(scope, _pendingDocumentDraft(proofId, source));
+        if (scope != store.accountScope) return false;
+      }
       final proof = await proofPicker.pick(source);
+      if (_disposed || (store != null && scope != store.accountScope)) {
+        return false;
+      }
       if (proof == null) return false;
-      addedProofs[proofId] = await gateway.saveProof(proofId, proof);
+      final reference = await gateway.saveProof(proofId, proof);
+      if (_disposed || (store != null && scope != store.accountScope)) {
+        return false;
+      }
+      addedProofs[proofId] = reference;
       pickedProofs[proofId] = proof;
       declarationAccepted = false;
       noticeMessage = 'Document received. You can review it before submission.';
@@ -2523,7 +2741,17 @@ class WorkSession extends ChangeNotifier {
     } on WorkGatewayException catch (error) {
       if (!error.cancelled) errorMessage = error.message;
       return false;
+    } on Object {
+      errorMessage = 'The document could not be added. Please try again.';
+      return false;
     } finally {
+      if (store != null && scope != null && scope == store.accountScope) {
+        try {
+          await store.clear(scope);
+        } on Object {
+          /* Retain recovery until storage is available. */
+        }
+      }
       busy = false;
       notifyListeners();
     }
@@ -2653,20 +2881,16 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return true;
     }
-    return _runBool(
-      () async {
-        final submission = _currentProfileSubmission();
-        final result = await gateway.submitProfile(submission);
-        submittedProfile = submission;
-        reviewCaseId = result.caseId;
-        subscriptionPlan = result.plan;
-        reviewReason = result.reason;
-        remoteReviewStatus = result.status;
-        reviewStage = WorkReviewStage.gstPending;
-      },
-      success:
-          'Work profile sent for review. Your personal account remains active.',
-    );
+    return _runBool(() async {
+      final submission = _currentProfileSubmission();
+      final result = await gateway.submitProfile(submission);
+      submittedProfile = submission;
+      reviewCaseId = result.caseId;
+      subscriptionPlan = result.plan;
+      reviewReason = result.reason;
+      remoteReviewStatus = result.status;
+      reviewStage = WorkReviewStage.gstPending;
+    }, success: 'Application submitted.');
   }
 
   void remindGstLater() {
@@ -2792,6 +3016,10 @@ class WorkSession extends ChangeNotifier {
             id: approvedWorkspaceId,
             name: previousWorkspace?.id == approvedWorkspaceId
                 ? previousWorkspace!.name
+                : result.name?.trim().isNotEmpty == true
+                ? result.name!.trim()
+                : workName.trim().isNotEmpty
+                ? workName.trim()
                 : selectedProfile?.label ?? 'Your Workspace',
             profileLabel: selectedProfile?.label ?? 'Work profile',
             profileId: selectedProfile?.id,

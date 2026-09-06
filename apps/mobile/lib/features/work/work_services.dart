@@ -4,7 +4,10 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../shared/social_content_gateway.dart';
@@ -45,7 +48,79 @@ abstract interface class WorkProofPicker {
   Future<WorkPickedProof?> pick(WorkProofSource source);
 }
 
-class NativeWorkProofPicker implements WorkProofPicker {
+abstract interface class WorkRecoverableProofPicker implements WorkProofPicker {
+  Future<WorkPickedProof?> recover(WorkProofSource source);
+}
+
+/// A short-lived checkpoint for one external document-picker operation.
+/// OTP codes, tokens, document bytes and Workspace approvals are never stored.
+abstract interface class WorkPendingProofStore {
+  String? get accountScope;
+  Future<Map<String, Object?>?> read(String scope);
+  Future<void> save(String scope, Map<String, Object?> draft);
+  Future<void> clear(String scope);
+}
+
+class SecureWorkPendingProofStore implements WorkPendingProofStore {
+  SecureWorkPendingProofStore({this.reviewOnly = false});
+  final bool reviewOnly;
+  static const _storage = FlutterSecureStorage();
+  bool get _review =>
+      reviewOnly &&
+      kDebugMode &&
+      const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
+      const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
+  String get _key => _review
+      ? 'moolsocial.workspace.pending-proof.review.v1'
+      : 'moolsocial.workspace.pending-proof.v1';
+
+  @override
+  String? get accountScope {
+    if (_review) return 'isolated-workspace-ui-review';
+    try {
+      return FirebaseAuth.instance.currentUser?.uid;
+    } on Object {
+      return null;
+    }
+  }
+
+  @override
+  Future<Map<String, Object?>?> read(String scope) async {
+    if (scope != accountScope) return null;
+    final value = await _storage
+        .read(key: _key)
+        .timeout(const Duration(seconds: 10));
+    if (value == null || scope != accountScope) return null;
+    final decoded = jsonDecode(value);
+    if (decoded is! Map ||
+        decoded['scope'] != scope ||
+        decoded['draft'] is! Map) {
+      return null;
+    }
+    return Map<String, Object?>.from(decoded['draft'] as Map);
+  }
+
+  @override
+  Future<void> save(String scope, Map<String, Object?> draft) async {
+    if (scope != accountScope) {
+      throw const WorkGatewayException(
+        'Sign in again before adding a document.',
+      );
+    }
+    await _storage
+        .write(key: _key, value: jsonEncode({'scope': scope, 'draft': draft}))
+        .timeout(const Duration(seconds: 10));
+  }
+
+  @override
+  Future<void> clear(String scope) async {
+    if (await read(scope) != null && scope == accountScope) {
+      await _storage.delete(key: _key).timeout(const Duration(seconds: 10));
+    }
+  }
+}
+
+class NativeWorkProofPicker implements WorkRecoverableProofPicker {
   NativeWorkProofPicker({ImagePicker? imagePicker})
     : _imagePicker = imagePicker ?? ImagePicker();
 
@@ -73,7 +148,7 @@ class NativeWorkProofPicker implements WorkProofPicker {
         maxHeight: 2400,
       );
       if (image == null) return null;
-      return _validateProof(image.name, await image.readAsBytes());
+      return _pickedImage(image, source);
     } on WorkGatewayException {
       rethrow;
     } on PlatformException catch (error) {
@@ -92,6 +167,39 @@ class NativeWorkProofPicker implements WorkProofPicker {
     } on Object {
       throw const WorkGatewayException(
         'The device could not open that option. Choose another way to add the document.',
+      );
+    }
+  }
+
+  Future<WorkPickedProof> _pickedImage(
+    XFile image,
+    WorkProofSource source,
+  ) async {
+    final proof = _validateProof(image.name, await image.readAsBytes());
+    if (source != WorkProofSource.camera) return proof;
+    return WorkPickedProof(
+      fileName: 'Camera photo.${proof.fileName.split('.').last.toLowerCase()}',
+      contentType: proof.contentType,
+      bytes: proof.bytes,
+    );
+  }
+
+  @override
+  Future<WorkPickedProof?> recover(WorkProofSource source) async {
+    try {
+      final result = await _imagePicker.retrieveLostData();
+      if (result.exception != null) {
+        throw const WorkGatewayException(
+          'The camera could not return the document. Please add it again.',
+        );
+      }
+      final file = result.files?.firstOrNull;
+      return file == null ? null : await _pickedImage(file, source);
+    } on WorkGatewayException {
+      rethrow;
+    } on Object {
+      throw const WorkGatewayException(
+        'Your details are restored. Please add the document again.',
       );
     }
   }

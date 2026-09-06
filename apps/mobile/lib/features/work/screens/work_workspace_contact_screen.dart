@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
@@ -31,6 +32,15 @@ class _WorkWorkspaceContactScreenState
   final TextEditingController _primaryOtp = TextEditingController();
   final TextEditingController _emailOtp = TextEditingController();
   final TextEditingController _alternateOtp = TextEditingController();
+  final FocusNode _primaryOtpFocus = FocusNode();
+  final FocusNode _emailOtpFocus = FocusNode();
+  final FocusNode _alternateOtpFocus = FocusNode();
+
+  void _focusCode(FocusNode node) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) node.requestFocus();
+    });
+  }
 
   @override
   void initState() {
@@ -70,6 +80,9 @@ class _WorkWorkspaceContactScreenState
     _primaryOtp.dispose();
     _emailOtp.dispose();
     _alternateOtp.dispose();
+    _primaryOtpFocus.dispose();
+    _emailOtpFocus.dispose();
+    _alternateOtpFocus.dispose();
     super.dispose();
   }
 
@@ -106,7 +119,9 @@ class _WorkWorkspaceContactScreenState
           activeLocalAction: 'workspace',
           showHeaderChat: false,
           showTrailingAction: false,
-          bottomAction: profile == null
+          hideNavigationWhenKeyboardVisible: true,
+          bottomAction:
+              profile == null || MediaQuery.viewInsetsOf(context).bottom > 0
               ? null
               : WorkPrimaryButton(
                   keyName: 'work-contact-continue',
@@ -169,6 +184,7 @@ class _WorkWorkspaceContactScreenState
                       requiredContact: true,
                       controller: _primaryMobile,
                       otpController: _primaryOtp,
+                      otpFocusNode: _primaryOtpFocus,
                       keyboardType: TextInputType.phone,
                       prefixText: '+91 ',
                       confirmed: session.primaryMobileVerified,
@@ -184,6 +200,9 @@ class _WorkWorkspaceContactScreenState
                       confirmedMessage: 'Contact confirmed',
                       onSend: () async {
                         await session.sendPrimaryMobileOtp(_primaryMobile.text);
+                        if (session.primaryMobileOtpSent) {
+                          _focusCode(_primaryOtpFocus);
+                        }
                       },
                       onVerify: () async {
                         await session.verifyPrimaryMobileOtp(_primaryOtp.text);
@@ -203,6 +222,7 @@ class _WorkWorkspaceContactScreenState
                       requiredContact: true,
                       controller: _email,
                       otpController: _emailOtp,
+                      otpFocusNode: _emailOtpFocus,
                       keyboardType: TextInputType.emailAddress,
                       confirmed: session.contactEmailVerified,
                       otpSent: session.contactEmailOtpSent,
@@ -217,6 +237,9 @@ class _WorkWorkspaceContactScreenState
                       confirmedMessage: 'Contact confirmed',
                       onSend: () async {
                         await session.sendContactEmailOtp(_email.text);
+                        if (session.contactEmailOtpSent) {
+                          _focusCode(_emailOtpFocus);
+                        }
                       },
                       onVerify: () async {
                         await session.verifyContactEmailOtp(_emailOtp.text);
@@ -236,6 +259,7 @@ class _WorkWorkspaceContactScreenState
                       requiredContact: false,
                       controller: _alternate,
                       otpController: _alternateOtp,
+                      otpFocusNode: _alternateOtpFocus,
                       keyboardType: TextInputType.phone,
                       prefixText: '+91 ',
                       confirmed: session.alternateVerified,
@@ -255,6 +279,9 @@ class _WorkWorkspaceContactScreenState
                           return;
                         }
                         await session.sendAlternateOtp(_alternate.text);
+                        if (session.alternateOtpSent) {
+                          _focusCode(_alternateOtpFocus);
+                        }
                       },
                       onVerify: () async {
                         await session.verifyAlternateOtp(_alternateOtp.text);
@@ -363,6 +390,7 @@ class _ContactVerificationCard extends StatelessWidget {
     required this.requiredContact,
     required this.controller,
     required this.otpController,
+    required this.otpFocusNode,
     required this.keyboardType,
     required this.confirmed,
     required this.otpSent,
@@ -377,6 +405,7 @@ class _ContactVerificationCard extends StatelessWidget {
   final String keyName, title, detail, confirmedMessage;
   final bool requiredContact, confirmed, otpSent, busy;
   final TextEditingController controller, otpController;
+  final FocusNode otpFocusNode;
   final TextInputType keyboardType;
   final String? prefixText;
   final VoidCallback onSend, onVerify, onChange;
@@ -395,6 +424,8 @@ class _ContactVerificationCard extends StatelessWidget {
           enabled: !busy,
           readOnly: confirmed,
           keyboardType: keyboardType,
+          autocorrect: false,
+          enableSuggestions: false,
           textInputAction: TextInputAction.next,
           scrollPadding: const EdgeInsets.only(bottom: 32),
           onChanged: onEdit,
@@ -448,7 +479,12 @@ class _ContactVerificationCard extends StatelessWidget {
           TextField(
             key: Key('$keyName-otp'),
             controller: otpController,
+            focusNode: otpFocusNode,
             enabled: !busy,
+            autocorrect: false,
+            enableSuggestions: false,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 104),
             keyboardType: TextInputType.number,
             textInputAction: TextInputAction.done,
             autofillHints: const [AutofillHints.oneTimeCode],

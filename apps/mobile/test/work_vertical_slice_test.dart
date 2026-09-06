@@ -208,7 +208,8 @@ void main() {
 
       expect(work.reviewStage, WorkReviewStage.live);
       expect(work.retailerSetupSaved, isTrue);
-      expect(find.text('Shop ready'), findsOneWidget);
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(find.text('Shop ready'), findsNothing);
       final gateway = work.gateway as ReviewWorkGateway;
       expect(gateway.submissionCalls, 1);
       expect(gateway.reviewCalls, 1);

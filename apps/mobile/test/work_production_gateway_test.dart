@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -11,6 +12,151 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 
 void main() {
+  test(
+    'interrupted camera restores only the account-scoped document draft once',
+    () async {
+      final store = _PendingProofMemory()..draft = _cameraDraft();
+      final picker = _RecoveryPicker();
+      final work = WorkSession(pendingProofStore: store, proofPicker: picker);
+      addTearDown(work.dispose);
+      expect(await work.recoverPendingProof(accountReady: true), isTrue);
+      expect(work.selectedProfile?.id, 'retailer-grocery');
+      expect(work.workName, 'Review Kirana');
+      expect(work.authorizedPersonName, 'Review Owner');
+      expect(work.primaryMobileVerified, isTrue);
+      expect(work.contactEmailVerified, isTrue);
+      expect(work.primaryMobileOtpSent, isFalse);
+      expect(work.declarationAccepted, isFalse);
+      expect(work.hasVerifiedWorkspace, isFalse);
+      expect(work.activeWorkspace, isNull);
+      expect(work.pickedProofs['shop-front']?.fileName, 'Camera photo.jpg');
+      expect(work.addedProofs.keys, contains('shop-front'));
+      expect(work.addedProofs.keys, isNot(contains('unrelated-proof')));
+      expect(work.recoveredDocumentStep, isTrue);
+      expect(store.draft, isNull);
+      expect(await work.recoverPendingProof(accountReady: true), isFalse);
+      expect(picker.recoveries, 1);
+      work.recoveredDocumentStep = false;
+      store.accountScope = 'another-account';
+      expect(await work.recoverPendingProof(accountReady: true), isFalse);
+      expect(work.workName, isEmpty);
+      expect(work.pickedProofs, isEmpty);
+      expect(work.primaryMobileVerified, isFalse);
+    },
+  );
+
+  test(
+    'guest and different-account recovery never read or attach a proof',
+    () async {
+      final store = _PendingProofMemory()..draft = _cameraDraft();
+      final picker = _RecoveryPicker();
+      final work = WorkSession(pendingProofStore: store, proofPicker: picker);
+      addTearDown(work.dispose);
+      expect(await work.recoverPendingProof(accountReady: false), isFalse);
+      expect(store.reads, 0);
+      store.accountScope = 'another-account';
+      expect(await work.recoverPendingProof(accountReady: true), isFalse);
+      expect(work.selectedProfile, isNull);
+      expect(picker.recoveries, 0);
+      expect(store.draft, isNotNull);
+    },
+  );
+
+  test('expired camera checkpoint cannot restore an old application', () async {
+    final store = _PendingProofMemory()
+      ..draft = _cameraDraft()
+      ..draft!['savedAt'] = DateTime.now()
+          .subtract(const Duration(days: 2))
+          .toIso8601String();
+    final picker = _RecoveryPicker();
+    final work = WorkSession(pendingProofStore: store, proofPicker: picker);
+    addTearDown(work.dispose);
+    expect(await work.recoverPendingProof(accountReady: true), isFalse);
+    expect(work.selectedProfile, isNull);
+    expect(picker.recoveries, 0);
+    expect(store.draft, isNull);
+  });
+
+  test(
+    'camera recovery failure preserves details and asks for a real replacement',
+    () async {
+      final store = _PendingProofMemory()..draft = _cameraDraft();
+      final work = WorkSession(
+        pendingProofStore: store,
+        proofPicker: _RecoveryPicker(failRecovery: true),
+      );
+      addTearDown(work.dispose);
+      expect(await work.recoverPendingProof(accountReady: true), isTrue);
+      expect(work.workName, 'Review Kirana');
+      expect(work.errorMessage, contains('add it again'));
+      expect(work.pickedProofs, isEmpty);
+      expect(work.hasVerifiedWorkspace, isFalse);
+    },
+  );
+
+  test(
+    'account switch during lost-image recovery discards the old result',
+    () async {
+      final result = Completer<WorkPickedProof?>();
+      final store = _PendingProofMemory()..draft = _cameraDraft();
+      final picker = _RecoveryPicker(delayedRecovery: result);
+      final work = WorkSession(pendingProofStore: store, proofPicker: picker);
+      addTearDown(work.dispose);
+      final recovery = work.recoverPendingProof(accountReady: true);
+      await Future<void>.delayed(Duration.zero);
+      store.accountScope = 'another-account';
+      expect(await work.recoverPendingProof(accountReady: true), isFalse);
+      result.complete(_cameraProof());
+      expect(await recovery, isFalse);
+      expect(work.pickedProofs, isEmpty);
+      expect(work.workName, isEmpty);
+      expect(work.activeWorkspace, isNull);
+    },
+  );
+
+  test(
+    'document launch checkpoints before opening camera and cancellation clears it',
+    () async {
+      final store = _PendingProofMemory();
+      final result = Completer<WorkPickedProof?>();
+      final picker = _RecoveryPicker(pendingPick: result);
+      final work = WorkSession(pendingProofStore: store, proofPicker: picker)
+        ..selectProfile('retailer-grocery')
+        ..workName = 'Review Kirana'
+        ..authorizedPersonName = 'Review Owner';
+      addTearDown(work.dispose);
+      final upload = work.addProof('shop-front', WorkProofSource.camera);
+      await Future<void>.delayed(Duration.zero);
+      expect(store.draft?['name'], 'Review Kirana');
+      expect(store.draft?['proofId'], 'shop-front');
+      expect(
+        store.draft?.keys.any(
+          (key) =>
+              key.toLowerCase().contains('token') ||
+              key.toLowerCase().contains('otp') ||
+              key == 'bytes',
+        ),
+        isFalse,
+      );
+      expect(picker.picks, 1);
+      result.complete(null);
+      expect(await upload, isFalse);
+      expect(store.draft, isNull);
+      expect(work.addedProofs, isEmpty);
+    },
+  );
+
+  test('first approval retains the submitted legal business name', () async {
+    final gateway = ReviewWorkGateway()
+      ..reviewResultStatus = WorkRemoteReviewStatus.approved;
+    final work = WorkSession(gateway: gateway)
+      ..selectProfile('retailer-grocery')
+      ..workName = 'Review Kirana'
+      ..reviewCaseId = 'review-case';
+    addTearDown(work.dispose);
+    expect(await work.checkReview(), isTrue);
+    expect(work.activeWorkspace?.name, 'Review Kirana');
+  });
   test(
     'order selection preserves packing and rider state without advancing another order',
     () {
@@ -820,6 +966,79 @@ void main() {
       ),
     );
   });
+}
+
+Map<String, Object?> _cameraDraft() => {
+  'version': 1,
+  'savedAt': DateTime.now().toUtc().toIso8601String(),
+  'profileId': 'retailer-grocery',
+  'proofId': 'shop-front',
+  'source': 'camera',
+  'personName': 'Review Owner',
+  'relationship': 'Owner',
+  'name': 'Review Kirana',
+  'area': 'Review market',
+  'activity': 'Groceries',
+  'phone': '9876543210',
+  'email': 'review@example.com',
+  'phoneConfirmed': true,
+  'emailConfirmed': true,
+  'proofs': {'unrelated-proof': 'must-not-restore'},
+};
+
+WorkPickedProof _cameraProof() => WorkPickedProof(
+  fileName: 'Camera photo.jpg',
+  contentType: 'image/jpeg',
+  bytes: Uint8List.fromList([0xff, 0xd8, 0xff, 0xd9]),
+);
+
+class _PendingProofMemory implements WorkPendingProofStore {
+  @override
+  String? accountScope = 'review-account';
+  String? savedScope = 'review-account';
+  Map<String, Object?>? draft;
+  int reads = 0;
+  @override
+  Future<Map<String, Object?>?> read(String scope) async {
+    reads++;
+    return scope == accountScope && scope == savedScope ? draft : null;
+  }
+
+  @override
+  Future<void> save(String scope, Map<String, Object?> value) async {
+    savedScope = scope;
+    draft = Map.of(value);
+  }
+
+  @override
+  Future<void> clear(String scope) async {
+    if (scope == savedScope && scope == accountScope) draft = null;
+  }
+}
+
+class _RecoveryPicker implements WorkRecoverableProofPicker {
+  _RecoveryPicker({
+    this.failRecovery = false,
+    this.pendingPick,
+    this.delayedRecovery,
+  });
+  final bool failRecovery;
+  final Completer<WorkPickedProof?>? pendingPick, delayedRecovery;
+  int recoveries = 0, picks = 0;
+  @override
+  Future<WorkPickedProof?> pick(WorkProofSource source) async {
+    picks++;
+    return pendingPick == null ? null : await pendingPick!.future;
+  }
+
+  @override
+  Future<WorkPickedProof?> recover(WorkProofSource source) async {
+    recoveries++;
+    if (failRecovery) throw const WorkGatewayException('Please add it again.');
+    return delayedRecovery == null
+        ? _cameraProof()
+        : await delayedRecovery!.future;
+  }
 }
 
 class _PendingGateway extends ReviewWorkGateway {

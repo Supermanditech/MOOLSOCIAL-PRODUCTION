@@ -67,6 +67,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
         return WorkPageScaffold(
           session: widget.session,
           title: 'Grow with MoolSocial',
+          headerHeight: 68,
           subtitle: family == null
               ? 'Choose the Workspace that matches what you do'
               : widget.session.familyLabel(family),
@@ -108,7 +109,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                 const SizedBox(height: MoolSpacing.sm),
                 _WorkspaceApplicationSummary(session: widget.session),
               ],
-              const SizedBox(height: MoolSpacing.lg),
+              const SizedBox(height: MoolSpacing.sm),
               if (family == null) ...[
                 TextField(
                   key: const Key('work-workspace-search'),
@@ -122,12 +123,6 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                   ),
                 ),
                 const SizedBox(height: MoolSpacing.sm),
-                const WorkSectionTitle(
-                  title: 'Choose how you want to grow',
-                  detail:
-                      'Select the Workspace that best represents your business, profession or service.',
-                ),
-                const SizedBox(height: MoolSpacing.md),
                 for (final familyId in widget.session.familyIds)
                   if (widget.session
                       .profilesForFamily(familyId)
@@ -994,7 +989,7 @@ class _WorkspaceEntryHero extends StatelessWidget {
       builder: (context, value, child) => Opacity(opacity: value, child: child),
       child: Container(
         key: const Key('workspace-chooser-hero'),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: MoolColors.navy,
           borderRadius: BorderRadius.circular(12),
@@ -1010,12 +1005,7 @@ class _WorkspaceEntryHero extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 5),
-            const Text(
-              'Reach more customers. Grow repeat sales.',
-              style: TextStyle(color: Colors.white, fontSize: 12),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Wrap(
               spacing: 6,
               runSpacing: 6,
@@ -1643,6 +1633,12 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   void initState() {
     super.initState();
     if (widget.session.reviewCaseId != null) _step = 3;
+    if (widget.session.recoveredDocumentStep) {
+      _step = 1;
+      _correctionMode = widget.session.reviewCorrectionDraft;
+      _correctionInstruction = widget.session.reviewReason;
+      widget.session.recoveredDocumentStep = false;
+    }
     WidgetsBinding.instance.addObserver(this);
     widget.session.addListener(_onReviewChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2245,17 +2241,28 @@ class _ProofSourceSheet extends StatefulWidget {
 
 class _ProofSourceSheetState extends State<_ProofSourceSheet> {
   String? _busySource;
+  String? _error;
 
   Future<void> _pick(String id, WorkProofSource source) async {
     if (_busySource != null) return;
-    setState(() => _busySource = id);
+    setState(() {
+      _busySource = id;
+      _error = null;
+    });
     final added = await widget.session.addProof(widget.proof.id, source);
     if (!mounted) return;
     if (added) {
       Navigator.of(context).pop();
       return;
     }
-    setState(() => _busySource = null);
+    setState(() {
+      _busySource = null;
+      _error = widget.session.errorMessage;
+    });
+    if (_error != null) {
+      widget.session.clearMessages();
+      widget.session.notifyListeners();
+    }
   }
 
   @override
@@ -2350,6 +2357,20 @@ class _ProofSourceSheetState extends State<_ProofSourceSheet> {
                   ),
                 ),
                 const SizedBox(height: MoolSpacing.md),
+                if (_error case final message?) ...[
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      message,
+                      key: const Key('work-proof-source-error'),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -3603,9 +3624,7 @@ class _CompletedRow extends StatelessWidget {
 
 class RetailerSetupScreen extends StatefulWidget {
   const RetailerSetupScreen({required this.session, super.key});
-
   final WorkSession session;
-
   @override
   State<RetailerSetupScreen> createState() => _RetailerSetupScreenState();
 }
@@ -3626,7 +3645,6 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
         ? ''
         : '${widget.session.retailerSellPrice}',
   );
-
   @override
   void dispose() {
     _quantity.dispose();
@@ -3635,321 +3653,224 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
     super.dispose();
   }
 
-  void _saveFields() {
-    widget.session.saveRetailerProduct(
-      quantity: int.tryParse(_quantity.text) ?? 0,
-      buyPrice: int.tryParse(_buy.text) ?? 0,
-      sellPrice: int.tryParse(_sell.text) ?? 0,
-    );
-  }
+  void _saveFields() => widget.session.saveRetailerProduct(
+    quantity: int.tryParse(_quantity.text) ?? 0,
+    buyPrice: int.tryParse(_buy.text) ?? 0,
+    sellPrice: int.tryParse(_sell.text) ?? 0,
+  );
 
   @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.session,
-      builder: (context, _) {
-        final complete =
-            widget.session.reviewStage == WorkReviewStage.live &&
-            widget.session.retailerSetupSaved;
-        return WorkPageScaffold(
-          session: widget.session,
-          title: complete ? 'Shop ready' : 'Set up your shop',
-          subtitle: complete
-              ? widget.session.workspaceVisibleToCustomers
-                    ? 'Available products are open for customers'
-                    : 'Setup complete · store is off'
-              : 'Stock, price, fulfilment and publishing',
-          fallbackBackRoute: complete
-              ? '/app/work/workspace/choose'
-              : '/app/work/ready',
-          activeLocalAction: 'workspace',
-          bottomAction: WorkPrimaryButton(
-            keyName: complete
-                ? 'retailer-setup-open-my-work'
-                : 'retailer-finish-setup',
-            label: complete
-                ? 'Open shop operations'
-                : widget.session.retailerPublishAfterSetup
-                ? 'Finish setup and open store'
-                : 'Finish setup with store off',
-            busy: widget.session.busy,
-            onPressed: () async {
-              if (complete) {
-                context.go('/app/work/workspace/dashboard');
-                return;
-              }
-              _saveFields();
-              await widget.session.finishRetailerSetup();
-            },
-            icon: complete
-                ? Icons.work_outline_rounded
-                : Icons.rocket_launch_rounded,
-          ),
-          body: ListView(
-            key: const Key('retailer-setup-screen'),
-            padding: const EdgeInsets.fromLTRB(
-              MoolSpacing.md,
-              MoolSpacing.sm,
-              MoolSpacing.md,
-              MoolSpacing.xl,
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.session,
+    builder: (context, _) {
+      final session = widget.session;
+      final product =
+          session.workspaceCatalogueItems.firstOrNull ??
+          workspaceMasterCatalogue.first;
+      void openSection(String section) {
+        FocusManager.instance.primaryFocus?.unfocus();
+        _saveFields();
+        context.go('/app/work/workspace/dashboard?section=$section');
+      }
+
+      return WorkPageScaffold(
+        session: session,
+        title: 'Set up your shop',
+        subtitle: session.activeWorkspace?.name ?? session.workName,
+        headerHeight: 68,
+        fallbackBackRoute: '/app/work/workspace/dashboard',
+        showHeaderChat: false,
+        showTrailingAction: false,
+        hideNavigationWhenKeyboardVisible: true,
+        contextualDestinationLabel: 'Store',
+        contextualActiveId: 'store',
+        contextualLocalActions: [
+          for (final entry in const [
+            ('store', 'Store', Icons.storefront_outlined),
+            ('orders', 'Orders', Icons.receipt_long_outlined),
+            ('sell', 'Sell', Icons.point_of_sale_outlined),
+            ('stock', 'Stock', Icons.inventory_2_outlined),
+          ])
+            MoolLocalNavigationAction(
+              keyName: 'work-setup-${entry.$1}',
+              id: entry.$1,
+              label: entry.$2,
+              icon: entry.$3,
+              onPressed: () => openSection(entry.$1),
             ),
-            children: [
-              WorkCard(
-                color: complete ? const Color(0xFFEAF7E8) : MoolColors.navy,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      complete
-                          ? '${widget.session.activeWorkspace?.name ?? widget.session.workName} is ready'
-                          : '4 steps',
-                      style: TextStyle(
-                        color: complete ? MoolColors.ink : Colors.white,
-                        fontSize: 21,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      complete
-                          ? 'Customers see only available stock with the fulfilment you approved.'
-                          : 'Products remain private until setup passes and you choose whether to open the store.',
-                      style: TextStyle(
-                        color: complete
-                            ? MoolColors.muted
-                            : const Color(0xFFD9DAFF),
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
+        ],
+        bottomAction: MediaQuery.viewInsetsOf(context).bottom > 0
+            ? null
+            : WorkPrimaryButton(
+                keyName: 'retailer-finish-setup',
+                label: 'Finish setup',
+                busy: session.busy,
+                onPressed: () async {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  _saveFields();
+                  final saved = await session.finishRetailerSetup();
+                  if (saved && context.mounted) {
+                    context.go('/app/work/workspace/dashboard');
+                  }
+                },
               ),
-              const SizedBox(height: MoolSpacing.md),
-              const WorkSectionTitle(
-                title: '1. Add a product',
-                detail: 'Use the verified master catalogue',
+        body: ListView(
+          key: const Key('retailer-setup-screen'),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+          children: [
+            const Text(
+              'Your first product',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: MoolColors.navy,
               ),
-              const SizedBox(height: MoolSpacing.sm),
-              if (!widget.session.retailerProductAdded)
-                WorkCard(
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.inventory_2_outlined, color: MoolColors.navy),
+                const SizedBox(width: 10),
+                Expanded(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.inventory_2_outlined,
-                        color: MoolColors.navy,
-                        size: 42,
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      const Text(
-                        'Aashirvaad Whole Wheat Atta',
-                        style: TextStyle(
-                          color: MoolColors.ink,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const Text(
-                        '1 kg consumer pack · brand verified · barcode ready',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: MoolColors.muted),
-                      ),
-                      const SizedBox(height: MoolSpacing.sm),
-                      FilledButton.icon(
-                        key: const Key('retailer-add-catalog-product'),
-                        onPressed: widget.session.addRetailerProduct,
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Add to my shop'),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                const WorkCard(
-                  color: Color(0xFFEAF7E8),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: MoolColors.success,
-                        foregroundColor: Colors.white,
-                        child: Icon(Icons.check_rounded),
-                      ),
-                      SizedBox(width: MoolSpacing.sm),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Aashirvaad Whole Wheat Atta',
-                              style: TextStyle(
-                                color: MoolColors.ink,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            Text(
-                              '1 kg consumer pack · catalogue matched',
-                              style: TextStyle(color: MoolColors.muted),
-                            ),
-                          ],
-                        ),
-                      ),
-                      WorkPill(label: 'Added'),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: MoolSpacing.md),
-              const WorkSectionTitle(
-                title: '2. Set stock and price',
-                detail:
-                    'Quantity for customer sales · wholesale orders are managed separately',
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              TextField(
-                key: const Key('retailer-product-quantity'),
-                controller: _quantity,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Available consumer quantity',
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('retailer-product-buy-price'),
-                      controller: _buy,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Purchase ₹',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: MoolSpacing.xs),
-                  Expanded(
-                    child: TextField(
-                      key: const Key('retailer-product-sell-price'),
-                      controller: _sell,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Sell ₹'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: MoolSpacing.md),
-              const WorkSectionTitle(
-                title: '3. Choose fulfilment',
-                detail: 'Home delivery and store collection are distinct',
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              WorkCard(
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      key: const Key('retailer-home-delivery'),
-                      contentPadding: EdgeInsets.zero,
-                      value: widget.session.retailerHomeDelivery,
-                      title: const Text(
-                        'Home delivery',
-                        style: TextStyle(
-                          color: MoolColors.ink,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Customer orders from home and receives delivery',
-                      ),
-                      onChanged: (value) =>
-                          widget.session.setRetailerFulfilment(
-                            homeDelivery: value,
-                            storeCollection:
-                                widget.session.retailerStoreCollection,
-                          ),
-                    ),
-                    const Divider(),
-                    SwitchListTile(
-                      key: const Key('retailer-store-collection'),
-                      contentPadding: EdgeInsets.zero,
-                      value: widget.session.retailerStoreCollection,
-                      title: const Text(
-                        'Store collection',
-                        style: TextStyle(
-                          color: MoolColors.ink,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Customer explicitly chooses this shop and collects',
-                      ),
-                      onChanged: (value) =>
-                          widget.session.setRetailerFulfilment(
-                            homeDelivery: widget.session.retailerHomeDelivery,
-                            storeCollection: value,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.md),
-              const WorkSectionTitle(
-                title: '4. Choose store publishing',
-                detail: 'You can open the store now or keep it off after setup',
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              WorkCard(
-                child: SwitchListTile.adaptive(
-                  key: const Key('retailer-publish-after-setup'),
-                  contentPadding: EdgeInsets.zero,
-                  value: widget.session.retailerPublishAfterSetup,
-                  title: const Text(
-                    'Open store after setup',
-                    style: TextStyle(
-                      color: MoolColors.ink,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  subtitle: Text(
-                    widget.session.retailerPublishAfterSetup
-                        ? 'Available products will be public and ready for customer orders.'
-                        : 'The store remains off and private until you choose Open.',
-                  ),
-                  onChanged: widget.session.setRetailerPublishAfterSetup,
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.md),
-              WorkCard(
-                color: const Color(0xFFFFF4E5),
-                child: Row(
-                  children: [
-                    Icon(
-                      complete && widget.session.workspaceVisibleToCustomers
-                          ? Icons.visibility_rounded
-                          : Icons.visibility_off_outlined,
-                      color:
-                          complete && widget.session.workspaceVisibleToCustomers
-                          ? MoolColors.success
-                          : MoolColors.orange,
-                    ),
-                    const SizedBox(width: MoolSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        complete
-                            ? widget.session.workspaceVisibleToCustomers
-                                  ? 'Available products are public with the fulfilment you approved.'
-                                  : 'Setup is complete. The store remains off until you choose Open.'
-                            : widget.session.retailerPublishAfterSetup
-                            ? 'The store will open after all four setup steps pass.'
-                            : 'Nothing will be public after setup until you choose Open.',
+                      Text(
+                        product.title,
                         style: const TextStyle(
-                          color: MoolColors.ink,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ),
-                  ],
+                      Text(
+                        product.pack,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: MoolColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                if (!session.retailerProductAdded)
+                  TextButton.icon(
+                    key: const Key('retailer-add-catalog-product'),
+                    onPressed: session.addRetailerProduct,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add'),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(
+                      Icons.check_circle_outline,
+                      color: MoolColors.navy,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('retailer-product-quantity'),
+              controller: _quantity,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Quantity available',
+                border: UnderlineInputBorder(),
+                isDense: true,
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const Key('retailer-product-buy-price'),
+                    controller: _buy,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Cost price',
+                      prefixText: '₹ ',
+                      border: UnderlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextField(
+                    key: const Key('retailer-product-sell-price'),
+                    controller: _sell,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      labelText: 'Sell price',
+                      prefixText: '₹ ',
+                      border: UnderlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'How customers receive orders',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+            ),
+            SwitchListTile.adaptive(
+              key: const Key('retailer-home-delivery'),
+              contentPadding: EdgeInsets.zero,
+              value: session.retailerHomeDelivery,
+              title: const Text(
+                'Home delivery',
+                style: TextStyle(fontSize: 14),
+              ),
+              onChanged: (value) => session.setRetailerFulfilment(
+                homeDelivery: value,
+                storeCollection: session.retailerStoreCollection,
+              ),
+            ),
+            SwitchListTile.adaptive(
+              key: const Key('retailer-store-collection'),
+              contentPadding: EdgeInsets.zero,
+              value: session.retailerStoreCollection,
+              title: const Text(
+                'Store collection',
+                style: TextStyle(fontSize: 14),
+              ),
+              onChanged: (value) => session.setRetailerFulfilment(
+                homeDelivery: session.retailerHomeDelivery,
+                storeCollection: value,
+              ),
+            ),
+            const Divider(),
+            SwitchListTile.adaptive(
+              key: const Key('retailer-publish-after-setup'),
+              contentPadding: EdgeInsets.zero,
+              value: session.retailerPublishAfterSetup,
+              title: const Text(
+                'Open store after setup',
+                style: TextStyle(fontSize: 14),
+              ),
+              onChanged: session.setRetailerPublishAfterSetup,
+            ),
+            Text(
+              session.retailerPublishAfterSetup
+                  ? 'Your available products will be public and ready for orders.'
+                  : 'Your store stays off and private. Open it later from your business profile.',
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: MoolColors.muted,
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }

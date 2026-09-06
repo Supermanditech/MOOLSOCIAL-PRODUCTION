@@ -10,6 +10,112 @@
   },
   "entries": [
     {
+      "id": "REG-20260906-4509-WORKSPACE-NATIVE-CAMERA-PROCESS-RECOVERY",
+      "childAnalysis20260906": "First native-child analysis found 11 curly-brace style infos in new contact/recovery code, no compile errors. Retain oppo-r66-2-child-analysis1.log; add explicit blocks and rerun, without relaxing analysis.",
+      "status": "native_confirmed_child_correction_in_progress",
+      "appliesTo": [
+        "primary",
+        "work",
+        "testing",
+        "device"
+      ],
+      "mistake": "OPPO-R66.2-05: OPPO revoked one-time camera permission while native Camera was open. The app process was killed; return lost the pending document and Workspace draft and opened Shop.",
+      "rootCause": "An in-memory Work session has no account-scoped pending-media checkpoint or image_picker lost-data recovery.",
+      "prevention": "Checkpoint only the pending upload and minimum Workspace form data in existing secure storage under the current account. Recover a lost image to the exact document step without persisting OTP secrets, changing approval state, attaching to another account, or adding backend behavior.",
+      "gates": [
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "apps/mobile/test/work_production_gateway_test.dart"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-2-review-20260906/device-review.md"
+      ]
+    },
+    {
+      "id": "REG-20260906-4510-WORKSPACE-NATIVE-CONTACT-AND-PICKER-FEEDBACK",
+      "status": "native_confirmed_child_correction_in_progress",
+      "appliesTo": [
+        "primary",
+        "work",
+        "testing",
+        "device"
+      ],
+      "mistake": "OPPO-R66.2-02–04: Native OTP confirmation was obscured by the fixed Continue bar; email autocorrection inserted a space; camera permission denial appeared behind the modal.",
+      "rootCause": "Focus/scroll insets and modal feedback did not match native IME and permission transitions.",
+      "prevention": "Keep active OTP confirmation visible, suppress unrelated bottom navigation while typing, disable contact/OTP autocorrection and show picker failures beside retry options.",
+      "gates": [
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "apps/mobile/test/work_production_gateway_test.dart"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-2-review-20260906/device-review.md"
+      ]
+    },
+    {
+      "id": "REG-20260906-4511-WORKSPACE-NATIVE-ENTRY-AND-APPROVAL-PRESENTATION",
+      "visualChildV31": "v31 actual PNG review found Purchase price clipped in the compact two-column setup field. Use concise Cost price and Sell price, preserving currency and validation. Capture run1 passed 225 with 70 intentional capture skips and three failures: the old Shop ready assertion must now verify direct Dashboard; two proof-failure tests correctly detected duplicate modal and parent error text. Keep the error only at the active retry sheet rather than weakening the single-message contract.",
+      "status": "native_confirmed_child_correction_in_progress",
+      "appliesTo": [
+        "primary",
+        "work",
+        "testing",
+        "device"
+      ],
+      "mistake": "OPPO-R66.2-01,06–08: The first selection was clipped below repetitive hero content; camera UUID filenames dominated Review; first approval discarded the entered business name; initial Store setup opened a legacy shell.",
+      "rootCause": "The native first-view and post-approval path retained older typography, filename and fallback-name contracts.",
+      "prevention": "Compact existing entry/setup surfaces without altering approved prerequisite content or validation. Retain submitted name, readable camera filename and direct Store return. Remove old Chat/Earn navigation only on the retailer setup destination.",
+      "gates": [
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "apps/mobile/test/work_production_gateway_test.dart"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-2-review-20260906/device-review.md"
+      ]
+    },
+    {
+      "id": "REG-20260906-4512-STORE-NATIVE-PROCUREMENT-KEYBOARD-SEMANTICS",
+      "focusedChildRun3": "Third focused run: 158 passed, 79 capture skips, one semantic test mismatch. Flutter getSemantics on a clipped widget walks to its nearest retained ancestor, so isHidden on that ancestor is not a footer test. Use the SDK simulated accessibility traversal to assert the Shop rail is absent and Buy search remains accessible; retain the no-hit-test and viewport-bound checks.",
+      "focusedChildRun2": "Second focused run: 157 passed, 79 captures skipped, two residual owned assertions. Exact Finish setup wording replaced the old long CTA. Clipped Buy rail is no longer hit-testable, but the test incorrectly requires its widget to cease existing; verify its exported semantics are hidden plus accessible Buy content instead of removing the retained nested screen. No source regression is waived.",
+      "focusedChildRun1": "oppo-r66-2-child-focused1.log: 152 passed, 79 capture skips, 7 failures. Procurement retained native bottom view padding while the crop measured removed body padding, leaving a reachable Buy footer; use the same maintainBottomViewPadding geometry and platform as the actual shared rail. The semantic action assertions passed but the new test handle was disposed too late; dispose within the test. Five remaining failures are exact changed-copy assertions and a setup fixture that omitted Add/collection; preserve real setup validation and update only these owned test contracts.",
+      "status": "native_confirmed_child_correction_in_progress",
+      "appliesTo": [
+        "primary",
+        "work",
+        "testing",
+        "device"
+      ],
+      "mistake": "OPPO-R66.2-10–11: Native Store procurement search reset on keyboard appearance. Overlay semantics hid the Buy body, the old Buy rail showed through, and top/right action semantics were inert.",
+      "rootCause": "Conditional embedding changed subtree identity; BlockSemantics and excluded InkWell actions removed accessible controls; host clamped text scale.",
+      "prevention": "Keep the same nested Buy state and real insets, mask only its footer with opaque Store navigation, preserve text scaling and one accessible tap action. Do not edit any Cursor Buy owner.",
+      "gates": [
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "apps/mobile/test/work_production_gateway_test.dart"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-2-review-20260906/device-review.md"
+      ]
+    },
+    {
+      "id": "REG-20260906-4513-STORE-NATIVE-FIRST-TAP-DENSITY-AND-STATE-COPY",
+      "visualRailChild20260906": "After the 228-pass/70-capture-skip v32 local run, visual review plus source tracing found business destinations using removed activeId business and Stock/Orders parent actions inert on child destinations. Map general business actions to Store, retain Stock for supply/catalogue and Orders for fulfilment, but disable each parent action only at its own root. Also distinguish an open private storefront from a closed one in the quiet-state card. Preserve approved placement and all destinations.",
+      "status": "native_confirmed_child_correction_in_progress",
+      "appliesTo": [
+        "primary",
+        "work",
+        "testing",
+        "device"
+      ],
+      "mistake": "OPPO-R66.2-09,12: An off/private Store claimed readiness and a paused alert; empty Orders said No all order needs action; short bill review had a large vacant area.",
+      "rootCause": "Fallback customer copy did not distinguish states; short first-tap surfaces inherited full-height form spacing.",
+      "prevention": "Use exact off/paused/private status, grammatically correct counts and compact content-sized bill/empty/offer surfaces. Preserve validation, existing destinations, complete product fields and truthful payment/delivery states.",
+      "gates": [
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "apps/mobile/test/work_production_gateway_test.dart"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-2-review-20260906/device-review.md"
+      ]
+    },
+    {
       "id": "REG-20260906-4507-WORKSPACE-PICKER-SPACE-AND-HEADER-READABILITY",
       "status": "local_qualified_oppo_review_pending",
       "appliesTo": ["primary", "work", "testing", "device"],
@@ -41,6 +147,12 @@
     },
     {
       "id": "REG-20260906-4505-FLUTTER-CHILD-RUN-WRONG-WORKING-DIRECTORY",
+      "evidencePatchReadback20260906": "A prebuild-document patch used a remembered pending paragraph rather than the actual file text. apply_patch rejected it before mutation. The exact three-line file was then read in full; retry must use that literal paragraph. Product/test source, completed test results and build authority were unchanged.",
+      "nativeHelperPreflight20260906": "The external r66.3 review-fixture preparation guard expected CRLF in a tool-returned LF string and stopped with Exact previous helper block absent before creating a file or taking a device action. Normalize the known helper text before one exact bounded replacement; remove the prior candidate PID/VM fallback. No product source or qualification result changed.",
+      "fixtureDeclaration20260906": "Local capture attempt3 failed loading the layout suite because new rail-return cases preceded the local liveStore helper declaration. No layout tests ran; the remaining suites returned 86 passes and 2 capture skips. Preserve oppo-r66-3-local-capture3.log, move only the existing fixture helper before its first use, and rerun the complete six-file capture set. An eight-image review batch exceeded tool context: count none of that batch as visually reviewed and inspect at most three images per call; an AGENTS reread was likewise truncated and its missing section was reread separately.",
+      "candidatePreflight20260906": "r66.3 owner preflight ran before its pending candidate files existed and correctly rejected the missing candidate-contract.md. No build or device action ran. Create truthful pending inputs, omit generated provenance/install/native outputs from the active claim until generated, refresh the current binding and rerun the same unchanged gate.",
+      "patchPreflight20260906": "A layout-test patch listed a later insertion before an earlier existing helper and apply_patch rejected the backward match before changing the file. Apply hunks in source order, then read back; no test or qualification followed the rejected patch.",
+      "recurrence20260906": "Native-child formatting preflight used repository-relative Git pathspecs from apps/mobile and produced an empty file list. dart format exited 64 before formatting or analysis; no qualification ran. Resolve changed owners with git -C at the repository root, convert to absolute paths, require a nonempty list, and keep the mobile working directory for Flutter.",
       "status": "runner_only_no_tests_executed",
       "appliesTo": ["primary", "testing", "tooling"],
       "mistake": "The first Store child regression invocation ran from the repository root and Flutter rejected it because pubspec.yaml was absent. No tests executed; the log is preserved as failed runner evidence.",
