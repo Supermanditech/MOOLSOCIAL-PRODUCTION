@@ -252,7 +252,8 @@ function Test-RedmiReviewBuySource {
   # This is an unaccepted, locally tested review source, never a replacement baseline.
   $qualifiedSources = @(
     'd07559609ffad7371a6a98d765d4fefa186dc065',
-    'd119c85eccc85af99c86c32ae526f57421855ff3'
+    'd119c85eccc85af99c86c32ae526f57421855ff3',
+    '28b1b6126a4f145f8c639cfc3029860507845845'
   )
   $acceptedBase = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
   if ($SourceCommit -cnotin $qualifiedSources) { return $false }
@@ -277,8 +278,11 @@ function Test-RedmiReviewBuySource {
     'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
     'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart'
   )
-  if ($SourceCommit -ceq $qualifiedSources[1]) {
+  if ($SourceCommit -cin @($qualifiedSources[1], $qualifiedSources[2])) {
     $expectedDelta = @('apps/mobile/lib/features/buy/buy_v2_models.dart') + $expectedDelta
+  }
+  if ($SourceCommit -ceq $qualifiedSources[2]) {
+    $expectedDelta = $expectedDelta + @('apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart')
   }
   $sourceDelta = @(& git -C $root diff --name-only $acceptedBase $SourceCommit -- @boundaryRoots)
   if ($LASTEXITCODE -ne 0 -or
