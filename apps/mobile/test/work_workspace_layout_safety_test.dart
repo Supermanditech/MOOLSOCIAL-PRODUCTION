@@ -220,6 +220,228 @@ void main() {
     );
   }
 
+  for (final display in [
+    (width: 412.0, height: 915.0, scale: 1.0),
+    (width: 320.0, height: 640.0, scale: 1.4),
+    (width: 320.0, height: 640.0, scale: 2.0),
+  ]) {
+    final suffix = '${display.width.toInt()}-${display.scale}';
+    Future<void> tapRefinementAction(WidgetTester tester, String key) async {
+      final action = find.byKey(Key(key));
+      if (display.scale > 1.4) await reveal(tester, action);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('S09 refinement finance context $suffix', (tester) async {
+      final work = storeViewFixture();
+      final semantics = tester.ensureSemantics();
+      try {
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        for (final metric in [
+          ('work-pulse-sales', 'Sales today', '₹28,450'),
+          ('work-pulse-dues', 'Unpaid bills', '₹860'),
+          ('work-pulse-settlement', 'Available', '₹17,820'),
+        ]) {
+          final target = find.byKey(Key(metric.$1));
+          expect(target.hitTestable(), findsOneWidget);
+          expect(
+            find.descendant(of: target, matching: find.text(metric.$2)),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: target, matching: find.text(metric.$3)),
+            findsOneWidget,
+          );
+          expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
+        }
+        expect(
+          find.bySemanticsLabel(
+            'View statement, Sales today, ₹28,450 in store records',
+          ),
+          findsOneWidget,
+        );
+        await captureStoreView(tester, 'r665-refinement-finance-$suffix');
+        await tester.tap(find.byKey(const Key('work-pulse-sales')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
+        expect(work.workspaceSalesToday, 28450);
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    });
+
+    testWidgets('S09 refinement empty Sell has one recovery $suffix', (
+      tester,
+    ) async {
+      final work = liveStore()..workspaceCatalogueItems.clear();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.width, display.height),
+        textScale: display.scale,
+      );
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      expect(find.text('Add products').hitTestable(), findsOneWidget);
+      final review = find.byKey(const Key('work-order-review'));
+      expect(review.hitTestable(), findsOneWidget);
+      expect(tester.widget<FilledButton>(review).onPressed, isNull);
+      expect(
+        find.descendant(of: review, matching: find.text('Review bill')),
+        findsOneWidget,
+      );
+      await captureStoreView(tester, 'r665-refinement-sell-$suffix');
+      await tester.tap(find.text('Add products'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-dashboard-catalogue-screen')),
+        findsOneWidget,
+      );
+      expect(work.workspaceCatalogueItems, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final setup in [false, true]) {
+      testWidgets('S09 refinement store link recovery $setup $suffix', (
+        tester,
+      ) async {
+        final work = liveStore()
+          ..retailerSetupSaved = setup
+          ..workspaceVisibleToCustomers = false
+          ..workspaceAcceptingOrders = false
+          ..workspaceCatalogueItems.clear();
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        await tapRefinementAction(tester, 'work-quick-store-link');
+        final recovery = find.byKey(const Key('work-store-link-recovery'));
+        expect(recovery.hitTestable(), findsOneWidget);
+        expect(
+          find.text(setup ? 'View products' : 'Set up store'),
+          findsOneWidget,
+        );
+        expect(find.text('Store link unavailable'), findsOneWidget);
+        expect(
+          tester
+              .getSize(find.byKey(const Key('work-store-link-unavailable')))
+              .height,
+          lessThan(display.height * .55),
+        );
+        await captureStoreView(tester, 'r665-refinement-link-$setup-$suffix');
+        await tester.tap(recovery);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(
+            Key(
+              setup
+                  ? 'work-dashboard-catalogue-screen'
+                  : 'retailer-setup-screen',
+            ),
+          ),
+          findsOneWidget,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-store-link')), findsOneWidget);
+        expect(work.workspaceVisibleToCustomers, isFalse);
+        expect(work.workspaceAcceptingOrders, isFalse);
+        expect(work.workspaceCatalogueItems, isEmpty);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('S09 refinement empty Stock exposes products $suffix', (
+      tester,
+    ) async {
+      final work = liveStore()..workspaceCatalogueItems.clear();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.width, display.height),
+        textScale: display.scale,
+      );
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      expect(find.text('Low stock'), findsNothing);
+      expect(
+        find.byKey(const Key('work-catalogue-add')).hitTestable(),
+        findsOneWidget,
+      );
+      final product = find.byKey(
+        Key('work-catalogue-master-${workspaceMasterCatalogue.first.id}'),
+      );
+      final heading = find.byKey(const Key('work-catalogue-heading'));
+      expect(
+        tester
+            .renderObject<RenderParagraph>(heading)
+            .getBoxesForSelection(
+              const TextSelection(baseOffset: 0, extentOffset: 8),
+            )
+            .length,
+        1,
+      );
+      if (display.scale > 1.4) await reveal(tester, product);
+      expect(product.hitTestable(), findsOneWidget);
+      await captureStoreView(tester, 'r665-refinement-stock-$suffix');
+      await tester.tap(product);
+      await tester.pumpAndSettle();
+      expect(work.workspaceCatalogueItems, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-dashboard-catalogue-screen')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'S09 refinement promotion shows prerequisites and fixed action $suffix',
+      (tester) async {
+        final work = liveStore()..workspaceCatalogueItems.clear();
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        await tapRefinementAction(tester, 'work-quick-promote');
+        expect(
+          find.byKey(const Key('work-offer-prerequisites')).hitTestable(),
+          findsOneWidget,
+        );
+        final publish = find.byKey(const Key('work-offer-publish'));
+        expect(publish.hitTestable(), findsOneWidget);
+        expect(tester.widget<FilledButton>(publish).onPressed, isNull);
+        final actionPosition = tester.getRect(publish);
+        await captureStoreView(tester, 'r665-refinement-promote-$suffix');
+        await tester.drag(
+          find.byKey(const Key('work-store-offers-screen')),
+          const Offset(0, -260),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getRect(publish), actionPosition);
+        expect(work.workspaceOffers, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final filters in <(String?, String?)>[
     (null, null),
     ('freight', null),
@@ -6544,7 +6766,13 @@ void main() {
       await tester.tap(find.byTooltip('Close invoice'));
       await tester.pumpAndSettle();
       expect(find.text('Add customer'), findsOneWidget);
-      expect(find.text('Review bill'), findsNothing);
+      expect(find.text('Review bill'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('work-order-review')))
+            .onPressed,
+        isNull,
+      );
       await tester.tap(find.byKey(const Key('work-store-home')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-order-discard-dialog')), findsNothing);

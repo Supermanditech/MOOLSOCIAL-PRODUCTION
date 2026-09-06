@@ -913,7 +913,9 @@ class _WorkWorkspaceDashboardScreenState
         _operationReturnView = _WorkspaceControlView.status;
         _operationReturnOperation = null;
       } else if (_view == _WorkspaceControlView.operation &&
-          _isNestedWorkspaceOperation(operation)) {
+          (_isNestedWorkspaceOperation(operation) ||
+              (operation == _WorkspaceOperation.catalogue &&
+                  _operation == _WorkspaceOperation.storeLink))) {
         _operationReturnView = _WorkspaceControlView.operation;
         _operationReturnOperation = _operation;
       } else {
@@ -1887,56 +1889,74 @@ class _StoreControlDashboard extends StatelessWidget {
     return Material(
       key: const Key('work-workspace-dashboard'),
       color: const Color(0xFFF7F8FC),
-      child: Column(
-        children: [
-          _StoreLiveBusinessPulse(
-            session: session,
-            onOrders: onCustomers,
-            onSales: onMoney,
-            onStock: onStock,
-            onSettlement: () => onOpenOperation(_WorkspaceOperation.payments),
-          ),
-          if (session.workspaceDashboardState != WorkspaceDashboardState.ready)
-            _DashboardSyncBanner(session: session),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: ready
-                      ? _StoreActivityDeck(
-                          key: const Key('store-stable-working-centre'),
-                          session: session,
-                          reviewedOrder: reviewedOrder,
-                          onReviewOrder: onReviewOrder,
-                          onCloseOrder: onCloseOrder,
-                          onStock: onStock,
-                          onMoney: onMoney,
-                          onGroupBulk: () =>
-                              onOpenOperation(_WorkspaceOperation.groupBuying),
-                        )
-                      : _StoreSetupDeck(
-                          session: session,
-                          workspace: workspace,
-                          onSetup: onSetup,
-                        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final enlarged = MediaQuery.textScalerOf(context).scale(14) > 23;
+          final content = Column(
+            children: [
+              _StoreLiveBusinessPulse(
+                session: session,
+                onOrders: onCustomers,
+                onSales: onMoney,
+                onStock: onStock,
+                onSettlement: () =>
+                    onOpenOperation(_WorkspaceOperation.payments),
+              ),
+              if (session.workspaceDashboardState !=
+                  WorkspaceDashboardState.ready)
+                _DashboardSyncBanner(session: session),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: ready
+                          ? _StoreActivityDeck(
+                              key: const Key('store-stable-working-centre'),
+                              session: session,
+                              reviewedOrder: reviewedOrder,
+                              onReviewOrder: onReviewOrder,
+                              onCloseOrder: onCloseOrder,
+                              onStock: onStock,
+                              onMoney: onMoney,
+                              onGroupBulk: () => onOpenOperation(
+                                _WorkspaceOperation.groupBuying,
+                              ),
+                            )
+                          : _StoreSetupDeck(
+                              session: session,
+                              workspace: workspace,
+                              onSetup: onSetup,
+                            ),
+                    ),
+                    _StoreActionEdge(
+                      session: session,
+                      onRestock: onBuyStock,
+                      onDirect: () =>
+                          onOpenOperation(_WorkspaceOperation.direct),
+                      onGroup: () =>
+                          onOpenOperation(_WorkspaceOperation.groupBuying),
+                    ),
+                  ],
                 ),
-                _StoreActionEdge(
-                  session: session,
-                  onRestock: onBuyStock,
-                  onDirect: () => onOpenOperation(_WorkspaceOperation.direct),
-                  onGroup: () =>
-                      onOpenOperation(_WorkspaceOperation.groupBuying),
-                ),
-              ],
+              ),
+              _StoreReachStrip(
+                onLink: onDeliverOrder,
+                onPromote: onGrow,
+                onRequirement: () =>
+                    onOpenOperation(_WorkspaceOperation.paidWork),
+              ),
+            ],
+          );
+          if (!enlarged) return content;
+          return SingleChildScrollView(
+            key: const Key('work-dashboard-enlarged-scroll'),
+            child: SizedBox(
+              height: constraints.maxHeight.clamp(760, double.infinity),
+              child: content,
             ),
-          ),
-          _StoreReachStrip(
-            onLink: onDeliverOrder,
-            onPromote: onGrow,
-            onRequirement: () => onOpenOperation(_WorkspaceOperation.paidWork),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -2192,6 +2212,7 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
               _StorePulseMetric(
                 keyName: 'work-pulse-sales',
                 label: 'View statement',
+                contextLabel: 'Sales today',
                 value: '₹${_formatStoreAmount(session.workspaceSalesToday)}',
                 icon: Icons.point_of_sale_outlined,
                 onTap: onSales,
@@ -2200,6 +2221,7 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
               _StorePulseMetric(
                 keyName: 'work-pulse-dues',
                 label: 'Collect dues',
+                contextLabel: 'Unpaid bills',
                 value:
                     '₹${_formatStoreAmount(session.workspaceCustomerBook.fold<int>(0, (total, customer) => total + customer.amountDue))}',
                 icon: Icons.payments_outlined,
@@ -2209,6 +2231,7 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
               _StorePulseMetric(
                 keyName: 'work-pulse-settlement',
                 label: 'Settle',
+                contextLabel: 'Available',
                 value:
                     '₹${_formatStoreAmount(session.workspaceSettlementEligible)}',
                 icon: Icons.account_balance_wallet_outlined,
@@ -2238,6 +2261,7 @@ class _StorePulseMetric extends StatelessWidget {
   const _StorePulseMetric({
     required this.keyName,
     required this.label,
+    required this.contextLabel,
     required this.value,
     required this.icon,
     required this.onTap,
@@ -2245,6 +2269,7 @@ class _StorePulseMetric extends StatelessWidget {
 
   final String keyName;
   final String label;
+  final String contextLabel;
   final String value;
   final IconData icon;
   final VoidCallback onTap;
@@ -2255,7 +2280,7 @@ class _StorePulseMetric extends StatelessWidget {
     return Expanded(
       child: Semantics(
         button: true,
-        label: '$label, $value',
+        label: '$label, $contextLabel, $value in store records',
         onTap: onTap,
         excludeSemantics: true,
         child: InkWell(
@@ -2265,7 +2290,7 @@ class _StorePulseMetric extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 72),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -2297,7 +2322,15 @@ class _StorePulseMetric extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  Text(
+                    contextLabel,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 10,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
                   Text(
                     label,
                     textAlign: TextAlign.center,
@@ -4398,19 +4431,21 @@ class _StoreReadyActivity extends StatelessWidget {
             children: [
               _LiveDot(color: MoolColors.navy),
               SizedBox(width: 8),
-              Text(
-                open
-                    ? 'TAKING ORDERS'
-                    : paused
-                    ? 'PAUSED'
-                    : private
-                    ? 'PRIVATE'
-                    : 'STORE OFF',
-                style: const TextStyle(
-                  color: MoolColors.navy,
-                  fontSize: 11,
-                  letterSpacing: .8,
-                  fontWeight: FontWeight.w900,
+              Expanded(
+                child: Text(
+                  open
+                      ? 'TAKING ORDERS'
+                      : paused
+                      ? 'PAUSED'
+                      : private
+                      ? 'PRIVATE'
+                      : 'STORE OFF',
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 11,
+                    letterSpacing: .8,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
@@ -6367,45 +6402,63 @@ class _StoreDuesSurface extends StatelessWidget {
 }
 
 class _StoreLinkSurface extends StatelessWidget {
-  const _StoreLinkSurface({required this.session});
+  const _StoreLinkSurface({
+    required this.session,
+    required this.onSetup,
+    required this.onCatalogue,
+  });
   final WorkSession session;
+  final VoidCallback onSetup, onCatalogue;
   @override
   Widget build(BuildContext context) => ListView(
     key: const Key('work-store-link'),
-    padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.all(16),
     children: [
-      const Text(
-        'Send store link',
-        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-      ),
-      const SizedBox(height: 24),
-      const Icon(Icons.storefront_outlined, size: 44, color: MoolColors.navy),
-      const SizedBox(height: 14),
-      Text(
-        session.activeWorkspace?.name ?? session.workName,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
-          color: MoolColors.navy,
+      Container(
+        key: const Key('work-store-link-unavailable'),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFE2E7F4)),
+          borderRadius: BorderRadius.circular(12),
         ),
-      ),
-      const SizedBox(height: 24),
-      const Text(
-        'A call becomes an online order.',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-      ),
-      const SizedBox(height: 8),
-      const Text(
-        'Send your store to a customer. They choose their items, add an address and pay in MoolSocial. You receive the order here.',
-        style: TextStyle(fontSize: 13, height: 1.5, color: MoolColors.muted),
-      ),
-      const SizedBox(height: 24),
-      const _DeskEmpty(
-        icon: Icons.link_off_rounded,
-        title: 'Your store link is not available yet',
-        detail:
-            'Sharing becomes available when your published storefront has its own customer link.',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.link_off_rounded, size: 20, color: MoolColors.navy),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Store link unavailable',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              session.retailerSetupSaved
+                  ? 'No customer link is available yet. You can still prepare your products.'
+                  : 'Finish setup first. Sharing needs a public storefront and customer link.',
+              style: const TextStyle(fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const Key('work-store-link-recovery'),
+              onPressed: session.retailerSetupSaved ? onCatalogue : onSetup,
+              icon: Icon(
+                session.retailerSetupSaved
+                    ? Icons.inventory_2_outlined
+                    : Icons.storefront_outlined,
+              ),
+              label: Text(
+                session.retailerSetupSaved ? 'View products' : 'Set up store',
+              ),
+            ),
+          ],
+        ),
       ),
     ],
   );
@@ -6616,7 +6669,14 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       return _StoreDuesSurface(session: session, onOpenRoute: onOpenRoute);
     }
     if (operation == _WorkspaceOperation.storeLink) {
-      return _StoreLinkSurface(session: session);
+      return _StoreLinkSurface(
+        session: session,
+        onSetup: () {
+          session.beginRetailerSetup();
+          onOpenRoute('/app/work/retailer/setup');
+        },
+        onCatalogue: () => onOpenOperation(_WorkspaceOperation.catalogue),
+      );
     }
     if (operation == _WorkspaceOperation.direct) {
       return _StoreDirectSurface(
@@ -6732,6 +6792,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     if (operation == _WorkspaceOperation.offers) {
       return _WorkspaceOffersSurface(
         session: session,
+        onCatalogue: () => onOpenOperation(_WorkspaceOperation.catalogue),
         onPromote: () => onOpenRoute(
           Uri(
             path: '/app/social/promote',
@@ -7727,39 +7788,60 @@ class _WorkspaceCatalogueSurfaceState
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         children: [
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
-              Expanded(
-                child: Text(
-                  'Products',
-                  style: TextStyle(
-                    color: MoolColors.ink,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
+              const Text(
+                'Products',
+                key: Key('work-catalogue-heading'),
+                style: TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (MediaQuery.sizeOf(context).width < 360 &&
+                      MediaQuery.textScalerOf(context).scale(14) > 17)
+                    IconButton.filled(
+                      key: const Key('work-catalogue-add'),
+                      tooltip: 'Add product',
+                      onPressed: () => _edit(_blankProduct()),
+                      icon: const Icon(Icons.add_rounded),
+                    )
+                  else
+                    FilledButton.icon(
+                      key: const Key('work-catalogue-add'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
+                      onPressed: () => _edit(_blankProduct()),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Add'),
+                    ),
+                  const SizedBox(width: 4),
+                  IconButton.filledTonal(
+                    key: const Key('work-catalogue-stock-statement'),
+                    tooltip: 'Stock statement',
+                    onPressed: widget.onOpenStockStatement,
+                    icon: const Icon(Icons.list_alt_rounded),
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  key: const Key('work-catalogue-add'),
-                  onPressed: () => _edit(_blankProduct()),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add'),
-                ),
-              ),
-              const SizedBox(width: 4),
-              IconButton.filledTonal(
-                key: const Key('work-catalogue-stock-statement'),
-                tooltip: 'Stock statement',
-                onPressed: widget.onOpenStockStatement,
-                icon: const Icon(Icons.list_alt_rounded),
-              ),
-              IconButton.filledTonal(
-                key: const Key('work-catalogue-more'),
-                tooltip: 'More product tools',
-                onPressed: _showCatalogueTools,
-                icon: const Icon(Icons.more_horiz_rounded),
+                  IconButton.filledTonal(
+                    key: const Key('work-catalogue-more'),
+                    tooltip: 'More product tools',
+                    onPressed: _showCatalogueTools,
+                    icon: const Icon(Icons.more_horiz_rounded),
+                  ),
+                ],
               ),
             ],
           ),
@@ -7769,7 +7851,8 @@ class _WorkspaceCatalogueSurfaceState
             style: TextStyle(color: MoolColors.muted, fontSize: 12),
           ),
           const SizedBox(height: 9),
-          _CatalogueSummary(session: widget.session),
+          if (widget.session.workspaceCatalogueItems.isNotEmpty)
+            _CatalogueSummary(session: widget.session),
           if (_lowStockOnly) ...[
             const SizedBox(height: 8),
             Material(
@@ -7795,16 +7878,16 @@ class _WorkspaceCatalogueSurfaceState
           const SizedBox(height: 8),
           if (own.isEmpty)
             Container(
-              padding: const EdgeInsets.all(20),
+              key: const Key('work-catalogue-empty-guidance'),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 _lowStockOnly
                     ? 'No products currently need restocking.'
-                    : 'No products are active yet. Scan, import or add your first product.',
-                textAlign: TextAlign.center,
+                    : 'Choose a product below, or scan or add your own.',
                 style: const TextStyle(color: MoolColors.muted),
               ),
             )
@@ -7836,7 +7919,8 @@ class _WorkspaceCatalogueSurfaceState
             ),
             const SizedBox(height: 10),
             SizedBox(
-              height: 126,
+              height:
+                  126 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: available.length,
@@ -8100,12 +8184,14 @@ class _VerifiedProductMatch extends StatelessWidget {
                       size: 15,
                     ),
                     SizedBox(width: 4),
-                    Text(
-                      'Add this product',
-                      style: TextStyle(
-                        color: Color(0xFF08765D),
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
+                    Expanded(
+                      child: Text(
+                        'Add this product',
+                        style: TextStyle(
+                          color: Color(0xFF08765D),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ],
@@ -13570,10 +13656,12 @@ class _WorkspaceOffersSurface extends StatefulWidget {
   const _WorkspaceOffersSurface({
     required this.session,
     required this.onPromote,
+    required this.onCatalogue,
   });
 
   final WorkSession session;
   final VoidCallback onPromote;
+  final VoidCallback onCatalogue;
 
   @override
   State<_WorkspaceOffersSurface> createState() =>
@@ -13643,181 +13731,231 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
         .where((product) => product.id == _productId)
         .firstOrNull;
     final cap = int.tryParse(_orderCap.text.trim()) ?? 0;
-    return ListView(
-      key: const Key('work-store-offers-screen'),
-      padding: const EdgeInsets.all(18),
+    return Column(
       children: [
-        const _WorkspaceSectionLabel(
-          title: 'Bring customers back',
-          detail:
-              'Choose a useful offer for customers who allow Store messages',
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 38,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: 4,
-            separatorBuilder: (_, _) => const SizedBox(width: 6),
-            itemBuilder: (context, index) {
-              final template = const [
-                'Monthly essentials',
-                'Back in stock',
-                'Festival saving',
-                'Repeat your basket',
-              ][index];
-              return ActionChip(
-                label: Text(template),
-                onPressed: () => _useTemplate(template),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          key: const Key('work-offer-product'),
-          isExpanded: true,
-          initialValue: _productId,
-          decoration: const InputDecoration(
-            labelText: 'Product customers can buy',
-          ),
-          items: products
-              .map(
-                (product) => DropdownMenuItem(
-                  value: product.id,
-                  child: Text(
-                    '${product.title} · ${product.pack}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+        Expanded(
+          child: ListView(
+            key: const Key('work-store-offers-screen'),
+            padding: const EdgeInsets.all(18),
+            children: [
+              const _WorkspaceSectionLabel(
+                title: 'Bring customers back',
+                detail:
+                    'Choose a useful offer for customers who allow Store messages',
+              ),
+              if (products.isEmpty || eligibleCustomers == 0) ...[
+                const SizedBox(height: 8),
+                Container(
+                  key: const Key('work-offer-prerequisites'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0xFFE2E7F4)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (products.isEmpty) ...[
+                        const Text(
+                          'No public products yet.',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        TextButton(
+                          key: const Key('work-offer-catalogue'),
+                          onPressed: widget.onCatalogue,
+                          child: const Text('View products'),
+                        ),
+                      ],
+                      if (eligibleCustomers == 0)
+                        const Text(
+                          'No customers allow offers yet.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: MoolColors.muted,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-              )
-              .toList(growable: false),
-          onChanged: (value) => setState(() => _productId = value),
-        ),
-        const SizedBox(height: 8),
-        _AccessibleWorkTextField(
-          keyName: 'work-offer-title',
-          controller: _title,
-          onChanged: (_) => setState(() {}),
-          label: 'Offer headline',
-        ),
-        const SizedBox(height: 8),
-        _AccessibleWorkTextField(
-          keyName: 'work-offer-detail',
-          controller: _detail,
-          onChanged: (_) => setState(() {}),
-          maxLines: 2,
-          label: 'Customer saving and terms',
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          key: const Key('work-offer-valid-until'),
-          onPressed: _pickDate,
-          icon: const Icon(Icons.event_outlined),
-          label: Text(
-            _validUntil == null
-                ? 'Choose offer end date'
-                : 'Valid until ${_validUntil!.day}/${_validUntil!.month}/${_validUntil!.year}',
-          ),
-        ),
-        const SizedBox(height: 8),
-        _NumberField(
-          keyName: 'work-offer-order-cap',
-          controller: _orderCap,
-          label: 'Maximum customer orders for this offer',
-        ),
-        const SizedBox(height: 8),
-        Container(
-          key: const Key('work-offer-preview'),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF3F6FF),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _title.text.trim().isEmpty
-                    ? 'Your offer preview'
-                    : _title.text.trim(),
-                style: const TextStyle(
-                  color: MoolColors.navy,
-                  fontWeight: FontWeight.w900,
+              ],
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 38,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: 4,
+                  separatorBuilder: (_, _) => const SizedBox(width: 6),
+                  itemBuilder: (context, index) {
+                    final template = const [
+                      'Monthly essentials',
+                      'Back in stock',
+                      'Festival saving',
+                      'Repeat your basket',
+                    ][index];
+                    return ActionChip(
+                      label: Text(template),
+                      onPressed: () => _useTemplate(template),
+                    );
+                  },
                 ),
               ),
-              Text(
-                selectedProduct == null
-                    ? 'Choose an available product.'
-                    : '${selectedProduct.title} · ${selectedProduct.pack} · ₹${selectedProduct.sellingPrice}',
-                style: const TextStyle(color: MoolColors.muted, fontSize: 10),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                key: const Key('work-offer-product'),
+                isExpanded: true,
+                initialValue: _productId,
+                decoration: const InputDecoration(
+                  labelText: 'Product customers can buy',
+                ),
+                items: products
+                    .map(
+                      (product) => DropdownMenuItem(
+                        value: product.id,
+                        child: Text(
+                          '${product.title} · ${product.pack}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+                onChanged: (value) => setState(() => _productId = value),
               ),
-              Text(
-                eligibleCustomers == 0
-                    ? 'No customer has allowed Store offers yet.'
-                    : '$eligibleCustomers customers can receive this offer · first $cap orders',
-                style: TextStyle(
-                  color: eligibleCustomers == 0
-                      ? const Color(0xFFB42318)
-                      : const Color(0xFF08765D),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
+              const SizedBox(height: 8),
+              _AccessibleWorkTextField(
+                keyName: 'work-offer-title',
+                controller: _title,
+                onChanged: (_) => setState(() {}),
+                label: 'Offer headline',
+              ),
+              const SizedBox(height: 8),
+              _AccessibleWorkTextField(
+                keyName: 'work-offer-detail',
+                controller: _detail,
+                onChanged: (_) => setState(() {}),
+                maxLines: 2,
+                label: 'Customer saving and terms',
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('work-offer-valid-until'),
+                onPressed: _pickDate,
+                icon: const Icon(Icons.event_outlined),
+                label: Text(
+                  _validUntil == null
+                      ? 'Choose offer end date'
+                      : 'Valid until ${_validUntil!.day}/${_validUntil!.month}/${_validUntil!.year}',
                 ),
               ),
+              const SizedBox(height: 8),
+              _NumberField(
+                keyName: 'work-offer-order-cap',
+                controller: _orderCap,
+                label: 'Maximum customer orders for this offer',
+              ),
+              const SizedBox(height: 8),
+              Container(
+                key: const Key('work-offer-preview'),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F6FF),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _title.text.trim().isEmpty
+                          ? 'Your offer preview'
+                          : _title.text.trim(),
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      selectedProduct == null
+                          ? 'Choose an available product.'
+                          : '${selectedProduct.title} · ${selectedProduct.pack} · ₹${selectedProduct.sellingPrice}',
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 10,
+                      ),
+                    ),
+                    Text(
+                      eligibleCustomers == 0
+                          ? 'Only customers who allow offers can receive them.'
+                          : '$eligibleCustomers customers can receive this offer · first $cap orders',
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (widget.session.workspaceOffers.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                const Text(
+                  'Active offers',
+                  style: TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                for (final offer in widget.session.workspaceOffers)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.sell_outlined),
+                    title: Text(offer.title),
+                    subtitle: Text(offer.detail),
+                    trailing: Text(
+                      '${offer.validUntil.day}/${offer.validUntil.month}',
+                    ),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: widget.onPromote,
+                  icon: const Icon(Icons.campaign_outlined),
+                  label: const Text('Promote this Store offer'),
+                ),
+              ],
             ],
           ),
         ),
-        const SizedBox(height: 10),
-        FilledButton.icon(
-          key: const Key('work-offer-publish'),
-          onPressed:
-              _title.text.trim().isEmpty ||
-                  _detail.text.trim().isEmpty ||
-                  _validUntil == null ||
-                  selectedProduct == null ||
-                  eligibleCustomers == 0 ||
-                  cap <= 0
-              ? null
-              : () {
-                  widget.session.addWorkspaceOffer(
-                    title: _title.text,
-                    detail: _detail.text,
-                    validUntil: _validUntil!,
-                    productId: selectedProduct.id,
-                    orderCap: cap,
-                  );
-                  setState(() {});
-                },
-          icon: const Icon(Icons.local_offer_outlined),
-          label: const Text('Publish Store offer'),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Color(0xFFE2E7F4))),
+          ),
+          child: FilledButton.icon(
+            key: const Key('work-offer-publish'),
+            onPressed:
+                _title.text.trim().isEmpty ||
+                    _detail.text.trim().isEmpty ||
+                    _validUntil == null ||
+                    selectedProduct == null ||
+                    eligibleCustomers == 0 ||
+                    cap <= 0
+                ? null
+                : () {
+                    widget.session.addWorkspaceOffer(
+                      title: _title.text,
+                      detail: _detail.text,
+                      validUntil: _validUntil!,
+                      productId: selectedProduct.id,
+                      orderCap: cap,
+                    );
+                    setState(() {});
+                  },
+            icon: const Icon(Icons.local_offer_outlined),
+            label: const Text('Publish Store offer'),
+          ),
         ),
-        if (widget.session.workspaceOffers.isNotEmpty) ...[
-          const SizedBox(height: 18),
-          const Text(
-            'Active offers',
-            style: TextStyle(
-              color: MoolColors.navy,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          for (final offer in widget.session.workspaceOffers)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.sell_outlined),
-              title: Text(offer.title),
-              subtitle: Text(offer.detail),
-              trailing: Text(
-                '${offer.validUntil.day}/${offer.validUntil.month}',
-              ),
-            ),
-          OutlinedButton.icon(
-            onPressed: widget.onPromote,
-            icon: const Icon(Icons.campaign_outlined),
-            label: const Text('Promote this Store offer'),
-          ),
-        ],
       ],
     );
   }
@@ -15581,30 +15719,29 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
           Expanded(
             child: products.isEmpty
                 ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(12),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            query.isNotEmpty
-                                ? 'No products match your search'
-                                : 'Your catalogue is ready for products',
-                            style: const TextStyle(
-                              color: MoolColors.ink,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
                           if (query.isEmpty) ...[
-                            const SizedBox(height: 12),
                             OutlinedButton.icon(
                               onPressed: widget.onOpenCatalogue,
                               icon: const Icon(Icons.add_rounded),
                               label: const Text('Add products'),
                             ),
+                            const SizedBox(height: 8),
                           ],
+                          Text(
+                            query.isNotEmpty
+                                ? 'No products match your search'
+                                : 'Start with your store catalogue.',
+                            style: const TextStyle(
+                              color: MoolColors.muted,
+                              fontSize: 13,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ],
                       ),
                     ),
@@ -15685,7 +15822,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                     ),
                     child: Text(
                       _selectedUnits == 0
-                          ? 'Add products'
+                          ? 'Review bill'
                           : validPhone
                           ? 'Review bill'
                           : 'Add customer',
