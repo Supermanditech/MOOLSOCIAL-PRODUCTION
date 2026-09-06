@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/core/design/mool_design_system.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -216,6 +217,199 @@ void main() {
         '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/$name.png',
       ),
     );
+  }
+
+  for (final width in [320.0, 360.0]) {
+    for (final decision in [
+      'pending',
+      'clarification',
+      'rejected',
+      'approved',
+    ]) {
+      testWidgets(
+        'S07 S08 application $decision at $width stays truthful and compact',
+        (tester) async {
+          if (width == 320) {
+            tester.platformDispatcher.accessibilityFeaturesTestValue =
+                const FakeAccessibilityFeatures(disableAnimations: true);
+            addTearDown(
+              tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+            );
+          }
+          final gateway = ReviewWorkGateway(
+            initialReviewStatus: WorkRemoteReviewStatus.pending,
+          );
+          final work = WorkSession(gateway: gateway)
+            ..selectProfile('retailer-grocery')
+            ..workName = 'Sharma Stores'
+            ..workArea = 'Jaipur'
+            ..primaryActivity = 'Groceries'
+            ..authorizedPersonName = 'Asha Sharma'
+            ..businessRelationship = 'Owner'
+            ..primaryMobile = '9829012321'
+            ..contactEmail = 'asha@example.com'
+            ..primaryMobileVerified = true
+            ..contactEmailVerified = true
+            ..declarationAccepted = true;
+          expect(await tester.runAsync(work.submitProfile), isTrue);
+          final caseId = work.reviewCaseId;
+          if (decision == 'clarification') {
+            gateway.reviewResultReason =
+                'Please resend the readable bank document.';
+          } else if (decision == 'rejected') {
+            gateway
+              ..reviewResultStatus = WorkRemoteReviewStatus.rejected
+              ..reviewResultReason =
+                  'The submitted business name does not match the document.';
+          } else if (decision == 'approved') {
+            gateway.reviewResultStatus = WorkRemoteReviewStatus.approved;
+          }
+          // Unsent edits must never become the acknowledged application summary.
+          work.workName = 'Unsent business name';
+          await mount(
+            tester,
+            route: '/app/work/workspace/proof',
+            work: work,
+            viewport: Size(width, width == 320 ? 640 : 800),
+            textScale: width == 320 ? 1.4 : 1,
+          );
+          await tester.pump(const Duration(milliseconds: 50));
+          await tester.pumpAndSettle();
+          if (decision == 'approved') {
+            expect(
+              find.byKey(const Key('work-approval-welcome')),
+              findsOneWidget,
+            );
+            expect(
+              find.byKey(const Key('work-inline-review-status')),
+              findsNothing,
+            );
+            expect(work.activeWorkspace?.id, work.workspaceId);
+            expect(work.activeWorkspace?.name, 'Sharma Stores');
+            expect(work.workspaceAcceptingOrders, isFalse);
+            expect(work.workspaceVisibleToCustomers, isFalse);
+            expect(work.reviewCaseId, caseId);
+            await captureStoreView(
+              tester,
+              'r665-application-$decision-${width.toInt()}',
+            );
+            if (width == 360) {
+              await tester.tap(
+                find.byKey(const Key('work-dashboard-priority-action')),
+              );
+              await tester.pumpAndSettle();
+              expect(
+                find.byKey(const Key('retailer-finish-setup')),
+                findsOneWidget,
+              );
+              expect(
+                find.byKey(const Key('work-approval-welcome')),
+                findsNothing,
+              );
+            }
+            await tester.pump(const Duration(seconds: 5));
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const Key('work-approval-welcome')),
+              findsNothing,
+            );
+            expect(await tester.runAsync(work.checkReview), isTrue);
+            expect(work.takeWorkspaceApprovalWelcome(), isFalse);
+            GoRouter.of(
+              tester.element(find.byType(Scaffold).first),
+            ).go('/app/work/workspace/proof');
+            await tester.pumpAndSettle();
+            await tester.pump(const Duration(milliseconds: 50));
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const Key('work-inline-review-status')),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const Key('work-approval-welcome')),
+              findsNothing,
+            );
+            expect(work.reviewCaseId, caseId);
+          } else {
+            expect(find.text('Application status'), findsOneWidget);
+            expect(find.text('Complete your Workspace'), findsNothing);
+            expect(
+              find.byKey(const Key('work-approval-welcome')),
+              findsNothing,
+            );
+            expect(work.activeWorkspace, isNull);
+            final title = decision == 'pending'
+                ? 'Application received'
+                : decision == 'rejected'
+                ? 'Application not approved'
+                : 'More information needed';
+            expect(find.text(title), findsOneWidget);
+            if (decision != 'pending') {
+              expect(find.text(gateway.reviewResultReason!), findsOneWidget);
+            }
+            await captureStoreView(
+              tester,
+              'r665-application-$decision-${width.toInt()}',
+            );
+            await reveal(
+              tester,
+              find.byKey(const Key('work-submitted-summary')),
+            );
+            final summary = find.byKey(const Key('work-submitted-summary'));
+            expect(
+              find.descendant(
+                of: summary,
+                matching: find.text('Sharma Stores'),
+              ),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(
+                of: summary,
+                matching: find.text('Unsent business name'),
+              ),
+              findsNothing,
+            );
+            expect(
+              find.descendant(
+                of: summary,
+                matching: find.byIcon(Icons.edit_outlined),
+              ),
+              findsNothing,
+            );
+            await reveal(tester, find.text('0 attached'));
+            expect(find.text('0 attached').hitTestable(), findsOneWidget);
+            if (decision != 'clarification') {
+              expect(
+                find.byKey(const Key('work-inline-update-documents')),
+                findsNothing,
+              );
+            }
+            await tester.pump(const Duration(seconds: 31));
+            await tester.pumpAndSettle();
+            expect(work.activeWorkspace, isNull);
+            expect(work.reviewCaseId, caseId);
+            expect(
+              find.byKey(const Key('work-inline-review-status')),
+              findsOneWidget,
+            );
+            if (decision == 'pending') {
+              gateway.failReview = true;
+              expect(await tester.runAsync(work.checkReview), isFalse);
+              await tester.pumpAndSettle();
+              final retry = find.byKey(const Key('work-inline-review-check'));
+              await tester.ensureVisible(retry);
+              await tester.tap(retry);
+              await tester.pumpAndSettle();
+              expect(work.errorMessage, isNull);
+              expect(work.remoteReviewStatus, WorkRemoteReviewStatus.pending);
+              expect(work.submittedProfile?.name, 'Sharma Stores');
+            }
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   }
 
   for (final channel in WorkContactChannel.values) {

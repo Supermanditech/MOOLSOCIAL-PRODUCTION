@@ -13,6 +13,273 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 
 void main() {
+  WorkSession application({
+    WorkGateway? gateway,
+    WorkPendingProofStore? store,
+  }) => WorkSession(gateway: gateway, contactDraftStore: store)
+    ..selectProfile('retailer-grocery')
+    ..workName = 'Sharma Stores'
+    ..workArea = 'Jaipur'
+    ..primaryActivity = 'Groceries'
+    ..authorizedPersonName = 'Asha Sharma'
+    ..businessRelationship = 'Owner'
+    ..primaryMobile = '9829012321'
+    ..contactEmail = 'asha@example.com'
+    ..primaryMobileVerified = true
+    ..contactEmailVerified = true
+    ..declarationAccepted = true;
+
+  test(
+    'S07 device review defaults pending without changing ordinary fixtures',
+    () {
+      const deviceReview =
+          bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+          bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+      expect(
+        ReviewWorkGateway().reviewResultStatus,
+        deviceReview
+            ? WorkRemoteReviewStatus.pending
+            : WorkRemoteReviewStatus.approved,
+      );
+    },
+  );
+
+  test(
+    'S07 pending fixture stays pending and approval keeps one Workspace per case',
+    () async {
+      final gateway = ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.pending,
+      );
+      for (var attempt = 0; attempt < 3; attempt++) {
+        final result = await gateway.checkReview('case-a');
+        expect(result.status, WorkRemoteReviewStatus.pending);
+        expect(result.workspaceId, isNull);
+      }
+      gateway.reviewResultStatus = WorkRemoteReviewStatus.approved;
+      final first = await gateway.checkReview('case-a');
+      expect(
+        (await gateway.checkReview('case-a')).workspaceId,
+        first.workspaceId,
+      );
+      expect(
+        (await gateway.checkReview('case-b')).workspaceId,
+        isNot(first.workspaceId),
+      );
+    },
+  );
+
+  for (final changed in ['account', 'case', 'business']) {
+    test('S07 delayed approval cannot replace another $changed', () async {
+      final gateway = _DeferredReviewGateway();
+      final store = _PendingProofMemory();
+      final work = application(gateway: gateway, store: store)
+        ..reviewCaseId = 'case-a'
+        ..remoteReviewStatus = WorkRemoteReviewStatus.pending;
+      addTearDown(work.dispose);
+      final pending = work.checkReview();
+      switch (changed) {
+        case 'account':
+          store.accountScope = 'another-account';
+        case 'case':
+          work.reviewCaseId = 'case-b';
+        case 'business':
+          work.selectProfile('retailer-speciality');
+      }
+      gateway.result.complete(
+        const WorkReviewResult(
+          caseId: 'case-a',
+          status: WorkRemoteReviewStatus.approved,
+          workspaceId: 'workspace-a',
+          plan: 'free',
+        ),
+      );
+      expect(await pending, isFalse);
+      expect(work.activeWorkspace, isNull);
+      expect(work.remoteReviewStatus, WorkRemoteReviewStatus.pending);
+      expect(work.takeWorkspaceApprovalWelcome(), isFalse);
+      expect(work.noticeMessage, isNull);
+    });
+  }
+
+  test('S07 delayed submission cannot acknowledge another account', () async {
+    final gateway = _DeferredSubmissionGateway();
+    final store = _PendingProofMemory();
+    final work = application(gateway: gateway, store: store);
+    addTearDown(work.dispose);
+    final pending = work.submitProfile();
+    store.accountScope = 'another-account';
+    gateway.result.complete(
+      const WorkReviewResult(
+        caseId: 'case-a',
+        status: WorkRemoteReviewStatus.pending,
+        plan: 'free',
+      ),
+    );
+    expect(await pending, isFalse);
+    expect(work.submittedProfile, isNull);
+    expect(work.reviewCaseId, isNull);
+    expect(work.noticeMessage, isNull);
+  });
+
+  test(
+    'S07 mismatched correction preserves the acknowledged submission',
+    () async {
+      final gateway = _DeferredSubmissionGateway();
+      final work = application(gateway: gateway);
+      addTearDown(work.dispose);
+      gateway.result.complete(
+        const WorkReviewResult(
+          caseId: 'case-a',
+          status: WorkRemoteReviewStatus.pending,
+          plan: 'free',
+        ),
+      );
+      expect(await work.submitProfile(), isTrue);
+      final acknowledged = work.submittedProfile;
+      work.reviewReason = 'Please confirm the registered business name.';
+      expect(work.beginReviewCorrection(), isTrue);
+      work.workName = 'Corrected Stores';
+      work.declarationAccepted = true;
+      gateway.result = Completer<WorkReviewResult>();
+      final correction = work.submitProfile();
+      gateway.result.complete(
+        const WorkReviewResult(
+          caseId: 'different-case',
+          status: WorkRemoteReviewStatus.pending,
+          plan: 'free',
+        ),
+      );
+      expect(await correction, isFalse);
+      expect(work.submittedProfile, same(acknowledged));
+      expect(work.reviewCaseId, 'case-a');
+      expect(work.reviewCorrectionDraft, isTrue);
+      expect(work.errorMessage, contains('could not be matched'));
+      gateway.result = Completer<WorkReviewResult>();
+      final retry = work.submitProfile();
+      gateway.result.complete(
+        const WorkReviewResult(
+          caseId: 'case-a',
+          status: WorkRemoteReviewStatus.pending,
+          plan: 'free',
+        ),
+      );
+      expect(await retry, isTrue);
+      expect(work.submittedProfile?.name, 'Corrected Stores');
+      expect(work.reviewCaseId, 'case-a');
+      expect(work.reviewCorrectionDraft, isFalse);
+    },
+  );
+
+  test(
+    'S07 malformed approval cannot replace the last valid pending decision',
+    () async {
+      final gateway = _DeferredReviewGateway();
+      final work = application(gateway: gateway)
+        ..reviewCaseId = 'case-a'
+        ..remoteReviewStatus = WorkRemoteReviewStatus.pending;
+      addTearDown(work.dispose);
+      final pending = work.checkReview();
+      gateway.result.complete(
+        const WorkReviewResult(
+          caseId: 'case-a',
+          status: WorkRemoteReviewStatus.approved,
+          workspaceId: '  ',
+          plan: 'free',
+        ),
+      );
+      expect(await pending, isFalse);
+      expect(work.remoteReviewStatus, WorkRemoteReviewStatus.pending);
+      expect(work.activeWorkspace, isNull);
+      expect(work.errorMessage, contains('without a Workspace'));
+    },
+  );
+
+  test(
+    'S07 restored clarification retains its exact service request',
+    () async {
+      final gateway = _DeferredFeedGateway();
+      final work = application(gateway: gateway);
+      addTearDown(work.dispose);
+      final pending = work.refreshFeed();
+      gateway.result.complete(const [
+        WorkReviewResult(
+          caseId: 'case-a',
+          status: WorkRemoteReviewStatus.pending,
+          plan: 'free',
+          profileId: 'retailer-grocery',
+          reason: 'Please resend the readable bank document.',
+        ),
+      ]);
+      await pending;
+      expect(work.reviewReason, 'Please resend the readable bank document.');
+      expect(work.reviewCaseId, 'case-a');
+      expect(work.hasVerifiedWorkspace, isFalse);
+    },
+  );
+
+  test(
+    'S07 late account feed cannot restore or announce another application',
+    () async {
+      final gateway = _DeferredFeedGateway();
+      final store = _PendingProofMemory();
+      final work = application(gateway: gateway, store: store);
+      addTearDown(work.dispose);
+      final pending = work.refreshFeed();
+      store.accountScope = 'another-account';
+      gateway.result.complete(const [
+        WorkReviewResult(
+          caseId: 'case-a',
+          status: WorkRemoteReviewStatus.approved,
+          plan: 'free',
+          profileId: 'retailer-grocery',
+          workspaceId: 'workspace-a',
+          name: 'Other Stores',
+          area: 'Jaipur',
+        ),
+      ]);
+      await pending;
+      expect(work.hasVerifiedWorkspace, isFalse);
+      expect(work.initialWorkspaceStateLoaded, isFalse);
+      expect(work.noticeMessage, isNull);
+    },
+  );
+
+  test(
+    'S08 welcome is once per matching approval and survives account-scoped restart',
+    () async {
+      final store = _PendingProofMemory();
+      final work = application(store: store);
+      await work.recoverPendingProof(accountReady: true);
+      work.reviewCaseId = 'case-a';
+      expect(work.takeWorkspaceApprovalWelcome(), isFalse);
+      expect(await work.checkReview(), isTrue);
+      expect(work.takeWorkspaceApprovalWelcome(), isTrue);
+      expect(work.takeWorkspaceApprovalWelcome(), isFalse);
+      expect(work.workspaceVisibleToCustomers, isFalse);
+      expect(work.workspaceAcceptingOrders, isFalse);
+      await work.flushContactDraft();
+      work.dispose();
+      final restored = WorkSession(contactDraftStore: store);
+      addTearDown(restored.dispose);
+      await restored.recoverPendingProof(accountReady: true);
+      expect(restored.hasVerifiedWorkspace, isFalse);
+      expect(restored.takeWorkspaceApprovalWelcome(), isFalse);
+      restored.reviewCaseId = 'case-a';
+      expect(await restored.checkReview(), isTrue);
+      expect(restored.takeWorkspaceApprovalWelcome(), isFalse);
+      restored.reviewCaseId = 'case-b';
+      expect(await restored.checkReview(), isTrue);
+      expect(restored.takeWorkspaceApprovalWelcome(), isTrue);
+      await restored.flushContactDraft();
+      store.accountScope = 'different-account';
+      await restored.recoverPendingProof(accountReady: true);
+      expect(restored.activeWorkspace, isNull);
+      expect(restored.otherWorkspaces, isEmpty);
+      expect(restored.initialWorkspaceStateLoaded, isFalse);
+      expect(restored.takeWorkspaceApprovalWelcome(), isFalse);
+    },
+  );
+
   WorkSession removableProof({WorkPendingProofStore? store}) {
     final work = WorkSession(pendingProofStore: store)
       ..selectProfile('retailer-grocery');
@@ -1678,6 +1945,30 @@ WorkPickedProof _cameraProof() => WorkPickedProof(
   contentType: 'image/jpeg',
   bytes: Uint8List.fromList([0xff, 0xd8, 0xff, 0xd9]),
 );
+
+class _DeferredReviewGateway extends ReviewWorkGateway {
+  final result = Completer<WorkReviewResult>();
+  @override
+  Future<WorkReviewResult> checkReview(String caseId) => result.future;
+}
+
+class _DeferredSubmissionGateway extends ReviewWorkGateway {
+  Completer<WorkReviewResult> result = Completer<WorkReviewResult>();
+  @override
+  Future<WorkReviewResult> submitProfile(WorkProfileSubmission profile) =>
+      result.future;
+  @override
+  Future<WorkReviewResult> submitCorrection(
+    String caseId,
+    WorkProfileSubmission profile,
+  ) => result.future;
+}
+
+class _DeferredFeedGateway extends ReviewWorkGateway {
+  final result = Completer<List<WorkReviewResult>>();
+  @override
+  Future<List<WorkReviewResult>> loadFeed() => result.future;
+}
 
 class _PendingProofMemory implements WorkPendingProofStore {
   @override

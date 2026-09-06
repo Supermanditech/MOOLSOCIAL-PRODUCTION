@@ -916,6 +916,15 @@ class AuthenticatedWorkGateway implements WorkGateway {
 }
 
 class ReviewWorkGateway implements WorkGateway {
+  ReviewWorkGateway({WorkRemoteReviewStatus? initialReviewStatus})
+    : reviewResultStatus =
+          initialReviewStatus ??
+          (kDebugMode &&
+                  const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+                  const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')
+              ? WorkRemoteReviewStatus.pending
+              : WorkRemoteReviewStatus.approved);
+
   bool failFeed = false;
   bool failApplication = false;
   bool failWithdrawal = false;
@@ -923,7 +932,8 @@ class ReviewWorkGateway implements WorkGateway {
   bool failProof = false;
   bool failSubmission = false;
   bool failReview = false;
-  WorkRemoteReviewStatus reviewResultStatus = WorkRemoteReviewStatus.approved;
+  WorkRemoteReviewStatus reviewResultStatus;
+  final Map<String, String> _reviewWorkspaceIds = {};
   String? reviewResultReason;
   bool failGst = false;
   bool failSetup = false;
@@ -1088,7 +1098,14 @@ class ReviewWorkGateway implements WorkGateway {
       status: reviewResultStatus,
       reason: reviewResultReason,
       plan: 'free',
-      workspaceId: 'WK-${510000 + reviewCalls}',
+      workspaceId:
+          reviewResultStatus == WorkRemoteReviewStatus.approved ||
+              reviewResultStatus == WorkRemoteReviewStatus.live
+          ? _reviewWorkspaceIds.putIfAbsent(
+              caseId,
+              () => 'WK-${510001 + _reviewWorkspaceIds.length}',
+            )
+          : null,
     );
   }
 

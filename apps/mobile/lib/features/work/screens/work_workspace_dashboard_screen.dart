@@ -59,6 +59,7 @@ class WorkWorkspaceDashboardScreen extends StatefulWidget {
 class _WorkWorkspaceDashboardScreenState
     extends State<WorkWorkspaceDashboardScreen> {
   WorkSession get session => widget.session;
+  final _workspaceMessengerKey = GlobalKey<ScaffoldMessengerState>();
   late final TextEditingController _searchController;
   final FocusNode _searchFocus = FocusNode(debugLabel: 'workspace-search');
   final _catalogueKey = GlobalKey<_WorkspaceCatalogueSurfaceState>();
@@ -103,6 +104,29 @@ class _WorkWorkspaceDashboardScreenState
       _operation = section;
       _view = _WorkspaceControlView.operation;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      if (!session.takeWorkspaceApprovalWelcome()) return;
+      _workspaceMessengerKey.currentState?.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Welcome to MoolSocial. Your Workspace is approved.',
+            key: Key('work-approval-welcome'),
+            style: TextStyle(fontSize: 13, height: 1.3, color: Colors.white),
+          ),
+          backgroundColor: MoolColors.navy,
+          elevation: 0,
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 4),
+          showCloseIcon: true,
+          closeIconColor: Colors.white,
+        ),
+      );
+    });
   }
 
   @override
@@ -115,7 +139,10 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      ScaffoldMessenger(key: _workspaceMessengerKey, child: _buildDashboard());
+
+  Widget _buildDashboard() {
     return AnimatedBuilder(
       animation: session,
       builder: (context, _) {

@@ -1889,7 +1889,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
       animation: widget.session,
       builder: (context, _) => WorkPageScaffold(
         session: widget.session,
-        title: 'Complete your Workspace',
+        title: _step == 3 ? 'Application status' : 'Complete your Workspace',
         subtitle:
             widget.session.selectedProfile?.setupSubtitle ??
             'Workspace details',
@@ -2793,7 +2793,7 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
                     ? Icons.info_outline
                     : Icons.fact_check_outlined,
                 color: MoolColors.navy,
-                size: 26,
+                size: 22,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -2804,17 +2804,18 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
                       title,
                       style: const TextStyle(
                         color: MoolColors.navy,
-                        fontSize: 20,
+                        fontSize: 16,
+                        height: 1.25,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
                       detail,
                       style: const TextStyle(
                         color: MoolColors.ink,
-                        fontSize: 14,
-                        height: 1.4,
+                        fontSize: 13,
+                        height: 1.35,
                       ),
                     ),
                   ],
@@ -2850,26 +2851,41 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           if (session.submittedProfile case final submitted?) ...[
-            const Text(
-              'Submitted information',
-              style: TextStyle(
-                color: MoolColors.navy,
-                fontWeight: FontWeight.w700,
+            Container(
+              key: const Key('work-submitted-summary'),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0x22000080)),
               ),
-            ),
-            const Divider(),
-            _ReviewRow(label: 'Business', value: submitted.name),
-            _ReviewRow(
-              label: 'Your name',
-              value: submitted.authorizedPersonName,
-            ),
-            _ReviewRow(label: 'Contact', value: submitted.primaryMobile),
-            _ReviewRow(label: 'Email', value: submitted.email),
-            _ReviewRow(
-              label: 'Documents',
-              value: '${submitted.proofReferences.length} attached',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Submitted information',
+                    style: TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Divider(),
+                  _ReviewRow(label: 'Business', value: submitted.name),
+                  _ReviewRow(
+                    label: 'Your name',
+                    value: submitted.authorizedPersonName,
+                  ),
+                  _ReviewRow(label: 'Contact', value: submitted.primaryMobile),
+                  _ReviewRow(label: 'Email', value: submitted.email),
+                  _ReviewRow(
+                    label: 'Documents',
+                    value: '${submitted.proofReferences.length} attached',
+                  ),
+                ],
+              ),
             ),
           ],
           if (session.reviewCaseId case final caseId?)
@@ -3010,22 +3026,22 @@ class _ProgressHeader extends StatelessWidget {
             key: const Key('work-workspace-progress'),
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                compactLabels
-                    ? step > 2
-                          ? labels[current]
-                          : '${labels[current]} · ${step + 1} of 3'
-                    : step > 2
-                    ? 'Application status'
-                    : 'Step ${step + 1} of 3',
-                key: const Key('work-progress-current'),
-                style: const TextStyle(
-                  color: MoolColors.navy,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+              if (step <= 2 || compactLabels) ...[
+                Text(
+                  compactLabels
+                      ? step > 2
+                            ? labels[current]
+                            : '${labels[current]} · ${step + 1} of 3'
+                      : 'Step ${step + 1} of 3',
+                  key: const Key('work-progress-current'),
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
+                const SizedBox(height: 8),
+              ],
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

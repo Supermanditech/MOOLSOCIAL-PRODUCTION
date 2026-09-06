@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
@@ -126,6 +127,8 @@ class WorkSession extends ChangeNotifier {
   >
   _removedProofs = {};
   WorkProfileSubmission? submittedProfile;
+  final Set<String> _seenApprovalMessages = {};
+  ({String? scope, String caseId, String workspaceId})? _approvalWelcome;
   bool declarationAccepted = false;
   WorkReviewStage reviewStage = WorkReviewStage.none;
   String? reviewCaseId;
@@ -788,6 +791,26 @@ class WorkSession extends ChangeNotifier {
       .every((proof) => addedProofs.containsKey(proof.id));
 
   bool get hasVerifiedWorkspace => activeWorkspace?.verified == true;
+
+  bool takeWorkspaceApprovalWelcome() {
+    final welcome = _approvalWelcome;
+    if (welcome == null ||
+        welcome.scope != _contactAccountScope ||
+        welcome.caseId != reviewCaseId ||
+        welcome.workspaceId != workspaceId ||
+        welcome.workspaceId != activeWorkspace?.id ||
+        !hasVerifiedWorkspace ||
+        (remoteReviewStatus != WorkRemoteReviewStatus.approved &&
+            remoteReviewStatus != WorkRemoteReviewStatus.live)) {
+      return false;
+    }
+    _approvalWelcome = null;
+    final key = jsonEncode([welcome.caseId, welcome.workspaceId]);
+    if (!_seenApprovalMessages.add(key)) return false;
+    // A dismissal acknowledgement is not authority for Workspace approval.
+    _queueContactDraft();
+    return true;
+  }
 
   bool get retailerReady =>
       retailerProductAdded &&
@@ -2072,11 +2095,24 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<void> refreshFeed() async {
-    await _run(() async {
+    if (busy) return;
+    final requestedScope = _contactAccountScope;
+    bool current() => !_disposed && requestedScope == _contactAccountScope;
+    busy = true;
+    clearMessages();
+    notifyListeners();
+    try {
       final records = await gateway.loadFeed();
+      if (!current()) return;
       _restoreWorkspaceState(records);
       initialWorkspaceStateLoaded = true;
-    }, success: 'Work opportunities refreshed.');
+      noticeMessage = 'Work opportunities refreshed.';
+    } on WorkGatewayException catch (error) {
+      if (current()) errorMessage = error.message;
+    } finally {
+      busy = false;
+      if (!_disposed) notifyListeners();
+    }
   }
 
   Future<void> loadInitialWorkspaceState() async {
@@ -2338,6 +2374,7 @@ class WorkSession extends ChangeNotifier {
         'area': workArea,
         'activity': primaryActivity,
         'editedFields': _editedDraftFields.toList(),
+        'dismissedWorkspaceWelcomes': _seenApprovalMessages.toList(),
       },
     );
     unawaited(flushContactDraft());
@@ -2399,6 +2436,12 @@ class WorkSession extends ChangeNotifier {
         pickedProofs.clear();
         _removedProofs.clear();
         submittedProfile = null;
+        _approvalWelcome = null;
+        _seenApprovalMessages.clear();
+        _profileSubmissionKey = null;
+        activeWorkspace = null;
+        otherWorkspaces.clear();
+        initialWorkspaceStateLoaded = false;
         reviewCaseId = workspaceId = reviewReason = null;
         remoteReviewStatus = null;
         reviewCorrectionDraft = false;
@@ -2436,6 +2479,9 @@ class WorkSession extends ChangeNotifier {
     try {
       final draft = await store.read(scope);
       if (draft == null || !current() || draft['version'] != 1) return;
+      if (draft['dismissedWorkspaceWelcomes'] case final List messages) {
+        _seenApprovalMessages.addAll(messages.whereType<String>());
+      }
       final savedAt = DateTime.tryParse(draft['savedAt'] as String? ?? '');
       if (savedAt == null ||
           DateTime.now().difference(savedAt).isNegative ||
@@ -3280,43 +3326,55 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     final existingCaseId = reviewCaseId;
-    if (existingCaseId != null && reviewCorrectionDraft) {
-      return _runBool(
-        () async {
-          final submission = _currentProfileSubmission();
-          final result = await gateway.submitCorrection(
-            existingCaseId,
-            submission,
-          );
-          submittedProfile = submission;
-          reviewCaseId = result.caseId;
-          subscriptionPlan = result.plan;
-          reviewReason = result.reason;
-          remoteReviewStatus = result.status;
-          reviewStage = WorkReviewStage.gstPending;
-          reviewCorrectionDraft = false;
-        },
-        success:
-            'Your Workspace correction was sent with the existing review reference.',
-      );
-    }
-    if (existingCaseId != null) {
+    if (existingCaseId != null && !reviewCorrectionDraft) {
       noticeMessage =
           'This Workspace is already under review as $existingCaseId.';
       errorMessage = null;
       notifyListeners();
       return true;
     }
-    return _runBool(() async {
-      final submission = _currentProfileSubmission();
-      final result = await gateway.submitProfile(submission);
+    if (busy) return false;
+    final requestedScope = _contactAccountScope;
+    final submission = _currentProfileSubmission();
+    bool current() =>
+        !_disposed &&
+        requestedScope == _contactAccountScope &&
+        selectedProfile?.id == submission.profileId &&
+        reviewCaseId == existingCaseId;
+    busy = true;
+    clearMessages();
+    notifyListeners();
+    try {
+      final result = existingCaseId == null
+          ? await gateway.submitProfile(submission)
+          : await gateway.submitCorrection(existingCaseId, submission);
+      if (!current()) return false;
+      if (result.caseId.trim().isEmpty ||
+          (existingCaseId != null && result.caseId != existingCaseId) ||
+          (result.profileId != null &&
+              result.profileId != submission.profileId)) {
+        throw const WorkGatewayException(
+          'The response could not be matched to this application. Please retry.',
+        );
+      }
       submittedProfile = submission;
       reviewCaseId = result.caseId;
       subscriptionPlan = result.plan;
       reviewReason = result.reason;
       remoteReviewStatus = result.status;
       reviewStage = WorkReviewStage.gstPending;
-    }, success: 'Application submitted.');
+      reviewCorrectionDraft = false;
+      noticeMessage = existingCaseId == null
+          ? 'Application submitted.'
+          : 'Your updated information was submitted.';
+      return true;
+    } on WorkGatewayException catch (error) {
+      if (current()) errorMessage = error.message;
+      return false;
+    } finally {
+      busy = false;
+      if (!_disposed) notifyListeners();
+    }
   }
 
   void remindGstLater() {
@@ -3391,13 +3449,29 @@ class WorkSession extends ChangeNotifier {
     busy = true;
     clearMessages();
     notifyListeners();
+    final requestedCase = reviewCaseId!;
+    final requestedScope = _contactAccountScope;
+    final requestedProfile = selectedProfile?.id;
+    bool current() =>
+        !_disposed &&
+        reviewCaseId == requestedCase &&
+        requestedScope == _contactAccountScope &&
+        requestedProfile == selectedProfile?.id;
     try {
-      final requestedCase = reviewCaseId!;
       final result = await gateway.checkReview(requestedCase);
-      if (_disposed || reviewCaseId != requestedCase) return false;
-      if (result.caseId != requestedCase) {
+      if (!current()) return false;
+      if (result.caseId != requestedCase ||
+          (result.profileId != null && result.profileId != requestedProfile)) {
         throw const WorkGatewayException(
           'The review update could not be matched to this application. Please retry.',
+        );
+      }
+      if ((result.status == WorkRemoteReviewStatus.approved ||
+              result.status == WorkRemoteReviewStatus.live) &&
+          (result.workspaceId?.trim().isEmpty ?? true)) {
+        throw const WorkGatewayException(
+          'Approval was received without a Workspace. Try checking again.',
+          retryable: true,
         );
       }
       subscriptionPlan = result.plan;
@@ -3418,13 +3492,7 @@ class WorkSession extends ChangeNotifier {
           return false;
         case WorkRemoteReviewStatus.approved:
         case WorkRemoteReviewStatus.live:
-          final approvedWorkspaceId = result.workspaceId;
-          if (approvedWorkspaceId == null || approvedWorkspaceId.isEmpty) {
-            throw const WorkGatewayException(
-              'Approval was received without a Workspace. Try checking again.',
-              retryable: true,
-            );
-          }
+          final approvedWorkspaceId = result.workspaceId!;
           workspaceId = approvedWorkspaceId;
           reviewCorrectionDraft = false;
           reviewStage = result.status == WorkRemoteReviewStatus.live
@@ -3444,25 +3512,34 @@ class WorkSession extends ChangeNotifier {
                 ? previousWorkspace!.name
                 : result.name?.trim().isNotEmpty == true
                 ? result.name!.trim()
+                : submittedProfile?.name.trim().isNotEmpty == true
+                ? submittedProfile!.name.trim()
                 : workName.trim().isNotEmpty
                 ? workName.trim()
                 : selectedProfile?.label ?? 'Your Workspace',
             profileLabel: selectedProfile?.label ?? 'Work profile',
             profileId: selectedProfile?.id,
-            area: workArea,
+            area: result.area ?? submittedProfile?.area ?? workArea,
             verified: true,
             gstReminder: gstReminder && gstin.isEmpty,
+          );
+          _approvalWelcome = (
+            scope: requestedScope,
+            caseId: requestedCase,
+            workspaceId: approvedWorkspaceId,
           );
           noticeMessage = null;
           return true;
       }
     } on WorkGatewayException catch (error) {
-      errorMessage = error.message;
-      noticeMessage = null;
+      if (current()) {
+        errorMessage = error.message;
+        noticeMessage = null;
+      }
       return false;
     } finally {
       busy = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -3846,6 +3923,11 @@ class WorkSession extends ChangeNotifier {
         workspaceId = id;
         subscriptionPlan = record.plan;
         remoteReviewStatus = record.status;
+        _approvalWelcome = (
+          scope: _contactAccountScope,
+          caseId: record.caseId,
+          workspaceId: id,
+        );
         reviewStage = record.status == WorkRemoteReviewStatus.live
             ? WorkReviewStage.live
             : WorkReviewStage.approved;
@@ -3871,6 +3953,7 @@ class WorkSession extends ChangeNotifier {
       primaryActivity = pending.primaryActivity ?? primaryActivity;
       reviewCaseId = pending.caseId;
       subscriptionPlan = pending.plan;
+      reviewReason = pending.reason;
       remoteReviewStatus = pending.status;
       reviewStage = WorkReviewStage.gstPending;
       return;
@@ -3890,13 +3973,6 @@ class WorkSession extends ChangeNotifier {
       remoteReviewStatus = stopped.status;
       reviewStage = WorkReviewStage.gstPending;
     }
-  }
-
-  Future<void> _run(
-    Future<void> Function() action, {
-    required String success,
-  }) async {
-    await _runBool(action, success: success);
   }
 
   Future<bool> _runBool(
