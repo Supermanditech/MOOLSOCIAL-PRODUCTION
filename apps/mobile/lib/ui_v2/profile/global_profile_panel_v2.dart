@@ -1088,7 +1088,31 @@ class _ProfileQuickActions extends StatelessWidget {
       LayoutBuilder(
         builder: (context, constraints) {
           const gap = MoolSpacing.xs;
-          final tileWidth = (constraints.maxWidth - gap) / 2;
+          const labelStyle = TextStyle(
+            color: MoolColors.ink,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+          );
+          var minimumTileWidth = 0.0;
+          for (final action in _actions) {
+            final measure = TextPainter(
+              text: TextSpan(
+                text: action.label,
+                style: DefaultTextStyle.of(context).style.merge(labelStyle),
+              ),
+              textDirection: Directionality.of(context),
+              textScaler: MediaQuery.textScalerOf(context),
+            )..layout();
+            minimumTileWidth = math.max(
+              minimumTileWidth,
+              measure.width + 30 + gap * 3 + 2,
+            );
+            measure.dispose();
+          }
+          final twoColumnWidth = (constraints.maxWidth - gap) / 2;
+          final tileWidth = twoColumnWidth >= minimumTileWidth
+              ? twoColumnWidth
+              : constraints.maxWidth;
           return Wrap(
             spacing: gap,
             runSpacing: gap,
@@ -1131,13 +1155,9 @@ class _ProfileQuickActions extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 action.label,
-                                maxLines: 2,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: MoolColors.ink,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                ),
+                                style: labelStyle,
                               ),
                             ),
                           ],

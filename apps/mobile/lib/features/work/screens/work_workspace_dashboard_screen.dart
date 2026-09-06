@@ -12388,63 +12388,51 @@ class _CustomersDestinationSurfaceState
                   const SizedBox(height: 10),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Row(
+                    child: _CustomerActionBar(
                       children: [
-                        Expanded(
-                          child: _CustomerAction(
-                            icon: Icons.call_outlined,
-                            label: 'Call',
-                            onTap: () => _call(customer),
-                          ),
+                        _CustomerAction(
+                          icon: Icons.call_outlined,
+                          label: 'Call',
+                          onTap: () => _call(customer),
                         ),
-                        Expanded(
-                          child: _CustomerAction(
-                            icon: Icons.chat_bubble_outline_rounded,
-                            label: 'Chat',
-                            onTap: () {
-                              Navigator.pop(sheetContext);
-                              _chat(context, customer);
-                            },
-                          ),
+                        _CustomerAction(
+                          icon: Icons.chat_bubble_outline_rounded,
+                          label: 'Chat',
+                          onTap: () {
+                            Navigator.pop(sheetContext);
+                            _chat(context, customer);
+                          },
                         ),
-                        Expanded(
-                          child: _CustomerAction(
-                            icon: Icons.message_outlined,
-                            label: 'WhatsApp',
-                            onTap: () => _whatsApp(customer),
-                          ),
+                        _CustomerAction(
+                          icon: Icons.message_outlined,
+                          label: 'WhatsApp',
+                          onTap: () => _whatsApp(customer),
                         ),
-                        Expanded(
-                          child: _CustomerAction(
-                            keyName: 'work-customer-repeat',
-                            icon: Icons.repeat_rounded,
-                            label: 'Repeat',
-                            onTap: () {
-                              Navigator.pop(sheetContext);
-                              widget.onRepeatBasket(customer.id);
-                            },
-                          ),
+                        _CustomerAction(
+                          keyName: 'work-customer-repeat',
+                          icon: Icons.repeat_rounded,
+                          label: 'Repeat',
+                          onTap: () {
+                            Navigator.pop(sheetContext);
+                            widget.onRepeatBasket(customer.id);
+                          },
                         ),
-                        Expanded(
-                          child: _CustomerAction(
-                            icon: Icons.receipt_long_outlined,
-                            label: 'Invoice',
-                            onTap: () => _invoice(sheetContext, customer),
-                          ),
+                        _CustomerAction(
+                          icon: Icons.receipt_long_outlined,
+                          label: 'Invoice',
+                          onTap: () => _invoice(sheetContext, customer),
                         ),
-                        Expanded(
-                          child: _CustomerAction(
-                            icon: Icons.local_offer_outlined,
-                            label: customer.messagesAllowed
-                                ? 'Send offer'
-                                : 'Offer locked',
-                            onTap: customer.messagesAllowed
-                                ? () {
-                                    Navigator.pop(sheetContext);
-                                    widget.onOffer();
-                                  }
-                                : null,
-                          ),
+                        _CustomerAction(
+                          icon: Icons.local_offer_outlined,
+                          label: customer.messagesAllowed
+                              ? 'Send offer'
+                              : 'Offer locked',
+                          onTap: customer.messagesAllowed
+                              ? () {
+                                  Navigator.pop(sheetContext);
+                                  widget.onOffer();
+                                }
+                              : null,
                         ),
                       ],
                     ),
@@ -13006,6 +12994,47 @@ class _CustomerMiniFact extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CustomerActionBar extends StatelessWidget {
+  const _CustomerActionBar({required this.children});
+
+  final List<_CustomerAction> children;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      var minimumWidth = 48.0;
+      for (final action in children) {
+        final measure = TextPainter(
+          text: TextSpan(
+            text: action.label,
+            style: DefaultTextStyle.of(context).style.merge(
+              const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800),
+            ),
+          ),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        if (measure.width + 8 > minimumWidth) {
+          minimumWidth = measure.width + 8;
+        }
+        measure.dispose();
+      }
+      final columns = [6, 3, 2, 1].firstWhere(
+        (count) => constraints.maxWidth / count >= minimumWidth,
+        orElse: () => 1,
+      );
+      return Wrap(
+        key: const Key('work-customer-actions'),
+        runSpacing: 8,
+        children: [
+          for (final action in children)
+            SizedBox(width: constraints.maxWidth / columns, child: action),
+        ],
+      );
+    },
+  );
 }
 
 class _CustomerAction extends StatelessWidget {

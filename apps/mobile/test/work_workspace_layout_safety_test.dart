@@ -4430,6 +4430,33 @@ void main() {
       await tester.tap(customer);
       await tester.pumpAndSettle();
       final order = find.byKey(const Key('work-customer-order-CUSTOMER-RANGE'));
+      for (final label in [
+        'Call',
+        'Chat',
+        'WhatsApp',
+        'Repeat',
+        'Invoice',
+        'Offer locked',
+      ]) {
+        final actionLabel = find.text(label).last;
+        await reveal(tester, actionLabel);
+        expectExactMoneyVisible(tester, actionLabel);
+      }
+      final lockedOffer = find
+          .ancestor(
+            of: find.text('Offer locked'),
+            matching: find.byType(InkWell),
+          )
+          .first;
+      expect(tester.widget<InkWell>(lockedOffer).onTap, isNull);
+      final actionGroup = find.byKey(const Key('work-customer-actions'));
+      await tester.ensureVisible(actionGroup);
+      await tester.pumpAndSettle();
+      final sheetRect = tester.getRect(find.byType(BottomSheet));
+      final actionRect = tester.getRect(actionGroup);
+      expect(actionRect.top, greaterThanOrEqualTo(sheetRect.top));
+      expect(actionRect.bottom, lessThanOrEqualTo(sheetRect.bottom));
+      await captureStoreView(tester, 'r665-money-customer-actions-$suffix');
       await reveal(tester, order);
       final amount = find.descendant(
         of: order,

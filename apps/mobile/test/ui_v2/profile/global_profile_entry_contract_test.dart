@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
@@ -108,13 +109,40 @@ void main() {
             }
             await capture('footer');
             if (entry == 'workspace') {
-              final operations = find.byKey(
-                const Key('global-profile-quick-operations'),
-              );
-              await tester.ensureVisible(operations);
-              await tester.tap(operations);
-              await tester.pumpAndSettle();
-              expect(routes.last, '/app/work/my-work');
+              for (final shortcut in const [
+                ('operations', 'Operations', '/app/work/my-work'),
+                ('activity', 'Activity', '/app/activity'),
+                ('documents', 'Documents', '/app/files'),
+                ('plans', 'Plans', '/app/account/plans'),
+                ('support', 'Support', '/app/ask'),
+              ]) {
+                final action = find.byKey(
+                  Key('global-profile-quick-${shortcut.$1}'),
+                );
+                await tester.ensureVisible(action);
+                await tester.pumpAndSettle();
+                final label = find.descendant(
+                  of: action,
+                  matching: find.text(shortcut.$2),
+                );
+                final paragraph = tester.renderObject<RenderParagraph>(label);
+                expect(paragraph.didExceedMaxLines, isFalse);
+                expect(
+                  paragraph.getBoxesForSelection(
+                    TextSelection(
+                      baseOffset: 0,
+                      extentOffset: shortcut.$2.length,
+                    ),
+                  ),
+                  hasLength(1),
+                  reason: '${shortcut.$2} must not split within a word',
+                );
+                expect(tester.getSize(action).height, greaterThanOrEqualTo(42));
+                await tester.tap(action);
+                await tester.pumpAndSettle();
+                expect(routes.last, shortcut.$3);
+              }
+              await capture('shortcuts');
             } else if (entry == 'context') {
               final action = find.byKey(
                 const Key('global-profile-context-action-orders'),
