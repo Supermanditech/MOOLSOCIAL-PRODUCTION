@@ -6984,7 +6984,7 @@ class _CheckoutPaymentStage extends StatelessWidget {
                 onChanged: session.updatePurchaseOrderReference,
                 decoration: const InputDecoration(
                   labelText: 'Purchase order reference',
-                  hintText: 'For example, PO-2026-184',
+                  hintText: 'PO-2026-184',
                   helperText:
                       'Use the reference approved in your procurement record.',
                   counterText: '',

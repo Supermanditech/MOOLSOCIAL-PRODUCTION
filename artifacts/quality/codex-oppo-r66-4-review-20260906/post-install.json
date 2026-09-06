@@ -1,0 +1,9 @@
+{
+  "state": "pending",
+  "candidateId": "UAW-CODEX-OPPO-R66.4-REVIEW-20260906",
+  "expectedPackage": "com.moolsocial.app.runtime",
+  "expectedVersion": "1.0.0-r66.4-runtime",
+  "expectedVersionCode": 2026090603,
+  "deviceSerial": "2b3e0f71",
+  "installed": false
+}

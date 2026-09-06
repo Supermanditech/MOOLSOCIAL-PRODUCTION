@@ -1515,6 +1515,16 @@ if ($ProductionLane -ceq 'baseline') {
         [string]$selectedContinuationBinding.id -ceq 'codex_oppo_review_v1_20260905' -and
         [string]$selectedContinuationBinding.baselineHead -ceq '1f3c91d07af1b4487d9b4039f13d3fd5cefeea7d' -and
         $effectiveOwner -cin @(
+          'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
+          'artifacts/quality/codex-oppo-r66-4-review-20260906/candidate-contract.md',
+          'artifacts/quality/codex-oppo-r66-4-review-20260906/source-manifest.txt',
+          'artifacts/quality/codex-oppo-r66-4-review-20260906/local-validation.md',
+          'artifacts/quality/codex-oppo-r66-4-review-20260906/prebuild-validation.md',
+          'artifacts/quality/codex-oppo-r66-4-review-20260906/motion-disposition.md',
+          'artifacts/quality/codex-oppo-r66-4-review-20260906/apk-regression-state.json',
+          'artifacts/quality/codex-oppo-r66-4-review-20260906/uaw-codex-oppo-r66.4-review-20260906-build-provenance.txt',
+          'artifacts/quality/codex-oppo-r66-4-review-20260906/post-install.json',
+          'artifacts/quality/codex-oppo-r66-4-review-20260906/device-review.md',
           'apps/mobile/android/app/build.gradle.kts',
           'config/codex-development-regression-registry.json',
           'config/codex-subagent-coordination-policy.json',

@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4491,
-    "sha256": "821D785EB7392C8D39880AB8690E6F95657BAF7A8A399992F0460B24A38289F4"
+    "sha256": "6BF631D3C7B50833FE9F8891BED0D5857098FEB0952BAA6517D91357500F458A"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,6 +34,16 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "artifacts/quality/codex-oppo-r66-4-review-20260906/candidate-contract.md",
+        "artifacts/quality/codex-oppo-r66-4-review-20260906/source-manifest.txt",
+        "artifacts/quality/codex-oppo-r66-4-review-20260906/local-validation.md",
+        "artifacts/quality/codex-oppo-r66-4-review-20260906/prebuild-validation.md",
+        "artifacts/quality/codex-oppo-r66-4-review-20260906/motion-disposition.md",
+        "artifacts/quality/codex-oppo-r66-4-review-20260906/apk-regression-state.json",
+        "artifacts/quality/codex-oppo-r66-4-review-20260906/uaw-codex-oppo-r66.4-review-20260906-build-provenance.txt",
+        "artifacts/quality/codex-oppo-r66-4-review-20260906/post-install.json",
+        "artifacts/quality/codex-oppo-r66-4-review-20260906/device-review.md",
         "apps/mobile/lib/features/chat/chat_entry_context.dart",
         "apps/mobile/lib/features/chat/chat_session.dart",
         "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart",
@@ -151,7 +161,6 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_supplier_sheet_motion.dart",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart",
