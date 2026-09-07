@@ -264,6 +264,342 @@ void main() {
     );
   }
 
+  Future<void> captureReadability(WidgetTester tester, String label) async {
+    if (!const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) return;
+    final root = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(const ValueKey('r66-cart-capture')),
+    );
+    void repaint(RenderObject object) {
+      object.markNeedsPaint();
+      object.visitChildren(repaint);
+    }
+
+    final previous = debugDisableShadows;
+    debugDisableShadows = false;
+    try {
+      repaint(root);
+      await captureR66Visual(tester, label);
+    } finally {
+      debugDisableShadows = previous;
+      repaint(root);
+      await tester.pump();
+    }
+  }
+
+  void expectReadable(
+    WidgetTester tester,
+    Finder label, {
+    Finder? action,
+    bool wholeWords = false,
+  }) {
+    expect(label, findsOneWidget);
+    final paragraph = tester.renderObject<RenderParagraph>(label);
+    final text = paragraph.text.toPlainText();
+    final natural = TextPainter(
+      text: paragraph.text,
+      textDirection: paragraph.textDirection,
+      textScaler: paragraph.textScaler,
+    )..layout(maxWidth: paragraph.size.width);
+    expect(paragraph.didExceedMaxLines, isFalse, reason: text);
+    expect(
+      paragraph.size.height + .5,
+      greaterThanOrEqualTo(natural.height),
+      reason: text,
+    );
+    natural.dispose();
+    if (wholeWords) {
+      for (final match in RegExp(r'\S+').allMatches(text)) {
+        final word = match.group(0)!;
+        final wordBoxes = paragraph.getBoxesForSelection(
+          TextSelection(baseOffset: match.start, extentOffset: match.end),
+        );
+        expect(
+          wordBoxes.map((box) => box.top).toSet(),
+          hasLength(1),
+          reason: 'Painted word $word stays on one line in $text',
+        );
+        final measured = TextPainter(
+          text: TextSpan(text: word, style: paragraph.text.style),
+          textDirection: paragraph.textDirection,
+          textScaler: paragraph.textScaler,
+        )..layout();
+        expect(
+          measured.width,
+          lessThanOrEqualTo(paragraph.size.width + .5),
+          reason: 'Whole word $word in $text',
+        );
+        measured.dispose();
+      }
+    }
+    if (action != null) {
+      final bounds = tester.getRect(action);
+      final content = tester.getRect(label);
+      expect(content.top, greaterThanOrEqualTo(bounds.top - .5), reason: text);
+      expect(
+        content.bottom,
+        lessThanOrEqualTo(bounds.bottom + .5),
+        reason: text,
+      );
+      expect(bounds.height, greaterThanOrEqualTo(44));
+      expect(action.hitTestable(), findsOneWidget);
+    }
+  }
+
+  for (final size in [const Size(320, 844), const Size(640, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      final label = '${size.width.toInt()}x${size.height.toInt()}-$scale';
+      for (final delivered in [false, true]) {
+        testWidgets('R5 readability tracking $delivered $label', (
+          tester,
+        ) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          session.addProduct('s-milk');
+          final originalTotal = session.cartTotal;
+          await tester.pumpWidget(
+            app(
+              session,
+              textScale: scale,
+              safePadding: const EdgeInsets.only(top: 24, bottom: 34),
+              disableAnimations: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final order = session.orders.firstWhere(
+            (candidate) =>
+                candidate.destination == BuyV2Destination.shop &&
+                (candidate.status == BuyV2OrderStatus.delivered) == delivered,
+          );
+          expect(session.openTracking(order.id), isTrue);
+          await tester.pumpAndSettle();
+          final tracking = find.byKey(
+            PageStorageKey('buy-tracking-${order.id}'),
+          );
+          final scroll = scrollableWithin(
+            PageStorageKey('buy-tracking-${order.id}'),
+          ).first;
+          final address = find.byKey(const ValueKey('buy-tracking-address'));
+          await tester.scrollUntilVisible(address, 160, scrollable: scroll);
+          await Scrollable.ensureVisible(
+            tester.element(address),
+            alignment: .5,
+          );
+          await tester.pumpAndSettle();
+          expectReadable(
+            tester,
+            find.descendant(of: address, matching: find.text('Address')),
+            action: address,
+            wholeWords: true,
+          );
+          await captureReadability(
+            tester,
+            'r5-readable-tracking-$delivered-$label-actions',
+          );
+          await tester.tap(address);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-order-delivery-sheet')),
+            findsOneWidget,
+          );
+          expect(session.selectedOrderId, order.id);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.tracking);
+          final items = find.descendant(
+            of: tracking,
+            matching: find.text('Items'),
+          );
+          await Scrollable.ensureVisible(tester.element(items), alignment: .5);
+          await tester.pumpAndSettle();
+          expectReadable(tester, items, wholeWords: true);
+          await tester.tap(items);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.orderItems);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.selectedOrderId, order.id);
+          final manage = find.byKey(
+            ValueKey('buy-tracking-manage-order-${order.id}'),
+          );
+          await tester.scrollUntilVisible(manage, 160, scrollable: scroll);
+          await Scrollable.ensureVisible(tester.element(manage), alignment: .5);
+          await tester.pumpAndSettle();
+          expectReadable(
+            tester,
+            find.descendant(
+              of: manage,
+              matching: find.text(
+                delivered ? 'Return, replace or refund' : 'Manage order',
+              ),
+            ),
+            action: manage,
+            wholeWords: true,
+          );
+          await captureReadability(
+            tester,
+            'r5-readable-tracking-$delivered-$label-manage',
+          );
+          await tester.tap(manage);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-order-resolution-sheet')),
+            findsOneWidget,
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.tracking);
+          expect(session.selectedOrderId, order.id);
+          expect(session.quantityFor('s-milk'), 1);
+          expect(session.cartTotal, originalTotal);
+          expect(tester.takeException(), isNull);
+        });
+      }
+
+      for (final id in ['s-milk', 'w-oil-10l', 'm-paracetamol-500']) {
+        testWidgets('R5 readability cart $id $label', (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          await tester.pumpWidget(
+            app(
+              session,
+              textScale: scale,
+              safePadding: const EdgeInsets.only(top: 24, bottom: 34),
+              disableAnimations: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          session.addProduct(id);
+          session.openCart();
+          await tester.pumpAndSettle();
+          final product = session.product(id);
+          final total = session.cartTotal;
+          final quantity = session.quantityFor(id);
+          final summary = find.byKey(ValueKey('buy-cart-product-summary-$id'));
+          final fields = find.descendant(
+            of: summary,
+            matching: find.byType(Text),
+          );
+          expect(fields, findsWidgets);
+          for (final field in fields.evaluate().toList()) {
+            final target = find.byWidget(field.widget);
+            await Scrollable.ensureVisible(field, alignment: .5);
+            await tester.pumpAndSettle();
+            expectReadable(tester, target, wholeWords: true);
+          }
+          final detail = find.descendant(
+            of: summary,
+            matching: find.text('${product.variant} · ${product.pack}'),
+          );
+          await Scrollable.ensureVisible(tester.element(detail), alignment: .5);
+          await tester.pumpAndSettle();
+          await captureReadability(
+            tester,
+            'r5-readable-cart-$id-$label-detail',
+          );
+          final promise = fields.last;
+          await Scrollable.ensureVisible(
+            tester.element(promise),
+            alignment: .5,
+          );
+          await tester.pumpAndSettle();
+          expect(promise.hitTestable(), findsOneWidget);
+          await captureReadability(
+            tester,
+            'r5-readable-cart-$id-$label-promise',
+          );
+          await tester.tap(promise);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.product);
+          expect(session.selectedProductId, id);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          expect(session.quantityFor(id), quantity);
+          expect(session.cartTotal, total);
+          expect(tester.takeException(), isNull);
+        });
+      }
+
+      testWidgets('R5 readability prescription $label', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await tester.pumpWidget(
+          app(
+            session,
+            textScale: scale,
+            safePadding: const EdgeInsets.only(top: 24, bottom: 34),
+            disableAnimations: true,
+          ),
+        );
+        await tester.pumpAndSettle();
+        session.openDestination(BuyV2Destination.medicine);
+        session.submitSearch('Metformin');
+        await tester.pumpAndSettle();
+        final action = find.byKey(const ValueKey('buy-add-m-metformin-500'));
+        await Scrollable.ensureVisible(tester.element(action), alignment: .5);
+        await tester.pumpAndSettle();
+        expect(action.hitTestable(), findsOneWidget);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        final title = find.byKey(
+          const ValueKey('buy-prescription-sheet-title'),
+        );
+        expectReadable(tester, title, wholeWords: true);
+        final close = find.byKey(const ValueKey('buy-prescription-close'));
+        expect(close.hitTestable(), findsOneWidget);
+        expect(tester.getSize(close).height, greaterThanOrEqualTo(44));
+        await captureReadability(
+          tester,
+          'r5-readable-prescription-$label-heading',
+        );
+        final explanation = find.textContaining(
+          'Pharmacist review is still required before payment.',
+        );
+        await Scrollable.ensureVisible(
+          tester.element(explanation),
+          alignment: .5,
+        );
+        await tester.pumpAndSettle();
+        expectReadable(tester, explanation);
+        await captureReadability(
+          tester,
+          'r5-readable-prescription-$label-explanation',
+        );
+        if (scale == 2) {
+          await tester.binding.handlePopRoute();
+        } else {
+          await Scrollable.ensureVisible(tester.element(close), alignment: .5);
+          await tester.pumpAndSettle();
+          await tester.tap(close);
+        }
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('buy-prescription-sheet-route')),
+          findsNothing,
+        );
+        expect(session.prescriptionAttached, isFalse);
+        expect(session.quantityFor('m-metformin-500'), 0);
+        expect(session.destination, BuyV2Destination.medicine);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   for (final owner in ['hint', 'history']) {
     testWidgets('R5 search 029A enlarged $owner is fully painted', (
       tester,

@@ -10771,54 +10771,46 @@ class BuyV2TrackingView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Row(
-          children: [
-            Expanded(
-              child: _TrackingAction(
-                key: const ValueKey('buy-tracking-address'),
-                onPressed: () => _showBuyV2OrderDeliveryContextSheet(
-                  context,
-                  session,
-                  order,
-                  onOpenOrderHelp,
-                ),
-                icon: Icons.location_on_outlined,
-                label: 'Address',
+        _TrackingActionGroup(
+          actions: [
+            _TrackingAction(
+              key: const ValueKey('buy-tracking-address'),
+              onPressed: () => _showBuyV2OrderDeliveryContextSheet(
+                context,
+                session,
+                order,
+                onOpenOrderHelp,
               ),
+              icon: Icons.location_on_outlined,
+              label: 'Address',
             ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: _TrackingAction(
-                onPressed: () => session.openOrderItems(order.id),
-                icon: Icons.inventory_2_outlined,
-                label: 'Items',
-              ),
+            _TrackingAction(
+              onPressed: () => session.openOrderItems(order.id),
+              icon: Icons.inventory_2_outlined,
+              label: 'Items',
             ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: _TrackingAction(
-                key: ValueKey(
-                  order.status == BuyV2OrderStatus.delivered
-                      ? 'buy-tracking-reorder'
-                      : 'buy-tracking-help',
-                ),
-                onPressed: order.status == BuyV2OrderStatus.delivered
-                    ? () => session.reorder(order)
-                    : () => onOpenOrderHelp(order),
-                icon: order.status == BuyV2OrderStatus.delivered
-                    ? Icons.replay_rounded
-                    : Icons.chat_outlined,
-                label: order.status == BuyV2OrderStatus.delivered
-                    ? 'Reorder'
-                    : 'Help',
-                primary: true,
+            _TrackingAction(
+              key: ValueKey(
+                order.status == BuyV2OrderStatus.delivered
+                    ? 'buy-tracking-reorder'
+                    : 'buy-tracking-help',
               ),
+              onPressed: order.status == BuyV2OrderStatus.delivered
+                  ? () => session.reorder(order)
+                  : () => onOpenOrderHelp(order),
+              icon: order.status == BuyV2OrderStatus.delivered
+                  ? Icons.replay_rounded
+                  : Icons.chat_outlined,
+              label: order.status == BuyV2OrderStatus.delivered
+                  ? 'Reorder'
+                  : 'Help',
+              primary: true,
             ),
           ],
         ),
         const SizedBox(height: 6),
-        SizedBox(
-          height: BuyV2Metrics.minimumTap,
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: BuyV2Metrics.minimumTap),
           child: OutlinedButton.icon(
             key: ValueKey('buy-tracking-manage-order-${order.id}'),
             onPressed: () => showBuyV2OrderResolutionSheet(
@@ -10837,8 +10829,8 @@ class BuyV2TrackingView extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         if (order.invoiceAvailable)
-          SizedBox(
-            height: 44,
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
             child: OutlinedButton.icon(
               key: ValueKey('buy-tracking-invoice-${order.id}'),
               onPressed: () => showBuyV2InvoicePage(
@@ -13195,28 +13187,19 @@ Future<void> showBuyV2PrescriptionSheet(
             shrinkWrap: true,
             padding: EdgeInsets.fromLTRB(16, 0, 16, 18 + bottomViewPadding),
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Add your prescription',
-                          key: const ValueKey('buy-prescription-sheet-title'),
-                          style: sheetContext.buyTitle,
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'Use a saved prescription or add one for medicine matching in this session. Pharmacist review is still required before payment.',
-                          style: sheetContext.buyMeta,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const heading = 'Add your prescription';
+                  final title = Text(
+                    heading,
+                    key: const ValueKey('buy-prescription-sheet-title'),
+                    style: sheetContext.buyTitle,
+                  );
+                  final detail = Text(
+                    'Use a saved prescription or add one for medicine matching in this session. Pharmacist review is still required before payment.',
+                    style: sheetContext.buyMeta,
+                  );
+                  final close = IconButton(
                     key: const ValueKey('buy-prescription-close'),
                     tooltip: 'Close prescription centre',
                     onPressed: () => Navigator.of(sheetContext).pop(),
@@ -13227,8 +13210,49 @@ Future<void> showBuyV2PrescriptionSheet(
                       foregroundColor: BuyV2Colors.navy,
                       backgroundColor: BuyV2Colors.softBlue,
                     ),
-                  ),
-                ],
+                  );
+                  final longestWord = heading.split(' ').fold<double>(0, (
+                    width,
+                    word,
+                  ) {
+                    final measured = buyV2ValueTextSize(
+                      sheetContext,
+                      word,
+                      sheetContext.buyTitle,
+                    ).width;
+                    return measured > width ? measured : width;
+                  });
+                  if (longestWord > constraints.maxWidth - 52) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        title,
+                        const SizedBox(height: 3),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: detail),
+                            const SizedBox(width: 8),
+                            close,
+                          ],
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [title, const SizedBox(height: 3), detail],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      close,
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 12),
               _PrescriptionChoice(
@@ -17052,16 +17076,9 @@ class _CartLine extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          product.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.buyBody,
-                        ),
+                        Text(product.title, style: context.buyBody),
                         Text(
                           '${product.variant} · ${product.pack}',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                           style: context.buyMeta.copyWith(fontSize: 8),
                         ),
                         const SizedBox(height: 3),
@@ -17069,8 +17086,6 @@ class _CartLine extends StatelessWidget {
                           automaticFulfilment
                               ? '$buyerPromise · ${facts.partner}'
                               : '${product.deliveryPromise} · ${product.seller}',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: BuyV2Colors.green,
                             fontSize: 8,
@@ -17244,9 +17259,24 @@ class _CartLine extends StatelessWidget {
       decoration: buyV2CardDecoration(radius: 14),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final controlsWidth =
+              (88 + quantitySize.width.clamp(24.0, double.infinity)).clamp(
+                lineTotalSize.width,
+                double.infinity,
+              );
+          // Image, chevron and gaps also share the inline product row.
+          final inlineTitleWidth = constraints.maxWidth - controlsWidth - 96;
+          final titleNeedsMoreWidth = product.title
+              .split(RegExp(r'\s+'))
+              .any(
+                (word) =>
+                    buyV2ValueTextSize(context, word, context.buyBody).width >
+                    inlineTitleWidth,
+              );
           final compactDetails =
               (wholesale && constraints.maxWidth < 340) ||
-              MediaQuery.textScalerOf(context).scale(1) > 1.2;
+              MediaQuery.textScalerOf(context).scale(1) > 1.2 ||
+              titleNeedsMoreWidth;
           if (compactDetails) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -17893,6 +17923,49 @@ class _TrackingRoute extends StatelessWidget {
   }
 }
 
+class _TrackingActionGroup extends StatelessWidget {
+  const _TrackingActionGroup({required this.actions});
+
+  final List<_TrackingAction> actions;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      const spacing = 6.0;
+      final requiredWidth = actions.fold<double>(44, (width, action) {
+        final measured =
+            buyV2ValueTextSize(
+              context,
+              action.label,
+              _TrackingAction.labelStyle,
+            ).width +
+            36;
+        return measured > width ? measured : width;
+      });
+      final columns =
+          ((constraints.maxWidth + spacing) / (requiredWidth + spacing))
+              .floor()
+              .clamp(1, actions.length);
+      final cellWidth =
+          (constraints.maxWidth - spacing * (columns - 1)) / columns;
+      return Wrap(
+        spacing: spacing,
+        runSpacing: spacing,
+        children: [
+          for (var index = 0; index < actions.length; index++)
+            SizedBox(
+              width:
+                  index == actions.length - 1 && actions.length % columns == 1
+                  ? constraints.maxWidth
+                  : cellWidth,
+              child: actions[index],
+            ),
+        ],
+      );
+    },
+  );
+}
+
 class _TrackingAction extends StatelessWidget {
   const _TrackingAction({
     super.key,
@@ -17906,6 +17979,8 @@ class _TrackingAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool primary;
+
+  static const labelStyle = TextStyle(fontSize: 9, fontWeight: FontWeight.w900);
 
   @override
   Widget build(BuildContext context) {
@@ -17927,27 +18002,24 @@ class _TrackingAction extends StatelessWidget {
             onPressed();
           },
           borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            height: 44,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: foreground, size: 16),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.fade,
-                    softWrap: false,
-                    style: TextStyle(
-                      color: foreground,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: foreground, size: 16),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: labelStyle.copyWith(color: foreground),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
