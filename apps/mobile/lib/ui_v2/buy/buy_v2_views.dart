@@ -1916,7 +1916,7 @@ class _WholesaleTradeDecisionPanelState
       container: true,
       label:
           '${product.title}. ${product.pack}. Minimum order '
-          '${product.minimumOrder} packs. ${buyV2Money(facts.price)} per pack. '
+          '${_packCountLabel(product.minimumOrder)}. ${buyV2Money(facts.price)} per pack. '
           '${buyV2Money(minimumTotal)} minimum order total. '
           '${facts.orderabilityLabel}. ${widget.buyerPromise}. '
           '${buyV2AutomaticFulfilmentLabel(product.destination)}. '
@@ -1956,7 +1956,8 @@ class _WholesaleTradeDecisionPanelState
               _DecisionRow(
                 icon: Icons.inventory_2_outlined,
                 label: 'Trade pack',
-                value: '${product.pack} · MOQ ${product.minimumOrder} packs',
+                value:
+                    '${product.pack} · MOQ ${_packCountLabel(product.minimumOrder)}',
               ),
               _DecisionRow(
                 icon: Icons.calculate_outlined,
@@ -2175,7 +2176,7 @@ class _WholesaleTradePriceSummary extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'MOQ ${product.minimumOrder} packs',
+                  'MOQ ${_packCountLabel(product.minimumOrder)}',
                   style: const TextStyle(
                     color: Color(0xFFFFD29F),
                     fontSize: 10,
@@ -2380,8 +2381,8 @@ class _WholesaleTradeActionDock extends StatelessWidget {
       children: [
         Text(
           quantity > 0
-              ? '$quantity packs in Cart'
-              : 'Minimum ${product.minimumOrder} packs · ${product.pack} each',
+              ? '${_packCountLabel(quantity)} in Cart'
+              : 'Minimum ${_packCountLabel(product.minimumOrder)} · ${product.pack} each',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: context.buyMeta.copyWith(
@@ -2440,7 +2441,7 @@ class _WholesaleTradeActionDock extends StatelessWidget {
         product: product,
         quantity: quantity,
         addSemanticLabel:
-            'Add minimum order of ${product.minimumOrder} packs of '
+            'Add minimum order of ${_packCountLabel(product.minimumOrder)} of '
             '${product.title} to Cart for ${buyV2Money(orderTotal)}. '
             '$deliveryDecision',
         onAdd: onAdd,
@@ -7535,7 +7536,7 @@ class _WholesaleCheckoutReceivingLine extends StatelessWidget {
     final quantityLabel = _packCountLabel(line.quantity);
     final semanticLabel =
         '${product.title}. $quantityLabel. ${product.pack}. '
-        'Minimum order ${product.minimumOrder} packs. '
+        'Minimum order ${_packCountLabel(product.minimumOrder)}. '
         '${buyV2Money(product.price)} per pack. ${product.unitPrice}. '
         'Line subtotal ${buyV2Money(line.total)}.';
     return Semantics(
@@ -15165,7 +15166,7 @@ String _paymentOfferStatus(BuyV2Session session, BuyV2CartBenefit offer) {
   } else if (offer.minimumQuantity != null &&
       session.countForDestination(offer.destination) < offer.minimumQuantity!) {
     reason =
-        'Not eligible. Minimum ${offer.minimumQuantity} packs '
+        'Not eligible. Minimum ${_packCountLabel(offer.minimumQuantity!)} '
         'in ${offer.destination.label}.';
   } else if (offer.eligiblePaymentMethods.isNotEmpty &&
       !offer.eligiblePaymentMethods.contains(session.selectedPayment)) {
@@ -17100,7 +17101,7 @@ class _CartLine extends StatelessWidget {
             key: ValueKey('buy-wholesale-cart-line-facts-${product.id}'),
             container: true,
             label:
-                'Minimum order ${product.minimumOrder} packs. '
+                'Minimum order ${_packCountLabel(product.minimumOrder)}. '
                 '${buyV2Money(product.price)} per pack. ${product.unitPrice}. '
                 '${product.freightIncluded ? 'Freight included in landed price.' : 'Freight confirmed before payment.'}',
             excludeSemantics: true,

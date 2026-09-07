@@ -448,7 +448,7 @@ class _PublishedOfferFactsRail extends StatelessWidget {
         .map((entry) {
           final product = entry.product;
           final minimum = product.destination == BuyV2Destination.wholesale
-              ? 'Minimum ${product.minimumOrder} packs'
+              ? 'Minimum ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'}'
               : 'Pack-size minimum';
           return <({String text, TextStyle style})>[
             (
