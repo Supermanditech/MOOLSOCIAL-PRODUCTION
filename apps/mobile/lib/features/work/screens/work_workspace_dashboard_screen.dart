@@ -12325,14 +12325,6 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
       _ => false,
     };
 
-    int countFor(String filter) =>
-        allOrders.where((order) => matches(order, filter)).length;
-    final visibleOrders = allOrders
-        .where((order) => matches(order, _filter))
-        .toList(growable: false);
-    final compactText =
-        MediaQuery.sizeOf(context).width < 360 &&
-        MediaQuery.textScalerOf(context).scale(1) >= 1.4;
     const filterLabels = {
       'Live': 'All',
       'New': 'New',
@@ -12340,6 +12332,24 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
       'Ready': 'Ready',
       'Done': 'History',
     };
+    final counts = {for (final filter in filterLabels.keys) filter: 0};
+    final visibleOrders = <WorkspaceOrderRecord>[];
+    final indices = <String, int>{};
+    for (final order in allOrders) {
+      for (final filter in filterLabels.keys) {
+        if (!matches(order, filter)) continue;
+        counts[filter] = counts[filter]! + 1;
+        if (filter == _filter) {
+          indices[order.id] = visibleOrders.length;
+          visibleOrders.add(order);
+        }
+      }
+    }
+    int countFor(String filter) => counts[filter] ?? 0;
+    final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+    final compactText =
+        MediaQuery.sizeOf(context).width < 360 &&
+        MediaQuery.textScalerOf(context).scale(1) >= 1.4;
     return Container(
       key: const Key('work-orders-destination'),
       color: Colors.white,
@@ -12415,11 +12425,28 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
           ),
           Expanded(
             child: visibleOrders.isNotEmpty
-                ? ListView(
+                ? ListView.builder(
+                    key: PageStorageKey((
+                      'work-orders-queue',
+                      storeId,
+                      _filter,
+                    )),
                     padding: const EdgeInsets.fromLTRB(14, 10, 14, 100),
-                    children: [
-                      for (final order in visibleOrders) ...[
-                        _LiveOrderTicket(
+                    itemCount: visibleOrders.length,
+                    addAutomaticKeepAlives: false,
+                    findChildIndexCallback: (key) {
+                      if (key is! ValueKey<(String?, String)> ||
+                          key.value.$1 != storeId) {
+                        return null;
+                      }
+                      return indices[key.value.$2];
+                    },
+                    itemBuilder: (context, index) {
+                      final order = visibleOrders[index];
+                      return Padding(
+                        key: ValueKey<(String?, String)>((storeId, order.id)),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _LiveOrderTicket(
                           session: session,
                           onOpenCollection: widget.onOpenCollection,
                           order: order,
@@ -12429,9 +12456,8 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                                   order.id == session.currentWorkspaceOrderId),
                           onOpenDelivery: widget.onOpenDelivery,
                         ),
-                        const SizedBox(height: 8),
-                      ],
-                    ],
+                      );
+                    },
                   )
                 : Center(
                     child: Padding(
@@ -12514,6 +12540,21 @@ class _LiveOrderTicket extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stage = order.stage;
+    final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+    bool sameStore() =>
+        context.mounted &&
+        storeId == (session.activeWorkspace?.id ?? session.workspaceId);
+    bool currentActionIsValid() =>
+        sameStore() &&
+        !session.busy &&
+        !session.workspaceOperationsSyncing &&
+        !session.workspaceHandoverBusy &&
+        session.currentCollection?.needsReconciliation != true &&
+        session.workspaceOrderStage == stage &&
+        (session.currentWorkspaceOrderId == order.id ||
+            (session.currentWorkspaceOrderId == null &&
+                session.visibleWorkspaceOrders.length == 1 &&
+                session.visibleWorkspaceOrders.single.id == order.id));
     final packingLines =
         active && stage == 'Preparing' && !order.isCustomerCollection
         ? session.workspacePackingLines
@@ -12570,7 +12611,11 @@ class _LiveOrderTicket extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      stage == 'Confirmed' ? 'Accept within' : stage,
+                      stage == 'Confirmed'
+                          ? order.actionDeadline != null
+                                ? 'Accept within'
+                                : 'Awaiting acceptance'
+                          : stage,
                       key: Key('work-order-stage-label-${order.id}'),
                       style: const TextStyle(
                         color: MoolColors.navy,
@@ -12657,12 +12702,12 @@ class _LiveOrderTicket extends StatelessWidget {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                     controlAffinity: ListTileControlAffinity.trailing,
                     value: line.packed,
-                    onChanged: (value) =>
-                        session.setWorkspacePackingLine(line.id, value == true),
+                    onChanged: (value) {
+                      if (!currentActionIsValid()) return;
+                      session.setWorkspacePackingLine(line.id, value == true);
+                    },
                     title: Text(
                       '${line.label} × ${line.quantity}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: MoolColors.ink,
                         fontSize: 10.5,
@@ -12678,7 +12723,7 @@ class _LiveOrderTicket extends StatelessWidget {
                 child: TextButton(
                   key: Key('work-order-collection-open-${order.id}'),
                   onPressed: () {
-                    if (session.selectWorkspaceOrder(order.id)) {
+                    if (sameStore() && session.selectWorkspaceOrder(order.id)) {
                       onOpenCollection();
                     }
                   },
@@ -12699,7 +12744,11 @@ class _LiveOrderTicket extends StatelessWidget {
                       onPressed:
                           session.busy || session.workspaceOperationsSyncing
                           ? null
-                          : () => _showRejectOrderSheet(context, session),
+                          : () {
+                              if (currentActionIsValid()) {
+                                _showRejectOrderSheet(context, session);
+                              }
+                            },
                       child: const Text('Reject'),
                     ),
                   FilledButton.icon(
@@ -12710,19 +12759,27 @@ class _LiveOrderTicket extends StatelessWidget {
                             (stage == 'Preparing' &&
                                 !session.workspacePackingComplete)
                         ? null
-                        : stage == 'Ready for pickup'
-                        ? () => _showWorkspacePickupSheet(context, session)
-                        : stage == 'Delivery requested'
-                        ? onOpenDelivery
-                        : stage == 'Ready' && order.needsDelivery
-                        ? () {
-                            session.advanceWorkspaceOrder();
-                            onOpenDelivery();
-                          }
-                        : () => _advanceDeskOrder(
-                            session,
-                            expectedOrderId: order.id,
-                          ),
+                        : () {
+                            if (!currentActionIsValid() ||
+                                (stage == 'Preparing' &&
+                                    !session.workspacePackingComplete)) {
+                              return;
+                            }
+                            if (stage == 'Ready for pickup') {
+                              _showWorkspacePickupSheet(context, session);
+                            } else if (stage == 'Delivery requested') {
+                              onOpenDelivery();
+                            } else if (stage == 'Ready' &&
+                                order.needsDelivery) {
+                              session.advanceWorkspaceOrder();
+                              onOpenDelivery();
+                            } else {
+                              _advanceDeskOrder(
+                                session,
+                                expectedOrderId: order.id,
+                              );
+                            }
+                          },
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(48, 48),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -12742,7 +12799,11 @@ class _LiveOrderTicket extends StatelessWidget {
                           session.workspaceOperationsSyncing ||
                           session.workspaceHandoverBusy
                       ? null
-                      : () => session.selectWorkspaceOrder(order.id),
+                      : () {
+                          if (sameStore()) {
+                            session.selectWorkspaceOrder(order.id);
+                          }
+                        },
                   child: const Text('Open order'),
                 ),
               ),

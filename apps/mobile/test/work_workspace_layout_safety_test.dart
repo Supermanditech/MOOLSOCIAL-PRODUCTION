@@ -6906,6 +6906,333 @@ void main() {
     createdAt: createdAt,
   );
 
+  for (final scale in [1.0, 1.4, 2.0]) {
+    testWidgets('Store queue 1000 local records and first action $scale', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      const stages = [
+        'Confirmed',
+        'Preparing',
+        'Ready',
+        'Delivery requested',
+        'Completed',
+      ];
+      work.workspaceOrders.addAll(
+        List.generate(
+          1000,
+          (index) => customerOrder(
+            id: 'QUEUE-${index.toString().padLeft(4, '0')}',
+            customer: 'Customer ${index + 1}',
+            stage: stages[index % stages.length],
+            createdAt: DateTime(2026, 9, 7, 8).add(Duration(seconds: index)),
+          ),
+        ),
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 640),
+        textScale: scale,
+      );
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      Finder queue() => find.descendant(
+        of: find.byKey(const Key('work-orders-destination')),
+        matching: find.byType(ListView),
+      );
+      final list = tester.widget<ListView>(queue());
+      expect(list.childrenDelegate, isA<SliverChildBuilderDelegate>());
+      expect(
+        (list.childrenDelegate as SliverChildBuilderDelegate).childCount,
+        801,
+      );
+      expect(
+        find.byKey(const Key('work-live-order-ticket')).evaluate().length,
+        lessThan(20),
+      );
+      expect(find.text('All 801'), findsOneWidget);
+      expect(find.text('New 201'), findsOneWidget);
+      expect(find.text('Packing 200'), findsOneWidget);
+      expect(find.text('Ready 400'), findsOneWidget);
+      expect(find.text('History 201'), findsOneWidget);
+      await captureStoreView(tester, 'queue-1000-first-$scale');
+      await tester.drag(queue(), const Offset(0, -600));
+      await tester.pumpAndSettle();
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      expect(
+        find.byKey(const Key('work-live-order-ticket')).evaluate().length,
+        lessThan(20),
+      );
+      final packing = find.byKey(const Key('work-orders-filter-packing'));
+      await tester.ensureVisible(packing);
+      await tester.tap(packing);
+      await tester.pumpAndSettle();
+      expect(
+        (tester.widget<ListView>(queue()).childrenDelegate
+                as SliverChildBuilderDelegate)
+            .childCount,
+        200,
+      );
+      final open = find.byKey(const Key('work-order-open-QUEUE-0001'));
+      await tester.ensureVisible(open);
+      await tester.pumpAndSettle();
+      await tester.tap(open);
+      await tester.pumpAndSettle();
+      expect(work.currentWorkspaceOrderId, 'QUEUE-0001');
+      expect(work.workspaceOrderStage, 'Preparing');
+      await tester.drag(queue(), const Offset(0, 2000));
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'queue-1000-selected-$scale');
+      final pack = find.byKey(const Key('work-order-pack-oil-fortune-1l'));
+      await tester.ensureVisible(pack);
+      await tester.pumpAndSettle();
+      expect(tester.widget<CheckboxListTile>(pack).value, isFalse);
+      final label = find.descendant(
+        of: pack,
+        matching: find.text('Fortune Sunflower Oil × 1'),
+      );
+      expect(label, findsOneWidget);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: label, matching: find.byType(RichText)),
+      );
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(
+        tester.getRect(label).width,
+        lessThanOrEqualTo(tester.getRect(pack).width),
+      );
+      expect(
+        tester.getRect(label).bottom,
+        lessThanOrEqualTo(tester.getRect(pack).bottom),
+      );
+      await tester.tap(pack);
+      await tester.pumpAndSettle();
+      expect(work.workspacePackedProductIds, contains('oil-fortune-1l'));
+      expect(work.workspaceOrderStage, 'Preparing');
+      expect(work.workspaceInvoices, isEmpty);
+      await captureStoreView(tester, 'queue-1000-packing-action-$scale');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets(
+    'Store queue keys survive arrivals without selecting another order',
+    (tester) async {
+      final work = storeViewFixture();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        textScale: 1,
+      );
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      final originalRow = find
+          .byKey(const Key('work-order-stage-label-APP-1043'))
+          .evaluate()
+          .single;
+      final originalOrder = work.currentWorkspaceOrderId;
+      work.workspaceOrders.insert(
+        0,
+        customerOrder(
+          id: 'ARRIVAL-1',
+          customer: 'New customer',
+          stage: 'Confirmed',
+          createdAt: DateTime(2026, 9, 7, 9),
+        ),
+      );
+      work.dismissMessages();
+      await tester.pumpAndSettle();
+      expect(
+        find
+            .byKey(const Key('work-order-stage-label-APP-1043'))
+            .evaluate()
+            .single,
+        same(originalRow),
+      );
+      expect(work.currentWorkspaceOrderId, originalOrder);
+      expect(find.text('All 2'), findsOneWidget);
+      expect(find.text('New 2'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const Key('work-order-stage-label-ARRIVAL-1')),
+            )
+            .data,
+        'Awaiting acceptance',
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const Key('work-order-stage-label-APP-1043')),
+            )
+            .data,
+        'Accept within',
+      );
+      expect(work.workspaceOrderStage, 'Confirmed');
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('Store queue retained packing tap cannot affect the next order', (
+    tester,
+  ) async {
+    final work = storeViewFixture()..workspaceOrderStage = 'Preparing';
+    work.workspaceOrders[0] = work.workspaceOrders.first.copyWith(
+      stage: 'Preparing',
+      quantities: const {'oil-fortune-1l': 1},
+    );
+    work.workspaceOrders.add(
+      customerOrder(
+        id: 'PACK-2',
+        customer: 'Next customer',
+        stage: 'Preparing',
+        createdAt: DateTime(2026, 9, 7, 9),
+      ),
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-store-orders')));
+    await tester.pumpAndSettle();
+    final checkbox = find.byKey(const Key('work-order-pack-oil-fortune-1l'));
+    final oldTap = tester.widget<CheckboxListTile>(checkbox).onChanged!;
+    expect(work.selectWorkspaceOrder('PACK-2'), isTrue);
+    oldTap(true);
+    expect(work.workspacePackedProductIds, isEmpty);
+    expect(work.workspaceOrderStage, 'Preparing');
+    expect(work.selectWorkspaceOrder('APP-1043'), isTrue);
+    expect(work.workspacePackedProductIds, isEmpty);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(checkbox);
+    await tester.tap(checkbox);
+    await tester.pumpAndSettle();
+    expect(work.workspacePackedProductIds, contains('oil-fortune-1l'));
+    expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final action in [
+    ('Confirmed', 'Reject'),
+    ('Confirmed', 'Accept'),
+    ('Ready for pickup', 'Confirm pickup'),
+    ('Delivery requested', 'Track delivery'),
+  ]) {
+    testWidgets('Store queue stale ${action.$2} cannot act on another order', (
+      tester,
+    ) async {
+      final work = storeViewFixture()..workspaceOrderStage = action.$1;
+      work.workspaceOrders[0] = work.workspaceOrders.first.copyWith(
+        stage: action.$1,
+      );
+      work.workspaceOrders.add(
+        customerOrder(
+          id: 'NEXT-ORDER',
+          customer: 'Next customer',
+          stage: action.$1,
+          createdAt: DateTime(2026, 9, 7, 9),
+        ),
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        textScale: 1,
+      );
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      final button = find
+          .ancestor(
+            of: find.text(action.$2),
+            matching: find.byWidgetPredicate(
+              (widget) => widget is ButtonStyleButton,
+            ),
+          )
+          .first;
+      final oldTap = tester.widget<ButtonStyleButton>(button).onPressed!;
+      expect(work.selectWorkspaceOrder('NEXT-ORDER'), isTrue);
+      oldTap();
+      await tester.pumpAndSettle();
+      expect(work.currentWorkspaceOrderId, 'NEXT-ORDER');
+      expect(work.workspaceOrderStage, action.$1);
+      expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+      expect(find.byKey(const Key('work-reject-order-dialog')), findsNothing);
+      expect(find.byKey(const Key('work-pickup-code')), findsNothing);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+      expect(work.selectWorkspaceOrder('APP-1043'), isTrue);
+      work.workspaceOrders[0] = work.workspaceOrders.first.copyWith(
+        stage: 'Completed',
+      );
+      work.workspaceOrderStage = 'Completed';
+      oldTap();
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderStage, 'Completed');
+      expect(find.byKey(const Key('work-reject-order-dialog')), findsNothing);
+      expect(find.byKey(const Key('work-pickup-code')), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      work.workspaceOrders[0] = work.workspaceOrders.first.copyWith(
+        stage: action.$1,
+      );
+      work.workspaceOrderStage = action.$1;
+      oldTap();
+      expect(work.workspaceOrderStage, action.$1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Store queue retained row selection cannot cross stores', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    work.workspaceOrders.add(
+      customerOrder(
+        id: 'OPEN-LATER',
+        customer: 'Next customer',
+        stage: 'Preparing',
+        createdAt: DateTime(2026, 9, 7, 9),
+      ),
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-store-orders')));
+    await tester.pumpAndSettle();
+    final open = find.byKey(const Key('work-order-open-OPEN-LATER'));
+    await tester.ensureVisible(open);
+    final oldTap = tester.widget<TextButton>(open).onPressed!;
+    final current = work.currentWorkspaceOrderId;
+    final store = work.activeWorkspace!;
+    work.activateWorkspace(
+      WorkWorkspace(
+        id: 'QUEUE-OTHER-STORE',
+        name: 'Second store',
+        profileLabel: store.profileLabel,
+        profileId: store.profileId,
+        area: store.area,
+        verified: true,
+      ),
+    );
+    oldTap();
+    expect(work.currentWorkspaceOrderId, current);
+    expect(work.activeWorkspace!.id, 'QUEUE-OTHER-STORE');
+    expect(work.workspaceInvoices, isEmpty);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   for (final display in [
     (width: 412.0, height: 915.0, scale: 1.0),
     (width: 320.0, height: 640.0, scale: 1.4),
