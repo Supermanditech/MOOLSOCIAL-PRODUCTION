@@ -1028,6 +1028,58 @@ void main() {
       );
     }
 
+    test(
+      'keeps page viewport on Back and forgets evicted or refreshed pages',
+      () async {
+        final pager = BuyV2CataloguePager<String>(
+          identityOf: (item) => item,
+          load: (q, {cursor, required pageSize}) async =>
+              pageFor(q, cursor: cursor, pageSize: pageSize, count: 5000),
+        );
+        addTearDown(pager.dispose);
+        await pager.open(query);
+        pager.scrollOffset = 88;
+        pager.rememberLaneOffset(0, 140);
+        pager.rememberLaneOffset(1, 75);
+        await pager.next();
+        expect(pager.scrollOffset, 0);
+        expect(pager.laneOffset(0), 0);
+        pager.scrollOffset = 34;
+        pager.rememberLaneOffset(0, 200);
+        // The opaque previous cursor '0' aliases the original null-cursor page.
+        await pager.previous();
+        expect(pager.scrollOffset, 88);
+        expect(pager.laneOffset(0), 140);
+        expect(pager.laneOffset(1), 75);
+        pager.scrollOffset = double.nan;
+        pager.rememberLaneOffset(0, -1);
+        expect(pager.scrollOffset, 88);
+        expect(pager.laneOffset(0), 140);
+        await pager.next();
+        expect(pager.scrollOffset, 34);
+        expect(pager.laneOffset(0), 200);
+        await pager.next();
+        await pager.next();
+        await pager.open(query, cursor: '0');
+        expect(pager.cachedPageCount, lessThanOrEqualTo(3));
+        expect(pager.scrollOffset, 0);
+        expect(pager.laneOffset(0), 0);
+        pager.scrollOffset = 45;
+        pager.rememberLaneOffset(1, 60);
+        await pager.refresh();
+        expect(pager.scrollOffset, 0);
+        expect(pager.laneOffset(1), 0);
+        pager.scrollOffset = 15;
+        await pager.open(
+          BuyV2CatalogueQuery(
+            destination: BuyV2Destination.shop,
+            regionId: 'mumbai',
+          ),
+        );
+        expect(pager.scrollOffset, 0);
+      },
+    );
+
     for (final count in [5000, 100000]) {
       test('reaches every one of $count listings with bounded pages', () async {
         var requests = 0;

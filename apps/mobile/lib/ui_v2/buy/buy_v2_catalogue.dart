@@ -730,6 +730,556 @@ class _OfferPublisherChip extends StatelessWidget {
   }
 }
 
+/// Bounded source pages rendered with the existing compact product cards.
+class BuyV2PagedProductCatalogue extends StatefulWidget {
+  const BuyV2PagedProductCatalogue({
+    super.key,
+    required this.session,
+    required this.query,
+    required this.scopeKey,
+    this.header,
+    this.onOpenProduct,
+    this.storeContext = false,
+    this.showAreaControl = false,
+    this.usePrimaryScrollController = false,
+  });
+
+  final BuyV2Session session;
+  final BuyV2CatalogueQuery query;
+  final String scopeKey;
+  final Widget? header;
+  final ValueChanged<BuyV2Product>? onOpenProduct;
+  final bool storeContext;
+  final bool showAreaControl;
+  final bool usePrimaryScrollController;
+
+  @override
+  State<BuyV2PagedProductCatalogue> createState() =>
+      _BuyV2PagedProductCatalogueState();
+}
+
+class _BuyV2PagedProductCatalogueState
+    extends State<BuyV2PagedProductCatalogue> {
+  late BuyV2CataloguePager<BuyV2Product> _pager;
+  late ScrollController _vertical;
+  bool _ownsVertical = true;
+  late List<ScrollController> _lanes;
+  BuyV2CataloguePage<BuyV2Product>? _shownPage;
+  bool _restoring = false;
+  int _openSequence = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _attach();
+  }
+
+  void _attach() {
+    _pager = widget.session.acquireCatalogueProducts(widget.scopeKey);
+    _shownPage = _pager.page;
+    _vertical = ScrollController(
+      initialScrollOffset: _pager.scrollOffset,
+      keepScrollOffset: false,
+    );
+    _ownsVertical = true;
+    _lanes = List.generate(
+      2,
+      (lane) => ScrollController(
+        initialScrollOffset: _pager.laneOffset(lane),
+        keepScrollOffset: false,
+      ),
+    );
+    _vertical.addListener(_saveOffsets);
+    for (final lane in _lanes) {
+      lane.addListener(_saveOffsets);
+    }
+    _pager.addListener(_pageChanged);
+    _scheduleQuery();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _bindPrimaryController();
+  }
+
+  void _bindPrimaryController() {
+    final inherited = widget.usePrimaryScrollController
+        ? PrimaryScrollController.maybeOf(context)
+        : null;
+    if ((inherited == null && _ownsVertical) ||
+        identical(inherited, _vertical)) {
+      return;
+    }
+    _saveOffsets();
+    _vertical.removeListener(_saveOffsets);
+    if (_ownsVertical) _vertical.dispose();
+    _vertical =
+        inherited ??
+        ScrollController(
+          initialScrollOffset: _pager.scrollOffset,
+          keepScrollOffset: false,
+        );
+    _ownsVertical = inherited == null;
+    _vertical.addListener(_saveOffsets);
+  }
+
+  void _saveOffsets() {
+    if (_restoring ||
+        _pager.query != widget.query ||
+        _shownPage != _pager.page) {
+      return;
+    }
+    if (_vertical.positions.length == 1) {
+      _pager.scrollOffset = _vertical.offset.clamp(0.0, double.infinity);
+    }
+    for (var lane = 0; lane < _lanes.length; lane++) {
+      if (_lanes[lane].hasClients) {
+        _pager.rememberLaneOffset(
+          lane,
+          _lanes[lane].offset.clamp(0.0, double.infinity),
+        );
+      }
+    }
+  }
+
+  void _scheduleQuery() {
+    final sequence = ++_openSequence;
+    Future<void>.microtask(() async {
+      if (!mounted || sequence != _openSequence) return;
+      if (_pager.query != widget.query ||
+          (_pager.page == null && !_pager.loading && _pager.message == null)) {
+        await _pager.open(widget.query);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant BuyV2PagedProductCatalogue oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session ||
+        oldWidget.scopeKey != widget.scopeKey) {
+      _detach(oldWidget.session, oldWidget.scopeKey);
+      _attach();
+      _bindPrimaryController();
+    } else if (oldWidget.query != widget.query) {
+      _scheduleQuery();
+    }
+  }
+
+  void _pageChanged() {
+    if (!mounted) return;
+    if (_shownPage != _pager.page) {
+      _shownPage = _pager.page;
+      _restoring = true;
+      final page = _shownPage;
+      final offset = _pager.scrollOffset;
+      final lanes = List.generate(2, _pager.laneOffset);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || page != _pager.page) return;
+        void restore(ScrollController controller, double value) {
+          if (controller.positions.length == 1) {
+            controller.jumpTo(
+              value.clamp(0.0, controller.position.maxScrollExtent),
+            );
+          }
+        }
+
+        restore(_vertical, offset);
+        for (var lane = 0; lane < _lanes.length; lane++) {
+          restore(_lanes[lane], lanes[lane]);
+        }
+        _restoring = false;
+      });
+    }
+    setState(() {});
+  }
+
+  void _detach(BuyV2Session session, String scopeKey) {
+    _openSequence++;
+    _saveOffsets();
+    _pager.removeListener(_pageChanged);
+    _vertical.removeListener(_saveOffsets);
+    if (_ownsVertical) _vertical.dispose();
+    for (final lane in _lanes) {
+      lane.dispose();
+    }
+    session.releaseCatalogueProducts(scopeKey);
+  }
+
+  @override
+  void dispose() {
+    _detach(widget.session, widget.scopeKey);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final page = _pager.query == widget.query ? _pager.page : null;
+    final loading = _pager.query != widget.query || _pager.loading;
+    final message = _pager.query == widget.query ? _pager.message : null;
+    final products = page?.items ?? const <BuyV2Product>[];
+    final needsArea =
+        widget.query.storeId == null &&
+        widget.query.areaScope != BuyV2CatalogueAreaScope.allAreas &&
+        widget.query.regionId == null;
+    return BuyV2VerticalScrollIndicator(
+      child: ListView(
+        key: ValueKey('buy-paged-scroll-${widget.scopeKey}'),
+        controller: _vertical,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.only(bottom: 12),
+        children: [
+          if (widget.header != null) widget.header!,
+          _CataloguePageControls(
+            scopeKey: widget.scopeKey,
+            start: page?.startIndex,
+            count: products.length,
+            total: page?.totalCount,
+            loading: loading,
+            areaLabel: !widget.storeContext
+                ? widget.session.catalogueAreaLabel
+                : null,
+            onArea: widget.showAreaControl
+                ? () => showBuyV2CatalogueArea(context, widget.session)
+                : null,
+            onPrevious: !loading && page?.previousCursor != null
+                ? _pager.previous
+                : null,
+            onNext: !loading && page?.nextCursor != null ? _pager.next : null,
+            onRefresh: loading ? null : _pager.refresh,
+          ),
+          if (loading) const LinearProgressIndicator(minHeight: 2),
+          if (needsArea)
+            _CataloguePageNotice(
+              title: 'Where are you shopping?',
+              detail: 'Choose an area, or browse stores in any area.',
+              action: 'Choose area',
+              onAction: () => showBuyV2CatalogueArea(context, widget.session),
+            )
+          else if (message != null)
+            _CataloguePageNotice(
+              title: 'Results could not refresh',
+              detail: message,
+              action: 'Try again',
+              onAction: _pager.retry,
+            )
+          else if (!loading && products.isEmpty)
+            const _CataloguePageNotice(
+              title: 'No matching products',
+              detail: 'Try another search, category or area.',
+            ),
+          if (products.isNotEmpty)
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final scale = MediaQuery.textScalerOf(context).scale(1);
+                final layout = _resolveCompactProductGridLayout(
+                  constraints: constraints,
+                  accessibleText: scale > 1.25,
+                  textScale: scale,
+                  denseStore: widget.storeContext,
+                  scrollIndicatorInset: true,
+                );
+                final laneCount = products.length == 1 ? 1 : 2;
+                return SizedBox(
+                  height:
+                      layout.tileHeight * laneCount + (laneCount - 1) * 7 + 12,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      children: [
+                        for (var lane = 0; lane < laneCount; lane++) ...[
+                          if (lane > 0) const SizedBox(height: 7),
+                          Expanded(
+                            child: ListView.separated(
+                              key: ValueKey(
+                                'buy-paged-lane-${widget.scopeKey}-$lane',
+                              ),
+                              controller: _lanes[lane],
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              itemCount:
+                                  (products.length - lane + laneCount - 1) ~/
+                                  laneCount,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: 7),
+                              itemBuilder: (context, index) {
+                                final product =
+                                    products[index * laneCount + lane];
+                                return SizedBox(
+                                  width: layout.cardWidth,
+                                  child: BuyV2ProductCard(
+                                    key: ValueKey(
+                                      'buy-paged-card-${product.id}',
+                                    ),
+                                    session: widget.session,
+                                    product: product,
+                                    compact: true,
+                                    storeContext: widget.storeContext,
+                                    onOpenProduct: widget.onOpenProduct,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          if (!loading &&
+              page != null &&
+              products.isNotEmpty &&
+              page.nextCursor == null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Text(
+                'All matching products are on this or earlier pages.',
+                style: context.buyMeta,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+String _catalogueCount(int value) => value.toString().replaceAllMapped(
+  RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+  (match) => '${match[1]},',
+);
+
+class _CataloguePageControls extends StatelessWidget {
+  const _CataloguePageControls({
+    required this.scopeKey,
+    required this.start,
+    required this.count,
+    required this.total,
+    required this.loading,
+    this.areaLabel,
+    this.onArea,
+    this.onPrevious,
+    this.onNext,
+    this.onRefresh,
+  });
+  final String scopeKey;
+  final int? start;
+  final int count;
+  final int? total;
+  final bool loading;
+  final String? areaLabel;
+  final VoidCallback? onArea;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+  final VoidCallback? onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final range = start == null
+        ? (loading ? 'Loading products' : 'Products')
+        : count == 0
+        ? '0 products'
+        : '${_catalogueCount(start! + 1)}–${_catalogueCount(start! + count)}'
+              '${total == null ? '' : ' of ${_catalogueCount(total!)}'}';
+    return BuyV2CartAvoidanceRegion(
+      key: ValueKey('buy-page-controls-protection-$scopeKey'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Row(
+          children: [
+            IconButton(
+              key: ValueKey('buy-page-previous-$scopeKey'),
+              tooltip: 'Previous products',
+              onPressed: onPrevious,
+              icon: const Icon(Icons.chevron_left_rounded),
+            ),
+            Expanded(
+              child: Semantics(
+                liveRegion: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      range,
+                      key: ValueKey('buy-page-range-$scopeKey'),
+                      style: context.buyMeta.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (areaLabel != null)
+                      Text(areaLabel!, style: context.buyMeta),
+                  ],
+                ),
+              ),
+            ),
+            IconButton(
+              key: ValueKey('buy-page-next-$scopeKey'),
+              tooltip: 'Next products',
+              onPressed: onNext,
+              icon: const Icon(Icons.chevron_right_rounded),
+            ),
+            IconButton(
+              key: ValueKey('buy-page-refresh-$scopeKey'),
+              tooltip: 'Refresh products',
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh_rounded, size: 20),
+            ),
+            if (onArea != null)
+              IconButton(
+                key: ValueKey('buy-page-area-$scopeKey'),
+                tooltip: 'Choose shopping area',
+                onPressed: onArea,
+                icon: const Icon(Icons.location_on_outlined, size: 20),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CataloguePageNotice extends StatelessWidget {
+  const _CataloguePageNotice({
+    required this.title,
+    required this.detail,
+    this.action,
+    this.onAction,
+  });
+  final String title;
+  final String detail;
+  final String? action;
+  final VoidCallback? onAction;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: context.buyTitle.copyWith(fontSize: 15)),
+        const SizedBox(height: 4),
+        Text(detail, style: context.buyMeta),
+        if (onAction != null)
+          TextButton(onPressed: onAction, child: Text(action!)),
+      ],
+    ),
+  );
+}
+
+Future<void> showBuyV2CatalogueArea(
+  BuildContext context,
+  BuyV2Session session,
+) async {
+  var search = '';
+  var national = session.catalogueAreaScope == BuyV2CatalogueAreaScope.national;
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.white,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (context, setState) {
+        final areas = session.catalogueAreaChoices.entries
+            .where(
+              (entry) =>
+                  entry.value.toLowerCase().contains(search.toLowerCase()),
+            )
+            .toList(growable: false);
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: FractionallySizedBox(
+            heightFactor: .9,
+            child: BuyV2VerticalScrollIndicator(
+              child: ListView(
+                key: const ValueKey('buy-catalogue-area-list'),
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text('Shopping area', style: context.buyTitle),
+                      ),
+                      IconButton(
+                        tooltip: 'Close shopping area',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  TextField(
+                    key: const ValueKey('buy-catalogue-area-search'),
+                    maxLength: 80,
+                    decoration: const InputDecoration(
+                      hintText: 'City or area',
+                      counterText: '',
+                    ),
+                    onChanged: (value) => setState(() => search = value.trim()),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('In this area'),
+                        selected: !national,
+                        onSelected: (_) => setState(() => national = false),
+                      ),
+                      ChoiceChip(
+                        label: const Text('National delivery'),
+                        selected: national,
+                        onSelected: (_) => setState(() => national = true),
+                      ),
+                    ],
+                  ),
+                  ListTile(
+                    key: const ValueKey('buy-catalogue-any-area'),
+                    title: const Text('Any area'),
+                    subtitle: const Text('Find stores in other areas.'),
+                    onTap: () {
+                      session.chooseCatalogueArea(
+                        null,
+                        BuyV2CatalogueAreaScope.allAreas,
+                      );
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                  for (final area in areas)
+                    ListTile(
+                      key: ValueKey('buy-catalogue-area-${area.key}'),
+                      title: Text(area.value),
+                      onTap: () {
+                        session.chooseCatalogueArea(
+                          area.key,
+                          national
+                              ? BuyV2CatalogueAreaScope.national
+                              : BuyV2CatalogueAreaScope.regional,
+                        );
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  if (areas.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                        'No matching areas. You can still browse stores in any area.',
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
 class BuyV2CatalogueView extends StatelessWidget {
   const BuyV2CatalogueView({super.key, required this.session});
 
@@ -754,13 +1304,23 @@ class BuyV2CatalogueView extends StatelessWidget {
               '${session.selectedCategoryId}-${session.saleTypeSignature}',
             ),
             destination: session.destination,
-            child: BuyV2VerticalScrollIndicator(
-              child: _ProductGrid(
-                session: session,
-                savedOnly: savedOnly,
-                onShowAll: () => session.showSavedProducts(false),
-              ),
-            ),
+            child: session.pagedCatalogueEnabled && !savedOnly
+                ? BuyV2PagedProductCatalogue(
+                    session: session,
+                    query: session.catalogueQuery(),
+                    scopeKey: 'catalogue-${session.destination.name}',
+                    usePrimaryScrollController:
+                        MediaQuery.sizeOf(context).width >
+                            MediaQuery.sizeOf(context).height &&
+                        MediaQuery.sizeOf(context).height <= 480,
+                  )
+                : BuyV2VerticalScrollIndicator(
+                    child: _ProductGrid(
+                      session: session,
+                      savedOnly: savedOnly,
+                      onShowAll: () => session.showSavedProducts(false),
+                    ),
+                  ),
           ),
         ),
       ],
@@ -1296,6 +1856,17 @@ class BuyV2SearchResultsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final query = session.query.trim();
+    if (session.pagedCatalogueEnabled && query.isNotEmpty) {
+      return BuyV2PagedProductCatalogue(
+        session: session,
+        query: session.catalogueQuery(),
+        scopeKey: 'search-${session.destination.name}',
+        usePrimaryScrollController:
+            MediaQuery.sizeOf(context).width >
+                MediaQuery.sizeOf(context).height &&
+            MediaQuery.sizeOf(context).height <= 480,
+      );
+    }
     final products = session.visibleProducts;
     return BuyV2FiniteIncomingTransition(
       key: const ValueKey('buy-search-results-surface'),
@@ -5843,9 +6414,7 @@ class _ProductGrid extends StatelessWidget {
       return _CatalogueAvailabilityState(session: session);
     }
     final products = savedOnly
-        ? session.visibleProducts
-              .where((product) => session.isSaved(product.id))
-              .toList(growable: false)
+        ? session.visibleSavedProducts
         : session.catalogueSaleTypeProducts;
     final showPromotions =
         !savedOnly &&
@@ -6477,17 +7046,21 @@ _resolveCompactProductGridLayout({
   required double textScale,
   bool savedOnly = false,
   bool denseStore = false,
+  bool scrollIndicatorInset = false,
 }) {
   // The founder-approved Shop and Wholesale rhythm keeps three products
   // visible at normal text scale. Enlarged accessibility text uses two cards
   // so type and actions can grow without clipping.
+  // The page scroller reserves 8px inside the same viewport. Keep that gutter
+  // out of the breakpoint calculation, while card widths use the real space.
+  final viewportWidth = constraints.maxWidth + (scrollIndicatorInset ? 8 : 0);
   final columns = savedOnly
-      ? constraints.maxWidth >= 320
+      ? viewportWidth >= 320
             ? 2
             : 1
-      : accessibleText && constraints.maxWidth < 460
+      : accessibleText && viewportWidth < 460
       ? 2
-      : constraints.maxWidth >= 320
+      : viewportWidth >= 320
       ? 3
       : 2;
   const horizontalInsets = 20.0;

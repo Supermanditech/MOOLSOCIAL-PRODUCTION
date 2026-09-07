@@ -451,6 +451,7 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
   final int pageSize;
   final int maximumCachedPages;
   final Map<String, BuyV2CataloguePage<T>> _cache = {};
+  final Map<String, Map<String, double>> _scrollOffsets = {};
   BuyV2CatalogueQuery? _query;
   BuyV2CataloguePage<T>? _page;
   ({BuyV2CatalogueQuery query, String? cursor, int generation})? _pending;
@@ -473,7 +474,33 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
   int get retainedItemCount =>
       _cache.values.fold(0, (count, value) => count + value.items.length);
   Iterable<T> get cachedItems => _cache.values.expand((page) => page.items);
-  double scrollOffset = 0;
+  String _pageScrollKey(
+    BuyV2CatalogueQuery query,
+    BuyV2CataloguePage<T> page,
+  ) => jsonEncode([query.key, page.snapshotId, page.startIndex]);
+  String? get _visibleScrollKey =>
+      _query == null || _page == null ? null : _pageScrollKey(_query!, _page!);
+
+  double _readOffset(String axis) =>
+      _scrollOffsets[_visibleScrollKey]?[axis] ?? 0;
+
+  void _rememberOffset(String axis, double value) {
+    final key = _visibleScrollKey;
+    if (_disposed ||
+        key == null ||
+        _page == null ||
+        !value.isFinite ||
+        value < 0) {
+      return;
+    }
+    _scrollOffsets.putIfAbsent(key, () => {})[axis] = value;
+  }
+
+  double get scrollOffset => _readOffset('vertical');
+  set scrollOffset(double value) => _rememberOffset('vertical', value);
+  double laneOffset(int lane) => _readOffset('lane-${lane.clamp(0, 1)}');
+  void rememberLaneOffset(int lane, double value) =>
+      _rememberOffset('lane-${lane.clamp(0, 1)}', value);
 
   String _cacheKey(BuyV2CatalogueQuery query, String? cursor) =>
       jsonEncode([query.key, cursor]);
@@ -491,6 +518,7 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
       _page = null;
       _cursor = null;
       _cache.clear();
+      _scrollOffsets.clear();
     }
     _query = query;
     _requestedCursor = cursor;
@@ -541,6 +569,7 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
     final currentQuery = _query;
     if (currentQuery == null || _disposed) return Future.value();
     _cache.clear();
+    _scrollOffsets.clear();
     _page = null;
     _cursor = null;
     _requestedCursor = null;
@@ -576,6 +605,10 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
         while (_cache.length > maximumCachedPages) {
           _cache.remove(_cache.keys.first);
         }
+        final retainedOffsets = _cache.values
+            .map((page) => _pageScrollKey(request.query, page))
+            .toSet();
+        _scrollOffsets.removeWhere((key, _) => !retainedOffsets.contains(key));
         _page = result;
         _cursor = request.cursor;
         _message = null;
@@ -648,6 +681,7 @@ class BuyV2CataloguePager<T> extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _scrollOffsets.clear();
     _generation += 1;
     _pending = null;
     _cache.clear();
@@ -1047,6 +1081,8 @@ class BuyV2Session extends ChangeNotifier {
     this.collectionPendingStore,
     this.catalogueNow = DateTime.now,
     this.cataloguePageSource,
+    Map<String, String> catalogueAreas = const {},
+    String? initialCatalogueRegionId,
     BuyV2OrderResolutionAdapter? orderResolutionAdapter,
     BuyV2ShoppingAlertsAdapter? shoppingAlertsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
@@ -1089,6 +1125,8 @@ class BuyV2Session extends ChangeNotifier {
                ? const BuyV2UiReviewShoppingAlertsAdapter()
                : const BuyV2UnavailableShoppingAlertsAdapter()) {
     collectionIdentity?.addListener(_onCollectionIdentityChanged);
+    _catalogueAreas.addAll(catalogueAreas);
+    _catalogueRegionId = initialCatalogueRegionId;
     if (cataloguePageSource == null && buyV2DeviceReviewBenefitSeedsEnabled) {
       for (final destination in [
         BuyV2Destination.shop,
@@ -1099,6 +1137,11 @@ class BuyV2Session extends ChangeNotifier {
           now: catalogueNow,
         );
       }
+      for (final area in BuyV2DevelopmentCatalogueSource.regions) {
+        _catalogueAreas[area] = '${area[0].toUpperCase()}${area.substring(1)}';
+      }
+      // The review cohort is explicitly based in Jodhpur; this is not GPS.
+      _catalogueRegionId ??= 'jodhpur';
     }
     if (cartBenefitsAdapter is BuyV2LiveCartBenefitsAdapter) {
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.idle;
@@ -1132,6 +1175,70 @@ class BuyV2Session extends ChangeNotifier {
 
   int get pagedProductCount => _pagedProducts.length;
   int get catalogueRequestsInFlight => _catalogueActiveRequests;
+
+  final Map<String, String> _catalogueAreas = {};
+  String? _catalogueRegionId;
+  BuyV2CatalogueAreaScope _catalogueAreaScope =
+      BuyV2CatalogueAreaScope.regional;
+  Map<String, String> get catalogueAreaChoices =>
+      Map.unmodifiable(_catalogueAreas);
+  String? get catalogueRegionId => _catalogueRegionId;
+  BuyV2CatalogueAreaScope get catalogueAreaScope => _catalogueAreaScope;
+  String get catalogueAreaLabel =>
+      _catalogueAreaScope == BuyV2CatalogueAreaScope.allAreas
+      ? 'Any area'
+      : _catalogueAreas[_catalogueRegionId] ?? 'Choose area';
+
+  void chooseCatalogueArea(String? regionId, BuyV2CatalogueAreaScope scope) {
+    if (scope != BuyV2CatalogueAreaScope.allAreas &&
+        (regionId == null || !_catalogueAreas.containsKey(regionId))) {
+      return;
+    }
+    if (_catalogueRegionId == regionId && _catalogueAreaScope == scope) return;
+    _catalogueRegionId = regionId;
+    _catalogueAreaScope = scope;
+    notifyListeners();
+  }
+
+  BuyV2CatalogueQuery catalogueQuery({
+    String? storeId,
+    String? search,
+    String? categoryId,
+    bool offersOnly = false,
+    bool collectionOnly = false,
+    BuyV2Destination? catalogueDestination,
+  }) {
+    final value = catalogueDestination ?? destination;
+    final storeCatalogue = storeId != null;
+    return BuyV2CatalogueQuery(
+      destination: value,
+      regionId: _catalogueRegionId,
+      areaScope: storeCatalogue
+          ? BuyV2CatalogueAreaScope.allAreas
+          : _catalogueAreaScope,
+      storeId: storeId,
+      query: search ?? (storeCatalogue ? '' : query),
+      categoryId: categoryId ?? (storeCatalogue ? 'all' : selectedCategoryId),
+      sort: productSort,
+      shopSaleType:
+          !storeCatalogue && !collectionOnly && value == BuyV2Destination.shop
+          ? shopSaleType
+          : null,
+      wholesaleSaleType: !storeCatalogue && value == BuyV2Destination.wholesale
+          ? wholesaleSaleType
+          : null,
+      fulfilmentMode: storeCatalogue || collectionOnly
+          ? null
+          : selectedFulfilmentMode,
+      pack: storeCatalogue ? null : selectedPackFilter,
+      filter: storeCatalogue ? null : selectedFilter,
+      brands: storeCatalogue ? const {} : selectedBrands,
+      maximumPrice: storeCatalogue ? null : maximumProductPrice,
+      availableOnly: !storeCatalogue && availableProductsOnly,
+      offersOnly: offersOnly,
+      collectionOnly: collectionOnly,
+    );
+  }
 
   BuyV2CataloguePageSource? _sourceForCatalogue(BuyV2Destination destination) =>
       cataloguePageSource ?? _deviceCatalogueSources[destination];
@@ -3084,9 +3191,15 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2Product> get visibleProducts =>
       _resolveVisibleProducts(limit: true);
 
+  List<BuyV2Product> get visibleSavedProducts => _resolveVisibleProducts(
+    limit: false,
+    source: savedProductsFor(destination),
+  );
+
   List<BuyV2Product> _resolveVisibleProducts({
     required bool limit,
     BuyV2DiscoveryRefinements? refinements,
+    Iterable<BuyV2Product>? source,
   }) {
     final choices = refinements ?? discoveryRefinements;
     final normalized = query.trim().toLowerCase();
@@ -3099,7 +3212,7 @@ class BuyV2Session extends ChangeNotifier {
             filterDestination == BuyV2Destination.shop
         ? monthlyBasketPlan.map((line) => line.product.id).toSet()
         : null;
-    final candidates = _catalogueProducts.where((product) {
+    final candidates = (source ?? _catalogueProducts).where((product) {
       if (product.destination != filterDestination) return false;
       if (!product.catalogueListing) return false;
       if (intentProductIds != null && !intentProductIds.contains(product.id)) {

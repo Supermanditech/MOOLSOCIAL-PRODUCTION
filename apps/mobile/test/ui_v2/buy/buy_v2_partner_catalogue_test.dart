@@ -6,12 +6,183 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final size in [const Size(320, 844), const Size(640, 360)]) {
+      for (final scale in [1.0, 2.0]) {
+        final profile =
+            '${destination.name}-${size.width.toInt()}x${size.height.toInt()}-$scale';
+        testWidgets('R5 paged catalogue user actions $profile', (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+          tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+          addTearDown(tester.view.reset);
+          final source = _PagedWidgetSource(destination);
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            reviewDataEnabled: true,
+            cataloguePageSource: source,
+            catalogueAreas: const {'jodhpur': 'Jodhpur', 'mumbai': 'Mumbai'},
+            initialCatalogueRegionId: 'jodhpur',
+          )..destination = destination;
+          // Existing review orders and verified trade state model this positive
+          // UI journey; no live commerce or verification result is claimed.
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await tester.pumpWidget(_app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+          final scope = 'catalogue-${destination.name}';
+          final range = find.byKey(ValueKey('buy-page-range-$scope'));
+          expect(tester.widget<Text>(range).data, startsWith('1–40 of '));
+          expect(source.requests.length, 1);
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(tester, 'r5-paged-$profile-initial');
+
+          final first = tester
+              .widget<BuyV2ProductCard>(find.byType(BuyV2ProductCard).first)
+              .product;
+          final save = find.byKey(ValueKey('buy-save-${first.id}'));
+          await tester.ensureVisible(save);
+          await tester.pumpAndSettle();
+          await tester.tap(save);
+          await tester.pumpAndSettle();
+          expect(session.isSaved(first.id), isTrue);
+          final add = find.byKey(ValueKey('buy-add-${first.id}'));
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          expect(add.hitTestable(), findsOneWidget);
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(first.id), first.minimumOrder);
+
+          final next = find.byKey(ValueKey('buy-page-next-$scope'));
+          await _revealPagedHeader(tester, scope, next);
+          source.failNext = true;
+          await tester.tap(next);
+          await tester.pumpAndSettle();
+          expect(find.text('Results could not refresh'), findsOneWidget);
+          expect(tester.widget<Text>(range).data, startsWith('1–40 of '));
+          expect(session.quantityFor(first.id), first.minimumOrder);
+          await captureR66Visual(tester, 'r5-paged-$profile-retry');
+          source.failNext = false;
+          final retry = find.widgetWithText(TextButton, 'Try again');
+          await tester.ensureVisible(retry);
+          await tester.pumpAndSettle();
+          await tester.tap(retry);
+          await tester.pumpAndSettle();
+          expect(tester.widget<Text>(range).data, startsWith('41–80 of '));
+          expect(session.isSaved(first.id), isTrue);
+          expect(session.quantityFor(first.id), first.minimumOrder);
+
+          final lane = find.byKey(ValueKey('buy-paged-lane-$scope-0'));
+          final packshots = find.descendant(
+            of: lane,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget.key is ValueKey<String> &&
+                  (widget.key! as ValueKey<String>).value.startsWith(
+                    'buy-grid-packshot-',
+                  ),
+            ),
+          );
+          await tester.ensureVisible(packshots.first);
+          await tester.pumpAndSettle();
+          // Use the uncovered image below the badge and Save hit area. A tall
+          // card's centre can sit outside the short landscape viewport.
+          const imageAction = Alignment(-.5, .55);
+          expect(packshots.first.hitTestable(at: imageAction), findsOneWidget);
+          await tester.dragFrom(
+            imageAction.withinRect(tester.getRect(packshots.first)),
+            const Offset(-330, 0),
+          );
+          await tester.pumpAndSettle();
+          final laneOffset = tester.widget<ListView>(lane).controller!.offset;
+          expect(laneOffset, greaterThan(0));
+          final visibleImage = packshots.hitTestable(at: imageAction).first;
+          final visible = find.ancestor(
+            of: visibleImage,
+            matching: find.byType(BuyV2ProductCard),
+          );
+          final opened = tester.widget<BuyV2ProductCard>(visible).product;
+          final vertical = find.byKey(ValueKey('buy-paged-scroll-$scope'));
+          final verticalOffset = tester
+              .widget<ListView>(vertical)
+              .controller!
+              .offset;
+          final requestCount = source.requests.length;
+          await captureR66Visual(tester, 'r5-paged-$profile-page2');
+          await tester.tapAt(
+            imageAction.withinRect(tester.getRect(visibleImage)),
+          );
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, opened.id);
+          expect(session.view, BuyV2View.product);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.catalogue);
+          expect(source.requests.length, requestCount);
+          expect(
+            tester.widget<ListView>(vertical).controller!.offset,
+            closeTo(verticalOffset, 1),
+          );
+          expect(
+            tester.widget<ListView>(lane).controller!.offset,
+            closeTo(laneOffset, 1),
+          );
+          expect(session.quantityFor(first.id), first.minimumOrder);
+          await captureR66Visual(tester, 'r5-paged-$profile-return');
+
+          await _revealPagedHeader(tester, scope, next);
+          expect(tester.widget<Text>(range).data, startsWith('41–80 of '));
+          final area = find.byKey(const ValueKey('buy-change-location'));
+          await _revealPagedHeader(tester, scope, area);
+          await tester.tap(area);
+          await tester.pumpAndSettle();
+          final field = find.byKey(const ValueKey('buy-catalogue-area-search'));
+          await tester.enterText(field, 'Mum');
+          tester.view.viewInsets = const FakeViewPadding(bottom: 180);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(tester, 'r5-paged-$profile-area-keyboard');
+          final mumbai = find.byKey(
+            const ValueKey('buy-catalogue-area-mumbai'),
+          );
+          final areaScroll = find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-catalogue-area-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(mumbai, 80, scrollable: areaScroll);
+          await tester.pumpAndSettle();
+          expect(mumbai.hitTestable(), findsOneWidget);
+          await tester.tap(mumbai);
+          tester.view.viewInsets = const FakeViewPadding();
+          await tester.pumpAndSettle();
+          expect(session.catalogueRegionId, 'mumbai');
+          expect(source.requests.last.regionId, 'mumbai');
+          expect(tester.widget<Text>(range).data, startsWith('1–40 of '));
+          expect(session.isSaved(first.id), isTrue);
+          expect(session.quantityFor(first.id), first.minimumOrder);
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(tester, 'r5-paged-$profile-area-result');
+        });
+      }
+    }
+  }
 
   for (final size in [const Size(320, 844), const Size(640, 360)]) {
     for (final scale in [1.0, 2.0]) {
@@ -1066,6 +1237,41 @@ final class _CollectionHeaderFixture {
   void dispose() {
     session.dispose();
     core.dispose();
+  }
+}
+
+Future<void> _revealPagedHeader(
+  WidgetTester tester,
+  String scope,
+  Finder target,
+) async {
+  final scrollable = find
+      .descendant(
+        of: find.byKey(ValueKey('buy-paged-scroll-$scope')),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+  await tester.scrollUntilVisible(target, -100, scrollable: scrollable);
+  await tester.ensureVisible(target);
+  await tester.pumpAndSettle();
+  expect(target.hitTestable(), findsOneWidget);
+}
+
+class _PagedWidgetSource extends BuyV2DevelopmentCatalogueSource {
+  _PagedWidgetSource(BuyV2Destination destination)
+    : super(destination: destination, providerCount: 40);
+  bool failNext = false;
+  final requests = <BuyV2CatalogueQuery>[];
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    requests.add(query);
+    if (failNext && cursor != null) throw StateError('Page source unavailable');
+    return super.loadProducts(query, cursor: cursor, pageSize: pageSize);
   }
 }
 

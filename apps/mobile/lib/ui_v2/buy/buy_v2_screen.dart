@@ -950,8 +950,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                 open: _searchOpen,
                                 onOpenChanged: (value) =>
                                     setState(() => _searchOpen = value),
-                                onLocation: () =>
-                                    showBuyV2AddressSheet(context, session),
+                                onLocation: () => session.pagedCatalogueEnabled
+                                    ? showBuyV2CatalogueArea(context, session)
+                                    : showBuyV2AddressSheet(context, session),
                                 onAccount: _openBuyProfile,
                                 trailingAction: keyboardVisible
                                     ? _buildDeliveryControl(session, setState)
@@ -2821,7 +2822,9 @@ class _BuySearchBand extends StatelessWidget {
               ),
               child: IconButton(
                 key: const ValueKey('buy-change-location'),
-                tooltip: 'Change delivery location',
+                tooltip: session.pagedCatalogueEnabled
+                    ? 'Choose shopping area'
+                    : 'Change delivery location',
                 onPressed: onLocation,
                 icon: const Icon(Icons.location_on_outlined, size: 22),
                 color: BuyV2Colors.navy,
