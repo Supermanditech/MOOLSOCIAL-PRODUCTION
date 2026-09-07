@@ -1,0 +1,1 @@
+PENDING — no r66.6 APK has been built. Exact builder provenance will be copied from the new immutable device-artifact location after successful qualification and build.
