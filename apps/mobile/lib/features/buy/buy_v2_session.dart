@@ -1466,6 +1466,7 @@ class BuyV2Session extends ChangeNotifier {
       ?_cartProductReturnId,
       ?_accountReturnProductId,
       ?_pendingStoreReturnAnchorId,
+      ..._catalogueStoreBrowseAnchors.values,
       for (final lease in _catalogueProductPagers.values)
         for (final product in lease.pager.cachedItems) product.id,
       for (final store in _pagedStores.values)
@@ -1493,6 +1494,30 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   BuyV2StoreListing? catalogueStore(String storeId) => _pagedStores[storeId];
+
+  BuyV2CatalogueQuery? retainedCatalogueQuery(String scopeKey) =>
+      _catalogueProductPagers[scopeKey]?.pager.query;
+
+  final Map<BuyV2Destination, String> _catalogueStoreBrowseAnchors = {};
+
+  /// One public Store return anchor per destination, independent of page LRU.
+  void retainCatalogueStoreBrowse(BuyV2Product product) {
+    if (_collectionDisposed ||
+        !pagedCatalogueEnabled ||
+        product.storeId == null) {
+      return;
+    }
+    _validatePagedProduct(
+      product,
+      catalogueQuery(
+        storeId: product.storeId,
+        catalogueDestination: product.destination,
+      ),
+    );
+    _pagedProducts.putIfAbsent(product.id, () => product);
+    _catalogueStoreBrowseAnchors[product.destination] = product.id;
+    _retainCataloguePages(notify: false);
+  }
 
   Future<BuyV2StoreListing?> refreshCatalogueStore(
     String storeId,
@@ -3105,12 +3130,15 @@ class BuyV2Session extends ChangeNotifier {
     return commerceAdapter.createAddressRequest(recipient: recipient.trim());
   }
 
-  List<BuyV2Category> get categories => switch (destination) {
-    BuyV2Destination.shop => BuyV2Catalogue.shopCategories,
-    BuyV2Destination.wholesale => BuyV2Catalogue.wholesaleCategories,
-    BuyV2Destination.medicine => BuyV2Catalogue.medicineCategories,
-    BuyV2Destination.orders => const [],
-  };
+  List<BuyV2Category> get categories => categoriesFor(destination);
+
+  List<BuyV2Category> categoriesFor(BuyV2Destination destination) =>
+      switch (destination) {
+        BuyV2Destination.shop => BuyV2Catalogue.shopCategories,
+        BuyV2Destination.wholesale => BuyV2Catalogue.wholesaleCategories,
+        BuyV2Destination.medicine => BuyV2Catalogue.medicineCategories,
+        BuyV2Destination.orders => const [],
+      };
 
   String get selectedCategoryId => switch (destination) {
     BuyV2Destination.shop => shopCategoryId,
@@ -5203,7 +5231,7 @@ class BuyV2Session extends ChangeNotifier {
         current.destination == BuyV2Destination.medicine;
     if (!supportedDestination || limit <= 0) return const [];
 
-    final candidates = _catalogueProducts
+    final candidates = _knownCatalogueProducts
         .where(
           (product) =>
               product.destination == current.destination &&
@@ -5225,8 +5253,23 @@ class BuyV2Session extends ChangeNotifier {
     int limit = 4,
   }) {
     if (limit <= 0) return const [];
+    if (pagedCatalogueEnabled && current.storeId != null) {
+      final region = _pagedStores[current.storeId]?.regionId;
+      if (region == null) return const [];
+      return List.unmodifiable(
+        _pagedStores.values
+            .where(
+              (store) =>
+                  store.id != current.storeId &&
+                  store.regionId == region &&
+                  store.previewProduct?.destination == current.destination,
+            )
+            .take(limit)
+            .map((store) => store.previewProduct!),
+      );
+    }
     final stores = <BuyV2Product>[];
-    for (final product in _catalogueProducts) {
+    for (final product in _knownCatalogueProducts) {
       if (product.destination != current.destination ||
           !product.catalogueListing ||
           product.id == current.id ||
@@ -5256,7 +5299,7 @@ class BuyV2Session extends ChangeNotifier {
 
     // Alternate packs stay out of the main grid, but the exact catalogue-backed
     // entry pack must remain browsable when its customer visits this supplier.
-    final candidates = _catalogueProducts
+    final candidates = _knownCatalogueProducts
         .where(
           (product) =>
               product.destination == current.destination &&

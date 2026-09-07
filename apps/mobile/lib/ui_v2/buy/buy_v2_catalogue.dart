@@ -1065,6 +1065,7 @@ class _CataloguePageControls extends StatelessWidget {
     this.onPrevious,
     this.onNext,
     this.onRefresh,
+    this.noun = 'products',
   });
   final String scopeKey;
   final int? start;
@@ -1076,15 +1077,19 @@ class _CataloguePageControls extends StatelessWidget {
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
   final VoidCallback? onRefresh;
+  final String noun;
 
   @override
   Widget build(BuildContext context) {
     final range = start == null
-        ? (loading ? 'Loading products' : 'Products')
+        ? (loading
+              ? 'Loading $noun'
+              : '${noun[0].toUpperCase()}${noun.substring(1)}')
         : count == 0
-        ? '0 products'
+        ? '0 $noun'
         : '${_catalogueCount(start! + 1)}–${_catalogueCount(start! + count)}'
-              '${total == null ? '' : ' of ${_catalogueCount(total!)}'}';
+              '${total == null ? '' : ' of ${_catalogueCount(total!)}'}'
+              '${noun == 'products' ? '' : ' $noun'}';
     return BuyV2CartAvoidanceRegion(
       key: ValueKey('buy-page-controls-protection-$scopeKey'),
       child: Padding(
@@ -1093,7 +1098,7 @@ class _CataloguePageControls extends StatelessWidget {
           children: [
             IconButton(
               key: ValueKey('buy-page-previous-$scopeKey'),
-              tooltip: 'Previous products',
+              tooltip: 'Previous $noun',
               onPressed: onPrevious,
               icon: const Icon(Icons.chevron_left_rounded),
             ),
@@ -1118,13 +1123,13 @@ class _CataloguePageControls extends StatelessWidget {
             ),
             IconButton(
               key: ValueKey('buy-page-next-$scopeKey'),
-              tooltip: 'Next products',
+              tooltip: 'Next $noun',
               onPressed: onNext,
               icon: const Icon(Icons.chevron_right_rounded),
             ),
             IconButton(
               key: ValueKey('buy-page-refresh-$scopeKey'),
-              tooltip: 'Refresh products',
+              tooltip: 'Refresh $noun',
               onPressed: onRefresh,
               icon: const Icon(Icons.refresh_rounded, size: 20),
             ),
@@ -1281,9 +1286,14 @@ Future<void> showBuyV2CatalogueArea(
 }
 
 class BuyV2CatalogueView extends StatelessWidget {
-  const BuyV2CatalogueView({super.key, required this.session});
+  const BuyV2CatalogueView({
+    super.key,
+    required this.session,
+    this.onOpenStore,
+  });
 
   final BuyV2Session session;
+  final ValueChanged<BuyV2Product>? onOpenStore;
 
   @override
   Widget build(BuildContext context) {
@@ -1309,6 +1319,13 @@ class BuyV2CatalogueView extends StatelessWidget {
                     session: session,
                     query: session.catalogueQuery(),
                     scopeKey: 'catalogue-${session.destination.name}',
+                    header: session.query.trim().isEmpty || onOpenStore == null
+                        ? null
+                        : _CatalogueStoreMatches(
+                            session: session,
+                            query: session.catalogueQuery(),
+                            onOpenStore: onOpenStore!,
+                          ),
                     usePrimaryScrollController:
                         MediaQuery.sizeOf(context).width >
                             MediaQuery.sizeOf(context).height &&
@@ -1848,10 +1865,309 @@ class _CatalogueAccountReturn extends StatelessWidget {
   }
 }
 
+class _CatalogueStoreMatches extends StatefulWidget {
+  const _CatalogueStoreMatches({
+    required this.session,
+    required this.query,
+    required this.onOpenStore,
+  });
+  final BuyV2Session session;
+  final BuyV2CatalogueQuery query;
+  final ValueChanged<BuyV2Product> onOpenStore;
+
+  @override
+  State<_CatalogueStoreMatches> createState() => _CatalogueStoreMatchesState();
+}
+
+class _CatalogueStoreMatchesState extends State<_CatalogueStoreMatches>
+    with WidgetsBindingObserver {
+  late BuyV2CataloguePager<BuyV2StoreListing> _pager;
+  late ScrollController _row;
+  BuyV2CataloguePage<BuyV2StoreListing>? _shown;
+  Timer? _expiry;
+  int _sequence = 0;
+  bool _restoring = false;
+  String get _scope => 'store-search-${widget.query.destination.name}';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _attach();
+  }
+
+  void _attach() {
+    _pager = widget.session.acquireCatalogueStores(_scope);
+    _shown = _pager.page;
+    _row = ScrollController(
+      initialScrollOffset: _pager.laneOffset(0),
+      keepScrollOffset: false,
+    )..addListener(_rememberRow);
+    _pager.addListener(_changed);
+    _schedule();
+    _scheduleExpiry();
+  }
+
+  void _rememberRow() {
+    if (!_restoring &&
+        _row.hasClients &&
+        _pager.query == widget.query &&
+        identical(_shown, _pager.page)) {
+      _pager.rememberLaneOffset(0, _row.offset.clamp(0.0, double.infinity));
+    }
+  }
+
+  void _schedule() {
+    final sequence = ++_sequence;
+    Future<void>.microtask(() async {
+      if (!mounted || sequence != _sequence) return;
+      if (_pager.query != widget.query ||
+          (_pager.page == null && !_pager.loading && _pager.message == null)) {
+        await _pager.open(widget.query);
+      }
+    });
+  }
+
+  void _scheduleExpiry() {
+    _expiry?.cancel();
+    final now = widget.session.catalogueNow();
+    Duration? earliest;
+    for (final original in _pager.page?.items ?? const <BuyV2StoreListing>[]) {
+      final store = widget.session.catalogueStore(original.id) ?? original;
+      final capability = store.collection;
+      if (capability?.isSupportedFor(store.id, now: now) != true) continue;
+      final remaining = capability!.validUntil.difference(now);
+      if (earliest == null || remaining < earliest) earliest = remaining;
+    }
+    if (earliest != null) {
+      _expiry = Timer(earliest, () {
+        if (!mounted) return;
+        setState(() {});
+        _scheduleExpiry();
+      });
+    }
+  }
+
+  void _changed() {
+    if (!mounted) return;
+    if (!identical(_shown, _pager.page)) {
+      _shown = _pager.page;
+      _restoring = true;
+      final page = _shown;
+      final offset = _pager.laneOffset(0);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !identical(page, _pager.page)) return;
+        if (_row.hasClients) {
+          _row.jumpTo(offset.clamp(0.0, _row.position.maxScrollExtent));
+        }
+        _restoring = false;
+      });
+    }
+    _scheduleExpiry();
+    setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(covariant _CatalogueStoreMatches oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session ||
+        oldWidget.query.destination != widget.query.destination) {
+      _detach(
+        oldWidget.session,
+        'store-search-${oldWidget.query.destination.name}',
+      );
+      _attach();
+    } else if (oldWidget.query != widget.query) {
+      _schedule();
+    }
+    _scheduleExpiry();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    setState(() {});
+    _scheduleExpiry();
+  }
+
+  void _detach(BuyV2Session session, String scope) {
+    _sequence++;
+    _expiry?.cancel();
+    _rememberRow();
+    _pager.removeListener(_changed);
+    _row.dispose();
+    session.releaseCatalogueStores(scope);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _detach(widget.session, _scope);
+    super.dispose();
+  }
+
+  String _location(BuyV2StoreListing store) {
+    final distance = store.distanceMeters;
+    final location = store.address.contains(store.area)
+        ? store.address
+        : '${store.area} · ${store.address}';
+    if (distance == null) return location;
+    return '$location · ${distance < 1000 ? '${distance.round()} m' : '${(distance / 1000).toStringAsFixed(1)} km'}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final page = _pager.query == widget.query ? _pager.page : null;
+    final loading = _pager.query != widget.query || _pager.loading;
+    final message = _pager.query == widget.query ? _pager.message : null;
+    final stores = [
+      for (final store in page?.items ?? const <BuyV2StoreListing>[])
+        widget.session.catalogueStore(store.id) ?? store,
+    ];
+    if (!loading && message == null && stores.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final scaler = MediaQuery.textScalerOf(context);
+    final width = MediaQuery.sizeOf(context).width < 400 ? 230.0 : 280.0;
+    final titleStyle = context.buyBody.copyWith(fontWeight: FontWeight.w900);
+    final detailStyle = context.buyMeta;
+    final actionStyle = detailStyle.copyWith(fontWeight: FontWeight.w800);
+    final now = widget.session.catalogueNow();
+    double heightFor(BuyV2StoreListing store) {
+      double measure(String text, TextStyle style) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: style),
+          textDirection: Directionality.of(context),
+          textScaler: scaler,
+        )..layout(maxWidth: width - 24);
+        final height = painter.height;
+        painter.dispose();
+        return height;
+      }
+
+      return 34 +
+          measure(store.name, titleStyle) +
+          measure(_location(store), detailStyle) +
+          measure(
+            store.previewProduct == null
+                ? 'Products unavailable'
+                : store.collection?.isSupportedFor(store.id, now: now) == true
+                ? 'Collect at store'
+                : 'View store',
+            actionStyle,
+          );
+    }
+
+    final height = stores.fold<double>(44, (value, store) {
+      final candidate = heightFor(store);
+      return candidate > value ? candidate : value;
+    });
+    return Column(
+      key: ValueKey(
+        'buy-store-search-results-${widget.query.destination.name}',
+      ),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _CataloguePageControls(
+          scopeKey: _scope,
+          noun: 'stores',
+          start: page?.startIndex,
+          count: stores.length,
+          total: page?.totalCount,
+          loading: loading,
+          onPrevious: !loading && page?.previousCursor != null
+              ? _pager.previous
+              : null,
+          onNext: !loading && page?.nextCursor != null ? _pager.next : null,
+          onRefresh: loading ? null : _pager.refresh,
+        ),
+        if (loading) const LinearProgressIndicator(minHeight: 2),
+        if (message != null)
+          _CataloguePageNotice(
+            title: 'Stores could not refresh',
+            detail: message,
+            action: 'Try stores again',
+            onAction: loading ? null : _pager.retry,
+          ),
+        if (stores.isNotEmpty)
+          SizedBox(
+            height: height,
+            child: ListView.separated(
+              key: ValueKey(
+                'buy-store-search-row-${widget.query.destination.name}',
+              ),
+              controller: _row,
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              itemCount: stores.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final store = stores[index];
+                final product = store.previewProduct;
+                final collect =
+                    store.collection?.isSupportedFor(store.id, now: now) ==
+                    true;
+                return SizedBox(
+                  width: width,
+                  child: BuyV2CartAvoidanceRegion(
+                    child: Material(
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        side: const BorderSide(color: BuyV2Colors.line),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        key: ValueKey('buy-store-search-open-${store.id}'),
+                        onTap: product == null
+                            ? null
+                            : () => widget.onOpenStore(product),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(store.name, style: titleStyle),
+                              const SizedBox(height: 3),
+                              Text(_location(store), style: detailStyle),
+                              const SizedBox(height: 5),
+                              Text(
+                                product == null
+                                    ? 'Products unavailable'
+                                    : collect
+                                    ? 'Collect at store'
+                                    : 'View store',
+                                style: actionStyle.copyWith(
+                                  color: collect
+                                      ? BuyV2Colors.green
+                                      : BuyV2Colors.navy,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
 class BuyV2SearchResultsView extends StatelessWidget {
-  const BuyV2SearchResultsView({super.key, required this.session});
+  const BuyV2SearchResultsView({
+    super.key,
+    required this.session,
+    this.onOpenStore,
+  });
 
   final BuyV2Session session;
+  final ValueChanged<BuyV2Product>? onOpenStore;
 
   @override
   Widget build(BuildContext context) {
@@ -1861,6 +2177,13 @@ class BuyV2SearchResultsView extends StatelessWidget {
         session: session,
         query: session.catalogueQuery(),
         scopeKey: 'search-${session.destination.name}',
+        header: onOpenStore == null
+            ? null
+            : _CatalogueStoreMatches(
+                session: session,
+                query: session.catalogueQuery(),
+                onOpenStore: onOpenStore!,
+              ),
         usePrimaryScrollController:
             MediaQuery.sizeOf(context).width >
                 MediaQuery.sizeOf(context).height &&
@@ -4192,7 +4515,16 @@ Future<void> showBuyV2PartnerCatalogue(
       !brandOnly &&
       (current.destination == BuyV2Destination.shop ||
           current.destination == BuyV2Destination.wholesale);
+  final pagedPartner =
+      publicPartner && session.pagedCatalogueEnabled && current.storeId != null;
+  final canViewAll = !brandOnly && (pagedPartner || products.length > 1);
   if (!supportedDestination || (products.isEmpty && !publicPartner)) return;
+  if (pagedPartner) {
+    session.retainCatalogueStoreBrowse(current);
+    unawaited(
+      session.refreshCatalogueStore(current.storeId!, current.destination),
+    );
+  }
   final previewProducts = products.take(6).toList(growable: false);
   final storeTrust = session.marketplaceTrustFor(current);
   final storeFulfilment = publicPartner
@@ -4337,12 +4669,12 @@ Future<void> showBuyV2PartnerCatalogue(
                                 child: Material(
                                   color: Colors.transparent,
                                   child: InkWell(
-                                    key: !brandOnly && products.length > 1
+                                    key: canViewAll
                                         ? ValueKey(
                                             '$ownerPrefix-view-more-${current.id}',
                                           )
                                         : null,
-                                    onTap: !brandOnly && products.length > 1
+                                    onTap: canViewAll
                                         ? () => unawaited(
                                             openFullStoreCatalogue(
                                               sheetContext,
@@ -4371,7 +4703,7 @@ Future<void> showBuyV2PartnerCatalogue(
                                                 ),
                                           ),
                                           const SizedBox(height: 2),
-                                          if (!brandOnly && products.length > 1)
+                                          if (canViewAll)
                                             Row(
                                               key: ValueKey(
                                                 '$ownerPrefix-view-more-visible-${current.id}',
@@ -4386,7 +4718,9 @@ Future<void> showBuyV2PartnerCatalogue(
                                                 const SizedBox(width: 4),
                                                 Flexible(
                                                   child: Text(
-                                                    '${products.length} ${current.destination == BuyV2Destination.wholesale ? 'packs' : 'products'} · View all',
+                                                    pagedPartner
+                                                        ? 'Browse all products'
+                                                        : '${products.length} ${current.destination == BuyV2Destination.wholesale ? 'packs' : 'products'} · View all',
                                                     overflow: TextOverflow.clip,
                                                     style: sheetContext.buyMeta
                                                         .copyWith(
@@ -4448,7 +4782,15 @@ Future<void> showBuyV2PartnerCatalogue(
                             ),
                             const SizedBox(height: 8),
                           ],
-                          if (previewProducts.isEmpty)
+                          if (pagedPartner)
+                            _PagedPublicStorePreview(
+                              session: session,
+                              product: current,
+                              onOpenProduct: (product) => unawaited(
+                                openStoreProduct(sheetContext, product),
+                              ),
+                            )
+                          else if (previewProducts.isEmpty)
                             const _PublicStoreNoProductsState()
                           else
                             BuyV2ProgressiveProductGrid(
@@ -4510,6 +4852,16 @@ Future<void> showBuyV2PartnerCatalogue(
                                             '$ownerPrefix-other-store-${otherStores[index].id}',
                                           ),
                                           product: otherStores[index],
+                                          branchAddress:
+                                              otherStores[index].storeId == null
+                                              ? null
+                                              : session
+                                                        .catalogueStore(
+                                                          otherStores[index]
+                                                              .storeId!,
+                                                        )
+                                                        ?.address ??
+                                                    otherStores[index].origin,
                                           onTap: () {
                                             onStoreChanged?.call(
                                               otherStores[index],
@@ -5246,6 +5598,304 @@ class BuyV2StoreCartBar extends StatelessWidget {
   }
 }
 
+class _PagedPublicStorePreview extends StatefulWidget {
+  const _PagedPublicStorePreview({
+    required this.session,
+    required this.product,
+    required this.onOpenProduct,
+  });
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final ValueChanged<BuyV2Product> onOpenProduct;
+
+  @override
+  State<_PagedPublicStorePreview> createState() =>
+      _PagedPublicStorePreviewState();
+}
+
+class _PagedPublicStorePreviewState extends State<_PagedPublicStorePreview> {
+  late BuyV2CataloguePager<BuyV2Product> _pager;
+  int _sequence = 0;
+  String get _scope =>
+      'store-preview-${widget.product.destination.name}-${widget.product.storeId}';
+  BuyV2CatalogueQuery get _query => widget.session.catalogueQuery(
+    storeId: widget.product.storeId,
+    catalogueDestination: widget.product.destination,
+    search: '',
+    categoryId: 'all',
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _attach();
+  }
+
+  void _attach() {
+    _pager = widget.session.acquireCatalogueProducts(_scope);
+    _pager.addListener(_changed);
+    _schedule();
+  }
+
+  void _schedule() {
+    final sequence = ++_sequence;
+    Future<void>.microtask(() async {
+      if (!mounted || sequence != _sequence) return;
+      if (_pager.query != _query ||
+          (_pager.page == null && !_pager.loading && _pager.message == null)) {
+        await _pager.open(_query);
+      }
+    });
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  void _detach(BuyV2Session session, String scope) {
+    _sequence++;
+    _pager.removeListener(_changed);
+    session.releaseCatalogueProducts(scope);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PagedPublicStorePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session ||
+        oldWidget.product.storeId != widget.product.storeId ||
+        oldWidget.product.destination != widget.product.destination) {
+      _detach(
+        oldWidget.session,
+        'store-preview-${oldWidget.product.destination.name}-${oldWidget.product.storeId}',
+      );
+      _attach();
+    } else {
+      _schedule();
+    }
+  }
+
+  @override
+  void dispose() {
+    _detach(widget.session, _scope);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final page = _pager.query == _query ? _pager.page : null;
+    final loading = _pager.query != _query || _pager.loading;
+    final message = _pager.query == _query ? _pager.message : null;
+    final products =
+        page?.items.take(6).toList(growable: false) ?? const <BuyV2Product>[];
+    return Column(
+      key: ValueKey('buy-store-source-preview-${widget.product.storeId}'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (loading) const LinearProgressIndicator(minHeight: 2),
+        if (message != null)
+          _CataloguePageNotice(
+            title: 'Store products could not load',
+            detail: message,
+            action: 'Try products again',
+            onAction: loading ? null : _pager.retry,
+          ),
+        if (!loading && message == null && products.isEmpty)
+          const _PublicStoreNoProductsState(),
+        if (products.isNotEmpty)
+          BuyV2ProgressiveProductGrid(
+            session: widget.session,
+            products: products,
+            storageKey: _scope,
+            semanticLabel: '${widget.product.seller} product catalogue preview',
+            laneCount: 1,
+            storeContext: true,
+            onOpenProduct: widget.onOpenProduct,
+          ),
+      ],
+    );
+  }
+}
+
+class _PagedFullStoreCatalogue extends StatefulWidget {
+  const _PagedFullStoreCatalogue({
+    required this.session,
+    required this.product,
+    required this.onOpenProduct,
+    required this.onClose,
+  });
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final ValueChanged<BuyV2Product> onOpenProduct;
+  final VoidCallback onClose;
+
+  @override
+  State<_PagedFullStoreCatalogue> createState() =>
+      _PagedFullStoreCatalogueState();
+}
+
+class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
+  late TextEditingController _search;
+  String _category = 'all';
+  String get _scope =>
+      'store-${widget.product.destination.name}-${widget.product.storeId}';
+
+  @override
+  void initState() {
+    super.initState();
+    final retained = widget.session.retainedCatalogueQuery(_scope);
+    final sameStore = retained?.storeId == widget.product.storeId;
+    _category = sameStore ? retained?.categoryId ?? 'all' : 'all';
+    _search = TextEditingController(
+      text: sameStore ? retained?.query ?? '' : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _chooseCategory() async {
+    FocusScope.of(context).unfocus();
+    final categories = widget.session.categoriesFor(widget.product.destination);
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      builder: (sheetContext) => FractionallySizedBox(
+        heightFactor: .8,
+        child: BuyV2VerticalScrollIndicator(
+          child: ListView(
+            key: const ValueKey('buy-store-category-list'),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Store categories', style: context.buyTitle),
+                  ),
+                  IconButton(
+                    tooltip: 'Close store categories',
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              ListTile(
+                key: const ValueKey('buy-store-category-all'),
+                selected: _category == 'all',
+                title: const Text('All products'),
+                onTap: () => Navigator.of(sheetContext).pop('all'),
+              ),
+              for (final category in categories.where(
+                (value) => value.id != 'all',
+              ))
+                ListTile(
+                  key: ValueKey('buy-store-category-${category.id}'),
+                  selected: _category == category.id,
+                  title: Text(category.label),
+                  onTap: () => Navigator.of(sheetContext).pop(category.id),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (choice != null && mounted) setState(() => _category = choice);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.product;
+    final store = widget.session.catalogueStore(product.storeId!);
+    final category = widget.session
+        .categoriesFor(product.destination)
+        .where((value) => value.id == _category)
+        .firstOrNull;
+    return BuyV2PagedProductCatalogue(
+      session: widget.session,
+      scopeKey: _scope,
+      storeContext: true,
+      query: widget.session.catalogueQuery(
+        storeId: product.storeId,
+        catalogueDestination: product.destination,
+        search: _search.text,
+        categoryId: _category,
+      ),
+      onOpenProduct: widget.onOpenProduct,
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            BuyV2AdaptiveIdentityRow(
+              leading: const Icon(
+                Icons.storefront_outlined,
+                color: BuyV2Colors.navy,
+              ),
+              body: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    store?.name ?? product.seller,
+                    key: const ValueKey('buy-paged-store-name'),
+                    style: context.buyTitle.copyWith(fontSize: 16),
+                  ),
+                  Text(
+                    store?.address ?? product.origin,
+                    style: context.buyMeta,
+                  ),
+                ],
+              ),
+              trailing: IconButton.outlined(
+                key: const ValueKey('buy-paged-store-close'),
+                tooltip: 'Close full store catalogue',
+                onPressed: widget.onClose,
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              key: const ValueKey('buy-store-product-search'),
+              controller: _search,
+              maxLength: 80,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: 'Search this store',
+                counterText: '',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: _search.text.isEmpty
+                    ? null
+                    : IconButton(
+                        key: const ValueKey('buy-store-product-search-clear'),
+                        tooltip: 'Clear store search',
+                        onPressed: () => setState(_search.clear),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => FocusScope.of(context).unfocus(),
+            ),
+            TextButton.icon(
+              key: const ValueKey('buy-store-category-control'),
+              onPressed: _chooseCategory,
+              icon: const Icon(Icons.category_outlined, size: 18),
+              label: Text(
+                _category == 'all'
+                    ? 'All products'
+                    : category?.label ?? 'Choose category',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 Future<String?> _showBuyV2FullStoreCatalogue(
   BuildContext context,
   BuyV2Session session,
@@ -5282,84 +5932,106 @@ Future<String?> _showBuyV2FullStoreCatalogue(
     ),
     builder: (sheetContext) => AnimatedBuilder(
       animation: session,
-      builder: (context, _) => FractionallySizedBox(
-        key: ValueKey('$ownerPrefix-full-catalogue-sheet'),
-        heightFactor: .98,
-        child: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  key: ValueKey('$ownerPrefix-full-catalogue-list'),
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 18),
-                  children: [
-                    BuyV2AdaptiveIdentityRow(
-                      spacing: 10,
-                      leading: const SizedBox.square(
-                        dimension: 44,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: BuyV2Colors.softOrange,
-                            borderRadius: BorderRadius.all(Radius.circular(14)),
-                          ),
-                          child: Icon(
-                            Icons.storefront_rounded,
-                            color: BuyV2Colors.navy,
-                          ),
-                        ),
-                      ),
-                      body: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            current.seller,
-                            style: sheetContext.buyTitle.copyWith(fontSize: 18),
-                          ),
-                          Text(
-                            '${_sellerTypeLabel(current.sellerType)} · ${products.length} available products',
-                            style: sheetContext.buyMeta.copyWith(
-                              color: BuyV2Colors.green,
-                              fontWeight: FontWeight.w900,
+      builder: (context, _) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: FractionallySizedBox(
+          key: ValueKey('$ownerPrefix-full-catalogue-sheet'),
+          heightFactor: .98,
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                Expanded(
+                  child:
+                      session.pagedCatalogueEnabled && current.storeId != null
+                      ? _PagedFullStoreCatalogue(
+                          session: session,
+                          product: current,
+                          onOpenProduct: (product) =>
+                              unawaited(openProduct(sheetContext, product)),
+                          onClose: () => Navigator.of(sheetContext).pop(),
+                        )
+                      : ListView(
+                          key: ValueKey('$ownerPrefix-full-catalogue-list'),
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 18),
+                          children: [
+                            BuyV2AdaptiveIdentityRow(
+                              spacing: 10,
+                              leading: const SizedBox.square(
+                                dimension: 44,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: BuyV2Colors.softOrange,
+                                    borderRadius: BorderRadius.all(
+                                      Radius.circular(14),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.storefront_rounded,
+                                    color: BuyV2Colors.navy,
+                                  ),
+                                ),
+                              ),
+                              body: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    current.seller,
+                                    style: sheetContext.buyTitle.copyWith(
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${_sellerTypeLabel(current.sellerType)} · ${products.length} available products',
+                                    style: sheetContext.buyMeta.copyWith(
+                                      color: BuyV2Colors.green,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              trailing: IconButton.outlined(
+                                key: ValueKey(
+                                  '$ownerPrefix-full-catalogue-close',
+                                ),
+                                onPressed: () =>
+                                    Navigator.of(sheetContext).pop(),
+                                tooltip: 'Close full store catalogue',
+                                icon: const Icon(Icons.close_rounded),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      trailing: IconButton.outlined(
-                        key: ValueKey('$ownerPrefix-full-catalogue-close'),
-                        onPressed: () => Navigator.of(sheetContext).pop(),
-                        tooltip: 'Close full store catalogue',
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    BuyV2ProgressiveProductGrid(
+                            const SizedBox(height: 10),
+                            BuyV2ProgressiveProductGrid(
+                              session: session,
+                              products: products,
+                              storageKey:
+                                  '$ownerPrefix-full-catalogue-${current.seller}',
+                              semanticLabel:
+                                  '${current.seller} full product catalogue',
+                              laneCount: products.length >= 6 ? 2 : 1,
+                              storeContext: true,
+                              onOpenProduct: (product) =>
+                                  unawaited(openProduct(sheetContext, product)),
+                            ),
+                          ],
+                        ),
+                ),
+                if (session.countForDestination(current.destination) > 0)
+                  BuyV2FiniteIncomingTransition(
+                    stateKey:
+                        '$ownerPrefix-full-catalogue-cart-${session.itemCount}',
+                    child: BuyV2StoreCartBar(
                       session: session,
-                      products: products,
-                      storageKey:
-                          '$ownerPrefix-full-catalogue-${current.seller}',
-                      semanticLabel: '${current.seller} full product catalogue',
-                      laneCount: products.length >= 6 ? 2 : 1,
-                      storeContext: true,
-                      onOpenProduct: (product) =>
-                          unawaited(openProduct(sheetContext, product)),
+                      destination: current.destination,
+                      onOpenCart:
+                          onOpenCart ??
+                          () => Navigator.of(sheetContext).pop('cart:'),
                     ),
-                  ],
-                ),
-              ),
-              if (session.countForDestination(current.destination) > 0)
-                BuyV2FiniteIncomingTransition(
-                  stateKey:
-                      '$ownerPrefix-full-catalogue-cart-${session.itemCount}',
-                  child: BuyV2StoreCartBar(
-                    session: session,
-                    destination: current.destination,
-                    onOpenCart:
-                        onOpenCart ??
-                        () => Navigator.of(sheetContext).pop('cart:'),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -5371,11 +6043,13 @@ class _RelatedStoreCard extends StatelessWidget {
   const _RelatedStoreCard({
     required this.product,
     required this.onTap,
+    this.branchAddress,
     super.key,
   });
 
   final BuyV2Product product;
   final VoidCallback onTap;
+  final String? branchAddress;
 
   @override
   Widget build(BuildContext context) {
@@ -5484,6 +6158,18 @@ class _RelatedStoreCard extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
+                  if (branchAddress?.trim().isNotEmpty == true)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3, bottom: 3),
+                      child: Text(
+                        branchAddress!,
+                        key: ValueKey('buy-related-store-branch-${product.id}'),
+                        style: context.buyMeta.copyWith(
+                          fontSize: 9.5,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 1),
                   Text(
                     '${product.title} · ${product.pack}',

@@ -1011,6 +1011,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                                       BuyV2Destination.orders
                                             ? BuyV2SearchResultsView(
                                                 session: session,
+                                                onOpenStore:
+                                                    _openPartnerCatalogue,
                                               )
                                             : _currentView(session),
                                       ),
@@ -1745,6 +1747,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   void _rememberStoreBrowse(BuyV2Product product) {
+    widget.session.retainCatalogueStoreBrowse(product);
     setState(() {
       _storeBrowseAnchors.remove(product.destination);
       _storeBrowseAnchors[product.destination] = product;
@@ -1817,8 +1820,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     bool cartEntry = false,
   }) async {
     final session = widget.session;
-    if (_storeBrowseAnchor?.seller != product.seller ||
-        _storeBrowseAnchor?.destination != product.destination) {
+    if (_storeBrowseAnchor?.isFromSameStoreAs(product) != true) {
       _rememberStoreBrowse(product);
     }
     final restoreOrigin = session.beginStoreNavigationVisit();
@@ -2083,7 +2085,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       );
     }
     return switch (session.view) {
-      BuyV2View.catalogue => BuyV2CatalogueView(session: session),
+      BuyV2View.catalogue => BuyV2CatalogueView(
+        session: session,
+        onOpenStore: _openPartnerCatalogue,
+      ),
       BuyV2View.product => BuyV2ProductView(
         session: session,
         scrollController: _rootProductScrollController,
@@ -2603,7 +2608,14 @@ class _BuySearchBand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hint = offersActive
+    final storeSearch =
+        session.pagedCatalogueEnabled &&
+        !offersActive &&
+        (session.destination == BuyV2Destination.shop ||
+            session.destination == BuyV2Destination.wholesale);
+    final hint = storeSearch
+        ? 'Search stores or products'
+        : offersActive
         ? 'Search offers, products and sellers'
         : switch (session.destination) {
             BuyV2Destination.wholesale => 'Search bulk products and suppliers',
@@ -2611,7 +2623,9 @@ class _BuySearchBand extends StatelessWidget {
             BuyV2Destination.orders => 'Search orders, sellers or ID',
             _ => 'Search products, brands and codes',
           };
-    final compactHint = offersActive
+    final compactHint = storeSearch
+        ? 'Stores or products'
+        : offersActive
         ? 'Search current offers'
         : switch (session.destination) {
             BuyV2Destination.wholesale => 'Search bulk products',
@@ -2628,222 +2642,264 @@ class _BuySearchBand extends StatelessWidget {
       BuyV2Motion.expandCollapse,
     );
     final theme = BuyV2ThemeScope.of(context);
-    return AnimatedContainer(
-      key: const ValueKey('buy-search-band'),
-      duration: expandCollapseDuration,
-      curve: Curves.easeOutCubic,
-      height: open ? (longQuery ? longQueryBandHeight : 82) : 56,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: theme.canvas,
-        border: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: AnimatedContainer(
-              key: const ValueKey('buy-search-control'),
-              duration: expandCollapseDuration,
-              curve: Curves.easeOutCubic,
-              height: open ? (longQuery ? longQueryControlHeight : 70) : 44,
-              decoration: const BoxDecoration(color: Colors.transparent),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final hintStyle =
-                            (open
-                                    ? Theme.of(context).textTheme.bodyLarge!
-                                    : DefaultTextStyle.of(context).style)
-                                .copyWith(
-                                  fontSize: open ? 12 : 11,
-                                  fontWeight: open
-                                      ? FontWeight.w600
-                                      : FontWeight.w700,
-                                );
-                        final painter = TextPainter(
-                          text: TextSpan(text: compactHint, style: hintStyle),
-                          textDirection: Directionality.of(context),
-                          textScaler: MediaQuery.textScalerOf(context),
-                          locale: Localizations.maybeLocaleOf(context),
-                        )..layout();
-                        final visibleHint =
-                            painter.width <=
-                                constraints.maxWidth - (open ? 42 : 54)
-                            ? compactHint
-                            : 'Search';
-                        painter.dispose();
-                        return open
-                            ? TextField(
-                                key: const ValueKey('buy-search-field'),
-                                controller: controller,
-                                autofocus: true,
-                                onChanged: session.updateQuery,
-                                textInputAction: TextInputAction.search,
-                                minLines: 1,
-                                maxLines: 6,
-                                textAlignVertical: longQuery
-                                    ? TextAlignVertical.top
-                                    : TextAlignVertical.center,
-                                style: const TextStyle(
-                                  color: BuyV2Colors.ink,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: visibleHint,
-                                  hintMaxLines: 1,
-                                  hintStyle: const TextStyle(
-                                    color: BuyV2Colors.muted,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  border: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                  disabledBorder: InputBorder.none,
-                                  errorBorder: InputBorder.none,
-                                  focusedErrorBorder: InputBorder.none,
-                                  filled: false,
-                                  isDense: true,
-                                  prefixIcon: const Icon(
-                                    Icons.search_rounded,
-                                    color: BuyV2Colors.navy,
-                                    size: 21,
-                                  ),
-                                  prefixIconConstraints: const BoxConstraints(
-                                    minWidth: 42,
-                                    minHeight: 46,
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 10,
-                                  ),
-                                ),
-                                onSubmitted: (value) {
-                                  session.submitSearch(value);
-                                  FocusScope.of(context).unfocus();
-                                },
-                              )
-                            : Semantics(
-                                label: hint,
-                                button: true,
-                                child: InkWell(
-                                  onTap: () {
-                                    HapticFeedback.selectionClick();
-                                    onOpenChanged(true);
-                                  },
-                                  borderRadius: BorderRadius.circular(13),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.search_rounded,
-                                          color: BuyV2Colors.navy,
-                                          size: 21,
-                                        ),
-                                        const SizedBox(width: 9),
-                                        Expanded(
-                                          child: Text(
-                                            session.query.isEmpty
-                                                ? visibleHint
-                                                : session.query,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: session.query.isEmpty
-                                                  ? BuyV2Colors.muted
-                                                  : BuyV2Colors.ink,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                      },
-                    ),
-                  ),
-                  if (open && controller.text.isNotEmpty)
-                    IconButton(
-                      key: const ValueKey('buy-search-clear'),
-                      tooltip: 'Clear search',
-                      onPressed: () {
-                        controller.clear();
-                        session.updateQuery('');
-                      },
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                      color: BuyV2Colors.muted,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 44,
-                        height: 44,
-                      ),
-                      padding: EdgeInsets.zero,
-                    ),
-                  if (open)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 3),
-                      child: IconButton(
-                        key: const ValueKey('buy-search-close'),
-                        tooltip: 'Finish search',
-                        onPressed: () {
-                          if (controller.text.trim().isNotEmpty) {
-                            session.submitSearch(controller.text);
-                          }
-                          FocusScope.of(context).unfocus();
-                          onOpenChanged(false);
-                        },
-                        icon: const Icon(Icons.check_rounded, size: 21),
-                        color: BuyV2Colors.navy,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 44,
-                          height: 44,
-                        ),
-                        padding: EdgeInsets.zero,
-                      ),
-                    ),
-                ],
+    return LayoutBuilder(
+      builder: (context, bandConstraints) {
+        var queryControlHeight = longQuery ? longQueryControlHeight : 70.0;
+        if (open && !longQuery && controller.text.isNotEmpty) {
+          final queryWidth =
+              (bandConstraints.maxWidth -
+                      16 -
+                      46 -
+                      51 -
+                      48 -
+                      (trailingAction == null ? 0 : 44) -
+                      2)
+                  .clamp(1.0, double.infinity);
+          final queryPainter = TextPainter(
+            text: TextSpan(
+              text: controller.text,
+              style: Theme.of(context).textTheme.bodyLarge!.merge(
+                const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
               ),
             ),
+            maxLines: 6,
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+            locale: Localizations.maybeLocaleOf(context),
+          )..layout(maxWidth: queryWidth);
+          queryControlHeight = (queryPainter.height + 24).ceilToDouble().clamp(
+            70.0,
+            longQueryControlHeight,
+          );
+          queryPainter.dispose();
+        }
+        return AnimatedContainer(
+          key: const ValueKey('buy-search-band'),
+          duration: expandCollapseDuration,
+          curve: Curves.easeOutCubic,
+          height: open
+              ? (longQuery ? longQueryBandHeight : queryControlHeight + 12)
+              : 56,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: BoxDecoration(
+            color: theme.canvas,
+            border: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
           ),
-          if (!open) ...[
-            const SizedBox(width: 6),
-            Material(
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: BuyV2Colors.line),
-              ),
-              child: IconButton(
-                key: const ValueKey('buy-change-location'),
-                tooltip: session.pagedCatalogueEnabled
-                    ? 'Choose shopping area'
-                    : 'Change delivery location',
-                onPressed: onLocation,
-                icon: const Icon(Icons.location_on_outlined, size: 22),
-                color: BuyV2Colors.navy,
-                constraints: const BoxConstraints.tightFor(
-                  width: 44,
-                  height: 44,
+          child: Row(
+            children: [
+              Expanded(
+                child: AnimatedContainer(
+                  key: const ValueKey('buy-search-control'),
+                  duration: expandCollapseDuration,
+                  curve: Curves.easeOutCubic,
+                  height: open ? queryControlHeight : 44,
+                  // A short store name can wrap at large text sizes. Let the
+                  // measured field determine its finite animated height.
+                  decoration: const BoxDecoration(color: Colors.transparent),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final hintStyle =
+                                (open
+                                        ? Theme.of(context).textTheme.bodyLarge!
+                                        : DefaultTextStyle.of(context).style)
+                                    .copyWith(
+                                      fontSize: open ? 12 : 11,
+                                      fontWeight: open
+                                          ? FontWeight.w600
+                                          : FontWeight.w700,
+                                    );
+                            final painter = TextPainter(
+                              text: TextSpan(
+                                text: compactHint,
+                                style: hintStyle,
+                              ),
+                              textDirection: Directionality.of(context),
+                              textScaler: MediaQuery.textScalerOf(context),
+                              locale: Localizations.maybeLocaleOf(context),
+                            )..layout();
+                            final visibleHint =
+                                painter.width <=
+                                    constraints.maxWidth - (open ? 42 : 54)
+                                ? compactHint
+                                : 'Search';
+                            painter.dispose();
+                            return open
+                                ? TextField(
+                                    key: const ValueKey('buy-search-field'),
+                                    controller: controller,
+                                    autofocus: true,
+                                    onChanged: session.updateQuery,
+                                    textInputAction: TextInputAction.search,
+                                    minLines: 1,
+                                    maxLines: 6,
+                                    textAlignVertical: longQuery
+                                        ? TextAlignVertical.top
+                                        : TextAlignVertical.center,
+                                    style: const TextStyle(
+                                      color: BuyV2Colors.ink,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: visibleHint,
+                                      hintMaxLines: 1,
+                                      hintStyle: const TextStyle(
+                                        color: BuyV2Colors.muted,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      disabledBorder: InputBorder.none,
+                                      errorBorder: InputBorder.none,
+                                      focusedErrorBorder: InputBorder.none,
+                                      filled: false,
+                                      isDense: true,
+                                      prefixIcon: const Icon(
+                                        Icons.search_rounded,
+                                        color: BuyV2Colors.navy,
+                                        size: 21,
+                                      ),
+                                      prefixIconConstraints:
+                                          const BoxConstraints(
+                                            minWidth: 42,
+                                            minHeight: 46,
+                                          ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            vertical: 10,
+                                          ),
+                                    ),
+                                    onSubmitted: (value) {
+                                      session.submitSearch(value);
+                                      FocusScope.of(context).unfocus();
+                                    },
+                                  )
+                                : Semantics(
+                                    label: hint,
+                                    button: true,
+                                    child: InkWell(
+                                      onTap: () {
+                                        HapticFeedback.selectionClick();
+                                        onOpenChanged(true);
+                                      },
+                                      borderRadius: BorderRadius.circular(13),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.search_rounded,
+                                              color: BuyV2Colors.navy,
+                                              size: 21,
+                                            ),
+                                            const SizedBox(width: 9),
+                                            Expanded(
+                                              child: Text(
+                                                session.query.isEmpty
+                                                    ? visibleHint
+                                                    : session.query,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: session.query.isEmpty
+                                                      ? BuyV2Colors.muted
+                                                      : BuyV2Colors.ink,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                          },
+                        ),
+                      ),
+                      if (open && controller.text.isNotEmpty)
+                        IconButton(
+                          key: const ValueKey('buy-search-clear'),
+                          tooltip: 'Clear search',
+                          onPressed: () {
+                            controller.clear();
+                            session.updateQuery('');
+                          },
+                          icon: const Icon(Icons.close_rounded, size: 20),
+                          color: BuyV2Colors.muted,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 44,
+                            height: 44,
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                      if (open)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 3),
+                          child: IconButton(
+                            key: const ValueKey('buy-search-close'),
+                            tooltip: 'Finish search',
+                            onPressed: () {
+                              if (controller.text.trim().isNotEmpty) {
+                                session.submitSearch(controller.text);
+                              }
+                              FocusScope.of(context).unfocus();
+                              onOpenChanged(false);
+                            },
+                            icon: const Icon(Icons.check_rounded, size: 21),
+                            color: BuyV2Colors.navy,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 44,
+                              height: 44,
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-                padding: EdgeInsets.zero,
               ),
-            ),
-            const SizedBox(width: 4),
-            MoolGlobalProfileShortcutV2(
-              keyName: 'buy-open-account',
-              onPressed: onAccount,
-            ),
-          ],
-          ?trailingAction,
-        ],
-      ),
+              if (!open) ...[
+                const SizedBox(width: 6),
+                Material(
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: BuyV2Colors.line),
+                  ),
+                  child: IconButton(
+                    key: const ValueKey('buy-change-location'),
+                    tooltip: session.pagedCatalogueEnabled
+                        ? 'Choose shopping area'
+                        : 'Change delivery location',
+                    onPressed: onLocation,
+                    icon: const Icon(Icons.location_on_outlined, size: 22),
+                    color: BuyV2Colors.navy,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 44,
+                      height: 44,
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                MoolGlobalProfileShortcutV2(
+                  keyName: 'buy-open-account',
+                  onPressed: onAccount,
+                ),
+              ],
+              ?trailingAction,
+            ],
+          ),
+        );
+      },
     );
   }
 }

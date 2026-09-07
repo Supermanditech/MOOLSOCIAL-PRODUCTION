@@ -22,6 +22,359 @@ void main() {
       for (final scale in [1.0, 2.0]) {
         final profile =
             '${destination.name}-${size.width.toInt()}x${size.height.toInt()}-$scale';
+        testWidgets('R5 store-first catalogue journey $profile', (
+          tester,
+        ) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+          tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+          addTearDown(tester.view.reset);
+          final source = _StoreJourneySource(destination);
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            reviewDataEnabled: true,
+            cataloguePageSource: source,
+            catalogueAreas: const {'jodhpur': 'Jodhpur', 'mumbai': 'Mumbai'},
+            initialCatalogueRegionId: 'jodhpur',
+          )..destination = destination;
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await tester.pumpWidget(_app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+          final rootScope = 'catalogue-${destination.name}';
+          final searchControl = find.byKey(
+            const ValueKey('buy-search-control'),
+          );
+          await _revealPagedHeader(tester, rootScope, searchControl);
+          await tester.tap(searchControl);
+          await tester.pumpAndSettle();
+          final searchField = find.byKey(const ValueKey('buy-search-field'));
+          await tester.enterText(searchField, 'Mool Market');
+          await tester.pumpAndSettle();
+          await _revealPagedHeader(
+            tester,
+            'search-${destination.name}',
+            searchField,
+          );
+          final editable = tester
+              .state<EditableTextState>(
+                find.descendant(
+                  of: searchField,
+                  matching: find.byType(EditableText),
+                ),
+              )
+              .renderEditable;
+          final queryBoxes = editable.getBoxesForSelection(
+            const TextSelection(baseOffset: 0, extentOffset: 11),
+          );
+          expect(queryBoxes, isNotEmpty);
+          for (final box in queryBoxes) {
+            expect(
+              box.top,
+              greaterThanOrEqualTo(-.1),
+              reason:
+                  'Rendered query ${editable.size}; '
+                  'offset ${editable.offset.pixels}; '
+                  'field ${tester.getSize(searchField)}; '
+                  'control ${tester.getSize(searchControl)}; '
+                  'style ${editable.text?.style}',
+            );
+            expect(box.bottom, lessThanOrEqualTo(editable.size.height + .1));
+          }
+          final storeRange = find.byKey(
+            ValueKey('buy-page-range-store-search-${destination.name}'),
+          );
+          expect(tester.widget<Text>(storeRange).data, '1–40 of 10,000 stores');
+          expect(source.storeQueries.last.query, 'Mool Market');
+          await captureR66Visual(tester, 'r5-store-$profile-search-open');
+          final finish = find.byKey(const ValueKey('buy-search-close'));
+          await _revealPagedHeader(
+            tester,
+            'search-${destination.name}',
+            finish,
+          );
+          final storeRequests = source.storeQueries.length;
+          await tester.tap(finish);
+          await tester.pumpAndSettle();
+          expect(source.storeQueries.length, storeRequests);
+          expect(tester.widget<Text>(storeRange).data, '1–40 of 10,000 stores');
+          expect(session.query, 'Mool Market');
+
+          final firstStoreId = source.storeIdAt(0);
+          final firstProductId = source.productIdAt(0, 0);
+          final firstStore = find.byKey(
+            ValueKey('buy-store-search-open-$firstStoreId'),
+          );
+          final firstName = find.descendant(
+            of: firstStore,
+            matching: find.text('Mool Market'),
+          );
+          await tester.ensureVisible(firstName);
+          await tester.pumpAndSettle();
+          expect(firstName.hitTestable(), findsOneWidget);
+          await tester.tap(firstName);
+          await tester.pumpAndSettle();
+          expect(
+            tester
+                .widget<Text>(
+                  find.byKey(const ValueKey('buy-public-store-name')),
+                )
+                .data,
+            'Mool Market',
+          );
+          expect(
+            find.byKey(const ValueKey('buy-public-store-collection-benefit')),
+            findsOneWidget,
+          );
+          expect(
+            session.partnerCatalogueFor(session.product(firstProductId)).length,
+            greaterThanOrEqualTo(6),
+          );
+          expect(
+            session
+                .otherStorePreviewsFor(session.product(firstProductId))
+                .every(
+                  (product) =>
+                      product.storeId != firstStoreId &&
+                      session.catalogueStore(product.storeId!)?.regionId ==
+                          'jodhpur',
+                ),
+            isTrue,
+          );
+          await captureR66Visual(tester, 'r5-store-$profile-public');
+          final owner = destination == BuyV2Destination.shop
+              ? 'buy-shop-seller'
+              : 'buy-wholesale-supplier';
+          final relatedProductId = source.productIdAt(10, 0);
+          final relatedBranch = find.byKey(
+            ValueKey('buy-related-store-branch-$relatedProductId'),
+          );
+          final publicScroll = find
+              .descendant(
+                of: find.byKey(ValueKey('$owner-sheet-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(
+            relatedBranch,
+            100,
+            scrollable: publicScroll,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<Text>(relatedBranch).data,
+            session.catalogueStore(source.storeIdAt(10))!.address,
+          );
+          expect(relatedBranch.hitTestable(), findsOneWidget);
+          await captureR66Visual(tester, 'r5-store-$profile-related-branches');
+          await tester.tap(relatedBranch);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(ValueKey('$owner-view-more-$relatedProductId')),
+            findsOneWidget,
+          );
+          expect(
+            session.product(relatedProductId).storeId,
+            source.storeIdAt(10),
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          final viewAll = find.byKey(
+            ValueKey('$owner-view-more-$firstProductId'),
+          );
+          await tester.scrollUntilVisible(
+            viewAll,
+            -100,
+            scrollable: publicScroll,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(viewAll);
+          await tester.pumpAndSettle();
+          final storeScope = 'store-${destination.name}-$firstStoreId';
+          final range = find.byKey(ValueKey('buy-page-range-$storeScope'));
+          expect(tester.widget<Text>(range).data, '1–40 of 5,000');
+          expect(source.productQueries.last.storeId, firstStoreId);
+          expect(source.productQueries.last.query, '');
+          expect(source.productQueries.last.categoryId, 'all');
+          await captureR66Visual(tester, 'r5-store-$profile-full');
+
+          final next = find.byKey(ValueKey('buy-page-next-$storeScope'));
+          await _revealPagedHeader(tester, storeScope, next);
+          source.failStorePage = true;
+          await tester.tap(next);
+          await tester.pumpAndSettle();
+          expect(find.text('Results could not refresh'), findsOneWidget);
+          await captureR66Visual(tester, 'r5-store-$profile-retry');
+          source.failStorePage = false;
+          final retry = find.widgetWithText(TextButton, 'Try again');
+          await tester.ensureVisible(retry);
+          await tester.pumpAndSettle();
+          await tester.tap(retry);
+          await tester.pumpAndSettle();
+          expect(tester.widget<Text>(range).data, '41–80 of 5,000');
+          final product = source.productIdAt(0, 40);
+          final image = find.byKey(ValueKey('buy-grid-packshot-$product'));
+          await tester.ensureVisible(image);
+          await tester.pumpAndSettle();
+          const imageAction = Alignment(-.5, .55);
+          expect(image.hitTestable(at: imageAction), findsOneWidget);
+          final requestCount = source.productQueries.length;
+          await tester.tapAt(imageAction.withinRect(tester.getRect(image)));
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, product);
+          expect(session.selectedProduct?.storeId, firstStoreId);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(source.productQueries.length, requestCount);
+          await captureR66Visual(tester, 'r5-store-$profile-return');
+          await _revealPagedHeader(tester, storeScope, range);
+          expect(tester.widget<Text>(range).data, '41–80 of 5,000');
+
+          final storeField = find.byKey(
+            const ValueKey('buy-store-product-search'),
+          );
+          await _revealPagedHeader(tester, storeScope, storeField);
+          await tester.enterText(storeField, 'sku 4999');
+          await tester.pumpAndSettle();
+          final lastProduct = source.productIdAt(0, 4998);
+          expect(tester.widget<Text>(range).data, '1–1 of 1');
+          expect(session.findProduct(lastProduct)?.storeId, firstStoreId);
+          expect(session.query, 'Mool Market');
+          tester.view.viewInsets = FakeViewPadding(
+            bottom: size.height < 400 ? 140 : 260,
+          );
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(storeField);
+          await tester.pumpAndSettle();
+          final keyboardTop = size.height - (size.height < 400 ? 140 : 260);
+          expect(
+            tester.getRect(storeField).bottom,
+            lessThanOrEqualTo(keyboardTop),
+          );
+          expect(
+            tester
+                .getRect(find.byKey(ValueKey('buy-paged-scroll-$storeScope')))
+                .bottom,
+            lessThanOrEqualTo(keyboardTop),
+          );
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(tester, 'r5-store-$profile-search-keyboard');
+          tester.view.resetViewInsets();
+          tester.testTextInput.hide();
+          await tester.pumpAndSettle();
+          final add = find.byKey(ValueKey('buy-add-$lastProduct'));
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          expect(add.hitTestable(), findsOneWidget);
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          final quantity = session.product(lastProduct).minimumOrder;
+          expect(session.quantityFor(lastProduct), quantity);
+          final save = find.byKey(ValueKey('buy-save-$lastProduct'));
+          await tester.ensureVisible(save);
+          await tester.pumpAndSettle();
+          await tester.tap(save);
+          await tester.pumpAndSettle();
+          expect(session.isSaved(lastProduct), isTrue);
+
+          final clear = find.byKey(
+            const ValueKey('buy-store-product-search-clear'),
+          );
+          await _revealPagedHeader(tester, storeScope, clear);
+          await tester.tap(clear);
+          await tester.pumpAndSettle();
+          final categoryControl = find.byKey(
+            const ValueKey('buy-store-category-control'),
+          );
+          await _revealPagedHeader(tester, storeScope, categoryControl);
+          await tester.tap(categoryControl);
+          await tester.pumpAndSettle();
+          final category = session
+              .categoriesFor(destination)
+              .firstWhere((value) => value.id != 'all');
+          final choice = find.byKey(
+            ValueKey('buy-store-category-${category.id}'),
+          );
+          final categoryScroll = find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-store-category-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(
+            choice,
+            100,
+            scrollable: categoryScroll,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(choice);
+          await tester.pumpAndSettle();
+          expect(source.productQueries.last.categoryId, category.id);
+          expect(session.selectedCategoryId, 'all');
+          expect(session.query, 'Mool Market');
+          final visibleCards = find.descendant(
+            of: find.byKey(ValueKey('buy-paged-scroll-$storeScope')),
+            matching: find.byType(BuyV2ProductCard),
+          );
+          final productScroll = find
+              .descendant(
+                of: find.byKey(ValueKey('buy-paged-scroll-$storeScope')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(
+            find.byKey(ValueKey('buy-paged-lane-$storeScope-0')),
+            100,
+            scrollable: productScroll,
+          );
+          await tester.pumpAndSettle();
+          final cards = tester.widgetList<BuyV2ProductCard>(visibleCards);
+          expect(cards, isNotEmpty);
+          expect(
+            cards.every(
+              (card) =>
+                  card.product.storeId == firstStoreId &&
+                  card.product.categoryId == category.id,
+            ),
+            isTrue,
+          );
+          expect(session.quantityFor(lastProduct), quantity);
+          expect(session.isSaved(lastProduct), isTrue);
+          await captureR66Visual(tester, 'r5-store-$profile-category');
+
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.query, 'Mool Market');
+          final secondStoreId = source.storeIdAt(10);
+          final secondStore = find.byKey(
+            ValueKey('buy-store-search-open-$secondStoreId'),
+          );
+          final secondName = find.descendant(
+            of: secondStore,
+            matching: find.text('Mool Market'),
+          );
+          await tester.ensureVisible(secondName);
+          await tester.pumpAndSettle();
+          expect(secondName.hitTestable(), findsOneWidget);
+          await tester.tap(secondName);
+          await tester.pumpAndSettle();
+          final secondProductId = source.productIdAt(10, 0);
+          expect(
+            find.byKey(ValueKey('$owner-view-more-$secondProductId')),
+            findsOneWidget,
+          );
+          expect(session.product(secondProductId).storeId, secondStoreId);
+          expect(session.quantityFor(lastProduct), quantity);
+          expect(session.isSaved(lastProduct), isTrue);
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(tester, 'r5-store-$profile-other-branch');
+        });
+
         testWidgets('R5 paged catalogue user actions $profile', (tester) async {
           tester.view.devicePixelRatio = 1;
           tester.view.physicalSize = size;
@@ -1255,6 +1608,78 @@ Future<void> _revealPagedHeader(
   await tester.ensureVisible(target);
   await tester.pumpAndSettle();
   expect(target.hitTestable(), findsOneWidget);
+}
+
+class _StoreJourneySource extends BuyV2DevelopmentCatalogueSource {
+  _StoreJourneySource(BuyV2Destination destination)
+    : super(destination: destination);
+  bool failStorePage = false;
+  final storeQueries = <BuyV2CatalogueQuery>[];
+  final productQueries = <BuyV2CatalogueQuery>[];
+  // The same display name deliberately identifies different Store branches.
+  BuyV2Product _named(BuyV2Product product) =>
+      product.copyWith(seller: 'Mool Market');
+  BuyV2CataloguePage<T> _copyPage<T>(
+    BuyV2CataloguePage<dynamic> page,
+    Iterable<T> items,
+  ) => BuyV2CataloguePage<T>(
+    queryKey: page.queryKey,
+    snapshotId: page.snapshotId,
+    items: items,
+    startIndex: page.startIndex,
+    totalCount: page.totalCount,
+    previousCursor: page.previousCursor,
+    nextCursor: page.nextCursor,
+  );
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    storeQueries.add(query);
+    final page = await super.loadStores(
+      query,
+      cursor: cursor,
+      pageSize: pageSize,
+    );
+    return _copyPage(
+      page,
+      page.items.map(
+        (store) => BuyV2StoreListing(
+          id: store.id,
+          name: 'Mool Market',
+          area: store.area,
+          address: store.address,
+          regionId: store.regionId,
+          distanceMeters: store.distanceMeters,
+          collection: store.collection,
+          previewProduct: store.previewProduct == null
+              ? null
+              : _named(store.previewProduct!),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    productQueries.add(query);
+    if (failStorePage && query.storeId != null && cursor != null) {
+      throw StateError('Store page unavailable');
+    }
+    final page = await super.loadProducts(
+      query,
+      cursor: cursor,
+      pageSize: pageSize,
+    );
+    return _copyPage(page, page.items.map(_named));
+  }
 }
 
 class _PagedWidgetSource extends BuyV2DevelopmentCatalogueSource {

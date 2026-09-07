@@ -594,6 +594,53 @@ void main() {
         expect(restored.page!.items.first.storeId, source.storeIdAt(0));
       },
     );
+
+    test(
+      'Store browse return retains one exact branch after page eviction',
+      () async {
+        final source = _PagingRecoverySource();
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: false,
+          cataloguePageSource: source,
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        final firstPage = session.acquireCatalogueProducts('first-store');
+        await firstPage.open(storeQuery(source, 0));
+        final first = firstPage.page!.items.first;
+        session.retainCatalogueStoreBrowse(first);
+        session.releaseCatalogueProducts('first-store');
+        BuyV2Product? replacement;
+        for (var index = 1; index <= 7; index++) {
+          final key = 'store-$index';
+          final pager = session.acquireCatalogueProducts(key);
+          final query = storeQuery(source, index);
+          await pager.open(query);
+          replacement = pager.page!.items.first;
+          expect(session.retainedCatalogueQuery(key), query);
+          session.releaseCatalogueProducts(key);
+        }
+        expect(firstPage.isDisposed, isTrue);
+        expect(session.product(first.id).storeId, first.storeId);
+        expect(session.pagedProductCount, lessThanOrEqualTo(161));
+        final otherBranch = replacement!.copyWith(seller: first.seller);
+        expect(otherBranch.isFromSameStoreAs(first), isFalse);
+        session.retainCatalogueStoreBrowse(otherBranch);
+        expect(session.findProduct(first.id), isNull);
+        final catalogue = session.partnerCatalogueFor(otherBranch);
+        expect(catalogue, isNotEmpty);
+        expect(
+          catalogue.every((item) => item.storeId == otherBranch.storeId),
+          isTrue,
+        );
+        expect(session.pagedProductCount, lessThanOrEqualTo(160));
+        final destination = session.destination;
+        expect(session.categoriesFor(BuyV2Destination.wholesale), isNotEmpty);
+        expect(session.destination, destination);
+      },
+    );
   });
 
   group('R5 catalogue session recovery', () {
