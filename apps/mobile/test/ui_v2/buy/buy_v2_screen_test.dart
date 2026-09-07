@@ -1996,7 +1996,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text(product.title), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(ValueKey('buy-product-purchase-hero-${product.id}')),
+        matching: find.text(product.title),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.byKey(ValueKey('buy-product-inline-action-${product.id}')),
       findsNothing,

@@ -1538,6 +1538,91 @@ void main() {
       );
     });
 
+    for (final operation in ['decrease', 'remove']) {
+      for (final origin in [BuyV2View.catalogue, BuyV2View.product]) {
+        for (final id in ['s-tomato', 'w-notebook']) {
+          test('R5 023 $operation last $id preserves inline $origin', () {
+            final item = session.product(id);
+            session.addProduct(id);
+            session.openDestination(BuyV2Destination.shop);
+            session.updateQuery('notebook');
+            session.chooseMaximumProductPrice(250);
+            expect(session.maximumProductPrice, 250);
+            if (origin == BuyV2View.product) session.openProduct('s-tomato');
+            final productId = session.selectedProductId;
+            final motion = session.navigationMotionSequence;
+            if (operation == 'decrease') {
+              session.decrease(id);
+            } else {
+              session.remove(id);
+            }
+            expect(session.quantityFor(id), 0);
+            expect(session.destination, BuyV2Destination.shop);
+            expect(session.view, origin);
+            expect(session.selectedProductId, productId);
+            expect(session.query, 'notebook');
+            expect(session.maximumProductPrice, 250);
+            expect(session.navigationMotionSequence, motion);
+            expect(session.cartAcknowledgement, '${item.title} removed');
+          });
+        }
+      }
+    }
+
+    for (final operation in ['decrease', 'remove']) {
+      for (final destination in [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+      ]) {
+        test(
+          'R5 023 $operation mixed Cart preserves $destination browsing',
+          () {
+            final first = destination == BuyV2Destination.shop
+                ? 's-tomato'
+                : 'w-notebook';
+            final last = destination == BuyV2Destination.shop
+                ? 'w-notebook'
+                : 's-tomato';
+            session.addProduct(first);
+            session.addProduct(last);
+            session.openDestination(destination);
+            session.updateQuery('rice');
+            final retained = session.quantityFor(last);
+            void removeItem(String id) => operation == 'decrease'
+                ? session.decrease(id)
+                : session.remove(id);
+            removeItem(first);
+            expect(session.quantityFor(first), 0);
+            expect(session.quantityFor(last), retained);
+            expect(session.destination, destination);
+            expect(session.view, BuyV2View.catalogue);
+            expect(session.query, 'rice');
+            removeItem(last);
+            expect(session.itemCount, 0);
+            expect(session.destination, destination);
+            expect(session.view, BuyV2View.catalogue);
+            expect(session.query, 'rice');
+          },
+        );
+      }
+      for (final origin in [BuyV2View.cart, BuyV2View.checkout]) {
+        test('R5 023 $operation from empty $origin retains Cart recovery', () {
+          session.addProduct('w-notebook');
+          session.openCart(scope: BuyV2CartScope.wholesale);
+          if (origin == BuyV2View.checkout) session.openCheckout();
+          expect(session.view, origin);
+          if (operation == 'decrease') {
+            session.decrease('w-notebook');
+          } else {
+            session.remove('w-notebook');
+          }
+          expect(session.itemCount, 0);
+          expect(session.destination, BuyV2Destination.wholesale);
+          expect(session.view, BuyV2View.catalogue);
+          expect(session.cartScope, BuyV2CartScope.all);
+        });
+      }
+    }
     test('Buy assist returns to the exact originating purchase depth', () {
       final product = BuyV2Catalogue.products.firstWhere(
         (item) => item.destination == BuyV2Destination.wholesale,

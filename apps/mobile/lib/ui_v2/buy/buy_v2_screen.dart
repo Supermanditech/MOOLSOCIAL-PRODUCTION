@@ -717,18 +717,22 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
               state.innerController.positions.length != 1) {
             return;
           }
-          state.outerController.jumpTo(
-            offsets.$1.clamp(
-              0.0,
-              state.outerController.position.maxScrollExtent,
-            ),
+          // Each NestedScrollView jump coordinates both scroll positions.
+          // A scrolled body restores through the inner controller; at the
+          // body's start, restore the fully or partly visible header instead.
+          final inner = state.innerController.position;
+          final innerOffset = offsets.$2.clamp(
+            inner.minScrollExtent,
+            inner.maxScrollExtent,
           );
-          state.innerController.jumpTo(
-            offsets.$2.clamp(
-              0.0,
-              state.innerController.position.maxScrollExtent,
-            ),
-          );
+          if (innerOffset > inner.minScrollExtent) {
+            state.innerController.jumpTo(innerOffset);
+          } else {
+            final outer = state.outerController.position;
+            state.outerController.jumpTo(
+              offsets.$1.clamp(outer.minScrollExtent, outer.maxScrollExtent),
+            );
+          }
         });
       }
       return NestedScrollView(
@@ -1382,13 +1386,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         _storeBrowseAnchor?.destination != product.destination) {
       _rememberStoreBrowse(product);
     }
-    final previousView = session.view;
-    final previousDestination = session.destination;
-    final previousProductId = session.selectedProductId;
-    final previousCartScope = session.cartScope;
-    final previousComparisonOrigin = session.takeProductComparisonOrigin();
-    if (!session.openProduct(product.id) || !mounted) {
-      session.restoreProductComparisonOrigin(previousComparisonOrigin);
+    final restoreOrigin = session.beginStoreNavigationVisit();
+    if (!mounted || (!cartEntry && !session.openProduct(product.id))) {
+      restoreOrigin();
       return false;
     }
     if (cartEntry) {
@@ -1582,15 +1582,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     _storeProductRouteDepth--;
     if (!mounted) return openCart ?? false;
     setState(() {});
-    if (generation != _storeNavigationGeneration) return false;
-
-    if (previousView == BuyV2View.cart) {
-      session.destination = previousDestination;
-      session.openCart(scope: previousCartScope);
-    } else if (previousView == BuyV2View.product && previousProductId != null) {
-      session.openProduct(previousProductId);
+    if (generation != _storeNavigationGeneration || widget.session != session) {
+      return false;
     }
-    session.restoreProductComparisonOrigin(previousComparisonOrigin);
+    restoreOrigin();
     return openCart ?? false;
   }
 

@@ -2101,6 +2101,410 @@ void main() {
     ),
   ];
 
+  for (final size in [
+    const Size(320, 700),
+    const Size(430, 900),
+    const Size(640, 360),
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final id in ['s-tomato', 'w-notebook']) {
+        testWidgets('R5 023 Offers last quantity $id $size at $scale', (
+          tester,
+        ) async {
+          await tester.binding.setSurfaceSize(size);
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          await tester.pumpWidget(
+            app(
+              session,
+              size: size,
+              textScale: scale,
+              safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+          await tester.pumpAndSettle();
+          final offers = find.byKey(const PageStorageKey('buy-offers'));
+          final publisher = find.byKey(
+            ValueKey(
+              'buy-offers-filter-${id == 'w-notebook' ? 'manufacturer' : 'retailer'}',
+            ),
+          );
+          await tester.ensureVisible(publisher);
+          await tester.pumpAndSettle();
+          expect(publisher.hitTestable(), findsOneWidget);
+          await tester.tap(publisher);
+          await tester.pumpAndSettle();
+          final scroll = find
+              .descendant(of: offers, matching: find.byType(Scrollable))
+              .first;
+          final add = find.byKey(ValueKey('buy-add-$id'));
+          await tester.scrollUntilVisible(
+            add,
+            160,
+            maxScrolls: 60,
+            scrollable: scroll,
+          );
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          expect(add.hitTestable(), findsOneWidget);
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          final product = session.product(id);
+          expect(session.quantityFor(id), product.minimumOrder);
+          final card = find.byKey(ValueKey('buy-product-$id'));
+          final plus = find.descendant(
+            of: card,
+            matching: find.byTooltip('Add one'),
+          );
+          final minus = find.descendant(
+            of: card,
+            matching: find.byTooltip('Remove one'),
+          );
+          await Scrollable.ensureVisible(tester.element(plus), alignment: .5);
+          await tester.pumpAndSettle();
+          expect(plus.hitTestable(), findsOneWidget);
+          await tester.tap(plus);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(id), product.minimumOrder + 1);
+          await tester.tap(minus);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(id), product.minimumOrder);
+          final state = tester.state<ScrollableState>(scroll);
+          final offset = state.position.pixels;
+          final cardTop = tester.getTopLeft(card).dy;
+          final frame =
+              'r5-offers-$id-${size.width.toInt()}-${size.height.toInt()}-$scale';
+          await capture(tester, '$frame-before');
+          expect(minus.hitTestable(), findsOneWidget);
+          await tester.tap(minus);
+          await tester.pumpAndSettle();
+          expect(session.itemCount, 0);
+          expect(session.destination, BuyV2Destination.shop);
+          expect(session.view, BuyV2View.catalogue);
+          expect(offers, findsOneWidget);
+          expect(state.mounted, isTrue);
+          expect(state.position.pixels, closeTo(offset, .1));
+          expect(tester.getTopLeft(card).dy, closeTo(cardTop, .1));
+          expect(add.hitTestable(), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('buy-mini-cart-drag-handle')),
+            findsNothing,
+          );
+          await capture(tester, '$frame-after');
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(id), product.minimumOrder);
+          expect(offers, findsOneWidget);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  }
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final (search, partialHeader) in [
+        (false, false),
+        (false, true),
+        (true, false),
+        (true, true),
+      ]) {
+        testWidgets(
+          'R5 007 landscape visible search returns ${destination.name} $search partial $partialHeader at $scale',
+          (tester) async {
+            const size = Size(800, 360);
+            await tester.binding.setSurfaceSize(size);
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            session.openDestination(destination);
+            for (final item
+                in BuyV2Catalogue.products
+                    .where(
+                      (product) =>
+                          product.destination == destination &&
+                          !product.requiresPrescription,
+                    )
+                    .take(8)) {
+              session.addProduct(item.id);
+            }
+            if (search) {
+              session.updateQuery(
+                destination == BuyV2Destination.shop ? 'tomato' : 'rice',
+              );
+            }
+            final query = session.query;
+            final count = session.itemCount;
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                textScale: scale,
+                safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final header = find.byKey(const ValueKey('buy-search-band'));
+            if (partialHeader) {
+              await tester.dragFrom(
+                Offset(size.width - 12, tester.getCenter(header).dy),
+                const Offset(0, -30),
+              );
+              await tester.pumpAndSettle();
+            }
+            final before = tester.state<NestedScrollViewState>(
+              find.byType(NestedScrollView),
+            );
+            final initialRect = tester.getRect(header);
+            final outer = before.outerController.offset;
+            final inner = before.innerController.offset;
+            if (partialHeader) {
+              expect(outer, greaterThan(0));
+              expect(
+                outer,
+                lessThan(before.outerController.position.maxScrollExtent),
+              );
+              expect(inner, closeTo(0, .1));
+            } else {
+              expect(outer, closeTo(0, .1));
+              expect(initialRect.top, greaterThanOrEqualTo(24));
+            }
+            final frame =
+                'r5-landscape-search-${destination.name}-$search-$partialHeader-$scale';
+            await capture(tester, '$frame-before');
+            final cart = find.byKey(
+              const ValueKey('buy-mini-cart-drag-handle'),
+            );
+            expect(cart.hitTestable(), findsOneWidget);
+            await tester.tap(cart);
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.cart);
+            final scroll = find
+                .descendant(
+                  of: find.byType(BuyV2CartView),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            final review = find.widgetWithText(FilledButton, 'Review order');
+            await tester.scrollUntilVisible(
+              review,
+              180,
+              maxScrolls: 60,
+              scrollable: scroll,
+            );
+            await tester.ensureVisible(review);
+            await tester.pumpAndSettle();
+            expect(
+              tester.state<ScrollableState>(scroll).position.pixels,
+              greaterThan(0),
+            );
+            expect(review.hitTestable(), findsOneWidget);
+            await capture(tester, '$frame-cart');
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.catalogue);
+            expect(session.destination, destination);
+            expect(session.query, query);
+            expect(session.itemCount, count);
+            final after = tester.state<NestedScrollViewState>(
+              find.byType(NestedScrollView),
+            );
+            expect(after.outerController.offset, closeTo(outer, .1));
+            expect(after.innerController.offset, closeTo(inner, .1));
+            expect(tester.getRect(header), initialRect);
+            await capture(tester, '$frame-after');
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final size in [const Size(360, 800), const Size(640, 360)]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'R5 007 related Store Cart has no phantom visit ${destination.name} $size at $scale',
+          (tester) async {
+            await tester.binding.setSurfaceSize(size);
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            session.addProduct('s-tomato');
+            session.addProduct('w-rice');
+            session.openDestination(destination);
+            final isShop = destination == BuyV2Destination.shop;
+            final product = session.product(isShop ? 's-tomato' : 'w-rice');
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                textScale: scale,
+                safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+              ),
+            );
+            session.openProduct(product.id);
+            await tester.pumpAndSettle();
+            final productScroll = find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            final supplier = find.byKey(
+              ValueKey(
+                '${isShop ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-${product.id}',
+              ),
+            );
+            await tester.scrollUntilVisible(
+              supplier,
+              180,
+              maxScrolls: 60,
+              scrollable: productScroll,
+            );
+            await tester.ensureVisible(supplier);
+            await tester.pumpAndSettle();
+            final productOffset = tester
+                .state<ScrollableState>(productScroll)
+                .position
+                .pixels;
+            final supplierRect = tester.getRect(supplier);
+            final recent = session
+                .recentlyViewedProductsFor(destination)
+                .map((item) => item.id)
+                .toList();
+            final total = session.itemCount;
+            final prefix = isShop
+                ? 'buy-shop-seller'
+                : 'buy-wholesale-supplier';
+            final frame =
+                'r5-related-${destination.name}-${size.width.toInt()}-$scale';
+            await capture(tester, '$frame-origin');
+            await tester.tap(supplier);
+            await tester.pumpAndSettle();
+            final outerStore = find.byKey(
+              ValueKey('$prefix-sheet-${product.id}'),
+            );
+            final outerScroll = find
+                .descendant(of: outerStore, matching: find.byType(Scrollable))
+                .first;
+            final relatedCards = find.descendant(
+              of: outerStore,
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget.key is ValueKey<String> &&
+                    (widget.key! as ValueKey<String>).value.startsWith(
+                      '$prefix-other-store-',
+                    ),
+              ),
+            );
+            await tester.scrollUntilVisible(
+              find.byKey(ValueKey('$prefix-other-stores')),
+              180,
+              maxScrolls: 60,
+              scrollable: outerScroll,
+            );
+            final related = relatedCards.first;
+            await tester.ensureVisible(related);
+            await tester.pumpAndSettle();
+            final outerState = tester.state<ScrollableState>(outerScroll);
+            final outerOffset = outerState.position.pixels;
+            final relatedId = (tester.widget(related).key! as ValueKey<String>)
+                .value
+                .substring('$prefix-other-store-'.length);
+            expect(relatedId, isNot(product.id));
+            expect(related.hitTestable(), findsOneWidget);
+            await tester.tap(related);
+            await tester.pumpAndSettle();
+            final innerStore = find.byKey(ValueKey('$prefix-sheet-$relatedId'));
+            final innerRoute = find.byKey(ValueKey('$prefix-route-$relatedId'));
+            final innerState = tester.state<ScrollableState>(
+              find
+                  .descendant(of: innerStore, matching: find.byType(Scrollable))
+                  .first,
+            );
+            final innerOffset = innerState.position.pixels;
+            await capture(tester, '$frame-related');
+            for (var visit = 0; visit < 2; visit++) {
+              final cart = find.descendant(
+                of: innerRoute,
+                matching: find.byKey(const ValueKey('buy-store-cart-bar')),
+              );
+              expect(cart.hitTestable(), findsOneWidget);
+              await tester.tap(cart);
+              await tester.pumpAndSettle();
+              expect(session.view, BuyV2View.cart);
+              await tester.binding.handlePopRoute();
+              await tester.pumpAndSettle();
+              expect(innerStore, findsOneWidget);
+              expect(innerState.mounted, isTrue);
+              expect(innerState.position.pixels, closeTo(innerOffset, .1));
+              expect(
+                session
+                    .recentlyViewedProductsFor(destination)
+                    .map((item) => item.id),
+                recent,
+              );
+            }
+            await capture(tester, '$frame-related-return');
+            if (scale == 1) {
+              final close = find.descendant(
+                of: innerStore,
+                matching: find.byTooltip(
+                  isShop ? 'Close store' : 'Close supplier products',
+                ),
+              );
+              await tester.ensureVisible(close);
+              await tester.pumpAndSettle();
+              expect(close.hitTestable(), findsOneWidget);
+              await tester.tap(close);
+            } else {
+              await tester.binding.handlePopRoute();
+            }
+            await tester.pumpAndSettle();
+            expect(outerStore, findsOneWidget);
+            expect(outerState.position.pixels, closeTo(outerOffset, .1));
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.product);
+            expect(session.selectedProductId, product.id);
+            expect(
+              tester.state<ScrollableState>(productScroll).position.pixels,
+              closeTo(productOffset, .1),
+            );
+            expect(tester.getRect(supplier), supplierRect);
+            await capture(tester, '$frame-product-return');
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.catalogue);
+            expect(session.destination, destination);
+            expect(session.itemCount, total);
+            expect(
+              session
+                  .recentlyViewedProductsFor(destination)
+                  .map((item) => item.id),
+              recent,
+            );
+            await capture(tester, '$frame-final');
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
   for (final lane in [
     'shop',
     'wholesale',
@@ -2464,6 +2868,27 @@ void main() {
             );
           }
           await capture(tester, '$lane-root-restored-$scale', store: true);
+          final recentBeforeBack = session
+              .recentlyViewedProductsFor(destination)
+              .map((product) => product.id)
+              .toList();
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(
+            session.view,
+            BuyV2View.catalogue,
+            reason: 'Dismissed Store Cart visits must not reopen on Back',
+          );
+          expect(session.destination, destination);
+          expect(session.quantityFor(product.id), count);
+          expect(session.quantityFor(retained.id), retainedQuantity);
+          expect(
+            session
+                .recentlyViewedProductsFor(destination)
+                .map((item) => item.id),
+            recentBeforeBack,
+          );
+          await capture(tester, '$lane-final-catalogue-$scale', store: true);
           expect(tester.takeException(), isNull);
           return;
         }

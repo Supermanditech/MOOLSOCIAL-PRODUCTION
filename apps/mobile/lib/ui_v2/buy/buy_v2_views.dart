@@ -764,333 +764,357 @@ class BuyV2ProductView extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 8),
-              if (wholesale)
-                Column(
-                  children: [
-                    if (!session.businessVerified) ...[
-                      _WholesaleVerificationCard(
-                        state: session.businessVerificationState,
-                        onOpenWorkspace: () =>
-                            context.push('/app/work/workspace/choose'),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                    _WholesaleTradeDecisionPanel(
+              // Keep this one product's finite detail panels in one layout.
+              // Async panels above a restored offset must be laid out again;
+              // otherwise a lazy list retains their obsolete loading height.
+              // Media and the purchase hero retain their lazy lifecycle.
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (wholesale)
+                    Column(
+                      children: [
+                        if (!session.businessVerified) ...[
+                          _WholesaleVerificationCard(
+                            state: session.businessVerificationState,
+                            onOpenWorkspace: () =>
+                                context.push('/app/work/workspace/choose'),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        _WholesaleTradeDecisionPanel(
+                          session: session,
+                          product: product,
+                          facts: facts,
+                          decision: offerDecision!,
+                          buyerPromise: buyerPromise,
+                          adapter: wholesaleTradeDecisionAdapter,
+                          onOpenPartnerCatalogue: onOpenPartnerCatalogue,
+                        ),
+                      ],
+                    )
+                  else if (automaticFulfilment)
+                    _ProductOfferDecisionPanel(
                       session: session,
                       product: product,
                       facts: facts,
                       decision: offerDecision!,
-                      buyerPromise: buyerPromise,
-                      adapter: wholesaleTradeDecisionAdapter,
-                      onOpenPartnerCatalogue: onOpenPartnerCatalogue,
-                    ),
-                  ],
-                )
-              else if (automaticFulfilment)
-                _ProductOfferDecisionPanel(
-                  session: session,
-                  product: product,
-                  facts: facts,
-                  decision: offerDecision!,
-                )
-              else
-                _DecisionPanel(
-                  title: 'Pack, delivery and pharmacy',
-                  children: [
-                    _DecisionRow(
-                      icon: Icons.inventory_2_outlined,
-                      label: 'Pack',
-                      value: product.pack,
-                    ),
-                    _DecisionRow(
-                      icon: Icons.schedule_rounded,
-                      label: 'Delivery',
-                      value: buyerPromise,
-                      valueColor: BuyV2Colors.green,
-                    ),
-                    if (partnerProducts.isEmpty ||
-                        onOpenPartnerCatalogue == null)
-                      _DecisionRow(
-                        icon: Icons.local_pharmacy_outlined,
-                        label: product.partnerRole,
-                        value: product.seller,
-                      )
-                    else
-                      _DecisionActionRow(
-                        key: ValueKey(
-                          'buy-medicine-pharmacy-action-${product.id}',
-                        ),
-                        icon: Icons.local_pharmacy_outlined,
-                        label: product.partnerRole,
-                        value: product.seller,
-                        detail:
-                            '${partnerProducts.length} other current products · Not medical advice',
-                        semanticLabel:
-                            'View ${partnerProducts.length} more products from ${product.seller} '
-                            'that are available now. Not medical advice',
-                        onTap: () => onOpenPartnerCatalogue!(product),
-                      ),
-                    _DecisionRow(
-                      icon: Icons.route_outlined,
-                      label: 'Delivery path',
-                      value: product.origin,
-                    ),
-                    _DecisionRow(
-                      icon: Icons.event_available_outlined,
-                      label: 'Price checked',
-                      value: product.confirmedOn,
-                    ),
-                  ],
-                ),
-              if (product.destination == BuyV2Destination.shop ||
-                  product.destination == BuyV2Destination.wholesale) ...[
-                const SizedBox(height: 10),
-                BuyV2CartAvoidanceRegion(
-                  child: _ProductBenefitsPreview(
-                    session: session,
-                    product: product,
-                    benefits: productBenefits,
-                    state: productBenefitsState,
-                    customerMessage: session.productBenefitsMessageFor(product),
-                  ),
-                ),
-              ],
-              if (product.destination == BuyV2Destination.medicine) ...[
-                const SizedBox(height: 10),
-                _DecisionPanel(
-                  title: 'Medicine information',
-                  children: [
-                    _DecisionRow(
-                      icon: Icons.science_outlined,
-                      label: 'Composition',
-                      value: product.composition ?? product.variant,
-                    ),
-                    _DecisionRow(
-                      icon: Icons.health_and_safety_outlined,
-                      label: 'Dispensing',
-                      value: product.requiresPrescription
-                          ? 'Valid prescription and pharmacist review required'
-                          : 'No prescription required for this listed pack',
-                    ),
-                    _DecisionRow(
-                      icon: Icons.info_outline_rounded,
-                      label: 'Important',
-                      value:
-                          product.regulatoryNote ??
-                          'Check the sealed pack before use.',
-                    ),
-                    if (product.manufacturerVerified)
-                      const _DecisionRow(
-                        icon: Icons.factory_outlined,
-                        label: 'Supply',
-                        value:
-                            'Sealed manufacturer pack · dispensed by the listed licensed pharmacy',
-                      ),
-                  ],
-                ),
-              ],
-              if (!shop || purchaseProtection != null) ...[
-                const SizedBox(height: 10),
-                _DecisionPanel(
-                  title: shop ? 'Purchase protection' : 'Product details',
-                  children: [
-                    if (!shop) ...[
-                      _DecisionRow(
-                        icon: Icons.sell_outlined,
-                        label: 'Brand',
-                        value: product.brand,
-                      ),
-                      _DecisionRow(
-                        icon: Icons.tune_rounded,
-                        label: 'Variant',
-                        value: product.variant,
-                      ),
-                      _DecisionRow(
-                        icon: Icons.inventory_2_outlined,
-                        label: 'Pack size',
-                        value: product.pack,
-                      ),
-                      if (automaticFulfilment)
+                    )
+                  else
+                    _DecisionPanel(
+                      title: 'Pack, delivery and pharmacy',
+                      children: [
                         _DecisionRow(
-                          icon: Icons.location_on_outlined,
-                          label: 'Service area',
-                          value:
-                              session.selectedAddressOrNull?.shortLine ??
-                              'Based on your delivery address',
-                        )
-                      else
+                          icon: Icons.inventory_2_outlined,
+                          label: 'Pack',
+                          value: product.pack,
+                        ),
+                        _DecisionRow(
+                          icon: Icons.schedule_rounded,
+                          label: 'Delivery',
+                          value: buyerPromise,
+                          valueColor: BuyV2Colors.green,
+                        ),
+                        if (partnerProducts.isEmpty ||
+                            onOpenPartnerCatalogue == null)
+                          _DecisionRow(
+                            icon: Icons.local_pharmacy_outlined,
+                            label: product.partnerRole,
+                            value: product.seller,
+                          )
+                        else
+                          _DecisionActionRow(
+                            key: ValueKey(
+                              'buy-medicine-pharmacy-action-${product.id}',
+                            ),
+                            icon: Icons.local_pharmacy_outlined,
+                            label: product.partnerRole,
+                            value: product.seller,
+                            detail:
+                                '${partnerProducts.length} other current products · Not medical advice',
+                            semanticLabel:
+                                'View ${partnerProducts.length} more products from ${product.seller} '
+                                'that are available now. Not medical advice',
+                            onTap: () => onOpenPartnerCatalogue!(product),
+                          ),
                         _DecisionRow(
                           icon: Icons.route_outlined,
-                          label: 'Where it comes from',
+                          label: 'Delivery path',
                           value: product.origin,
                         ),
-                      if (returnSummary case final returnPolicy?)
                         _DecisionRow(
-                          icon: Icons.assignment_return_outlined,
-                          label: 'After delivery',
-                          value: returnPolicy,
-                        ),
-                    ],
-                    if (purchaseProtection case final protection?) ...[
-                      if (protectionRemedies.isNotEmpty)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
-                          icon: Icons.rule_rounded,
-                          label: 'Available options',
-                          value: protectionRemedies.join(' · '),
-                        ),
-                      if (_nonBlankComplianceValue(protection.windowLabel)
-                          case final value?)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
-                          icon: Icons.schedule_rounded,
-                          label: 'Request window',
-                          value: value,
-                        ),
-                      if (_nonBlankComplianceValue(protection.conditionsLabel)
-                          case final value?)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
-                          icon: Icons.fact_check_outlined,
-                          label: 'Conditions',
-                          value: value,
-                        ),
-                      if (_nonBlankComplianceValue(protection.verificationLabel)
-                          case final value?)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
-                          icon: Icons.verified_outlined,
-                          label: 'Verification',
-                          value: value,
-                        ),
-                      if (_nonBlankComplianceValue(protection.initiationLabel)
-                          case final value?)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
-                          icon: Icons.playlist_add_check_rounded,
-                          label: 'How to request',
-                          value: value,
-                        ),
-                      if (_nonBlankComplianceValue(protection.approvalLabel)
-                          case final value?)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
-                          icon: Icons.approval_outlined,
-                          label: 'Approval',
-                          value: value,
-                        ),
-                      if (_nonBlankComplianceValue(protection.pickupLabel)
-                          case final value?)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
-                          icon: Icons.local_shipping_outlined,
-                          label: 'Pickup',
-                          value: value,
-                        ),
-                      if (_nonBlankComplianceValue(protection.refundMethodLabel)
-                          case final value?)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
-                          icon: Icons.account_balance_wallet_outlined,
-                          label: 'Refund method',
-                          value: value,
-                        ),
-                      if (_nonBlankComplianceValue(
-                            protection.refundTimelineLabel,
-                          )
-                          case final value?)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
-                          icon: Icons.timelapse_rounded,
-                          label: 'Refund timeline',
-                          value: value,
-                        ),
-                      if (_nonBlankComplianceValue(protection.warrantyLabel)
-                          case final value?)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
-                          icon: Icons.shield_outlined,
-                          label: 'Warranty',
-                          value: value,
-                        ),
-                      if (_nonBlankComplianceValue(
-                            protection.nonReturnableReason,
-                          )
-                          case final value?)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
-                          icon: Icons.info_outline_rounded,
-                          label: 'Non-returnable',
-                          value: value,
-                        ),
-                      if (_nonBlankComplianceValue(protection.policyVersion)
-                          case final value?)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
-                          icon: Icons.description_outlined,
-                          label: 'Policy reference',
-                          value: value,
-                        ),
-                      if (_nonBlankComplianceValue(
-                            protection.effectiveFromLabel,
-                          )
-                          case final value?)
-                        _DecisionRow(
-                          stackAtLargeText: shop,
                           icon: Icons.event_available_outlined,
-                          label: 'Applies from',
-                          value: value,
+                          label: 'Price checked',
+                          value: product.confirmedOn,
                         ),
-                    ],
+                      ],
+                    ),
+                  if (product.destination == BuyV2Destination.shop ||
+                      product.destination == BuyV2Destination.wholesale) ...[
+                    const SizedBox(height: 10),
+                    BuyV2CartAvoidanceRegion(
+                      child: _ProductBenefitsPreview(
+                        session: session,
+                        product: product,
+                        benefits: productBenefits,
+                        state: productBenefitsState,
+                        customerMessage: session.productBenefitsMessageFor(
+                          product,
+                        ),
+                      ),
+                    ),
                   ],
-                ),
-              ],
-              if (automaticFulfilment) ...[
-                const SizedBox(height: 10),
-                BuyV2ProductCompliancePanel(product: product),
-              ],
-              const SizedBox(height: 10),
-              _ProductContentSections(
-                session: session,
-                product: product,
-                content: content,
+                  if (product.destination == BuyV2Destination.medicine) ...[
+                    const SizedBox(height: 10),
+                    _DecisionPanel(
+                      title: 'Medicine information',
+                      children: [
+                        _DecisionRow(
+                          icon: Icons.science_outlined,
+                          label: 'Composition',
+                          value: product.composition ?? product.variant,
+                        ),
+                        _DecisionRow(
+                          icon: Icons.health_and_safety_outlined,
+                          label: 'Dispensing',
+                          value: product.requiresPrescription
+                              ? 'Valid prescription and pharmacist review required'
+                              : 'No prescription required for this listed pack',
+                        ),
+                        _DecisionRow(
+                          icon: Icons.info_outline_rounded,
+                          label: 'Important',
+                          value:
+                              product.regulatoryNote ??
+                              'Check the sealed pack before use.',
+                        ),
+                        if (product.manufacturerVerified)
+                          const _DecisionRow(
+                            icon: Icons.factory_outlined,
+                            label: 'Supply',
+                            value:
+                                'Sealed manufacturer pack · dispensed by the listed licensed pharmacy',
+                          ),
+                      ],
+                    ),
+                  ],
+                  if (!shop || purchaseProtection != null) ...[
+                    const SizedBox(height: 10),
+                    _DecisionPanel(
+                      title: shop ? 'Purchase protection' : 'Product details',
+                      children: [
+                        if (!shop) ...[
+                          _DecisionRow(
+                            icon: Icons.sell_outlined,
+                            label: 'Brand',
+                            value: product.brand,
+                          ),
+                          _DecisionRow(
+                            icon: Icons.tune_rounded,
+                            label: 'Variant',
+                            value: product.variant,
+                          ),
+                          _DecisionRow(
+                            icon: Icons.inventory_2_outlined,
+                            label: 'Pack size',
+                            value: product.pack,
+                          ),
+                          if (automaticFulfilment)
+                            _DecisionRow(
+                              icon: Icons.location_on_outlined,
+                              label: 'Service area',
+                              value:
+                                  session.selectedAddressOrNull?.shortLine ??
+                                  'Based on your delivery address',
+                            )
+                          else
+                            _DecisionRow(
+                              icon: Icons.route_outlined,
+                              label: 'Where it comes from',
+                              value: product.origin,
+                            ),
+                          if (returnSummary case final returnPolicy?)
+                            _DecisionRow(
+                              icon: Icons.assignment_return_outlined,
+                              label: 'After delivery',
+                              value: returnPolicy,
+                            ),
+                        ],
+                        if (purchaseProtection case final protection?) ...[
+                          if (protectionRemedies.isNotEmpty)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.rule_rounded,
+                              label: 'Available options',
+                              value: protectionRemedies.join(' · '),
+                            ),
+                          if (_nonBlankComplianceValue(protection.windowLabel)
+                              case final value?)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.schedule_rounded,
+                              label: 'Request window',
+                              value: value,
+                            ),
+                          if (_nonBlankComplianceValue(
+                                protection.conditionsLabel,
+                              )
+                              case final value?)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.fact_check_outlined,
+                              label: 'Conditions',
+                              value: value,
+                            ),
+                          if (_nonBlankComplianceValue(
+                                protection.verificationLabel,
+                              )
+                              case final value?)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.verified_outlined,
+                              label: 'Verification',
+                              value: value,
+                            ),
+                          if (_nonBlankComplianceValue(
+                                protection.initiationLabel,
+                              )
+                              case final value?)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.playlist_add_check_rounded,
+                              label: 'How to request',
+                              value: value,
+                            ),
+                          if (_nonBlankComplianceValue(protection.approvalLabel)
+                              case final value?)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.approval_outlined,
+                              label: 'Approval',
+                              value: value,
+                            ),
+                          if (_nonBlankComplianceValue(protection.pickupLabel)
+                              case final value?)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.local_shipping_outlined,
+                              label: 'Pickup',
+                              value: value,
+                            ),
+                          if (_nonBlankComplianceValue(
+                                protection.refundMethodLabel,
+                              )
+                              case final value?)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.account_balance_wallet_outlined,
+                              label: 'Refund method',
+                              value: value,
+                            ),
+                          if (_nonBlankComplianceValue(
+                                protection.refundTimelineLabel,
+                              )
+                              case final value?)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.timelapse_rounded,
+                              label: 'Refund timeline',
+                              value: value,
+                            ),
+                          if (_nonBlankComplianceValue(protection.warrantyLabel)
+                              case final value?)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.shield_outlined,
+                              label: 'Warranty',
+                              value: value,
+                            ),
+                          if (_nonBlankComplianceValue(
+                                protection.nonReturnableReason,
+                              )
+                              case final value?)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.info_outline_rounded,
+                              label: 'Non-returnable',
+                              value: value,
+                            ),
+                          if (_nonBlankComplianceValue(protection.policyVersion)
+                              case final value?)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.description_outlined,
+                              label: 'Policy reference',
+                              value: value,
+                            ),
+                          if (_nonBlankComplianceValue(
+                                protection.effectiveFromLabel,
+                              )
+                              case final value?)
+                            _DecisionRow(
+                              stackAtLargeText: shop,
+                              icon: Icons.event_available_outlined,
+                              label: 'Applies from',
+                              value: value,
+                            ),
+                        ],
+                      ],
+                    ),
+                  ],
+                  if (automaticFulfilment) ...[
+                    const SizedBox(height: 10),
+                    BuyV2ProductCompliancePanel(product: product),
+                  ],
+                  const SizedBox(height: 10),
+                  _ProductContentSections(
+                    session: session,
+                    product: product,
+                    content: content,
+                  ),
+                  const SizedBox(height: 10),
+                  _MarketplaceTrustPanel(
+                    session: session,
+                    product: product,
+                    trust: trust,
+                    onViewSeller:
+                        product.destination == BuyV2Destination.wholesale &&
+                            onOpenPartnerCatalogue != null
+                        ? () => onOpenPartnerCatalogue!(product)
+                        : null,
+                    sellerProductCount: partnerProducts.length,
+                  ),
+                  const SizedBox(height: 10),
+                  _ProductReviewsPanel(
+                    product: product,
+                    review: review,
+                    onReview: session.canReviewProduct(product.id)
+                        ? () =>
+                              _showProductReviewSheet(context, session, product)
+                        : null,
+                    onReport: session.canReportProduct(product.id)
+                        ? () =>
+                              _showProductReportSheet(context, session, product)
+                        : null,
+                    reported: session.hasReportedProduct(product.id),
+                  ),
+                  if (product.destination == BuyV2Destination.shop ||
+                      product.destination == BuyV2Destination.wholesale) ...[
+                    const SizedBox(height: 8),
+                    _ProductQuickActions(
+                      session: session,
+                      product: product,
+                      onAskSeller: onAskSeller,
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  _ProductContinuationSection(
+                    session: session,
+                    product: product,
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ),
-              const SizedBox(height: 10),
-              _MarketplaceTrustPanel(
-                session: session,
-                product: product,
-                trust: trust,
-                onViewSeller:
-                    product.destination == BuyV2Destination.wholesale &&
-                        onOpenPartnerCatalogue != null
-                    ? () => onOpenPartnerCatalogue!(product)
-                    : null,
-                sellerProductCount: partnerProducts.length,
-              ),
-              const SizedBox(height: 10),
-              _ProductReviewsPanel(
-                product: product,
-                review: review,
-                onReview: session.canReviewProduct(product.id)
-                    ? () => _showProductReviewSheet(context, session, product)
-                    : null,
-                onReport: session.canReportProduct(product.id)
-                    ? () => _showProductReportSheet(context, session, product)
-                    : null,
-                reported: session.hasReportedProduct(product.id),
-              ),
-              if (product.destination == BuyV2Destination.shop ||
-                  product.destination == BuyV2Destination.wholesale) ...[
-                const SizedBox(height: 8),
-                _ProductQuickActions(
-                  session: session,
-                  product: product,
-                  onAskSeller: onAskSeller,
-                ),
-              ],
-              const SizedBox(height: 10),
-              _ProductContinuationSection(session: session, product: product),
-              const SizedBox(height: 8),
             ],
           ),
         ),

@@ -4144,6 +4144,54 @@ class BuyV2Session extends ChangeNotifier {
   bool get canReturnToComparedProduct =>
       view == BuyV2View.product && _comparedProductOrigins.isNotEmpty;
 
+  /// Restores the navigation underneath a temporary Store route without
+  /// opening another product or reverting Cart, Saved or checkout decisions.
+  /// The route owner discards this return when the customer changes destination.
+  VoidCallback beginStoreNavigationVisit() {
+    final origin = (
+      destination: destination,
+      view: view,
+      productId: selectedProductId,
+      cartScope: cartScope,
+      productReturnDestination: _productReturnDestination,
+      productReturnView: _productReturnView,
+      comparisons: List<String>.of(_comparedProductOrigins),
+      cartProductReturnActive: _cartProductReturnActive,
+      cartProductReturnDestination: _cartProductReturnDestination,
+      cartProductReturnId: _cartProductReturnId,
+      cartProductReturnOrigin: _cartProductReturnOrigin,
+    );
+    _comparedProductOrigins.clear();
+    var returned = false;
+    return () {
+      if (returned) return;
+      returned = true;
+      final previous = _navigationSurfaceIdentity;
+      destination = origin.destination;
+      view = origin.view;
+      selectedProductId = origin.productId;
+      cartScope = origin.cartScope;
+      _productReturnDestination = origin.productReturnDestination;
+      _productReturnView = origin.productReturnView;
+      _comparedProductOrigins
+        ..clear()
+        ..addAll(origin.comparisons.where((id) => findProduct(id) != null));
+      _cartProductReturnActive = origin.cartProductReturnActive;
+      _cartProductReturnDestination = origin.cartProductReturnDestination;
+      _cartProductReturnId = origin.cartProductReturnId;
+      _cartProductReturnOrigin = origin.cartProductReturnOrigin;
+      notice = null;
+      if ((view == BuyV2View.cart && _cart.isEmpty) ||
+          (view == BuyV2View.product &&
+              (selectedProductId == null ||
+                  findProduct(selectedProductId!) == null))) {
+        returnToCatalogue();
+        return;
+      }
+      _notifyNavigationIfChanged(previous, BuyV2NavigationMotionDirection.back);
+    };
+  }
+
   List<String> takeProductComparisonOrigin() {
     final origin = List<String>.unmodifiable(_comparedProductOrigins);
     _comparedProductOrigins.clear();
@@ -5724,7 +5772,8 @@ class BuyV2Session extends ChangeNotifier {
         destination: current.product.destination,
       );
     }
-    if (_cart.isEmpty) {
+    if (_cart.isEmpty &&
+        (view == BuyV2View.cart || view == BuyV2View.checkout)) {
       destination = current.product.destination;
       view = BuyV2View.catalogue;
       cartScope = BuyV2CartScope.all;
@@ -5747,7 +5796,8 @@ class BuyV2Session extends ChangeNotifier {
       '${removed.product.title} removed',
       destination: removed.product.destination,
     );
-    if (_cart.isEmpty) {
+    if (_cart.isEmpty &&
+        (view == BuyV2View.cart || view == BuyV2View.checkout)) {
       destination = removed.product.destination;
       view = BuyV2View.catalogue;
       cartScope = BuyV2CartScope.all;
