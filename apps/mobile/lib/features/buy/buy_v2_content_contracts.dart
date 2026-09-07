@@ -301,6 +301,58 @@ class BuyV2BankTransferInstructions {
   final String transferReference;
 }
 
+/// Account context from the authentication adapter, not from an order or QR.
+/// A new login/session must publish a new identity, even for the same account.
+@immutable
+class BuyV2CollectionIdentity {
+  const BuyV2CollectionIdentity({
+    required this.accountId,
+    required this.sessionId,
+  });
+
+  final String accountId;
+  final String sessionId;
+}
+
+/// Durable reconciliation context. The scanned security token is never stored.
+@immutable
+class BuyV2CollectionPendingIntent {
+  const BuyV2CollectionPendingIntent({
+    required this.accountId,
+    required this.orderId,
+    required this.storeId,
+    required this.operationId,
+    required this.requestFingerprint,
+  });
+
+  final String accountId;
+  final String orderId;
+  final String storeId;
+  final String operationId;
+  final String requestFingerprint;
+}
+
+/// Supplied by the authenticated persistence adapter. There is deliberately no
+/// in-memory production default: uncertain scans must survive process death.
+abstract interface class BuyV2CollectionPendingStore {
+  /// Reads serialize after earlier reservations/clears, including a caller's
+  /// timed-out operation. No delayed write may appear after this read settles.
+  Future<BuyV2CollectionPendingIntent?> read({
+    required String accountId,
+    required String orderId,
+    required String storeId,
+  });
+
+  /// Atomically writes only when this account/order/store has no pending intent.
+  /// True means durably committed before the authorisation request can start.
+  Future<bool> reserve(BuyV2CollectionPendingIntent intent);
+
+  /// Clears only the exact original operation/fingerprint, never a newer intent.
+  /// An already absent intent also succeeds; a different pending intent does not.
+  /// False or a storage error leaves reconciliation pending.
+  Future<bool> clear(BuyV2CollectionPendingIntent intent);
+}
+
 @immutable
 class BuyV2CommerceSnapshot {
   const BuyV2CommerceSnapshot({

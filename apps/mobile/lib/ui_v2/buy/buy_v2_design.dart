@@ -1907,6 +1907,30 @@ class BuyV2PromotionCard extends StatefulWidget {
     fontWeight: FontWeight.w700,
   );
 
+  double requiredHeight(BuildContext context) {
+    final accessibleText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
+    var textHeight = 3.0;
+    for (final value in [
+      (text: title, style: titleStyle, lines: 3),
+      (text: detail, style: detailStyle, lines: 4),
+    ]) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: value.text,
+          style: DefaultTextStyle.of(context).style.merge(value.style),
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        locale: Localizations.maybeLocaleOf(context),
+        maxLines: accessibleText ? null : value.lines,
+      )..layout(maxWidth: (width - 93).clamp(1, double.infinity));
+      textHeight += painter.height;
+      painter.dispose();
+    }
+    // The same row has a 38px icon, 18px vertical padding and two border edges.
+    return (textHeight < 38 ? 58.0 : textHeight + 20).ceilToDouble();
+  }
+
   bool fitsTextWidth(BuildContext context, double cardWidth) {
     // Match the row's icons/gaps, horizontal padding and both border edges.
     final textWidth = cardWidth - 93;

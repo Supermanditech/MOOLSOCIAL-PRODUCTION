@@ -13,6 +13,7 @@ import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_order_resolution_contracts.dart';
 import '../../features/buy/buy_v2_saved_products_store.dart';
 import '../../features/buy/buy_v2_session.dart';
+import '../../features/work/scan_and_pick_contract.dart';
 import '../../features/journey01/journey_services.dart';
 import 'buy_v2_address_form_sheet_motion.dart';
 import 'buy_v2_address_sheet_motion.dart';
@@ -23,6 +24,7 @@ import 'buy_v2_payment_sheet_motion.dart';
 import 'buy_v2_prescription_sheet_motion.dart';
 import 'buy_v2_product_feedback_sheet_motion.dart';
 import 'buy_v2_product_video.dart';
+import 'buy_v2_scanner.dart';
 
 typedef BuyV2LiveDeliveryMapBuilder =
     Widget Function(BuildContext context, BuyV2LiveDeliverySnapshot snapshot);
@@ -8386,6 +8388,30 @@ String buyV2OrderRowKey({
     'buy-order-row-${purchaseId ?? 'ungrouped-$groupIndex'}-'
     '$orderIndex-$orderId';
 
+String _buyV2PurchaseSummary(BuyV2Session session, List<BuyV2Order> orders) {
+  final collections = orders.where((order) => order.collection != null).length;
+  if (collections == 0) {
+    final count = orders.length;
+    final total = orders.fold<int>(0, (sum, order) => sum + order.total);
+    return '$count ${count == 1 ? 'delivery' : 'deliveries'} · ${buyV2Money(total)}';
+  }
+  final count = orders.length;
+  final kind = collections == count
+      ? (count == 1 ? 'collection' : 'collections')
+      : (count == 1 ? 'order' : 'orders');
+  var totalMinor = 0;
+  for (final order in orders) {
+    if (order.collection == null) {
+      totalMinor += order.total * 100;
+    } else {
+      final snapshot = session.collectionSnapshotFor(order.id);
+      if (snapshot == null) return '$count $kind · Updating total';
+      totalMinor += snapshot.totalMinor;
+    }
+  }
+  return '$count $kind · ${_collectionMoney(totalMinor)}';
+}
+
 class BuyV2OrdersView extends StatelessWidget {
   const BuyV2OrdersView({
     super.key,
@@ -8444,8 +8470,6 @@ class BuyV2OrdersView extends StatelessWidget {
                             child: Text(
                               '${session.activeOrderCount} active · '
                               '${session.deliveredOrderCount} delivered',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                               style: context.buyMeta.copyWith(fontSize: 8),
                             ),
                           ),
@@ -8461,7 +8485,8 @@ class BuyV2OrdersView extends StatelessWidget {
         const SizedBox(height: 6),
         BuyV2CartAvoidanceRegion(
           child: Container(
-            height: 34,
+            key: const ValueKey('buy-orders-tabs'),
+            constraints: const BoxConstraints(minHeight: 50),
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
               color: const Color(0xFFE8E9F3),
@@ -8526,7 +8551,10 @@ class BuyV2OrdersView extends StatelessWidget {
                                         ),
                                       ),
                                       Text(
-                                        '${group.orders.length} ${group.orders.length == 1 ? 'delivery' : 'deliveries'} · ${buyV2Money(group.orders.fold<int>(0, (total, order) => total + order.total))}',
+                                        _buyV2PurchaseSummary(
+                                          session,
+                                          group.orders,
+                                        ),
                                         style: context.buyMeta.copyWith(
                                           fontSize: 8,
                                         ),
@@ -8622,6 +8650,8 @@ class _OrdersTabButton extends StatelessWidget {
         child: AnimatedContainer(
           duration: duration,
           curve: Curves.easeInOutCubic,
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: selected ? Colors.white : Colors.transparent,
@@ -8633,6 +8663,8 @@ class _OrdersTabButton extends StatelessWidget {
             style: DefaultTextStyle.of(context).style.copyWith(
               color: selected ? BuyV2Colors.navy : BuyV2Colors.muted,
               fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              fontSize: 13,
+              height: 1.25,
             ),
             child: Text(label),
           ),
@@ -8881,7 +8913,6 @@ class _OrdersContinuationRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accessibleText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
     final cards = [
       BuyV2PromotionCard(
         key: const ValueKey('buy-promotion-orders-shop'),
@@ -8912,7 +8943,10 @@ class _OrdersContinuationRail extends StatelessWidget {
     ];
     return SizedBox(
       key: const ValueKey('buy-orders-promotions'),
-      height: accessibleText ? 108 : 90,
+      height: cards.fold<double>(90, (height, card) {
+        final measured = card.requiredHeight(context);
+        return measured > height ? measured : height;
+      }),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: cards.length,
@@ -9735,6 +9769,483 @@ String _liveDeliveryUpdatedLabel(DateTime updatedAt) {
   return '$hours ${hours == 1 ? 'hour' : 'hours'} ago';
 }
 
+String _collectionMoney(int minor) =>
+    '₹${minor ~/ 100}.${(minor % 100).toString().padLeft(2, '0')}';
+
+class _BuyV2CollectionOrderView extends StatefulWidget {
+  const _BuyV2CollectionOrderView({
+    required this.session,
+    required this.order,
+    required this.onOpenOrderHelp,
+    this.cameraBuilder,
+  });
+
+  final BuyV2Session session;
+  final BuyV2Order order;
+  final ValueChanged<BuyV2Order> onOpenOrderHelp;
+  final BuyV2CollectionCameraBuilder? cameraBuilder;
+
+  @override
+  State<_BuyV2CollectionOrderView> createState() =>
+      _BuyV2CollectionOrderViewState();
+}
+
+class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
+    with WidgetsBindingObserver {
+  Timer? _poll;
+  bool _scanning = false;
+  bool _submitting = false;
+  bool _foreground = true;
+  String? _cameraMessage;
+  int _scanGeneration = 0;
+  BuyV2CollectionIdentity? _identity;
+  final _cameraAnchor = GlobalKey();
+  final _headingAnchor = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _identity = widget.session.collectionIdentity?.value;
+    widget.session.addListener(_changed);
+    _poll = Timer.periodic(const Duration(seconds: 3), (_) => _refresh());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _refresh();
+    });
+  }
+
+  void _changed() {
+    if (!mounted) return;
+    setState(() {
+      final identity = widget.session.collectionIdentity?.value;
+      if (!identical(_identity, identity) ||
+          !widget.session.collectionOrderBelongsToCurrentAccount(
+            widget.order,
+          )) {
+        _identity = identity;
+        _scanGeneration++;
+        _scanning = false;
+        _submitting = false;
+      }
+    });
+  }
+
+  void _refresh() {
+    if (!mounted ||
+        !_foreground ||
+        _submitting ||
+        ModalRoute.of(context)?.isCurrent == false ||
+        widget.session.view != BuyV2View.tracking ||
+        widget.session.selectedOrderId != widget.order.id) {
+      return;
+    }
+    final snapshot = widget.session.collectionSnapshotFor(widget.order.id);
+    if (!_scanning &&
+        (snapshot?.state == ScanPickState.collected ||
+            snapshot?.state == ScanPickState.cancelled)) {
+      return;
+    }
+    if (!_scanning && !widget.session.collectionBusy(widget.order.id)) {
+      unawaited(widget.session.refreshCollectionOrder(widget.order.id));
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _foreground = true;
+      _refresh();
+    } else {
+      _foreground = false;
+      _scanGeneration++;
+      if (mounted) {
+        setState(() {
+          if (_submitting || state != AppLifecycleState.inactive) {
+            _scanning = false;
+          }
+          _submitting = false;
+        });
+      }
+      widget.session.pauseCollection();
+    }
+  }
+
+  void _revealCollectionAnchor(GlobalKey anchor) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final anchorContext = anchor.currentContext;
+      if (!mounted || !_foreground || anchorContext == null) return;
+      unawaited(Scrollable.ensureVisible(anchorContext, alignment: 0));
+    });
+  }
+
+  Future<void> _detected(String raw) async {
+    if (!mounted ||
+        !_scanning ||
+        _submitting ||
+        !_foreground ||
+        ModalRoute.of(context)?.isCurrent == false) {
+      return;
+    }
+    final session = widget.session;
+    final orderId = widget.order.id;
+    final generation = ++_scanGeneration;
+    setState(() {
+      _submitting = true;
+      _cameraMessage = null;
+    });
+    if (!session.canScanCollection(orderId)) {
+      await session.refreshCollectionOrder(orderId);
+    }
+    if (mounted &&
+        generation == _scanGeneration &&
+        _foreground &&
+        identical(widget.session, session) &&
+        widget.order.id == orderId &&
+        session.canScanCollection(orderId)) {
+      await session.authoriseCollection(orderId, raw);
+    }
+    if (!mounted ||
+        generation != _scanGeneration ||
+        !identical(widget.session, session) ||
+        widget.order.id != orderId) {
+      return;
+    }
+    setState(() {
+      _scanning = false;
+      _submitting = false;
+      if (session.collectionMessageFor(orderId) == null &&
+          session.collectionSnapshotFor(orderId)?.state ==
+              ScanPickState.awaitingCustomer) {
+        _cameraMessage =
+            'Order status changed. Check the latest details, then scan again.';
+      }
+    });
+    _revealCollectionAnchor(_headingAnchor);
+  }
+
+  @override
+  void didUpdateWidget(covariant _BuyV2CollectionOrderView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session ||
+        oldWidget.order.id != widget.order.id) {
+      oldWidget.session.removeListener(_changed);
+      if (oldWidget.session != widget.session) {
+        oldWidget.session.pauseCollection(notify: false);
+      }
+      _scanGeneration++;
+      _identity = widget.session.collectionIdentity?.value;
+      widget.session.addListener(_changed);
+      _scanning = false;
+      _submitting = false;
+      _cameraMessage = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _refresh();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scanGeneration++;
+    _poll?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    widget.session.removeListener(_changed);
+    widget.session.pauseCollection(notify: false);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = widget.session;
+    final order = widget.order;
+    final owned = session.collectionOrderBelongsToCurrentAccount(order);
+    final snapshot = owned ? session.collectionSnapshotFor(order.id) : null;
+    final status = session.collectionStatusLabelFor(order.id);
+    final message = session.collectionMessageFor(order.id) ?? _cameraMessage;
+    final positive =
+        status == 'Ready at store' ||
+        status == 'Collected' ||
+        status.startsWith('Matched');
+    final lines = snapshot?.lines ?? const <ScanPickLine>[];
+    return ListView.builder(
+      key: PageStorageKey('buy-collection-order-${order.id}'),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+      itemCount: lines.length + 2,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          final previewHeight =
+              (Scrollable.of(context).position.viewportDimension * .55).clamp(
+                80.0,
+                320.0,
+              );
+          return BuyV2CartAvoidanceRegion(
+            child: Column(
+              key: _headingAnchor,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _ReturnAffordance(
+                    key: const ValueKey('buy-collection-return-orders'),
+                    label: 'Orders',
+                    minimumHeight: 44,
+                    onTap: session.returnToOrders,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Semantics(
+                  header: true,
+                  child: Text(
+                    'Collect at store',
+                    style: context.buyTitle.copyWith(fontSize: 19),
+                  ),
+                ),
+                if (owned) ...[
+                  Text(
+                    snapshot?.storeName ?? order.partner,
+                    style: context.buyBody,
+                  ),
+                  Text(order.id, style: context.buyMeta),
+                ],
+                const SizedBox(height: 12),
+                Container(
+                  key: const ValueKey('buy-collection-status'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: buyV2CardDecoration(
+                    color: positive
+                        ? BuyV2Colors.softGreen
+                        : const Color(0xFFF0F3F8),
+                    radius: 12,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        status,
+                        style: context.buyTitle.copyWith(
+                          fontSize: 16,
+                          color: positive
+                              ? BuyV2Colors.green
+                              : BuyV2Colors.navy,
+                        ),
+                      ),
+                      if (snapshot != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '${snapshot.payment == ScanPickPayment.paid ? 'Paid ' : 'Order total '}${_collectionMoney(snapshot.totalMinor)}',
+                          style: context.buyBody,
+                        ),
+                      ],
+                      if (!owned)
+                        Text(
+                          'Sign in with the account that placed this order.',
+                          style: context.buyBody,
+                        ),
+                      if (status.startsWith('Matched'))
+                        Text(
+                          'Your order is matched. The store can now hand over your items.',
+                          style: context.buyBody,
+                        ),
+                      if (snapshot?.state == ScanPickState.preparing)
+                        Text(
+                          'We’ll update this order when the store is ready.',
+                          style: context.buyBody,
+                        ),
+                      if (message != null) ...[
+                        const SizedBox(height: 6),
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(message, style: context.buyBody),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (owned &&
+                    !status.startsWith('Matched') &&
+                    snapshot?.state != ScanPickState.collected &&
+                    snapshot?.state != ScanPickState.cancelled) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Check your items, then scan at the counter.',
+                    style: context.buyBody,
+                  ),
+                  const SizedBox(height: 8),
+                  if (_scanning && !_submitting)
+                    KeyedSubtree(
+                      key: _cameraAnchor,
+                      child: widget.cameraBuilder != null
+                          ? ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxHeight: previewHeight,
+                              ),
+                              child: widget.cameraBuilder!(
+                                context,
+                                (raw) => unawaited(_detected(raw)),
+                              ),
+                            )
+                          : BuyV2CollectionCamera(
+                              key: ValueKey(
+                                'buy-collection-camera-${order.id}',
+                              ),
+                              maximumPreviewHeight: previewHeight,
+                              onDetected: (raw) => unawaited(_detected(raw)),
+                            ),
+                    )
+                  else if (_submitting ||
+                      session.collectionReconciliationPending(order.id))
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        'Checking this order…',
+                        style: context.buyBody,
+                      ),
+                    )
+                  else if (!status.startsWith('Matched'))
+                    FilledButton.icon(
+                      key: const ValueKey('buy-collection-scan'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
+                      onPressed: session.canScanCollection(order.id)
+                          ? () {
+                              setState(() {
+                                _scanning = true;
+                                _cameraMessage = null;
+                              });
+                              _revealCollectionAnchor(_cameraAnchor);
+                            }
+                          : null,
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 22),
+                      label: const Text(
+                        'Scan & Pick',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  if (_scanning && !_submitting)
+                    TextButton(
+                      key: const ValueKey('buy-collection-close-camera'),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                      ),
+                      onPressed: () => setState(() => _scanning = false),
+                      child: const Text('Close camera'),
+                    ),
+                ],
+                if (lines.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      'Your purchased items',
+                      style: context.buyTitle.copyWith(
+                        fontSize: 15,
+                        height: 1.25,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ],
+            ),
+          );
+        }
+        if (index <= lines.length) {
+          final line = lines[index - 1];
+          return BuyV2CartAvoidanceRegion(
+            child: Container(
+              key: ValueKey('buy-collection-line-${line.lineId}'),
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: buyV2CardDecoration(radius: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    line.name,
+                    style: context.buyTitle.copyWith(
+                      fontSize: 16,
+                      height: 1.25,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(line.pack, style: context.buyBody),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    spacing: 12,
+                    runSpacing: 4,
+                    children: [
+                      Text('Quantity ${line.quantity}', style: context.buyBody),
+                      Text(
+                        _collectionMoney(line.amountMinor),
+                        style: context.buyBody,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return BuyV2CartAvoidanceRegion(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (snapshot?.receipt case final receipt?) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Collection receipt',
+                  style: context.buyTitle.copyWith(
+                    fontSize: 15,
+                    height: 1.25,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(receipt.id, style: context.buyBody),
+                Text(
+                  MaterialLocalizations.of(
+                    context,
+                  ).formatFullDate(receipt.collectedAt.toLocal()),
+                  style: context.buyMeta,
+                ),
+                if (receipt.invoiceReference case final invoice?)
+                  Text('Invoice $invoice', style: context.buyBody),
+              ],
+              const SizedBox(height: 12),
+              Text(
+                'Your rights for faulty or incorrect goods remain.',
+                style: context.buyMeta.copyWith(fontSize: 11),
+              ),
+              if (owned)
+                TextButton.icon(
+                  key: const ValueKey('buy-collection-help'),
+                  style: TextButton.styleFrom(minimumSize: const Size(0, 44)),
+                  onPressed: () {
+                    _scanGeneration++;
+                    setState(() {
+                      _scanning = false;
+                      _submitting = false;
+                    });
+                    session.pauseCollection();
+                    widget.onOpenOrderHelp(order);
+                  },
+                  icon: const Icon(Icons.help_outline_rounded, size: 18),
+                  label: const Text('Order help'),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class BuyV2TrackingView extends StatelessWidget {
   const BuyV2TrackingView({
     super.key,
@@ -9743,6 +10254,7 @@ class BuyV2TrackingView extends StatelessWidget {
     this.invoiceDownloader,
     this.paymentHandoff,
     this.liveDeliveryMapBuilder,
+    this.collectionCameraBuilder,
   });
 
   final BuyV2Session session;
@@ -9750,12 +10262,21 @@ class BuyV2TrackingView extends StatelessWidget {
   final BuyV2InvoiceDownloader? invoiceDownloader;
   final BuyV2PaymentHandoff? paymentHandoff;
   final BuyV2LiveDeliveryMapBuilder? liveDeliveryMapBuilder;
+  final BuyV2CollectionCameraBuilder? collectionCameraBuilder;
 
   @override
   Widget build(BuildContext context) {
     final order = session.selectedOrderOrNull;
     if (order == null) {
       return _MissingOrderSelection(session: session);
+    }
+    if (order.collection != null) {
+      return _BuyV2CollectionOrderView(
+        session: session,
+        order: order,
+        onOpenOrderHelp: onOpenOrderHelp,
+        cameraBuilder: collectionCameraBuilder,
+      );
     }
     final returnToOrders = IntrinsicWidth(
       child: _ReturnAffordance(
@@ -17042,6 +17563,56 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (order.collection != null) {
+      final owned = session.collectionOrderBelongsToCurrentAccount(order);
+      final snapshot = session.collectionSnapshotFor(order.id);
+      return BuyV2CartAvoidanceRegion(
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Collect at store',
+                  style: context.buyTitle.copyWith(fontSize: 16, height: 1.25),
+                ),
+                if (owned) ...[
+                  Text(
+                    snapshot?.storeName ?? order.partner,
+                    style: context.buyBody,
+                  ),
+                  Text(order.id, style: context.buyMeta),
+                ],
+                const SizedBox(height: 6),
+                Text(
+                  session.collectionStatusLabelFor(order.id),
+                  style: context.buyBody,
+                ),
+                if (snapshot != null)
+                  Text(
+                    _collectionMoney(snapshot.totalMinor),
+                    style: context.buyTitle.copyWith(
+                      fontSize: 16,
+                      height: 1.25,
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  key: ValueKey('buy-order-primary-${order.id}'),
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+                  onPressed: owned
+                      ? () => session.openTracking(order.id)
+                      : null,
+                  child: const Text('View order'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     void activatePrimaryAction() {
       HapticFeedback.selectionClick();
       session.openTracking(order.id);

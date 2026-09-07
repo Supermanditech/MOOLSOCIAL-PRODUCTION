@@ -57,6 +57,7 @@ class BuyV2Screen extends StatefulWidget {
     this.orderId,
     this.recoveryKind,
     this.scannerLauncher = showBuyV2ProductScanner,
+    this.collectionCameraBuilder,
     this.onExit,
     this.onOpenMool,
     this.onOpenMainAction,
@@ -81,6 +82,7 @@ class BuyV2Screen extends StatefulWidget {
   final String? orderId;
   final BuyV2RecoveryKind? recoveryKind;
   final BuyV2ScannerLauncher scannerLauncher;
+  final BuyV2CollectionCameraBuilder? collectionCameraBuilder;
   final VoidCallback? onExit;
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec>? onOpenMainAction;
@@ -1209,6 +1211,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   void _openOrderHelpChat(BuyV2Order order) {
+    if (order.collection != null &&
+        !widget.session.collectionOrderBelongsToCurrentAccount(order)) {
+      widget.session.showNotice(
+        'Sign in with the account that placed this order.',
+      );
+      return;
+    }
     final onOpenChat = widget.onOpenChat;
     final chatLabel = order.destination == BuyV2Destination.medicine
         ? 'Care Chat'
@@ -1226,7 +1235,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     }
     try {
       context.push(
-        const BuyV2ChatRouteAdapter().orderHelpLocationFor(order: order),
+        order.collection == null
+            ? const BuyV2ChatRouteAdapter().orderHelpLocationFor(order: order)
+            : const BuyV2ChatRouteAdapter().orderHelpLocationFor(
+                orderId: order.id,
+              ),
       );
     } on ArgumentError {
       widget.session.showNotice(
@@ -1688,6 +1701,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       ),
       BuyV2View.tracking => BuyV2TrackingView(
         session: session,
+        collectionCameraBuilder: widget.collectionCameraBuilder,
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
         paymentHandoff: widget.paymentHandoff,
@@ -1696,6 +1710,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
       BuyV2View.assist => BuyV2TrackingView(
         session: session,
+        collectionCameraBuilder: widget.collectionCameraBuilder,
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
         paymentHandoff: widget.paymentHandoff,

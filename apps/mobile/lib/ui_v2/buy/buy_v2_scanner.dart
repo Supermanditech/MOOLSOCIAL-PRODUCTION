@@ -8,6 +8,224 @@ import 'package:permission_handler/permission_handler.dart';
 import 'buy_v2_design.dart';
 import 'buy_v2_manual_code_sheet_motion.dart';
 
+typedef BuyV2CollectionCameraBuilder =
+    Widget Function(BuildContext context, ValueChanged<String> onDetected);
+
+/// An automatic, order-bound camera surface. The parent order owns validation,
+/// recovery and status; this camera never interprets a QR as a product or URL.
+class BuyV2CollectionCamera extends StatefulWidget {
+  const BuyV2CollectionCamera({
+    super.key,
+    required this.onDetected,
+    this.maximumPreviewHeight = 320,
+  });
+
+  final ValueChanged<String> onDetected;
+  final double maximumPreviewHeight;
+
+  @override
+  State<BuyV2CollectionCamera> createState() => _BuyV2CollectionCameraState();
+}
+
+class _BuyV2CollectionCameraState extends State<BuyV2CollectionCamera>
+    with WidgetsBindingObserver {
+  final _controller = MobileScannerController(
+    autoStart: false,
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    formats: const [BarcodeFormat.qrCode],
+  );
+  bool _starting = false;
+  bool _handled = false;
+  bool _foreground = true;
+  bool _settingsNeeded = false;
+  bool _permissionNeeded = false;
+  String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_start(requestPermission: true));
+    });
+  }
+
+  Future<void> _start({bool requestPermission = false}) async {
+    if (_starting || _handled || !mounted || !_foreground) return;
+    setState(() {
+      _starting = true;
+      _message = null;
+    });
+    try {
+      final permission = requestPermission
+          ? await Permission.camera.request()
+          : await Permission.camera.status;
+      if (!mounted || !_foreground || _handled) return;
+      if (!permission.isGranted) {
+        setState(() {
+          _permissionNeeded = true;
+          _settingsNeeded =
+              permission.isPermanentlyDenied || permission.isRestricted;
+          _message = 'Allow camera access to scan this order at the counter.';
+        });
+        return;
+      }
+      _permissionNeeded = false;
+      _settingsNeeded = false;
+      await _controller.start();
+      if (!_foreground || _handled) await _stop();
+      if (mounted && _foreground && !_handled && _controller.value.isRunning) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_foreground || _handled) return;
+          unawaited(Scrollable.ensureVisible(context, alignment: 0));
+        });
+      }
+    } on Object {
+      if (mounted) {
+        setState(() => _message = 'Camera could not start. Try again here.');
+      }
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
+  }
+
+  Future<void> _stop() async {
+    try {
+      await _controller.stop();
+    } on Object {
+      // Camera teardown cannot authorise or complete an order.
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _foreground = true;
+      if (!_starting) unawaited(_start());
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _foreground = false;
+      unawaited(_stop());
+    } else if (!_starting && _controller.value.hasCameraPermission) {
+      _foreground = false;
+      unawaited(_stop());
+    }
+  }
+
+  void _detect(BarcodeCapture capture) {
+    if (!mounted || _handled || !_foreground) return;
+    for (final barcode in capture.barcodes) {
+      final raw = barcode.rawValue;
+      if (barcode.format != BarcodeFormat.qrCode || raw == null) continue;
+      _handled = true;
+      unawaited(_stop());
+      widget.onDetected(raw);
+      break;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_controller.dispose());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: widget.maximumPreviewHeight),
+          child: AspectRatio(
+            aspectRatio: 4 / 3,
+            child: MobileScanner(
+              key: const ValueKey('buy-collection-camera-preview'),
+              controller: _controller,
+              fit: BoxFit.contain,
+              tapToFocus: true,
+              onDetect: _detect,
+              placeholderBuilder: (_) => const ColoredBox(
+                color: Color(0xFF10182B),
+                child: Center(
+                  child: Icon(
+                    Icons.qr_code_scanner,
+                    color: Colors.white,
+                    size: 48,
+                  ),
+                ),
+              ),
+              errorBuilder: (_, _) => ColoredBox(
+                color: Color(0xFF10182B),
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Camera unavailable',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        if (_message == null)
+                          TextButton(
+                            key: const ValueKey('buy-collection-camera-retry'),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(0, 44),
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: _starting
+                                ? null
+                                : () async {
+                                    await _stop();
+                                    await _start(requestPermission: true);
+                                  },
+                            child: const Text('Retry camera'),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        _message ??
+            'Point at the QR on the store’s order card. Scans automatically.',
+        style: context.buyBody,
+      ),
+      if (_message != null)
+        TextButton.icon(
+          key: const ValueKey('buy-collection-camera-recover'),
+          style: TextButton.styleFrom(minimumSize: const Size(0, 44)),
+          onPressed: _starting
+              ? null
+              : () async {
+                  if (_settingsNeeded) {
+                    await openAppSettings();
+                  } else {
+                    await _start(requestPermission: true);
+                  }
+                },
+          icon: const Icon(Icons.camera_alt_outlined, size: 18),
+          label: Text(
+            _settingsNeeded
+                ? 'Open camera settings'
+                : _permissionNeeded
+                ? 'Allow camera'
+                : 'Retry camera',
+          ),
+        ),
+    ],
+  );
+}
+
 typedef BuyV2ScannerLauncher = Future<String?> Function(BuildContext context);
 
 Future<String?> showBuyV2ProductScanner(BuildContext context) async {

@@ -435,6 +435,18 @@ class BuyV2TaxInvoiceDetails {
   int get totalTax => lines.fold(0, (total, line) => total + line.totalTax);
 }
 
+/// A customer-collection reference supplied by the authenticated commerce
+/// adapter. It is routing context, never evidence of payment or collection.
+class BuyV2CollectionOrderReference {
+  const BuyV2CollectionOrderReference({
+    required this.storeId,
+    required this.purchaserAccountId,
+  });
+
+  final String storeId;
+  final String purchaserAccountId;
+}
+
 class BuyV2Order {
   const BuyV2Order({
     required this.id,
@@ -448,6 +460,7 @@ class BuyV2Order {
     required this.destinationLabel,
     required this.progress,
     required this.status,
+    this.collection,
     this.purchaseId,
     this.promisedByLabel,
     this.updatedDeliveryEstimate,
@@ -495,6 +508,7 @@ class BuyV2Order {
   final String destinationLabel;
   final double progress;
   final BuyV2OrderStatus status;
+  final BuyV2CollectionOrderReference? collection;
   final String? purchaseId;
   final String? promisedByLabel;
   final String? updatedDeliveryEstimate;

@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
+import '../work/scan_and_pick_contract.dart';
 import 'buy_session.dart';
 import 'buy_v2_cart_contracts.dart';
 import 'buy_v2_content_contracts.dart';
@@ -381,6 +385,28 @@ final class _BuyV2DeviceReviewGstInvoiceProfileStore
   }
 }
 
+class _BuyV2CollectionState {
+  ScanPickSnapshot? snapshot;
+  BuyV2CollectionPendingIntent? pendingIntent;
+  final Stopwatch elapsed = Stopwatch();
+  bool busy = false;
+  bool pending = false;
+  bool refreshRequired = true;
+  int attempt = 0;
+  int? navigation;
+  String? message;
+  String? scanMessage;
+  ScanPickState? scanMessageState;
+  String? scanMessageChallenge;
+}
+
+typedef _BuyV2CollectionContext = ({
+  BuyV2Order order,
+  BuyV2CollectionIdentity identity,
+  int epoch,
+  int navigation,
+});
+
 class BuyV2Session extends ChangeNotifier {
   BuyV2Session({
     required this.core,
@@ -399,6 +425,9 @@ class BuyV2Session extends ChangeNotifier {
     this.balancePaymentAdapter,
     this.deliveryExceptionAdapter,
     this.liveDeliveryAdapter,
+    this.collectionGateway,
+    this.collectionIdentity,
+    this.collectionPendingStore,
     BuyV2OrderResolutionAdapter? orderResolutionAdapter,
     BuyV2ShoppingAlertsAdapter? shoppingAlertsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
@@ -440,6 +469,7 @@ class BuyV2Session extends ChangeNotifier {
                    (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled))
                ? const BuyV2UiReviewShoppingAlertsAdapter()
                : const BuyV2UnavailableShoppingAlertsAdapter()) {
+    collectionIdentity?.addListener(_onCollectionIdentityChanged);
     if (cartBenefitsAdapter is BuyV2LiveCartBenefitsAdapter) {
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.idle;
     }
@@ -466,6 +496,424 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
+  void _onCollectionIdentityChanged() {
+    _collectionEpoch++;
+    for (final state in _collectionStates.values) {
+      state.elapsed.stop();
+    }
+    _collectionStates.clear();
+    if (_collectionDisposed) return;
+    notifyListeners();
+    final order = selectedOrderOrNull;
+    if (view == BuyV2View.tracking && order?.collection != null) {
+      unawaited(refreshCollectionOrder(order!.id));
+    }
+  }
+
+  @override
+  void dispose() {
+    _collectionDisposed = true;
+    _collectionEpoch++;
+    collectionIdentity?.removeListener(_onCollectionIdentityChanged);
+    for (final state in _collectionStates.values) {
+      state.elapsed.stop();
+    }
+    super.dispose();
+  }
+
+  bool collectionOrderBelongsToCurrentAccount(BuyV2Order order) {
+    final reference = order.collection;
+    final identity = collectionIdentity?.value;
+    return reference != null &&
+        identity != null &&
+        identity.accountId.trim().isNotEmpty &&
+        identity.sessionId.trim().isNotEmpty &&
+        reference.storeId.trim().isNotEmpty &&
+        reference.purchaserAccountId == identity.accountId;
+  }
+
+  _BuyV2CollectionContext? _collectionContext(String orderId) {
+    final order = _orders.where((value) => value.id == orderId).firstOrNull;
+    if (_collectionDisposed ||
+        order == null ||
+        view != BuyV2View.tracking ||
+        selectedOrderId != orderId ||
+        !collectionOrderBelongsToCurrentAccount(order)) {
+      return null;
+    }
+    return (
+      order: order,
+      identity: collectionIdentity!.value!,
+      epoch: _collectionEpoch,
+      navigation: _navigationMotionSequence,
+    );
+  }
+
+  bool _collectionContextIsCurrent(_BuyV2CollectionContext context) {
+    final current = _collectionContext(context.order.id);
+    return current != null &&
+        identical(current.order, context.order) &&
+        identical(current.identity, context.identity) &&
+        current.epoch == context.epoch &&
+        current.navigation == context.navigation;
+  }
+
+  _BuyV2CollectionState? _collectionStateFor(String orderId) {
+    final order = _orders.where((value) => value.id == orderId).firstOrNull;
+    if (order == null || !collectionOrderBelongsToCurrentAccount(order)) {
+      return null;
+    }
+    final state = _collectionStates[orderId];
+    final snapshot = state?.snapshot;
+    if (snapshot != null &&
+        (snapshot.storeId != order.collection!.storeId ||
+            snapshot.purchaserAccountId !=
+                order.collection!.purchaserAccountId)) {
+      return null;
+    }
+    return state;
+  }
+
+  ScanPickSnapshot? collectionSnapshotFor(String orderId) =>
+      _collectionStateFor(orderId)?.snapshot;
+
+  bool collectionBusy(String orderId) =>
+      _collectionStateFor(orderId)?.busy ?? false;
+
+  bool collectionReconciliationPending(String orderId) =>
+      _collectionStateFor(orderId)?.pending ?? false;
+
+  String? collectionMessageFor(String orderId) {
+    final state = _collectionStateFor(orderId);
+    if (state == null) return null;
+    if (state.message != null) return state.message;
+    if (state.scanMessage != null) return state.scanMessage;
+    final snapshot = state.snapshot;
+    if (snapshot == null ||
+        snapshot.state == ScanPickState.collected ||
+        snapshot.state == ScanPickState.cancelled) {
+      return null;
+    }
+    if (snapshot.payment != ScanPickPayment.paid) {
+      return 'Payment needs checking before collection.';
+    }
+    if (snapshot.state == ScanPickState.ready ||
+        (snapshot.state == ScanPickState.awaitingCustomer &&
+            snapshot.challenge == null)) {
+      return 'Waiting for the store’s QR. This order updates automatically.';
+    }
+    if (snapshot.state == ScanPickState.awaitingCustomer &&
+        !snapshot.serverTime
+            .add(state.elapsed.elapsed)
+            .isBefore(snapshot.challenge!.expiresAt)) {
+      return 'Ask the store to refresh this order’s QR. We’ll check again automatically.';
+    }
+    return null;
+  }
+
+  bool canScanCollection(String orderId) {
+    final context = _collectionContext(orderId);
+    final state = _collectionStateFor(orderId);
+    final snapshot = state?.snapshot;
+    if (context == null ||
+        collectionGateway == null ||
+        collectionPendingStore == null ||
+        state == null ||
+        state.busy ||
+        state.pending ||
+        state.refreshRequired ||
+        state.navigation != context.navigation ||
+        state.elapsed.elapsed >= const Duration(seconds: 30) ||
+        snapshot == null ||
+        snapshot.state != ScanPickState.awaitingCustomer ||
+        snapshot.payment != ScanPickPayment.paid ||
+        snapshot.readiness != ScanPickReadiness.ready) {
+      return false;
+    }
+    final challenge = snapshot.challenge;
+    return challenge != null &&
+        snapshot.serverTime
+            .add(state.elapsed.elapsed)
+            .isBefore(challenge.expiresAt);
+  }
+
+  String collectionStatusLabelFor(String orderId) {
+    final state = _collectionStateFor(orderId);
+    if (state == null) return 'Collection unavailable';
+    if (state.pending) return 'Checking collection';
+    final snapshot = state.snapshot;
+    if (snapshot == null) {
+      return state.busy ? 'Checking order' : 'Check collection';
+    }
+    if (snapshot.state == ScanPickState.collected) return 'Collected';
+    final approvalExpired =
+        snapshot.state == ScanPickState.matched &&
+        !snapshot.serverTime
+            .add(state.elapsed.elapsed)
+            .isBefore(snapshot.approval!.expiresAt);
+    if (state.refreshRequired ||
+        approvalExpired ||
+        state.elapsed.elapsed >= const Duration(seconds: 30)) {
+      return 'Updating collection';
+    }
+    return switch (snapshot.state) {
+      ScanPickState.preparing => 'Preparing your order',
+      ScanPickState.ready || ScanPickState.awaitingCustomer => 'Ready at store',
+      ScanPickState.matched => 'Matched · awaiting handover',
+      ScanPickState.collected => 'Collected',
+      ScanPickState.cancelled => 'Collection cancelled',
+    };
+  }
+
+  bool orderIsCompleted(BuyV2Order order) => order.collection == null
+      ? order.status == BuyV2OrderStatus.delivered
+      : collectionSnapshotFor(order.id)?.state == ScanPickState.collected &&
+            collectionSnapshotFor(order.id)?.receipt != null;
+
+  /// Called when the order view loses the foreground. An in-flight scan keeps
+  /// its durable intent, but its eventual reply cannot update a resumed view.
+  void pauseCollection({bool notify = true}) {
+    _collectionEpoch++;
+    for (final state in _collectionStates.values) {
+      state.attempt++;
+      state.busy = false;
+      state.refreshRequired = true;
+    }
+    if (notify && !_collectionDisposed) notifyListeners();
+  }
+
+  Future<bool> refreshCollectionOrder(String orderId) =>
+      _runCollection(orderId);
+
+  Future<bool> authoriseCollection(String orderId, String qrPayload) =>
+      _runCollection(orderId, qrPayload: qrPayload);
+
+  String _newCollectionRequestId() {
+    final random = math.Random.secure();
+    return List.generate(
+      24,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+  }
+
+  bool _validCollectionIntent(
+    BuyV2CollectionPendingIntent intent,
+    _BuyV2CollectionContext context,
+  ) =>
+      intent.accountId == context.identity.accountId &&
+      intent.orderId == context.order.id &&
+      intent.storeId == context.order.collection!.storeId &&
+      intent.operationId.trim().isNotEmpty &&
+      RegExp(r'^[a-f0-9]{64}$').hasMatch(intent.requestFingerprint);
+
+  Future<bool> _runCollection(String orderId, {String? qrPayload}) async {
+    final context = _collectionContext(orderId);
+    if (context == null) return false;
+    final state = _collectionStates.putIfAbsent(
+      orderId,
+      _BuyV2CollectionState.new,
+    );
+    if (state.busy) return false;
+    final gateway = collectionGateway;
+    final pendingStore = collectionPendingStore;
+    if (gateway == null || pendingStore == null) {
+      state.refreshRequired = true;
+      state.message =
+          'Collection is unavailable here. Open Order help for this order.';
+      notifyListeners();
+      return false;
+    }
+    if (qrPayload != null && !canScanCollection(orderId)) return false;
+    final revision = state.snapshot?.revision;
+    state.busy = true;
+    state.refreshRequired = true;
+    final attempt = ++state.attempt;
+    if (qrPayload != null) {
+      state.scanMessage = null;
+      state.message = 'Checking this order…';
+    }
+    notifyListeners();
+    BuyV2CollectionPendingIntent? intent;
+    try {
+      // The durable adapter serializes reads after earlier reservations. The
+      // transport is never called until a reservation has completed durably.
+      intent = await pendingStore
+          .read(
+            accountId: context.identity.accountId,
+            orderId: orderId,
+            storeId: context.order.collection!.storeId,
+          )
+          .timeout(const Duration(seconds: 15));
+      if (!_collectionContextIsCurrent(context)) return false;
+      final original = state.pendingIntent;
+      if (intent != null &&
+          original != null &&
+          (intent.operationId != original.operationId ||
+              intent.requestFingerprint != original.requestFingerprint)) {
+        state.pending = true;
+        state.message = 'The earlier scan needs recovery on this order.';
+        return false;
+      }
+      // A missing cache entry cannot settle a request already sent by this
+      // session. Reconcile its original operation even if storage was lost.
+      intent ??= state.pendingIntent;
+      if (intent != null && !_validCollectionIntent(intent, context)) {
+        state.pending = true;
+        state.message = 'The earlier scan needs recovery on this order.';
+        return false;
+      }
+      ScanPickRequest request;
+      if (intent != null) {
+        state.pending = true;
+        request = ScanPickRequest.reconcile(
+          requestId: _newCollectionRequestId(),
+          operationId: intent.operationId,
+          orderId: orderId,
+          storeId: context.order.collection!.storeId,
+        );
+      } else if (qrPayload != null) {
+        // Shared constructor validates the unmodified payload before any write.
+        request = ScanPickRequest.authorise(
+          requestId: _newCollectionRequestId(),
+          operationId: _newCollectionRequestId(),
+          orderId: orderId,
+          storeId: context.order.collection!.storeId,
+          expectedRevision: revision!,
+          qrPayload: qrPayload,
+        );
+        intent = BuyV2CollectionPendingIntent(
+          accountId: context.identity.accountId,
+          orderId: orderId,
+          storeId: context.order.collection!.storeId,
+          operationId: request.operationId!,
+          requestFingerprint: sha256
+              .convert(
+                utf8.encode(
+                  jsonEncode([
+                    context.identity.accountId,
+                    request.orderId,
+                    request.storeId,
+                    request.expectedRevision,
+                    qrPayload,
+                  ]),
+                ),
+              )
+              .toString(),
+        );
+        state.pending = true;
+        final reserved = await pendingStore
+            .reserve(intent)
+            .timeout(const Duration(seconds: 15));
+        if (!_collectionContextIsCurrent(context)) return false;
+        if (!reserved) {
+          state.message = 'An earlier scan is being checked on this order.';
+          return false;
+        }
+      } else {
+        state.pending = false;
+        request = ScanPickRequest.read(
+          requestId: _newCollectionRequestId(),
+          orderId: orderId,
+          storeId: context.order.collection!.storeId,
+        );
+      }
+      if (intent != null) state.pendingIntent = intent;
+      final result = await gateway
+          .execute(request)
+          .timeout(const Duration(seconds: 15));
+      if (!_collectionContextIsCurrent(context)) return false;
+      result.validateFor(
+        request,
+        client: ScanPickClient.consumer,
+        purchaserAccountId: context.identity.accountId,
+      );
+      final uncertain =
+          result.outcome == ScanPickOutcome.unknown ||
+          (result.outcome == ScanPickOutcome.rejected &&
+              const {
+                ScanPickError.operationInProgress,
+                ScanPickError.operationConflict,
+                ScanPickError.unavailable,
+                ScanPickError.rateLimited,
+                ScanPickError.unauthenticated,
+                ScanPickError.forbidden,
+                ScanPickError.wrongPurchaser,
+              }.contains(result.error));
+      if (uncertain) {
+        state.pending = intent != null;
+        state.message = intent == null
+            ? 'Order status could not refresh. We’ll check again automatically.'
+            : 'Checking your earlier scan. Keep this order open.';
+        return false;
+      }
+      if (intent != null) {
+        final cleared = await pendingStore
+            .clear(intent)
+            .timeout(const Duration(seconds: 15));
+        if (!_collectionContextIsCurrent(context)) return false;
+        if (!cleared) {
+          state.pending = true;
+          state.message = 'Finishing the earlier scan check on this order.';
+          return false;
+        }
+      }
+      state.pending = false;
+      state.pendingIntent = null;
+      final accepted =
+          result.outcome == ScanPickOutcome.snapshot ||
+          (result.error == ScanPickError.alreadyCollected &&
+              result.snapshot?.state == ScanPickState.collected);
+      if (!accepted) {
+        state.scanMessageState = state.snapshot?.state;
+        state.scanMessageChallenge = state.snapshot?.challenge?.id;
+        state.snapshot = null;
+        state.scanMessage = switch (result.error) {
+          ScanPickError.wrongOrder || ScanPickError.wrongStore =>
+            'Use the QR for this order at the correct store.',
+          ScanPickError.challengeExpired ||
+          ScanPickError.challengeInvalid ||
+          ScanPickError.challengeConsumed =>
+            'Ask the store to refresh this order’s QR, then scan again.',
+          ScanPickError.notReady => 'The store is still preparing this order.',
+          ScanPickError.paymentRequired || ScanPickError.paymentChanged =>
+            'Payment needs checking before collection.',
+          ScanPickError.cancelled => 'This collection has been cancelled.',
+          _ => 'Order status changed. Checking the latest details here.',
+        };
+        state.message = null;
+        return false;
+      }
+      state.snapshot = result.snapshot!;
+      state.elapsed
+        ..reset()
+        ..start();
+      state.navigation = context.navigation;
+      state.refreshRequired = false;
+      state.message = null;
+      if (state.snapshot!.state != state.scanMessageState ||
+          state.snapshot!.challenge?.id != state.scanMessageChallenge ||
+          state.snapshot!.state == ScanPickState.matched ||
+          state.snapshot!.state == ScanPickState.collected ||
+          state.snapshot!.state == ScanPickState.cancelled) {
+        state.scanMessage = null;
+      }
+      return true;
+    } on Object {
+      if (!_collectionContextIsCurrent(context)) return false;
+      state.pending = intent != null || state.pending;
+      state.message = state.pending
+          ? 'The scan result is uncertain. Checking this same order safely.'
+          : 'Collection could not refresh. We’ll check again automatically.';
+      return false;
+    } finally {
+      if (state.attempt == attempt) state.busy = false;
+      if (!_collectionDisposed &&
+          identical(_collectionStates[orderId], state)) {
+        notifyListeners();
+      }
+    }
+  }
+
   final BuySession core;
   final BuyV2ProductFactsAdapter productFactsAdapter;
   final BuyV2ProductContentAdapter productContentAdapter;
@@ -481,6 +929,12 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2BalancePaymentAdapter? balancePaymentAdapter;
   final BuyV2DeliveryExceptionAdapter? deliveryExceptionAdapter;
   final BuyV2LiveDeliveryAdapter? liveDeliveryAdapter;
+  final ScanPickGateway? collectionGateway;
+  final ValueListenable<BuyV2CollectionIdentity?>? collectionIdentity;
+  final BuyV2CollectionPendingStore? collectionPendingStore;
+  final Map<String, _BuyV2CollectionState> _collectionStates = {};
+  int _collectionEpoch = 0;
+  bool _collectionDisposed = false;
   final BuyV2OrderResolutionAdapter orderResolutionAdapter;
   final BuyV2ShoppingAlertsAdapter shoppingAlertsAdapter;
   final BuyV2CommerceAdapter commerceAdapter;
@@ -995,6 +1449,9 @@ class BuyV2Session extends ChangeNotifier {
       notice = 'This order could not be found.';
       notifyListeners();
       return false;
+    }
+    if (_orders[index].collection != null) {
+      return refreshCollectionOrder(orderId);
     }
     if (!_orderRefreshBusyIds.add(orderId)) return false;
     _orderRefreshStates[orderId] = BuyV2CommerceLoadState.loading;
@@ -2007,6 +2464,7 @@ class BuyV2Session extends ChangeNotifier {
       }
       for (final order in snapshot.orders.reversed) {
         final validOrder =
+            order.collection == null &&
             order.destination != BuyV2Destination.orders &&
             order.id.trim().isNotEmpty &&
             order.total >= 0 &&
@@ -2135,8 +2593,11 @@ class BuyV2Session extends ChangeNotifier {
       orders: List.unmodifiable(
         _orders.where(
           (order) =>
-              order.purchaseId?.trim().isNotEmpty == true ||
-              order.id.contains('-NEW-'),
+              // The legacy cache codec cannot preserve collection identity.
+              // Collection orders must be restored by authenticated commerce.
+              order.collection == null &&
+              (order.purchaseId?.trim().isNotEmpty == true ||
+                  order.id.contains('-NEW-')),
         ),
       ),
     );
@@ -3686,11 +4147,16 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2Order> get visibleOrders {
     final normalizedQuery = query.trim().toLowerCase();
     return _orders
+        .where(
+          (order) =>
+              order.collection == null ||
+              collectionOrderBelongsToCurrentAccount(order),
+        )
         .where((order) => order.destination != BuyV2Destination.medicine)
         .where(
           (order) => ordersTab == BuyV2OrdersTab.delivered
-              ? order.status == BuyV2OrderStatus.delivered
-              : order.status != BuyV2OrderStatus.delivered,
+              ? orderIsCompleted(order)
+              : !orderIsCompleted(order),
         )
         .where(
           (order) =>
@@ -3708,11 +4174,17 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   int get activeOrderCount => _orders
+      .where(
+        (order) =>
+            order.collection == null ||
+            collectionOrderBelongsToCurrentAccount(order),
+      )
       .where((order) => order.destination != BuyV2Destination.medicine)
-      .where((order) => order.status != BuyV2OrderStatus.delivered)
+      .where((order) => !orderIsCompleted(order))
       .length;
 
   BuyV2Order? get activeQuickDeliveryOrder => _orders
+      .where((order) => order.collection == null)
       .where((order) => order.destination != BuyV2Destination.medicine)
       .where((order) => order.status != BuyV2OrderStatus.delivered)
       .where((order) => order.lines.isNotEmpty)
@@ -3725,6 +4197,7 @@ class BuyV2Session extends ChangeNotifier {
       .firstOrNull;
 
   BuyV2Order? get activeQuietDeliveryOrder => _orders
+      .where((order) => order.collection == null)
       .where((order) => order.destination != BuyV2Destination.medicine)
       .where((order) => order.status != BuyV2OrderStatus.delivered)
       .where((order) => order.lines.isNotEmpty)
@@ -3737,8 +4210,13 @@ class BuyV2Session extends ChangeNotifier {
       .firstOrNull;
 
   int get deliveredOrderCount => _orders
+      .where(
+        (order) =>
+            order.collection == null ||
+            collectionOrderBelongsToCurrentAccount(order),
+      )
       .where((order) => order.destination != BuyV2Destination.medicine)
-      .where((order) => order.status == BuyV2OrderStatus.delivered)
+      .where(orderIsCompleted)
       .length;
 
   BuyV2Product? findProduct(String id) {
@@ -4479,6 +4957,10 @@ class BuyV2Session extends ChangeNotifier {
       previous,
       BuyV2NavigationMotionDirection.forward,
     );
+    if (order.collection != null) {
+      unawaited(refreshCollectionOrder(orderId));
+      return true;
+    }
     if (balancePaymentAdapter != null) {
       unawaited(restoreBalancePayment(orderId));
     }
@@ -4508,6 +4990,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (order.collection != null) return openTracking(orderId);
     final previous = _navigationSurfaceIdentity;
     _selectedOrderId = order.id;
     destination = order.destination == BuyV2Destination.medicine
