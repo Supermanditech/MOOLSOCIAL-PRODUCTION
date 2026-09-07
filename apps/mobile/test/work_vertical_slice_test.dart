@@ -432,6 +432,11 @@ void main() {
         const Key('work-request-profile-name'),
         'Community library operator',
       );
+      expect(
+        find.text('Enter your business, profession or service.'),
+        findsNothing,
+      );
+      expect(find.text('Choose the closest category.'), findsOneWidget);
       await tapVisible(tester, const Key('work-request-family'));
       await tester.tap(find.text('Other').last);
       await tester.pumpAndSettle();
@@ -449,7 +454,10 @@ void main() {
         const Key('work-request-other-activity'),
         'Community library and reading services',
       );
+      expect(find.text('Enter the activity you want to offer.'), findsNothing);
+      expect(find.text('Enter your city or service area.'), findsOneWidget);
       await enter(tester, const Key('work-request-area'), 'Jodhpur');
+      expect(find.byKey(const Key('work-profile-request-error')), findsNothing);
       await tapVisible(tester, const Key('work-send-profile-request'));
 
       expect(work.unsupportedRequestSent, isTrue);

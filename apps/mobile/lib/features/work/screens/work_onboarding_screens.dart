@@ -306,7 +306,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      useSafeArea: false,
+      useSafeArea: true,
       showDragHandle: false,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) =>
@@ -342,8 +342,10 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
   final FocusNode _workspaceFocus = FocusNode();
   final FocusNode _areaFocus = FocusNode();
   final FocusNode _otherActivityFocus = FocusNode();
+  final ScrollController _formScroll = ScrollController();
   String _category = '';
   String? _error;
+  bool _validationShown = false;
   bool _submitting = false;
 
   @override
@@ -369,27 +371,42 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
     _workspaceFocus.dispose();
     _areaFocus.dispose();
     _otherActivityFocus.dispose();
+    _formScroll.dispose();
     super.dispose();
+  }
+
+  String? get _validationError => _workspace.text.trim().length < 3
+      ? 'Enter your business, profession or service.'
+      : _category.isEmpty
+      ? 'Choose the closest category.'
+      : _category == 'Other' && _otherActivity.text.trim().length < 3
+      ? 'Enter the activity you want to offer.'
+      : _area.text.trim().length < 3
+      ? 'Enter your city or service area.'
+      : null;
+
+  void _refreshValidation(String _) {
+    if (!_validationShown) return;
+    setState(() => _error = _validationError);
   }
 
   Future<void> _submit() async {
     if (_submitting) return;
     FocusManager.instance.primaryFocus?.unfocus();
-    final validationError = _workspace.text.trim().length < 3
-        ? 'Enter your business, profession or service.'
-        : _category.isEmpty
-        ? 'Choose the closest category.'
-        : _category == 'Other' && _otherActivity.text.trim().length < 3
-        ? 'Enter the activity you want to offer.'
-        : _area.text.trim().length < 3
-        ? 'Enter your city or service area.'
-        : null;
+    final validationError = _validationError;
     if (validationError != null) {
-      setState(() => _error = validationError);
+      setState(() {
+        _validationShown = true;
+        _error = validationError;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _formScroll.hasClients) _formScroll.jumpTo(0);
+      });
       return;
     }
     setState(() {
       _submitting = true;
+      _validationShown = false;
       _error = null;
     });
     final sent = await widget.session.sendUnsupportedRequest(
@@ -454,90 +471,36 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                       MoolSpacing.xs,
                       MoolSpacing.xs,
                     ),
-                    child: Column(
+                    child: Row(
                       children: [
-                        Container(
-                          width: 42,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFD8DAE8),
-                            borderRadius: BorderRadius.circular(
-                              MoolRadii.capsule,
+                        Expanded(
+                          child: Center(
+                            child: Container(
+                              width: 42,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD8DAE8),
+                                borderRadius: BorderRadius.circular(
+                                  MoolRadii.capsule,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                        const SizedBox(height: MoolSpacing.xs),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Tell us what you do',
-                                    style: TextStyle(
-                                      color: MoolColors.ink,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Share your business, profession or service. MoolSocial will guide you to the right Workspace.',
-                                    style: TextStyle(
-                                      color: MoolColors.muted,
-                                      fontSize: 11,
-                                      height: 1.3,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              key: const Key('work-profile-request-close'),
-                              tooltip: 'Close',
-                              onPressed: _close,
-                              icon: const Icon(Icons.close_rounded),
-                            ),
-                          ],
+                        IconButton(
+                          key: const Key('work-profile-request-close'),
+                          tooltip: 'Close',
+                          onPressed: _close,
+                          icon: const Icon(Icons.close_rounded),
                         ),
                       ],
                     ),
                   ),
-                  if (_error case final error?)
-                    Semantics(
-                      liveRegion: true,
-                      child: Container(
-                        key: const Key('work-profile-request-error'),
-                        width: double.infinity,
-                        margin: const EdgeInsets.fromLTRB(
-                          MoolSpacing.md,
-                          0,
-                          MoolSpacing.md,
-                          MoolSpacing.xs,
-                        ),
-                        padding: const EdgeInsets.all(MoolSpacing.xs),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFE9E7),
-                          borderRadius: BorderRadius.circular(
-                            MoolRadii.control,
-                          ),
-                        ),
-                        child: Text(
-                          error,
-                          style: const TextStyle(
-                            color: Color(0xFF9D1C15),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ),
                   Flexible(
                     fit: FlexFit.loose,
                     child: ListView(
                       key: const Key('work-profile-request-scroll'),
+                      controller: _formScroll,
                       shrinkWrap: true,
                       primary: false,
                       keyboardDismissBehavior:
@@ -549,6 +512,51 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                         MoolSpacing.md,
                       ),
                       children: [
+                        const Text(
+                          'Tell us what you do',
+                          style: TextStyle(
+                            color: MoolColors.ink,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: MoolSpacing.xs),
+                        const Text(
+                          'Share your business, profession or service. MoolSocial will guide you to the right Workspace.',
+                          style: TextStyle(
+                            color: MoolColors.muted,
+                            fontSize: 11,
+                            height: 1.3,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: MoolSpacing.xs),
+                        if (_error case final error?)
+                          Semantics(
+                            liveRegion: true,
+                            child: Container(
+                              key: const Key('work-profile-request-error'),
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(
+                                bottom: MoolSpacing.xs,
+                              ),
+                              padding: const EdgeInsets.all(MoolSpacing.xs),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFE9E7),
+                                borderRadius: BorderRadius.circular(
+                                  MoolRadii.control,
+                                ),
+                              ),
+                              child: Text(
+                                error,
+                                style: const TextStyle(
+                                  color: Color(0xFF9D1C15),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
                         TextField(
                           key: const Key('work-request-profile-name'),
                           controller: _workspace,
@@ -557,6 +565,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                           textInputAction: TextInputAction.next,
                           scrollPadding: const EdgeInsets.only(bottom: 120),
                           onSubmitted: (_) => _areaFocus.requestFocus(),
+                          onChanged: _refreshValidation,
                           decoration: const InputDecoration(
                             labelText: 'Business, profession or service',
                             hintText: 'Furniture repair',
@@ -565,6 +574,11 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                         const SizedBox(height: MoolSpacing.sm),
                         DropdownButtonFormField<String>(
                           key: const Key('work-request-family'),
+                          isExpanded: true,
+                          isDense:
+                              MediaQuery.textScalerOf(context).scale(16) <=
+                              20.8,
+                          itemHeight: null,
                           initialValue: _category.isEmpty ? null : _category,
                           decoration: const InputDecoration(
                             labelText: 'Closest category',
@@ -581,8 +595,12 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                               FocusManager.instance.primaryFocus?.unfocus(),
                           onChanged: _submitting
                               ? null
-                              : (value) =>
-                                    setState(() => _category = value ?? ''),
+                              : (value) => setState(() {
+                                  _category = value ?? '';
+                                  if (_validationShown) {
+                                    _error = _validationError;
+                                  }
+                                }),
                         ),
                         if (_category == 'Other') ...[
                           const SizedBox(height: MoolSpacing.sm),
@@ -594,6 +612,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                             textInputAction: TextInputAction.next,
                             scrollPadding: const EdgeInsets.only(bottom: 120),
                             onSubmitted: (_) => _areaFocus.requestFocus(),
+                            onChanged: _refreshValidation,
                             decoration: const InputDecoration(
                               labelText: 'Describe your activity',
                               hintText: 'Handloom repair',
@@ -608,6 +627,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                           enabled: !_submitting,
                           textInputAction: TextInputAction.done,
                           scrollPadding: const EdgeInsets.only(bottom: 120),
+                          onChanged: _refreshValidation,
                           decoration: const InputDecoration(
                             labelText: 'City or service area',
                             hintText: 'Jodhpur',

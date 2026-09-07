@@ -90,6 +90,14 @@ Record/agree these interfaces before backend development; implement service auth
 No ticket above is implemented or closed by this audit. Reachable retailer onboarding and unsent Workspace Chat interactions were exercised; admin-approved dashboard/first-tap operations, other business types, real OTP delivery/autofill, PDF/gallery/cloud completion, actual camera capture, physical200%, authenticated clarification/rejection/approval and live services remain pending. No source edits, APK rebuild, integration, Cursor/Redmi action, outbound message or real payment occurred.
 
 
+## Correction round, 8 September 2026 — request form
+
+AUDIT-R665-02/03 and their compact-layout child02a are implemented in the existing request sheet. Android top insets are retained, corrected inputs revalidate only after validation has been shown, and the title/help/errors scroll with the form rather than consuming the small-screen editable area. Close, Cancel and Send remain accessible. Production request submission still reports unavailable when no service exists.
+
+Local qualification: four focused cases pass; full affected Work suites pass550/79 existing skips/0failed with retained exit0. Full analysis reports zero issues. Six fresh Flutter captures cover normal,140percent and200percent text with IME/status/navigation insets. The200percent compact layout requires scrolling and preserves actual input focus and a minimum48px editable viewport. No protected image was regenerated and no new skip was introduced.
+
+This is local correction status, not device closure. The installed r66.5 APK is unchanged; successor OPPO replay is pending. Other findings01,04–08 and the documented backend/consumer dependencies remain open. Exact commands, hashes and failed-attempt disposition are in local-validation.md.
+
 ## Source reconciliation
 
 All completed Codex frontend fixes are retained through 6212aca44117d70fdbe2fc517ca2de7774f1a966. The founder's frontend clarification additionally authorizes S09-ACCEPTANCE-TIME-UI-01 in six existing Work source/test owners. This candidate imports no new Cursor work. Historical pending implementation notes in the append-only founder review ledger are superseded only where source and tests support the disposition. Backend-only and consumer integration dependencies remain open.

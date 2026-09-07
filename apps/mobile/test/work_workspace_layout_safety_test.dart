@@ -8202,70 +8202,169 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'Workspace request sheet clears Android and keyboard insets without losing input',
-    (tester) async {
-      final work = WorkSession();
-      await mount(
-        tester,
-        route: '/app/work/workspace/choose',
-        work: work,
-        bottomInset: 0,
-      );
+  for (final display in [
+    (size: const Size(360, 806), scale: 1.0, keyboard: 328.0, bottom: 42.0),
+    (size: const Size(360, 800), scale: 1.4, keyboard: 300.0, bottom: 0.0),
+    (size: const Size(320, 568), scale: 2.0, keyboard: 228.0, bottom: 0.0),
+  ]) {
+    testWidgets(
+      'Workspace request sheet clears Android and keyboard insets without losing input ${display.size.width} ${display.scale}',
+      (tester) async {
+        final previousHitTestPolicy =
+            WidgetController.hitTestWarningShouldBeFatal;
+        WidgetController.hitTestWarningShouldBeFatal = true;
+        addTearDown(
+          () => WidgetController.hitTestWarningShouldBeFatal =
+              previousHitTestPolicy,
+        );
+        final work = WorkSession();
+        final safeBottom = (display.bottom > 24 ? display.bottom : 24) + 8;
+        await mount(
+          tester,
+          route: '/app/work/workspace/choose',
+          work: work,
+          bottomInset: display.bottom,
+          viewport: display.size,
+          textScale: display.scale,
+        );
+        tester.view.viewPadding = FakeViewPadding(
+          top: 41,
+          bottom: display.bottom,
+        );
+        tester.view.padding = FakeViewPadding(top: 41, bottom: display.bottom);
+        await tester.pumpAndSettle();
 
-      final request = find.byKey(const Key('work-profile-not-shown'));
-      await tester.scrollUntilVisible(
-        request,
-        300,
-        scrollable: find
-            .descendant(
-              of: find.byKey(const Key('work-choose-screen')),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-        maxScrolls: 60,
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(request);
-      await tester.pumpAndSettle();
+        final request = find.byKey(const Key('work-profile-not-shown'));
+        await tester.scrollUntilVisible(
+          request,
+          300,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const Key('work-choose-screen')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+          maxScrolls: 60,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(request);
+        await tester.pumpAndSettle();
 
-      expect(
-        find.byKey(const Key('work-profile-request-sheet')),
-        findsOneWidget,
-      );
-      final actions = find.byKey(const Key('work-profile-request-actions'));
-      expect(tester.getBottomRight(actions).dy, lessThanOrEqualTo(768));
-      final area = find.byKey(const Key('work-request-area'));
-      expect(area, findsOneWidget);
-      expect(
-        tester.getTopLeft(actions).dy - tester.getBottomLeft(area).dy,
-        lessThanOrEqualTo(48),
-      );
+        expect(
+          find.byKey(const Key('work-profile-request-sheet')),
+          findsOneWidget,
+        );
+        final actions = find.byKey(const Key('work-profile-request-actions'));
+        expect(
+          tester.getBottomRight(actions).dy,
+          lessThanOrEqualTo(display.size.height - safeBottom),
+        );
+        final area = find.byKey(const Key('work-request-area'));
+        await reveal(tester, area);
+        expect(area, findsOneWidget);
+        expect(
+          tester.getTopLeft(actions).dy - tester.getBottomLeft(area).dy,
+          lessThanOrEqualTo(48),
+        );
 
-      final name = find.byKey(const Key('work-request-profile-name'));
-      await tester.tap(name);
-      await tester.enterText(name, 'Furniture repair');
-      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-      await tester.pumpAndSettle();
+        final name = find.byKey(const Key('work-request-profile-name'));
+        await tester.scrollUntilVisible(
+          name,
+          -120,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const Key('work-profile-request-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        await reveal(tester, name);
+        await tester.tap(name);
+        await tester.enterText(name, 'Furniture repair');
+        tester.view.viewInsets = FakeViewPadding(bottom: display.keyboard);
+        await tester.pumpAndSettle();
 
-      expect(
-        tester.widget<TextField>(name).controller?.text,
-        'Furniture repair',
-      );
-      expect(tester.getBottomRight(actions).dy, lessThanOrEqualTo(468));
-      final send = find.byKey(const Key('work-send-profile-request'));
-      final back = find.byKey(const Key('work-profile-request-back'));
-      expect(send, findsOneWidget);
-      expect(back, findsOneWidget);
-      expect(tester.getBottomRight(send).dy, lessThanOrEqualTo(436));
-      expect(tester.getBottomRight(back).dy, lessThanOrEqualTo(436));
-      expect(tester.takeException(), isNull);
+        await tester.tap(find.byKey(const Key('work-send-profile-request')));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getTopLeft(find.text('Tell us what you do')).dy,
+          greaterThanOrEqualTo(41),
+        );
+        await captureStoreView(
+          tester,
+          'r666-request-error-${display.size.width}-${display.scale}',
+        );
+        await tester.scrollUntilVisible(
+          name,
+          48,
+          maxScrolls: 40,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const Key('work-profile-request-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(name);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(name).focusNode!.hasFocus, isTrue);
+        expect(
+          tester
+              .getSize(find.byKey(const Key('work-profile-request-scroll')))
+              .height,
+          greaterThanOrEqualTo(48),
+        );
+        expect(
+          tester
+              .getTopLeft(find.byKey(const Key('work-profile-request-close')))
+              .dy,
+          greaterThanOrEqualTo(41),
+          reason: 'Close must remain below the real Android status inset.',
+        );
 
-      await tester.tap(find.byKey(const Key('work-profile-request-back')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-profile-request-sheet')), findsNothing);
-    },
-  );
+        expect(
+          tester.widget<TextField>(name).controller?.text,
+          'Furniture repair',
+        );
+        expect(
+          tester.getBottomRight(actions).dy,
+          lessThanOrEqualTo(
+            display.size.height - display.keyboard - safeBottom,
+          ),
+        );
+        final send = find.byKey(const Key('work-send-profile-request'));
+        final back = find.byKey(const Key('work-profile-request-back'));
+        expect(send, findsOneWidget);
+        expect(back, findsOneWidget);
+        expect(
+          tester.getBottomRight(send).dy,
+          lessThanOrEqualTo(
+            display.size.height - display.keyboard - safeBottom - 32,
+          ),
+        );
+        expect(
+          tester.getBottomRight(back).dy,
+          lessThanOrEqualTo(
+            display.size.height - display.keyboard - safeBottom - 32,
+          ),
+        );
+        await captureStoreView(
+          tester,
+          'r666-request-ime-${display.size.width}-${display.scale}',
+        );
+        expect(tester.takeException(), isNull);
+
+        await tester.tap(find.byKey(const Key('work-profile-request-back')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-profile-request-sheet')),
+          findsNothing,
+        );
+      },
+    );
+  }
 
   testWidgets(
     'proof source and review declaration clear system and sticky actions',

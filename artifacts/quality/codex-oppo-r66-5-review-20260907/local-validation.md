@@ -80,3 +80,26 @@ The final two cycles use this identical file list, toolchain and unchanged sourc
 Selection: S01 growth placement; OPPO S01 inline discovery/search; OPPO S02 document copy; OPPO S04 setup headers; S03 compact contact first view/draft cold restart; OPPO S06 inline review corrections; S07 S08 application; Store Review first tap/compact requirement window/compact bill actions/global Chat/requirement keyboard; Store collection actual dashboard; Store scope native; Store View v2; Store Desk exact order; Order time UI; Store finish; pickup order becomes customer pickup and produces invoice.
 
 No protected references were regenerated. Toolchain: Flutter 3.44.6 / Dart 3.12.2. Dependency/generated owners remain unchanged. OPPO and founder review are separate pending qualification.
+
+## Request-sheet correction — 8 September 2026
+
+Owners: work_onboarding_screens.dart, work_vertical_slice_test.dart and work_workspace_layout_safety_test.dart. AUDIT-R665-02/03 plus compact child 02a. No backend, Cursor, APK or device mutation.
+
+All new logs and captures are retained under `C:\GUARANTEED OUTCOME\MOOLSOCIAL-POST-UI-AUDIT-20260905`. Existing protected references remain unchanged.
+
+- Expected red reproduction: `r666-request-before-20260908.log`, 2 failed, 0 passed; stale validation and lost top inset. SHA-256 `C2DBAB13B3965EAF47E58D1675E15807039C6361D1BF2493AF2D005B19559063`.
+- Compact diagnostic attempts 2–5 retain both lazy-scroll test-harness corrections and genuine 138px vertical/78px dropdown overflow. Capture 6 is NOT qualification despite exit 0: its input tap missed. The strengthened tests require actual focus, fatal hit-test warnings and at least 48px of editable viewport. No assertion was skipped to hide that issue.
+- Final focused command: `flutter test --no-pub --concurrency=1 --reporter expanded --update-goldens --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=r666-request-capture8-20260908 test/work_vertical_slice_test.dart test/work_workspace_layout_safety_test.dart --name 'unsupported profile request validates|Workspace request sheet clears'`. Result: 4 passed, 0 failed, exit 0, no hit-test warnings. Log `r666-request-capture8-20260908.log`; SHA-256 `7D65A7CF7664E11163D1D250CDB4D68B41DB87DB97D90A4A877C00B295E9AF5D`.
+- Full affected command: `flutter test --no-pub --concurrency=1 --reporter expanded --exclude-tags protected-reference test/work_vertical_slice_test.dart test/work_workspace_layout_safety_test.dart`. Result: 550 passed, 79 existing skips, 0 failed, exit 0. Log `r666-request-affected2-20260908.log`; SHA-256 `D9368EE45702699AA6278B155A71F1D54078ADD6736FA67120BB5E51CCA3417E`. Prior affected1 retained the same test totals but its tool completion/exit was lost; it was not used alone to seal the child.
+- Full `flutter analyze --no-pub`: zero issues, exit 0. Log `r666-request-analysis1-20260908.log`; SHA-256 `5DAC57BA2E086EC712DEAB0288A31696C295CCF04734DF276A59D589A693793B`.
+
+All six final PNGs in `r666-request-capture8-20260908` were inspected directly. These are actual Flutter renders with simulated insets, not physical OPPO screenshots. At 200% on 320×568, the form scrolls while Close/Cancel/Send remain reachable; text entry preserves actual focus. Physical successor replay remains pending.
+
+| Capture | SHA-256 |
+| --- | --- |
+| r666-request-error-320.0-2.0.png | D3C00709577C0ED30828CE6607E9DECA94E80857A4C7EAD0E7B3D991773F168C |
+| r666-request-error-360.0-1.0.png | C5788A425FEBCC9938EAFDD559F4E139BED288A6BD33BFF38467A5B58C06897A |
+| r666-request-error-360.0-1.4.png | DA040DEC34FE478AB545922C692E0991931A5C080C78C3019C900AF0C4425E88 |
+| r666-request-ime-320.0-2.0.png | 58ECD512B199F70945BC87E82637CBB3654C9E7D22B05112997CBE96B839DE34 |
+| r666-request-ime-360.0-1.0.png | B4C5AA43ECBD13C21F2FDA177A55F251A78310FD3F080EC176AD4D2FFF9332CD |
+| r666-request-ime-360.0-1.4.png | 45DF96ADCE15B1EA4DD2B1B00D55C252702C6EB0621DFD8B3CCA7BE279F503F6 |
