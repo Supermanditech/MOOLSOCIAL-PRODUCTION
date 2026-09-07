@@ -1,3 +1,15 @@
-BuildState=pending
 CandidateId=UAW-CODEX-OPPO-R66.5-REVIEW-20260907
-No APK has been built for this candidate.
+RuntimeProfile=RuntimeUiReview
+RuntimeDefines=RuntimeUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-CODEX-OPPO-R66.5-REVIEW-20260907;AndroidDebugPackage=runtime;Promotable=false
+Version=1.0.0-r66.5
+VersionCode=2026090604
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905\artifacts\quality\codex-oppo-r66-5-review-20260907\apk-regression-state.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905\artifacts\quality\codex-oppo-r66-5-review-20260907\apk-regression-state.json
+Branch=work/codex-ui/codex-oppo-review-v1-20260905
+HEAD=91d9a9b8a321946bc26a1c4645b22784ab43f2e3
+SourceFingerprint=F06DECD5EE139E6C01163354DF42506EB892EE8F475196B19BB0A05A156D9673
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905\artifacts\device\codex-oppo-r66-5-review-20260907\uaw-codex-oppo-r66.5-review-20260907-device-review-debug.apk
+Bytes=209715721
+SHA256=69EEC3287857A634BFDD71E7327BCFAD347DC60526165657499F40E9CBA807AE
+BuiltAt=2026-09-07T21:34:46.9115791+05:30

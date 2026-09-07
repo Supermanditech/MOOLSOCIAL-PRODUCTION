@@ -1,6 +1,18 @@
 {
-  "state": "pending",
+  "state": "blocked_device_not_detected",
   "candidate": "UAW-CODEX-OPPO-R66.5-REVIEW-20260907",
+  "sourceHead": "91d9a9b8a321946bc26a1c4645b22784ab43f2e3",
+  "expectedSerial": "2b3e0f71",
+  "expectedModel": "CPH2375",
   "package": "com.moolsocial.app.runtime",
-  "deviceQualification": "not_executed"
+  "expectedVersionCode": 2026090604,
+  "expectedVersionName": "1.0.0-r66.5-runtime",
+  "install": "not_attempted",
+  "localSha256": "69EEC3287857A634BFDD71E7327BCFAD347DC60526165657499F40E9CBA807AE",
+  "installedSha256": null,
+  "apkBytes": 209715721,
+  "adbReadback": "Expected OPPO serial not found; adb devices -l returned no devices.",
+  "deviceJourneys": "not_executed",
+  "founderAppearance": "pending",
+  "backendQualification": "not_claimed_review_gateway"
 }
