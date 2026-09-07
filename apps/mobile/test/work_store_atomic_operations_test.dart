@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
@@ -447,6 +449,466 @@ void main() {
     expect(session.workspaceId, 'workspace-store-2');
   });
 
+  test('Store scope restores only the selected store operational state', () {
+    final session = liveSession();
+    final first = session.activeWorkspace!;
+    const second = WorkWorkspace(
+      id: 'workspace-store-2',
+      name: 'Second store',
+      profileLabel: 'Speciality Retail Shop',
+      profileId: 'retailer-speciality',
+      area: 'Paota',
+      verified: true,
+    );
+    session.otherWorkspaces.add(second);
+    session.workspaceCatalogueItems.add(_product());
+    final firstCatalogue = session.workspaceCatalogueItems;
+    session.workspaceOrderQuantities['atta-5kg'] = 2;
+    session.workspaceOrderCustomer = 'First customer';
+    session.workspaceOrderStage = 'Preparing';
+    session.workspacePackedProductIds.add('atta-5kg');
+    session.currentWorkspaceOrderId = 'shared-id';
+    session.workspaceSalesToday = 900;
+    session.workspaceSettlementBalance = 700;
+    session.workspacePayoutAccountEnding = '1234';
+    session.workspaceCustomersFollowingStore.add('first-customer');
+    session.workspaceCustomerLastContactAt['first-customer'] = DateTime(
+      2026,
+      9,
+      7,
+    );
+    session.workspaceAcceptingOrders = true;
+    session.workspaceVisibleToCustomers = true;
+    session.workspaceSearchQuery = 'First draft';
+    session.activateWorkspace(second);
+    expect(session.workspaceCatalogueItems, isEmpty);
+    expect(identical(session.workspaceCatalogueItems, firstCatalogue), isFalse);
+    expect(session.workspaceOrderQuantities, isEmpty);
+    expect(session.workspacePackedProductIds, isEmpty);
+    expect(session.currentWorkspaceOrderId, isNull);
+    expect(session.visibleWorkspaceOrders, isEmpty);
+    expect(session.workspaceSalesToday, 0);
+    expect(session.workspaceSettlementBalance, 0);
+    expect(session.workspacePayoutAccountEnding, isEmpty);
+    expect(session.workspaceCustomersFollowingStore, isEmpty);
+    expect(session.workspaceCustomerLastContactAt, isEmpty);
+    expect(session.workspaceAcceptingOrders, isFalse);
+    expect(session.workspaceVisibleToCustomers, isFalse);
+    session.workspaceCatalogueItems.add(_product(id: 'second-sku'));
+    session.workspaceSalesToday = 75;
+    session.workspaceOrderCustomer = 'Second customer';
+    session.activateWorkspace(first);
+    expect(identical(session.workspaceCatalogueItems, firstCatalogue), isTrue);
+    expect(session.workspaceCatalogueItems.single.id, 'atta-5kg');
+    expect(session.workspaceOrderQuantities, {'atta-5kg': 2});
+    expect(session.workspacePackedProductIds, {'atta-5kg'});
+    expect(session.currentWorkspaceOrderId, 'shared-id');
+    expect(session.workspaceOrderCustomer, 'First customer');
+    expect(session.workspaceSalesToday, 900);
+    expect(session.workspaceSettlementBalance, 700);
+    expect(session.workspacePayoutAccountEnding, '1234');
+    expect(session.workspaceCustomerLastContactAt, contains('first-customer'));
+    session.activateWorkspace(second);
+    expect(session.workspaceCatalogueItems.single.id, 'second-sku');
+    expect(session.workspaceSalesToday, 75);
+    expect(session.workspaceOrderCustomer, 'Second customer');
+  });
+
+  test('Store scope partitions all public operational fields and defaults', () {
+    final session = liveSession();
+    final first = session.activeWorkspace!;
+    const second = WorkWorkspace(
+      id: 'store-b',
+      name: 'Second store',
+      profileLabel: 'Speciality Retail Shop',
+      profileId: 'retailer-speciality',
+      area: 'Paota',
+      verified: true,
+    );
+    session.otherWorkspaces.add(second);
+    session.retailerProductAdded = !session.retailerProductAdded;
+    session.retailerQuantity = session.retailerQuantity + 7;
+    session.retailerBuyPrice = session.retailerBuyPrice + 7;
+    session.retailerSellPrice = session.retailerSellPrice + 7;
+    session.retailerHomeDelivery = !session.retailerHomeDelivery;
+    session.retailerStoreCollection = !session.retailerStoreCollection;
+    session.retailerPublishAfterSetup = !session.retailerPublishAfterSetup;
+    session.retailerSetupSaved = !session.retailerSetupSaved;
+    session.workspaceSearchQuery = 'first-workspaceSearchQuery';
+    session.workspaceStoreState = WorkspaceStoreState.values.firstWhere(
+      (value) => value != session.workspaceStoreState,
+    );
+    session.workspaceDashboardState = WorkspaceDashboardState.values.firstWhere(
+      (value) => value != session.workspaceDashboardState,
+    );
+    session.workspaceLastUpdatedAt = DateTime(2026, 9, 7, 12);
+    session.workspaceDashboardError = 'first-workspaceDashboardError';
+    session.workspaceAcceptingOrders = !session.workspaceAcceptingOrders;
+    session.workspaceFulfilmentMode = 'first-workspaceFulfilmentMode';
+    session.workspaceBusyMinutes = session.workspaceBusyMinutes + 7;
+    session.workspaceReopensAt = 'first-workspaceReopensAt';
+    session.workspaceOpeningTime = 'first-workspaceOpeningTime';
+    session.workspaceClosingTime = 'first-workspaceClosingTime';
+    session.workspaceMaximumActiveOrders =
+        session.workspaceMaximumActiveOrders + 7;
+    session.workspaceOrderAlertSound = !session.workspaceOrderAlertSound;
+    session.workspaceOrderAlertVibration =
+        !session.workspaceOrderAlertVibration;
+    session.workspaceVisibleToCustomers = !session.workspaceVisibleToCustomers;
+    session.workspaceOrderCustomer = 'first-workspaceOrderCustomer';
+    session.workspaceOrderItems = 'first-workspaceOrderItems';
+    session.workspaceOrderAmount = 'first-workspaceOrderAmount';
+    session.workspaceOrderNeedsDelivery = !session.workspaceOrderNeedsDelivery;
+    session.workspaceOrderSource = 'first-workspaceOrderSource';
+    session.workspaceOrderFulfilment = 'first-workspaceOrderFulfilment';
+    session.workspaceOrderPayment = 'first-workspaceOrderPayment';
+    session.workspaceOrderAddress = 'first-workspaceOrderAddress';
+    session.workspaceOrderStage = 'first-workspaceOrderStage';
+    session.workspaceOrderExtraMinutes = session.workspaceOrderExtraMinutes + 7;
+    session.workspaceOrderActionDeadline = DateTime(2026, 9, 7, 12);
+    session.workspaceOrderFilter = 'first-workspaceOrderFilter';
+    session.workspaceCustomerPeriod = 'first-workspaceCustomerPeriod';
+    session.workspaceCustomerSearch = 'first-workspaceCustomerSearch';
+    session.workspaceCustomerFilter = 'first-workspaceCustomerFilter';
+    session.workspaceMoneyPeriod = 'first-workspaceMoneyPeriod';
+    session.workspaceCustomerCustomStart = DateTime(2026, 9, 7, 12);
+    session.workspaceCustomerCustomEnd = DateTime(2026, 9, 7, 12);
+    session.workspaceSalesToday = session.workspaceSalesToday + 7;
+    session.workspaceCompletedSalesCount =
+        session.workspaceCompletedSalesCount + 7;
+    session.workspacePlatformAdjustments =
+        session.workspacePlatformAdjustments + 7;
+    session.workspaceDeliveryAdjustments =
+        session.workspaceDeliveryAdjustments + 7;
+    session.workspaceRefunds = session.workspaceRefunds + 7;
+    session.workspaceTaxWithheld = session.workspaceTaxWithheld + 7;
+    session.workspaceSettlementBalance = session.workspaceSettlementBalance + 7;
+    session.workspaceSettlementRequested =
+        session.workspaceSettlementRequested + 7;
+    session.workspaceSettlementReference = 'first-workspaceSettlementReference';
+    session.workspacePayoutBankName = 'first-workspacePayoutBankName';
+    session.workspacePayoutAccountEnding = 'first-workspacePayoutAccountEnding';
+    session.currentWorkspaceOrderId = 'first-currentWorkspaceOrderId';
+    session.workspaceOperationsSyncing = false;
+    session.workspaceOperationsSyncError = 'first-workspaceOperationsSyncError';
+    session.workspaceHandoverBusy = false;
+    session.workspaceDeliveryRadiusKm = session.workspaceDeliveryRadiusKm + 7;
+    session.workspaceDeliveryFee = session.workspaceDeliveryFee + 7;
+    session.workspaceFreeDeliveryAbove = session.workspaceFreeDeliveryAbove + 7;
+    session.workspaceDeliveryCity = 'first-workspaceDeliveryCity';
+    session.workspaceDeliveryArea = 'first-workspaceDeliveryArea';
+    session.workspaceDeliveryPincode = 'first-workspaceDeliveryPincode';
+    session.workspacePickupEnabled = !session.workspacePickupEnabled;
+    session.workspaceStaffAccessEnabled = !session.workspaceStaffAccessEnabled;
+    session.workspaceCounterCount = session.workspaceCounterCount + 7;
+    session.workspacePaidRequirementReference =
+        'first-workspacePaidRequirementReference';
+    session.workspacePaidRequirementState = WorkspacePaidRequirementState.values
+        .firstWhere((value) => value != session.workspacePaidRequirementState);
+    session.workspaceCatalogueItems.add(_product());
+    session.workspaceOrders.add(_scopeOrder('same-order'));
+    session.workspaceInvoices.add(
+      WorkspaceCustomerInvoice(
+        id: 'invoice-a',
+        orderId: 'same-order',
+        customer: 'First customer',
+        items: 'Atta',
+        amount: 100,
+        payment: 'Paid online',
+        issuedAt: DateTime(2026, 9, 7),
+      ),
+    );
+    session.workspaceStockMovements.add(
+      WorkspaceStockMovement(
+        id: 'move-a',
+        productId: 'atta-5kg',
+        productLabel: 'Atta',
+        kind: WorkspaceStockMovementKind.adjustment,
+        quantityDelta: 1,
+        reason: 'Counted',
+        occurredAt: DateTime(2026, 9, 7),
+      ),
+    );
+    session.workspaceOffers.add(
+      WorkspaceStoreOffer(
+        id: 'offer-a',
+        title: 'Store offer',
+        detail: 'Atta',
+        validUntil: DateTime(2026, 9, 8),
+        active: true,
+      ),
+    );
+    session.workspaceActivity.add(
+      WorkspaceActivityEntry(
+        message: 'First activity',
+        time: DateTime(2026, 9, 7),
+      ),
+    );
+    session.workspaceOrderQuantities['atta-5kg'] = 3;
+    session.workspacePackedProductIds.add('atta-5kg');
+    session.dismissedWorkspaceAlerts.add('first-alert');
+    session.workspaceCustomersFollowingStore.add('first-customer');
+    session.workspaceCustomersAllowingMessages.add('first-customer');
+    session.workspaceCustomerLastContactAt['first-customer'] = DateTime(
+      2026,
+      9,
+      7,
+    );
+    session.workspaceDeliveryAssignment = WorkspaceDeliveryAssignment(
+      orderId: 'same-order',
+      partnerName: 'First rider',
+      vehicleLabel: 'Bike',
+      eta: DateTime(2026, 9, 7),
+      stage: 'Arriving',
+    );
+    final expectedFirst = _storeValues(session);
+    final fresh = WorkSession();
+    addTearDown(fresh.dispose);
+    session.activateWorkspace(second);
+    final actualSecond = _storeValues(session);
+    expect(actualSecond, _storeValues(fresh));
+    for (final entry in expectedFirst.entries) {
+      if (entry.value is Iterable || entry.value is Map) {
+        expect(
+          identical(actualSecond[entry.key], entry.value),
+          isFalse,
+          reason: entry.key,
+        );
+      }
+    }
+    session.workspaceOrderCustomer = 'Second customer';
+    session.workspaceOrderQuantities['second-sku'] = 1;
+    session.workspaceSettlementBalance = 10000000000;
+    final expectedSecond = _storeValues(session);
+    session.activateWorkspace(first);
+    expect(_storeValues(session), expectedFirst);
+    session.activateWorkspace(second);
+    expect(_storeValues(session), expectedSecond);
+  });
+
+  for (final pending in ['operation', 'save', 'handover']) {
+    test('Store scope blocks switching during $pending', () {
+      final session = liveSession()..otherWorkspaces.add(_scopeSecondStore);
+      if (pending == 'operation') session.busy = true;
+      if (pending == 'save') session.workspaceOperationsSyncing = true;
+      if (pending == 'handover') session.workspaceHandoverBusy = true;
+      session.activateWorkspace(_scopeSecondStore);
+      expect(session.activeWorkspace?.id, 'workspace-store-1');
+      expect(session.noticeMessage, contains('Please wait'));
+    });
+  }
+
+  test(
+    'Store scope waits for every concurrent save before switching',
+    () async {
+      final gateway = _ScopeGateway();
+      final session = liveSession(gateway)
+        ..otherWorkspaces.add(_scopeSecondStore);
+      session.saveWorkspaceAvailability(
+        acceptingOrders: true,
+        fulfilmentMode: 'Pickup',
+        busyMinutes: 0,
+        reopensAt: '',
+      );
+      session.saveWorkspaceTradingControls(
+        openingTime: '9 AM',
+        closingTime: '8 PM',
+        maximumActiveOrders: 8,
+        alertSound: true,
+        alertVibration: true,
+      );
+      expect(gateway.saves, hasLength(2));
+      expect(
+        gateway.snapshots.map((s) => s.workspaceId),
+        everyElement('workspace-store-1'),
+      );
+      gateway.saves.first.complete();
+      await Future<void>.delayed(Duration.zero);
+      expect(session.workspaceOperationsSyncing, isTrue);
+      session.activateWorkspace(_scopeSecondStore);
+      expect(session.activeWorkspace?.id, 'workspace-store-1');
+      gateway.saves.last.complete();
+      await Future<void>.delayed(Duration.zero);
+      expect(session.workspaceOperationsSyncing, isFalse);
+      session.activateWorkspace(_scopeSecondStore);
+      expect(session.activeWorkspace?.id, _scopeSecondStore.id);
+    },
+  );
+
+  for (final fails in [false, true]) {
+    test(
+      'Store scope late save cannot finish another store save $fails',
+      () async {
+        final gateway = _ScopeGateway();
+        final session = liveSession(gateway);
+        session.saveWorkspaceAvailability(
+          acceptingOrders: true,
+          fulfilmentMode: 'Pickup',
+          busyMinutes: 0,
+          reopensAt: '',
+        );
+        session.activeWorkspace = _scopeSecondStore;
+        session.workspaceId = _scopeSecondStore.id;
+        session.saveWorkspaceAvailability(
+          acceptingOrders: false,
+          fulfilmentMode: 'Pickup',
+          busyMinutes: 0,
+          reopensAt: '',
+        );
+        if (fails) {
+          gateway.saves.first.completeError(
+            const WorkGatewayException('First store failure'),
+          );
+        } else {
+          gateway.saves.first.complete();
+        }
+        await Future<void>.delayed(Duration.zero);
+        expect(session.workspaceOperationsSyncing, isTrue);
+        expect(session.workspaceOperationsSyncError, isNull);
+        expect(session.workspaceAcceptingOrders, isFalse);
+        gateway.saves.last.complete();
+        await Future<void>.delayed(Duration.zero);
+        expect(session.workspaceOperationsSyncing, isFalse);
+      },
+    );
+
+    test(
+      'Store scope late settlement cannot change another store $fails',
+      () async {
+        final gateway = _ScopeGateway();
+        final session = liveSession(gateway)..workspaceSettlementBalance = 500;
+        final pending = session.requestWorkspaceSettlement(amount: 100);
+        session.activeWorkspace = _scopeSecondStore;
+        session.workspaceId = _scopeSecondStore.id;
+        session.workspaceSettlementBalance = 12000;
+        if (fails) {
+          gateway.settlement.completeError(
+            const WorkGatewayException('Old settlement failure'),
+          );
+        } else {
+          gateway.settlement.complete(
+            const WorkSettlementResult(
+              reference: 'old-settlement',
+              acceptedAmount: 100,
+            ),
+          );
+        }
+        await pending;
+        expect(session.workspaceSettlementBalance, 12000);
+        expect(session.workspaceSettlementRequested, 0);
+        expect(session.workspaceSettlementReference, isNull);
+        expect(session.workspaceActivity, isEmpty);
+        expect(session.errorMessage, isNull);
+        expect(gateway.saves, isEmpty);
+        expect(session.busy, isFalse);
+      },
+    );
+  }
+
+  for (final pickup in [false, true]) {
+    test(
+      'Store scope late handover cannot complete a same-id order $pickup',
+      () async {
+        final gateway = _ScopeGateway();
+        final session = liveSession(gateway);
+        session.workspaceOrders.add(_scopeOrder('same-order'));
+        expect(session.selectWorkspaceOrder('same-order'), isTrue);
+        final pending = pickup
+            ? session.verifyWorkspacePickup('123456')
+            : session.verifyWorkspaceHandover('123456');
+        session.activeWorkspace = _scopeSecondStore;
+        session.workspaceId = _scopeSecondStore.id;
+        session.workspaceOrders.add(_scopeOrder('same-order'));
+        expect(session.selectWorkspaceOrder('same-order'), isTrue);
+        gateway.handover.complete();
+        expect(await pending, isFalse);
+        expect(session.workspaceOrderStage, 'Ready for pickup');
+        expect(session.workspaceInvoices, isEmpty);
+        expect(session.workspaceCompletedSalesCount, 0);
+        expect(session.workspaceSettlementBalance, 0);
+        expect(session.workspaceHandoverBusy, isFalse);
+      },
+    );
+  }
+
+  test(
+    'Store scope late rider assignment cannot replace another store rider',
+    () async {
+      final gateway = _ScopeGateway();
+      final session = liveSession(gateway);
+      session.workspaceOrders.add(
+        _scopeOrder('same-order', stage: 'Delivery requested'),
+      );
+      expect(session.selectWorkspaceOrder('same-order'), isTrue);
+      final pending = session.retryWorkspaceDeliveryAssignment();
+      session.activeWorkspace = _scopeSecondStore;
+      session.workspaceId = _scopeSecondStore.id;
+      session.workspaceOrders.add(
+        _scopeOrder('same-order', stage: 'Delivery requested'),
+      );
+      expect(session.selectWorkspaceOrder('same-order'), isTrue);
+      gateway.delivery.complete(
+        WorkDeliveryAssignmentResult(
+          partnerName: 'Old rider',
+          vehicleLabel: 'Bike',
+          eta: DateTime(2026, 9, 7),
+          stage: 'Arriving',
+        ),
+      );
+      await pending;
+      expect(session.workspaceDeliveryAssignment, isNull);
+      expect(session.workspaceOrderActionDeadline, isNull);
+      expect(session.workspaceOperationsSyncing, isFalse);
+    },
+  );
+
+  for (final group in [false, true]) {
+    test(
+      'Store scope late publication cannot populate another store $group',
+      () async {
+        final gateway = _ScopeGateway();
+        final session = liveSession(gateway);
+        final pending = group
+            ? session.createWorkspaceGroupBuy(
+                productName: 'Onion',
+                specification: 'Grade A',
+                targetQuantity: 100,
+                securedQuantity: 10,
+                unitLabel: 'kg',
+                regularUnitPrice: 20,
+                groupUnitPrice: 14,
+                facilitationFee: 5,
+                deliveryFee: 0,
+                confirmationAmount: 140,
+                closingLabel: '10 September',
+                storeDeliveryLabel: '12 September',
+              )
+            : session.createWorkspacePaidRequirement(
+                position: 'Product sourcing',
+                work: 'Source stock',
+                candidateRequirement: 'Wholesale experience',
+                location: 'Jodhpur',
+                peopleNeeded: 1,
+                paymentAmount: 100,
+                paymentFormat: 'Assignment',
+                deadline: DateTime(2026, 9, 10),
+              );
+        session.activeWorkspace = _scopeSecondStore;
+        session.workspaceId = _scopeSecondStore.id;
+        gateway.publication.complete('first-store-reference');
+        expect(await pending, isFalse);
+        expect(session.activeGroupBuy, isNull);
+        expect(session.workspacePaidRequirementReference, isNull);
+        expect(
+          session.workspacePaidRequirementState,
+          WorkspacePaidRequirementState.draft,
+        );
+        expect(session.workspaceActivity, isEmpty);
+        expect(gateway.saves, isEmpty);
+      },
+    );
+  }
+
   test('repeat basket reconstructs an available legacy purchase summary', () {
     final session = liveSession();
     session.addOrUpdateWorkspaceProduct(
@@ -473,6 +935,163 @@ void main() {
     expect(session.noticeMessage, contains('Available products'));
   });
 }
+
+const _scopeSecondStore = WorkWorkspace(
+  id: 'workspace-store-2',
+  name: 'Second store',
+  profileLabel: 'Speciality Retail Shop',
+  profileId: 'retailer-speciality',
+  area: 'Paota',
+  verified: true,
+);
+
+class _ScopeGateway extends ReviewWorkGateway {
+  final saves = <Completer<void>>[];
+  final snapshots = <WorkOperationalSnapshot>[];
+  final settlement = Completer<WorkSettlementResult>();
+  final handover = Completer<void>();
+  final delivery = Completer<WorkDeliveryAssignmentResult>();
+  final publication = Completer<String>();
+  @override
+  Future<void> saveOperationalState(WorkOperationalSnapshot snapshot) {
+    snapshots.add(snapshot);
+    final result = Completer<void>();
+    saves.add(result);
+    return result.future;
+  }
+
+  @override
+  Future<WorkSettlementResult> requestSettlement({
+    required String workspaceId,
+    required int amount,
+    required String idempotencyKey,
+  }) => settlement.future;
+  @override
+  Future<void> verifyOrderHandover({
+    required String workspaceId,
+    required String orderId,
+    required String otp,
+    required String idempotencyKey,
+  }) => handover.future;
+  @override
+  Future<WorkDeliveryAssignmentResult> requestDeliveryAssignment({
+    required String workspaceId,
+    required String orderId,
+    required String address,
+    required String idempotencyKey,
+  }) => delivery.future;
+  @override
+  Future<String> createGroupBuy(WorkGroupBuySubmission submission) =>
+      publication.future;
+  @override
+  Future<String> createPaidRequirement(
+    WorkPaidRequirementSubmission submission,
+  ) => publication.future;
+}
+
+Map<String, Object?> _storeValues(WorkSession session) => {
+  'retailerProductAdded': session.retailerProductAdded,
+  'retailerQuantity': session.retailerQuantity,
+  'retailerBuyPrice': session.retailerBuyPrice,
+  'retailerSellPrice': session.retailerSellPrice,
+  'retailerHomeDelivery': session.retailerHomeDelivery,
+  'retailerStoreCollection': session.retailerStoreCollection,
+  'retailerPublishAfterSetup': session.retailerPublishAfterSetup,
+  'retailerSetupSaved': session.retailerSetupSaved,
+  'workspaceSearchQuery': session.workspaceSearchQuery,
+  'workspaceStoreState': session.workspaceStoreState,
+  'workspaceDashboardState': session.workspaceDashboardState,
+  'workspaceLastUpdatedAt': session.workspaceLastUpdatedAt,
+  'workspaceDashboardError': session.workspaceDashboardError,
+  'workspaceAcceptingOrders': session.workspaceAcceptingOrders,
+  'workspaceFulfilmentMode': session.workspaceFulfilmentMode,
+  'workspaceBusyMinutes': session.workspaceBusyMinutes,
+  'workspaceReopensAt': session.workspaceReopensAt,
+  'workspaceOpeningTime': session.workspaceOpeningTime,
+  'workspaceClosingTime': session.workspaceClosingTime,
+  'workspaceMaximumActiveOrders': session.workspaceMaximumActiveOrders,
+  'workspaceOrderAlertSound': session.workspaceOrderAlertSound,
+  'workspaceOrderAlertVibration': session.workspaceOrderAlertVibration,
+  'workspaceVisibleToCustomers': session.workspaceVisibleToCustomers,
+  'workspaceOrderCustomer': session.workspaceOrderCustomer,
+  'workspaceOrderItems': session.workspaceOrderItems,
+  'workspaceOrderAmount': session.workspaceOrderAmount,
+  'workspaceOrderNeedsDelivery': session.workspaceOrderNeedsDelivery,
+  'workspaceOrderSource': session.workspaceOrderSource,
+  'workspaceOrderFulfilment': session.workspaceOrderFulfilment,
+  'workspaceOrderPayment': session.workspaceOrderPayment,
+  'workspaceOrderAddress': session.workspaceOrderAddress,
+  'workspaceOrderStage': session.workspaceOrderStage,
+  'workspaceOrderExtraMinutes': session.workspaceOrderExtraMinutes,
+  'workspaceOrderActionDeadline': session.workspaceOrderActionDeadline,
+  'workspaceOrderFilter': session.workspaceOrderFilter,
+  'workspaceCustomerPeriod': session.workspaceCustomerPeriod,
+  'workspaceCustomerSearch': session.workspaceCustomerSearch,
+  'workspaceCustomerFilter': session.workspaceCustomerFilter,
+  'workspaceMoneyPeriod': session.workspaceMoneyPeriod,
+  'workspaceCustomerCustomStart': session.workspaceCustomerCustomStart,
+  'workspaceCustomerCustomEnd': session.workspaceCustomerCustomEnd,
+  'workspaceSalesToday': session.workspaceSalesToday,
+  'workspaceCompletedSalesCount': session.workspaceCompletedSalesCount,
+  'workspacePlatformAdjustments': session.workspacePlatformAdjustments,
+  'workspaceDeliveryAdjustments': session.workspaceDeliveryAdjustments,
+  'workspaceRefunds': session.workspaceRefunds,
+  'workspaceTaxWithheld': session.workspaceTaxWithheld,
+  'workspaceSettlementBalance': session.workspaceSettlementBalance,
+  'workspaceSettlementRequested': session.workspaceSettlementRequested,
+  'workspaceSettlementReference': session.workspaceSettlementReference,
+  'workspacePayoutBankName': session.workspacePayoutBankName,
+  'workspacePayoutAccountEnding': session.workspacePayoutAccountEnding,
+  'workspaceCatalogueItems': session.workspaceCatalogueItems,
+  'workspaceStockMovements': session.workspaceStockMovements,
+  'workspaceOrderQuantities': session.workspaceOrderQuantities,
+  'workspaceOrders': session.workspaceOrders,
+  'workspacePackedProductIds': session.workspacePackedProductIds,
+  'workspaceInvoices': session.workspaceInvoices,
+  'workspaceOffers': session.workspaceOffers,
+  'currentWorkspaceOrderId': session.currentWorkspaceOrderId,
+  'workspaceDeliveryAssignment': session.workspaceDeliveryAssignment,
+  'workspaceOperationsSyncing': session.workspaceOperationsSyncing,
+  'workspaceOperationsSyncError': session.workspaceOperationsSyncError,
+  'workspaceHandoverBusy': session.workspaceHandoverBusy,
+  'workspaceActivity': session.workspaceActivity,
+  'activeGroupBuy': session.activeGroupBuy,
+  'workspaceDeliveryRadiusKm': session.workspaceDeliveryRadiusKm,
+  'workspaceDeliveryFee': session.workspaceDeliveryFee,
+  'workspaceFreeDeliveryAbove': session.workspaceFreeDeliveryAbove,
+  'workspaceDeliveryCity': session.workspaceDeliveryCity,
+  'workspaceDeliveryArea': session.workspaceDeliveryArea,
+  'workspaceDeliveryPincode': session.workspaceDeliveryPincode,
+  'workspacePickupEnabled': session.workspacePickupEnabled,
+  'workspaceStaffAccessEnabled': session.workspaceStaffAccessEnabled,
+  'workspaceCounterCount': session.workspaceCounterCount,
+  'workspacePaidRequirementReference':
+      session.workspacePaidRequirementReference,
+  'workspacePaidRequirementState': session.workspacePaidRequirementState,
+  'dismissedWorkspaceAlerts': session.dismissedWorkspaceAlerts,
+  'workspaceCustomersFollowingStore': session.workspaceCustomersFollowingStore,
+  'workspaceCustomersAllowingMessages':
+      session.workspaceCustomersAllowingMessages,
+  'workspaceCustomerLastContactAt': session.workspaceCustomerLastContactAt,
+};
+
+WorkspaceOrderRecord _scopeOrder(
+  String id, {
+  String stage = 'Ready for pickup',
+}) => WorkspaceOrderRecord(
+  id: id,
+  customer: 'Customer',
+  items: 'Atta',
+  quantities: const {'atta-5kg': 1},
+  amount: 275,
+  source: 'App',
+  fulfilment: 'Pickup',
+  payment: 'Paid online',
+  address: 'Customer address',
+  stage: stage,
+  needsDelivery: false,
+  createdAt: DateTime(2026, 9, 7),
+);
 
 WorkspaceCatalogueItem _product({
   String id = 'atta-5kg',

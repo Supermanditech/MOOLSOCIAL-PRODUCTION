@@ -925,6 +925,118 @@ void main() {
     },
   );
 
+  test(
+    'Store scope account change clears current and cached operational data',
+    () async {
+      final memory = _PendingProofMemory();
+      final work = WorkSession(contactDraftStore: memory);
+      addTearDown(work.dispose);
+      await work.recoverPendingProof(accountReady: true);
+      const first = WorkWorkspace(
+        id: 'store-a',
+        name: 'First store',
+        profileLabel: 'Grocery / Kirana Shop',
+        profileId: 'retailer-grocery',
+        area: 'Jodhpur',
+        verified: true,
+      );
+      const second = WorkWorkspace(
+        id: 'store-b',
+        name: 'Second store',
+        profileLabel: 'Speciality Retail Shop',
+        profileId: 'retailer-speciality',
+        area: 'Jaipur',
+        verified: true,
+      );
+      work.activeWorkspace = first;
+      work.workspaceId = first.id;
+      work.otherWorkspaces.add(second);
+      work.workspaceSettlementBalance = 500;
+      work.workspaceOrderCustomer = 'First customer';
+      work.workspaceOrderQuantities['first-sku'] = 2;
+      work.activateWorkspace(second);
+      work.workspaceSettlementBalance = 900;
+      work.workspaceOrderCustomer = 'Second customer';
+      memory.accountScope = 'new-account';
+      await work.recoverPendingProof(accountReady: true);
+      expect(work.activeWorkspace, isNull);
+      expect(work.workspaceSettlementBalance, 0);
+      expect(work.workspaceOrderCustomer, isEmpty);
+      expect(work.workspaceOrderQuantities, isEmpty);
+      work.activeWorkspace = first;
+      work.workspaceId = first.id;
+      expect(work.workspaceSettlementBalance, 0);
+      work.activateWorkspace(second);
+      expect(work.workspaceSettlementBalance, 0);
+      expect(work.workspaceOrderCustomer, isEmpty);
+    },
+  );
+
+  test(
+    'Store scope old account settlement cannot finish the new account operation',
+    () async {
+      final memory = _PendingProofMemory();
+      final gateway = _AccountSettlementGateway();
+      final work = WorkSession(gateway: gateway, contactDraftStore: memory);
+      addTearDown(work.dispose);
+      await work.recoverPendingProof(accountReady: true);
+      const store = WorkWorkspace(
+        id: 'same-store',
+        name: 'Store',
+        profileLabel: 'Grocery / Kirana Shop',
+        profileId: 'retailer-grocery',
+        area: 'Jodhpur',
+        verified: true,
+      );
+      work.activeWorkspace = store;
+      work.workspaceId = store.id;
+      work.workspaceSettlementBalance = 500;
+      final old = work.requestWorkspaceSettlement(amount: 100);
+      memory.accountScope = 'new-account';
+      await work.recoverPendingProof(accountReady: true);
+      work.activeWorkspace = store;
+      work.workspaceId = store.id;
+      work.workspaceSettlementBalance = 900;
+      final current = work.requestWorkspaceSettlement(amount: 200);
+      expect(gateway.results, hasLength(2));
+      gateway.results.first.complete(
+        const WorkSettlementResult(reference: 'old', acceptedAmount: 100),
+      );
+      await old;
+      expect(work.busy, isTrue);
+      expect(work.workspaceSettlementBalance, 900);
+      expect(work.workspaceSettlementReference, isNull);
+      gateway.results.last.complete(
+        const WorkSettlementResult(reference: 'current', acceptedAmount: 200),
+      );
+      await current;
+      expect(work.busy, isFalse);
+      expect(work.workspaceSettlementBalance, 700);
+      expect(work.workspaceSettlementReference, 'current');
+    },
+  );
+
+  test(
+    'Store scope feed refresh retains the selected approved store',
+    () async {
+      final work = WorkSession(gateway: _MultiStoreFeedGateway());
+      addTearDown(work.dispose);
+      await work.refreshFeed();
+      expect(work.activeWorkspace?.id, 'store-b');
+      work.workspaceSettlementBalance = 900;
+      final first = work.otherWorkspaces.single;
+      work.activateWorkspace(first);
+      work.workspaceSettlementBalance = 100;
+      await work.refreshFeed();
+      expect(work.activeWorkspace?.id, 'store-a');
+      expect(work.workspaceId, 'store-a');
+      expect(work.workName, 'First store');
+      expect(work.workspaceSettlementBalance, 100);
+      work.activateWorkspace(work.otherWorkspaces.single);
+      expect(work.workspaceSettlementBalance, 900);
+    },
+  );
+
   WorkSession removableProof({WorkPendingProofStore? store}) {
     final work = WorkSession(pendingProofStore: store)
       ..selectProfile('retailer-grocery');
@@ -2676,6 +2788,44 @@ class _DeferredSubmissionGateway extends ReviewWorkGateway {
     String caseId,
     WorkProfileSubmission profile,
   ) => result.future;
+}
+
+class _AccountSettlementGateway extends ReviewWorkGateway {
+  final results = <Completer<WorkSettlementResult>>[];
+  @override
+  Future<WorkSettlementResult> requestSettlement({
+    required String workspaceId,
+    required int amount,
+    required String idempotencyKey,
+  }) {
+    final pending = Completer<WorkSettlementResult>();
+    results.add(pending);
+    return pending.future;
+  }
+}
+
+class _MultiStoreFeedGateway extends ReviewWorkGateway {
+  @override
+  Future<List<WorkReviewResult>> loadFeed() async => const [
+    WorkReviewResult(
+      caseId: 'a',
+      status: WorkRemoteReviewStatus.live,
+      plan: 'free',
+      workspaceId: 'store-a',
+      profileId: 'retailer-grocery',
+      name: 'First store',
+      area: 'Jodhpur',
+    ),
+    WorkReviewResult(
+      caseId: 'b',
+      status: WorkRemoteReviewStatus.live,
+      plan: 'free',
+      workspaceId: 'store-b',
+      profileId: 'retailer-speciality',
+      name: 'Second store',
+      area: 'Jaipur',
+    ),
+  ];
 }
 
 class _DeferredFeedGateway extends ReviewWorkGateway {

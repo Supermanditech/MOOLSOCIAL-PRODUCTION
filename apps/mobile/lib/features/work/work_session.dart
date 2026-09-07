@@ -303,6 +303,99 @@ class StoreCollectionController extends ChangeNotifier {
   }
 }
 
+/// Existing Store fields partitioned by workspace, within this signed-in session.
+/// This cache is not authoritative persistence or backend membership validation.
+class _StoreOperationalData {
+  bool retailerProductAdded = false;
+  int retailerQuantity = 0;
+  int retailerBuyPrice = 0;
+  int retailerSellPrice = 0;
+  bool retailerHomeDelivery = false;
+  bool retailerStoreCollection = false;
+  bool retailerPublishAfterSetup = false;
+  bool retailerSetupSaved = false;
+  String workspaceSearchQuery = '';
+  WorkspaceStoreState workspaceStoreState = WorkspaceStoreState.off;
+  WorkspaceDashboardState workspaceDashboardState =
+      WorkspaceDashboardState.ready;
+  DateTime? workspaceLastUpdatedAt;
+  String workspaceDashboardError = '';
+  bool workspaceAcceptingOrders = false;
+  String workspaceFulfilmentMode = 'Delivery and pickup';
+  int workspaceBusyMinutes = 0;
+  String workspaceReopensAt = '';
+  String workspaceOpeningTime = '8:00 AM';
+  String workspaceClosingTime = '10:00 PM';
+  int workspaceMaximumActiveOrders = 8;
+  bool workspaceOrderAlertSound = true;
+  bool workspaceOrderAlertVibration = true;
+  bool workspaceVisibleToCustomers = false;
+  String workspaceOrderCustomer = '';
+  String workspaceOrderItems = '';
+  String workspaceOrderAmount = '';
+  bool workspaceOrderNeedsDelivery = false;
+  String workspaceOrderSource = 'Counter';
+  String workspaceOrderFulfilment = 'At the shop';
+  String workspaceOrderPayment = 'Cash';
+  String workspaceOrderAddress = '';
+  String workspaceOrderStage = 'No order';
+  int workspaceOrderExtraMinutes = 0;
+  DateTime? workspaceOrderActionDeadline;
+  String workspaceOrderFilter = 'Live';
+  String workspaceCustomerPeriod = 'Month';
+  String workspaceCustomerSearch = '';
+  String workspaceCustomerFilter = 'Recent';
+  String workspaceMoneyPeriod = 'Today';
+  DateTime? workspaceCustomerCustomStart;
+  DateTime? workspaceCustomerCustomEnd;
+  int workspaceSalesToday = 0;
+  int workspaceCompletedSalesCount = 0;
+  int workspacePlatformAdjustments = 0;
+  int workspaceDeliveryAdjustments = 0;
+  int workspaceRefunds = 0;
+  int workspaceTaxWithheld = 0;
+  int workspaceSettlementBalance = 0;
+  int workspaceSettlementRequested = 0;
+  String? workspaceSettlementReference;
+  String workspacePayoutBankName = '';
+  String workspacePayoutAccountEnding = '';
+  final List<WorkspaceCatalogueItem> workspaceCatalogueItems = [];
+  final List<WorkspaceStockMovement> workspaceStockMovements = [];
+  final Map<String, int> workspaceOrderQuantities = {};
+  final List<WorkspaceOrderRecord> workspaceOrders = [];
+  final Set<String> workspacePackedProductIds = <String>{};
+  final Map<String, Set<String>> _packingByOrder = {};
+  final Map<String, WorkspaceDeliveryAssignment> _deliveryByOrder = {};
+  final List<WorkspaceCustomerInvoice> workspaceInvoices = [];
+  final List<WorkspaceStoreOffer> workspaceOffers = [];
+  String? currentWorkspaceOrderId;
+  WorkspaceDeliveryAssignment? workspaceDeliveryAssignment;
+  bool workspaceOperationsSyncing = false;
+  String? workspaceOperationsSyncError;
+  bool workspaceHandoverBusy = false;
+  final List<WorkspaceActivityEntry> workspaceActivity = [];
+  WorkspaceGroupBuy? activeGroupBuy;
+  int workspaceDeliveryRadiusKm = 5;
+  int workspaceDeliveryFee = 30;
+  int workspaceFreeDeliveryAbove = 499;
+  String workspaceDeliveryCity = 'Jodhpur';
+  String workspaceDeliveryArea = 'Sardarpura';
+  String workspaceDeliveryPincode = '342003';
+  bool workspacePickupEnabled = true;
+  bool workspaceStaffAccessEnabled = false;
+  int workspaceCounterCount = 1;
+  String? workspacePaidRequirementReference;
+  WorkspacePaidRequirementState workspacePaidRequirementState =
+      WorkspacePaidRequirementState.draft;
+  final Set<String> dismissedWorkspaceAlerts = <String>{};
+  final Set<String> workspaceCustomersFollowingStore = <String>{};
+  final Set<String> workspaceCustomersAllowingMessages = <String>{};
+  final Map<String, DateTime> workspaceCustomerLastContactAt =
+      <String, DateTime>{};
+
+  int pendingOperationalRequests = 0;
+}
+
 class WorkSession extends ChangeNotifier {
   WorkSession({
     WorkGateway? gateway,
@@ -530,96 +623,311 @@ class WorkSession extends ChangeNotifier {
   String unsupportedFamily = '';
   String unsupportedOtherActivity = '';
 
-  WorkWorkspace? activeWorkspace;
+  WorkWorkspace? _activeWorkspace;
+  WorkWorkspace? get activeWorkspace => _activeWorkspace;
+  set activeWorkspace(WorkWorkspace? value) {
+    final previousId = _activeWorkspace?.id;
+    if (previousId != value?.id) {
+      _clearCollection();
+      if (previousId != null) _storeDataById[previousId] = _storeData;
+      if (value == null) {
+        _storeData = _StoreOperationalData();
+      } else {
+        // First activation may adopt setup fields from this same session.
+        // A different existing store must never inherit the previous data.
+        _storeData =
+            _storeDataById.remove(value.id) ??
+            (previousId == null ? _storeData : _StoreOperationalData());
+      }
+    }
+    _activeWorkspace = value;
+  }
+
   final List<WorkWorkspace> otherWorkspaces = <WorkWorkspace>[];
 
-  bool retailerProductAdded = false;
-  int retailerQuantity = 0;
-  int retailerBuyPrice = 0;
-  int retailerSellPrice = 0;
-  bool retailerHomeDelivery = false;
-  bool retailerStoreCollection = false;
-  bool retailerPublishAfterSetup = false;
-  bool retailerSetupSaved = false;
   bool initialWorkspaceStateLoaded = false;
-  String workspaceSearchQuery = '';
-  WorkspaceStoreState workspaceStoreState = WorkspaceStoreState.off;
-  WorkspaceDashboardState workspaceDashboardState =
-      WorkspaceDashboardState.ready;
-  DateTime? workspaceLastUpdatedAt;
-  String workspaceDashboardError = '';
-  bool workspaceAcceptingOrders = false;
-  String workspaceFulfilmentMode = 'Delivery and pickup';
-  int workspaceBusyMinutes = 0;
-  String workspaceReopensAt = '';
-  String workspaceOpeningTime = '8:00 AM';
-  String workspaceClosingTime = '10:00 PM';
-  int workspaceMaximumActiveOrders = 8;
-  bool workspaceOrderAlertSound = true;
-  bool workspaceOrderAlertVibration = true;
-  bool workspaceVisibleToCustomers = false;
-  String workspaceOrderCustomer = '';
-  String workspaceOrderItems = '';
-  String workspaceOrderAmount = '';
-  bool workspaceOrderNeedsDelivery = false;
-  String workspaceOrderSource = 'Counter';
-  String workspaceOrderFulfilment = 'At the shop';
-  String workspaceOrderPayment = 'Cash';
-  String workspaceOrderAddress = '';
-  String workspaceOrderStage = 'No order';
-  int workspaceOrderExtraMinutes = 0;
-  DateTime? workspaceOrderActionDeadline;
-  String workspaceOrderFilter = 'Live';
-  String workspaceCustomerPeriod = 'Month';
-  String workspaceCustomerSearch = '';
-  String workspaceCustomerFilter = 'Recent';
-  String workspaceMoneyPeriod = 'Today';
-  DateTime? workspaceCustomerCustomStart;
-  DateTime? workspaceCustomerCustomEnd;
-  int workspaceSalesToday = 0;
-  int workspaceCompletedSalesCount = 0;
-  int workspacePlatformAdjustments = 0;
-  int workspaceDeliveryAdjustments = 0;
-  int workspaceRefunds = 0;
-  int workspaceTaxWithheld = 0;
-  int workspaceSettlementBalance = 0;
-  int workspaceSettlementRequested = 0;
-  String? workspaceSettlementReference;
-  String workspacePayoutBankName = '';
-  String workspacePayoutAccountEnding = '';
-  final List<WorkspaceCatalogueItem> workspaceCatalogueItems = [];
-  final List<WorkspaceStockMovement> workspaceStockMovements = [];
-  final Map<String, int> workspaceOrderQuantities = {};
-  final List<WorkspaceOrderRecord> workspaceOrders = [];
-  final Set<String> workspacePackedProductIds = <String>{};
-  final Map<String, Set<String>> _packingByOrder = {};
-  final Map<String, WorkspaceDeliveryAssignment> _deliveryByOrder = {};
-  final List<WorkspaceCustomerInvoice> workspaceInvoices = [];
-  final List<WorkspaceStoreOffer> workspaceOffers = [];
-  String? currentWorkspaceOrderId;
-  WorkspaceDeliveryAssignment? workspaceDeliveryAssignment;
-  bool workspaceOperationsSyncing = false;
-  String? workspaceOperationsSyncError;
-  bool workspaceHandoverBusy = false;
-  final List<WorkspaceActivityEntry> workspaceActivity = [];
-  WorkspaceGroupBuy? activeGroupBuy;
-  int workspaceDeliveryRadiusKm = 5;
-  int workspaceDeliveryFee = 30;
-  int workspaceFreeDeliveryAbove = 499;
-  String workspaceDeliveryCity = 'Jodhpur';
-  String workspaceDeliveryArea = 'Sardarpura';
-  String workspaceDeliveryPincode = '342003';
-  bool workspacePickupEnabled = true;
-  bool workspaceStaffAccessEnabled = false;
-  int workspaceCounterCount = 1;
-  String? workspacePaidRequirementReference;
-  WorkspacePaidRequirementState workspacePaidRequirementState =
-      WorkspacePaidRequirementState.draft;
-  final Set<String> dismissedWorkspaceAlerts = <String>{};
-  final Set<String> workspaceCustomersFollowingStore = <String>{};
-  final Set<String> workspaceCustomersAllowingMessages = <String>{};
-  final Map<String, DateTime> workspaceCustomerLastContactAt =
-      <String, DateTime>{};
+  _StoreOperationalData _storeData = _StoreOperationalData();
+  final Map<String, _StoreOperationalData> _storeDataById = {};
+  Object? _busyStoreOperation;
+
+  bool _isStoreScopeCurrent(
+    _StoreOperationalData data,
+    String id,
+    String? scope,
+  ) =>
+      !_disposed &&
+      identical(data, _storeData) &&
+      id == (activeWorkspace?.id ?? workspaceId) &&
+      scope == _contactAccountScope;
+
+  Object _beginBusyStoreOperation() {
+    final token = Object();
+    _busyStoreOperation = token;
+    busy = true;
+    return token;
+  }
+
+  void _finishBusyStoreOperation(Object token) {
+    if (!identical(token, _busyStoreOperation)) return;
+    _busyStoreOperation = null;
+    busy = false;
+    notifyListeners();
+  }
+
+  void _finishOperationalRequest(
+    _StoreOperationalData data,
+    String id,
+    String? scope,
+  ) {
+    data.pendingOperationalRequests--;
+    data.workspaceOperationsSyncing = data.pendingOperationalRequests > 0;
+    if (_isStoreScopeCurrent(data, id, scope)) notifyListeners();
+  }
+
+  bool get retailerProductAdded => _storeData.retailerProductAdded;
+  set retailerProductAdded(bool value) =>
+      _storeData.retailerProductAdded = value;
+  int get retailerQuantity => _storeData.retailerQuantity;
+  set retailerQuantity(int value) => _storeData.retailerQuantity = value;
+  int get retailerBuyPrice => _storeData.retailerBuyPrice;
+  set retailerBuyPrice(int value) => _storeData.retailerBuyPrice = value;
+  int get retailerSellPrice => _storeData.retailerSellPrice;
+  set retailerSellPrice(int value) => _storeData.retailerSellPrice = value;
+  bool get retailerHomeDelivery => _storeData.retailerHomeDelivery;
+  set retailerHomeDelivery(bool value) =>
+      _storeData.retailerHomeDelivery = value;
+  bool get retailerStoreCollection => _storeData.retailerStoreCollection;
+  set retailerStoreCollection(bool value) =>
+      _storeData.retailerStoreCollection = value;
+  bool get retailerPublishAfterSetup => _storeData.retailerPublishAfterSetup;
+  set retailerPublishAfterSetup(bool value) =>
+      _storeData.retailerPublishAfterSetup = value;
+  bool get retailerSetupSaved => _storeData.retailerSetupSaved;
+  set retailerSetupSaved(bool value) => _storeData.retailerSetupSaved = value;
+  String get workspaceSearchQuery => _storeData.workspaceSearchQuery;
+  set workspaceSearchQuery(String value) =>
+      _storeData.workspaceSearchQuery = value;
+  WorkspaceStoreState get workspaceStoreState => _storeData.workspaceStoreState;
+  set workspaceStoreState(WorkspaceStoreState value) =>
+      _storeData.workspaceStoreState = value;
+  WorkspaceDashboardState get workspaceDashboardState =>
+      _storeData.workspaceDashboardState;
+  set workspaceDashboardState(WorkspaceDashboardState value) =>
+      _storeData.workspaceDashboardState = value;
+  DateTime? get workspaceLastUpdatedAt => _storeData.workspaceLastUpdatedAt;
+  set workspaceLastUpdatedAt(DateTime? value) =>
+      _storeData.workspaceLastUpdatedAt = value;
+  String get workspaceDashboardError => _storeData.workspaceDashboardError;
+  set workspaceDashboardError(String value) =>
+      _storeData.workspaceDashboardError = value;
+  bool get workspaceAcceptingOrders => _storeData.workspaceAcceptingOrders;
+  set workspaceAcceptingOrders(bool value) =>
+      _storeData.workspaceAcceptingOrders = value;
+  String get workspaceFulfilmentMode => _storeData.workspaceFulfilmentMode;
+  set workspaceFulfilmentMode(String value) =>
+      _storeData.workspaceFulfilmentMode = value;
+  int get workspaceBusyMinutes => _storeData.workspaceBusyMinutes;
+  set workspaceBusyMinutes(int value) =>
+      _storeData.workspaceBusyMinutes = value;
+  String get workspaceReopensAt => _storeData.workspaceReopensAt;
+  set workspaceReopensAt(String value) => _storeData.workspaceReopensAt = value;
+  String get workspaceOpeningTime => _storeData.workspaceOpeningTime;
+  set workspaceOpeningTime(String value) =>
+      _storeData.workspaceOpeningTime = value;
+  String get workspaceClosingTime => _storeData.workspaceClosingTime;
+  set workspaceClosingTime(String value) =>
+      _storeData.workspaceClosingTime = value;
+  int get workspaceMaximumActiveOrders =>
+      _storeData.workspaceMaximumActiveOrders;
+  set workspaceMaximumActiveOrders(int value) =>
+      _storeData.workspaceMaximumActiveOrders = value;
+  bool get workspaceOrderAlertSound => _storeData.workspaceOrderAlertSound;
+  set workspaceOrderAlertSound(bool value) =>
+      _storeData.workspaceOrderAlertSound = value;
+  bool get workspaceOrderAlertVibration =>
+      _storeData.workspaceOrderAlertVibration;
+  set workspaceOrderAlertVibration(bool value) =>
+      _storeData.workspaceOrderAlertVibration = value;
+  bool get workspaceVisibleToCustomers =>
+      _storeData.workspaceVisibleToCustomers;
+  set workspaceVisibleToCustomers(bool value) =>
+      _storeData.workspaceVisibleToCustomers = value;
+  String get workspaceOrderCustomer => _storeData.workspaceOrderCustomer;
+  set workspaceOrderCustomer(String value) =>
+      _storeData.workspaceOrderCustomer = value;
+  String get workspaceOrderItems => _storeData.workspaceOrderItems;
+  set workspaceOrderItems(String value) =>
+      _storeData.workspaceOrderItems = value;
+  String get workspaceOrderAmount => _storeData.workspaceOrderAmount;
+  set workspaceOrderAmount(String value) =>
+      _storeData.workspaceOrderAmount = value;
+  bool get workspaceOrderNeedsDelivery =>
+      _storeData.workspaceOrderNeedsDelivery;
+  set workspaceOrderNeedsDelivery(bool value) =>
+      _storeData.workspaceOrderNeedsDelivery = value;
+  String get workspaceOrderSource => _storeData.workspaceOrderSource;
+  set workspaceOrderSource(String value) =>
+      _storeData.workspaceOrderSource = value;
+  String get workspaceOrderFulfilment => _storeData.workspaceOrderFulfilment;
+  set workspaceOrderFulfilment(String value) =>
+      _storeData.workspaceOrderFulfilment = value;
+  String get workspaceOrderPayment => _storeData.workspaceOrderPayment;
+  set workspaceOrderPayment(String value) =>
+      _storeData.workspaceOrderPayment = value;
+  String get workspaceOrderAddress => _storeData.workspaceOrderAddress;
+  set workspaceOrderAddress(String value) =>
+      _storeData.workspaceOrderAddress = value;
+  String get workspaceOrderStage => _storeData.workspaceOrderStage;
+  set workspaceOrderStage(String value) =>
+      _storeData.workspaceOrderStage = value;
+  int get workspaceOrderExtraMinutes => _storeData.workspaceOrderExtraMinutes;
+  set workspaceOrderExtraMinutes(int value) =>
+      _storeData.workspaceOrderExtraMinutes = value;
+  DateTime? get workspaceOrderActionDeadline =>
+      _storeData.workspaceOrderActionDeadline;
+  set workspaceOrderActionDeadline(DateTime? value) =>
+      _storeData.workspaceOrderActionDeadline = value;
+  String get workspaceOrderFilter => _storeData.workspaceOrderFilter;
+  set workspaceOrderFilter(String value) =>
+      _storeData.workspaceOrderFilter = value;
+  String get workspaceCustomerPeriod => _storeData.workspaceCustomerPeriod;
+  set workspaceCustomerPeriod(String value) =>
+      _storeData.workspaceCustomerPeriod = value;
+  String get workspaceCustomerSearch => _storeData.workspaceCustomerSearch;
+  set workspaceCustomerSearch(String value) =>
+      _storeData.workspaceCustomerSearch = value;
+  String get workspaceCustomerFilter => _storeData.workspaceCustomerFilter;
+  set workspaceCustomerFilter(String value) =>
+      _storeData.workspaceCustomerFilter = value;
+  String get workspaceMoneyPeriod => _storeData.workspaceMoneyPeriod;
+  set workspaceMoneyPeriod(String value) =>
+      _storeData.workspaceMoneyPeriod = value;
+  DateTime? get workspaceCustomerCustomStart =>
+      _storeData.workspaceCustomerCustomStart;
+  set workspaceCustomerCustomStart(DateTime? value) =>
+      _storeData.workspaceCustomerCustomStart = value;
+  DateTime? get workspaceCustomerCustomEnd =>
+      _storeData.workspaceCustomerCustomEnd;
+  set workspaceCustomerCustomEnd(DateTime? value) =>
+      _storeData.workspaceCustomerCustomEnd = value;
+  int get workspaceSalesToday => _storeData.workspaceSalesToday;
+  set workspaceSalesToday(int value) => _storeData.workspaceSalesToday = value;
+  int get workspaceCompletedSalesCount =>
+      _storeData.workspaceCompletedSalesCount;
+  set workspaceCompletedSalesCount(int value) =>
+      _storeData.workspaceCompletedSalesCount = value;
+  int get workspacePlatformAdjustments =>
+      _storeData.workspacePlatformAdjustments;
+  set workspacePlatformAdjustments(int value) =>
+      _storeData.workspacePlatformAdjustments = value;
+  int get workspaceDeliveryAdjustments =>
+      _storeData.workspaceDeliveryAdjustments;
+  set workspaceDeliveryAdjustments(int value) =>
+      _storeData.workspaceDeliveryAdjustments = value;
+  int get workspaceRefunds => _storeData.workspaceRefunds;
+  set workspaceRefunds(int value) => _storeData.workspaceRefunds = value;
+  int get workspaceTaxWithheld => _storeData.workspaceTaxWithheld;
+  set workspaceTaxWithheld(int value) =>
+      _storeData.workspaceTaxWithheld = value;
+  int get workspaceSettlementBalance => _storeData.workspaceSettlementBalance;
+  set workspaceSettlementBalance(int value) =>
+      _storeData.workspaceSettlementBalance = value;
+  int get workspaceSettlementRequested =>
+      _storeData.workspaceSettlementRequested;
+  set workspaceSettlementRequested(int value) =>
+      _storeData.workspaceSettlementRequested = value;
+  String? get workspaceSettlementReference =>
+      _storeData.workspaceSettlementReference;
+  set workspaceSettlementReference(String? value) =>
+      _storeData.workspaceSettlementReference = value;
+  String get workspacePayoutBankName => _storeData.workspacePayoutBankName;
+  set workspacePayoutBankName(String value) =>
+      _storeData.workspacePayoutBankName = value;
+  String get workspacePayoutAccountEnding =>
+      _storeData.workspacePayoutAccountEnding;
+  set workspacePayoutAccountEnding(String value) =>
+      _storeData.workspacePayoutAccountEnding = value;
+  List<WorkspaceCatalogueItem> get workspaceCatalogueItems =>
+      _storeData.workspaceCatalogueItems;
+  List<WorkspaceStockMovement> get workspaceStockMovements =>
+      _storeData.workspaceStockMovements;
+  Map<String, int> get workspaceOrderQuantities =>
+      _storeData.workspaceOrderQuantities;
+  List<WorkspaceOrderRecord> get workspaceOrders => _storeData.workspaceOrders;
+  Set<String> get workspacePackedProductIds =>
+      _storeData.workspacePackedProductIds;
+  Map<String, Set<String>> get _packingByOrder => _storeData._packingByOrder;
+  Map<String, WorkspaceDeliveryAssignment> get _deliveryByOrder =>
+      _storeData._deliveryByOrder;
+  List<WorkspaceCustomerInvoice> get workspaceInvoices =>
+      _storeData.workspaceInvoices;
+  List<WorkspaceStoreOffer> get workspaceOffers => _storeData.workspaceOffers;
+  String? get currentWorkspaceOrderId => _storeData.currentWorkspaceOrderId;
+  set currentWorkspaceOrderId(String? value) =>
+      _storeData.currentWorkspaceOrderId = value;
+  WorkspaceDeliveryAssignment? get workspaceDeliveryAssignment =>
+      _storeData.workspaceDeliveryAssignment;
+  set workspaceDeliveryAssignment(WorkspaceDeliveryAssignment? value) =>
+      _storeData.workspaceDeliveryAssignment = value;
+  bool get workspaceOperationsSyncing => _storeData.workspaceOperationsSyncing;
+  set workspaceOperationsSyncing(bool value) =>
+      _storeData.workspaceOperationsSyncing = value;
+  String? get workspaceOperationsSyncError =>
+      _storeData.workspaceOperationsSyncError;
+  set workspaceOperationsSyncError(String? value) =>
+      _storeData.workspaceOperationsSyncError = value;
+  bool get workspaceHandoverBusy => _storeData.workspaceHandoverBusy;
+  set workspaceHandoverBusy(bool value) =>
+      _storeData.workspaceHandoverBusy = value;
+  List<WorkspaceActivityEntry> get workspaceActivity =>
+      _storeData.workspaceActivity;
+  WorkspaceGroupBuy? get activeGroupBuy => _storeData.activeGroupBuy;
+  set activeGroupBuy(WorkspaceGroupBuy? value) =>
+      _storeData.activeGroupBuy = value;
+  int get workspaceDeliveryRadiusKm => _storeData.workspaceDeliveryRadiusKm;
+  set workspaceDeliveryRadiusKm(int value) =>
+      _storeData.workspaceDeliveryRadiusKm = value;
+  int get workspaceDeliveryFee => _storeData.workspaceDeliveryFee;
+  set workspaceDeliveryFee(int value) =>
+      _storeData.workspaceDeliveryFee = value;
+  int get workspaceFreeDeliveryAbove => _storeData.workspaceFreeDeliveryAbove;
+  set workspaceFreeDeliveryAbove(int value) =>
+      _storeData.workspaceFreeDeliveryAbove = value;
+  String get workspaceDeliveryCity => _storeData.workspaceDeliveryCity;
+  set workspaceDeliveryCity(String value) =>
+      _storeData.workspaceDeliveryCity = value;
+  String get workspaceDeliveryArea => _storeData.workspaceDeliveryArea;
+  set workspaceDeliveryArea(String value) =>
+      _storeData.workspaceDeliveryArea = value;
+  String get workspaceDeliveryPincode => _storeData.workspaceDeliveryPincode;
+  set workspaceDeliveryPincode(String value) =>
+      _storeData.workspaceDeliveryPincode = value;
+  bool get workspacePickupEnabled => _storeData.workspacePickupEnabled;
+  set workspacePickupEnabled(bool value) =>
+      _storeData.workspacePickupEnabled = value;
+  bool get workspaceStaffAccessEnabled =>
+      _storeData.workspaceStaffAccessEnabled;
+  set workspaceStaffAccessEnabled(bool value) =>
+      _storeData.workspaceStaffAccessEnabled = value;
+  int get workspaceCounterCount => _storeData.workspaceCounterCount;
+  set workspaceCounterCount(int value) =>
+      _storeData.workspaceCounterCount = value;
+  String? get workspacePaidRequirementReference =>
+      _storeData.workspacePaidRequirementReference;
+  set workspacePaidRequirementReference(String? value) =>
+      _storeData.workspacePaidRequirementReference = value;
+  WorkspacePaidRequirementState get workspacePaidRequirementState =>
+      _storeData.workspacePaidRequirementState;
+  set workspacePaidRequirementState(WorkspacePaidRequirementState value) =>
+      _storeData.workspacePaidRequirementState = value;
+  Set<String> get dismissedWorkspaceAlerts =>
+      _storeData.dismissedWorkspaceAlerts;
+  Set<String> get workspaceCustomersFollowingStore =>
+      _storeData.workspaceCustomersFollowingStore;
+  Set<String> get workspaceCustomersAllowingMessages =>
+      _storeData.workspaceCustomersAllowingMessages;
+  Map<String, DateTime> get workspaceCustomerLastContactAt =>
+      _storeData.workspaceCustomerLastContactAt;
 
   int get workspaceOrderItemCount => workspaceOrderQuantities.values.fold(
     0,
@@ -1372,6 +1680,13 @@ class WorkSession extends ChangeNotifier {
       showNotice('Confirming this collection. Please wait for the update.');
       return;
     }
+    if (busy ||
+        workspaceOperationsSyncing ||
+        workspaceHandoverBusy ||
+        _collection?.busy == true) {
+      showNotice('Finishing this store update. Please wait before switching.');
+      return;
+    }
     _clearCollection();
     otherWorkspaces.removeWhere((item) => item.id == workspace.id);
     otherWorkspaces.add(current);
@@ -1382,7 +1697,6 @@ class WorkSession extends ChangeNotifier {
     selectedProfile = workProfiles
         .where((profile) => profile.id == workspace.profileId)
         .firstOrNull;
-    workspaceSearchQuery = '';
     clearMessages();
     notifyListeners();
   }
@@ -1494,6 +1808,10 @@ class WorkSession extends ChangeNotifier {
   void _persistOperationalState(String reason) {
     final id = activeWorkspace?.id ?? workspaceId;
     if (id == null || id.isEmpty) return;
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    final snapshot = _operationalState();
+    data.pendingOperationalRequests++;
     workspaceOperationsSyncing = true;
     workspaceOperationsSyncError = null;
     notifyListeners();
@@ -1504,24 +1822,21 @@ class WorkSession extends ChangeNotifier {
             WorkOperationalSnapshot(
               workspaceId: id,
               reason: reason,
-              state: _operationalState(),
+              state: snapshot,
               idempotencyKey: key,
             ),
           )
           .then((_) {
-            if (_disposed) return;
-            workspaceOperationsSyncing = false;
+            if (!_isStoreScopeCurrent(data, id, scope)) return;
             workspaceOperationsSyncError = null;
-            notifyListeners();
           })
           .catchError((Object error) {
-            if (_disposed) return;
-            workspaceOperationsSyncing = false;
+            if (!_isStoreScopeCurrent(data, id, scope)) return;
             workspaceOperationsSyncError = error is WorkGatewayException
                 ? error.message
                 : 'Store changes could not sync. Your draft remains on this device.';
-            notifyListeners();
-          }),
+          })
+          .whenComplete(() => _finishOperationalRequest(data, id, scope)),
     );
   }
 
@@ -1998,6 +2313,12 @@ class WorkSession extends ChangeNotifier {
   Future<void> _requestWorkspaceDeliveryAssignment(String orderId) async {
     final id = activeWorkspace?.id ?? workspaceId;
     if (id == null || id.isEmpty) return;
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    bool current() =>
+        _isStoreScopeCurrent(data, id, scope) &&
+        currentWorkspaceOrderId == orderId;
+    data.pendingOperationalRequests++;
     workspaceOperationsSyncing = true;
     notifyListeners();
     try {
@@ -2008,6 +2329,7 @@ class WorkSession extends ChangeNotifier {
         idempotencyKey:
             'DEL-$id-$orderId-${DateTime.now().microsecondsSinceEpoch}',
       );
+      if (!current()) return;
       workspaceDeliveryAssignment = WorkspaceDeliveryAssignment(
         orderId: orderId,
         partnerName: result.partnerName,
@@ -2018,11 +2340,12 @@ class WorkSession extends ChangeNotifier {
       workspaceOrderActionDeadline = result.eta;
       showNotice('Delivery partner assigned. Track arrival at your store.');
     } on WorkGatewayException catch (error) {
-      workspaceOperationsSyncError = error.message;
-      showError(error.message);
+      if (current()) {
+        workspaceOperationsSyncError = error.message;
+        showError(error.message);
+      }
     } finally {
-      workspaceOperationsSyncing = false;
-      notifyListeners();
+      _finishOperationalRequest(data, id, scope);
     }
   }
 
@@ -2038,6 +2361,11 @@ class WorkSession extends ChangeNotifier {
       showError('Enter the 6-digit delivery OTP shared by the customer.');
       return false;
     }
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    bool current() =>
+        _isStoreScopeCurrent(data, id, scope) &&
+        currentWorkspaceOrderId == order.id;
     workspaceHandoverBusy = true;
     clearMessages();
     notifyListeners();
@@ -2049,17 +2377,18 @@ class WorkSession extends ChangeNotifier {
         idempotencyKey:
             'HANDOVER-$id-${order.id}-${DateTime.now().microsecondsSinceEpoch}',
       );
+      if (!current()) return false;
       _completeWorkspaceOrder(
         order,
         activity: 'Order handover confirmed by customer OTP.',
       );
       return true;
     } on WorkGatewayException catch (error) {
-      showError(error.message);
+      if (current()) showError(error.message);
       return false;
     } finally {
-      workspaceHandoverBusy = false;
-      notifyListeners();
+      data.workspaceHandoverBusy = false;
+      if (current()) notifyListeners();
     }
   }
 
@@ -2079,6 +2408,11 @@ class WorkSession extends ChangeNotifier {
       showError('Enter the 6-digit pickup code shared with the customer.');
       return false;
     }
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    bool current() =>
+        _isStoreScopeCurrent(data, id, scope) &&
+        currentWorkspaceOrderId == order.id;
     workspaceHandoverBusy = true;
     clearMessages();
     notifyListeners();
@@ -2090,17 +2424,20 @@ class WorkSession extends ChangeNotifier {
         idempotencyKey:
             'PICKUP-$id-${order.id}-${DateTime.now().microsecondsSinceEpoch}',
       );
+      if (!current()) return false;
       _completeWorkspaceOrder(
         order,
         activity: 'Customer pickup confirmed with the order pickup code.',
       );
       return true;
     } on WorkGatewayException catch (error) {
-      showError(error.message.replaceAll('delivery OTP', 'pickup code'));
+      if (current()) {
+        showError(error.message.replaceAll('delivery OTP', 'pickup code'));
+      }
       return false;
     } finally {
-      workspaceHandoverBusy = false;
-      notifyListeners();
+      data.workspaceHandoverBusy = false;
+      if (current()) notifyListeners();
     }
   }
 
@@ -2124,7 +2461,10 @@ class WorkSession extends ChangeNotifier {
     final requestedAmount = (amount ?? eligible).clamp(1, eligible).toInt();
     final id = activeWorkspace?.id ?? workspaceId;
     if (id == null || id.isEmpty || busy) return;
-    busy = true;
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    bool current() => _isStoreScopeCurrent(data, id, scope);
+    final token = _beginBusyStoreOperation();
     clearMessages();
     notifyListeners();
     try {
@@ -2133,6 +2473,7 @@ class WorkSession extends ChangeNotifier {
         amount: requestedAmount,
         idempotencyKey: 'SET-$id-${DateTime.now().microsecondsSinceEpoch}',
       );
+      if (!current()) return;
       final accepted = result.acceptedAmount.clamp(0, requestedAmount).toInt();
       workspaceSettlementRequested += accepted;
       final remaining = workspaceSettlementBalance - accepted;
@@ -2144,10 +2485,9 @@ class WorkSession extends ChangeNotifier {
       showNotice('Settlement request received for processing.');
       _persistOperationalState('settlement-requested');
     } on WorkGatewayException catch (error) {
-      showError(error.message);
+      if (current()) showError(error.message);
     } finally {
-      busy = false;
-      notifyListeners();
+      _finishBusyStoreOperation(token);
     }
   }
 
@@ -2195,7 +2535,10 @@ class WorkSession extends ChangeNotifier {
   }) async {
     final id = activeWorkspace?.id ?? workspaceId;
     if (id == null || id.isEmpty || busy) return false;
-    busy = true;
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    bool current() => _isStoreScopeCurrent(data, id, scope);
+    final token = _beginBusyStoreOperation();
     clearMessages();
     notifyListeners();
     try {
@@ -2218,6 +2561,7 @@ class WorkSession extends ChangeNotifier {
               'WORK-REQ-$id-${DateTime.now().microsecondsSinceEpoch}',
         ),
       );
+      if (!current()) return false;
       workspacePaidRequirementReference = reference;
       workspacePaidRequirementState = WorkspacePaidRequirementState.published;
       _recordWorkspaceActivity('Paid work $reference published for $position.');
@@ -2225,11 +2569,10 @@ class WorkSession extends ChangeNotifier {
       _persistOperationalState('paid-work-published');
       return true;
     } on WorkGatewayException catch (error) {
-      showError(error.message);
+      if (current()) showError(error.message);
       return false;
     } finally {
-      busy = false;
-      notifyListeners();
+      _finishBusyStoreOperation(token);
     }
   }
 
@@ -2493,6 +2836,9 @@ class WorkSession extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _clearCollection();
+    _storeDataById.clear();
+    _storeData = _StoreOperationalData();
+    _busyStoreOperation = null;
     super.dispose();
   }
 
@@ -2510,7 +2856,13 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<void> refreshFeed() async {
-    if (busy) return;
+    if (busy ||
+        workspaceOperationsSyncing ||
+        workspaceHandoverBusy ||
+        _collection?.busy == true ||
+        _collection?.needsReconciliation == true) {
+      return;
+    }
     final requestedScope = _contactAccountScope;
     bool current() => !_disposed && requestedScope == _contactAccountScope;
     busy = true;
@@ -2856,6 +3208,10 @@ class WorkSession extends ChangeNotifier {
         _seenApprovalMessages.clear();
         _profileSubmissionKey = null;
         activeWorkspace = null;
+        _storeDataById.clear();
+        _storeData = _StoreOperationalData();
+        _busyStoreOperation = null;
+        busy = false;
         otherWorkspaces.clear();
         initialWorkspaceStateLoaded = false;
         reviewCaseId = workspaceId = reviewReason = null;
@@ -4111,7 +4467,10 @@ class WorkSession extends ChangeNotifier {
   }) async {
     final id = activeWorkspace?.id ?? workspaceId;
     if (id == null || id.isEmpty || busy) return false;
-    busy = true;
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    bool current() => _isStoreScopeCurrent(data, id, scope);
+    final token = _beginBusyStoreOperation();
     clearMessages();
     notifyListeners();
     final values = <String, Object?>{
@@ -4136,6 +4495,7 @@ class WorkSession extends ChangeNotifier {
           idempotencyKey: 'GROUP-$id-${DateTime.now().microsecondsSinceEpoch}',
         ),
       );
+      if (!current()) return false;
       applyConfirmedWorkspaceGroupBuyPayment(
         productName: productName,
         specification: specification,
@@ -4153,11 +4513,10 @@ class WorkSession extends ChangeNotifier {
       );
       return true;
     } on WorkGatewayException catch (error) {
-      showError(error.message);
+      if (current()) showError(error.message);
       return false;
     } finally {
-      busy = false;
-      notifyListeners();
+      _finishBusyStoreOperation(token);
     }
   }
 
@@ -4298,6 +4657,7 @@ class WorkSession extends ChangeNotifier {
 
   void _restoreWorkspaceState(List<WorkReviewResult> records) {
     if (records.isEmpty) return;
+    final preferredId = activeWorkspace?.id;
     WorkWorkspace? restoredActive;
     final restoredOthers = <WorkWorkspace>[];
     WorkReviewResult? pending;
@@ -4336,7 +4696,9 @@ class WorkSession extends ChangeNotifier {
         verified: true,
       );
       if (restoredActive == null ||
-          record.status == WorkRemoteReviewStatus.live) {
+          id == preferredId ||
+          (restoredActive.id != preferredId &&
+              record.status == WorkRemoteReviewStatus.live)) {
         if (restoredActive != null) restoredOthers.add(restoredActive);
         restoredActive = workspace;
         selectedProfile = option;

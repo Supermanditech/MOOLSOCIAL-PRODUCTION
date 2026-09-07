@@ -7225,13 +7225,91 @@ void main() {
       ),
     );
     oldTap();
-    expect(work.currentWorkspaceOrderId, current);
+    expect(work.currentWorkspaceOrderId, isNull);
     expect(work.activeWorkspace!.id, 'QUEUE-OTHER-STORE');
+    expect(work.visibleWorkspaceOrders, isEmpty);
     expect(work.workspaceInvoices, isEmpty);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+    work.activateWorkspace(store);
+    expect(work.currentWorkspaceOrderId, current);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Store scope native selector roundtrip $scale', (tester) async {
+      final work = storeViewFixture();
+      final first = work.activeWorkspace!;
+      final previousOrder = work.currentWorkspaceOrderId;
+      final previousBalance = work.workspaceSettlementBalance;
+      work.otherWorkspaces.add(
+        const WorkWorkspace(
+          id: 'scope-second-store',
+          name: 'Second Store',
+          profileLabel: 'Speciality Retail Shop',
+          profileId: 'retailer-speciality',
+          area: 'Jaipur',
+          verified: true,
+        ),
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 640),
+        textScale: scale,
+      );
+      final picker = find.byKey(const Key('work-dashboard-workspace-switcher'));
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
+      final second = find.byKey(
+        const ValueKey('work-switch-scope-second-store'),
+      );
+      final selectorScroll = find.descendant(
+        of: find.byKey(const Key('work-workspace-switcher-sheet')),
+        matching: find.byType(Scrollable),
+      );
+      await tester.scrollUntilVisible(second, 120, scrollable: selectorScroll);
+      await tester.pumpAndSettle();
+      expect(second.hitTestable(), findsOneWidget);
+      await tester.tap(second);
+      await tester.pumpAndSettle();
+      expect(work.activeWorkspace?.id, 'scope-second-store');
+      expect(work.workspaceSettlementBalance, 0);
+      expect(work.visibleWorkspaceOrders, isEmpty);
+      expect(work.workspaceCatalogueItems, isEmpty);
+      expect(find.textContaining('Rakesh'), findsNothing);
+      await captureStoreView(tester, 'store-b-empty-$scale');
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-live-order-ticket')), findsNothing);
+      await captureStoreView(tester, 'store-b-orders-empty-$scale');
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
+      final original = find.byKey(ValueKey('work-switch-${first.id}'));
+      final originalTitle = find.descendant(
+        of: original,
+        matching: find.text(first.name),
+      );
+      await tester.scrollUntilVisible(
+        originalTitle,
+        80,
+        scrollable: selectorScroll,
+      );
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'store-return-selector-$scale');
+      expect(originalTitle.hitTestable(), findsOneWidget);
+      await tester.tap(originalTitle);
+      await tester.pumpAndSettle();
+      expect(work.activeWorkspace?.id, first.id);
+      expect(work.currentWorkspaceOrderId, previousOrder);
+      expect(work.workspaceSettlementBalance, previousBalance);
+      expect(work.visibleWorkspaceOrders, isNotEmpty);
+      await captureStoreView(tester, 'store-a-restored-$scale');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   for (final display in [
     (width: 412.0, height: 915.0, scale: 1.0),

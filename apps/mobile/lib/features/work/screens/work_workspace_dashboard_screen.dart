@@ -12460,7 +12460,8 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                     },
                   )
                 : Center(
-                    child: Padding(
+                    child: SingleChildScrollView(
+                      key: const Key('work-orders-empty-state'),
                       padding: const EdgeInsets.all(24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
