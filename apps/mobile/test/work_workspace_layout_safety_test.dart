@@ -1347,6 +1347,220 @@ void main() {
     },
   );
 
+  for (final display in [
+    (412.0, 915.0, 1.0),
+    (320.0, 568.0, 1.4),
+    (320.0, 568.0, 2.0),
+  ]) {
+    for (final amount in <(int, String)>[
+      (0, '₹0'),
+      (264, '₹264'),
+      (10000000, '₹1,00,00,000'),
+      (1000000000, '₹1,00,00,00,000'),
+      (9990000000, '₹9,99,00,00,000'),
+      (10000000000, '₹10,00,00,00,000'),
+      (100000000000, '₹1,00,00,00,00,000'),
+    ]) {
+      testWidgets('S09 catalogue exact price ${amount.$1} $display', (
+        tester,
+      ) async {
+        final work = liveStore();
+        final product = work.workspaceCatalogueItems.first.copyWith(
+          sellingPrice: amount.$1,
+          mrp: amount.$1,
+          stock: 20,
+        );
+        work.workspaceCatalogueItems
+          ..clear()
+          ..add(product);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.$1, display.$2),
+          textScale: display.$3,
+        );
+        await tester.tap(find.byKey(const Key('work-store-stock')));
+        await tester.pumpAndSettle();
+        final priceAction = find.byKey(
+          Key('work-catalogue-price-${product.id}'),
+        );
+        await reveal(tester, priceAction);
+        final exactPrice = find.descendant(
+          of: priceAction,
+          matching: find.text(amount.$2),
+        );
+        if (amount.$1 >= 10000000000 && display.$3 == 2) {
+          final paragraph = tester.renderObject<RenderParagraph>(exactPrice);
+          expect((paragraph.text as TextSpan).style!.fontSize, 14);
+          await captureStoreView(tester, 'r665-catalogue-measure-${amount.$1}');
+        }
+        expectExactMoneyVisible(tester, exactPrice);
+        if (display.$3 >= 1.4 || amount.$1 >= 10000000) {
+          final mrp = find.byKey(Key('work-catalogue-mrp-${product.id}'));
+          await reveal(tester, mrp);
+          expectExactMoneyVisible(
+            tester,
+            find.descendant(of: mrp, matching: find.text(amount.$2)),
+          );
+        } else {
+          final facts = find.text(
+            '${product.pack} · MRP ${amount.$2} · ${product.sku}',
+          );
+          expect(facts, findsOneWidget);
+          final paragraph = tester.renderObject<RenderParagraph>(facts);
+          final content = tester.widget<Text>(facts).data!;
+          final start = content.indexOf(amount.$2);
+          final boxes = paragraph.getBoxesForSelection(
+            TextSelection(
+              baseOffset: start,
+              extentOffset: start + amount.$2.length,
+            ),
+          );
+          expect(boxes, hasLength(1));
+          expect(
+            boxes.single.right,
+            lessThanOrEqualTo(paragraph.size.width + .5),
+          );
+        }
+        if (amount.$1 == 10000000000) {
+          await captureStoreView(
+            tester,
+            'r665-catalogue-amount-${display.$1}-${display.$3}',
+          );
+          await reveal(tester, priceAction);
+          await tester.tap(priceAction);
+          await tester.pumpAndSettle();
+          final field = find.byKey(const Key('work-quick-price'));
+          expect(
+            find.descendant(of: field, matching: find.text('10000000000')),
+            findsOneWidget,
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-dashboard-catalogue-screen')),
+            findsOneWidget,
+          );
+        }
+        final unchanged = work.workspaceCatalogueItems.single;
+        expect(unchanged.sellingPrice, amount.$1);
+        expect(unchanged.mrp, amount.$1);
+        expect(unchanged.stock, 20);
+        expect(unchanged.publicListing, product.publicListing);
+        final publicProduct = unchanged.toBuyPublicProduct(
+          storeName: work.activeWorkspace!.name,
+        );
+        expect(publicProduct.price, amount.$1);
+        expect(publicProduct.mrp, amount.$1);
+        expect(publicProduct.pack, product.pack);
+        expect(publicProduct.title, product.title);
+        expect(work.workspaceOrders, isEmpty);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final isPublic in [true, false]) {
+      testWidgets('S09 catalogue visibility label $isPublic $display', (
+        tester,
+      ) async {
+        final work = liveStore();
+        final product = work.workspaceCatalogueItems.first.copyWith(
+          publicListing: isPublic,
+        );
+        work.workspaceCatalogueItems
+          ..clear()
+          ..add(product);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.$1, display.$2),
+          textScale: display.$3,
+        );
+        await tester.tap(find.byKey(const Key('work-store-stock')));
+        await tester.pumpAndSettle();
+        final action = find.byKey(
+          Key('work-catalogue-visibility-${product.id}'),
+        );
+        await reveal(tester, action);
+        expect(action.hitTestable(), findsOneWidget);
+        expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+        final label = isPublic ? 'Public' : 'Private';
+        final text = find.descendant(of: action, matching: find.text(label));
+        final paragraph = tester.renderObject<RenderParagraph>(text);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(paragraph.textScaler.scale(1), closeTo(display.$3, .01));
+        final boxes = paragraph.getBoxesForSelection(
+          TextSelection(baseOffset: 0, extentOffset: label.length),
+        );
+        expect(boxes, hasLength(1));
+        expect(
+          boxes.single.right,
+          lessThanOrEqualTo(paragraph.size.width + .5),
+        );
+        await captureStoreView(
+          tester,
+          'r665-catalogue-visibility-$isPublic-${display.$1}-${display.$3}',
+        );
+        expect(work.workspaceCatalogueItems.single.publicListing, isPublic);
+        expect(work.workspaceVisibleToCustomers, isTrue);
+        expect(work.workspaceOrders, isEmpty);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('S09 catalogue suggestions keep complete identity $display', (
+      tester,
+    ) async {
+      final work = liveStore()..workspaceCatalogueItems.clear();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+      );
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      final product = workspaceMasterCatalogue.first;
+      final card = find.byKey(Key('work-catalogue-master-${product.id}'));
+      await reveal(tester, card);
+      for (final label in [
+        product.title,
+        '${product.brand} · ${product.pack}',
+        'Add this product',
+      ]) {
+        final text = find.descendant(of: card, matching: find.text(label));
+        expect(text, findsOneWidget);
+        final paragraph = tester.renderObject<RenderParagraph>(text);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(paragraph.overflow, isNot(TextOverflow.ellipsis));
+        expect(paragraph.textScaler.scale(1), closeTo(display.$3, .01));
+      }
+      await captureStoreView(
+        tester,
+        'r665-catalogue-suggestion-${display.$1}-${display.$3}',
+      );
+      await tester.tap(card);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-product-selling-price')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-dashboard-catalogue-screen')),
+        findsOneWidget,
+      );
+      expect(work.workspaceCatalogueItems, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final filters in <(String?, String?)>[
     (null, null),
     ('freight', null),

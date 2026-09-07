@@ -8508,20 +8508,21 @@ class _WorkspaceCatalogueSurfaceState
               style: TextStyle(color: MoolColors.muted, fontSize: 10),
             ),
             const SizedBox(height: 10),
-            SizedBox(
-              height:
-                  126 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: available.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (context, index) {
-                  final product = available[index];
-                  return _VerifiedProductMatch(
-                    product: product,
-                    onTap: () => _edit(product),
-                  );
-                },
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var index = 0; index < available.length; index++) ...[
+                      if (index != 0) const SizedBox(width: 10),
+                      _VerifiedProductMatch(
+                        product: available[index],
+                        onTap: () => _edit(available[index]),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -8739,8 +8740,16 @@ class _VerifiedProductMatch extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        child: SizedBox(
-          width: 180,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: 126,
+            maxWidth: MediaQuery.textScalerOf(context).scale(1) >= 1.4
+                ? (MediaQuery.sizeOf(context).width - 48).clamp(180.0, 380.0)
+                : 180,
+            minWidth: MediaQuery.textScalerOf(context).scale(1) >= 1.4
+                ? (MediaQuery.sizeOf(context).width - 48).clamp(180.0, 380.0)
+                : 180,
+          ),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -8748,18 +8757,14 @@ class _VerifiedProductMatch extends StatelessWidget {
               children: [
                 Text(
                   product.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: MoolColors.ink,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(height: 10),
                 Text(
                   '${product.brand} · ${product.pack}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: MoolColors.muted,
                     fontSize: 9.5,
@@ -8943,6 +8948,12 @@ class _WorkspaceProductRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (owned &&
+        (MediaQuery.textScalerOf(context).scale(1) >= 1.4 ||
+            product.sellingPrice.abs() >= 10000000 ||
+            (product.mrp ?? product.sellingPrice).abs() >= 10000000)) {
+      return _expandedProduct(context);
+    }
     return KeyedSubtree(
       key: owned ? Key('work-public-sku-${product.id}') : null,
       child: WorkCard(
@@ -9058,6 +9069,132 @@ class _WorkspaceProductRow extends StatelessWidget {
       ),
     );
   }
+
+  Widget _expandedProduct(BuildContext context) {
+    final compactInsets =
+        MediaQuery.sizeOf(context).width < 360 &&
+        MediaQuery.textScalerOf(context).scale(1) >= 2;
+    final moneyStyle = Theme.of(context).textTheme.bodyMedium!.copyWith(
+      fontSize: 14,
+      color: MoolColors.navy,
+      fontWeight: FontWeight.w800,
+    );
+    return KeyedSubtree(
+      key: Key('work-public-sku-${product.id}'),
+      child: WorkCard(
+        keyName: 'work-catalogue-owned-${product.id}',
+        padding: EdgeInsets.symmetric(
+          horizontal: compactInsets ? 4 : 12,
+          vertical: 12,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    product.title,
+                    style: const TextStyle(
+                      color: MoolColors.ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  key: Key('work-catalogue-edit-${product.id}'),
+                  tooltip: 'Edit complete product details',
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 20),
+                ),
+              ],
+            ),
+            Text(
+              '${product.brand} · ${product.pack}',
+              style: const TextStyle(fontSize: 11, color: MoolColors.muted),
+            ),
+            Text(
+              product.sku,
+              style: const TextStyle(fontSize: 11, color: MoolColors.muted),
+            ),
+            const SizedBox(height: 8),
+            Material(
+              color: const Color(0xFFF1F4FF),
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                key: Key('work-catalogue-price-${product.id}'),
+                onTap: onChangePrice,
+                borderRadius: BorderRadius.circular(10),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compactInsets ? 0 : 8,
+                      vertical: 8,
+                    ),
+                    child: _StoreMoneyLine(
+                      leading: const Text(
+                        'Selling price',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: '₹${_formatStoreAmount(product.sellingPrice)}',
+                      style: moneyStyle,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              key: Key('work-catalogue-mrp-${product.id}'),
+              padding: EdgeInsets.symmetric(
+                horizontal: compactInsets ? 0 : 8,
+                vertical: 8,
+              ),
+              child: _StoreMoneyLine(
+                leading: const Text('MRP', style: TextStyle(fontSize: 12)),
+                value:
+                    '₹${_formatStoreAmount(product.mrp ?? product.sellingPrice)}',
+                style: moneyStyle.copyWith(fontWeight: FontWeight.w500),
+              ),
+            ),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: 48,
+                    minWidth: 48,
+                  ),
+                  child: _ProductQuickValue(
+                    keyName: 'work-catalogue-stock-${product.id}',
+                    icon: Icons.inventory_2_outlined,
+                    label:
+                        product.stockMode == WorkspaceStockMode.availabilityOnly
+                        ? (product.available ? 'Available' : 'Unavailable')
+                        : '${product.stock} in stock',
+                    attention:
+                        product.stockMode == WorkspaceStockMode.exactQuantity &&
+                        product.stock <= product.lowStockThreshold,
+                    onTap: onUpdateStock,
+                  ),
+                ),
+                _ProductVisibilityButton(
+                  keyName: 'work-catalogue-visibility-${product.id}',
+                  isPublic: product.publicListing,
+                  onTap: onTogglePublic,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ProductVisibilityButton extends StatelessWidget {
@@ -9080,27 +9217,31 @@ class _ProductVisibilityButton extends StatelessWidget {
         key: Key(keyName),
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
-        child: SizedBox(
-          width: 38,
-          height: 42,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isPublic ? Icons.public_rounded : Icons.visibility_off_outlined,
-                color: color,
-                size: 18,
-              ),
-              Text(
-                isPublic ? 'Public' : 'Private',
-                maxLines: 1,
-                style: TextStyle(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  isPublic
+                      ? Icons.public_rounded
+                      : Icons.visibility_off_outlined,
                   color: color,
-                  fontSize: 7,
-                  fontWeight: FontWeight.w900,
+                  size: 18,
                 ),
-              ),
-            ],
+                Text(
+                  isPublic ? 'Public' : 'Private',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
