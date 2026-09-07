@@ -10255,6 +10255,7 @@ class BuyV2TrackingView extends StatelessWidget {
     this.paymentHandoff,
     this.liveDeliveryMapBuilder,
     this.collectionCameraBuilder,
+    this.onRestoreDeliveryStatus,
   });
 
   final BuyV2Session session;
@@ -10263,6 +10264,7 @@ class BuyV2TrackingView extends StatelessWidget {
   final BuyV2PaymentHandoff? paymentHandoff;
   final BuyV2LiveDeliveryMapBuilder? liveDeliveryMapBuilder;
   final BuyV2CollectionCameraBuilder? collectionCameraBuilder;
+  final VoidCallback? onRestoreDeliveryStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -10393,6 +10395,17 @@ class BuyV2TrackingView extends StatelessWidget {
             );
           },
         ),
+        if (onRestoreDeliveryStatus != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const ValueKey('buy-quick-delivery-restore'),
+              onPressed: onRestoreDeliveryStatus,
+              icon: const Icon(Icons.local_shipping_outlined, size: 18),
+              label: const Text('Show delivery status'),
+              style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
+            ),
+          ),
         if (session.orderRefreshState(order.id) case final refreshState?
             when refreshState != BuyV2CommerceLoadState.ready &&
                 refreshState != BuyV2CommerceLoadState.loading) ...[

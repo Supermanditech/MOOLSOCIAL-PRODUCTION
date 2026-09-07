@@ -1,9 +1,14 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/design/mool_design_system.dart';
 import '../../core/design/mool_motion_primitives.dart';
@@ -43,6 +48,187 @@ String buyV2CustomerPaymentProviderLabel(
   };
 }
 
+abstract interface class BuyV2DeliveryArrivalSound {
+  Future<bool> prepare();
+  Future<bool> play();
+  Future<void> stop();
+  Future<void> dispose();
+}
+
+/// A short foreground cue. It uses the existing mobile audio dependency and
+/// never changes the shared audio-session configuration or device volume.
+class BuyV2LocalDeliveryArrivalSound implements BuyV2DeliveryArrivalSound {
+  BuyV2LocalDeliveryArrivalSound({
+    Future<Directory> Function()? temporaryDirectory,
+    AudioPlayer Function()? playerFactory,
+    bool? supportedPlatform,
+  }) : _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory,
+       _playerFactory =
+           playerFactory ??
+           (() => AudioPlayer(useProxyForRequestHeaders: false)),
+       _supported =
+           supportedPlatform ??
+           (!kIsWeb &&
+               (defaultTargetPlatform == TargetPlatform.android ||
+                   defaultTargetPlatform == TargetPlatform.iOS));
+
+  final Future<Directory> Function() _temporaryDirectory;
+  final AudioPlayer Function() _playerFactory;
+  final bool _supported;
+  AudioPlayer? _player;
+  Directory? _directory;
+  Future<bool>? _preparing;
+  bool _ready = false;
+  bool _disposed = false;
+  int _generation = 0;
+
+  @override
+  Future<bool> prepare() {
+    if (_disposed || !_supported) return Future.value(false);
+    if (_ready) return Future.value(true);
+    final pending = _preparing;
+    if (pending != null) return pending;
+    final operation = _prepare(_generation);
+    _preparing = operation;
+    return operation.whenComplete(() {
+      if (identical(_preparing, operation)) _preparing = null;
+    });
+  }
+
+  Future<bool> _prepare(int generation) async {
+    Directory? directory;
+    AudioPlayer? player;
+    var ready = false;
+    bool current() => !_disposed && generation == _generation;
+    try {
+      final root = await _temporaryDirectory().timeout(
+        const Duration(seconds: 3),
+      );
+      if (!current()) return false;
+      directory = await root.createTemp('buy-arrival-');
+      if (!current()) return false;
+      final file = File('${directory.path}/arrival.wav');
+      await file.writeAsBytes(_arrivalWave(), flush: true);
+      if (!current()) return false;
+      player = _playerFactory();
+      _player = player;
+      _directory = directory;
+      await player.setFilePath(file.path).timeout(const Duration(seconds: 3));
+      if (!current()) return false;
+      _ready = true;
+      ready = true;
+      return true;
+    } on Object {
+      return false;
+    } finally {
+      if (!ready) {
+        if (player == null) {
+          await _release(null, directory);
+        } else if (identical(_player, player)) {
+          _player = null;
+          _directory = null;
+          _ready = false;
+          await _release(player, directory);
+        }
+      }
+    }
+  }
+
+  @override
+  Future<bool> play() async {
+    if (!await prepare()) return false;
+    final generation = _generation;
+    final player = _player;
+    if (player == null || _disposed) return false;
+    try {
+      await player.seek(Duration.zero).timeout(const Duration(seconds: 2));
+      if (_disposed || generation != _generation) return false;
+      await player.play().timeout(const Duration(seconds: 2));
+      return !_disposed &&
+          generation == _generation &&
+          player.processingState == ProcessingState.completed;
+    } on Object {
+      return false;
+    } finally {
+      if (generation == _generation) await stop();
+    }
+  }
+
+  @override
+  Future<void> stop() async {
+    _generation++;
+    _preparing = null;
+    _ready = false;
+    final player = _player;
+    final directory = _directory;
+    _player = null;
+    _directory = null;
+    await _release(player, directory);
+  }
+
+  @override
+  Future<void> dispose() async {
+    _disposed = true;
+    await stop();
+  }
+
+  static Future<void> _release(
+    AudioPlayer? player,
+    Directory? directory,
+  ) async {
+    try {
+      await player?.dispose().timeout(const Duration(seconds: 3));
+    } on Object {
+      // Cancellation must not reopen playback or escape into the order journey.
+    }
+    try {
+      if (directory != null && await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    } on Object {
+      // Only this cue's unique application-temporary directory is touched.
+    }
+  }
+
+  static Uint8List _arrivalWave() {
+    const rate = 16000;
+    const samples = 6400;
+    final bytes = Uint8List(44 + samples * 2);
+    final data = ByteData.sublistView(bytes);
+    void word(int offset, String value) =>
+        bytes.setRange(offset, offset + value.length, value.codeUnits);
+    word(0, 'RIFF');
+    data.setUint32(4, bytes.length - 8, Endian.little);
+    word(8, 'WAVE');
+    word(12, 'fmt ');
+    data.setUint32(16, 16, Endian.little);
+    data.setUint16(20, 1, Endian.little);
+    data.setUint16(22, 1, Endian.little);
+    data.setUint32(24, rate, Endian.little);
+    data.setUint32(28, rate * 2, Endian.little);
+    data.setUint16(32, 2, Endian.little);
+    data.setUint16(34, 16, Endian.little);
+    word(36, 'data');
+    data.setUint32(40, samples * 2, Endian.little);
+    for (var i = 0; i < samples; i++) {
+      final time = i / rate;
+      final toneTime = time < .2 ? time : time - .2;
+      final envelope = toneTime >= .16
+          ? 0.0
+          : math.min(1.0, math.min(toneTime / .015, (.16 - toneTime) / .025));
+      final frequency = time < .2 ? 660.0 : 880.0;
+      final sample =
+          (math.sin(2 * math.pi * frequency * toneTime) *
+                  envelope *
+                  .12 *
+                  32767)
+              .round();
+      data.setInt16(44 + i * 2, sample, Endian.little);
+    }
+    return bytes;
+  }
+}
+
 class BuyV2Screen extends StatefulWidget {
   const BuyV2Screen({
     super.key,
@@ -58,6 +244,7 @@ class BuyV2Screen extends StatefulWidget {
     this.recoveryKind,
     this.scannerLauncher = showBuyV2ProductScanner,
     this.collectionCameraBuilder,
+    this.deliveryArrivalSound,
     this.onExit,
     this.onOpenMool,
     this.onOpenMainAction,
@@ -85,6 +272,8 @@ class BuyV2Screen extends StatefulWidget {
   // customer collection uses the camera on its authenticated paid order.
   final BuyV2ScannerLauncher scannerLauncher;
   final BuyV2CollectionCameraBuilder? collectionCameraBuilder;
+  // An injected cue belongs to this screen and is disposed when it leaves.
+  final BuyV2DeliveryArrivalSound? deliveryArrivalSound;
   final VoidCallback? onExit;
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec>? onOpenMainAction;
@@ -100,7 +289,7 @@ class BuyV2Screen extends StatefulWidget {
   State<BuyV2Screen> createState() => _BuyV2ScreenState();
 }
 
-class _BuyV2ScreenState extends State<BuyV2Screen> {
+class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   final MoolGlobalNavigationController _moolNavigationController =
       MoolGlobalNavigationController();
   Timer? _noticeTimer;
@@ -112,7 +301,16 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   bool _offersActive = false;
   bool _quickTrackerMinimized = true;
   bool _quickTrackerHidden = false;
+  bool _quickTrackerKept = false;
   bool _quickTrackerSoundOnArrival = false;
+  bool _quickTrackerSoundPreparing = false;
+  String? _quickTrackerSoundError;
+  BuyV2DeliveryArrivalSound? _arrivalSound;
+  int _arrivalSoundOperation = 0;
+  Object? _arrivalAccount;
+  bool _arrivalSoundPlaying = false;
+  bool _foreground = true;
+  final _arrivalNotifiedOrders = <String>{};
   Offset? _miniCartPosition;
   bool _miniCartParked = false;
   final _parkedCartNavigationScrollController = ScrollController();
@@ -138,6 +336,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _foreground =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    _arrivalAccount = _arrivalIdentity;
+    _arrivalSound = widget.deliveryArrivalSound;
     _gstInvoiceController = BuyV2GstInvoiceController(
       store: widget.session.gstInvoiceProfileStore,
     );
@@ -152,6 +356,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       unawaited(_restoreSessionState());
     }
     _lastSearchDestination = widget.session.destination;
+    _presentedQuickOrderId = widget.session.activeQuickDeliveryOrder?.id;
+    _presentedQuickOrderStatus =
+        widget.session.activeQuickDeliveryOrder?.status;
     _quickTrackerNavigationSequence = widget.session.navigationMotionSequence;
     widget.session.addListener(_sessionChanged);
   }
@@ -160,6 +367,21 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   void didUpdateWidget(covariant BuyV2Screen oldWidget) {
     super.didUpdateWidget(oldWidget);
     var restoreState = false;
+    if (oldWidget.session != widget.session ||
+        oldWidget.deliveryArrivalSound != widget.deliveryArrivalSound ||
+        _arrivalAccount != _arrivalIdentity) {
+      _resetArrivalSound(
+        dispose: oldWidget.deliveryArrivalSound != widget.deliveryArrivalSound,
+      );
+      _arrivalSound = widget.deliveryArrivalSound;
+      _arrivalAccount = _arrivalIdentity;
+      _presentedQuickOrderId = widget.session.activeQuickDeliveryOrder?.id;
+      _presentedQuickOrderStatus =
+          widget.session.activeQuickDeliveryOrder?.status;
+      _quickTrackerKept = false;
+      _quickTrackerHidden = false;
+      _quickTrackerMinimized = true;
+    }
     if (oldWidget.session != widget.session) {
       oldWidget.session.removeListener(_sessionChanged);
       widget.session.addListener(_sessionChanged);
@@ -242,12 +464,18 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
 
   void _sessionChanged() {
     if (!mounted) return;
+    if (_arrivalAccount != _arrivalIdentity) {
+      _resetArrivalSound();
+      _arrivalAccount = _arrivalIdentity;
+      _presentedQuickOrderId = null;
+      _presentedQuickOrderStatus = null;
+    }
     if (_quickTrackerNavigationSequence !=
         widget.session.navigationMotionSequence) {
       _quickTrackerNavigationSequence = widget.session.navigationMotionSequence;
       _quickTrackerCollapseTimer?.cancel();
       _quickTrackerPointers.clear();
-      _quickTrackerMinimized = true;
+      if (!_quickTrackerKept) _quickTrackerMinimized = true;
     }
     if (_storeProductRouteDepth > 0 &&
         widget.session.view == BuyV2View.catalogue) {
@@ -258,6 +486,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       });
     }
     _surfaceMotionDirection = widget.session.navigationMotionDirection;
+    final previousOrder = widget.session.orders
+        .where((order) => order.id == _presentedQuickOrderId)
+        .firstOrNull;
+    _observeArrival(previousOrder, _presentedQuickOrderStatus);
     final quickOrder = widget.session.activeQuickDeliveryOrder;
     final quickOrderId = quickOrder?.id;
     if (quickOrderId != _presentedQuickOrderId) {
@@ -265,13 +497,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       _presentedQuickOrderStatus = quickOrder?.status;
       _quickTrackerMinimized = true;
       _quickTrackerHidden = false;
+      _quickTrackerKept = false;
       _quickTrackerCollapseTimer?.cancel();
-    } else if (_quickTrackerSoundOnArrival &&
-        quickOrder != null &&
-        quickOrder.status != _presentedQuickOrderStatus &&
-        (quickOrder.status == BuyV2OrderStatus.arriving ||
-            quickOrder.status == BuyV2OrderStatus.delivered)) {
-      unawaited(SystemSound.play(SystemSoundType.alert));
     }
     _presentedQuickOrderStatus = quickOrder?.status;
     if (_offersActive &&
@@ -307,6 +534,132 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       });
     }
     setState(() {});
+  }
+
+  Object get _arrivalIdentity => (
+    widget.session.collectionIdentity?.value,
+    widget.accountIdentity,
+    widget.accountAuthenticated,
+  );
+
+  bool get _canSound =>
+      mounted && _foreground && (ModalRoute.of(context)?.isCurrent ?? true);
+
+  Future<void> _closeArrivalSound(
+    BuyV2DeliveryArrivalSound? sound, {
+    bool dispose = false,
+  }) async {
+    if (sound == null) return;
+    try {
+      await (dispose ? sound.dispose() : sound.stop()).timeout(
+        const Duration(seconds: 3),
+      );
+    } on Object {
+      // A platform cancellation cannot interrupt shopping or start a retry.
+    }
+  }
+
+  void _resetArrivalSound({bool dispose = false}) {
+    _arrivalSoundOperation++;
+    _quickTrackerSoundOnArrival = false;
+    _quickTrackerSoundPreparing = false;
+    _quickTrackerSoundError = null;
+    _arrivalSoundPlaying = false;
+    _arrivalNotifiedOrders.clear();
+    final sound = _arrivalSound;
+    _arrivalSound = dispose ? null : widget.deliveryArrivalSound;
+    unawaited(_closeArrivalSound(sound, dispose: dispose));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (!_foreground) {
+      _arrivalSoundOperation++;
+      _quickTrackerSoundPreparing = false;
+      _arrivalSoundPlaying = false;
+      unawaited(_closeArrivalSound(_arrivalSound));
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _setArrivalSound(bool enabled, StateSetter update) async {
+    final operation = ++_arrivalSoundOperation;
+    if (!enabled) {
+      update(() {
+        _quickTrackerSoundOnArrival = false;
+        _quickTrackerSoundPreparing = false;
+        _quickTrackerSoundError = null;
+      });
+      await _closeArrivalSound(_arrivalSound);
+      return;
+    }
+    if (!_canSound) return;
+    final sound = _arrivalSound ??=
+        widget.deliveryArrivalSound ?? BuyV2LocalDeliveryArrivalSound();
+    update(() {
+      _quickTrackerSoundPreparing = true;
+      _quickTrackerSoundError = null;
+    });
+    var ready = false;
+    try {
+      ready = await sound.prepare().timeout(const Duration(seconds: 8));
+    } on Object {
+      ready = false;
+    }
+    if (!mounted || operation != _arrivalSoundOperation) return;
+    if (!_canSound) {
+      update(() => _quickTrackerSoundPreparing = false);
+      await _closeArrivalSound(sound);
+      return;
+    }
+    update(() {
+      _quickTrackerSoundPreparing = false;
+      _quickTrackerSoundOnArrival = ready;
+      _quickTrackerSoundError = ready ? null : 'Sound unavailable. Try again.';
+    });
+    if (!ready) await _closeArrivalSound(sound);
+    _scheduleQuickTrackerCollapse(update);
+  }
+
+  void _observeArrival(BuyV2Order? order, BuyV2OrderStatus? previousStatus) {
+    if (!_quickTrackerSoundOnArrival ||
+        !_canSound ||
+        order == null ||
+        order.collection != null ||
+        previousStatus == null ||
+        previousStatus == order.status ||
+        previousStatus == BuyV2OrderStatus.delivered ||
+        (order.status != BuyV2OrderStatus.arriving &&
+            order.status != BuyV2OrderStatus.delivered) ||
+        _arrivalSoundPlaying ||
+        !_arrivalNotifiedOrders.add(order.id)) {
+      return;
+    }
+    unawaited(_playArrivalSound());
+  }
+
+  Future<void> _playArrivalSound() async {
+    final sound = _arrivalSound;
+    if (sound == null) return;
+    final operation = _arrivalSoundOperation;
+    _arrivalSoundPlaying = true;
+    var played = false;
+    try {
+      played = await sound.play().timeout(const Duration(seconds: 10));
+    } on Object {
+      played = false;
+    }
+    if (!mounted || operation != _arrivalSoundOperation) return;
+    _arrivalSoundPlaying = false;
+    if (!played) {
+      await _closeArrivalSound(sound);
+      if (!mounted || operation != _arrivalSoundOperation) return;
+      setState(() {
+        _quickTrackerSoundOnArrival = false;
+        _quickTrackerSoundError = 'Sound unavailable. Try again.';
+      });
+    }
   }
 
   GlobalProfileContextAction _buyProfileContext(BuyV2Session session) {
@@ -463,6 +816,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _resetArrivalSound(dispose: true);
     _noticeTimer?.cancel();
     _cartAcknowledgementTimer?.cancel();
     _quickTrackerCollapseTimer?.cancel();
@@ -747,6 +1102,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     _quickTrackerCollapseTimer?.cancel();
     if (_quickTrackerMinimized ||
         _quickTrackerHidden ||
+        _quickTrackerKept ||
         _quickTrackerPointers.isNotEmpty) {
       return;
     }
@@ -754,6 +1110,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       if (!mounted ||
           _quickTrackerMinimized ||
           _quickTrackerHidden ||
+          _quickTrackerKept ||
           _quickTrackerPointers.isNotEmpty) {
         return;
       }
@@ -766,46 +1123,66 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     update(() {
       _quickTrackerMinimized = !expanded;
       _quickTrackerHidden = false;
+      if (!expanded) _quickTrackerKept = false;
     });
     if (expanded) _scheduleQuickTrackerCollapse(update);
   }
 
   Widget? _buildDeliveryControl(BuyV2Session session, StateSetter update) {
     final order = session.activeQuickDeliveryOrder;
-    if (order == null || session.view == BuyV2View.tracking) return null;
+    if (order == null ||
+        _quickTrackerHidden ||
+        session.view == BuyV2View.tracking ||
+        session.view == BuyV2View.assist) {
+      return null;
+    }
     final expanded = !_quickTrackerMinimized && !_quickTrackerHidden;
     return Semantics(
       key: ValueKey(
-        _quickTrackerHidden
-            ? 'buy-quick-delivery-status-hidden'
-            : _quickTrackerMinimized
+        _quickTrackerMinimized
             ? 'buy-quick-delivery-status-minimized'
             : 'buy-quick-delivery-status-control',
       ),
       label:
-          '${order.id}. ${_buyOrderStatusLabel(order.status)}. '
+          'Delivery. ${order.id}. ${_buyOrderStatusLabel(order.status)}. '
           '${buyV2OrderPromiseSummary(order)}',
       expanded: expanded,
       child: SizedBox.square(
         key: const ValueKey('buy-quick-delivery-toggle'),
         dimension: 44,
         child: IconButton(
-          key: ValueKey(
-            _quickTrackerHidden
-                ? 'buy-quick-delivery-restore'
-                : 'buy-quick-delivery-expand',
-          ),
+          key: const ValueKey('buy-quick-delivery-expand'),
           tooltip: expanded
-              ? 'Close delivery choices'
-              : _quickTrackerHidden
-              ? 'Restore live delivery'
+              ? 'Collapse delivery status'
               : 'Show delivery choices',
           onPressed: () => _setQuickTrackerExpanded(!expanded, update),
           padding: EdgeInsets.zero,
           color: BuyV2Colors.royal,
-          icon: Icon(
-            expanded ? Icons.expand_more_rounded : Icons.bolt_rounded,
-            size: 20,
+          icon: SizedBox(
+            width: 28,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  expanded
+                      ? Icons.expand_more_rounded
+                      : Icons.local_shipping_outlined,
+                  size: 20,
+                ),
+                const SizedBox(height: 3),
+                ExcludeSemantics(
+                  child: BuyV2HonestProgressIndicator(
+                    key: const ValueKey('buy-quick-delivery-compact-progress'),
+                    ownerId: order.id,
+                    progress: order.progress,
+                    statusLabel: _buyOrderStatusLabel(order.status),
+                    backgroundColor: BuyV2Colors.softBlue,
+                    valueColor: BuyV2Colors.royal,
+                    minHeight: 3,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -816,6 +1193,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     final order = session.activeQuickDeliveryOrder;
     if (order == null ||
         session.view == BuyV2View.tracking ||
+        session.view == BuyV2View.assist ||
         _quickTrackerMinimized ||
         _quickTrackerHidden) {
       return null;
@@ -853,7 +1231,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                     child: _BuyQuickDeliveryStatusBar(
                       order: order,
                       minimized: false,
+                      kept: _quickTrackerKept,
                       soundOnArrival: _quickTrackerSoundOnArrival,
+                      soundPreparing: _quickTrackerSoundPreparing,
+                      soundError: _quickTrackerSoundError,
                       onMinimizedChanged: (value) =>
                           _setQuickTrackerExpanded(!value, update),
                       onHiddenChanged: (value) {
@@ -861,14 +1242,16 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                         update(() {
                           _quickTrackerHidden = value;
                           _quickTrackerMinimized = true;
+                          _quickTrackerKept = false;
                         });
                       },
-                      onSoundChanged: (value) {
-                        update(() => _quickTrackerSoundOnArrival = value);
+                      onSoundChanged: (value) =>
+                          unawaited(_setArrivalSound(value, update)),
+                      onKeepOnScreen: () {
+                        _quickTrackerCollapseTimer?.cancel();
+                        update(() => _quickTrackerKept = !_quickTrackerKept);
                         _scheduleQuickTrackerCollapse(update);
                       },
-                      onKeepOnScreen: () =>
-                          _setQuickTrackerExpanded(false, update),
                       onOpen: () => session.openTracking(order.id),
                     ),
                   ),
@@ -897,6 +1280,19 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         },
       ),
     );
+  }
+
+  VoidCallback? _deliveryStatusRestore(BuyV2Session session) {
+    final order = session.activeQuickDeliveryOrder;
+    if (!_quickTrackerHidden ||
+        order == null ||
+        order.id != session.selectedOrderOrNull?.id) {
+      return null;
+    }
+    return () {
+      if (session.activeQuickDeliveryOrder?.id != order.id) return;
+      _setQuickTrackerExpanded(false, setState);
+    };
   }
 
   Widget _buildDestinationNavigation(
@@ -1676,6 +2072,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       ),
       BuyV2View.tracking => BuyV2TrackingView(
         session: session,
+        onRestoreDeliveryStatus: _deliveryStatusRestore(session),
         collectionCameraBuilder: widget.collectionCameraBuilder,
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
@@ -1685,6 +2082,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
       BuyV2View.assist => BuyV2TrackingView(
         session: session,
+        onRestoreDeliveryStatus: _deliveryStatusRestore(session),
         collectionCameraBuilder: widget.collectionCameraBuilder,
         onOpenOrderHelp: _openOrderHelpChat,
         invoiceDownloader: widget.invoiceDownloader,
@@ -1716,7 +2114,10 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
   const _BuyQuickDeliveryStatusBar({
     required this.order,
     required this.minimized,
+    required this.kept,
     required this.soundOnArrival,
+    required this.soundPreparing,
+    required this.soundError,
     required this.onMinimizedChanged,
     required this.onHiddenChanged,
     required this.onSoundChanged,
@@ -1726,7 +2127,10 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
 
   final BuyV2Order order;
   final bool minimized;
+  final bool kept;
   final bool soundOnArrival;
+  final bool soundPreparing;
+  final String? soundError;
   final ValueChanged<bool> onMinimizedChanged;
   final ValueChanged<bool> onHiddenChanged;
   final ValueChanged<bool> onSoundChanged;
@@ -1828,7 +2232,7 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                 Row(
                   children: [
                     const Icon(
-                      Icons.bolt_rounded,
+                      Icons.local_shipping_outlined,
                       color: BuyV2Colors.navy,
                       size: 19,
                     ),
@@ -1842,10 +2246,16 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                           children: [
                             Text(
                               'Quick delivery',
-                              style: context.buyBody.copyWith(fontSize: 10.5),
+                              style: context.buyBody.copyWith(fontSize: 12),
                             ),
-                            Text('$status · $promise', style: context.buyMeta),
-                            Text(order.id, style: context.buyMeta),
+                            Text(
+                              '$status · $promise',
+                              style: context.buyMeta.copyWith(fontSize: 11),
+                            ),
+                            Text(
+                              order.id,
+                              style: context.buyMeta.copyWith(fontSize: 9),
+                            ),
                           ],
                         ),
                       ),
@@ -1883,13 +2293,22 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                         minimumSize: const Size(0, 44),
                         padding: const EdgeInsets.symmetric(horizontal: 6),
                       ),
-                      icon: const Icon(Icons.push_pin_outlined, size: 15),
-                      label: const Text('Keep'),
+                      icon: Icon(
+                        kept ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                        size: 15,
+                      ),
+                      label: Text(
+                        kept ? 'Kept' : 'Keep',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                     FilterChip(
                       key: const ValueKey('buy-quick-delivery-sound'),
                       selected: soundOnArrival,
-                      onSelected: onSoundChanged,
+                      onSelected: soundPreparing ? null : onSoundChanged,
                       selectedColor: BuyV2Colors.navy,
                       backgroundColor: Colors.white,
                       visualDensity: VisualDensity.compact,
@@ -1897,10 +2316,12 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                       side: const BorderSide(color: BuyV2Colors.navy),
                       labelStyle: TextStyle(
                         color: soundOnArrival ? Colors.white : BuyV2Colors.navy,
-                        fontSize: 9,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
                       ),
-                      label: const Text('Arrival sound'),
+                      label: Text(
+                        soundPreparing ? 'Setting sound' : 'Arrival sound',
+                      ),
                     ),
                     TextButton.icon(
                       key: const ValueKey('buy-quick-delivery-hide'),
@@ -1910,10 +2331,25 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 6),
                       ),
                       icon: const Icon(Icons.visibility_off_outlined, size: 15),
-                      label: const Text('Hide'),
+                      label: const Text(
+                        'Hide',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ],
                 ),
+                if (soundOnArrival || soundError != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      soundError ?? 'Sounds while you use the app.',
+                      key: const ValueKey('buy-quick-delivery-sound-message'),
+                      style: context.buyMeta.copyWith(fontSize: 10),
+                    ),
+                  ),
               ],
             ),
           );

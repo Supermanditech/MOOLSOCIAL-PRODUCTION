@@ -20,6 +20,17 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_scanner.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
+class _R5ScreenArrivalSound implements BuyV2DeliveryArrivalSound {
+  @override
+  Future<bool> prepare() async => true;
+  @override
+  Future<bool> play() async => true;
+  @override
+  Future<void> stop() async {}
+  @override
+  Future<void> dispose() async {}
+}
+
 Widget r66VisualCaptureRoot(Widget child) =>
     const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')
     ? RepaintBoundary(key: const ValueKey('r66-cart-capture'), child: child)
@@ -193,6 +204,7 @@ void main() {
     bool disableAnimations = false,
     bool captureCart = false,
     BuyV2ScannerLauncher scannerLauncher = showBuyV2ProductScanner,
+    BuyV2DeliveryArrivalSound? deliveryArrivalSound,
     VoidCallback? onOpenMool,
     VoidCallback? onOpenChat,
     BuyV2InvoiceDownloader? invoiceDownloader,
@@ -225,6 +237,7 @@ void main() {
         accountIdentity: accountIdentity,
         accountAuthenticated: accountAuthenticated,
         scannerLauncher: scannerLauncher,
+        deliveryArrivalSound: deliveryArrivalSound,
         onOpenMool: onOpenMool,
         onOpenChat: onOpenChat,
         invoiceDownloader: invoiceDownloader,
@@ -4234,7 +4247,9 @@ void main() {
   ) async {
     final session = BuyV2Session(core: BuySession());
     addTearDown(session.dispose);
-    await tester.pumpWidget(app(session));
+    await tester.pumpWidget(
+      app(session, deliveryArrivalSound: _R5ScreenArrivalSound()),
+    );
     await tester.pumpAndSettle();
     expect(session.addProduct('s-tomato'), isTrue);
     session.openCart(scope: BuyV2CartScope.shop);
@@ -4300,21 +4315,28 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('buy-quick-delivery-hide')));
     await tester.pumpAndSettle();
     expect(
-      find.byKey(const ValueKey('buy-quick-delivery-status-hidden')),
-      findsOneWidget,
+      find.byKey(const ValueKey('buy-quick-delivery-toggle')),
+      findsNothing,
     );
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('buy-confirmation'))).dy,
       minimizedContentTop,
     );
+    expect(session.openTracking(session.activeQuickDeliveryOrder!.id), isTrue);
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('buy-quick-delivery-restore')));
+    await tester.pumpAndSettle();
+    session.returnToOrders();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-quick-delivery-toggle')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('buy-quick-delivery-keep')));
     await tester.pumpAndSettle();
     expect(
-      find.byKey(const ValueKey('buy-quick-delivery-status-minimized')),
+      find.byKey(const ValueKey('buy-quick-delivery-status-expanded')),
       findsOneWidget,
     );
+    expect(find.text('Kept'), findsOneWidget);
   });
 
   testWidgets('PAY-08 scheduled and courier delivery uses quiet status', (

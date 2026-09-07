@@ -14,6 +14,20 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
 
+class _R5DockArrivalSound implements BuyV2DeliveryArrivalSound {
+  @override
+  Future<bool> prepare() async => true;
+
+  @override
+  Future<bool> play() async => true;
+
+  @override
+  Future<void> stop() async {}
+
+  @override
+  Future<void> dispose() async {}
+}
+
 class _R66StoreStatusSession extends BuyV2Session {
   _R66StoreStatusSession({required super.core, required this.quiet}) {
     order = visibleOrders.firstWhere(
@@ -102,6 +116,26 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> revealDeliveryRailControl(
+    WidgetTester tester,
+    Finder control,
+  ) async {
+    if (control.hitTestable().evaluate().isEmpty) {
+      final viewport = find.byKey(
+        const PageStorageKey('buy-compact-cart-local-navigation-scroll'),
+      );
+      expect(viewport, findsOneWidget);
+      expect(
+        tester.getRect(viewport).contains(tester.getCenter(control)),
+        isFalse,
+        reason: 'A control obscured inside the visible rail is a defect',
+      );
+      await tester.drag(viewport, const Offset(-120, 0));
+      await tester.pumpAndSettle();
+    }
+    expect(control.hitTestable(), findsOneWidget);
+  }
+
   Widget app(
     BuyV2Session session, {
     Size size = const Size(390, 844),
@@ -109,6 +143,7 @@ void main() {
     bool reducedMotion = false,
     EdgeInsets safeArea = EdgeInsets.zero,
     ValueChanged<PersonalMoolActionSpec>? onOpenMainAction,
+    BuyV2DeliveryArrivalSound? deliveryArrivalSound,
   }) {
     return RepaintBoundary(
       key: const ValueKey('r66-cart-feedback-capture'),
@@ -131,6 +166,7 @@ void main() {
           initialView: session.view,
           initialCartScope: session.cartScope,
           onOpenMainAction: onOpenMainAction,
+          deliveryArrivalSound: deliveryArrivalSound,
         ),
       ),
     );
@@ -1532,7 +1568,14 @@ void main() {
         addTearDown(core.dispose);
         addTearDown(session.dispose);
         expect(session.addProduct('s-tomato'), isTrue);
-        await tester.pumpWidget(app(session, size: size, textScale: scale));
+        await tester.pumpWidget(
+          app(
+            session,
+            size: size,
+            textScale: scale,
+            deliveryArrivalSound: _R5DockArrivalSound(),
+          ),
+        );
         await tester.pumpAndSettle();
         final toggle = find.byKey(const ValueKey('buy-quick-delivery-toggle'));
         final expanded = find.byKey(
@@ -1627,6 +1670,22 @@ void main() {
         await tester.pumpAndSettle();
         expect(expanded, findsNothing);
         expect(tester.getRect(content), contentRect);
+        expect(toggle, findsNothing);
+        session.openTracking(session.order.id);
+        await tester.pumpAndSettle();
+        final restore = find.byKey(
+          const ValueKey('buy-quick-delivery-restore'),
+        );
+        await tester.ensureVisible(restore);
+        await tester.pumpAndSettle();
+        await tester.tap(restore);
+        await tester.pumpAndSettle();
+        expect(session.selectedOrderId, session.order.id);
+        expect(session.view, BuyV2View.tracking);
+        expect(restore, findsNothing);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        await revealDeliveryRailControl(tester, toggle);
         await tester.tap(toggle);
         await tester.pumpAndSettle();
         expect(tester.widget<FilterChip>(sound).selected, isTrue);
@@ -2737,18 +2796,11 @@ void main() {
           final restore = find.byKey(
             const ValueKey('buy-quick-delivery-restore'),
           );
-          expect(restore, findsOneWidget);
-          await tester.tap(restore);
-          await tester.pumpAndSettle();
           expect(restore, findsNothing);
           expect(
-            find.byKey(const ValueKey('buy-quick-delivery-open')),
-            findsOneWidget,
+            find.byKey(const ValueKey('buy-quick-delivery-toggle')),
+            findsNothing,
           );
-          await tester.tap(
-            find.byKey(const ValueKey('buy-quick-delivery-minimize')),
-          );
-          await tester.pumpAndSettle();
         } else if (lane == 'wholesale-quiet') {
           expect(
             find.byKey(const ValueKey('buy-quiet-delivery-status')),
@@ -2936,6 +2988,42 @@ void main() {
         expect(session.quantityFor(retained.id), retainedQuantity);
         if (lane == 'bulk') {
           expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.bulk);
+        }
+        if (lane == 'shop-live') {
+          expect(
+            find.byKey(const ValueKey('buy-quick-delivery-toggle')),
+            findsNothing,
+            reason: 'Hide persists through Cart, checkout and Store returns',
+          );
+          final orderId = session.activeQuickDeliveryOrder!.id;
+          session.openTracking(orderId);
+          await tester.pumpAndSettle();
+          final restore = find.byKey(
+            const ValueKey('buy-quick-delivery-restore'),
+          );
+          await tester.ensureVisible(restore);
+          await tester.pumpAndSettle();
+          await tester.tap(restore);
+          await tester.pumpAndSettle();
+          expect(session.selectedOrderId, orderId);
+          expect(session.view, BuyV2View.tracking);
+          expect(restore, findsNothing);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.destination, BuyV2Destination.orders);
+          expect(session.view, BuyV2View.catalogue);
+          await revealDeliveryRailControl(
+            tester,
+            find.byKey(const ValueKey('buy-quick-delivery-toggle')),
+          );
+          expect(
+            find
+                .byKey(const ValueKey('buy-quick-delivery-toggle'))
+                .hitTestable(),
+            findsOneWidget,
+          );
+          expect(session.quantityFor(product.id), count);
+          expect(session.quantityFor(retained.id), retainedQuantity);
         }
         expect(tester.takeException(), isNull);
       });
