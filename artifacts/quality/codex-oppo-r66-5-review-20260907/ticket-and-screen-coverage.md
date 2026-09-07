@@ -100,6 +100,8 @@ This is local correction status, not device closure. The installed r66.5 APK is 
 
 ## Source reconciliation
 
+Correction update AUDIT-R665-01: pending-review polling now backs off to five minutes after twenty attempts rather than stopping permanently. Pause/resume, one-case identity and approval guards are preserved. The full 22-case Work journey suite and analysis pass. No presentation change or live admin authority is introduced. Native successor qualification is pending; findings 06–08 remain open.
+
 Correction update AUDIT-R665-05: valid unconfirmed phone/email/backup now reveals Send code without reopening contact input; already-sent challenges focus the code field, and invalid input still receives focus. Twelve focused recovery/disposal cases and full analysis pass; six normal/200percent local captures were inspected. No automatic Send, verification shortcut or backend change. Device closure is pending; findings 01 and 06–08 remain open.
 
 Correction update AUDIT-R665-04: the complete business-relationship label is now shown above its selector at normal and enlarged text sizes, using the existing wrapping-label component. Three connected details-to-review-and-Back journeys and full analysis pass; local visuals were inspected. This does not change the approved business subtitle or relationship options. Device closure remains pending in the successor APK. Findings 01 and 05–08 remain open.

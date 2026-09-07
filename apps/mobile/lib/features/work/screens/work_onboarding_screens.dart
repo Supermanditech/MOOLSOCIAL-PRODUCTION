@@ -1782,10 +1782,12 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _refreshReview();
     });
-    _reviewTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => _refreshReview(),
-    );
+    _scheduleReviewRefresh(const Duration(seconds: 30));
+  }
+
+  void _scheduleReviewRefresh(Duration interval) {
+    _reviewTimer?.cancel();
+    _reviewTimer = Timer.periodic(interval, (_) => _refreshReview());
   }
 
   @override
@@ -1879,17 +1881,18 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
         ModalRoute.of(context)?.isCurrent != true) {
       return;
     }
-    if (_reviewPolls >= 20) {
-      _reviewTimer?.cancel();
-      return;
-    }
     _onReviewChanged();
     final status = widget.session.remoteReviewStatus;
     if (!_redirectQueued &&
         widget.session.reviewCaseId != null &&
         status != WorkRemoteReviewStatus.rejected &&
         status != WorkRemoteReviewStatus.suspended) {
-      _reviewPolls += 1;
+      if (_reviewPolls < 20) {
+        _reviewPolls += 1;
+        if (_reviewPolls == 20) {
+          _scheduleReviewRefresh(const Duration(minutes: 5));
+        }
+      }
       unawaited(widget.session.checkReview());
     }
   }
@@ -1899,13 +1902,10 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
     _appActive = state == AppLifecycleState.resumed;
     if (_appActive) {
       _reviewPolls = 0;
-      if (_reviewTimer?.isActive != true) {
-        _reviewTimer = Timer.periodic(
-          const Duration(seconds: 30),
-          (_) => _refreshReview(),
-        );
-      }
+      _scheduleReviewRefresh(const Duration(seconds: 30));
       _refreshReview();
+    } else {
+      _reviewTimer?.cancel();
     }
   }
 

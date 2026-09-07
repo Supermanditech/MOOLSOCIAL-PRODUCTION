@@ -775,6 +775,68 @@ void main() {
   );
 
   testWidgets(
+    'pending review continues with bounded backoff and resumes without duplicate submission',
+    (tester) async {
+      final gateway = ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.pending,
+      );
+      final work = WorkSession(gateway: gateway)
+        ..selectProfile('retailer-grocery')
+        ..saveDetails(
+          name: 'QA Retail Store',
+          area: 'Jodhpur',
+          activity: 'Grocery retail',
+        )
+        ..businessRelationship = 'Owner';
+      confirmWorkspaceContacts(work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/proof',
+        workSession: work,
+      );
+      await tapVisible(tester, const Key('work-details-continue'));
+      await tapVisible(tester, const Key('work-proof-review'));
+      await tapVisible(tester, const Key('work-declaration'));
+      await tapVisible(tester, const Key('work-submit-profile'));
+      final caseId = work.reviewCaseId;
+      expect(caseId, isNotNull);
+      expect(gateway.submissionCalls, 1);
+      for (var attempt = 0; attempt < 20; attempt++) {
+        await tester.pump(const Duration(seconds: 30));
+        await tester.pumpAndSettle();
+      }
+      expect(gateway.reviewCalls, 20);
+      expect(work.activeWorkspace, isNull);
+      await tester.pump(const Duration(minutes: 4));
+      await tester.pumpAndSettle();
+      expect(gateway.reviewCalls, 20);
+      await tester.pump(const Duration(minutes: 1));
+      await tester.pumpAndSettle();
+      expect(gateway.reviewCalls, 21);
+      expect(work.reviewCaseId, caseId);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(minutes: 20));
+      expect(gateway.reviewCalls, 21);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(gateway.reviewCalls, 22);
+      await tester.pump(const Duration(seconds: 31));
+      await tester.pumpAndSettle();
+      expect(gateway.reviewCalls, 23);
+      expect(work.activeWorkspace, isNull);
+      gateway.reviewResultStatus = WorkRemoteReviewStatus.approved;
+      await tester.pump(const Duration(seconds: 31));
+      await tester.pumpAndSettle();
+      expect(gateway.reviewCalls, 24);
+      expect(gateway.submissionCalls, 1);
+      expect(work.reviewCaseId, caseId);
+      expect(work.activeWorkspace?.id, isNotNull);
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'retailer setup rejects incomplete inputs and exact failure retry goes live',
     (tester) async {
       final gateway = ReviewWorkGateway()..failSetup = true;

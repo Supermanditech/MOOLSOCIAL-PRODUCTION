@@ -83,6 +83,14 @@ No protected references were regenerated. Toolchain: Flutter 3.44.6 / Dart 3.12.
 
 ## Correction qualification — 8 September 2026
 
+### Pending-review refresh child AUDIT-R665-01
+
+The current screen continues checking every five minutes after its first twenty 30-second attempts instead of cancelling permanently. Pausing cancels the timer; resuming immediately refreshes and restores the initial interval. Existing current-route, active-case, busy and approval guards are unchanged. No new screen, authority, automatic approval or backend endpoint was added.
+
+Command: `flutter test --no-pub --concurrency=1 --reporter expanded test/work_vertical_slice_test.dart`. Result: 22 passed, 0 failed, exit 0. The new fake-clock connected journey verifies twenty attempts, bounded backoff, a later check, twenty minutes paused without requests, immediate resume, restored interval, one submission and dashboard entry only after an approved fixture response. Existing rejection, clarification, retry, contact, document and dashboard journeys remain passing. `r666-review-refresh1-20260908.log` SHA-256 `B1EC36019A8DF142C6AFF144E0FDF0D31CC871F0A8AD40A16FCA7A2BFE4577D1`.
+
+Full analysis: zero issues, exit 0; `r666-review-analysis1-20260908.log` SHA-256 `BEEF3EC5EE844D8C51FC6D65ADD7BEE44245C2009BBB32EE03429A9EC9FE8977`. This fake-clock result is not a live server or physical ten-minute OPPO test. Visual structure is unchanged; connected prebuild and successor device replay remain required.
+
 ### Contact-recovery child AUDIT-R665-05
 
 The existing contact screen now reveals Send code for a valid unconfirmed contact without reopening its keyboard; an already-sent challenge focuses the code field. Invalid phone/email input still receives focus. The Send-code and code-confirmation rows share a mutually exclusive existing anchor. No code is sent automatically and no verification or backend rule is changed.
