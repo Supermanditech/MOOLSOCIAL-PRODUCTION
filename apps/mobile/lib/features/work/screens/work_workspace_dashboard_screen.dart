@@ -53,6 +53,100 @@ String _storeSummaryAmount(String exact) {
 String _storeAdjustmentAmount(int value) =>
     '${value < 0 ? '+' : '−'} ₹${_formatStoreAmount(value.abs())}';
 
+// Animate only the current, confirmed presentation. Never interpolate money,
+// retain an outgoing actionable surface, or move an action's hit target.
+class _StoreValueMotion extends StatefulWidget {
+  const _StoreValueMotion({
+    required this.value,
+    required this.child,
+    this.motionKey,
+  });
+  final Object value;
+  final Widget child;
+  final Key? motionKey;
+
+  @override
+  State<_StoreValueMotion> createState() => _StoreValueMotionState();
+}
+
+class _StoreValueMotionState extends State<_StoreValueMotion>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: MoolMotion.standard,
+    value: 1,
+  );
+  bool _enabled = false;
+  bool _foreground = true;
+  bool _resumeCatchUp = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _foreground =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _enabled =
+        !MoolMotion.isReduced(context) && TickerMode.valuesOf(context).enabled;
+    if (!_enabled) _controller.value = 1;
+  }
+
+  @override
+  void didUpdateWidget(covariant _StoreValueMotion oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      if (_enabled && _foreground && !_resumeCatchUp) {
+        _controller.forward(from: 0);
+      } else {
+        _controller.value = 1;
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (!_foreground) {
+      _resumeCatchUp = true;
+      _controller.value = 1;
+    } else {
+      // Flutter may defer the background data rebuild until this first frame.
+      // Display it settled; only subsequent foreground changes should move.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _resumeCatchUp = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _controller,
+    child: widget.child,
+    builder: (context, child) => Transform.translate(
+      key: widget.motionKey,
+      offset: Offset(
+        0,
+        3 * (1 - MoolMotion.enter.transform(_controller.value)),
+      ),
+      transformHitTests: false,
+      child: child,
+    ),
+  );
+}
+
 class _StoreMoneyText extends StatefulWidget {
   const _StoreMoneyText(
     this.value, {
@@ -136,7 +230,7 @@ class _StoreMoneyTextState extends State<_StoreMoneyText> {
                       ),
                     ),
                   )
-                : text,
+                : _StoreValueMotion(value: widget.value, child: text),
           ),
         );
       },
@@ -1985,18 +2079,23 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                           horizontal: 9,
                           vertical: 6,
                         ),
-                        child: SizedBox(
-                          width: 40,
-                          child: Icon(
-                            session.workspaceStoreState ==
-                                    WorkspaceStoreState.open
-                                ? Icons.radio_button_checked_rounded
-                                : session.workspaceStoreState ==
-                                      WorkspaceStoreState.paused
-                                ? Icons.pause_circle_outline_rounded
-                                : Icons.power_settings_new_rounded,
-                            size: 18,
-                            color: MoolColors.navy,
+                        child: _StoreValueMotion(
+                          value:
+                              '${session.workspaceStoreState}:${session.workspaceVisibleToCustomers}',
+                          motionKey: const Key('work-store-status-motion'),
+                          child: SizedBox(
+                            width: 40,
+                            child: Icon(
+                              session.workspaceStoreState ==
+                                      WorkspaceStoreState.open
+                                  ? Icons.radio_button_checked_rounded
+                                  : session.workspaceStoreState ==
+                                        WorkspaceStoreState.paused
+                                  ? Icons.pause_circle_outline_rounded
+                                  : Icons.power_settings_new_rounded,
+                              size: 18,
+                              color: MoolColors.navy,
+                            ),
                           ),
                         ),
                       ),
@@ -2274,7 +2373,7 @@ class _StoreFirstTapAccessState extends State<_StoreFirstTapAccess> {
     );
     final shortcuts = Material(
       key: const Key('work-first-tap-shortcuts'),
-      color: Colors.white,
+      color: const Color(0xFFF2F4FF),
       child: DecoratedBox(
         decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: Color(0xFFE5E8F1))),
@@ -2313,9 +2412,9 @@ class _StoreFirstTapAccessState extends State<_StoreFirstTapAccess> {
                             minimumSize: const Size(48, 48),
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             foregroundColor: MoolColors.navy,
-                            disabledForegroundColor: MoolColors.navy,
+                            disabledForegroundColor: Colors.white,
                             backgroundColor: _actions[i].$1 == widget.active
-                                ? const Color(0xFFEEF0FF)
+                                ? MoolColors.navy
                                 : Colors.transparent,
                             shape: const RoundedRectangleBorder(
                               borderRadius: BorderRadius.all(
@@ -2324,7 +2423,14 @@ class _StoreFirstTapAccessState extends State<_StoreFirstTapAccess> {
                             ),
                             textStyle: labelStyle,
                           ),
-                          child: Text(_actions[i].$2, style: labelStyle),
+                          child: Text(
+                            _actions[i].$2,
+                            style: labelStyle.copyWith(
+                              color: _actions[i].$1 == widget.active
+                                  ? Colors.white
+                                  : MoolColors.navy,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -2350,7 +2456,19 @@ class _StoreFirstTapAccessState extends State<_StoreFirstTapAccess> {
           )
         else
           Offstage(offstage: typing, child: shortcuts),
-        Expanded(child: widget.child),
+        Expanded(
+          child: widget.procurement != null
+              ? widget.child
+              : Material(
+                  key: const Key('work-first-tap-working-surface'),
+                  color: Colors.white,
+                  textStyle: DefaultTextStyle.of(context).style,
+                  child: DefaultTextStyle.merge(
+                    style: const TextStyle(color: MoolColors.ink),
+                    child: widget.child,
+                  ),
+                ),
+        ),
       ],
     );
   }
@@ -2494,47 +2612,51 @@ class _StoreActionEdge extends StatelessWidget {
         ? _storeRailWordWidth(context, 'Restock Buy Direct Group Bulk Buying') +
               20
         : normalWidth;
-    return Container(
-      key: const Key('work-store-action-edge'),
-      width: readableWidth > normalWidth ? readableWidth : normalWidth,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(left: BorderSide(color: Color(0xFFE5E8F1))),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        child: Column(
-          children: [
-            _StoreEdgeAction(
-              keyName: 'work-quick-buy',
-              icon: Icons.inventory_2_outlined,
-              label: 'Restock',
-              onTap: onRestock,
-              detail: session.workspaceLowStockCount > 0
-                  ? '${session.workspaceLowStockCount} low stock'
-                  : null,
-            ),
-            const Divider(height: 24, indent: 16, endIndent: 16),
-            _StoreEdgeAction(
-              keyName: 'work-quick-direct',
-              icon: Icons.factory_outlined,
-              label: 'Buy Direct',
-              onTap: onDirect,
-            ),
-            const Divider(height: 24, indent: 16, endIndent: 16),
-            _StoreEdgeAction(
-              keyName: 'work-quick-group-buy',
-              icon: Icons.groups_2_outlined,
-              label: 'Group Bulk Buying',
-              onTap: onGroup,
-              detail: deal == null
-                  ? null
-                  : '${deal.productName}\n₹${deal.groupUnitPrice}/${deal.unitLabel}',
-              progress: deal == null || deal.targetQuantity <= 0
-                  ? null
-                  : (deal.securedQuantity / deal.targetQuantity).clamp(0, 1),
-            ),
-          ],
+    return Material(
+      key: const Key('work-store-supply-material'),
+      color: Colors.white,
+      textStyle: DefaultTextStyle.of(context).style,
+      child: Container(
+        key: const Key('work-store-action-edge'),
+        width: readableWidth > normalWidth ? readableWidth : normalWidth,
+        decoration: const BoxDecoration(
+          border: Border(left: BorderSide(color: Color(0xFFE5E8F1))),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          child: Column(
+            children: [
+              _StoreEdgeAction(
+                keyName: 'work-quick-buy',
+                icon: Icons.inventory_2_outlined,
+                label: 'Restock',
+                onTap: onRestock,
+                detail: session.workspaceLowStockCount > 0
+                    ? '${session.workspaceLowStockCount} low stock'
+                    : null,
+              ),
+              const Divider(height: 24, indent: 16, endIndent: 16),
+              _StoreEdgeAction(
+                keyName: 'work-quick-direct',
+                icon: Icons.factory_outlined,
+                label: 'Buy Direct',
+                onTap: onDirect,
+              ),
+              const Divider(height: 24, indent: 16, endIndent: 16),
+              _StoreEdgeAction(
+                keyName: 'work-quick-group-buy',
+                icon: Icons.groups_2_outlined,
+                label: 'Group Bulk Buying',
+                onTap: onGroup,
+                detail: deal == null
+                    ? null
+                    : '${deal.productName}\n₹${deal.groupUnitPrice}/${deal.unitLabel}',
+                progress: deal == null || deal.targetQuantity <= 0
+                    ? null
+                    : (deal.securedQuantity / deal.targetQuantity).clamp(0, 1),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2572,7 +2694,13 @@ class _StoreEdgeAction extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           child: Column(
             children: [
-              Icon(icon, size: 25, color: MoolColors.navy),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: MoolColors.navy.withValues(alpha: .06),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Icon(icon, size: 25, color: MoolColors.navy),
+              ),
               const SizedBox(height: 7),
               Text(
                 label,
@@ -2586,14 +2714,17 @@ class _StoreEdgeAction extends StatelessWidget {
               ),
               if (detail != null) ...[
                 const SizedBox(height: 8),
-                Text(
-                  detail!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    height: 1.4,
-                    color: MoolColors.muted,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                _StoreValueMotion(
+                  value: detail!,
+                  child: Text(
+                    detail!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      height: 1.4,
+                      color: MoolColors.muted,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
                   ),
                 ),
               ],
@@ -2602,12 +2733,20 @@ class _StoreEdgeAction extends StatelessWidget {
                 Semantics(
                   label: 'Group quantity confirmed',
                   value: '${(progress! * 100).round()} percent',
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 3,
-                    color: MoolColors.navy,
-                    backgroundColor: const Color(0xFFE8EBF6),
-                    borderRadius: BorderRadius.circular(4),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: progress!, end: progress!),
+                    duration: MoolMotion.accessible(
+                      context,
+                      MoolMotion.standard,
+                    ),
+                    curve: MoolMotion.change,
+                    builder: (context, value, _) => LinearProgressIndicator(
+                      value: value,
+                      minHeight: 3,
+                      color: MoolColors.navy,
+                      backgroundColor: const Color(0xFFE8EBF6),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
                 ),
               ],
@@ -2686,7 +2825,7 @@ class _StoreReachStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Material(
     key: const Key('work-store-reach-strip'),
-    color: Colors.white,
+    color: const Color(0xFFF2F4FF),
     child: DecoratedBox(
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFFE5E8F1))),
@@ -2785,56 +2924,61 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
     return Semantics(
       container: true,
       label: 'Store finances',
-      child: Container(
-        key: const Key('work-live-status-bubbles'),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(bottom: BorderSide(color: Color(0xFFE5E8F1))),
-        ),
-        child: _StoreAdaptiveRail(
-          labels: const [
-            'View statement Sales today',
-            'Collect dues Unpaid bills',
-            'Settle Available',
-          ],
-          normalFlex: const [1, 1, 1],
-          builder: (flex) => IntrinsicHeight(
-            key: const Key('work-store-live-business-pulse'),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _StorePulseMetric(
-                  keyName: 'work-pulse-sales',
-                  flex: flex[0],
-                  label: 'View statement',
-                  contextLabel: 'Sales today',
-                  value: '₹${_formatStoreAmount(session.workspaceSalesToday)}',
-                  icon: Icons.point_of_sale_outlined,
-                  onTap: onSales,
-                ),
-                _StorePulseDivider(),
-                _StorePulseMetric(
-                  keyName: 'work-pulse-dues',
-                  flex: flex[1],
-                  label: 'Collect dues',
-                  contextLabel: 'Unpaid bills',
-                  value:
-                      '₹${_formatStoreAmount(session.workspaceCustomerBook.fold<int>(0, (total, customer) => total + customer.amountDue))}',
-                  icon: Icons.payments_outlined,
-                  onTap: onOrders,
-                ),
-                _StorePulseDivider(),
-                _StorePulseMetric(
-                  keyName: 'work-pulse-settlement',
-                  flex: flex[2],
-                  label: 'Settle',
-                  contextLabel: 'Available',
-                  value:
-                      '₹${_formatStoreAmount(session.workspaceSettlementEligible)}',
-                  icon: Icons.account_balance_wallet_outlined,
-                  onTap: onSettlement,
-                ),
-              ],
+      child: Material(
+        key: const Key('work-store-finance-material'),
+        color: MoolColors.navy,
+        textStyle: DefaultTextStyle.of(context).style,
+        child: Container(
+          key: const Key('work-live-status-bubbles'),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Color(0xFF3232A0))),
+          ),
+          child: _StoreAdaptiveRail(
+            labels: const [
+              'View statement Sales today',
+              'Collect dues Unpaid bills',
+              'Settle Available',
+            ],
+            normalFlex: const [1, 1, 1],
+            builder: (flex) => IntrinsicHeight(
+              key: const Key('work-store-live-business-pulse'),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _StorePulseMetric(
+                    keyName: 'work-pulse-sales',
+                    flex: flex[0],
+                    label: 'View statement',
+                    contextLabel: 'Sales today',
+                    value:
+                        '₹${_formatStoreAmount(session.workspaceSalesToday)}',
+                    icon: Icons.point_of_sale_outlined,
+                    onTap: onSales,
+                  ),
+                  _StorePulseDivider(),
+                  _StorePulseMetric(
+                    keyName: 'work-pulse-dues',
+                    flex: flex[1],
+                    label: 'Collect dues',
+                    contextLabel: 'Unpaid bills',
+                    value:
+                        '₹${_formatStoreAmount(session.workspaceCustomerBook.fold<int>(0, (total, customer) => total + customer.amountDue))}',
+                    icon: Icons.payments_outlined,
+                    onTap: onOrders,
+                  ),
+                  _StorePulseDivider(),
+                  _StorePulseMetric(
+                    keyName: 'work-pulse-settlement',
+                    flex: flex[2],
+                    label: 'Settle',
+                    contextLabel: 'Available',
+                    value:
+                        '₹${_formatStoreAmount(session.workspaceSettlementEligible)}',
+                    icon: Icons.account_balance_wallet_outlined,
+                    onTap: onSettlement,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -2850,7 +2994,7 @@ class _StorePulseDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return const SizedBox(
       height: 28,
-      child: VerticalDivider(width: 1, thickness: 1, color: Color(0xFFE2E7F4)),
+      child: VerticalDivider(width: 1, thickness: 1, color: Color(0xFF4242A5)),
     );
   }
 }
@@ -2876,7 +3020,7 @@ class _StorePulseMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const accent = MoolColors.navy;
+    const accent = Colors.white;
     final enlarged = MediaQuery.textScalerOf(context).scale(1) >= 2;
     return Expanded(
       flex: enlarged ? 1 : flex,
@@ -2888,6 +3032,16 @@ class _StorePulseMetric extends StatelessWidget {
         child: InkWell(
           key: Key(keyName),
           borderRadius: BorderRadius.circular(16),
+          splashFactory: MoolMotion.isReduced(context)
+              ? NoSplash.splashFactory
+              : null,
+          overlayColor: WidgetStateProperty.resolveWith<Color?>(
+            (states) =>
+                states.contains(WidgetState.pressed) ||
+                    states.contains(WidgetState.focused)
+                ? Colors.white24
+                : null,
+          ),
           onTap: onTap,
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 72),
@@ -2906,12 +3060,10 @@ class _StorePulseMetric extends StatelessWidget {
                         child: SizedBox(
                           height: MediaQuery.textScalerOf(context).scale(28),
                           child: Center(
-                            child: AnimatedSwitcher(
-                              duration: MediaQuery.disableAnimationsOf(context)
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 180),
+                            child: _StoreValueMotion(
+                              value: value,
+                              motionKey: Key('$keyName-value-motion'),
                               child: Tooltip(
-                                key: ValueKey(value),
                                 message: value,
                                 child: LayoutBuilder(
                                   builder: (context, constraints) {
@@ -2977,7 +3129,7 @@ class _StorePulseMetric extends StatelessWidget {
                     contextLabel,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      color: MoolColors.muted,
+                      color: Color(0xFFDADAF5),
                       fontSize: 10,
                     ),
                   ),
@@ -2986,7 +3138,7 @@ class _StorePulseMetric extends StatelessWidget {
                     label,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      color: MoolColors.navy,
+                      color: Colors.white,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -3101,8 +3253,8 @@ class _StoreActivityDeck extends StatelessWidget {
             _StoreReadyActivity() => 230.0,
             _IncomingOrderActivityCard() =>
               largeText
-                  ? 350.0 + session.workspacePackingLines.length * 48
-                  : 272.0 + session.workspacePackingLines.length * 36,
+                  ? 386.0 + session.workspacePackingLines.length * 48
+                  : 308.0 + session.workspacePackingLines.length * 36,
             _PackingActivityCard() => largeText ? 480.0 : 410.0,
             _PickupReadyActivityCard() => 300.0,
             _InvoiceReadyActivityCard() => 350.0,
@@ -3114,7 +3266,11 @@ class _StoreActivityDeck extends StatelessWidget {
               Flexible(
                 child: SizedBox(
                   height: desiredHeight.clamp(0, constraints.maxHeight),
-                  child: _ActivityDeckShell(child: content),
+                  child: _ActivityDeckShell(
+                    state:
+                        '${selectedOrder?.id}:${selectedOrder?.stage}:${content.runtimeType}',
+                    child: content,
+                  ),
                 ),
               ),
               if (reviewedOrder == null &&
@@ -3211,19 +3367,42 @@ class _StoreRecentSale extends StatelessWidget {
 }
 
 class _ActivityDeckShell extends StatelessWidget {
-  const _ActivityDeckShell({required this.child});
+  const _ActivityDeckShell({required this.child, required this.state});
   final Widget child;
+  final String state;
   @override
   Widget build(BuildContext context) => Material(
     color: Colors.white,
-    elevation: 1,
-    shadowColor: const Color(0x12000080),
+    elevation: 3,
+    shadowColor: const Color(0x24000080),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(16),
-      side: const BorderSide(color: Color(0xFFE1E5EF)),
+      side: const BorderSide(color: Color(0xFFCCD2ED)),
     ),
     clipBehavior: Clip.antiAlias,
-    child: child,
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        child,
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: IgnorePointer(
+            child: ExcludeSemantics(
+              child: _StoreValueMotion(
+                value: state,
+                motionKey: const Key('work-store-state-motion'),
+                child: const SizedBox(
+                  height: 3,
+                  child: ColoredBox(color: MoolColors.navy),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
@@ -3380,7 +3559,7 @@ class _IncomingOrderActivityCard extends StatelessWidget {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
             color: const Color(0xFFF3F5FD),
             child: _StoreScaledPair(
               gap: 5,
@@ -3403,13 +3582,35 @@ class _IncomingOrderActivityCard extends StatelessWidget {
               ),
               second: session.workspaceOrderActionDeadline == null
                   ? const SizedBox.shrink()
-                  : _LiveCountdownText(
-                      deadline: session.workspaceOrderActionDeadline,
-                      fallback: 'Review now',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: MoolColors.navy,
+                  : TextButton(
+                      key: const Key('work-order-more-time'),
+                      onPressed: session.busy
+                          ? null
+                          : () => _showOrderTimeRequest(context, session),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _LiveCountdownText(
+                            deadline: session.workspaceOrderActionDeadline,
+                            fallback: 'Review now',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: MoolColors.navy,
+                            ),
+                          ),
+                          Text(
+                            session.hasPendingOrderTime
+                                ? 'Check request'
+                                : 'More time',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                        ],
                       ),
                     ),
             ),
@@ -3439,7 +3640,7 @@ class _IncomingOrderActivityCard extends StatelessWidget {
             ),
           ),
           _OrderDecisionButtons(
-            busy: session.busy,
+            busy: session.busy || session.hasPendingOrderTime,
             onAccept: () => _advanceDeskOrder(session),
             onReject: onReject,
           ),
@@ -3447,6 +3648,158 @@ class _IncomingOrderActivityCard extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
+  final orderId = session.currentWorkspaceOrderId;
+  var minutes = session.pendingOrderTimeMinutes ?? 2;
+  String? feedback;
+  var confirmed = false;
+  return showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (context, setSheetState) => AnimatedBuilder(
+        animation: session,
+        builder: (context, _) => SafeArea(
+          top: false,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * .72,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              child: Column(
+                key: const Key('work-order-time-sheet'),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          confirmed ? 'Time confirmed' : 'More time',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: MoolColors.navy,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close, color: MoolColors.navy),
+                      ),
+                    ],
+                  ),
+                  if (confirmed) ...[
+                    for (final value in [
+                      (
+                        'Accept by',
+                        session.currentWorkspaceOrder?.actionDeadline,
+                      ),
+                      (
+                        session.currentWorkspaceOrder?.needsDelivery == true
+                            ? 'Delivery by'
+                            : 'Ready by',
+                        session.currentWorkspaceOrder?.fulfilmentDeadline,
+                      ),
+                    ])
+                      if (value.$2 != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Text(
+                            '${value.$1} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(value.$2!.toLocal()))}',
+                            style: const TextStyle(
+                              color: MoolColors.navy,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                  ] else ...[
+                    const Text(
+                      'The current time applies until your request is confirmed.',
+                      style: TextStyle(color: MoolColors.muted),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 6,
+                      children: [
+                        for (final choice in [2, 5])
+                          ChoiceChip(
+                            label: Text('+$choice min'),
+                            selected: minutes == choice,
+                            onSelected:
+                                session.busy || session.hasPendingOrderTime
+                                ? null
+                                : (_) => setSheetState(() => minutes = choice),
+                          ),
+                      ],
+                    ),
+                    if (!session.orderTimeServiceAvailable)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'Cannot request more time right now. The current time still applies.',
+                          style: TextStyle(color: MoolColors.navy),
+                        ),
+                      ),
+                    if (feedback != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            feedback!,
+                            style: const TextStyle(color: MoolColors.navy),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    FilledButton(
+                      key: const Key('work-order-time-request'),
+                      style: FilledButton.styleFrom(
+                        disabledForegroundColor: MoolColors.navy,
+                        disabledBackgroundColor: const Color(0xFFE6E9F2),
+                      ),
+                      onPressed:
+                          session.busy ||
+                              !session.orderTimeServiceAvailable ||
+                              orderId == null
+                          ? null
+                          : () async {
+                              final result = await session
+                                  .requestWorkspaceOrderTime(orderId, minutes);
+                              if (!sheetContext.mounted) return;
+                              final message =
+                                  session.errorMessage ?? session.noticeMessage;
+                              session.dismissMessages();
+                              setSheetState(() {
+                                confirmed = result;
+                                feedback = message;
+                              });
+                            },
+                      child: Text(
+                        session.busy
+                            ? 'Checking request…'
+                            : session.hasPendingOrderTime
+                            ? 'Retry request'
+                            : 'Request time',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _StoreScaledPair extends StatelessWidget {
@@ -3787,7 +4140,7 @@ class _StoreOrderDetails extends StatelessWidget {
         const Divider(height: 1),
         if (awaiting)
           _OrderDecisionButtons(
-            busy: session.busy,
+            busy: session.busy || session.hasPendingOrderTime,
             onAccept: () {
               final previous = session.workspaceOrderStage;
               _advanceDeskOrder(session, expectedOrderId: order.id);
@@ -4309,175 +4662,182 @@ Future<void> _showWorkspaceInvoiceSheet(
       '${invoice.items}\nTotal ₹${invoice.amount} · ${invoice.payment}';
   String? shareError;
   var openingWhatsApp = false;
-  await showModalBottomSheet<void>(
+  ModalRoute<bool>? invoiceSheetRoute;
+  final openChat = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (sheetContext) => StatefulBuilder(
-      builder: (sheetContext, updateSheet) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Send customer invoice',
-                        style: TextStyle(
-                          color: MoolColors.navy,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Close invoice',
-                      onPressed: () => Navigator.of(sheetContext).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                Text(
-                  '${invoice.id} · ${invoice.customer}',
-                  style: const TextStyle(color: MoolColors.muted),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: EdgeInsets.all(
-                    MediaQuery.textScalerOf(sheetContext).scale(1) > 1.5
-                        ? 8
-                        : 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF4F6FF),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    builder: (sheetContext) {
+      invoiceSheetRoute = ModalRoute.of<bool>(sheetContext);
+      return StatefulBuilder(
+        builder: (sheetContext, updateSheet) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
                     children: [
-                      _StoreMoneyText(
-                        '₹${_formatStoreAmount(invoice.amount)}',
-                        style: const TextStyle(
-                          color: MoolColors.navy,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
+                      const Expanded(
+                        child: Text(
+                          'Send customer invoice',
+                          style: TextStyle(
+                            color: MoolColors.navy,
+                            fontSize: 21,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
-                      Text(invoice.items),
-                      Text(
-                        invoice.payment,
-                        style: const TextStyle(color: MoolColors.muted),
+                      IconButton(
+                        tooltip: 'Close invoice',
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: const Icon(Icons.close_rounded),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Choose the customer’s preferred channel, then send the invoice there.',
-                  style: TextStyle(color: MoolColors.muted, height: 1.35),
-                ),
-                if (shareError != null) ...[
-                  const SizedBox(height: 8),
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      shareError!,
-                      key: const Key('work-invoice-share-error'),
-                      style: const TextStyle(color: MoolColors.navy),
+                  Text(
+                    '${invoice.id} · ${invoice.customer}',
+                    style: const TextStyle(color: MoolColors.muted),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: EdgeInsets.all(
+                      MediaQuery.textScalerOf(sheetContext).scale(1) > 1.5
+                          ? 8
+                          : 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF4F6FF),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _StoreMoneyText(
+                          '₹${_formatStoreAmount(invoice.amount)}',
+                          style: const TextStyle(
+                            color: MoolColors.navy,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(invoice.items),
+                        Text(
+                          invoice.payment,
+                          style: const TextStyle(color: MoolColors.muted),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  key: const Key('work-invoice-share-chat'),
-                  onPressed: () {
-                    Navigator.of(sheetContext).pop();
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      router.push(
-                        Uri(
-                          path: '/app/chat/inbox',
-                          queryParameters: {
-                            'type': 'business',
-                            'return': returnRoute,
-                            'recipient': invoice.customer,
-                            'draft': message,
-                          },
-                        ).toString(),
-                      );
-                    });
-                  },
-                  icon: const Icon(Icons.chat_bubble_outline_rounded),
-                  label: const Text('Send in MoolSocial Chat'),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  key: const Key('work-invoice-share-whatsapp'),
-                  onPressed: openingWhatsApp
-                      ? null
-                      : () async {
-                          final digits = invoice.customer.replaceAll(
-                            RegExp(r'\D'),
-                            '',
-                          );
-                          final mobile = digits.length == 10
-                              ? '91$digits'
-                              : digits;
-                          if (!RegExp(r'^91[6-9]\d{9}$').hasMatch(mobile)) {
-                            updateSheet(() {
-                              shareError =
-                                  'This invoice needs a valid customer phone number for WhatsApp. You can send it in MoolSocial Chat.';
-                            });
-                            return;
-                          }
-                          updateSheet(() {
-                            shareError = null;
-                            openingWhatsApp = true;
-                          });
-                          try {
-                            final opened = await launchUrl(
-                              Uri.https('wa.me', '/$mobile', {'text': message}),
-                              mode: LaunchMode.externalApplication,
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Choose the customer’s preferred channel, then send the invoice there.',
+                    style: TextStyle(color: MoolColors.muted, height: 1.35),
+                  ),
+                  if (shareError != null) ...[
+                    const SizedBox(height: 8),
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        shareError!,
+                        key: const Key('work-invoice-share-error'),
+                        style: const TextStyle(color: MoolColors.navy),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    key: const Key('work-invoice-share-chat'),
+                    onPressed: () => Navigator.of(sheetContext).pop(true),
+                    icon: const Icon(Icons.chat_bubble_outline_rounded),
+                    label: const Text('Send in MoolSocial Chat'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    key: const Key('work-invoice-share-whatsapp'),
+                    onPressed: openingWhatsApp
+                        ? null
+                        : () async {
+                            final digits = invoice.customer.replaceAll(
+                              RegExp(r'\D'),
+                              '',
                             );
-                            if (!sheetContext.mounted) return;
-                            if (opened) {
-                              Navigator.of(sheetContext).pop();
-                              session.showNotice(
-                                'Invoice opened in WhatsApp. Complete sending it there.',
+                            final mobile = digits.length == 10
+                                ? '91$digits'
+                                : digits;
+                            if (!RegExp(r'^91[6-9]\d{9}$').hasMatch(mobile)) {
+                              updateSheet(() {
+                                shareError =
+                                    'This invoice needs a valid customer phone number for WhatsApp. You can send it in MoolSocial Chat.';
+                              });
+                              return;
+                            }
+                            updateSheet(() {
+                              shareError = null;
+                              openingWhatsApp = true;
+                            });
+                            try {
+                              final opened = await launchUrl(
+                                Uri.https('wa.me', '/$mobile', {
+                                  'text': message,
+                                }),
+                                mode: LaunchMode.externalApplication,
                               );
-                            } else {
-                              updateSheet(() {
-                                shareError =
-                                    'WhatsApp could not open. Try again or use MoolSocial Chat.';
-                              });
+                              if (!sheetContext.mounted) return;
+                              if (opened) {
+                                Navigator.of(sheetContext).pop();
+                                session.showNotice(
+                                  'Invoice opened in WhatsApp. Complete sending it there.',
+                                );
+                              } else {
+                                updateSheet(() {
+                                  shareError =
+                                      'WhatsApp could not open. Try again or use MoolSocial Chat.';
+                                });
+                              }
+                            } on Object {
+                              if (sheetContext.mounted) {
+                                updateSheet(() {
+                                  shareError =
+                                      'WhatsApp could not open. Try again or use MoolSocial Chat.';
+                                });
+                              }
+                            } finally {
+                              if (sheetContext.mounted) {
+                                updateSheet(() => openingWhatsApp = false);
+                              }
                             }
-                          } on Object {
-                            if (sheetContext.mounted) {
-                              updateSheet(() {
-                                shareError =
-                                    'WhatsApp could not open. Try again or use MoolSocial Chat.';
-                              });
-                            }
-                          } finally {
-                            if (sheetContext.mounted) {
-                              updateSheet(() => openingWhatsApp = false);
-                            }
-                          }
-                        },
-                  icon: const Icon(Icons.send_outlined),
-                  label: const Text('Send on WhatsApp'),
-                ),
-              ],
+                          },
+                    icon: const Icon(Icons.send_outlined),
+                    label: const Text('Send on WhatsApp'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    ),
+      );
+    },
+  );
+  if (openChat != true) return;
+  // Finish removing the sheet before opening the customer's draft. A frame
+  // callback can race its exit transition and leave Back on the wrong surface.
+  await invoiceSheetRoute?.completed;
+  if (!context.mounted) return;
+  router.push(
+    Uri(
+      path: '/app/chat/inbox',
+      queryParameters: {
+        'type': 'business',
+        'return': returnRoute,
+        'recipient': invoice.customer,
+        'draft': message,
+      },
+    ).toString(),
   );
 }
 
@@ -5532,11 +5892,16 @@ class _LiveCountdownTextState extends State<_LiveCountdownText>
           ? 'Time ended'
           : '${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
     }
-    return Text(
-      label,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: widget.style,
+    return _StoreValueMotion(
+      value: label,
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: widget.style.copyWith(
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      ),
     );
   }
 }
@@ -12840,6 +13205,8 @@ class _DeliveryDestinationSurface extends StatelessWidget {
         ),
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
         child: _ActivityDeckShell(
+          state:
+              '${session.currentWorkspaceOrderId}:${session.workspaceOrderStage}',
           child: _DeliveryActivityCard(session: session),
         ),
       );

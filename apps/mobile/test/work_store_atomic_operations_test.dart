@@ -5,6 +5,29 @@ import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 
+class _OrderTimeGateway extends ReviewWorkGateway
+    implements WorkOrderTimeGateway {
+  final requests = <WorkOrderTimeRequest>[];
+  Future<WorkOrderTimeResult> Function(WorkOrderTimeRequest)? respond;
+  WorkOrderTimeResult approval(WorkOrderTimeRequest r) => WorkOrderTimeResult(
+    workspaceId: r.workspaceId,
+    orderId: r.orderId,
+    operationId: r.operationId,
+    approved: true,
+    acceptanceDeadline: r.expectedAcceptanceDeadline.add(
+      Duration(minutes: r.additionalMinutes),
+    ),
+    fulfilmentDeadline: r.expectedAcceptanceDeadline.add(
+      const Duration(minutes: 18),
+    ),
+  );
+  @override
+  Future<WorkOrderTimeResult> requestOrderTime(WorkOrderTimeRequest request) {
+    requests.add(request);
+    return respond?.call(request) ?? Future.value(approval(request));
+  }
+}
+
 void main() {
   WorkSession liveSession([ReviewWorkGateway? gateway]) {
     final session = WorkSession(gateway: gateway ?? ReviewWorkGateway())
@@ -20,6 +43,232 @@ void main() {
     addTearDown(session.dispose);
     return session;
   }
+
+  WorkSession timingSession(ReviewWorkGateway gateway) {
+    final session = liveSession(gateway);
+    session.workspaceCatalogueItems.add(_product(stock: 10));
+    session.workspaceOrders.add(
+      WorkspaceOrderRecord(
+        id: 'timing-order',
+        customer: 'Asha',
+        items: 'Atta',
+        quantities: {'atta-5kg': 1},
+        amount: 250,
+        source: 'App',
+        fulfilment: 'Mool delivery',
+        payment: 'Paid online',
+        address: 'Market road',
+        stage: 'Confirmed',
+        needsDelivery: true,
+        createdAt: DateTime.now(),
+        actionDeadline: DateTime.now().add(const Duration(seconds: 60)),
+      ),
+    );
+    expect(session.selectWorkspaceOrder('timing-order'), isTrue);
+    return session;
+  }
+
+  test(
+    'Order time missing service cannot change or publish a deadline',
+    () async {
+      final session = timingSession(ReviewWorkGateway());
+      final before = session.currentWorkspaceOrder;
+      expect(
+        await session.requestWorkspaceOrderTime('timing-order', 2),
+        isFalse,
+      );
+      expect(session.currentWorkspaceOrder, same(before));
+      expect(session.hasPendingOrderTime, isFalse);
+      expect(session.errorMessage, contains('current time still applies'));
+    },
+  );
+
+  test(
+    'Order time waits for authority and blocks duplicate state actions',
+    () async {
+      final gateway = _OrderTimeGateway();
+      final completer = Completer<WorkOrderTimeResult>();
+      gateway.respond = (_) => completer.future;
+      final session = timingSession(gateway);
+      final original = session.currentWorkspaceOrder!.actionDeadline;
+      final pending = session.requestWorkspaceOrderTime('timing-order', 2);
+      expect(session.busy, isTrue);
+      expect(session.currentWorkspaceOrder!.actionDeadline, original);
+      expect(
+        await session.requestWorkspaceOrderTime('timing-order', 5),
+        isFalse,
+      );
+      session.advanceWorkspaceOrder();
+      session.cancelWorkspaceOrder();
+      expect(session.workspaceOrderStage, 'Confirmed');
+      expect(session.workspaceCatalogueItems.single.stock, 10);
+      expect(gateway.requests, hasLength(1));
+      final result = gateway.approval(gateway.requests.single);
+      completer.complete(result);
+      expect(await pending, isTrue);
+      expect(session.hasPendingOrderTime, isFalse);
+      expect(
+        session.currentWorkspaceOrder!.actionDeadline,
+        result.acceptanceDeadline,
+      );
+      session.advanceWorkspaceOrder();
+      expect(session.workspaceOrderStage, 'Preparing');
+      expect(session.workspaceOrderActionDeadline, result.fulfilmentDeadline);
+      expect(session.workspaceInvoices, isEmpty);
+    },
+  );
+
+  test(
+    'Order time rejection leaves the original time and no fake approval',
+    () async {
+      final gateway = _OrderTimeGateway();
+      gateway.respond = (r) async => WorkOrderTimeResult(
+        workspaceId: r.workspaceId,
+        orderId: r.orderId,
+        operationId: r.operationId,
+        approved: false,
+      );
+      final session = timingSession(gateway);
+      final before = session.currentWorkspaceOrder;
+      expect(
+        await session.requestWorkspaceOrderTime('timing-order', 2),
+        isFalse,
+      );
+      expect(session.currentWorkspaceOrder, same(before));
+      expect(session.hasPendingOrderTime, isFalse);
+      expect(session.errorMessage, contains('not approved'));
+    },
+  );
+
+  test(
+    'Order time uncertain retry reuses the original operation and minutes',
+    () async {
+      final gateway = _OrderTimeGateway();
+      gateway.respond = (_) async => throw StateError('lost connection');
+      final session = timingSession(gateway);
+      final before = session.currentWorkspaceOrder;
+      expect(
+        await session.requestWorkspaceOrderTime('timing-order', 2),
+        isFalse,
+      );
+      expect(session.hasPendingOrderTime, isTrue);
+      expect(session.currentWorkspaceOrder, same(before));
+      final first = gateway.requests.single;
+      gateway.respond = (r) async => gateway.approval(r);
+      expect(
+        await session.requestWorkspaceOrderTime('timing-order', 5),
+        isTrue,
+      );
+      expect(gateway.requests.last, same(first));
+      expect(gateway.requests.last.additionalMinutes, 2);
+    },
+  );
+
+  for (final mismatch in [
+    'order',
+    'store',
+    'operation',
+    'expired',
+    'tooLong',
+    'fulfilment',
+  ]) {
+    test('Order time rejects mismatched or invalid $mismatch result', () async {
+      final gateway = _OrderTimeGateway();
+      gateway.respond = (r) async => WorkOrderTimeResult(
+        workspaceId: mismatch == 'store' ? 'other-store' : r.workspaceId,
+        orderId: mismatch == 'order' ? 'other-order' : r.orderId,
+        operationId: mismatch == 'operation'
+            ? 'other-operation'
+            : r.operationId,
+        approved: true,
+        acceptanceDeadline: mismatch == 'expired'
+            ? DateTime.now().subtract(const Duration(seconds: 1))
+            : r.expectedAcceptanceDeadline.add(
+                Duration(minutes: mismatch == 'tooLong' ? 20 : 2),
+              ),
+        fulfilmentDeadline: mismatch == 'fulfilment'
+            ? r.expectedAcceptanceDeadline
+            : r.expectedAcceptanceDeadline.add(const Duration(minutes: 25)),
+      );
+      final session = timingSession(gateway);
+      final before = session.currentWorkspaceOrder;
+      expect(
+        await session.requestWorkspaceOrderTime('timing-order', 2),
+        isFalse,
+      );
+      expect(session.currentWorkspaceOrder, same(before));
+      expect(session.hasPendingOrderTime, isTrue);
+      expect(session.workspaceInvoices, isEmpty);
+    });
+  }
+
+  test('Order time late response cannot update a different store', () async {
+    final gateway = _OrderTimeGateway();
+    final completer = Completer<WorkOrderTimeResult>();
+    gateway.respond = (_) => completer.future;
+    final session = timingSession(gateway);
+    final pending = session.requestWorkspaceOrderTime('timing-order', 2);
+    final request = gateway.requests.single;
+    session.activeWorkspace = const WorkWorkspace(
+      id: 'other-store',
+      name: 'Other',
+      profileLabel: 'Retail',
+      profileId: 'retailer-speciality',
+      area: 'Market',
+      verified: true,
+    );
+    completer.complete(gateway.approval(request));
+    expect(await pending, isFalse);
+    expect(session.workspaceOrders, isEmpty);
+    expect(session.workspaceOrderActionDeadline, isNull);
+    expect(session.hasPendingOrderTime, isFalse);
+  });
+
+  test('Order time old control cannot extend a deadline locally', () async {
+    final session = timingSession(ReviewWorkGateway());
+    final before = session.currentWorkspaceOrder;
+    session.extendWorkspaceOrder(10);
+    await Future<void>.delayed(Duration.zero);
+    expect(session.currentWorkspaceOrder, same(before));
+    expect(session.workspaceOrderExtraMinutes, 0);
+  });
+
+  test('Order time expired or wrong order cannot create a request', () async {
+    final gateway = _OrderTimeGateway();
+    final session = timingSession(gateway);
+    expect(
+      await session.requestWorkspaceOrderTime('another-order', 2),
+      isFalse,
+    );
+    final expired = session.currentWorkspaceOrder!.copyWith(
+      actionDeadline: DateTime.now().subtract(const Duration(seconds: 1)),
+    );
+    session.workspaceOrders[0] = expired;
+    session.workspaceOrderActionDeadline = expired.actionDeadline;
+    expect(await session.requestWorkspaceOrderTime('timing-order', 2), isFalse);
+    expect(gateway.requests, isEmpty);
+    expect(session.currentWorkspaceOrder, same(expired));
+  });
+
+  test(
+    'Order time stale stage cannot be overwritten by a late reply',
+    () async {
+      final gateway = _OrderTimeGateway();
+      final completer = Completer<WorkOrderTimeResult>();
+      gateway.respond = (_) => completer.future;
+      final session = timingSession(gateway);
+      final pending = session.requestWorkspaceOrderTime('timing-order', 2);
+      final changed = session.currentWorkspaceOrder!.copyWith(
+        stage: 'Cancelled',
+      );
+      session.workspaceOrders[0] = changed;
+      session.workspaceOrderStage = 'Cancelled';
+      completer.complete(gateway.approval(gateway.requests.single));
+      expect(await pending, isFalse);
+      expect(session.currentWorkspaceOrder, same(changed));
+      expect(session.workspaceOrderStage, 'Cancelled');
+    },
+  );
 
   test('orders reserve stock once and cancellation restores it', () async {
     final gateway = ReviewWorkGateway();

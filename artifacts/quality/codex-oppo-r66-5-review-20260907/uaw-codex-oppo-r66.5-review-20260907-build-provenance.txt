@@ -1,0 +1,3 @@
+BuildState=pending
+CandidateId=UAW-CODEX-OPPO-R66.5-REVIEW-20260907
+No APK has been built for this candidate.

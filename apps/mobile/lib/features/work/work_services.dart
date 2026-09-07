@@ -456,6 +456,40 @@ class WorkDeliveryAssignmentResult {
   final String stage;
 }
 
+/// Optional authenticated timing adapter. A request is not an order acceptance.
+/// Implementations must reconcile repeated operation IDs and validate the
+/// expected deadline, order state, store permission and current store workload.
+abstract interface class WorkOrderTimeGateway {
+  Future<WorkOrderTimeResult> requestOrderTime(WorkOrderTimeRequest request);
+}
+
+class WorkOrderTimeRequest {
+  const WorkOrderTimeRequest({
+    required this.workspaceId,
+    required this.orderId,
+    required this.operationId,
+    required this.expectedAcceptanceDeadline,
+    required this.additionalMinutes,
+  });
+  final String workspaceId, orderId, operationId;
+  final DateTime expectedAcceptanceDeadline;
+  final int additionalMinutes;
+}
+
+class WorkOrderTimeResult {
+  const WorkOrderTimeResult({
+    required this.workspaceId,
+    required this.orderId,
+    required this.operationId,
+    required this.approved,
+    this.acceptanceDeadline,
+    this.fulfilmentDeadline,
+  });
+  final String workspaceId, orderId, operationId;
+  final bool approved;
+  final DateTime? acceptanceDeadline, fulfilmentDeadline;
+}
+
 abstract interface class WorkGateway {
   Future<List<WorkReviewResult>> loadFeed();
   Future<String> apply(String opportunityId);

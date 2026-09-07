@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/core/design/mool_design_system.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
@@ -15,6 +16,31 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/widgets/work_widgets.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+
+class _TimingFixtureGateway extends ReviewWorkGateway
+    implements WorkOrderTimeGateway {
+  final requests = <WorkOrderTimeRequest>[];
+  Future<WorkOrderTimeResult> Function(WorkOrderTimeRequest)? respond;
+  @override
+  Future<WorkOrderTimeResult> requestOrderTime(
+    WorkOrderTimeRequest request,
+  ) async {
+    requests.add(request);
+    if (respond != null) return respond!(request);
+    return WorkOrderTimeResult(
+      workspaceId: request.workspaceId,
+      orderId: request.orderId,
+      operationId: request.operationId,
+      approved: true,
+      acceptanceDeadline: request.expectedAcceptanceDeadline.add(
+        Duration(minutes: request.additionalMinutes),
+      ),
+      fulfilmentDeadline: request.expectedAcceptanceDeadline.add(
+        const Duration(minutes: 18),
+      ),
+    );
+  }
+}
 
 const _collectionFixtureToken = 'mool-collection-review-order-1043';
 
@@ -297,8 +323,8 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  WorkSession storeViewFixture() {
-    final work = WorkSession()
+  WorkSession storeViewFixture([WorkGateway? gateway]) {
+    final work = WorkSession(gateway: gateway)
       ..seedVerifiedWorkspace()
       ..retailerSetupSaved = true
       ..reviewStage = WorkReviewStage.live
@@ -4702,6 +4728,340 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final display in [
+    (412.0, 915.0, 1.0),
+    (320.0, 640.0, 2.0),
+    (320.0, 568.0, 1.4),
+  ]) {
+    for (final reduced in [false, true]) {
+      testWidgets(
+        'Store finish confirmed figures and stable actions $display reduced=$reduced',
+        (tester) async {
+          tester.platformDispatcher.accessibilityFeaturesTestValue =
+              FakeAccessibilityFeatures(disableAnimations: reduced);
+          addTearDown(
+            tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+          );
+          final work = storeViewFixture();
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: Size(display.$1, display.$2),
+            textScale: display.$3,
+            bottomInset: 34,
+          );
+          final metric = find.byKey(const Key('work-pulse-sales'));
+          Finder renderedLabel(String label) => find.descendant(
+            of: metric,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Text &&
+                  widget.data?.replaceAll(RegExp(r'\s+'), '') ==
+                      label.replaceAll(RegExp(r'\s+'), ''),
+            ),
+          );
+          final motion = find.byKey(const Key('work-pulse-sales-value-motion'));
+          final action = find.byKey(const Key('work-activity-order-accept'));
+          final metricBounds = tester.getRect(metric);
+          final actionBounds = tester.getRect(action);
+          double displacement() =>
+              tester.widget<Transform>(motion).transform.entry(1, 3);
+          expect(displacement(), 0);
+          final band = tester.widget<Material>(
+            find.byKey(const Key('work-store-finance-material')),
+          );
+          final surface = band.color!;
+          expect(surface, MoolColors.navy);
+          for (final label in ['₹28,450', 'Sales today', 'View statement']) {
+            final text = renderedLabel(label);
+            final paragraph = find.descendant(
+              of: text,
+              matching: find.byType(RichText),
+            );
+            final color = tester.widget<RichText>(paragraph).text.style!.color!;
+            final light = color.computeLuminance();
+            final dark = surface.computeLuminance();
+            expect((light + .05) / (dark + .05), greaterThan(4.6));
+          }
+          final control = tester.widget<InkWell>(metric);
+          expect(
+            control.overlayColor!.resolve({WidgetState.pressed}),
+            Colors.white24,
+          );
+          if (reduced) expect(control.splashFactory, NoSplash.splashFactory);
+          final pressedSurface = Color.alphaBlend(Colors.white24, surface);
+          expect(
+            (const Color(0xFFDADAF5).computeLuminance() + .05) /
+                (pressedSurface.computeLuminance() + .05),
+            greaterThan(4.6),
+          );
+          final press = await tester.startGesture(tester.getCenter(metric));
+          await tester.pump(const Duration(milliseconds: 90));
+          await captureStoreView(
+            tester,
+            'finish-pressed-${display.$1}-${display.$3}-$reduced',
+          );
+          await press.cancel();
+          await tester.pumpAndSettle();
+          expect(work.currentWorkspaceOrderId, 'APP-1043');
+          work.workspaceSalesToday = 28550;
+          work.setWorkspaceMoneyPeriod('Today');
+          await tester.pump();
+          expect(renderedLabel('₹28,550'), findsOneWidget);
+          expect(renderedLabel('₹28,450'), findsNothing);
+          expect(displacement(), reduced ? 0 : greaterThan(0));
+          expect(tester.widget<Transform>(motion).transformHitTests, isFalse);
+          expect(tester.getRect(metric), metricBounds);
+          expect(tester.getRect(action), actionBounds);
+          await tester.pump(const Duration(milliseconds: 90));
+          await captureStoreView(
+            tester,
+            'finish-motion-${display.$1}-${display.$3}-$reduced',
+          );
+          work.workspaceSalesToday = 28700;
+          work.setWorkspaceMoneyPeriod('Today');
+          await tester.pump();
+          expect(renderedLabel('₹28,700'), findsOneWidget);
+          expect(renderedLabel('₹28,550'), findsNothing);
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(displacement(), 0);
+          expect(work.currentWorkspaceOrderId, 'APP-1043');
+          expect(work.workspaceOrderStage, 'Confirmed');
+          expect(tester.getRect(action), actionBounds);
+          work.setWorkspaceMoneyPeriod('Today');
+          await tester.pump();
+          expect(
+            displacement(),
+            0,
+            reason: 'Unchanged data must not replay motion',
+          );
+          await captureStoreView(
+            tester,
+            'finish-dashboard-${display.$1}-${display.$3}-$reduced',
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets('Store finish background and first tap continuity $display', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+        bottomInset: 34,
+      );
+      final motion = find.byKey(const Key('work-pulse-sales-value-motion'));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      work.workspaceSalesToday = 30000;
+      work.setWorkspaceMoneyPeriod('Today');
+      await tester.pump();
+      expect(tester.widget<Transform>(motion).transform.entry(1, 3), 0);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(tester.widget<Transform>(motion).transform.entry(1, 3), 0);
+      await tester.tap(find.byKey(const Key('work-pulse-sales')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
+      final selected = find.byKey(const Key('work-shortcut-statement'));
+      final button = tester.widget<TextButton>(selected);
+      expect(button.onPressed, isNull);
+      expect(
+        button.style!.backgroundColor!.resolve({WidgetState.disabled}),
+        MoolColors.navy,
+      );
+      final selectedText = tester.widget<Text>(
+        find.descendant(of: selected, matching: find.byType(Text)),
+      );
+      expect(selectedText.style!.color, Colors.white);
+      await captureStoreView(
+        tester,
+        'finish-statement-${display.$1}-${display.$3}',
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      await tester.tap(find.byKey(const Key('work-pulse-dues')));
+      await tester.pumpAndSettle();
+      final workingSurface = tester.widget<Material>(
+        find.byKey(const Key('work-first-tap-working-surface')),
+      );
+      expect(workingSurface.color, Colors.white);
+      for (final label in ['Collect dues', 'Meena']) {
+        final text = find.descendant(
+          of: find.byKey(const Key('work-store-dues')),
+          matching: find.text(label),
+        );
+        final paragraph = find.descendant(
+          of: text,
+          matching: find.byType(RichText),
+        );
+        expect(
+          tester.widget<RichText>(paragraph).text.style!.color,
+          MoolColors.ink,
+        );
+      }
+      await captureStoreView(tester, 'finish-dues-${display.$1}-${display.$3}');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Order time UI unavailable and Back $display', (tester) async {
+      final work = storeViewFixture();
+      final before = work.currentWorkspaceOrder;
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+        bottomInset: 24,
+      );
+      await captureStoreView(
+        tester,
+        'time-dashboard-${display.$1}-${display.$3}',
+      );
+      if (display.$3 == 1) {
+        expect(find.text('Aashirvaad Atta').hitTestable(), findsOneWidget);
+      }
+      await tester.tap(find.byKey(const Key('work-order-more-time')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-order-time-sheet')), findsOneWidget);
+      expect(
+        find.text(
+          'Cannot request more time right now. The current time still applies.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('work-order-time-request')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
+      await captureStoreView(
+        tester,
+        'time-unavailable-${display.$1}-${display.$3}',
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(work.currentWorkspaceOrder, same(before));
+      expect(find.byKey(const Key('work-order-time-sheet')), findsNothing);
+    });
+
+    testWidgets('Order time UI request confirmation $display', (tester) async {
+      final gateway = _TimingFixtureGateway();
+      final work = storeViewFixture(gateway);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+        bottomInset: 24,
+      );
+      await tester.tap(find.byKey(const Key('work-order-more-time')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('work-order-time-request')),
+      );
+      await tester.tap(find.byKey(const Key('work-order-time-request')));
+      await tester.pumpAndSettle();
+      expect(find.text('Time confirmed'), findsOneWidget);
+      expect(gateway.requests, hasLength(1));
+      expect(work.currentWorkspaceOrder!.fulfilmentDeadline, isNotNull);
+      expect(work.workspaceOrderStage, 'Confirmed');
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(
+        tester,
+        'time-confirmed-${display.$1}-${display.$3}',
+      );
+    });
+  }
+
+  testWidgets('Order time UI uncertain retry and request identity', (
+    tester,
+  ) async {
+    final gateway = _TimingFixtureGateway();
+    final pending = Completer<WorkOrderTimeResult>();
+    gateway.respond = (_) => pending.future;
+    final work = storeViewFixture(gateway);
+    final original = work.currentWorkspaceOrder!.actionDeadline;
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+      textScale: 1,
+      bottomInset: 24,
+    );
+    await tester.tap(find.byKey(const Key('work-order-more-time')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-order-time-request')));
+    await tester.pump();
+    expect(find.text('Checking request…'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 400));
+    final pendingText = tester.widget<RichText>(
+      find.descendant(
+        of: find.byKey(const Key('work-order-time-request')),
+        matching: find.byType(RichText),
+      ),
+    );
+    expect(pendingText.text.style?.color, MoolColors.navy);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('work-order-time-request')),
+          )
+          .style!
+          .foregroundColor!
+          .resolve({WidgetState.disabled}),
+      MoolColors.navy,
+    );
+    await captureStoreView(tester, 'time-request-pending');
+    pending.completeError(StateError('network uncertain'));
+    await tester.pumpAndSettle();
+    expect(find.text('Retry request'), findsOneWidget);
+    expect(work.currentWorkspaceOrder!.actionDeadline, original);
+    expect(work.hasPendingOrderTime, isTrue);
+    await captureStoreView(tester, 'time-retry');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('work-activity-order-accept')),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.byKey(const Key('work-order-more-time')));
+    await tester.pumpAndSettle();
+    gateway.respond = null;
+    await tester.tap(find.byKey(const Key('work-order-time-request')));
+    await tester.pumpAndSettle();
+    expect(gateway.requests, hasLength(2));
+    expect(
+      gateway.requests.first.operationId,
+      gateway.requests.last.operationId,
+    );
+    expect(find.text('Time confirmed'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Store View v2 - zero tap working centre', (tester) async {
     await mount(
@@ -9804,7 +10164,10 @@ void main() {
     expect(work.latestWorkspaceInvoice!.sharedChannels, isEmpty);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    await captureStoreView(tester, 'pickup-invoice-chat-back');
     expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+    expect(find.byKey(const Key('chat-inbox-screen')), findsNothing);
+    expect(find.byKey(const Key('work-activity-invoice')), findsOneWidget);
     expect(work.latestWorkspaceInvoice!.needsCustomerHandoff, isTrue);
     expect(work.workspaceInvoices, hasLength(1));
   });

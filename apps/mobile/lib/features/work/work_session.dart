@@ -649,6 +649,138 @@ class WorkSession extends ChangeNotifier {
   _StoreOperationalData _storeData = _StoreOperationalData();
   final Map<String, _StoreOperationalData> _storeDataById = {};
   Object? _busyStoreOperation;
+  WorkOrderTimeRequest? _pendingOrderTime;
+  _StoreOperationalData? _orderTimeData;
+  String? _orderTimeAccountScope;
+
+  bool get hasPendingOrderTime =>
+      _pendingOrderTime != null &&
+      identical(_orderTimeData, _storeData) &&
+      _orderTimeAccountScope == _contactAccountScope &&
+      _pendingOrderTime!.workspaceId == (activeWorkspace?.id ?? workspaceId);
+
+  int? get pendingOrderTimeMinutes =>
+      hasPendingOrderTime ? _pendingOrderTime!.additionalMinutes : null;
+
+  bool get orderTimeServiceAvailable => gateway is WorkOrderTimeGateway;
+
+  Future<bool> requestWorkspaceOrderTime(
+    String orderId,
+    int additionalMinutes,
+  ) async {
+    if (busy) return false;
+    final order = currentWorkspaceOrder;
+    final storeId = activeWorkspace?.id ?? workspaceId;
+    final deadline = order?.actionDeadline;
+    if (order == null ||
+        order.id != orderId ||
+        order.stage != 'Confirmed' ||
+        order.isCustomerCollection ||
+        storeId == null ||
+        deadline == null) {
+      showError('This order has changed. Review its current status.');
+      return false;
+    }
+    if (!hasPendingOrderTime && !{2, 5}.contains(additionalMinutes)) {
+      showError('Choose 2 or 5 additional minutes.');
+      return false;
+    }
+    if (!hasPendingOrderTime && !deadline.isAfter(DateTime.now())) {
+      showError('Acceptance time ended. Wait for the order update.');
+      return false;
+    }
+    if (!orderTimeServiceAvailable) {
+      showError(
+        'Cannot request more time right now. The current time still applies.',
+      );
+      return false;
+    }
+    final request = hasPendingOrderTime
+        ? _pendingOrderTime!
+        : WorkOrderTimeRequest(
+            workspaceId: storeId,
+            orderId: order.id,
+            operationId:
+                'ORDER-TIME-$storeId-${order.id}-${DateTime.now().microsecondsSinceEpoch}',
+            expectedAcceptanceDeadline: deadline,
+            additionalMinutes: additionalMinutes,
+          );
+    if (request.orderId != order.id ||
+        request.expectedAcceptanceDeadline != deadline) {
+      showError('Confirm the previous time request before making another.');
+      return false;
+    }
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    _pendingOrderTime = request;
+    _orderTimeData = data;
+    _orderTimeAccountScope = scope;
+    bool current() =>
+        _isStoreScopeCurrent(data, storeId, scope) &&
+        currentWorkspaceOrderId == request.orderId &&
+        identical(_pendingOrderTime, request);
+    final token = _beginBusyStoreOperation();
+    clearMessages();
+    notifyListeners();
+    try {
+      final result = await (gateway as WorkOrderTimeGateway)
+          .requestOrderTime(request)
+          .timeout(const Duration(seconds: 15));
+      if (!current()) return false;
+      final latest = currentWorkspaceOrder!;
+      if (latest.stage != 'Confirmed' ||
+          latest.actionDeadline != request.expectedAcceptanceDeadline ||
+          result.workspaceId != request.workspaceId ||
+          result.orderId != request.orderId ||
+          result.operationId != request.operationId) {
+        showError('The time request needs an order update. Retry to check it.');
+        return false;
+      }
+      if (!result.approved) {
+        _pendingOrderTime = null;
+        showError(
+          'More time was not approved. The current time still applies.',
+        );
+        return false;
+      }
+      final acceptance = result.acceptanceDeadline;
+      final fulfilment = result.fulfilmentDeadline;
+      if (acceptance == null ||
+          fulfilment == null ||
+          !acceptance.isAfter(DateTime.now()) ||
+          !acceptance.isAfter(request.expectedAcceptanceDeadline) ||
+          acceptance.isAfter(
+            request.expectedAcceptanceDeadline.add(
+              Duration(minutes: request.additionalMinutes),
+            ),
+          ) ||
+          !fulfilment.isAfter(acceptance)) {
+        showError('The updated time is not confirmed. Retry to check it.');
+        return false;
+      }
+      final index = workspaceOrders.indexWhere((item) => item.id == order.id);
+      if (index < 0) return false;
+      workspaceOrders[index] = latest.copyWith(
+        actionDeadline: acceptance,
+        fulfilmentDeadline: fulfilment,
+      );
+      workspaceOrderActionDeadline = acceptance;
+      _pendingOrderTime = null;
+      showNotice(
+        'Time confirmed. Check the updated acceptance and fulfilment times.',
+      );
+      return true;
+    } catch (_) {
+      if (current()) {
+        showError(
+          'The request could not be confirmed. Retry to check the same request.',
+        );
+      }
+      return false;
+    } finally {
+      if (!_disposed) _finishBusyStoreOperation(token);
+    }
+  }
 
   bool _isStoreScopeCurrent(
     _StoreOperationalData data,
@@ -1063,6 +1195,10 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool selectWorkspaceOrder(String orderId) {
+    if (hasPendingOrderTime && currentWorkspaceOrderId != orderId) {
+      showNotice('Confirm the time request before switching orders.');
+      return false;
+    }
     if (currentWorkspaceOrderId != orderId &&
         _collection?.needsReconciliation == true) {
       showNotice('Confirming this collection. Please wait for the update.');
@@ -1674,6 +1810,10 @@ class WorkSession extends ChangeNotifier {
   }
 
   void activateWorkspace(WorkWorkspace workspace) {
+    if (hasPendingOrderTime) {
+      showNotice('Confirm the time request before switching stores.');
+      return;
+    }
     final current = activeWorkspace;
     if (current == null || current.id == workspace.id) return;
     if (_collection?.needsReconciliation == true) {
@@ -1767,6 +1907,10 @@ class WorkSession extends ChangeNotifier {
           'needsDelivery': order.needsDelivery,
           'createdAt': order.createdAt.toUtc().toIso8601String(),
           'actionDeadline': order.actionDeadline?.toUtc().toIso8601String(),
+          if (order.fulfilmentDeadline != null)
+            'fulfilmentDeadline': order.fulfilmentDeadline!
+                .toUtc()
+                .toIso8601String(),
           'extraMinutes': order.extraMinutes,
           'stockReserved': order.stockReserved,
           if (order.isCustomerCollection)
@@ -2210,6 +2354,10 @@ class WorkSession extends ChangeNotifier {
   }
 
   void advanceWorkspaceOrder() {
+    if (hasPendingOrderTime) {
+      showError('Confirm the time request before accepting this order.');
+      return;
+    }
     if (currentWorkspaceOrder?.isCustomerCollection == true) {
       showError('Use the collection card for this paid order.');
       return;
@@ -2253,7 +2401,9 @@ class WorkSession extends ChangeNotifier {
           'retailer-grocery',
           'retailer-speciality',
         }.contains(activeWorkspace?.profileId);
-    final fulfilmentTarget = order.createdAt.add(const Duration(minutes: 10));
+    final fulfilmentTarget =
+        order.fulfilmentDeadline ??
+        order.createdAt.add(const Duration(minutes: 10));
     workspaceOrderActionDeadline = switch (workspaceOrderStage) {
       'Preparing' ||
       'Ready' ||
@@ -2577,29 +2727,16 @@ class WorkSession extends ChangeNotifier {
   }
 
   void extendWorkspaceOrder(int minutes) {
-    workspaceOrderExtraMinutes += minutes;
-    workspaceOrderActionDeadline =
-        (workspaceOrderActionDeadline ?? DateTime.now()).add(
-          Duration(minutes: minutes),
-        );
-    final order = currentWorkspaceOrder;
-    if (order != null) {
-      final index = workspaceOrders.indexWhere((item) => item.id == order.id);
-      if (index >= 0) {
-        workspaceOrders[index] = order.copyWith(
-          extraMinutes: workspaceOrderExtraMinutes,
-          actionDeadline: workspaceOrderActionDeadline,
-        );
-      }
-    }
-    _recordWorkspaceActivity(
-      'Customer preparation estimate extended by $minutes minutes.',
+    unawaited(
+      requestWorkspaceOrderTime(currentWorkspaceOrderId ?? '', minutes),
     );
-    showNotice('Customer preparation estimate updated.');
-    _persistOperationalState('order-time-extended');
   }
 
   void cancelWorkspaceOrder() {
+    if (hasPendingOrderTime) {
+      showError('Confirm the time request before changing this order.');
+      return;
+    }
     final order = _ensureCurrentOrderRecord();
     if (order.stockReserved) _releaseOrderStock(order);
     workspaceOrderStage = 'Cancelled';

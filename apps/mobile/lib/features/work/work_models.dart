@@ -70,6 +70,7 @@ class WorkspaceOrderRecord {
     required this.needsDelivery,
     required this.createdAt,
     this.actionDeadline,
+    this.fulfilmentDeadline,
     this.extraMinutes = 0,
     this.stockReserved = false,
     this.collectionStoreId,
@@ -88,6 +89,7 @@ class WorkspaceOrderRecord {
   final bool needsDelivery;
   final DateTime createdAt;
   final DateTime? actionDeadline;
+  final DateTime? fulfilmentDeadline;
   final int extraMinutes;
   final bool stockReserved;
 
@@ -111,6 +113,7 @@ class WorkspaceOrderRecord {
     String? stage,
     bool? needsDelivery,
     DateTime? actionDeadline,
+    DateTime? fulfilmentDeadline,
     int? extraMinutes,
     bool? stockReserved,
   }) => WorkspaceOrderRecord(
@@ -127,6 +130,7 @@ class WorkspaceOrderRecord {
     needsDelivery: needsDelivery ?? this.needsDelivery,
     createdAt: createdAt,
     actionDeadline: actionDeadline ?? this.actionDeadline,
+    fulfilmentDeadline: fulfilmentDeadline ?? this.fulfilmentDeadline,
     extraMinutes: extraMinutes ?? this.extraMinutes,
     stockReserved: stockReserved ?? this.stockReserved,
     collectionStoreId: collectionStoreId,
