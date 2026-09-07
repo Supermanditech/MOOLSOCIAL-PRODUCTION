@@ -202,12 +202,16 @@ class _StoreOrderAmount extends StatelessWidget {
     required this.orderReference,
     this.style,
     this.textAlign = TextAlign.start,
+    this.amountMinor,
+    this.amountLabel = 'Order total',
   });
 
   final String value;
   final String orderReference;
   final TextStyle? style;
   final TextAlign textAlign;
+  final int? amountMinor;
+  final String amountLabel;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -230,11 +234,20 @@ class _StoreOrderAmount extends StatelessWidget {
       if (!compact) {
         return _StoreMoneyText(value, style: style, textAlign: textAlign);
       }
-      final summary = _storeSummaryAmount(value).split(' ');
+      var summaryValue = _storeSummaryAmount(
+        amountMinor == null ? value : '₹${amountMinor! ~/ 100}',
+      );
+      if (amountMinor != null &&
+          amountMinor! % 100 != 0 &&
+          !summaryValue.startsWith('≈')) {
+        summaryValue = '≈$summaryValue';
+      }
+      final summary = summaryValue.split(' ');
       return Semantics(
         container: true,
         button: true,
-        label: '$orderReference, order total $value. Show exact amount',
+        label:
+            '$orderReference, ${amountLabel.toLowerCase()} $value. Show exact amount',
         child: InkWell(
           key: const Key('work-order-exact-amount-open'),
           onTap: () => showDialog<void>(
@@ -263,7 +276,7 @@ class _StoreOrderAmount extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const Text('Order total'),
+                      Text(amountLabel),
                       const SizedBox(height: 8),
                       _StoreMoneyText(
                         value,
@@ -2381,6 +2394,14 @@ class _StoreControlDashboard extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final enlarged = MediaQuery.textScalerOf(context).scale(14) > 23;
+          final collection =
+              (reviewedOrder ?? session.currentWorkspaceOrder)
+                  ?.isCustomerCollection ==
+              true;
+          final collectionNeedsScroll =
+              collection &&
+              (constraints.maxHeight < 580 ||
+                  MediaQuery.textScalerOf(context).scale(14) > 18);
           final content = Column(
             children: [
               _StoreLiveBusinessPulse(
@@ -2438,11 +2459,14 @@ class _StoreControlDashboard extends StatelessWidget {
               ),
             ],
           );
-          if (!enlarged) return content;
+          if (!enlarged && !collectionNeedsScroll) return content;
           return SingleChildScrollView(
             key: const Key('work-dashboard-enlarged-scroll'),
             child: SizedBox(
-              height: constraints.maxHeight.clamp(760, double.infinity),
+              height: constraints.maxHeight.clamp(
+                collection ? (enlarged ? 1260 : 980) : 760,
+                double.infinity,
+              ),
               child: content,
             ),
           );
@@ -2995,7 +3019,26 @@ class _StoreActivityDeck extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Widget content;
-    if (reviewedOrder case final selected?) {
+    final selectedOrder = reviewedOrder ?? session.currentWorkspaceOrder;
+    if (selectedOrder?.isCustomerCollection == true) {
+      content = WorkCollectionLiveCard(
+        key: ValueKey(
+          'collection-${selectedOrder!.collectionStoreId}-${selectedOrder.id}',
+        ),
+        order: selectedOrder,
+        amountBuilder: (value, minor, style) => _StoreOrderAmount(
+          value,
+          amountMinor: minor,
+          amountLabel: 'Amount',
+          orderReference: selectedOrder.id,
+          style: style,
+          textAlign: TextAlign.end,
+        ),
+        controller: session.currentCollection?.orderId == selectedOrder.id
+            ? session.currentCollection
+            : null,
+      );
+    } else if (reviewedOrder case final selected?) {
       final record =
           session.visibleWorkspaceOrders
               .where((order) => order.id == selected.id)
@@ -3047,6 +3090,12 @@ class _StoreActivityDeck extends StatelessWidget {
         builder: (context, constraints) {
           final largeText = MediaQuery.textScalerOf(context).scale(14) > 18;
           final desiredHeight = switch (content) {
+            WorkCollectionLiveCard(:final controller) =>
+              switch (controller?.snapshot?.state.name) {
+                'matched' => largeText ? 720.0 : 410.0,
+                'collected' || 'cancelled' => largeText ? 680.0 : 380.0,
+                _ => largeText ? 900.0 : 590.0,
+              },
             _StoreOrderDetails() => largeText ? 580.0 : 520.0,
             _StoreReadyActivity() => 230.0,
             _IncomingOrderActivityCard() =>
@@ -4056,6 +4105,10 @@ Future<void> _showWorkspacePickupSheet(
   BuildContext context,
   WorkSession session,
 ) async {
+  if (session.currentWorkspaceOrder?.isCustomerCollection == true) {
+    context.go('/app/work/workspace/dashboard');
+    return;
+  }
   final pageContext = context;
   var pickupCode = '';
   String? error;
@@ -7515,6 +7568,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     if (operation == _WorkspaceOperation.orders) {
       return _OrdersDestinationSurface(
         session: session,
+        onOpenCollection: onOpenStore,
         onCreateOrder: () => onOpenOperation(_WorkspaceOperation.counterOrder),
         onOpenDelivery: () => onOpenOperation(_WorkspaceOperation.delivery),
       );
@@ -12208,11 +12262,13 @@ class _PaymentMetric extends StatelessWidget {
 class _OrdersDestinationSurface extends StatefulWidget {
   const _OrdersDestinationSurface({
     required this.session,
+    required this.onOpenCollection,
     required this.onCreateOrder,
     required this.onOpenDelivery,
   });
 
   final WorkSession session;
+  final VoidCallback onOpenCollection;
   final VoidCallback onCreateOrder;
   final VoidCallback onOpenDelivery;
 
@@ -12243,15 +12299,22 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
     final session = widget.session;
     final allOrders = session.visibleWorkspaceOrders;
     bool matches(WorkspaceOrderRecord order, String filter) => switch (filter) {
-      'Live' => !const {'Completed', 'Cancelled'}.contains(order.stage),
+      'Live' => !order.isClosed,
       'New' => order.stage == 'Confirmed',
       'Packing' => order.stage == 'Preparing',
-      'Ready' => const {
-        'Ready',
-        'Ready for pickup',
-        'Delivery requested',
-      }.contains(order.stage),
-      'Done' => const {'Completed', 'Cancelled'}.contains(order.stage),
+      'Ready' =>
+        const {
+              'Ready',
+              'Ready for pickup',
+              'Delivery requested',
+            }.contains(order.stage) ||
+            (order.isCustomerCollection &&
+                const {
+                  'Ready for collection',
+                  'Awaiting customer',
+                  'Matched',
+                }.contains(order.stage)),
+      'Done' => order.isClosed,
       _ => false,
     };
 
@@ -12351,6 +12414,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                       for (final order in visibleOrders) ...[
                         _LiveOrderTicket(
                           session: session,
+                          onOpenCollection: widget.onOpenCollection,
                           order: order,
                           active:
                               session.hasActiveWorkspaceOrder &&
@@ -12428,12 +12492,14 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
 class _LiveOrderTicket extends StatelessWidget {
   const _LiveOrderTicket({
     required this.session,
+    required this.onOpenCollection,
     required this.order,
     required this.active,
     required this.onOpenDelivery,
   });
 
   final WorkSession session;
+  final VoidCallback onOpenCollection;
   final WorkspaceOrderRecord order;
   final bool active;
   final VoidCallback onOpenDelivery;
@@ -12441,7 +12507,8 @@ class _LiveOrderTicket extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stage = order.stage;
-    final packingLines = active && stage == 'Preparing'
+    final packingLines =
+        active && stage == 'Preparing' && !order.isCustomerCollection
         ? session.workspacePackingLines
         : const <WorkspacePackingLine>[];
     final packedUnits = packingLines
@@ -12478,40 +12545,51 @@ class _LiveOrderTicket extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _StoreMoneyLine(
-              leading: Wrap(
-                spacing: 8,
-                runSpacing: 2,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    stage == 'Confirmed' ? 'Accept within' : stage,
-                    key: Key('work-order-stage-label-${order.id}'),
-                    style: const TextStyle(
-                      color: MoolColors.navy,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  if (order.actionDeadline case final deadline?)
-                    _LiveCountdownText(
-                      deadline: deadline,
-                      fallback: 'Review',
+            if (order.isCustomerCollection)
+              Text(
+                '${order.id} · $stage',
+                key: Key('work-order-stage-label-${order.id}'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: MoolColors.navy,
+                  fontWeight: FontWeight.w700,
+                ),
+              )
+            else
+              _StoreMoneyLine(
+                leading: Wrap(
+                  spacing: 8,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      stage == 'Confirmed' ? 'Accept within' : stage,
+                      key: Key('work-order-stage-label-${order.id}'),
                       style: const TextStyle(
                         color: MoolColors.navy,
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                ],
+                    if (order.actionDeadline case final deadline?)
+                      _LiveCountdownText(
+                        deadline: deadline,
+                        fallback: 'Review',
+                        style: const TextStyle(
+                          color: MoolColors.navy,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                  ],
+                ),
+                value: '₹${_formatStoreAmount(order.amount)}',
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-              value: '₹${_formatStoreAmount(order.amount)}',
-              style: const TextStyle(
-                color: MoolColors.navy,
-                fontSize: 19,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
             const SizedBox(height: 8),
             Text(
               order.customer,
@@ -12522,7 +12600,9 @@ class _LiveOrderTicket extends StatelessWidget {
               ),
             ),
             Text(
-              '${order.source} · ${order.payment} · ${order.fulfilment}',
+              order.isCustomerCollection
+                  ? '${order.payment} · Collect at store'
+                  : '${order.source} · ${order.payment} · ${order.fulfilment}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: MoolColors.muted, fontSize: 10.5),
@@ -12585,7 +12665,22 @@ class _LiveOrderTicket extends StatelessWidget {
                   ),
                 ),
             ],
-            if (active) ...[
+            if (order.isCustomerCollection)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  key: Key('work-order-collection-open-${order.id}'),
+                  onPressed: () {
+                    if (session.selectWorkspaceOrder(order.id)) {
+                      onOpenCollection();
+                    }
+                  },
+                  child: Text(
+                    order.isClosed ? 'View collection' : 'Open collection',
+                  ),
+                ),
+              )
+            else if (active) ...[
               const SizedBox(height: 10),
               Wrap(
                 alignment: WrapAlignment.end,

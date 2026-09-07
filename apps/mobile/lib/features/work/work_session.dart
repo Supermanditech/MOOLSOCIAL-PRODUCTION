@@ -1,10 +1,207 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
 import 'work_models.dart';
 import 'work_services.dart';
+import 'scan_and_pick_contract.dart';
+
+/// Per-order presentation controller. Only an authenticated injected adapter
+/// may supply authority; no review WorkGateway or local completion fallback.
+class StoreCollectionController extends ChangeNotifier {
+  StoreCollectionController({
+    required this.storeId,
+    required this.orderId,
+    required this.gateway,
+  });
+
+  final String storeId, orderId;
+  final ScanPickGateway gateway;
+  ScanPickResult? _result;
+  ScanPickRequest? _request;
+  ScanPickRequest? _uncertainMutation;
+  final Stopwatch _elapsed = Stopwatch();
+  Duration _responseAllowance = Duration.zero;
+  bool busy = false;
+  bool _closed = false;
+  String? message;
+  ScanPickSnapshot? get snapshot => _result?.snapshot;
+  bool get needsReconciliation => _uncertainMutation != null;
+  DateTime? get serverNow =>
+      snapshot?.serverTime.add(_responseAllowance + _elapsed.elapsed);
+
+  static String _id() {
+    final random = Random.secure();
+    return List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+  }
+
+  bool get hasCurrentMatch =>
+      !_closed &&
+      message == null &&
+      !needsReconciliation &&
+      _request != null &&
+      serverNow != null &&
+      (_result?.canRequestHandOver(_request!, serverNow!) ?? false);
+  bool get canHandOver => !busy && hasCurrentMatch;
+  bool get actionPending => busy && needsReconciliation;
+  bool get hasAuthoritativeSnapshot =>
+      _result?.outcome == ScanPickOutcome.snapshot ||
+      _result?.error == ScanPickError.alreadyCollected;
+
+  String? get visibleQr {
+    final value = snapshot;
+    final now = serverNow;
+    if (_closed ||
+        message != null ||
+        needsReconciliation ||
+        _result?.outcome != ScanPickOutcome.snapshot ||
+        value == null ||
+        now == null ||
+        value.state != ScanPickState.awaitingCustomer ||
+        !now.isBefore(value.challenge!.expiresAt)) {
+      return null;
+    }
+    return value.challenge?.qrPayload;
+  }
+
+  Future<void> refresh() async {
+    if (_closed || busy) return;
+    final pending = _uncertainMutation;
+    await _execute(
+      pending == null
+          ? ScanPickRequest.read(
+              requestId: _id(),
+              orderId: orderId,
+              storeId: storeId,
+            )
+          : ScanPickRequest.reconcile(
+              requestId: _id(),
+              operationId: pending.operationId!,
+              orderId: orderId,
+              storeId: storeId,
+            ),
+    );
+  }
+
+  Future<void> showCode() async {
+    final value = snapshot;
+    if (_closed ||
+        busy ||
+        needsReconciliation ||
+        message != null ||
+        value == null ||
+        _result?.outcome != ScanPickOutcome.snapshot ||
+        value.payment != ScanPickPayment.paid ||
+        value.readiness != ScanPickReadiness.ready ||
+        !{
+          ScanPickState.ready,
+          ScanPickState.awaitingCustomer,
+        }.contains(value.state)) {
+      return;
+    }
+    await _execute(
+      ScanPickRequest.issueChallenge(
+        requestId: _id(),
+        operationId: _id(),
+        orderId: orderId,
+        storeId: storeId,
+        expectedRevision: value.revision,
+      ),
+    );
+  }
+
+  Future<void> handOver() async {
+    if (!canHandOver) return;
+    final value = snapshot!;
+    await _execute(
+      ScanPickRequest.handOver(
+        requestId: _id(),
+        operationId: _id(),
+        orderId: orderId,
+        storeId: storeId,
+        expectedRevision: value.revision,
+        approvalId: value.approval!.id,
+      ),
+    );
+  }
+
+  Future<void> _execute(ScanPickRequest request) async {
+    if (_closed || busy) return;
+    busy = true;
+    message = null;
+    if (request.operation == ScanPickOperation.handOver ||
+        request.operation == ScanPickOperation.issueChallenge) {
+      _uncertainMutation = request;
+    }
+    notifyListeners();
+    final roundTrip = Stopwatch()..start();
+    try {
+      final result = await gateway
+          .execute(request)
+          .timeout(const Duration(seconds: 20));
+      if (_closed) return;
+      result.validateFor(request, client: ScanPickClient.retailer);
+      _request = request;
+      _result = result;
+      _responseAllowance = roundTrip.elapsed;
+      _elapsed
+        ..reset()
+        ..start();
+      if (result.outcome == ScanPickOutcome.unknown ||
+          result.error == ScanPickError.operationInProgress ||
+          (request.operation == ScanPickOperation.reconcile &&
+              {
+                ScanPickError.unauthenticated,
+                ScanPickError.forbidden,
+                ScanPickError.unavailable,
+                ScanPickError.rateLimited,
+                ScanPickError.operationConflict,
+              }.contains(result.error))) {
+        message = 'Confirming the latest update. Do not hand over yet.';
+      } else {
+        _uncertainMutation = null;
+        if (result.outcome == ScanPickOutcome.rejected &&
+            result.error != ScanPickError.alreadyCollected) {
+          message = switch (result.error) {
+            ScanPickError.paymentRequired || ScanPickError.paymentChanged =>
+              'Payment needs checking. Do not hand over yet.',
+            ScanPickError.notReady => 'Finish packing before collection.',
+            ScanPickError.challengeExpired || ScanPickError.approvalExpired =>
+              'Please ask the customer to scan the current code.',
+            ScanPickError.cancelled =>
+              'This order was cancelled. Do not hand over.',
+            ScanPickError.forbidden || ScanPickError.unauthenticated =>
+              'Sign in with an authorised store account to continue.',
+            _ => 'The order has changed. Refresh before continuing.',
+          };
+        }
+      }
+    } catch (_) {
+      if (!_closed) {
+        message = needsReconciliation
+            ? 'Confirming the latest update. Do not hand over yet.'
+            : 'Unable to refresh this order. Try again before handing over.';
+      }
+    } finally {
+      if (!_closed) {
+        busy = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _closed = true;
+    _elapsed.stop();
+    super.dispose();
+  }
+}
 
 class WorkSession extends ChangeNotifier {
   WorkSession({
@@ -57,6 +254,69 @@ class WorkSession extends ChangeNotifier {
   final WorkProofPicker proofPicker;
   final WorkPendingProofStore? pendingProofStore;
   final WorkPendingProofStore? contactDraftStore;
+  StoreCollectionController? _collection;
+  StoreCollectionController? get currentCollection =>
+      currentWorkspaceOrder?.isCustomerCollection == true &&
+          _collection?.orderId == currentWorkspaceOrderId &&
+          _collection?.storeId == (activeWorkspace?.id ?? workspaceId)
+      ? _collection
+      : null;
+
+  /// Called by the future authenticated order adapter, never by a QR decoder.
+  void attachCollection(StoreCollectionController controller) {
+    if (_collection?.needsReconciliation == true) {
+      throw StateError('Reconcile the current collection update first');
+    }
+    final order = currentWorkspaceOrder;
+    if (order == null ||
+        !order.isCustomerCollection ||
+        controller.orderId != order.id ||
+        controller.storeId != order.collectionStoreId ||
+        controller.storeId != (activeWorkspace?.id ?? workspaceId)) {
+      throw ArgumentError(
+        'Collection context does not match the selected store order',
+      );
+    }
+    _clearCollection();
+    _collection = controller..addListener(_collectionChanged);
+    _collectionChanged();
+  }
+
+  void _collectionChanged() {
+    final controller = currentCollection;
+    final value = controller?.snapshot;
+    if (controller?.hasAuthoritativeSnapshot == true && value != null) {
+      final index = workspaceOrders.indexWhere(
+        (order) =>
+            order.id == value.orderId &&
+            order.collectionStoreId == value.storeId,
+      );
+      if (index >= 0) {
+        workspaceOrderStage = switch (value.state) {
+          ScanPickState.preparing => 'Preparing',
+          ScanPickState.ready => 'Ready for collection',
+          ScanPickState.awaitingCustomer => 'Awaiting customer',
+          ScanPickState.matched => 'Matched',
+          ScanPickState.collected => 'Collected',
+          ScanPickState.cancelled => 'Cancelled',
+        };
+        workspaceOrders[index] = workspaceOrders[index].copyWith(
+          stage: workspaceOrderStage,
+        );
+        workspaceOrderActionDeadline = null;
+        // These are server projections only. Never apply stock, invoice,
+        // payment or settlement effects again from a collection response.
+      }
+    }
+    notifyListeners();
+  }
+
+  void _clearCollection() {
+    _collection?.removeListener(_collectionChanged);
+    _collection?.dispose();
+    _collection = null;
+  }
+
   String? _contactDraftScope;
   bool _contactDraftScopeKnown = false;
   Future<void>? _contactDraftRecovery;
@@ -350,6 +610,8 @@ class WorkSession extends ChangeNotifier {
 
   bool get hasActiveWorkspaceOrder =>
       workspaceOrderCustomer.isNotEmpty &&
+      !(currentWorkspaceOrder?.isCustomerCollection == true &&
+          currentWorkspaceOrder?.isCompleted == true) &&
       workspaceOrderStage != 'Completed' &&
       workspaceOrderStage != 'Cancelled';
 
@@ -371,6 +633,11 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool selectWorkspaceOrder(String orderId) {
+    if (currentWorkspaceOrderId != orderId &&
+        _collection?.needsReconciliation == true) {
+      showNotice('Confirming this collection. Please wait for the update.');
+      return false;
+    }
     if (busy || workspaceOperationsSyncing || workspaceHandoverBusy) {
       return false;
     }
@@ -388,6 +655,7 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     _rememberActiveOrder();
+    _clearCollection();
     currentWorkspaceOrderId = order.id;
     workspaceOrderCustomer = order.customer;
     workspaceOrderItems = order.items;
@@ -978,6 +1246,11 @@ class WorkSession extends ChangeNotifier {
   void activateWorkspace(WorkWorkspace workspace) {
     final current = activeWorkspace;
     if (current == null || current.id == workspace.id) return;
+    if (_collection?.needsReconciliation == true) {
+      showNotice('Confirming this collection. Please wait for the update.');
+      return;
+    }
+    _clearCollection();
     otherWorkspaces.removeWhere((item) => item.id == workspace.id);
     otherWorkspaces.add(current);
     activeWorkspace = workspace;
@@ -1060,6 +1333,8 @@ class WorkSession extends ChangeNotifier {
           'actionDeadline': order.actionDeadline?.toUtc().toIso8601String(),
           'extraMinutes': order.extraMinutes,
           'stockReserved': order.stockReserved,
+          if (order.isCustomerCollection)
+            'collectionStoreId': order.collectionStoreId,
         },
     ],
     'invoices': [
@@ -1244,6 +1519,10 @@ class WorkSession extends ChangeNotifier {
   }
 
   WorkspaceCustomerInvoice? completeWorkspaceCounterSale() {
+    if (currentWorkspaceOrder?.isCustomerCollection == true) {
+      showError('Use the collection card for this paid order.');
+      return null;
+    }
     final completedInvoice = workspaceInvoices
         .where((invoice) => invoice.orderId == currentWorkspaceOrderId)
         .firstOrNull;
@@ -1335,6 +1614,10 @@ class WorkSession extends ChangeNotifier {
     required String payment,
     required String address,
   }) {
+    if (currentWorkspaceOrder?.isCustomerCollection == true) {
+      showNotice('This paid order cannot be replaced by a counter bill.');
+      return;
+    }
     if (workspaceInvoices.any(
       (invoice) => invoice.orderId == currentWorkspaceOrderId,
     )) {
@@ -1490,6 +1773,10 @@ class WorkSession extends ChangeNotifier {
   }
 
   void advanceWorkspaceOrder() {
+    if (currentWorkspaceOrder?.isCustomerCollection == true) {
+      showError('Use the collection card for this paid order.');
+      return;
+    }
     final previous = workspaceOrderStage;
     var order = _ensureCurrentOrderRecord();
     if (previous == 'Confirmed' && !order.stockReserved) {
@@ -1567,6 +1854,9 @@ class WorkSession extends ChangeNotifier {
     WorkspaceOrderRecord order, {
     required String activity,
   }) {
+    if (order.isCustomerCollection) {
+      throw StateError('Customer collection requires authoritative completion');
+    }
     workspaceOrderStage = 'Completed';
     workspaceOrderActionDeadline = null;
     final index = workspaceOrders.indexWhere((item) => item.id == order.id);
@@ -1615,6 +1905,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> verifyWorkspaceHandover(String otp) async {
+    if (currentWorkspaceOrder?.isCustomerCollection == true) return false;
     final id = activeWorkspace?.id ?? workspaceId;
     final order = currentWorkspaceOrder;
     if (id == null || id.isEmpty || order == null || workspaceHandoverBusy) {
@@ -1651,6 +1942,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> verifyWorkspacePickup(String code) async {
+    if (currentWorkspaceOrder?.isCustomerCollection == true) return false;
     final id = activeWorkspace?.id ?? workspaceId;
     final order = currentWorkspaceOrder;
     if (id == null ||
@@ -2078,6 +2370,7 @@ class WorkSession extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _clearCollection();
     super.dispose();
   }
 
@@ -2422,6 +2715,7 @@ class WorkSession extends ChangeNotifier {
     final scope = accountReady ? store.accountScope : null;
     if (!_contactDraftScopeKnown || scope != _contactDraftScope) {
       if (_contactDraftScopeKnown) {
+        _clearCollection();
         authorizedPersonName = businessRelationship = '';
         accountDisplayName = connectedProviderLabel = connectedProviderAccount =
             '';

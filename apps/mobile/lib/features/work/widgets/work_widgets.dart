@@ -8,6 +8,515 @@ import '../../../core/design/mool_service_home.dart';
 import '../../../core/design/mool_theme.dart';
 import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../work_session.dart';
+import '../work_models.dart';
+import '../scan_and_pick_contract.dart';
+
+/// Rendering seam only. The host supplies a real QR encoder; no placeholder
+/// code, local token signing or embedded customer-authorisation fallback.
+class WorkCollectionCodeRenderer extends InheritedWidget {
+  const WorkCollectionCodeRenderer({
+    required this.render,
+    required super.child,
+    super.key,
+  });
+  final Widget Function(BuildContext context, String payload) render;
+  static WorkCollectionCodeRenderer? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<WorkCollectionCodeRenderer>();
+  @override
+  bool updateShouldNotify(WorkCollectionCodeRenderer oldWidget) =>
+      render != oldWidget.render;
+}
+
+class WorkCollectionLiveCard extends StatefulWidget {
+  const WorkCollectionLiveCard({
+    required this.order,
+    required this.amountBuilder,
+    this.controller,
+    super.key,
+  });
+  final WorkspaceOrderRecord order;
+  final Widget Function(String value, int minor, TextStyle style) amountBuilder;
+  final StoreCollectionController? controller;
+  @override
+  State<WorkCollectionLiveCard> createState() => _WorkCollectionLiveCardState();
+}
+
+class _WorkCollectionLiveCardState extends State<WorkCollectionLiveCard>
+    with WidgetsBindingObserver {
+  Timer? _timer;
+  bool _foreground = true;
+  bool _expanded = false;
+  static const _blue = Color(0xFF000080);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    widget.controller?.addListener(_changed);
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _refresh());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+  }
+
+  @override
+  void didUpdateWidget(WorkCollectionLiveCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.removeListener(_changed);
+      widget.controller?.addListener(_changed);
+      _expanded = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+    }
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _refresh() async {
+    if (!mounted ||
+        !_foreground ||
+        ModalRoute.of(context)?.isCurrent == false) {
+      return;
+    }
+    final controller = widget.controller;
+    if (controller == null ||
+        controller.busy ||
+        controller.snapshot?.state == ScanPickState.collected ||
+        controller.snapshot?.state == ScanPickState.cancelled) {
+      return;
+    }
+    await controller.refresh();
+    if (!mounted || !_foreground || widget.controller != controller) return;
+    final value = controller.snapshot;
+    if (WorkCollectionCodeRenderer.of(context) != null &&
+        controller.message == null &&
+        !controller.needsReconciliation &&
+        (value?.state == ScanPickState.ready ||
+            (value?.state == ScanPickState.awaitingCustomer &&
+                controller.visibleQr == null))) {
+      await controller.showCode();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground) {
+      unawaited(_refresh());
+    } else {
+      _changed();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    widget.controller?.removeListener(_changed);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final value = controller?.snapshot;
+    final state = value?.state;
+    final matched =
+        state == ScanPickState.matched &&
+        controller?.hasCurrentMatch == true &&
+        _foreground;
+    final collected = state == ScanPickState.collected;
+    final renderer = WorkCollectionCodeRenderer.of(context);
+    final payload = _foreground ? controller?.visibleQr : null;
+    final showQr = payload != null && renderer != null;
+    final title = collected
+        ? 'Collected'
+        : matched
+        ? 'Matched'
+        : switch (state) {
+            ScanPickState.preparing => 'Pack the items',
+            ScanPickState.cancelled => 'Order cancelled',
+            ScanPickState.ready ||
+            ScanPickState.awaitingCustomer => 'Ready at the counter',
+            _ => 'Checking collection',
+          };
+    final message =
+        controller?.message ??
+        (controller == null
+            ? 'Collection confirmation is unavailable. Do not hand over yet.'
+            : value == null
+            ? 'Checking this order…'
+            : renderer == null &&
+                  (state == ScanPickState.ready ||
+                      state == ScanPickState.awaitingCustomer)
+            ? 'Collection code is unavailable. Do not hand over yet.'
+            : null);
+    return Column(
+      key: const Key('work-collection-live-card'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            key: const Key('work-collection-content'),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.shopping_bag_outlined,
+                      color: _blue,
+                      size: 18,
+                    ),
+                    const Text(
+                      'Collect at store',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _blue,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (value != null)
+                      Text(
+                        switch (value.payment) {
+                          ScanPickPayment.paid => 'Paid',
+                          ScanPickPayment.refunded => 'Refunded',
+                          ScanPickPayment.partiallyPaid => 'Part paid',
+                          ScanPickPayment.unpaid => 'Payment pending',
+                        },
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: MoolColors.muted,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  value?.customerName ?? widget.order.customer,
+                  key: const Key('work-collection-customer'),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: _blue,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${value?.orderId ?? widget.order.id} · ${value?.storeName ?? 'Your store'}',
+                  style: const TextStyle(fontSize: 11, color: MoolColors.muted),
+                ),
+                const SizedBox(height: 12),
+                AnimatedContainer(
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: matched || collected
+                        ? _blue
+                        : const Color(0xFFF1F3FC),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        matched || collected
+                            ? Icons.check_circle_outline
+                            : Icons.inventory_2_outlined,
+                        size: 20,
+                        color: matched || collected ? Colors.white : _blue,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          title,
+                          key: const Key('work-collection-state'),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: matched || collected ? Colors.white : _blue,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (value != null) ...[
+                  for (final line
+                      in (_expanded ? value.lines : value.lines.take(2)))
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            line.name,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: _blue,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final description = Text(
+                                '${line.pack} · Qty ${line.quantity}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: MoolColors.muted,
+                                ),
+                              );
+                              final amount = widget.amountBuilder(
+                                _collectionMoney(line.amountMinor),
+                                line.amountMinor,
+                                const TextStyle(
+                                  fontSize: 12,
+                                  color: _blue,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              );
+                              return MediaQuery.textScalerOf(
+                                            context,
+                                          ).scale(14) >
+                                          18 ||
+                                      line.amountMinor > 100000000
+                                  ? Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [description, amount],
+                                    )
+                                  : Row(
+                                      children: [
+                                        Expanded(child: description),
+                                        const SizedBox(width: 6),
+                                        SizedBox(
+                                          width: constraints.maxWidth * .35,
+                                          child: amount,
+                                        ),
+                                      ],
+                                    );
+                            },
+                          ),
+                          if (_expanded)
+                            Text(
+                              'SKU ${line.skuId}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: MoolColors.muted,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (value.lines.length > 2)
+                    TextButton(
+                      onPressed: () => setState(() => _expanded = !_expanded),
+                      child: Text(
+                        _expanded
+                            ? 'Show less'
+                            : 'All ${value.lines.length} items',
+                      ),
+                    ),
+                  const Divider(height: 14),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final count = Text(
+                        '${value.lines.length} items',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: MoolColors.muted,
+                        ),
+                      );
+                      final amount = SizedBox(
+                        key: const Key('work-collection-amount'),
+                        child: widget.amountBuilder(
+                          _collectionMoney(value.totalMinor),
+                          value.totalMinor,
+                          const TextStyle(
+                            fontSize: 18,
+                            color: _blue,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      );
+                      return MediaQuery.textScalerOf(context).scale(14) <= 18
+                          ? Row(
+                              children: [
+                                count,
+                                const SizedBox(width: 8),
+                                Expanded(child: amount),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                count,
+                                const SizedBox(height: 3),
+                                amount,
+                              ],
+                            );
+                    },
+                  ),
+                ] else
+                  Text(
+                    widget.order.items,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: MoolColors.muted,
+                    ),
+                  ),
+                if (showQr) ...[
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Ask the customer to scan this code from their order.',
+                    key: Key('work-collection-scan-instruction'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: _blue),
+                  ),
+                  const SizedBox(height: 7),
+                  Center(
+                    child: Semantics(
+                      label: 'Customer collection code for ${widget.order.id}',
+                      image: true,
+                      child: ExcludeSemantics(
+                        child: SizedBox.square(
+                          key: const Key('work-collection-qr'),
+                          dimension: 156,
+                          child: ColoredBox(
+                            color: Colors.white,
+                            child: renderer.render(context, payload),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                if (collected && value?.receipt != null) ...[
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Collection confirmed',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _blue,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (value!.receipt!.invoiceReference != null)
+                    Text(
+                      'Invoice ${value.receipt!.invoiceReference}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: MoolColors.muted,
+                      ),
+                    ),
+                ],
+                if (message != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(
+                      message,
+                      key: const Key('work-collection-recovery'),
+                      style: const TextStyle(fontSize: 12, color: _blue),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (!collected && state != ScanPickState.cancelled)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (message != null && controller != null)
+                  TextButton(
+                    onPressed: controller.busy ? null : _refresh,
+                    child: const Text('Try again'),
+                  )
+                else if (matched || controller?.actionPending == true)
+                  FilledButton(
+                    key: const Key('work-collection-hand-over'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _blue,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: matched && controller!.canHandOver
+                        ? () {
+                            if (_foreground &&
+                                ModalRoute.of(context)?.isCurrent != false) {
+                              unawaited(controller.handOver());
+                            }
+                          }
+                        : null,
+                    child: Text(
+                      controller?.actionPending == true
+                          ? 'Confirming…'
+                          : matched
+                          ? 'Hand Over'
+                          : 'Waiting for customer',
+                    ),
+                  ),
+                if (message == null &&
+                    !matched &&
+                    controller?.actionPending != true)
+                  Text(
+                    state == ScanPickState.preparing
+                        ? 'Waiting for packing confirmation'
+                        : 'Waiting for customer',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _blue,
+                    ),
+                  ),
+                const SizedBox(height: 6),
+                Text(
+                  matched
+                      ? 'Give the goods, then tap Hand Over. Payout remains pending until collection is confirmed.'
+                      : 'Hand over only when this screen shows Matched.',
+                  style: const TextStyle(fontSize: 11, color: MoolColors.muted),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+String _collectionMoney(int minor) {
+  final whole = (minor ~/ 100).toString();
+  final suffix = (minor % 100).toString().padLeft(2, '0');
+  if (whole.length <= 3) return '₹$whole${minor % 100 == 0 ? '' : '.$suffix'}';
+  final end = whole.substring(whole.length - 3);
+  final prefix = whole
+      .substring(0, whole.length - 3)
+      .replaceAllMapped(
+        RegExp(r'(\d)(?=(\d{2})+(?!\d))'),
+        (match) => '${match[1]},',
+      );
+  return '₹$prefix,$end${minor % 100 == 0 ? '' : '.$suffix'}';
+}
 
 class WorkPageScaffold extends StatelessWidget {
   const WorkPageScaffold({

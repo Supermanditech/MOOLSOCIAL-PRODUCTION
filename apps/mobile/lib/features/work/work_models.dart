@@ -72,6 +72,7 @@ class WorkspaceOrderRecord {
     this.actionDeadline,
     this.extraMinutes = 0,
     this.stockReserved = false,
+    this.collectionStoreId,
   });
 
   final String id;
@@ -89,6 +90,14 @@ class WorkspaceOrderRecord {
   final DateTime? actionDeadline;
   final int extraMinutes;
   final bool stockReserved;
+
+  /// Set only by the order adapter for authenticated customer collection.
+  /// A legacy Pickup label is not sufficient to grant collection authority.
+  final String? collectionStoreId;
+  bool get isCustomerCollection => collectionStoreId != null;
+  bool get isCompleted =>
+      stage == 'Completed' || (isCustomerCollection && stage == 'Collected');
+  bool get isClosed => isCompleted || stage == 'Cancelled';
 
   WorkspaceOrderRecord copyWith({
     String? customer,
@@ -120,6 +129,7 @@ class WorkspaceOrderRecord {
     actionDeadline: actionDeadline ?? this.actionDeadline,
     extraMinutes: extraMinutes ?? this.extraMinutes,
     stockReserved: stockReserved ?? this.stockReserved,
+    collectionStoreId: collectionStoreId,
   );
 }
 
