@@ -168,10 +168,14 @@ void main() {
       findsOneWidget,
     );
     expect(tester.widget<TextField>(search).decoration!.filled, isFalse);
-    expect(find.text('Partner with MoolSocial'), findsOneWidget);
+    expect(find.text('Grow with MoolSocial'), findsOneWidget);
     expect(find.text('Your business. More customers.'), findsNothing);
-    expect(find.textContaining('Choose Workspace'), findsOneWidget);
-    expect(find.textContaining('Upload documents'), findsOneWidget);
+    expect(
+      find.text(
+        'Bring customers back. Keep shelves stocked. Collect what is due.',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Signed in'), findsNothing);
     expect(find.text('Build your Workspace'), findsNothing);
     expect(find.text('Verified account'), findsNothing);
@@ -198,14 +202,12 @@ void main() {
       find.byKey(const Key('workspace-benefits-retailer-grocery')),
       findsOneWidget,
     );
-    expect(
-      find.text(
-        'A customer who forgets your shop becomes someone else’s customer.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('What changes with MoolSocial'), findsOneWidget);
-    expect(find.text('Bring customers back'), findsOneWidget);
+    expect(find.text('Customers buy once, then disappear.'), findsOneWidget);
+    expect(find.text('What changes with MoolSocial'), findsNothing);
+    expect(find.text('Send offers'), findsOneWidget);
+    for (final topic in ['Customers', 'Stock', 'Money', 'Daily work']) {
+      expect(find.byKey(Key('work-growth-group-$topic')), findsOneWidget);
+    }
     expect(find.text('Choose this Workspace'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('work-back')));

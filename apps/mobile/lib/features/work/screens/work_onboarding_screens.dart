@@ -33,6 +33,8 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
   String? _categoryId;
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
+  final _choicesScroll = ScrollController();
+  double _choicesOffset = 0;
 
   bool _matches(WorkProfileOption option) {
     final query = _workspaceQuery.replaceAll('saloon', 'salon');
@@ -55,6 +57,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
     _searchFocus.removeListener(_refreshSearch);
     _searchFocus.dispose();
     _searchController.dispose();
+    _choicesScroll.dispose();
     super.dispose();
   }
 
@@ -72,17 +75,47 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                   widget.session.profilesForFamily(id).any(_matches),
             )
             .toList();
+        final focusedOption = _expandedProfileId == null
+            ? null
+            : widget.session.familyIds
+                  .expand(widget.session.profilesForFamily)
+                  .where(
+                    (option) =>
+                        option.id == _expandedProfileId &&
+                        workWorkspaceBenefitFor(option.id).hasTopics,
+                  )
+                  .firstOrNull;
+        final dockChoose =
+            focusedOption != null &&
+            (MediaQuery.sizeOf(context).height < 850 ||
+                MediaQuery.textScalerOf(context).scale(14) > 18);
+
+        void restoreScroll(double offset) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _choicesScroll.hasClients) {
+              _choicesScroll.jumpTo(
+                offset.clamp(0, _choicesScroll.position.maxScrollExtent),
+              );
+            }
+          });
+        }
 
         void collapseBenefits() {
           setState(() => _expandedProfileId = null);
+          if (focusedOption != null) restoreScroll(_choicesOffset);
         }
 
         void toggleBenefits(String profileId) {
-          setState(() {
-            _expandedProfileId = _expandedProfileId == profileId
-                ? null
-                : profileId;
-          });
+          if (_expandedProfileId == profileId) {
+            collapseBenefits();
+            return;
+          }
+          _searchFocus.unfocus();
+          _choicesOffset = _choicesScroll.hasClients
+              ? _choicesScroll.offset
+              : 0;
+          setState(() => _expandedProfileId = profileId);
+          if (workWorkspaceBenefitFor(profileId).hasTopics) restoreScroll(0);
         }
 
         void chooseWorkspace(WorkProfileOption option) {
@@ -115,7 +148,10 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                       tooltip: 'Clear search',
                       onPressed: () {
                         _searchController.clear();
-                        setState(() => _workspaceQuery = '');
+                        setState(() {
+                          _workspaceQuery = '';
+                          _expandedProfileId = null;
+                        });
                       },
                       icon: const Icon(Icons.close, size: 20),
                     ),
@@ -168,8 +204,16 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                 ),
             ],
           ),
+          bottomAction: dockChoose && !_searchFocus.hasFocus
+              ? WorkWorkspaceChooseButton(
+                  profileId: focusedOption.id,
+                  onChoose: () => chooseWorkspace(focusedOption),
+                  showNextStep: false,
+                )
+              : null,
           body: ListView(
             key: const Key('work-choose-screen'),
+            controller: _choicesScroll,
             padding: const EdgeInsets.fromLTRB(
               MoolSpacing.md,
               MoolSpacing.sm,
@@ -177,7 +221,9 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
               MoolSpacing.xl,
             ),
             children: [
-              if (!_searchFocus.hasFocus && _workspaceQuery.isEmpty)
+              if (focusedOption == null &&
+                  !_searchFocus.hasFocus &&
+                  _workspaceQuery.isEmpty)
                 const _WorkspaceEntryHero(),
               if (widget.session.selectedOpportunity
                   case final opportunity?) ...[
@@ -196,27 +242,36 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
               ],
               const SizedBox(height: MoolSpacing.sm),
               for (final familyId in matchingFamilies) ...[
-                if (_searchFocus.hasFocus || _workspaceQuery.isNotEmpty)
-                  Text(
-                    widget.session.familyLabel(familyId),
-                    style: Theme.of(context).textTheme.labelLarge,
-                  )
-                else
-                  WorkSectionTitle(
-                    title: widget.session.familyLabel(familyId),
-                    detail: _workspaceGroupPresentation(familyId).examples,
-                  ),
-                const SizedBox(height: MoolSpacing.sm),
+                if (focusedOption == null && familyId != 'products-trade') ...[
+                  if (_searchFocus.hasFocus || _workspaceQuery.isNotEmpty)
+                    Text(
+                      widget.session.familyLabel(familyId),
+                      style: Theme.of(context).textTheme.labelLarge,
+                    )
+                  else
+                    WorkSectionTitle(
+                      title: widget.session.familyLabel(familyId),
+                      detail: _workspaceGroupPresentation(familyId).examples,
+                    ),
+                  const SizedBox(height: MoolSpacing.sm),
+                ],
                 for (final option
                     in widget.session
                         .profilesForFamily(familyId)
-                        .where(_matches)) ...[
+                        .where(
+                          (option) =>
+                              _matches(option) &&
+                              (focusedOption == null ||
+                                  option.id == focusedOption.id),
+                        )) ...[
                   WorkWorkspaceBenefitCard(
+                    key: ValueKey('workspace-choice-${option.id}'),
                     option: option,
                     content: workWorkspaceBenefitFor(option.id),
                     expanded: _expandedProfileId == option.id,
                     onToggle: () => toggleBenefits(option.id),
                     onChoose: () => chooseWorkspace(option),
+                    showChooseAction: !dockChoose,
                   ),
                   const SizedBox(height: MoolSpacing.sm),
                 ],
@@ -231,14 +286,15 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
-              OutlinedButton.icon(
-                key: const Key('work-profile-not-shown'),
-                onPressed: () => _showUnsupportedRequest(context),
-                icon: const Icon(Icons.chat_bubble_outline_rounded),
-                label: const Text(
-                  'Can’t find your Workspace? Tell us what you do',
+              if (focusedOption == null)
+                OutlinedButton.icon(
+                  key: const Key('work-profile-not-shown'),
+                  onPressed: () => _showUnsupportedRequest(context),
+                  icon: const Icon(Icons.chat_bubble_outline_rounded),
+                  label: const Text(
+                    'Can’t find your Workspace? Tell us what you do',
+                  ),
                 ),
-              ),
             ],
           ),
         );
@@ -1060,67 +1116,38 @@ class _WorkWorkspaceContactScreenState
 class _WorkspaceEntryHero extends StatelessWidget {
   const _WorkspaceEntryHero();
   @override
-  Widget build(BuildContext context) {
-    const steps = [
-      'Choose Workspace',
-      'Upload documents',
-      'MoolSocial review',
-      'Set up Workspace',
-      'Get started',
-    ];
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: MoolMotion.accessible(context, MoolMotion.standard),
-      builder: (context, value, child) => Opacity(opacity: value, child: child),
-      child: Container(
-        key: const Key('workspace-chooser-hero'),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: MoolColors.navy,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Partner with MoolSocial',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: 0, end: 1),
+    duration: MoolMotion.accessible(context, MoolMotion.standard),
+    builder: (context, value, child) => Opacity(opacity: value, child: child),
+    child: const Padding(
+      key: Key('workspace-chooser-hero'),
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Grow with MoolSocial',
+            style: TextStyle(
+              color: MoolColors.navy,
+              fontSize: 23,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (var i = 0; i < steps.length; i++)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '${i + 1}  ${steps[i]}',
-                      style: const TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-              ],
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Bring customers back. Keep shelves stocked. Collect what is due.',
+            style: TextStyle(
+              color: MoolColors.muted,
+              fontSize: 13,
+              height: 1.4,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _WorkspaceOpportunityContext extends StatelessWidget {

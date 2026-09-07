@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4500,
-    "sha256": "CE7B6740ABB47964D7CA1F5D883554712DD01CD9190951448F112F6A1C91EAB1"
+    "sha256": "5B0034E068CC2EDCF833C8C3F4FACA0ACF311FDB9D3940DDC9F48E0F62C144A6"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,6 +34,8 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "apps/mobile/lib/features/work/widgets/work_workspace_benefit_card.dart",
+        "apps/mobile/lib/features/work/work_workspace_benefits.dart",
         "apps/mobile/test/global_customer_copy_professionalization_test.dart",
         "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart",
         "apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart",

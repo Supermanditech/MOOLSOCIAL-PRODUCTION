@@ -13,6 +13,7 @@ class WorkWorkspaceBenefitCard extends StatelessWidget {
     required this.expanded,
     required this.onToggle,
     required this.onChoose,
+    this.showChooseAction = true,
     super.key,
   });
 
@@ -21,9 +22,13 @@ class WorkWorkspaceBenefitCard extends StatelessWidget {
   final bool expanded;
   final VoidCallback onToggle;
   final VoidCallback onChoose;
+  final bool showChooseAction;
 
   @override
   Widget build(BuildContext context) {
+    if (content.hasTopics) {
+      return _WorkspaceGrowthCard(key: ValueKey(option.id), card: this);
+    }
     final presentation = _workspacePresentation(option.familyId);
     return WorkCard(
       keyName: 'work-profile-${option.id}',
@@ -86,6 +91,398 @@ class WorkWorkspaceBenefitCard extends StatelessWidget {
                     accent: presentation.accent,
                   ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class WorkWorkspaceChooseButton extends StatelessWidget {
+  const WorkWorkspaceChooseButton({
+    required this.profileId,
+    required this.onChoose,
+    this.showNextStep = true,
+    super.key,
+  });
+  final String profileId;
+  final VoidCallback onChoose;
+  final bool showNextStep;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      FilledButton(
+        key: Key('work-profile-choose-$profileId'),
+        onPressed: onChoose,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          backgroundColor: MoolColors.navy,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Text(
+          'Choose this Workspace',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+        ),
+      ),
+      if (showNextStep) ...[
+        const SizedBox(height: 6),
+        const _WorkspaceNextStep(),
+      ],
+    ],
+  );
+}
+
+class _WorkspaceNextStep extends StatelessWidget {
+  const _WorkspaceNextStep();
+  @override
+  Widget build(BuildContext context) => const Text(
+    'Documents come next. No payment here.',
+    textAlign: TextAlign.center,
+    style: TextStyle(fontSize: 11, color: MoolColors.muted),
+  );
+}
+
+class _WorkspaceGrowthCard extends StatefulWidget {
+  const _WorkspaceGrowthCard({required this.card, super.key});
+  final WorkWorkspaceBenefitCard card;
+
+  @override
+  State<_WorkspaceGrowthCard> createState() => _WorkspaceGrowthCardState();
+}
+
+class _WorkspaceGrowthCardState extends State<_WorkspaceGrowthCard> {
+  String _topic = workWorkspaceGrowthTopics.first;
+  int _page = 0;
+  int? _detail = 0;
+
+  @override
+  void didUpdateWidget(_WorkspaceGrowthCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.card.expanded && oldWidget.card.expanded) {
+      _topic = workWorkspaceGrowthTopics.first;
+      _page = 0;
+      _detail = 0;
+    }
+  }
+
+  void _showTopic(String topic) => setState(() {
+    _topic = topic;
+    _page = 0;
+    _detail = 0;
+  });
+
+  void _showPage(int page) => setState(() {
+    _page = page;
+    _detail = 0;
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final card = widget.card;
+    final compactHeading = MediaQuery.textScalerOf(context).scale(14) > 18;
+    final items = card.content.benefits
+        .where((point) => point.group == _topic)
+        .toList();
+    final start = _page * 3;
+    final visible = items.skip(start).take(3).toList();
+    final radius = BorderRadius.circular(16);
+    if (!card.expanded) {
+      return Material(
+        key: Key('work-profile-${card.option.id}'),
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: const BorderSide(color: Color(0xFFE2E5F0)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: card.onToggle,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(card.option.icon, color: MoolColors.navy, size: 24),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        card.option.label,
+                        style: const TextStyle(
+                          color: MoolColors.navy,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  card.content.preview,
+                  key: Key('workspace-benefit-preview-${card.option.id}'),
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'See how MoolSocial helps',
+                  style: TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return Material(
+      key: Key('work-profile-${card.option.id}'),
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: const BorderSide(color: Color(0xFFD9DEEE)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        key: Key('workspace-benefits-${card.option.id}'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ColoredBox(
+            color: MoolColors.navy,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+              child: Row(
+                children: [
+                  if (!compactHeading) ...[
+                    Icon(card.option.icon, size: 25, color: Colors.white),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          card.option.label,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        if (!compactHeading) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            card.content.subtitle,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    key: Key('work-profile-close-${card.option.id}'),
+                    tooltip: 'Close details',
+                    onPressed: card.onToggle,
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final large = MediaQuery.textScalerOf(context).scale(13) > 17;
+                final columns = large || constraints.maxWidth < 290 ? 2 : 4;
+                return Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  children: [
+                    for (final topic in workWorkspaceGrowthTopics)
+                      SizedBox(
+                        width: large ? null : constraints.maxWidth / columns,
+                        child: Semantics(
+                          selected: _topic == topic,
+                          child: TextButton(
+                            key: Key('work-growth-group-$topic'),
+                            onPressed: _topic == topic
+                                ? null
+                                : () => _showTopic(topic),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(44, 44),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: large ? 8 : 2,
+                                vertical: 10,
+                              ),
+                              foregroundColor: MoolColors.muted,
+                              disabledForegroundColor: MoolColors.navy,
+                              backgroundColor: _topic == topic
+                                  ? const Color(0xFFF0F2FD)
+                                  : Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: Text(
+                              topic,
+                              softWrap: false,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE2E5F0)),
+          for (var index = 0; index < visible.length; index++) ...[
+            Semantics(
+              button: true,
+              expanded: _detail == index,
+              child: InkWell(
+                key: Key('work-growth-concern-${visible[index].action}'),
+                onTap: () =>
+                    setState(() => _detail = _detail == index ? null : index),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              visible[index].title,
+                              style: const TextStyle(
+                                color: MoolColors.ink,
+                                fontSize: 14,
+                                height: 1.3,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              visible[index].action,
+                              key: Key(
+                                'work-growth-action-${visible[index].action}',
+                              ),
+                              style: const TextStyle(
+                                color: MoolColors.navy,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        _detail == index ? Icons.remove : Icons.add,
+                        size: 18,
+                        color: MoolColors.navy,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            AnimatedSize(
+              key: Key('work-growth-disclosure-${visible[index].action}'),
+              alignment: Alignment.topCenter,
+              duration: MoolMotion.accessible(context, MoolMotion.standard),
+              curve: MoolMotion.enter,
+              child: _detail != index
+                  ? const SizedBox(width: double.infinity)
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 36, 12),
+                      child: Text(
+                        visible[index].detail,
+                        style: const TextStyle(
+                          color: MoolColors.muted,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E5F0)),
+          ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                IconButton(
+                  key: const Key('work-growth-previous'),
+                  tooltip: 'Previous points',
+                  onPressed: _page == 0 ? null : () => _showPage(_page - 1),
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                Expanded(
+                  child: Text(
+                    '${start + 1}–${start + visible.length} of ${items.length}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: MoolColors.muted,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  key: const Key('work-growth-next'),
+                  tooltip: 'More points',
+                  onPressed: start + visible.length >= items.length
+                      ? null
+                      : () => _showPage(_page + 1),
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+          ),
+          if (card.showChooseAction)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: WorkWorkspaceChooseButton(
+                profileId: card.option.id,
+                onChoose: card.onChoose,
+              ),
+            )
+          else
+            const Padding(
+              padding: EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: _WorkspaceNextStep(),
+            ),
         ],
       ),
     );

@@ -1481,23 +1481,92 @@ void main() {
       workWorkspaceBenefits.keys.toSet(),
       workProfiles.map((profile) => profile.id).toSet(),
     );
-    for (final content in workWorkspaceBenefits.values) {
+    for (final profileId in workWorkspaceBenefits.keys) {
+      final content = workWorkspaceBenefitFor(profileId);
       expect(content.problem.trim(), isNotEmpty);
       expect(content.preview.trim(), isNotEmpty);
-      expect(content.benefits, hasLength(4));
+      final expectedCount = switch (profileId) {
+        'retailer-grocery' || 'retailer-speciality' => 25,
+        'wholesaler' || 'manufacturer' => 12,
+        _ => 4,
+      };
+      expect(content.benefits, hasLength(expectedCount), reason: profileId);
+      if (content.hasTopics) {
+        expect(content.subtitle, isNotEmpty);
+        expect(
+          content.benefits.map((point) => point.action).toSet(),
+          hasLength(expectedCount),
+        );
+        expect(
+          content.benefits.map((point) => point.group).toSet(),
+          workWorkspaceGrowthTopics.toSet(),
+        );
+      }
       expect(content.difference.trim(), isNotEmpty);
       final visibleCopy = [
         content.problem,
         content.preview,
         content.difference,
         ...content.benefits.expand(
-          (benefit) => [benefit.title, benefit.detail],
+          (benefit) => [
+            benefit.title,
+            benefit.detail,
+            benefit.action,
+            benefit.group,
+          ],
         ),
       ].join(' ').toLowerCase();
       expect(visibleCopy, isNot(matches(RegExp(r'\bactor\b'))));
       expect(visibleCopy, isNot(contains('user type')));
       expect(visibleCopy, isNot(contains('internal')));
     }
+    const expectedRetailActions = {
+      'Publish products',
+      'Send store link',
+      'Collect at store',
+      'Promote store',
+      'Create basket',
+      'Send offers',
+      'Clear stock',
+      'Send bill',
+      'Restock',
+      'Buy Direct',
+      'Group Bulk Buying',
+      'Track stock',
+      'Receive goods',
+      'Request stock',
+      'Collect dues',
+      'View statement',
+      'Settle',
+      'Get tax help',
+      'Check eligibility',
+      'Add products',
+      'Pack orders',
+      'Arrange delivery',
+      'Post requirement',
+      'Review returns',
+      'Check earnings',
+    };
+    for (final id in ['retailer-grocery', 'retailer-speciality']) {
+      expect(
+        workWorkspaceBenefitFor(
+          id,
+        ).benefits.map((point) => point.action).toSet(),
+        expectedRetailActions,
+      );
+    }
+    expect(
+      workWorkspaceBenefitFor(
+        'retailer-speciality',
+      ).benefits.singleWhere((point) => point.action == 'Create basket').detail,
+      contains('product bundle'),
+    );
+    expect(
+      workWorkspaceBenefitFor(
+        'manufacturer',
+      ).benefits.singleWhere((point) => point.action == 'Create Offer').detail,
+      contains('disclosed service charges'),
+    );
   });
 
   test('opportunity filters combine city, area and exact six-digit PIN', () {

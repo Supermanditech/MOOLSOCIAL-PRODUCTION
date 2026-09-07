@@ -2109,6 +2109,289 @@ void main() {
     );
   }
 
+  for (final display in [
+    (size: Size(412, 915), scale: 1.0),
+    (size: Size(360, 800), scale: 1.0),
+    (size: Size(320, 568), scale: 1.4),
+    (size: Size(320, 640), scale: 2.0),
+  ]) {
+    testWidgets('S01 growth placement ${display.size.width} ${display.scale}', (
+      tester,
+    ) async {
+      final work = WorkSession();
+      await mount(
+        tester,
+        route: '/app/work/workspace/choose',
+        work: work,
+        viewport: display.size,
+        textScale: display.scale,
+        bottomInset: 24,
+      );
+      await captureStoreView(
+        tester,
+        'r665-growth-entry-${display.size.width.toInt()}-${display.scale}',
+      );
+      final profile = find.byKey(const Key('work-profile-retailer-grocery'));
+      expect(profile.hitTestable(), findsOneWidget);
+      await reveal(tester, profile);
+      await tester.tap(profile);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('workspace-benefits-retailer-grocery')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('work-profile-retailer-speciality')),
+        findsNothing,
+      );
+      expect(work.selectedProfile, isNull);
+      expect(find.byKey(const Key('workspace-chooser-hero')), findsNothing);
+      await captureStoreView(
+        tester,
+        'r665-growth-customers-${display.size.width.toInt()}-${display.scale}',
+      );
+      expect(
+        find.byKey(const Key('work-growth-concern-Send offers')).hitTestable(),
+        findsOneWidget,
+        reason:
+            'Concern ${tester.getRect(find.byKey(const Key('work-growth-concern-Send offers')))}; list ${tester.getRect(find.byKey(const Key('work-choose-screen')))}',
+      );
+      final choose = find.byKey(
+        const Key('work-profile-choose-retailer-grocery'),
+      );
+      expect(choose, findsOneWidget);
+      expect(choose.hitTestable(), findsOneWidget);
+      expect(
+        tester.getBottomRight(choose).dy,
+        lessThanOrEqualTo(display.size.height - 24),
+      );
+      final seen = <String>{};
+      for (final group in ['Customers', 'Stock', 'Money', 'Daily work']) {
+        final tab = find.byKey(Key('work-growth-group-$group'));
+        await reveal(tester, tab);
+        await tester.tap(tab);
+        await tester.pumpAndSettle();
+        while (true) {
+          final rows = find.byWidgetPredicate(
+            (widget) =>
+                widget is Text &&
+                widget.key is ValueKey<String> &&
+                (widget.key! as ValueKey<String>).value.startsWith(
+                  'work-growth-action-',
+                ),
+          );
+          expect(rows.evaluate().length, inInclusiveRange(1, 3));
+          seen.addAll(tester.widgetList<Text>(rows).map((text) => text.data!));
+          final next = find.byKey(const Key('work-growth-next'));
+          if (tester.widget<IconButton>(next).onPressed == null) break;
+          await reveal(tester, next);
+          await tester.tap(next);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        }
+      }
+      expect(seen, hasLength(25));
+      expect(
+        seen,
+        containsAll([
+          'Collect at store',
+          'Collect dues',
+          'Restock',
+          'Buy Direct',
+          'Group Bulk Buying',
+          'Get tax help',
+          'Check eligibility',
+          'Post requirement',
+          'Review returns',
+          'Check earnings',
+        ]),
+      );
+      await reveal(tester, find.byKey(const Key('work-growth-group-Stock')));
+      await tester.tap(find.byKey(const Key('work-growth-group-Stock')));
+      await tester.pumpAndSettle();
+      await captureStoreView(
+        tester,
+        'r665-growth-${display.size.width.toInt()}-${display.scale}',
+      );
+      await reveal(tester, choose);
+      await tester.tap(choose);
+      await tester.pumpAndSettle();
+      expect(work.selectedProfile?.id, 'retailer-grocery');
+      expect(find.byKey(const Key('work-requirements-screen')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+      expect(
+        find.byKey(const Key('workspace-benefits-retailer-grocery')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const Key('work-growth-group-Stock')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const Key('work-back')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('workspace-benefits-retailer-grocery')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final profile in ['retailer-speciality', 'wholesaler', 'manufacturer']) {
+    testWidgets('S01 growth profile $profile keeps copy focus and scroll', (
+      tester,
+    ) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      final work = WorkSession();
+      await mount(
+        tester,
+        route: '/app/work/workspace/choose',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+        bottomInset: 24,
+      );
+      final choice = find.byKey(Key('work-profile-$profile'));
+      await reveal(tester, choice);
+      final list = find.byKey(const Key('work-choose-screen'));
+      final controller = tester.widget<ListView>(list).controller!;
+      final offset = controller.offset;
+      await tester.tap(choice);
+      await tester.pumpAndSettle();
+      expect(controller.offset, 0);
+      expect(work.selectedProfile, isNull);
+      expect(
+        find.byKey(const Key('work-profile-retailer-grocery')),
+        findsNothing,
+      );
+      if (profile == 'retailer-speciality') {
+        expect(
+          find.text('The right products sell better together.'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('monthly shopping'), findsNothing);
+      } else {
+        expect(find.text('Collect at store'), findsNothing);
+        expect(find.textContaining('families'), findsNothing);
+      }
+      if (profile == 'manufacturer') {
+        expect(find.text('Create Offer'), findsOneWidget);
+        expect(
+          find.text('Finished goods are waiting for buyers.'),
+          findsOneWidget,
+        );
+      }
+      final rows = find.byWidgetPredicate(
+        (widget) =>
+            widget is AnimatedSize &&
+            widget.key.toString().contains('work-growth-disclosure-'),
+      );
+      expect(rows, findsNWidgets(3));
+      for (final row in tester.widgetList<AnimatedSize>(rows)) {
+        expect(row.duration, Duration.zero);
+      }
+      await captureStoreView(tester, 'r665-growth-$profile');
+      await tester.tap(find.byKey(Key('work-profile-close-$profile')));
+      await tester.pumpAndSettle();
+      expect(controller.offset, closeTo(offset, .5));
+      expect(choice.hitTestable(), findsOneWidget);
+      expect(work.selectedProfile, isNull);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'S01 growth disclosure is one native action and never activates a service',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final work = WorkSession();
+        await mount(
+          tester,
+          route: '/app/work/workspace/choose',
+          work: work,
+          viewport: const Size(412, 915),
+          textScale: 1,
+          bottomInset: 24,
+        );
+        final choice = find.byKey(const Key('work-profile-retailer-grocery'));
+        await reveal(tester, choice);
+        await tester.tap(choice);
+        await tester.pumpAndSettle();
+        final second = find.byKey(
+          const Key('work-growth-concern-Create basket'),
+        );
+        expect(tester.getSize(second).height, greaterThanOrEqualTo(44));
+        await tester.tap(second);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Put regular essentials'), findsOneWidget);
+        expect(
+          find.textContaining('Use your shop’s customer records'),
+          findsNothing,
+        );
+        await tester.tap(second);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Put regular essentials'), findsNothing);
+        expect(find.text('Choose this Workspace'), findsOneWidget);
+        expect(work.selectedProfile, isNull);
+        expect(work.reviewCaseId, isNull);
+        final stock = find.byKey(const Key('work-growth-group-Stock'));
+        await tester.tap(stock);
+        await tester.pumpAndSettle();
+        expect(find.text('Restock'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    'S01 growth clearing search restores choices without changing application',
+    (tester) async {
+      final work = WorkSession()..selectProfile('retailer-speciality');
+      await mount(
+        tester,
+        route: '/app/work/workspace/choose',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+      );
+      final search = find.byKey(const Key('work-workspace-search'));
+      await tester.enterText(search, 'grocery');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-profile-retailer-grocery')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-profile-retailer-speciality')),
+        findsNothing,
+      );
+      await tester.tap(find.byKey(const Key('work-workspace-search-clear')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('workspace-benefits-retailer-grocery')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('work-profile-retailer-speciality')),
+        findsOneWidget,
+      );
+      expect(work.selectedProfile?.id, 'retailer-speciality');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('OPPO S01 inline discovery preserves the selected application', (
     tester,
   ) async {
@@ -2126,7 +2409,7 @@ void main() {
       findsOneWidget,
     );
     expect(tester.widget<TextField>(search).decoration!.filled, isFalse);
-    expect(find.text('Partner with MoolSocial'), findsOneWidget);
+    expect(find.text('Grow with MoolSocial'), findsOneWidget);
     await captureStoreView(tester, 'r665-selector-first-view');
     await tester.enterText(search, 'saloon');
     await tester.pumpAndSettle();
