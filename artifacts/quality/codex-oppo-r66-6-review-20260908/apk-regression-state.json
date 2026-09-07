@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "prebuild_passed",
-  "buildAuthorization": "pending_source_seal",
+  "machineState": "built_integrity_passed_install_pending",
+  "buildAuthorization": "consumed",
   "preBuildValidation": {
     "state": "passed",
     "evidence": "artifacts/quality/codex-oppo-r66-6-review-20260908/prebuild-validation.md"
@@ -14,7 +14,7 @@
     "buildMode": "debug",
     "gateProfile": "uaw_runtime_ui_review_debug",
     "branch": "work/codex-ui/codex-oppo-review-v1-20260905",
-    "head": "01bc64a7ed3ca9eff227be934897ed38391eabb3"
+    "head": "c8d73ec44b52e9c9e4e341976c8fbd677dd9eb5d"
   },
   "source": {
     "manifestPath": "artifacts/quality/codex-oppo-r66-6-review-20260908/source-manifest.txt",
@@ -148,10 +148,20 @@
       "fabricated_live_activity_and_perpetual_decorative_blinking"
     ]
   },
+  "apk": {
+    "sourceHead": "c8d73ec44b52e9c9e4e341976c8fbd677dd9eb5d",
+    "sha256": "C9A891ACD0ABEAD78496CE78648D2E5E2F67DAE11C015E8645DD1FF9B78D0865",
+    "bytes": 209722689,
+    "package": "com.moolsocial.app.runtime",
+    "versionCode": 2026090801,
+    "versionName": "1.0.0-r66.6-runtime",
+    "path": "artifacts/device/codex-oppo-r66-6-review-20260908/uaw-codex-oppo-r66.6-review-20260908-device-review-debug.apk",
+    "buildLogSha256": "F2D63B958B679B92BC67343BB3F9554D27AE39D99AD2C37185946A77B64C034E"
+  },
   "postBuildGates": [
     {
       "id": "apk-integrity",
-      "state": "pending"
+      "state": "passed"
     },
     {
       "id": "oppo-install",

@@ -1,1 +1,15 @@
-PENDING — no r66.6 APK has been built. Exact builder provenance will be copied from the new immutable device-artifact location after successful qualification and build.
+CandidateId=UAW-CODEX-OPPO-R66.6-REVIEW-20260908
+RuntimeProfile=RuntimeUiReview
+RuntimeDefines=RuntimeUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-CODEX-OPPO-R66.6-REVIEW-20260908;AndroidDebugPackage=runtime;Promotable=false
+Version=1.0.0-r66.6
+VersionCode=2026090801
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905\artifacts\quality\codex-oppo-r66-6-review-20260908\apk-regression-state.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905\artifacts\quality\codex-oppo-r66-6-review-20260908\apk-regression-state.json
+Branch=work/codex-ui/codex-oppo-review-v1-20260905
+HEAD=c8d73ec44b52e9c9e4e341976c8fbd677dd9eb5d
+SourceFingerprint=6E18577B4FA608FDC70F922B3B942E8314C3ACA60D252E01D2217313FCE758EC
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905\artifacts\device\codex-oppo-r66-6-review-20260908\uaw-codex-oppo-r66.6-review-20260908-device-review-debug.apk
+Bytes=209722689
+SHA256=C9A891ACD0ABEAD78496CE78648D2E5E2F67DAE11C015E8645DD1FF9B78D0865
+BuiltAt=2026-09-08T02:45:28.4106341+05:30
