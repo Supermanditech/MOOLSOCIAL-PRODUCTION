@@ -8,11 +8,262 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  void expectCollectionText(WidgetTester tester, Finder owner) {
+    final bounds = tester.getRect(owner);
+    for (final paragraph in tester.renderObjectList<RenderParagraph>(
+      find.descendant(of: owner, matching: find.byType(RichText)),
+    )) {
+      final label = paragraph.text.toPlainText();
+      // Icon fonts have their own single-glyph metrics.
+      if (paragraph.text.style?.fontFamily == 'MaterialIcons') continue;
+      expect(paragraph.text.style?.fontFamily, 'Inter', reason: label);
+      expect(paragraph.didExceedMaxLines, isFalse, reason: label);
+      final natural = TextPainter(
+        text: paragraph.text,
+        textDirection: paragraph.textDirection,
+        textScaler: paragraph.textScaler,
+      )..layout(maxWidth: paragraph.size.width);
+      expect(
+        paragraph.size.height,
+        greaterThanOrEqualTo(natural.height - .1),
+        reason: label,
+      );
+      natural.dispose();
+      final rect = paragraph.localToGlobal(Offset.zero) & paragraph.size;
+      expect(rect.left, greaterThanOrEqualTo(bounds.left - .1), reason: label);
+      expect(rect.right, lessThanOrEqualTo(bounds.right + .1), reason: label);
+      expect(rect.bottom, lessThanOrEqualTo(bounds.bottom + .1), reason: label);
+      for (final word in label.split(RegExp(r'\s+'))) {
+        final painter = TextPainter(
+          text: TextSpan(text: word, style: paragraph.text.style),
+          textDirection: paragraph.textDirection,
+          textScaler: paragraph.textScaler,
+        )..layout();
+        expect(
+          painter.width,
+          lessThanOrEqualTo(paragraph.size.width + .1),
+          reason: 'Whole word must fit: $word in $label',
+        );
+        painter.dispose();
+      }
+    }
+  }
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final viewport in [
+      const Size(320, 700),
+      const Size(360, 800),
+      const Size(430, 900),
+      const Size(640, 360),
+    ]) {
+      for (final scale in [1.0, 1.4, 2.0]) {
+        for (final collection in ['saved', 'recently-viewed']) {
+          testWidgets(
+            'R5 029H collection facts and actions ${destination.name} '
+            '$collection ${viewport.width.toInt()}x${viewport.height.toInt()} $scale',
+            (tester) async {
+              tester.view.devicePixelRatio = 1;
+              tester.view.physicalSize = viewport;
+              tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+              tester.view.viewPadding = const FakeViewPadding(
+                top: 24,
+                bottom: 24,
+              );
+              tester.platformDispatcher.textScaleFactorTestValue = scale;
+              addTearDown(tester.view.reset);
+              addTearDown(
+                tester.platformDispatcher.clearTextScaleFactorTestValue,
+              );
+              final core = BuySession();
+              final session = BuyV2Session(core: core);
+              addTearDown(core.dispose);
+              addTearDown(session.dispose);
+              final productId = destination == BuyV2Destination.shop
+                  ? 's-milk'
+                  : 'w-rice-50kg';
+              final otherId = destination == BuyV2Destination.shop
+                  ? 'w-rice'
+                  : 's-tomato';
+              session.addProduct(otherId);
+              final otherQuantity = session.quantityFor(otherId);
+              session.openDestination(destination);
+              session.openProduct(productId);
+              session.closeProduct();
+              session.toggleSaved(productId);
+              await tester.pumpWidget(
+                MaterialApp(
+                  debugShowCheckedModeBanner: false,
+                  theme: MoolTheme.light(),
+                  builder: (_, child) => r66VisualCaptureRoot(child!),
+                  home: Scaffold(
+                    body: Builder(
+                      builder: (context) => TextButton(
+                        onPressed: () =>
+                            showBuyV2ShoppingSettings(context, session),
+                        child: const Text('Open settings'),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+              await tester.tap(find.text('Open settings'));
+              await tester.pumpAndSettle();
+              final entry = find.byKey(ValueKey('buy-settings-$collection'));
+              await tester.ensureVisible(entry);
+              await tester.pumpAndSettle();
+              final position = Scrollable.of(tester.element(entry)).position;
+              final originalOffset = position.pixels;
+              await tester.tap(entry);
+              await tester.pumpAndSettle();
+              final product = session.product(productId);
+              final open = find.byKey(
+                ValueKey(
+                  collection == 'saved'
+                      ? 'buy-saved-$productId'
+                      : 'buy-settings-recently-viewed-product-$productId',
+                ),
+              );
+              await tester.ensureVisible(open);
+              await tester.pumpAndSettle();
+              expectCollectionText(tester, open);
+              expect(
+                find.descendant(of: open, matching: find.text(product.title)),
+                findsOneWidget,
+              );
+              final price = collection == 'saved'
+                  ? product.price
+                  : session.productFactsFor(product).price;
+              expect(
+                find.descendant(
+                  of: open,
+                  matching: find.text('${product.pack} · ${buyV2Money(price)}'),
+                ),
+                findsOneWidget,
+              );
+              if (collection == 'recently-viewed') {
+                expect(
+                  find.descendant(
+                    of: open,
+                    matching: find.text(
+                      buyV2BuyerDeliveryPromise(
+                        session.productFactsFor(product),
+                      ),
+                    ),
+                  ),
+                  findsOneWidget,
+                );
+              }
+              final captureName =
+                  'r5-029h-${destination.name}-$collection-'
+                  '${viewport.width.toInt()}x${viewport.height.toInt()}-$scale';
+              final labels = find.descendant(
+                of: open,
+                matching: find.byType(Text),
+              );
+              await tester.ensureVisible(labels.first);
+              await tester.pumpAndSettle();
+              await captureR66Visual(tester, '$captureName-facts');
+              final list = find
+                  .ancestor(of: open, matching: find.byType(ListView))
+                  .first;
+              final initialScroll = Scrollable.of(
+                tester.element(open),
+              ).position.pixels;
+              for (final element in labels.evaluate().toList()) {
+                final label = find.byWidget(element.widget);
+                await tester.ensureVisible(label);
+                await tester.pumpAndSettle();
+                final labelBounds = tester.getRect(label);
+                final viewportBounds = tester.getRect(list);
+                expect(
+                  labelBounds.top,
+                  greaterThanOrEqualTo(viewportBounds.top - .1),
+                );
+                expect(
+                  labelBounds.bottom,
+                  lessThanOrEqualTo(viewportBounds.bottom + .1),
+                );
+              }
+              if (Scrollable.of(tester.element(open)).position.pixels !=
+                  initialScroll) {
+                await captureR66Visual(tester, '$captureName-facts-scrolled');
+              }
+              if (collection == 'recently-viewed') {
+                final add = find.byKey(
+                  ValueKey('buy-recently-viewed-add-$productId'),
+                );
+                await tester.ensureVisible(add);
+                await tester.pumpAndSettle();
+                expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
+                expect(tester.getSize(add).width, greaterThanOrEqualTo(44));
+                expectCollectionText(tester, add);
+                final label = tester.renderObject<RenderParagraph>(
+                  find.descendant(of: add, matching: find.text('Add')),
+                );
+                expect(label.text.style?.fontFamily, 'Inter');
+                await tester.tap(add);
+                await tester.pumpAndSettle();
+                expect(session.quantityFor(productId), 1);
+                expect(session.quantityFor(otherId), otherQuantity);
+                expectCollectionText(tester, add);
+                expect(
+                  find.descendant(of: add, matching: find.text('Added')),
+                  findsOneWidget,
+                );
+                await captureR66Visual(tester, '$captureName-added');
+              } else {
+                final remove = find.byKey(ValueKey('buy-unsave-$productId'));
+                await tester.ensureVisible(remove);
+                await tester.pumpAndSettle();
+                expect(tester.getSize(remove).height, greaterThanOrEqualTo(44));
+                expect(tester.getSize(remove).width, greaterThanOrEqualTo(44));
+                await tester.tap(remove);
+                await tester.pumpAndSettle();
+                expect(session.savedProductsFor(destination), isEmpty);
+                expect(find.text('No saved products yet'), findsOneWidget);
+              }
+              final close = find.byKey(
+                ValueKey(
+                  'buy-info-sheet-close-'
+                  '${collection == 'saved' ? 'Saved products' : 'Recently viewed'}',
+                ),
+              );
+              expect(tester.getSize(close).height, greaterThanOrEqualTo(44));
+              await tester.tap(close);
+              await tester.pumpAndSettle();
+              expect(position.pixels, originalOffset);
+              if (collection == 'saved') session.toggleSaved(productId);
+              await tester.tap(entry);
+              await tester.pumpAndSettle();
+              await tester.ensureVisible(open);
+              await tester.pumpAndSettle();
+              expect(tester.getSize(open).height, greaterThanOrEqualTo(44));
+              await tester.tap(open);
+              await tester.pumpAndSettle();
+              expect(session.selectedProductId, productId);
+              expect(session.view, BuyV2View.product);
+              expect(
+                find.byKey(const ValueKey('buy-shopping-settings')),
+                findsNothing,
+              );
+              expect(session.quantityFor(otherId), otherQuantity);
+              expect(tester.takeException(), isNull);
+            },
+          );
+        }
+      }
+    }
+  }
 
   for (final scenario in [
     for (final destination in [

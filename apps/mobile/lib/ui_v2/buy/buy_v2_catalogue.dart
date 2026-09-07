@@ -5317,74 +5317,67 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
-        child: Row(
-          children: [
-            Expanded(
-              child: Semantics(
-                button: true,
-                label: 'Open ${product.title}, ${product.pack}',
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final details = Semantics(
+              button: true,
+              label: 'Open ${product.title}, ${product.pack}',
+              onTap: onOpen,
+              excludeSemantics: true,
+              child: InkWell(
+                key: ValueKey(
+                  'buy-settings-recently-viewed-product-${product.id}',
+                ),
                 onTap: onOpen,
-                excludeSemantics: true,
-                child: InkWell(
-                  key: ValueKey(
-                    'buy-settings-recently-viewed-product-${product.id}',
-                  ),
-                  onTap: onOpen,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Row(
-                    children: [
-                      SizedBox.square(
-                        dimension: 48,
-                        child: BuyV2ProductPackshot(
-                          product: product,
-                          borderRadius: 12,
-                          animateFirstFrame: false,
-                        ),
+                borderRadius: BorderRadius.circular(12),
+                child: Row(
+                  children: [
+                    SizedBox.square(
+                      dimension: 48,
+                      child: BuyV2ProductPackshot(
+                        product: product,
+                        borderRadius: 12,
+                        animateFirstFrame: false,
                       ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: BuyV2Colors.ink,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w900,
-                              ),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.title,
+                            style: const TextStyle(
+                              color: BuyV2Colors.ink,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${product.pack} · ${buyV2Money(facts.price)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.buyMeta,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${product.pack} · ${buyV2Money(facts.price)}',
+                            style: context.buyMeta,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            buyV2BuyerDeliveryPromise(facts),
+                            style: context.buyMeta.copyWith(
+                              color: BuyV2Colors.green,
+                              fontWeight: FontWeight.w800,
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              buyV2BuyerDeliveryPromise(facts),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.buyMeta.copyWith(
-                                color: BuyV2Colors.green,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(width: 7),
-            SizedBox(
-              width: 76,
-              height: BuyV2Metrics.minimumTap,
+            );
+            final add = ConstrainedBox(
+              constraints: const BoxConstraints(
+                minWidth: 76,
+                minHeight: BuyV2Metrics.minimumTap,
+              ),
               child: Semantics(
                 button: true,
                 label: quantity > 0
@@ -5401,16 +5394,38 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
                   ),
                   label: Text(quantity > 0 ? 'Added' : 'Add'),
                   style: FilledButton.styleFrom(
+                    minimumSize: const Size(76, BuyV2Metrics.minimumTap),
                     padding: const EdgeInsets.symmetric(horizontal: 9),
-                    textStyle: const TextStyle(
+                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            );
+            // Keep purchase facts readable beside the image. Move the action
+            // below them when narrow or enlarged text needs the row width.
+            if (constraints.maxWidth /
+                    MediaQuery.textScalerOf(context).scale(1) <
+                330) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  details,
+                  const SizedBox(height: 4),
+                  Align(alignment: Alignment.centerRight, child: add),
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: details),
+                const SizedBox(width: 7),
+                add,
+              ],
+            );
+          },
         ),
       ),
     ),
@@ -5487,7 +5502,7 @@ class _SavedProductInfoRow extends StatelessWidget {
           Expanded(
             child: Semantics(
               button: true,
-              label: 'Open ${product.title}',
+              label: 'Open ${product.title}, ${product.pack}',
               onTap: onOpen,
               excludeSemantics: true,
               child: InkWell(
@@ -5517,8 +5532,6 @@ class _SavedProductInfoRow extends StatelessWidget {
                           children: [
                             Text(
                               product.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: BuyV2Colors.ink,
                                 fontSize: 13,
@@ -5528,8 +5541,6 @@ class _SavedProductInfoRow extends StatelessWidget {
                             const SizedBox(height: 2),
                             Text(
                               '${product.pack} · ${buyV2Money(product.price)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                               style: context.buyMeta,
                             ),
                           ],
