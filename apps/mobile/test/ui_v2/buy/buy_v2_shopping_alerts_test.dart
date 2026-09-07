@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -15,6 +16,155 @@ import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final viewport in [const Size(320, 700), const Size(640, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R5 029G full alert descriptions $viewport $scale', (
+        tester,
+      ) async {
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          shoppingAlertsAdapter: const BuyV2UiReviewShoppingAlertsAdapter(),
+        );
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        final router = await _mountAlertRouter(
+          tester,
+          session,
+          textScale: scale,
+          viewport: viewport,
+        );
+        addTearDown(router.dispose);
+        unawaited(
+          showBuyV2ShoppingAlerts(
+            tester.element(find.byType(BuyV2Screen)),
+            session,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(session.shoppingAlerts, hasLength(4));
+        for (final alert in session.shoppingAlerts) {
+          final row = find.byKey(ValueKey('buy-shopping-alert-${alert.id}'));
+          await tester.ensureVisible(row);
+          await tester.pumpAndSettle();
+          final bounds = tester.getRect(row);
+          expect(bounds.height, greaterThanOrEqualTo(44));
+          for (final paragraph in tester.renderObjectList<RenderParagraph>(
+            find.descendant(of: row, matching: find.byType(RichText)),
+          )) {
+            expect(paragraph.didExceedMaxLines, isFalse);
+            final textBounds =
+                paragraph.localToGlobal(Offset.zero) & paragraph.size;
+            expect(textBounds.left, greaterThanOrEqualTo(bounds.left));
+            expect(textBounds.right, lessThanOrEqualTo(bounds.right));
+            expect(textBounds.top, greaterThanOrEqualTo(bounds.top));
+            expect(textBounds.bottom, lessThanOrEqualTo(bounds.bottom));
+          }
+          await captureR66Visual(
+            tester,
+            'r5-alert-${alert.kind.name}-${viewport.width.toInt()}x${viewport.height.toInt()}-$scale',
+          );
+          expect(tester.takeException(), isNull);
+        }
+      });
+    }
+  }
+
+  testWidgets('R5 033 all alert returns then collections and Help keyboard', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      shoppingAlertsAdapter: const BuyV2UiReviewShoppingAlertsAdapter(),
+    );
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    final router = await _mountAlertRouter(tester, session, textScale: 2);
+    addTearDown(router.dispose);
+    session.openDestination(BuyV2Destination.shop);
+    session.openProduct('s-milk');
+    session.closeProduct();
+    session.addProduct('s-tomato');
+    final count = session.itemCount;
+    await tester.pumpAndSettle();
+    unawaited(
+      showBuyV2ShoppingSettings(
+        tester.element(find.byType(BuyV2Screen)),
+        session,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final alertsRow = find.byKey(
+      const ValueKey('buy-settings-shopping-alerts'),
+    );
+    await tester.ensureVisible(alertsRow);
+    await tester.pumpAndSettle();
+    await tester.tap(alertsRow);
+    await tester.pumpAndSettle();
+    for (final alert in List.of(session.shoppingAlerts)) {
+      final row = find.byKey(ValueKey('buy-shopping-alert-${alert.id}'));
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-shopping-alerts')), findsOneWidget);
+    }
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    final settings = find.byKey(const ValueKey('buy-shopping-settings'));
+    for (final name in ['saved', 'recently-viewed']) {
+      final row = find.byKey(ValueKey('buy-settings-$name'));
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      final top = tester.getTopLeft(row).dy;
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(
+          ValueKey(
+            name == 'saved'
+                ? 'buy-saved-products-info-sheet'
+                : 'buy-recently-viewed-info-sheet',
+          ),
+        ),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(settings, findsOneWidget);
+      expect(tester.getTopLeft(row).dy, top);
+    }
+    final help = find.byKey(const ValueKey('buy-settings-help'));
+    await tester.ensureVisible(help);
+    await tester.pumpAndSettle();
+    final position = Scrollable.of(tester.element(help)).position;
+    final offset = position.pixels;
+    final helpTop = tester.getTopLeft(help).dy;
+    await captureR66Visual(tester, 'r5-settings-before-help-keyboard');
+    await tester.tap(help);
+    await tester.pumpAndSettle();
+    final composer = find.byKey(const ValueKey('r5-help-composer'));
+    await tester.tap(composer);
+    await tester.enterText(composer, 'Unsent draft');
+    tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+    await tester.pumpAndSettle();
+    await tester.enterText(composer, '');
+    FocusManager.instance.primaryFocus?.unfocus();
+    tester.view.viewInsets = const FakeViewPadding();
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(settings, findsOneWidget);
+    expect(position.pixels, offset);
+    expect(tester.getTopLeft(help).dy, helpTop);
+    expect(session.itemCount, count);
+    await captureR66Visual(tester, 'r5-settings-after-help-keyboard');
+    expect(tester.takeException(), isNull);
+  });
 
   for (final scenario in [(true, 1.4), (false, 1.4), (true, 2.0)]) {
     final (systemBack, textScale) = scenario;
@@ -382,9 +532,10 @@ Future<GoRouter> _mountAlertRouter(
   WidgetTester tester,
   BuyV2Session session, {
   double textScale = 1.4,
+  Size viewport = const Size(320, 700),
 }) async {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(320, 700);
+  tester.view.physicalSize = viewport;
   tester.platformDispatcher.textScaleFactorTestValue = textScale;
   tester.platformDispatcher.accessibilityFeaturesTestValue =
       FakeAccessibilityFeatures(disableAnimations: true);
@@ -418,7 +569,14 @@ Future<GoRouter> _mountAlertRouter(
       ),
       GoRoute(
         path: '/app/ask',
-        builder: (_, _) => const Scaffold(body: Text('Help destination')),
+        builder: (_, _) => const Scaffold(
+          body: Column(
+            children: [
+              Text('Help destination'),
+              TextField(key: ValueKey('r5-help-composer')),
+            ],
+          ),
+        ),
       ),
     ],
   );

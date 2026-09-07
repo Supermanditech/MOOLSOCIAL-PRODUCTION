@@ -2863,7 +2863,7 @@ Future<void> showBuyV2ShoppingSettings(
   BuildContext context,
   BuyV2Session session,
 ) async {
-  await showModalBottomSheet<void>(
+  final selectedProductId = await showModalBottomSheet<String>(
     context: context,
     useSafeArea: true,
     isScrollControlled: true,
@@ -2877,26 +2877,37 @@ Future<void> showBuyV2ShoppingSettings(
     builder: (sheetContext) => _BuyV2ShoppingSettingsSheet(
       session: session,
       onOpenSavedProducts: () {
-        Navigator.of(sheetContext).pop();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (context.mounted) {
-            unawaited(showBuyV2SavedProducts(context, session));
-          }
-        });
+        unawaited(
+          showBuyV2SavedProducts(
+            sheetContext,
+            session,
+            onOpenProduct: (productId) {
+              if (sheetContext.mounted) {
+                Navigator.of(sheetContext).pop(productId);
+              }
+            },
+          ),
+        );
       },
       onOpenRecentlyViewed: () {
-        Navigator.of(sheetContext).pop();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (context.mounted) {
-            unawaited(showBuyV2RecentlyViewed(context, session));
-          }
-        });
+        unawaited(
+          showBuyV2RecentlyViewed(
+            sheetContext,
+            session,
+            onOpenProduct: (productId) {
+              if (sheetContext.mounted) {
+                Navigator.of(sheetContext).pop(productId);
+              }
+            },
+          ),
+        );
       },
     ),
   );
+  if (selectedProductId != null) session.openProduct(selectedProductId);
 }
 
-class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
+class _BuyV2ShoppingSettingsSheet extends StatefulWidget {
   const _BuyV2ShoppingSettingsSheet({
     required this.session,
     required this.onOpenSavedProducts,
@@ -2906,6 +2917,22 @@ class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
   final BuyV2Session session;
   final VoidCallback onOpenSavedProducts;
   final VoidCallback onOpenRecentlyViewed;
+
+  @override
+  State<_BuyV2ShoppingSettingsSheet> createState() =>
+      _BuyV2ShoppingSettingsSheetState();
+}
+
+class _BuyV2ShoppingSettingsSheetState
+    extends State<_BuyV2ShoppingSettingsSheet> {
+  final _scrollController = ScrollController();
+  BuyV2Session get session => widget.session;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2927,6 +2954,7 @@ class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
           top: false,
           child: SingleChildScrollView(
             key: const ValueKey('buy-shopping-settings'),
+            controller: _scrollController,
             padding: EdgeInsets.fromLTRB(
               14,
               0,
@@ -3026,7 +3054,7 @@ class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
                   icon: Icons.bookmark_border_rounded,
                   title: 'Saved products',
                   detail: '$savedCount saved',
-                  onTap: onOpenSavedProducts,
+                  onTap: widget.onOpenSavedProducts,
                 ),
                 _ShoppingSettingsRow(
                   key: const ValueKey('buy-settings-recently-viewed'),
@@ -3035,7 +3063,7 @@ class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
                   detail: recentCount == 0
                       ? 'No recently viewed products'
                       : '$recentCount recently viewed',
-                  onTap: recentCount == 0 ? null : onOpenRecentlyViewed,
+                  onTap: recentCount == 0 ? null : widget.onOpenRecentlyViewed,
                 ),
                 _ShoppingSettingsRow(
                   key: const ValueKey('buy-settings-messages'),
@@ -3051,6 +3079,7 @@ class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
                         'return': '/app/buy',
                       },
                     ).toString(),
+                    returnScrollController: _scrollController,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -3063,6 +3092,7 @@ class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
                   onTap: () => _openBuyV2SettingsRoute(
                     context,
                     '/app/account/workspaces/preferences',
+                    returnScrollController: _scrollController,
                   ),
                 ),
                 _ShoppingSettingsRow(
@@ -3070,15 +3100,22 @@ class _BuyV2ShoppingSettingsSheet extends StatelessWidget {
                   icon: Icons.security_outlined,
                   title: 'Security and account controls',
                   detail: 'Review sign-in, sessions and account access',
-                  onTap: () =>
-                      _openBuyV2SettingsRoute(context, '/app/account/security'),
+                  onTap: () => _openBuyV2SettingsRoute(
+                    context,
+                    '/app/account/security',
+                    returnScrollController: _scrollController,
+                  ),
                 ),
                 _ShoppingSettingsRow(
                   key: const ValueKey('buy-settings-help'),
                   icon: Icons.help_outline_rounded,
                   title: 'Help and support',
                   detail: 'Get help with shopping and orders',
-                  onTap: () => _openBuyV2SettingsRoute(context, '/app/ask'),
+                  onTap: () => _openBuyV2SettingsRoute(
+                    context,
+                    '/app/ask',
+                    returnScrollController: _scrollController,
+                  ),
                 ),
               ],
             ),
@@ -3154,12 +3191,7 @@ class _ShoppingSettingsRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    detail,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.buyMeta,
-                  ),
+                  Text(detail, style: context.buyMeta),
                 ],
               ),
             ),
@@ -3289,10 +3321,29 @@ Future<void> _confirmClearBuyV2RecentlyViewed(
   session.clearRecentlyViewed(BuyV2Destination.wholesale);
 }
 
-void _openBuyV2SettingsRoute(BuildContext context, String route) {
+Future<void> _openBuyV2SettingsRoute(
+  BuildContext context,
+  String route, {
+  required ScrollController returnScrollController,
+}) async {
   final router = GoRouter.maybeOf(context);
   if (router == null) return;
-  unawaited(router.push(route));
+  final offset = returnScrollController.hasClients
+      ? returnScrollController.offset
+      : null;
+  await router.push(route);
+  if (!context.mounted || offset == null) return;
+  // A keyboard on the pushed page can resize and clamp the covered sheet.
+  // Restore its actual origin after the returned page has laid out again.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!context.mounted || !returnScrollController.hasClients) return;
+    final position = returnScrollController.position;
+    final target = offset.clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (position.pixels != target) returnScrollController.jumpTo(target);
+  });
 }
 
 Future<void> showBuyV2ShoppingAlerts(
@@ -3454,8 +3505,6 @@ Future<void> showBuyV2ShoppingAlerts(
                                     const SizedBox(height: 2),
                                     Text(
                                       _shoppingAlertDetail(alert, session),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
                                       style: sheetContext.buyMeta,
                                     ),
                                     const SizedBox(height: 2),
@@ -3548,8 +3597,9 @@ Future<void> showBuyV2HouseholdBasket(
 
 Future<void> showBuyV2SavedProducts(
   BuildContext context,
-  BuyV2Session session,
-) async {
+  BuyV2Session session, {
+  ValueChanged<String>? onOpenProduct,
+}) async {
   final destination = session.destination;
   final selectedProductId = await showModalBottomSheet<String>(
     context: context,
@@ -3570,14 +3620,19 @@ Future<void> showBuyV2SavedProducts(
     ),
   );
   if (selectedProductId != null) {
-    session.openProduct(selectedProductId);
+    if (onOpenProduct != null) {
+      onOpenProduct(selectedProductId);
+    } else {
+      session.openProduct(selectedProductId);
+    }
   }
 }
 
 Future<void> showBuyV2RecentlyViewed(
   BuildContext context,
-  BuyV2Session session,
-) async {
+  BuyV2Session session, {
+  ValueChanged<String>? onOpenProduct,
+}) async {
   final destination = session.destination;
   final selectedProductId = await showModalBottomSheet<String>(
     context: context,
@@ -3599,7 +3654,11 @@ Future<void> showBuyV2RecentlyViewed(
     ),
   );
   if (selectedProductId != null) {
-    session.openProduct(selectedProductId);
+    if (onOpenProduct != null) {
+      onOpenProduct(selectedProductId);
+    } else {
+      session.openProduct(selectedProductId);
+    }
   }
 }
 

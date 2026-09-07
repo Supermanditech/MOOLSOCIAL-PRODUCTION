@@ -1268,3 +1268,63 @@ Founder continuation instruction received during003: complete all35 with local t
 003 readback recurrence: the initial two-scale tomato regression patch succeeded but its combined readback was truncated at context compaction. Bounded readback00dfae confirmed the import and both tests appear once before any runtime edit or test execution. No command remained active, no patch was reapplied, and registry allocation remains4502. Current child changes are the claimed decision-glance test and this record only.
 
 027 sealed at1376066b518c92c8960f9139b25d56a2b248d45e, exact origin verified, clean zero-byte/record digest and coordination handoff passed.003 resumes from that HEAD on the same ticket. Exact original requirement was reread in DEFECTS.md38–40 and registry REG-20260905-4500-CURSOR-R66-PRODUCT-DETAIL-REPETITION: Fresh tomatoes repeats decision fields across four sections, repeats brand/pack/variant further down and buries Add/Visit store. Customer outcome is mvp_required product comprehension and purchase/store access. Minimum correction consolidates Shop facts into the existing purchase summary, reuses the existing Add/quantity and Store callbacks near that summary, and preserves every distinct delivery, commercial, compliance and protection fact. Wholesale's dedicated trade decision and Medicine rules remain unchanged; no new route, backend or shared owner is needed. Inventory/readback covers current ProductView, decision glance, Shop offer panel, content sections and compact action owner; existing claimed product tests will be updated only where the fresh003 requirement supersedes their duplicate-layout expectations. Reproduce counts/action position on the actual tomato product, test unavailable/retry and Store/Cart/Back, normal/200% text and policy-fact retention, then two affected regressions and visual review. Coordination41 owners, memory4502/2490, unchanged memory hash and local MVP authorization all pass (r66-product-detail-* receipts). No003 runtime/test edit has occurred at this checkpoint.
+
+
+## R5 Settings and Alerts repair — 7 September 2026
+
+**033-R5-A and 029-R5-G are locally implemented and qualified; Redmi acceptance remains pending.** Settings now remains beneath Saved and Recently viewed, so closing either collection restores the same Settings scroll position. The sheet uses its own live context instead of a disposed catalogue entry context. Choosing a product explicitly dismisses the two sheets and opens that exact product through the existing session; existing product-to-catalogue Back behavior is preserved. Returning from a pushed Help/privacy/account page restores the prior Settings offset after layout, including the tested keyboard round trip. Settings and Alert descriptions wrap fully instead of ending after two lines. No new route, backend owner, preference store or commercial completion is introduced.
+
+This is one coherent corrective slice within UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905 on work/cursor-ui/buy-redmi-fixes-v1-20260905, parent c018022a80eb6bb621d89c50b0e696efebc56bd9. The exact changed owners are buy_v2_catalogue.dart, buy_v2_shopping_settings_test.dart, buy_v2_shopping_alerts_test.dart and this RESULTS owner. Mandatory recorded42-owner/4502-registry coordination and the exact local scope-state execution gate passed. The fully read regression memory remains SHA F8FFCBCED5906DFD3857FEF2610A07071FDE43E46F704DE3763E075EBFBF2B98; implementation memory passed with2490 applicable entries. No protected/shared/native/backend source was changed.
+
+### Reproduction, regression and visual evidence
+
+- Pre-repair r66-r5-settings-red-1: native1, three normal/landscape controls passed; four Shop/Wholesale empty/populated Saved cases failed after the original entry widget unmounted, and the320dp200% Settings-description case failed its rendered-line assertion. Complete stdout11539bytes SHA C0AA9A2CA8EFA0D52501AC6C780CEC39469368E393C7BC657BB8D8F79F1E2DC8. This isolates the old context dependency; the precise device route rebuild remains a narrower inference, not a claimed trace.
+- The first complete two-file run passed26 tests. Expanded collection coverage passed16 cases across Shop/Wholesale, empty/populated,320x700/640x360 and100%/200% text, including repeated Back, scope and Cart preservation. The original full product-selection path remains tested. An additional actual-router test visits all four alerts, returns through Saved/Recent, types and clears an unsent Help fixture draft, changes keyboard insets and verifies the exact Settings position and Cart count.
+- Final nine-file connected cycles r66-r5-settings-connected-cycle-1 and-2 each passed **347 tests, one unchanged intentional skip, zero failures**, with identical source/test hashes. Both native exits0 and stderr0. Cycle1 stdout79436bytes SHA1620D4FDE2C24118BAD6C96ABF95D091BA7AEDC5D6266F0122A36106509F5A37,02:38:49.064–02:45:16.608Z. Cycle2 stdout79436bytes SHA93A39A47CF159C8C75042A765234AFF46C2AB78C1656EAD5E0D0BE20D44619D0,02:45:44.963–02:51:07.398Z. The seven SCROLL-related suites plus Settings and Alerts were run; the unchanged five named legacy exclusions and R58.8.[67] candidate-capture pattern are retained verbatim in the receipts. These are two affected connected cycles, not the later full26-file APK qualification.
+- Final visual run r66-r5-settings-alerts-visual-2 passed25 targeted cases and generated62 PNGs in apps/mobile/build/r66-r5-settings-alerts-after-2-20260907. All were personally inspected:30 match the earlier reviewed Settings/Alerts set byte-for-byte;32 cover nested collections. External contact/binding directory r66-r5-settings-collections-contact-2 has binding SHA B52AFEC039EF2B9ECBA3B5B35D92725FC45C7D1C931310581214A2EF353B2FC3. Full Settings/Alert descriptions and their scroll-reachable controls pass; before/after Help keyboard frames match visually. Populated Saved/Recent fact clipping is separately registered below and prevents blanket visual acceptance.
+- Analysis r66-r5-settings-analyze-1: native0, No issues found, stdout96bytes SHA B12FA757C634CA0E5C8BFBA6FB4EEC27BE4D00F0C4003EAC8DE17F6354DE41AD. Formatter reports no remaining change; git diff --check passed. Approved UI locks r66-r5-settings-approved-locks-1: native0, stdout52bytes SHA3E4264965F00119D5F60E86C03C1262B7C17F6B683F112D3DC1C81A8C21BAC68. Precommit/postcommit/remote readback follow this atomic evidence update under the standing manifest authority.
+
+Exact final pins:
+
+| Owner under apps/mobile | SHA-256 |
+|---|---|
+|lib/ui_v2/buy/buy_v2_catalogue.dart|0861463B555CF1B90FCC97432BD6F8B289ABC2A740D106BE2E41F59890064CFA|
+|test/ui_v2/buy/buy_v2_shopping_settings_test.dart|F02BE84A913E2DBA464A8ADD2E75F500DF0B9899D7A6C8A7C6FCC7CDE5B02B8A|
+|test/ui_v2/buy/buy_v2_shopping_alerts_test.dart|289085577F6DC909EB17AE8491F80C2687C033E1E8DE27A4F18A3C977810F374|
+
+### Redmi checkpoint and complete remaining inventory
+
+Installed Redmi TG8HCYTGGQT885OF still has com.moolsocial.app.cursorreview r66.4/2026090701, runtime28b1b6126a4f145f8c639cfc3029860507845845/build5c75549a313d55cfc273f408178169137be4a240, APK6805F969B43EA7DD04CB750C4095E393EFA314916AE68616CDD38470A0238132. Neither this repair nor the prior c018 round ball is installed. Current last actual action/capture463 is Orders, normal portrait/font1.0/physicaldensity320/no override/rotation0/autorotate1. Temporary Wholesale50kg rice1/3200 and Shop monthly21/5145 were removed through scoped confirmations457–462;463 preserves12active/2delivered and NEW09/74 plus NEW08/37. Saved/Medicine/coupons/payment offers were cleared earlier; no draft, message, real payment, order, refund, upload, call, WhatsApp, OPPO or production mutation was made in this continuation.
+
+All35 originals,9R2 and16R4 have explicit current-candidate dispositions in apps/mobile/build/r66-4-prebuild-20260907/DEVICE-MATRIX-35-9-16.md, latest SHA E9A8B11694C7E76FF9B59391B219739D3EF27FA4F03C7F95D03422FCE861BBEA. Observed passes, child failures and backend/optical/arrival-sound/repeated-restart limits remain distinct; **zero tickets are accepted/closed**. Additional375–438 capture integrity64triples SHA9DC3D86426CC526CF8A523C83389435E4E3A2E5CB9C601D38B158754B65EF699;439–456 integrity18triples SHA8DAF2815CE048B7C96289965379A3E513DC2D5A893B02B8D41BAF4635E8098B4;457–463 integrity7triples SHA2290BC36344440EF8CA6820F3D72278370C1554F5A4D65B92EBA80352C452593. Earlier001–374 audits and every original frame remain preserved. Detailed chronology is in the adjacent REDMI-UAT.md and external founder instruction ledger.
+
+R5 count is now **23: three local implementations (029F,033A,029G) pending Redmi and20 other children awaiting repair**. This does not change the previously locally implemented35+9+16 totals.
+
+| R5 child | Remaining outcome |
+|---|---|
+|001-A|Restore light status icons after returning from global preferences/privacy/help.|
+|004-A|Keep Cart from covering Saved/filter empty messages.|
+|004-B|Keep Cart from covering the product description after Compare Back.|
+|006-A|Honor the user's Cart drag position and stable return placement.|
+|007-A|Remove stale nested Store/Cart/product history and restore catalogue search/scroll.|
+|011-A|Show meaningful compact order progress instead of a lightning-only indicator.|
+|011-B|Give Keep and Hide distinct behavior; preserve an honest sound preference.|
+|014-A|Use singular pack wording for minimum and Cart quantity1.|
+|020-A|Compact Sort/refine; unify delivery/filter state, remove semantic duplicates and separate global settings.|
+|022-A|Connect the approved consumer Scan & Pick/Collect at store flow and remove confusing generic scanner entry; backend authority stays pending.|
+|023-A|Preserve Offers when the last opposite-scope SKU is removed.|
+|024-A|Readable, neutral unavailable-payment recovery feedback.|
+|027-A|Full coupon/payment issuer and eligibility terms and readable Remove action.|
+|029-A|Readable empty-search hint and Recent searches heading.|
+|029-B|Full Tracking Address and delivered-order refund action labels.|
+|029-C|Unclipped enlarged Active/Delivered tabs.|
+|029-D|Full Medicine Cart delivery-confirmation wording.|
+|029-E|Unbroken enlarged prescription-sheet heading.|
+|029-H|Full Saved/Recent product, pack, price and delivery facts in compact/enlarged rows.|
+|035-A|Readable selected brand label.|
+
+**New029-R5-H** was registered before row repair: apps/mobile/build/r66-4-prebuild-20260907/CHILD-029-R5-H.md SHA FD3CBA924CC475C617889FB70C1FDBE7917C664214F5E478B324E8F8C8F8BF6E. Source inspection confirms the existing one-line ellipsis constraints in _SavedProductInfoRow and _RecentlyViewedProductInfoRow; these were not introduced by this slice. The normal360dp Redmi412 frame is legible, while actual local320dp/enlarged frames lose title/pack/price/deadline. Local white Add-label blocks are an unqualified font-fixture observation, not a confirmed device defect. Reuse those native rows and existing tests, preserve exact SKU/actions/Cart/Back, and qualify real fonts and responsive facts before device closure. No new route/backend/controller is necessary.
+
+The founder's separate SCALE-001 regional catalogue/national search and5000SKU-per-store frontend pagination, A11Y-001 global access, SCROLL-001 round-ball cue and approved retailer/customer Scan & Pick contract remain tracked in the external FOUNDER-BUY-UAT-INSTRUCTION-LEDGER-20260907.md; backend scale/payment/readiness/handover completion is next phase. The current candidate records failed catalogue/operational acceptance and23 children (SHA445E946055C4293AE3C16603552CC147838F513AA0E8EAF0D5B1F2EFE227BEF5); its exact preimages, build1/install1/promotion0, source/APK identity and consumed authority are unchanged. A successor APK requires fresh qualification after the pending repairs.
+
+Read/diagnostic incidents081–088, including clipped reconstruction output, an unverified draft getter, a guessed filename, a nonnumeric page bound and a locked live-log read, are retained in the r66.3 incident journal. They did not change device state or create a test pass. Each was recorded before recovery; no running test/device action was replayed.

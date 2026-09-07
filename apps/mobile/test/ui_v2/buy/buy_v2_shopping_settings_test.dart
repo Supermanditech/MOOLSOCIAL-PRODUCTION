@@ -9,8 +9,176 @@ import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final scenario in [
+    for (final destination in [
+      BuyV2Destination.shop,
+      BuyV2Destination.wholesale,
+    ])
+      for (final viewport in [const Size(320, 700), const Size(640, 360)])
+        for (final scale in [1.0, 2.0]) (destination, viewport, scale),
+  ]) {
+    final (destination, viewport, scale) = scenario;
+    for (final populated in [false, true]) {
+      testWidgets(
+        'R5 033 settings collections retain origin after entry unmounts '
+        '${destination.name} populated=$populated $viewport $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = viewport;
+          tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+          tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.reset);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          final entryVisible = ValueNotifier(true);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          addTearDown(entryVisible.dispose);
+          final productId = destination == BuyV2Destination.shop
+              ? 's-milk'
+              : 'w-rice';
+          session.openDestination(destination);
+          expect(session.openProduct(productId), isTrue);
+          session.closeProduct();
+          if (populated) session.toggleSaved(productId);
+          session.addProduct('s-tomato');
+          final cartQuantity = session.itemCount;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              builder: (_, child) => r66VisualCaptureRoot(child!),
+              home: Scaffold(
+                body: ValueListenableBuilder<bool>(
+                  valueListenable: entryVisible,
+                  builder: (_, visible, _) => visible
+                      ? Builder(
+                          builder: (context) => TextButton(
+                            onPressed: () =>
+                                showBuyV2ShoppingSettings(context, session),
+                            child: const Text('Open settings'),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          );
+          await tester.tap(find.text('Open settings'));
+          await tester.pumpAndSettle();
+          // A nested route can rebuild the catalogue that opened Settings.
+          // The still-visible sheet must not depend on that old entry context.
+          entryVisible.value = false;
+          await tester.pumpAndSettle();
+          final settings = find.byKey(const ValueKey('buy-shopping-settings'));
+          for (final collection in ['saved', 'recently-viewed']) {
+            final row = find.byKey(ValueKey('buy-settings-$collection'));
+            await tester.ensureVisible(row);
+            await tester.pumpAndSettle();
+            final position = Scrollable.of(tester.element(row)).position;
+            final offset = position.pixels;
+            final rowTop = tester.getTopLeft(row).dy;
+            for (var visit = 0; visit < 2; visit++) {
+              await tester.tap(row);
+              await tester.pumpAndSettle();
+              expect(
+                find.byKey(
+                  ValueKey(
+                    collection == 'saved'
+                        ? 'buy-saved-products-info-sheet'
+                        : 'buy-recently-viewed-info-sheet',
+                  ),
+                ),
+                findsOneWidget,
+              );
+              expect(tester.takeException(), isNull);
+              if (visit == 0) {
+                await captureR66Visual(
+                  tester,
+                  'r5-collection-${destination.name}-$populated-$collection-'
+                  '${viewport.width.toInt()}x${viewport.height.toInt()}-$scale',
+                );
+              }
+              await tester.binding.handlePopRoute();
+              await tester.pumpAndSettle();
+              expect(settings, findsOneWidget);
+              expect(position.pixels, offset);
+              expect(tester.getTopLeft(row).dy, rowTop);
+              expect(session.destination, destination);
+              expect(session.itemCount, cartQuantity);
+              expect(tester.takeException(), isNull);
+            }
+          }
+        },
+      );
+    }
+  }
+
+  for (final viewport in [const Size(320, 700), const Size(640, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R5 029G complete settings descriptions $viewport $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = viewport;
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+        tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (_, child) => r66VisualCaptureRoot(child!),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showBuyV2ShoppingSettings(context, session),
+                  child: const Text('Open settings'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Open settings'));
+        await tester.pumpAndSettle();
+        for (final name in ['privacy', 'security', 'help']) {
+          final row = find.byKey(ValueKey('buy-settings-$name'));
+          await tester.ensureVisible(row);
+          await tester.pumpAndSettle();
+          final bounds = tester.getRect(row);
+          expect(bounds.height, greaterThanOrEqualTo(44));
+          for (final paragraph in tester.renderObjectList<RenderParagraph>(
+            find.descendant(of: row, matching: find.byType(RichText)),
+          )) {
+            expect(paragraph.didExceedMaxLines, isFalse);
+            final textBounds =
+                paragraph.localToGlobal(Offset.zero) & paragraph.size;
+            expect(textBounds.left, greaterThanOrEqualTo(bounds.left));
+            expect(textBounds.right, lessThanOrEqualTo(bounds.right));
+            expect(textBounds.top, greaterThanOrEqualTo(bounds.top));
+            expect(textBounds.bottom, lessThanOrEqualTo(bounds.bottom));
+          }
+          await captureR66Visual(
+            tester,
+            'r5-settings-$name-${viewport.width.toInt()}x${viewport.height.toInt()}-$scale',
+          );
+          expect(tester.takeException(), isNull);
+        }
+      });
+    }
+  }
 
   for (final scale in [1.0, 2.0]) {
     testWidgets('R66 current delivery filter is truthful at $scale', (
@@ -351,7 +519,7 @@ void main() {
       await tester.tap(recentlyViewed);
       await tester.pumpAndSettle();
 
-      expect(settings, findsNothing);
+      expect(settings, findsOneWidget);
       expect(
         find.byKey(const ValueKey('buy-recently-viewed-info-sheet')),
         findsOneWidget,
@@ -365,6 +533,7 @@ void main() {
 
       expect(session.view, BuyV2View.product);
       expect(session.selectedProductId, 's-milk');
+      expect(settings, findsNothing);
       expect(
         find.byKey(const ValueKey('buy-recently-viewed-info-sheet')),
         findsNothing,
