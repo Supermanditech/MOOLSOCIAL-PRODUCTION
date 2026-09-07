@@ -3616,7 +3616,7 @@ void main() {
               area: '123',
               activity: 'Grocery retail',
             )
-            ..businessRelationship = 'Owner'
+            ..businessRelationship = ''
             ..authorizedPersonName = 'Asha Sharma'
             ..primaryMobile = '9829012321'
             ..contactEmail = 'asha@example.com'
@@ -3742,6 +3742,26 @@ void main() {
           expect(
             find.byKey(const Key('work-local-navigation')),
             findsOneWidget,
+          );
+          final relationshipLabel = find.byKey(
+            const Key('work-business-relationship-full-label'),
+          );
+          await reveal(tester, relationshipLabel);
+          final labelText = tester.widget<Text>(relationshipLabel);
+          expect(labelText.data, 'Your relationship with the business');
+          expect(labelText.maxLines, isNull);
+          final labelParagraph = tester.renderObject<RenderParagraph>(
+            find.descendant(
+              of: relationshipLabel,
+              matching: find.byType(RichText),
+            ),
+          );
+          expect(labelParagraph.didExceedMaxLines, isFalse);
+          expect(labelParagraph.overflow, isNot(TextOverflow.ellipsis));
+          expect(work.businessRelationship, isEmpty);
+          await captureStoreView(
+            tester,
+            'r666-relationship-empty-${display.width}-${display.scale}',
           );
           await tap('work-business-relationship');
           await tester.tap(find.text('Authorized representative').last);

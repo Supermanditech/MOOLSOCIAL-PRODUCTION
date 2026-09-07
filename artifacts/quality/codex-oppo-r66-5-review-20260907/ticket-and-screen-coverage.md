@@ -100,6 +100,8 @@ This is local correction status, not device closure. The installed r66.5 APK is 
 
 ## Source reconciliation
 
+Correction update AUDIT-R665-04: the complete business-relationship label is now shown above its selector at normal and enlarged text sizes, using the existing wrapping-label component. Three connected details-to-review-and-Back journeys and full analysis pass; local visuals were inspected. This does not change the approved business subtitle or relationship options. Device closure remains pending in the successor APK. Findings 01 and 05–08 remain open.
+
 All completed Codex frontend fixes are retained through 6212aca44117d70fdbe2fc517ca2de7774f1a966. The founder's frontend clarification additionally authorizes S09-ACCEPTANCE-TIME-UI-01 in six existing Work source/test owners. This candidate imports no new Cursor work. Historical pending implementation notes in the append-only founder review ledger are superseded only where source and tests support the disposition. Backend-only and consumer integration dependencies remain open.
 
 | Journey | Current frontend implementation | Remaining qualification |

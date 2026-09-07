@@ -2127,6 +2127,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                   _WorkDetailField(
                     label: 'Your relationship with the business',
                     fieldKey: 'work-business-relationship',
+                    alwaysShowLabel: true,
                     builder: (decoration) => DropdownButtonFormField<String>(
                       key: const Key('work-business-relationship'),
                       initialValue: widget.session.businessRelationship.isEmpty
@@ -2988,10 +2989,12 @@ class _WorkDetailField extends StatelessWidget {
     required this.label,
     required this.fieldKey,
     required this.builder,
+    this.alwaysShowLabel = false,
   });
 
   final String label;
   final String fieldKey;
+  final bool alwaysShowLabel;
   final Widget Function(InputDecoration) builder;
 
   @override
@@ -3010,7 +3013,8 @@ class _WorkDetailField extends StatelessWidget {
         textDirection: Directionality.of(context),
         textScaler: MediaQuery.textScalerOf(context),
       )..layout();
-      final needsWrapping = painter.width > constraints.maxWidth - 24;
+      final needsWrapping =
+          alwaysShowLabel || painter.width > constraints.maxWidth - 24;
       painter.dispose();
       final decoration = InputDecoration(
         labelText: needsWrapping ? null : label,

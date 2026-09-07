@@ -83,6 +83,12 @@ No protected references were regenerated. Toolchain: Flutter 3.44.6 / Dart 3.12.
 
 ## Request-sheet correction — 8 September 2026
 
+### Subsequent relationship-label child AUDIT-R665-04
+
+The business relationship selector now uses the existing external, wrapping label at every text size. The other field labels, profile selection and routing are unchanged. Three complete S04 journeys verify an initially unselected field, full non-ellipsised label, actual representative selection, input focus/errors, details/documents/review progress, Back and draft retention. Command: `flutter test --no-pub --concurrency=1 --reporter expanded --update-goldens --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=r666-relationship1-20260908 test/work_workspace_layout_safety_test.dart --name 'OPPO S04 details local errors focus and progress'`.
+
+Result: 3 passed, 0 failed, exit 0; `r666-relationship-focused1-20260908.log` SHA-256 `7DBDCCDF4002E0D5A05E999611290C92ED2723506C440B549C9D8883C8AFE4BE`. Full analysis: zero issues, exit 0; `r666-relationship-analysis1-20260908.log` SHA-256 `FA2EF13377DCA6AEB6A1FFB0927DCE906552189E04996BF57AE3DD1CBE0181AA`. Fresh unselected-field captures for 412/100%, 320/140% and 320/200% were directly inspected. This is local qualification; combined prebuild cycles and successor OPPO replay remain required.
+
 Owners: work_onboarding_screens.dart, work_vertical_slice_test.dart and work_workspace_layout_safety_test.dart. AUDIT-R665-02/03 plus compact child 02a. No backend, Cursor, APK or device mutation.
 
 All new logs and captures are retained under `C:\GUARANTEED OUTCOME\MOOLSOCIAL-POST-UI-AUDIT-20260905`. Existing protected references remain unchanged.
