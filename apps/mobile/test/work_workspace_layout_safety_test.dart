@@ -3136,6 +3136,86 @@ void main() {
   }
 
   for (final channel in WorkContactChannel.values) {
+    for (final display in [
+      (size: Size(360, 806), scale: 1.0),
+      (size: Size(320, 568), scale: 2.0),
+    ]) {
+      testWidgets(
+        'Contact Continue reveals verification without reopening number input $channel ${display.scale}',
+        (tester) async {
+          final gateway = ReviewWorkGateway();
+          final work = WorkSession(gateway: gateway)
+            ..selectProfile('retailer-grocery')
+            ..authorizedPersonName = 'QA Retailer'
+            ..primaryMobile = '9829012321'
+            ..contactEmail = 'asha@example.com'
+            ..primaryMobileVerified = true
+            ..contactEmailVerified = true;
+          await mount(
+            tester,
+            route: '/app/work/workspace/contact',
+            work: work,
+            viewport: display.size,
+            textScale: display.scale,
+          );
+          final key = switch (channel) {
+            WorkContactChannel.primaryMobile => 'work-primary-contact',
+            WorkContactChannel.email => 'work-contact-email',
+            WorkContactChannel.alternateMobile => 'work-alternate-contact',
+          };
+          if (channel != WorkContactChannel.alternateMobile) {
+            final change = find.byKey(Key('$key-change'));
+            await reveal(tester, change);
+            await tester.tap(change);
+            await tester.pumpAndSettle();
+          }
+          final field = find.byKey(Key('$key-field'));
+          await reveal(tester, field);
+          await tester.enterText(field, '123');
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pumpAndSettle();
+          final next = find.byKey(const Key('work-contact-continue'));
+          await tester.tap(next);
+          await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+          await tester.enterText(
+            field,
+            channel == WorkContactChannel.email
+                ? 'shop@example.com'
+                : '9876543210',
+          );
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pumpAndSettle();
+          await tester.tap(next);
+          await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
+          expect(tester.testTextInput.isVisible, isFalse);
+          final send = find.byKey(Key('$key-send-otp'));
+          expect(send.hitTestable(), findsOneWidget);
+          expect(gateway.otpCalls, 0);
+          expect(work.workspaceContactVerified(channel), isFalse);
+          await captureStoreView(
+            tester,
+            'r666-contact-confirm-${channel.name}-${display.scale}',
+          );
+          await tester.tap(send);
+          await tester.pumpAndSettle();
+          expect(gateway.otpCalls, 1);
+          final code = find.byKey(Key('$key-otp'));
+          expect(tester.widget<TextField>(code).focusNode!.hasFocus, isTrue);
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pumpAndSettle();
+          await tester.tap(next);
+          await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(code).focusNode!.hasFocus, isTrue);
+          expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
+          expect(gateway.otpCalls, 1);
+          expect(work.workspaceContactVerified(channel), isFalse);
+          expect(find.byKey(const Key('work-details-continue')), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
     // Channel-specific regressions keep the actual signed-in phone separate
     // from a new contact that still needs its own OTP.
     for (final operation in ['send', 'verify']) {

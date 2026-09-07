@@ -158,15 +158,58 @@ class _WorkWorkspaceContactScreenState
         context.push('/app/work/workspace/proof');
       }
     } else {
-      switch (_errorChannel!) {
-        case WorkContactChannel.primaryMobile:
-          _primaryFocus.requestFocus();
-        case WorkContactChannel.email:
-          _emailFocus.requestFocus();
-        case WorkContactChannel.alternateMobile:
-          _alternateFocus.requestFocus();
-      }
+      _revealContactCorrection(_errorChannel!);
     }
+  }
+
+  void _revealContactCorrection(WorkContactChannel channel) {
+    final session = widget.session;
+    final (input, code, actions, sent) = switch (channel) {
+      WorkContactChannel.primaryMobile => (
+        _primaryFocus,
+        _primaryOtpFocus,
+        _primaryCodeActions,
+        session.primaryMobileOtpSent,
+      ),
+      WorkContactChannel.email => (
+        _emailFocus,
+        _emailOtpFocus,
+        _emailCodeActions,
+        session.contactEmailOtpSent,
+      ),
+      WorkContactChannel.alternateMobile => (
+        _alternateFocus,
+        _alternateOtpFocus,
+        _alternateCodeActions,
+        session.alternateOtpSent,
+      ),
+    };
+    if (sent) {
+      _focusCode(code, actions);
+      return;
+    }
+    final value = session.workspaceContactValue(channel).trim();
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    final readyToConfirm = channel == WorkContactChannel.email
+        ? RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value)
+        : digits.length == 10 &&
+              (channel != WorkContactChannel.alternateMobile ||
+                  digits != session.primaryMobile);
+    if (!readyToConfirm) {
+      input.requestFocus();
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = actions.currentContext;
+      if (target != null) {
+        Scrollable.ensureVisible(
+          target,
+          alignment: 1,
+          duration: MoolMotion.accessible(context, MoolMotion.standard),
+        );
+      }
+    });
   }
 
   @override
@@ -692,6 +735,7 @@ class _ContactVerificationCard extends StatelessWidget {
           else if (!otpSent &&
               (requiredContact || controller.text.isNotEmpty || editing))
             Wrap(
+              key: codeActionsKey,
               alignment: WrapAlignment.end,
               spacing: 12,
               crossAxisAlignment: WrapCrossAlignment.center,

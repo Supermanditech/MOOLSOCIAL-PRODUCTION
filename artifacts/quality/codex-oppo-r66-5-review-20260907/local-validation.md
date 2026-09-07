@@ -81,13 +81,23 @@ Selection: S01 growth placement; OPPO S01 inline discovery/search; OPPO S02 docu
 
 No protected references were regenerated. Toolchain: Flutter 3.44.6 / Dart 3.12.2. Dependency/generated owners remain unchanged. OPPO and founder review are separate pending qualification.
 
-## Request-sheet correction — 8 September 2026
+## Correction qualification — 8 September 2026
 
-### Subsequent relationship-label child AUDIT-R665-04
+### Contact-recovery child AUDIT-R665-05
+
+The existing contact screen now reveals Send code for a valid unconfirmed contact without reopening its keyboard; an already-sent challenge focuses the code field. Invalid phone/email input still receives focus. The Send-code and code-confirmation rows share a mutually exclusive existing anchor. No code is sent automatically and no verification or backend rule is changed.
+
+Command: `flutter test --no-pub --concurrency=1 --reporter expanded --update-goldens --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=r666-contact1-20260908 test/work_workspace_layout_safety_test.dart --name 'Contact Continue reveals|S03 contact leaving during'`. Result: 12 passed, 0 failed, exit 0. Six new phone/email/backup recovery cases cover invalid input, valid unconfirmed input, actual Send, repeated Continue after Send, unchanged verification and no duplicate OTP requests at normal and 200% text; six existing leaving-during-send/verify cases remain passing. Log `r666-contact-focused1-20260908.log` SHA-256 `D91CBCCCC48A140164297BF649ADCE9FEA4F928753111F9C15D1A6121DE2C7DC`. All six contact-confirm captures were directly inspected. Editable long email remains horizontally scrollable at 200%; no hidden/ellipsised saved-value claim is made.
+
+Full analysis: zero issues, exit 0; `r666-contact-analysis1-20260908.log` SHA-256 `BEEF3EC5EE844D8C51FC6D65ADD7BEE44245C2009BBB32EE03429A9EC9FE8977`. Connected prebuild cycles and successor OPPO replay remain pending. Frontend-only correction; real OTP authority/autofill remains a separately tracked backend/device dependency.
+
+### Relationship-label child AUDIT-R665-04
 
 The business relationship selector now uses the existing external, wrapping label at every text size. The other field labels, profile selection and routing are unchanged. Three complete S04 journeys verify an initially unselected field, full non-ellipsised label, actual representative selection, input focus/errors, details/documents/review progress, Back and draft retention. Command: `flutter test --no-pub --concurrency=1 --reporter expanded --update-goldens --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=r666-relationship1-20260908 test/work_workspace_layout_safety_test.dart --name 'OPPO S04 details local errors focus and progress'`.
 
 Result: 3 passed, 0 failed, exit 0; `r666-relationship-focused1-20260908.log` SHA-256 `7DBDCCDF4002E0D5A05E999611290C92ED2723506C440B549C9D8883C8AFE4BE`. Full analysis: zero issues, exit 0; `r666-relationship-analysis1-20260908.log` SHA-256 `FA2EF13377DCA6AEB6A1FFB0927DCE906552189E04996BF57AE3DD1CBE0181AA`. Fresh unselected-field captures for 412/100%, 320/140% and 320/200% were directly inspected. This is local qualification; combined prebuild cycles and successor OPPO replay remain required.
+
+### Request-sheet children AUDIT-R665-02/03 and 02a
 
 Owners: work_onboarding_screens.dart, work_vertical_slice_test.dart and work_workspace_layout_safety_test.dart. AUDIT-R665-02/03 plus compact child 02a. No backend, Cursor, APK or device mutation.
 
