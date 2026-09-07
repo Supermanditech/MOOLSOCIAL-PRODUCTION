@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -4636,6 +4637,158 @@ void main() {
     (width: 320.0, height: 568.0, scale: 1.4),
     (width: 320.0, height: 568.0, scale: 2.0),
   ]) {
+    for (final corrupt in [false, true]) {
+      testWidgets(
+        'OPPO document image pinned controls ${display.width} ${display.scale} corrupt=$corrupt',
+        (tester) async {
+          final work = WorkSession(gateway: ReviewWorkGateway())
+            ..selectProfile('retailer-grocery')
+            ..recoveredDocumentStep = true
+            ..saveDetails(
+              name: 'Mahadev Traders',
+              area: 'Jodhpur',
+              activity: 'Groceries',
+            )
+            ..authorizedPersonName = 'Asha Sharma'
+            ..businessRelationship = 'Owner'
+            ..primaryMobile = '9829012321'
+            ..contactEmail = 'review.owner@example.com'
+            ..primaryMobileVerified = true
+            ..contactEmailVerified = true;
+          await tester.runAsync(
+            () => work.addProof('payout-bank-account', WorkProofSource.gallery),
+          );
+          var bytes = Uint8List.fromList([0, 1, 2]);
+          if (!corrupt) {
+            bytes = (await tester.runAsync(() async {
+              final recorder = ui.PictureRecorder();
+              final canvas = Canvas(recorder);
+              canvas.drawColor(Colors.white, BlendMode.src);
+              final text = TextPainter(
+                text: const TextSpan(
+                  text:
+                      'QA ONLY\nNOT A REAL DOCUMENT\n\nPage top\n\n\n\n\n\n\n\n\nPage bottom',
+                  style: TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 28,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                textDirection: TextDirection.ltr,
+              )..layout(maxWidth: 550);
+              text.paint(canvas, const Offset(24, 24));
+              final picture = recorder.endRecording();
+              final image = await picture.toImage(600, 1200);
+              final result = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              image.dispose();
+              picture.dispose();
+              text.dispose();
+              return result!.buffer.asUint8List();
+            }))!;
+          }
+          final attached = WorkPickedProof(
+            fileName: 'QA-NOT-A-REAL-DOCUMENT.png',
+            contentType: 'image/png',
+            bytes: bytes,
+          );
+          work.pickedProofs['payout-bank-account'] = attached;
+          await mount(
+            tester,
+            route: '/app/work/workspace/proof',
+            work: work,
+            viewport: Size(display.width, display.height),
+            textScale: display.scale,
+          );
+          final view = find.byKey(
+            const Key('work-view-proof-payout-bank-account'),
+          );
+          await reveal(tester, view);
+          await tester.tap(view);
+          await tester.pumpAndSettle();
+          await tester.runAsync(() async {
+            await Future<void>.delayed(const Duration(milliseconds: 80));
+          });
+          await tester.pumpAndSettle();
+          final actions = find.byKey(const Key('work-document-actions'));
+          final title = find.byKey(const Key('work-document-title'));
+          expect(tester.widget<Text>(title).data, 'Document');
+          expect(
+            tester.getRect(title).bottom,
+            lessThanOrEqualTo(
+              tester.getRect(find.byKey(const Key('work-document-image'))).top,
+            ),
+          );
+          expect(tester.getSize(title).height, lessThanOrEqualTo(40));
+          final initialActions = tester.getRect(actions);
+          for (final key in [
+            'work-document-close',
+            'work-document-replace',
+            'work-document-zoom',
+            'work-document-fit',
+          ]) {
+            final target = find.byKey(Key(key));
+            expect(target.hitTestable(), findsOneWidget);
+            expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
+            expect(
+              tester.getRect(target).bottom,
+              lessThanOrEqualTo(display.height - 44),
+            );
+          }
+          final viewer = tester.widget<InteractiveViewer>(
+            find.byKey(const Key('work-document-image')),
+          );
+          expect(
+            tester.getSize(find.byKey(const Key('work-document-image'))).height,
+            greaterThanOrEqualTo(80),
+          );
+          if (corrupt) {
+            expect(
+              find.text(
+                'Preview unavailable. Check the original or choose a replacement.',
+              ),
+              findsOneWidget,
+            );
+          } else {
+            await tester.tap(find.byKey(const Key('work-document-zoom')));
+            await tester.pumpAndSettle();
+            expect(
+              viewer.transformationController!.value.getMaxScaleOnAxis(),
+              2,
+            );
+            await tester.drag(
+              find.byKey(const Key('work-document-image')),
+              const Offset(-35, -35),
+            );
+            await tester.pumpAndSettle();
+            expect(tester.getRect(actions), initialActions);
+            await tester.tap(find.byKey(const Key('work-document-fit')));
+            await tester.pumpAndSettle();
+            expect(viewer.transformationController!.value, Matrix4.identity());
+          }
+          await captureStoreView(
+            tester,
+            'r666-document-${display.width}-${display.scale}-corrupt-$corrupt',
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-document-preview')), findsNothing);
+          expect(work.pickedProofs['payout-bank-account'], same(attached));
+          await reveal(tester, view);
+          await tester.tap(view);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-document-replace')));
+          await tester.pumpAndSettle();
+          final cancel = find.byKey(const Key('work-proof-source-cancel'));
+          expect(cancel.hitTestable(), findsOneWidget);
+          await tester.tap(cancel);
+          await tester.pumpAndSettle();
+          expect(work.pickedProofs['payout-bank-account'], same(attached));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
     testWidgets(
       'OPPO S06 inline review corrections ${display.width} ${display.scale}',
       (tester) async {
@@ -4715,9 +4868,19 @@ void main() {
         );
         await tap('work-review-view-payout-bank-account');
         expect(find.text('review-proof.pdf'), findsWidgets);
+        expect(find.text('File details'), findsWidgets);
+        expect(find.byKey(const Key('work-document-image')), findsNothing);
+        expect(
+          find.byKey(const Key('work-document-close')).hitTestable(),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('work-document-replace')).hitTestable(),
+          findsOneWidget,
+        );
         expect(
           find.text(
-            'PDF attached. You can check the original file on your device or choose a replacement.',
+            'PDF preview is unavailable. Check the original file on your device before submitting.',
           ),
           findsOneWidget,
         );

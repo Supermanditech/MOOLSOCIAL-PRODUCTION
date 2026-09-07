@@ -83,6 +83,22 @@ No protected references were regenerated. Toolchain: Flutter 3.44.6 / Dart 3.12.
 
 ## Correction qualification — 8 September 2026
 
+### Document-view controls — AUDIT-R665-06 / 06a (partial closure)
+
+Images now use a bounded pan/zoom viewport, explicit Zoom/Fit actions and pinned Close/Replace controls. Complete Document/File details headings remain outside the metadata scroll area. A damaged image gives honest recovery; Back and cancelling replacement retain the exact attachment. PDF actions explicitly say File details: real PDF content viewing is still an Android-platform dependency, not implemented or qualified here. No document was uploaded or approved by this correction.
+
+Focused command: `flutter test --no-pub --concurrency=1 --reporter expanded --update-goldens --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=r666-document3-20260908 test/work_workspace_layout_safety_test.dart --name 'OPPO document image pinned|OPPO S06 inline'`. 9 passed, 0 failed, exit 0; log SHA-256 `61FEC1A523BBB05C3C59CC0237D434CC912F52BFCE5603F80726515C8EB9EF0D`. Full `flutter analyze --no-pub`: zero issues, exit 0; r666-document-analysis2-20260908.log SHA-256 `F3704911DBEED50B7A4BF1B7C265A8702CD175164006F526FA8A2667FBA8E9D0`.
+
+Directly inspected final normal/200% image views, damaged-image200% and normal/200% PDF metadata views. At200%, metadata and longer recovery copy scroll above pinned actions. The synthetic image is a test rendering target, not legibility evidence for a real bank document; its default test-font blocks remain apparent even after an explicit font selection. Real image/content legibility must be replayed on OPPO using the retained labelled QA image. Earlier hanging fixture run, clipped heading and redundant-import analysis failure are preserved as non-passing evidence.
+
+| Final capture in r666-document3-20260908 | SHA-256 |
+| --- | --- |
+| r666-document-412.0-1.0-corrupt-false.png | 0A8BD987DFB7997BF3050C68F6C5DD17768F15BCED0C0A669A53AB34F4520E3C |
+| r666-document-320.0-2.0-corrupt-false.png | 1BFB3FD4421723F6EB354BE7A724CEF9A5236EB12FFF5A8AE00F66ECFA885C49 |
+| r666-document-320.0-2.0-corrupt-true.png | 419720CDB385E807AFBCC26CC63CB17E3D8621404552331FD771C8995706C1B2 |
+| r665-review-preview-412-1.0.png | 20CAAAFE0536C262D6057B2A3AF1DB33D18E6C92332CC8FB12E821A1149C2572 |
+| r665-review-preview-320-2.0.png | 234B04CFF854A24A263B12E9595A49137CC416696B032B8759B2A1ABD5CB33B9 |
+
 ### Application-isolation child AUDIT-R665-08 and visual child 08a
 
 The existing chooser now offers View application when an unapproved submitted case exists. Business previews and search remain available, but choosing a preview resumes the actual submitted application without selecting another profile or removing its documents. Chooser Back preserves the selected application. No new multi-case service, session state machine or verification rule was introduced; the existing immutable submission and late-response guards remain unchanged. Starting another approved Workspace through its explicit existing flow is unchanged.

@@ -132,7 +132,11 @@ All completed Codex frontend fixes are retained through 6212aca44117d70fdbe2fc51
 
 AUDIT-R665-01–05,07–08 and local children02a/07a/08a are implemented and locally qualified; their native successor replay is still pending. This checkpoint supersedes older appended open-number summaries, not their historical evidence. Chat97 affected cases and full analysis pass, and six normal/enlarged captures were inspected. AUDIT-R665-06 document viewing is next: image controls/zoom and genuine PDF viewing remain unresolved. Review-fixture dashboard entry, backend authority, consumer integration and physical200percent remain explicitly unqualified.
 
+AUDIT-R665-06/06a image-view controls are now locally corrected: pinned actions, pan/zoom/Fit, damaged-image recovery and attachment retention. Nine focused cases and full analysis pass; actual normal/enlarged Flutter captures were inspected. Real PDF viewing remains open and is explicitly labelled File details; no native renderer, dependency, Android configuration or lane-rule edit was made. Physical successor replay remains pending for all corrected findings.
+
 ## Deferred service dependencies, not APK-review claims
+
+- AUDIT-R665-06-PDF: add secure local PDF viewing in the appropriate platform owner ticket. The Work attachment has validated in-memory bytes but no native PDF rendering/open-document bridge. Do not launch a private file URI, misuse a share-provider path or upload a document to a remote viewer. Preserve page navigation, error recovery, close/replace and private-data boundaries; test the retained two-page QA PDF on OPPO. This UI lane explicitly excludes Android owners.
 
 - Authoritative store capacity, customer-visible waiting/ETA, extension decisions and reassignment. The retailer request frontend is implemented; a device timer must not fabricate acceptance, reassignment or delivery.
 - Collection account/order/store/item/revision/payment/readiness validation; challenge/approval expiry and replay; durable operation reconciliation and exactly-once stock/invoice/payment/completion effects. Review fixtures cannot qualify handover security.

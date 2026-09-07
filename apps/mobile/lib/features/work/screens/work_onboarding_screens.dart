@@ -2411,7 +2411,6 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   Future<void> _showDocument(BuildContext context, WorkProofRequirement proof) {
     final bottomInset = _workViewBottomInset(context);
     final file = widget.session.pickedProofs[proof.id];
-    final format = file?.contentType == 'application/pdf' ? 'PDF' : 'Image';
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -2422,62 +2421,14 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
           constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(sheetContext).height * .75,
           ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  proof.label,
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(file?.fileName ?? 'Document attached'),
-                if (file != null) ...[
-                  Text(
-                    '$format · ${(file.bytes.length / 1024).ceil()} KB',
-                    style: const TextStyle(
-                      color: MoolColors.muted,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (file.contentType.startsWith('image/'))
-                    Image.memory(
-                      file.bytes,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const Text(
-                        'Preview unavailable. You can choose a replacement.',
-                      ),
-                    )
-                  else
-                    const Text(
-                      'PDF attached. You can check the original file on your device or choose a replacement.',
-                    ),
-                ],
-                const SizedBox(height: 12),
-                Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 12,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(sheetContext).pop(),
-                      child: const Text('Close'),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(sheetContext).pop();
-                        _showProofSource(context, proof);
-                      },
-                      child: const Text('Replace'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+          child: _DocumentPreview(
+            label: proof.label,
+            file: file,
+            onClose: () => Navigator.of(sheetContext).pop(),
+            onReplace: () {
+              Navigator.of(sheetContext).pop();
+              _showProofSource(context, proof);
+            },
           ),
         ),
       ),
@@ -2496,6 +2447,165 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
       backgroundColor: Colors.transparent,
       builder: (sheetContext) =>
           _ProofSourceSheet(session: widget.session, proof: proof),
+    );
+  }
+}
+
+class _DocumentPreview extends StatefulWidget {
+  const _DocumentPreview({
+    required this.label,
+    required this.file,
+    required this.onClose,
+    required this.onReplace,
+  });
+
+  final String label;
+  final WorkPickedProof? file;
+  final VoidCallback onClose, onReplace;
+
+  @override
+  State<_DocumentPreview> createState() => _DocumentPreviewState();
+}
+
+class _DocumentPreviewState extends State<_DocumentPreview> {
+  final _transform = TransformationController();
+
+  @override
+  void dispose() {
+    _transform.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final file = widget.file;
+    final image = file?.contentType.startsWith('image/') ?? false;
+    return Padding(
+      key: const Key('work-document-preview'),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            image ? 'Document' : 'File details',
+            key: const Key('work-document-title'),
+            style: const TextStyle(
+              fontSize: 16,
+              height: 1.2,
+              fontWeight: FontWeight.w800,
+              color: MoolColors.navy,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Flexible(
+            flex: 3,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    widget.label,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.3,
+                      fontWeight: FontWeight.w700,
+                      color: MoolColors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    file?.fileName ?? 'Document attached',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  if (file != null)
+                    Text(
+                      '${image ? 'Image' : 'PDF'} · ${(file.bytes.length / 1024).ceil()} KB',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: MoolColors.muted,
+                      ),
+                    ),
+                  if (!image) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'PDF preview is unavailable. Check the original file on your device before submitting.',
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          if (image) ...[
+            const SizedBox(height: 8),
+            Flexible(
+              flex: 5,
+              child: SizedBox(
+                height: 360,
+                child: ClipRect(
+                  child: InteractiveViewer(
+                    key: const Key('work-document-image'),
+                    transformationController: _transform,
+                    minScale: 1,
+                    maxScale: 4,
+                    child: Center(
+                      child: Image.memory(
+                        file!.bytes,
+                        fit: BoxFit.contain,
+                        semanticLabel: '${widget.label} preview',
+                        errorBuilder: (_, _, _) => const SingleChildScrollView(
+                          child: Text(
+                            'Preview unavailable. Check the original or choose a replacement.',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          const Divider(height: 1),
+          Wrap(
+            key: const Key('work-document-actions'),
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (image) ...[
+                IconButton(
+                  key: const Key('work-document-zoom'),
+                  tooltip: 'Zoom in',
+                  onPressed: () {
+                    final scale = (_transform.value.getMaxScaleOnAxis() + 1)
+                        .clamp(1.0, 4.0);
+                    _transform.value = Matrix4.diagonal3Values(scale, scale, 1);
+                  },
+                  icon: const Icon(Icons.zoom_in),
+                ),
+                IconButton(
+                  key: const Key('work-document-fit'),
+                  tooltip: 'Fit document',
+                  onPressed: () => _transform.value = Matrix4.identity(),
+                  icon: const Icon(Icons.fit_screen),
+                ),
+              ],
+              TextButton(
+                key: const Key('work-document-close'),
+                style: TextButton.styleFrom(minimumSize: const Size(64, 48)),
+                onPressed: widget.onClose,
+                child: const Text('Close'),
+              ),
+              TextButton(
+                key: const Key('work-document-replace'),
+                style: TextButton.styleFrom(minimumSize: const Size(64, 48)),
+                onPressed: widget.onReplace,
+                child: const Text('Replace'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -3231,7 +3341,14 @@ class _ProofCard extends StatelessWidget {
                 TextButton(
                   key: Key('work-view-proof-${proof.id}'),
                   onPressed: onView,
-                  child: Text('View', semanticsLabel: 'View ${proof.label}'),
+                  child: Text(
+                    file?.contentType == 'application/pdf'
+                        ? 'File details'
+                        : 'View',
+                    semanticsLabel: file?.contentType == 'application/pdf'
+                        ? '${proof.label} file details'
+                        : 'View ${proof.label}',
+                  ),
                 ),
                 TextButton(
                   key: Key('work-replace-proof-${proof.id}'),
@@ -3362,7 +3479,9 @@ class _ReviewDocument extends StatelessWidget {
               ),
               if (file != null)
                 Tooltip(
-                  message: 'View ${proof.label.toLowerCase()}',
+                  message: file?.contentType == 'application/pdf'
+                      ? '${proof.label} file details'
+                      : 'View ${proof.label.toLowerCase()}',
                   child: TextButton(
                     key: Key('work-review-view-${proof.id}'),
                     style: TextButton.styleFrom(
@@ -3370,7 +3489,11 @@ class _ReviewDocument extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                     ),
                     onPressed: onView,
-                    child: const Text('View'),
+                    child: Text(
+                      file?.contentType == 'application/pdf'
+                          ? 'File details'
+                          : 'View',
+                    ),
                   ),
                 ),
             ],
