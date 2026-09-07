@@ -3092,7 +3092,8 @@ class _StoreActivityDeck extends StatelessWidget {
           final desiredHeight = switch (content) {
             WorkCollectionLiveCard(:final controller) =>
               switch (controller?.snapshot?.state.name) {
-                'matched' => largeText ? 720.0 : 410.0,
+                'matched' => largeText ? 720.0 : 452.0,
+                'preparing' => largeText ? 780.0 : 450.0,
                 'collected' || 'cancelled' => largeText ? 680.0 : 380.0,
                 _ => largeText ? 900.0 : 590.0,
               },
@@ -12313,6 +12314,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                   'Ready for collection',
                   'Awaiting customer',
                   'Matched',
+                  'Customer confirmed',
                 }.contains(order.stage)),
       'Done' => order.isClosed,
       _ => false,

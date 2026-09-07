@@ -132,7 +132,7 @@ class _WorkCollectionLiveCardState extends State<WorkCollectionLiveCard>
     final title = collected
         ? 'Collected'
         : matched
-        ? 'Matched'
+        ? 'Customer confirmed'
         : switch (state) {
             ScanPickState.preparing => 'Pack the items',
             ScanPickState.cancelled => 'Order cancelled',
@@ -146,6 +146,9 @@ class _WorkCollectionLiveCardState extends State<WorkCollectionLiveCard>
             ? 'Collection confirmation is unavailable. Do not hand over yet.'
             : value == null
             ? 'Checking this order…'
+            : state == ScanPickState.preparing &&
+                  controller.readinessGateway == null
+            ? 'Readiness confirmation is unavailable. Please try again later.'
             : renderer == null &&
                   (state == ScanPickState.ready ||
                       state == ScanPickState.awaitingCustomer)
@@ -249,6 +252,14 @@ class _WorkCollectionLiveCardState extends State<WorkCollectionLiveCard>
                     ],
                   ),
                 ),
+                if (matched) ...[
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Scanned from the account that placed this order.',
+                    key: Key('work-collection-customer-confirmed'),
+                    style: TextStyle(fontSize: 12, color: MoolColors.muted),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 if (value != null) ...[
                   for (final line
@@ -444,6 +455,39 @@ class _WorkCollectionLiveCardState extends State<WorkCollectionLiveCard>
                     onPressed: controller.busy ? null : _refresh,
                     child: const Text('Try again'),
                   )
+                else if (state == ScanPickState.preparing && controller != null)
+                  FilledButton(
+                    key: const Key('work-collection-goods-ready'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _blue,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: _foreground && controller.canMarkGoodsReady
+                        ? () async {
+                            if (!_foreground ||
+                                ModalRoute.of(context)?.isCurrent == false) {
+                              return;
+                            }
+                            await controller.goodsReady();
+                            if (mounted && widget.controller == controller) {
+                              await _refresh();
+                            }
+                          }
+                        : null,
+                    child: Text(
+                      controller.confirmingReadiness
+                          ? 'Updating…'
+                          : 'Order ready',
+                    ),
+                  )
                 else if (matched || controller?.actionPending == true)
                   FilledButton(
                     key: const Key('work-collection-hand-over'),
@@ -477,11 +521,10 @@ class _WorkCollectionLiveCardState extends State<WorkCollectionLiveCard>
                   ),
                 if (message == null &&
                     !matched &&
+                    state != ScanPickState.preparing &&
                     controller?.actionPending != true)
                   Text(
-                    state == ScanPickState.preparing
-                        ? 'Waiting for packing confirmation'
-                        : 'Waiting for customer',
+                    'Waiting for customer',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 12,
@@ -493,7 +536,9 @@ class _WorkCollectionLiveCardState extends State<WorkCollectionLiveCard>
                 Text(
                   matched
                       ? 'Give the goods, then tap Hand Over. Payout remains pending until collection is confirmed.'
-                      : 'Hand over only when this screen shows Matched.',
+                      : state == ScanPickState.preparing
+                      ? 'Pack all items and bring them to the counter before tapping Order ready.'
+                      : 'Hand over only after Customer confirmed.',
                   style: const TextStyle(fontSize: 11, color: MoolColors.muted),
                 ),
               ],

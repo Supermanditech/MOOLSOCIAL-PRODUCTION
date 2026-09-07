@@ -18,14 +18,40 @@ import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen
 
 const _collectionFixtureToken = 'mool-collection-review-order-1043';
 
-class _CollectionFixtureGateway implements ScanPickGateway {
+class _CollectionFixtureGateway
+    implements ScanPickGateway, StoreCollectionReadinessGateway {
   String storeId = 'WK-510001';
   ScanPickState state = ScanPickState.awaitingCustomer;
+  ScanPickPayment payment = ScanPickPayment.paid;
+  String? revision;
   ScanPickError? error;
   bool expired = false, wrongOrder = false, wrongStore = false;
   int totalMinor = 146850;
   final List<ScanPickRequest> requests = [];
   Future<ScanPickResult> Function(ScanPickRequest)? respond;
+  Future<void> Function()? readyRespond;
+  final List<({String store, String order, String revision, String operation})>
+  readyRequests = [];
+
+  @override
+  Future<void> markGoodsReady({
+    required String storeId,
+    required String orderId,
+    required String expectedRevision,
+    required String operationId,
+  }) async {
+    readyRequests.add((
+      store: storeId,
+      order: orderId,
+      revision: expectedRevision,
+      operation: operationId,
+    ));
+    if (readyRespond != null) {
+      await readyRespond!();
+    } else {
+      state = ScanPickState.ready;
+    }
+  }
 
   @override
   Future<ScanPickResult> execute(ScanPickRequest request) async {
@@ -59,10 +85,10 @@ class _CollectionFixtureGateway implements ScanPickGateway {
         'purchaserAccountId': 'review-purchaser',
         'customerName': 'Rakesh Sharma',
         'storeName': 'Mahadev Fresh Mart',
-        'revision': 'fixture-${state.name}',
+        'revision': revision ?? 'fixture-${state.name}',
         'serverTime': time.toIso8601String(),
         'state': state.name,
-        'payment': 'paid',
+        'payment': payment.name,
         'readiness': state == ScanPickState.preparing ? 'preparing' : 'ready',
         'currency': 'INR',
         'totalMinor': totalMinor,
@@ -411,7 +437,10 @@ void main() {
     );
   }
 
-  WorkSession collectionStore(_CollectionFixtureGateway gateway) {
+  WorkSession collectionStore(
+    _CollectionFixtureGateway gateway, {
+    bool readinessAvailable = true,
+  }) {
     final work = storeViewFixture();
     final original = work.currentWorkspaceOrder!;
     work.workspaceOrders[0] = WorkspaceOrderRecord(
@@ -435,12 +464,247 @@ void main() {
         storeId: gateway.storeId,
         orderId: original.id,
         gateway: gateway,
+        readinessGateway: readinessAvailable ? gateway : null,
       ),
     );
     return work;
   }
 
   group('Store collection controller', () {
+    test(
+      'Order ready cannot be submitted for unpaid or terminal orders',
+      () async {
+        for (final payment in [
+          ScanPickPayment.unpaid,
+          ScanPickPayment.partiallyPaid,
+          ScanPickPayment.refunded,
+        ]) {
+          final gate = _CollectionFixtureGateway()
+            ..state = ScanPickState.preparing
+            ..payment = payment;
+          final work = collectionStore(gate);
+          await work.currentCollection!.refresh();
+          expect(work.currentCollection!.canMarkGoodsReady, isFalse);
+          await work.currentCollection!.goodsReady();
+          expect(gate.readyRequests, isEmpty);
+          expect(work.currentCollection!.visibleQr, isNull);
+          work.dispose();
+        }
+        for (final state in [
+          ScanPickState.cancelled,
+          ScanPickState.collected,
+        ]) {
+          final gate = _CollectionFixtureGateway()..state = state;
+          final work = collectionStore(gate);
+          await work.currentCollection!.refresh();
+          await work.currentCollection!.goodsReady();
+          expect(gate.readyRequests, isEmpty);
+          work.dispose();
+        }
+      },
+    );
+
+    test('unchanged readiness revision cannot expose a QR', () async {
+      final gate = _CollectionFixtureGateway()
+        ..state = ScanPickState.preparing
+        ..revision = 'revision-before-packing';
+      final work = collectionStore(gate);
+      addTearDown(work.dispose);
+      await work.currentCollection!.refresh();
+      await work.currentCollection!.goodsReady();
+      await work.currentCollection!.showCode();
+      expect(work.currentCollection!.needsReconciliation, isTrue);
+      expect(work.currentCollection!.hasAuthoritativeSnapshot, isFalse);
+      expect(work.currentCollection!.visibleQr, isNull);
+      expect(work.workspaceOrderStage, 'Preparing');
+      gate.revision = 'revision-after-packing';
+      await work.currentCollection!.refresh();
+      expect(work.currentCollection!.needsReconciliation, isFalse);
+      expect(work.workspaceOrderStage, 'Ready for collection');
+      expect(gate.readyRequests, hasLength(1));
+    });
+
+    test(
+      'Goods ready requires a tap and correlated server readiness',
+      () async {
+        final gate = _CollectionFixtureGateway()
+          ..state = ScanPickState.preparing;
+        final work = collectionStore(gate);
+        addTearDown(work.dispose);
+        final controller = work.currentCollection!;
+        await controller.refresh();
+        await controller.refresh();
+        await controller.showCode();
+        expect(gate.readyRequests, isEmpty);
+        expect(controller.visibleQr, isNull);
+        expect(work.workspaceOrderStage, 'Preparing');
+        final pending = Completer<void>();
+        gate.readyRespond = () => pending.future;
+        final first = controller.goodsReady();
+        await controller.goodsReady();
+        await controller.showCode();
+        await controller.handOver();
+        expect(gate.readyRequests, hasLength(1));
+        final request = gate.readyRequests.single;
+        expect(request.store, gate.storeId);
+        expect(request.order, work.currentWorkspaceOrderId);
+        expect(request.revision, 'fixture-preparing');
+        expect(request.operation, isNotEmpty);
+        expect(controller.confirmingReadiness, isTrue);
+        expect(controller.visibleQr, isNull);
+        expect(controller.canHandOver, isFalse);
+        expect(work.workspaceOrderStage, 'Preparing');
+        expect(work.selectWorkspaceOrder('SALE-1042'), isFalse);
+        gate.state = ScanPickState.ready;
+        pending.complete();
+        await first;
+        expect(gate.requests.last.operation, ScanPickOperation.reconcile);
+        expect(gate.requests.last.operationId, request.operation);
+        expect(controller.needsReconciliation, isFalse);
+        expect(work.workspaceOrderStage, 'Ready for collection');
+        expect(controller.visibleQr, isNull);
+        await controller.goodsReady();
+        expect(gate.readyRequests, hasLength(1));
+        await controller.showCode();
+        expect(controller.visibleQr, _collectionFixtureToken);
+        expect(controller.canHandOver, isFalse);
+        expect(work.workspaceSalesToday, 28450);
+        expect(work.workspaceInvoices, isEmpty);
+      },
+    );
+
+    test(
+      'readiness ACK or lost reply does not prove goods are ready',
+      () async {
+        for (final lostReply in [false, true]) {
+          final gate = _CollectionFixtureGateway()
+            ..state = ScanPickState.preparing
+            ..readyRespond = () async {
+              if (lostReply) throw StateError('synthetic lost response');
+            };
+          final work = collectionStore(gate);
+          final controller = work.currentCollection!;
+          await controller.refresh();
+          await controller.goodsReady();
+          expect(controller.needsReconciliation, isTrue);
+          expect(controller.confirmingReadiness, isTrue);
+          expect(controller.visibleQr, isNull);
+          expect(controller.canHandOver, isFalse);
+          await controller.goodsReady();
+          await controller.refresh();
+          expect(gate.readyRequests, hasLength(1));
+          final reconciliations = gate.requests.where(
+            (r) => r.operation == ScanPickOperation.reconcile,
+          );
+          expect(reconciliations.map((r) => r.operationId).toSet(), {
+            gate.readyRequests.single.operation,
+          });
+          expect(reconciliations.map((r) => r.requestId).toSet(), hasLength(2));
+          gate.state = ScanPickState.ready;
+          await controller.refresh();
+          expect(controller.needsReconciliation, isFalse);
+          expect(work.workspaceOrderStage, 'Ready for collection');
+          work.dispose();
+        }
+      },
+    );
+
+    test(
+      'rejected readiness is recoverable but cannot expose a code',
+      () async {
+        final gate = _CollectionFixtureGateway()
+          ..state = ScanPickState.preparing;
+        final work = collectionStore(gate);
+        addTearDown(work.dispose);
+        final controller = work.currentCollection!;
+        await controller.refresh();
+        gate.readyRespond = () async {
+          gate.error = ScanPickError.paymentChanged;
+        };
+        await controller.goodsReady();
+        expect(controller.needsReconciliation, isFalse);
+        expect(controller.message, contains('Payment'));
+        expect(controller.canMarkGoodsReady, isFalse);
+        await controller.showCode();
+        expect(controller.visibleQr, isNull);
+        gate.error = null;
+        gate.readyRespond = null;
+        await controller.refresh();
+        await controller.goodsReady();
+        expect(gate.readyRequests, hasLength(2));
+        expect(
+          gate.readyRequests[0].operation,
+          isNot(gate.readyRequests[1].operation),
+        );
+        expect(controller.snapshot!.state, ScanPickState.ready);
+      },
+    );
+
+    test(
+      'wrong-order readiness remains uncertain until exact reconciliation',
+      () async {
+        final gate = _CollectionFixtureGateway()
+          ..state = ScanPickState.preparing;
+        final work = collectionStore(gate);
+        addTearDown(work.dispose);
+        final controller = work.currentCollection!;
+        await controller.refresh();
+        gate.wrongOrder = true;
+        await controller.goodsReady();
+        expect(controller.needsReconciliation, isTrue);
+        expect(work.workspaceOrderStage, 'Preparing');
+        expect(controller.visibleQr, isNull);
+        gate.wrongOrder = false;
+        await controller.refresh();
+        expect(controller.snapshot!.state, ScanPickState.ready);
+        expect(gate.readyRequests, hasLength(1));
+      },
+    );
+
+    test(
+      'no readiness adapter or reopened ready order never fakes a tap',
+      () async {
+        final gate = _CollectionFixtureGateway()
+          ..state = ScanPickState.preparing;
+        final work = collectionStore(gate, readinessAvailable: false);
+        await work.currentCollection!.refresh();
+        expect(work.currentCollection!.canMarkGoodsReady, isFalse);
+        await work.currentCollection!.goodsReady();
+        expect(gate.readyRequests, isEmpty);
+        expect(work.currentCollection!.visibleQr, isNull);
+        work.dispose();
+        gate.state = ScanPickState.ready;
+        final reopened = collectionStore(gate);
+        await reopened.currentCollection!.refresh();
+        await reopened.currentCollection!.goodsReady();
+        await reopened.currentCollection!.showCode();
+        expect(gate.readyRequests, isEmpty);
+        expect(reopened.currentCollection!.visibleQr, _collectionFixtureToken);
+        reopened.dispose();
+      },
+    );
+
+    test(
+      'late readiness reply cannot update a disposed Store session',
+      () async {
+        final gate = _CollectionFixtureGateway()
+          ..state = ScanPickState.preparing;
+        final work = collectionStore(gate);
+        final controller = work.currentCollection!;
+        await controller.refresh();
+        final pending = Completer<void>();
+        gate.readyRespond = () => pending.future;
+        final request = controller.goodsReady();
+        work.dispose();
+        gate.state = ScanPickState.ready;
+        pending.complete();
+        await request;
+        expect(gate.requests, hasLength(1));
+        expect(controller.visibleQr, isNull);
+        expect(controller.canHandOver, isFalse);
+      },
+    );
+
     test(
       'Matched permits one Hand Over; unknown reconciles the same mutation',
       () async {
@@ -637,6 +901,94 @@ void main() {
     (width: 320.0, height: 640.0, scale: 1.4),
     (width: 320.0, height: 640.0, scale: 2.0),
   ]) {
+    testWidgets('Store collection explicit Goods ready ${display.scale}', (
+      tester,
+    ) async {
+      final gate = _CollectionFixtureGateway()..state = ScanPickState.preparing;
+      final pending = Completer<void>();
+      gate.readyRespond = () => pending.future;
+      final work = collectionStore(gate);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.width, display.height),
+        textScale: display.scale,
+        wrapper: (child) => WorkCollectionCodeRenderer(
+          render: (_, payload) =>
+              const CustomPaint(painter: _CollectionQrFixture()),
+          child: child,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+      expect(gate.readyRequests, isEmpty);
+      expect(find.byKey(const Key('work-collection-qr')), findsNothing);
+      expect(find.text('Pack the items'), findsOneWidget);
+      expect(find.text('Order ready'), findsOneWidget);
+      expect(find.text('Goods ready'), findsNothing);
+      await captureStoreView(
+        tester,
+        'goods-ready-first-${display.width.toInt()}-${display.scale}',
+      );
+      if (display.scale == 1) {
+        final viewport = tester.getRect(
+          find.byKey(const Key('work-collection-content')),
+        );
+        expect(
+          viewport.contains(
+            tester
+                .getRect(find.byKey(const Key('work-collection-amount')))
+                .bottomRight,
+          ),
+          isTrue,
+        );
+      }
+      final action = find.byKey(const Key('work-collection-goods-ready'));
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+      await captureStoreView(
+        tester,
+        'goods-ready-${display.width.toInt()}-${display.scale}',
+      );
+      final readyRect = tester.getRect(action);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(gate.readyRequests, hasLength(1));
+      expect(tester.widget<FilledButton>(action).onPressed, isNull);
+      expect(find.text('Updating…'), findsOneWidget);
+      final pendingRect = tester.getRect(action);
+      expect(pendingRect.height, lessThanOrEqualTo(readyRect.height));
+      expect(pendingRect.top, greaterThanOrEqualTo(readyRect.top));
+      expect(pendingRect.bottom, lessThanOrEqualTo(readyRect.bottom + 1));
+      expect(find.byKey(const Key('work-collection-qr')), findsNothing);
+      expect(work.workspaceOrderStage, 'Preparing');
+      await captureStoreView(
+        tester,
+        'goods-ready-pending-${display.width.toInt()}-${display.scale}',
+      );
+      gate.state = ScanPickState.ready;
+      pending.complete();
+      await tester.pumpAndSettle();
+      expect(gate.readyRequests, hasLength(1));
+      expect(
+        find.byKey(const Key('work-collection-goods-ready')),
+        findsNothing,
+      );
+      final qr = find.byKey(const Key('work-collection-qr'));
+      await tester.ensureVisible(qr);
+      await tester.pumpAndSettle();
+      expect(qr, findsOneWidget);
+      expect(work.currentCollection!.canHandOver, isFalse);
+      await captureStoreView(
+        tester,
+        'goods-ready-confirmed-${display.width.toInt()}-${display.scale}',
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
     for (final state in [
       ScanPickState.awaitingCustomer,
       ScanPickState.matched,
@@ -699,6 +1051,26 @@ void main() {
             );
           }
           if (state == ScanPickState.matched) {
+            if (display.scale == 1) {
+              final viewport = tester.getRect(
+                find.byKey(const Key('work-collection-content')),
+              );
+              expect(
+                viewport.contains(
+                  tester
+                      .getRect(find.byKey(const Key('work-collection-amount')))
+                      .bottomRight,
+                ),
+                isTrue,
+              );
+            }
+            expect(find.text('Matched'), findsNothing);
+            expect(find.text('Customer confirmed'), findsOneWidget);
+            expect(
+              find.text('Scanned from the account that placed this order.'),
+              findsOneWidget,
+            );
+            expect(work.workspaceOrderStage, 'Customer confirmed');
             final action = find.byKey(const Key('work-collection-hand-over'));
             await tester.ensureVisible(action);
             await tester.pumpAndSettle();

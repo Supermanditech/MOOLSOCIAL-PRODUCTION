@@ -8,6 +8,21 @@ import 'work_models.dart';
 import 'work_services.dart';
 import 'scan_and_pick_contract.dart';
 
+/// Store packing capability, separate from the sealed consumer collection API.
+/// An authenticated adapter must persist the explicit staff action against this
+/// exact order/revision and register operationId in the collection reconciliation
+/// ledger. Returning here is NOT readiness authority: the controller reconciles
+/// the operation through ScanPickGateway before exposing a code. No default
+/// implementation, endpoint or local-ready fallback is supplied.
+abstract interface class StoreCollectionReadinessGateway {
+  Future<void> markGoodsReady({
+    required String storeId,
+    required String orderId,
+    required String expectedRevision,
+    required String operationId,
+  });
+}
+
 /// Per-order presentation controller. Only an authenticated injected adapter
 /// may supply authority; no review WorkGateway or local completion fallback.
 class StoreCollectionController extends ChangeNotifier {
@@ -15,13 +30,16 @@ class StoreCollectionController extends ChangeNotifier {
     required this.storeId,
     required this.orderId,
     required this.gateway,
+    this.readinessGateway,
   });
 
   final String storeId, orderId;
   final ScanPickGateway gateway;
+  final StoreCollectionReadinessGateway? readinessGateway;
   ScanPickResult? _result;
   ScanPickRequest? _request;
   ScanPickRequest? _uncertainMutation;
+  String? _readinessRevision;
   final Stopwatch _elapsed = Stopwatch();
   Duration _responseAllowance = Duration.zero;
   bool busy = false;
@@ -29,6 +47,7 @@ class StoreCollectionController extends ChangeNotifier {
   String? message;
   ScanPickSnapshot? get snapshot => _result?.snapshot;
   bool get needsReconciliation => _uncertainMutation != null;
+  bool get confirmingReadiness => _readinessRevision != null;
   DateTime? get serverNow =>
       snapshot?.serverTime.add(_responseAllowance + _elapsed.elapsed);
 
@@ -48,10 +67,21 @@ class StoreCollectionController extends ChangeNotifier {
       serverNow != null &&
       (_result?.canRequestHandOver(_request!, serverNow!) ?? false);
   bool get canHandOver => !busy && hasCurrentMatch;
+  bool get canMarkGoodsReady =>
+      !_closed &&
+      !busy &&
+      !needsReconciliation &&
+      message == null &&
+      readinessGateway != null &&
+      _result?.outcome == ScanPickOutcome.snapshot &&
+      snapshot?.state == ScanPickState.preparing &&
+      snapshot?.readiness == ScanPickReadiness.preparing &&
+      snapshot?.payment == ScanPickPayment.paid;
   bool get actionPending => busy && needsReconciliation;
   bool get hasAuthoritativeSnapshot =>
-      _result?.outcome == ScanPickOutcome.snapshot ||
-      _result?.error == ScanPickError.alreadyCollected;
+      !needsReconciliation &&
+      (_result?.outcome == ScanPickOutcome.snapshot ||
+          _result?.error == ScanPickError.alreadyCollected);
 
   String? get visibleQr {
     final value = snapshot;
@@ -115,6 +145,40 @@ class StoreCollectionController extends ChangeNotifier {
     );
   }
 
+  /// One deliberate retailer action after packing and bringing goods to the
+  /// counter. Neither polling, item ticks, a timer nor a transport ACK calls this.
+  Future<void> goodsReady() async {
+    if (!canMarkGoodsReady) return;
+    final revision = snapshot!.revision;
+    final operationId = _id();
+    _readinessRevision = revision;
+    _uncertainMutation = ScanPickRequest.reconcile(
+      requestId: _id(),
+      operationId: operationId,
+      orderId: orderId,
+      storeId: storeId,
+    );
+    busy = true;
+    message = null;
+    notifyListeners();
+    try {
+      await readinessGateway!
+          .markGoodsReady(
+            storeId: storeId,
+            orderId: orderId,
+            expectedRevision: revision,
+            operationId: operationId,
+          )
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      // A lost reply cannot establish failure or justify a new operation. Read
+      // the same operation's outcome; never turn the local order ready here.
+    }
+    if (_closed) return;
+    busy = false;
+    await refresh();
+  }
+
   Future<void> handOver() async {
     if (!canHandOver) return;
     final value = snapshot!;
@@ -153,6 +217,10 @@ class StoreCollectionController extends ChangeNotifier {
         ..reset()
         ..start();
       if (result.outcome == ScanPickOutcome.unknown ||
+          (confirmingReadiness &&
+              result.outcome == ScanPickOutcome.snapshot &&
+              (result.snapshot?.state == ScanPickState.preparing ||
+                  result.snapshot?.revision == _readinessRevision)) ||
           result.error == ScanPickError.operationInProgress ||
           (request.operation == ScanPickOperation.reconcile &&
               {
@@ -162,9 +230,12 @@ class StoreCollectionController extends ChangeNotifier {
                 ScanPickError.rateLimited,
                 ScanPickError.operationConflict,
               }.contains(result.error))) {
-        message = 'Confirming the latest update. Do not hand over yet.';
+        message = confirmingReadiness
+            ? 'Confirming readiness. The collection code is not available yet.'
+            : 'Confirming the latest update. Do not hand over yet.';
       } else {
         _uncertainMutation = null;
+        _readinessRevision = null;
         if (result.outcome == ScanPickOutcome.rejected &&
             result.error != ScanPickError.alreadyCollected) {
           message = switch (result.error) {
@@ -183,7 +254,9 @@ class StoreCollectionController extends ChangeNotifier {
       }
     } catch (_) {
       if (!_closed) {
-        message = needsReconciliation
+        message = confirmingReadiness
+            ? 'Confirming readiness. The collection code is not available yet.'
+            : needsReconciliation
             ? 'Confirming the latest update. Do not hand over yet.'
             : 'Unable to refresh this order. Try again before handing over.';
       }
@@ -296,7 +369,7 @@ class WorkSession extends ChangeNotifier {
           ScanPickState.preparing => 'Preparing',
           ScanPickState.ready => 'Ready for collection',
           ScanPickState.awaitingCustomer => 'Awaiting customer',
-          ScanPickState.matched => 'Matched',
+          ScanPickState.matched => 'Customer confirmed',
           ScanPickState.collected => 'Collected',
           ScanPickState.cancelled => 'Cancelled',
         };
