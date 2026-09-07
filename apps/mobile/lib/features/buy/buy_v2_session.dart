@@ -15,8 +15,25 @@ import 'buy_v2_search_relevance.dart';
 import 'buy_v2_saved_products_store.dart';
 import 'buy_v2_shopping_alerts.dart';
 
-String _buyV2SavedKey(BuyV2Product product) =>
-    '${product.destination.name}|${product.canonicalId}';
+String _buyV2SavedKey(BuyV2Product product) => product.storeId == null
+    ? '${product.destination.name}|${product.canonicalId}'
+    : '${product.destination.name}|listing:${Uri.encodeComponent(product.id)}';
+
+String? _buyV2SavedListingId(String key) {
+  final separator = key.indexOf('|listing:');
+  if (separator < 0 ||
+      !BuyV2Destination.values.any(
+        (value) => value.name == key.substring(0, separator),
+      )) {
+    return null;
+  }
+  try {
+    final id = Uri.decodeComponent(key.substring(separator + 9));
+    return id.trim().isEmpty ? null : id;
+  } on FormatException {
+    return null;
+  }
+}
 
 /// A catalogue draft. Previewing it never changes the session or saved account.
 @immutable
@@ -407,6 +424,606 @@ typedef _BuyV2CollectionContext = ({
   int navigation,
 });
 
+/// A bounded page window. Filter changes replace the pending request and stale
+/// responses never enter the cache. One controller has one source call in flight.
+class BuyV2CataloguePager<T> extends ChangeNotifier {
+  BuyV2CataloguePager({
+    required this.load,
+    required this.identityOf,
+    this.pageSize = 40,
+    this.maximumCachedPages = 3,
+  }) {
+    if (pageSize < 1 ||
+        pageSize > 50 ||
+        maximumCachedPages < 1 ||
+        maximumCachedPages > 5) {
+      throw ArgumentError('Invalid catalogue page bounds');
+    }
+  }
+
+  final Future<BuyV2CataloguePage<T>> Function(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  })
+  load;
+  final String Function(T item) identityOf;
+  final int pageSize;
+  final int maximumCachedPages;
+  final Map<String, BuyV2CataloguePage<T>> _cache = {};
+  BuyV2CatalogueQuery? _query;
+  BuyV2CataloguePage<T>? _page;
+  ({BuyV2CatalogueQuery query, String? cursor, int generation})? _pending;
+  Future<void>? _running;
+  String? _cursor;
+  String? _requestedCursor;
+  int _generation = 0;
+  bool _disposed = false;
+  bool _loading = false;
+  String? _message;
+
+  BuyV2CatalogueQuery? get query => _query;
+  BuyV2CataloguePage<T>? get page => _page;
+  String? get cursor => _cursor;
+  String? get requestedCursor => _requestedCursor;
+  bool get isDisposed => _disposed;
+  bool get loading => _loading;
+  String? get message => _message;
+  int get cachedPageCount => _cache.length;
+  int get retainedItemCount =>
+      _cache.values.fold(0, (count, value) => count + value.items.length);
+  Iterable<T> get cachedItems => _cache.values.expand((page) => page.items);
+  double scrollOffset = 0;
+
+  String _cacheKey(BuyV2CatalogueQuery query, String? cursor) =>
+      jsonEncode([query.key, cursor]);
+
+  Future<void> open(BuyV2CatalogueQuery query, {String? cursor}) {
+    if (_disposed) return Future.value();
+    if (_query == query &&
+        _requestedCursor == cursor &&
+        (_loading ||
+            (_page != null && _cursor == cursor && _message == null))) {
+      return _running ?? Future.value();
+    }
+    final changedQuery = _query != query;
+    if (changedQuery) {
+      _page = null;
+      _cursor = null;
+      _cache.clear();
+    }
+    _query = query;
+    _requestedCursor = cursor;
+    _message = null;
+    final generation = ++_generation;
+    final cacheKey = _cacheKey(query, cursor);
+    final cached = _cache.remove(cacheKey);
+    if (cached != null) {
+      _cache[cacheKey] = cached;
+      _page = cached;
+      _cursor = cursor;
+      _pending = null;
+      _loading = false;
+      notifyListeners();
+      return Future.value();
+    }
+    _pending = (query: query, cursor: cursor, generation: generation);
+    _loading = true;
+    notifyListeners();
+    return _running ??= _drain().whenComplete(() => _running = null);
+  }
+
+  Future<void> next() {
+    final currentQuery = _query;
+    final next = _page?.nextCursor;
+    if (currentQuery == null || next == null || _loading) {
+      return _running ?? Future.value();
+    }
+    return open(currentQuery, cursor: next);
+  }
+
+  Future<void> previous() {
+    final currentQuery = _query;
+    final previous = _page?.previousCursor;
+    if (currentQuery == null || previous == null || _loading) {
+      return _running ?? Future.value();
+    }
+    return open(currentQuery, cursor: previous);
+  }
+
+  Future<void> retry() {
+    final currentQuery = _query;
+    if (currentQuery == null) return Future.value();
+    return open(currentQuery, cursor: _requestedCursor);
+  }
+
+  Future<void> refresh() {
+    final currentQuery = _query;
+    if (currentQuery == null || _disposed) return Future.value();
+    _cache.clear();
+    _page = null;
+    _cursor = null;
+    _requestedCursor = null;
+    _generation += 1;
+    _loading = false;
+    _message = null;
+    return open(currentQuery);
+  }
+
+  Future<void> _drain() async {
+    while (!_disposed && _pending != null) {
+      final request = _pending!;
+      _pending = null;
+      final previous = _page;
+      final previousCursor = _cursor;
+      try {
+        final result = await load(
+          request.query,
+          cursor: request.cursor,
+          pageSize: pageSize,
+        );
+        if (_disposed || request.generation != _generation) continue;
+        _validate(
+          result,
+          request.query,
+          request.cursor,
+          previous,
+          previousCursor,
+        );
+        final key = _cacheKey(request.query, request.cursor);
+        _cache.remove(key);
+        _cache[key] = result;
+        while (_cache.length > maximumCachedPages) {
+          _cache.remove(_cache.keys.first);
+        }
+        _page = result;
+        _cursor = request.cursor;
+        _message = null;
+      } on Object {
+        if (_disposed || request.generation != _generation) continue;
+        _message = 'Results could not load. Try again.';
+      }
+      if (!_disposed && request.generation == _generation) {
+        _loading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  void _validate(
+    BuyV2CataloguePage<T> result,
+    BuyV2CatalogueQuery query,
+    String? requestedCursor,
+    BuyV2CataloguePage<T>? previous,
+    String? previousCursor,
+  ) {
+    final total = result.totalCount;
+    final ids = result.items.map(identityOf).toList(growable: false);
+    final end = result.startIndex + result.items.length;
+    if (result.queryKey != query.key ||
+        result.snapshotId.trim().isEmpty ||
+        result.items.length > pageSize ||
+        result.startIndex < 0 ||
+        (requestedCursor == null && result.startIndex != 0) ||
+        ids.any((id) => id.trim().isEmpty) ||
+        ids.toSet().length != ids.length ||
+        (result.nextCursor != null && result.nextCursor!.trim().isEmpty) ||
+        (result.previousCursor != null &&
+            result.previousCursor!.trim().isEmpty) ||
+        (result.nextCursor != null && result.nextCursor == requestedCursor) ||
+        (result.previousCursor != null &&
+            result.previousCursor == requestedCursor) ||
+        (result.startIndex == 0 && result.previousCursor != null) ||
+        (result.startIndex > 0 && result.previousCursor == null) ||
+        (result.items.isEmpty && result.nextCursor != null) ||
+        (total != null &&
+            (total < 0 ||
+                end > total ||
+                (result.nextCursor == null && end != total) ||
+                (result.nextCursor != null && end >= total)))) {
+      throw const FormatException('Invalid catalogue page');
+    }
+    if (previous != null &&
+        requestedCursor != null &&
+        requestedCursor != previousCursor) {
+      if (result.snapshotId != previous.snapshotId ||
+          result.totalCount != previous.totalCount) {
+        throw const FormatException('Catalogue snapshot changed');
+      }
+      if (requestedCursor == previous.nextCursor &&
+          result.startIndex != previous.startIndex + previous.items.length) {
+        throw const FormatException('Catalogue next-page gap');
+      }
+      if (requestedCursor == previous.previousCursor &&
+          end != previous.startIndex) {
+        throw const FormatException('Catalogue previous-page gap');
+      }
+      final previousIds = previous.items.map(identityOf).toSet();
+      if (ids.any(previousIds.contains)) {
+        throw const FormatException('Duplicate catalogue page boundary');
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _generation += 1;
+    _pending = null;
+    _cache.clear();
+    super.dispose();
+  }
+}
+
+/// Versioned, on-demand development catalogue. Each destination is an isolated
+/// fixture cohort; no inventory, payment or serviceability is claimed live.
+/// Only the requested page creates Product/Store objects, never the Cartesian
+/// estate. Stable IDs are also resolved through the future transport's seam.
+class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
+  BuyV2DevelopmentCatalogueSource({
+    required this.destination,
+    this.providerCount = 100000,
+    this.skusPerStore = 5000,
+    this.now = DateTime.now,
+  }) : _templates = List.unmodifiable(
+         BuyV2Catalogue.products.where((p) => p.destination == destination),
+       ) {
+    if (_templates.isEmpty ||
+        providerCount < 1 ||
+        providerCount > 100000 ||
+        skusPerStore < 1 ||
+        skusPerStore > 5000) {
+      throw ArgumentError('Invalid development catalogue cohort');
+    }
+  }
+
+  static const version = 'buy-catalogue-dev-v1';
+  static const regions = [
+    'jodhpur',
+    'jaipur',
+    'delhi',
+    'mumbai',
+    'bengaluru',
+    'hyderabad',
+    'kolkata',
+    'pune',
+    'ahmedabad',
+    'chennai',
+  ];
+  final BuyV2Destination destination;
+  final int providerCount;
+  final int skusPerStore;
+  final DateTime Function() now;
+  final List<BuyV2Product> _templates;
+  int productObjectsCreated = 0;
+  int storeObjectsCreated = 0;
+
+  String get _snapshotId =>
+      '$version-${destination.name}-$providerCount-$skusPerStore';
+
+  String storeIdAt(int index) =>
+      '$version-${destination.name}-store-${(index + 1).toString().padLeft(6, '0')}';
+
+  String productIdAt(int store, int sku) =>
+      '${storeIdAt(store)}-sku-${(sku + 1).toString().padLeft(4, '0')}';
+
+  int? _storeIndex(String? id) {
+    if (id == null) return null;
+    final prefix = '$version-${destination.name}-store-';
+    if (!id.startsWith(prefix)) return null;
+    final suffix = id.substring(prefix.length);
+    if (!RegExp(r'^\d{6}$').hasMatch(suffix)) return null;
+    final index = int.parse(suffix) - 1;
+    return index >= 0 && index < providerCount ? index : null;
+  }
+
+  String _region(int store) => regions[store % regions.length];
+  String _name(int store) =>
+      'Mool Market ${(store + 1).toString().padLeft(6, '0')}';
+  String _area(int store) =>
+      '${_region(store)} · Market ${store ~/ regions.length + 1}';
+
+  bool _serviceable(int store, BuyV2CatalogueQuery query) {
+    if (query.storeId != null ||
+        query.areaScope == BuyV2CatalogueAreaScope.allAreas) {
+      return true;
+    }
+    final region = query.regionId;
+    if (!regions.contains(region)) return false;
+    if (_region(store) == region) return true;
+    return query.areaScope == BuyV2CatalogueAreaScope.national &&
+        store % 3 == 0 &&
+        regions[(store + 1) % regions.length] != region;
+  }
+
+  List<int> _stores(BuyV2CatalogueQuery query, {required bool searchNames}) {
+    if (query.destination != destination) return const [];
+    final selected = _storeIndex(query.storeId);
+    if (query.storeId != null && selected == null) return const [];
+    final text = query.query.trim().toLowerCase();
+    final indexes = <int>[];
+    final first = selected ?? 0;
+    final end = selected == null ? providerCount : selected + 1;
+    for (var index = first; index < end; index++) {
+      if (!_serviceable(index, query)) continue;
+      if (query.collectionOnly && index % 4 == 3) continue;
+      if (searchNames &&
+          text.isNotEmpty &&
+          !'${_name(index)} ${_area(index)} ${storeIdAt(index)}'
+              .toLowerCase()
+              .contains(text)) {
+        continue;
+      }
+      indexes.add(index);
+    }
+    return indexes;
+  }
+
+  BuyV2StoreCollectionCapability _capability(int store) {
+    final observed = now();
+    return BuyV2StoreCollectionCapability(
+      storeId: storeIdAt(store),
+      supportsCollection: store % 4 != 3,
+      sourceId: version,
+      observedAt: observed,
+      validUntil: observed.add(const Duration(minutes: 15)),
+    );
+  }
+
+  BuyV2Product _product(int store, int sku) {
+    productObjectsCreated += 1;
+    final base = _templates[sku % _templates.length];
+    return base.copyWith(
+      id: productIdAt(store, sku),
+      canonicalId: '$version-${destination.name}-product-${sku + 1}',
+      storeId: storeIdAt(store),
+      title: '${base.title} ${sku + 1}',
+      seller: _name(store),
+      origin: _area(store),
+      variant: '${base.variant} · SKU ${sku + 1}',
+      catalogueListing: true,
+    );
+  }
+
+  BuyV2StoreListing _store(int index, {int previewSku = 0}) {
+    storeObjectsCreated += 1;
+    return BuyV2StoreListing(
+      id: storeIdAt(index),
+      name: _name(index),
+      area: _area(index),
+      address: '${index + 1}, ${_area(index)}',
+      regionId: _region(index),
+      // No invented distance: a real location service must supply that field.
+      collection: _capability(index),
+      previewProduct: _product(index, previewSku),
+    );
+  }
+
+  bool _matchesSku(
+    int sku,
+    BuyV2CatalogueQuery query, {
+    bool ignoreText = false,
+  }) {
+    final base = _templates[sku % _templates.length];
+    if (query.categoryId != 'all' && base.categoryId != query.categoryId) {
+      return false;
+    }
+    if (query.brands.isNotEmpty && !query.brands.contains(base.brand)) {
+      return false;
+    }
+    if (query.maximumPrice != null && base.price > query.maximumPrice!) {
+      return false;
+    }
+    if (query.offersOnly && sku % 5 != 0) return false;
+    final fulfilment = buyV2CatalogueFulfilmentModeFor(base);
+    if (query.fulfilmentMode != null && query.fulfilmentMode != fulfilment) {
+      return false;
+    }
+    if (query.shopSaleType != null &&
+        ((query.shopSaleType == BuyV2ShopSaleType.quickDelivery) !=
+            (fulfilment == BuyV2FulfilmentMode.quickLocal))) {
+      return false;
+    }
+    if (query.wholesaleSaleType != null &&
+        ((query.wholesaleSaleType == BuyV2WholesaleSaleType.bulk) !=
+            (base.minimumOrder > 2))) {
+      return false;
+    }
+    final pack = base.destination == BuyV2Destination.wholesale
+        ? (base.minimumOrder > 2
+              ? BuyV2PackFilter.bulk
+              : BuyV2PackFilter.standard)
+        : base.minimumOrder > 1 ||
+              RegExp(
+                r'case|carton|crate|sack|pallet|lot|trade',
+              ).hasMatch(base.pack.toLowerCase())
+        ? BuyV2PackFilter.bulk
+        : RegExp(
+            r'pack of\s*[2-9]|[2-9]\s*[×x]',
+          ).hasMatch(base.pack.toLowerCase())
+        ? BuyV2PackFilter.multipack
+        : BuyV2PackFilter.standard;
+    if (query.pack != null && query.pack != pack) return false;
+    final matchesFilter = switch (query.filter) {
+      null => true,
+      'fast' ||
+      'today' ||
+      'quick-local' => fulfilment == BuyV2FulfilmentMode.quickLocal,
+      'standard-courier' => fulfilment == BuyV2FulfilmentMode.standardCourier,
+      'bulk-freight' => fulfilment == BuyV2FulfilmentMode.bulkFreight,
+      'freight' => base.freightIncluded,
+      'moq' => base.minimumOrder <= 2,
+      'manufacturer' =>
+        base.manufacturerVerified ||
+            base.sellerType.toLowerCase().contains('manufacturer'),
+      'returns' => base.returnPolicy != null,
+      'lowest' =>
+        base.badge.toLowerCase().contains('lowest') ||
+            base.badge.toLowerCase().contains('off'),
+      // These require a regional source query, not inferred product promises.
+      'nearby' ||
+      'two-days' => query.areaScope == BuyV2CatalogueAreaScope.regional,
+      'rx' => base.requiresPrescription,
+      'otc' => !base.requiresPrescription,
+      _ => false,
+    };
+    if (!matchesFilter) return false;
+    final text = query.query.trim().toLowerCase();
+    if (ignoreText || text.isEmpty) return true;
+    final haystack = '${base.title} ${base.brand} ${base.pack} sku ${sku + 1}'
+        .toLowerCase();
+    return text.split(RegExp(r'\s+')).every(haystack.contains);
+  }
+
+  String _queryHash(BuyV2CatalogueQuery query) =>
+      sha256.convert(utf8.encode(query.key)).toString();
+
+  String _encodeCursor(BuyV2CatalogueQuery query, int start, int pageSize) =>
+      base64Url.encode(
+        utf8.encode(
+          jsonEncode([_snapshotId, _queryHash(query), start, pageSize]),
+        ),
+      );
+
+  int _offset(
+    BuyV2CatalogueQuery query,
+    String? cursor,
+    int pageSize,
+    int total,
+  ) {
+    if (pageSize < 1 || pageSize > 50) {
+      throw ArgumentError('Page size exceeds bound');
+    }
+    if (cursor == null) return 0;
+    final value = jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(cursor))),
+    );
+    if (value is! List ||
+        value.length != 4 ||
+        value[0] != _snapshotId ||
+        value[1] != _queryHash(query) ||
+        value[2] is! int ||
+        value[3] != pageSize ||
+        (value[2] as int) < 0 ||
+        (value[2] as int) >= total) {
+      throw const FormatException('Development cursor does not match query');
+    }
+    return value[2] as int;
+  }
+
+  BuyV2CataloguePage<T> _page<T>(
+    BuyV2CatalogueQuery query,
+    String? cursor,
+    int pageSize,
+    int total,
+    T Function(int index) itemAt,
+  ) {
+    final start = _offset(query, cursor, pageSize, total);
+    final end = math.min(start + pageSize, total);
+    return BuyV2CataloguePage(
+      queryKey: query.key,
+      snapshotId: _snapshotId,
+      items: [for (var index = start; index < end; index++) itemAt(index)],
+      startIndex: start,
+      totalCount: total,
+      previousCursor: start == 0
+          ? null
+          : _encodeCursor(query, math.max(0, start - pageSize), pageSize),
+      nextCursor: end == total ? null : _encodeCursor(query, end, pageSize),
+    );
+  }
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    final stores = _stores(query, searchNames: true);
+    final previewSku = Iterable.generate(
+      skusPerStore,
+    ).where((sku) => _matchesSku(sku, query, ignoreText: true)).firstOrNull;
+    return _page(
+      query,
+      cursor,
+      pageSize,
+      previewSku == null ? 0 : stores.length,
+      (i) => _store(stores[i], previewSku: previewSku!),
+    );
+  }
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    final stores = _stores(query, searchNames: false);
+    final skus = [
+      for (var sku = 0; sku < skusPerStore; sku++)
+        if (_matchesSku(sku, query)) sku,
+    ];
+    int price(int sku) => _templates[sku % _templates.length].price;
+    if (query.sort == BuyV2ProductSort.priceLowToHigh ||
+        query.sort == BuyV2ProductSort.priceHighToLow) {
+      skus.sort((a, b) {
+        final comparison = query.sort == BuyV2ProductSort.priceLowToHigh
+            ? price(a).compareTo(price(b))
+            : price(b).compareTo(price(a));
+        return comparison != 0 ? comparison : a.compareTo(b);
+      });
+    } else if (query.sort == BuyV2ProductSort.deliveryFastest) {
+      skus.sort((a, b) {
+        final first = buyV2CatalogueFulfilmentModeFor(
+          _templates[a % _templates.length],
+        );
+        final second = buyV2CatalogueFulfilmentModeFor(
+          _templates[b % _templates.length],
+        );
+        final comparison = first.index.compareTo(second.index);
+        return comparison != 0 ? comparison : a.compareTo(b);
+      });
+    }
+    final sortedAcrossStores = query.sort != BuyV2ProductSort.relevance;
+    return _page(query, cursor, pageSize, stores.length * skus.length, (i) {
+      final storeIndex = sortedAcrossStores
+          ? i % stores.length
+          : i ~/ skus.length;
+      final skuIndex = sortedAcrossStores
+          ? i ~/ stores.length
+          : i % skus.length;
+      return _product(stores[storeIndex], skus[skuIndex]);
+    });
+  }
+
+  @override
+  Future<List<BuyV2Product>> resolveProducts(Set<String> productIds) async {
+    if (productIds.length > 50) {
+      throw ArgumentError('Product resolution exceeds bound');
+    }
+    final products = <BuyV2Product>[];
+    for (final id in productIds) {
+      final separator = id.lastIndexOf('-sku-');
+      if (separator < 0) continue;
+      final store = _storeIndex(id.substring(0, separator));
+      final suffix = id.substring(separator + 5);
+      if (store == null || !RegExp(r'^\d{4}$').hasMatch(suffix)) continue;
+      final sku = int.parse(suffix) - 1;
+      if (sku < 0 || sku >= skusPerStore) continue;
+      products.add(_product(store, sku));
+    }
+    return List.unmodifiable(products);
+  }
+}
+
+class _BuyV2PagerLease<T> {
+  _BuyV2PagerLease(this.pager);
+
+  final BuyV2CataloguePager<T> pager;
+  int references = 1;
+  int lastUsed = 0;
+}
+
 class BuyV2Session extends ChangeNotifier {
   BuyV2Session({
     required this.core,
@@ -429,6 +1046,7 @@ class BuyV2Session extends ChangeNotifier {
     this.collectionIdentity,
     this.collectionPendingStore,
     this.catalogueNow = DateTime.now,
+    this.cataloguePageSource,
     BuyV2OrderResolutionAdapter? orderResolutionAdapter,
     BuyV2ShoppingAlertsAdapter? shoppingAlertsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
@@ -471,6 +1089,17 @@ class BuyV2Session extends ChangeNotifier {
                ? const BuyV2UiReviewShoppingAlertsAdapter()
                : const BuyV2UnavailableShoppingAlertsAdapter()) {
     collectionIdentity?.addListener(_onCollectionIdentityChanged);
+    if (cataloguePageSource == null && buyV2DeviceReviewBenefitSeedsEnabled) {
+      for (final destination in [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+      ]) {
+        _deviceCatalogueSources[destination] = BuyV2DevelopmentCatalogueSource(
+          destination: destination,
+          now: catalogueNow,
+        );
+      }
+    }
     if (cartBenefitsAdapter is BuyV2LiveCartBenefitsAdapter) {
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.idle;
     }
@@ -497,6 +1126,327 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
+  bool get pagedCatalogueEnabled =>
+      cataloguePageSource != null ||
+      _deviceCatalogueSources.containsKey(destination);
+
+  int get pagedProductCount => _pagedProducts.length;
+  int get catalogueRequestsInFlight => _catalogueActiveRequests;
+
+  BuyV2CataloguePageSource? _sourceForCatalogue(BuyV2Destination destination) =>
+      cataloguePageSource ?? _deviceCatalogueSources[destination];
+
+  Future<R> _withCatalogueRequest<R>(
+    Future<R> Function() action, {
+    bool Function()? isCurrent,
+  }) async {
+    if (_collectionDisposed) throw StateError('Buy session disposed');
+    if (_catalogueActiveRequests >= 2) {
+      final slot = Completer<void>();
+      _catalogueRequestQueue.add(slot);
+      await slot.future;
+    } else {
+      _catalogueActiveRequests += 1;
+    }
+    try {
+      if (_collectionDisposed || (isCurrent != null && !isCurrent())) {
+        throw StateError('Catalogue request is obsolete');
+      }
+      return await action();
+    } finally {
+      if (_catalogueRequestQueue.isEmpty) {
+        _catalogueActiveRequests -= 1;
+      } else {
+        _catalogueRequestQueue.removeAt(0).complete();
+      }
+    }
+  }
+
+  void _validatePagedProduct(BuyV2Product product, BuyV2CatalogueQuery query) {
+    final storeId = product.storeId;
+    final previous = _pagedProducts[product.id];
+    if (product.id.trim().isEmpty ||
+        storeId == null ||
+        storeId.trim().isEmpty ||
+        storeId.trim() != storeId ||
+        product.destination != query.destination ||
+        (query.storeId != null && storeId != query.storeId) ||
+        product.price <= 0 ||
+        product.title.trim().isEmpty ||
+        product.pack.trim().isEmpty ||
+        product.minimumOrder < 1 ||
+        (previous != null && previous.storeId != storeId)) {
+      throw const FormatException('Catalogue listing identity mismatch');
+    }
+  }
+
+  void _validateStore(BuyV2StoreListing store, BuyV2CatalogueQuery query) {
+    if (store.id.trim().isEmpty ||
+        store.id.trim() != store.id ||
+        store.name.trim().isEmpty ||
+        store.area.trim().isEmpty ||
+        store.address.trim().isEmpty ||
+        store.regionId.trim().isEmpty ||
+        (query.storeId != null && store.id != query.storeId) ||
+        (store.distanceMeters != null && store.distanceMeters! < 0) ||
+        (store.collection != null && store.collection!.storeId != store.id)) {
+      throw const FormatException('Catalogue Store identity mismatch');
+    }
+    final preview = store.previewProduct;
+    if (preview != null) {
+      _validatePagedProduct(preview, query);
+      if (preview.storeId != store.id) {
+        throw const FormatException('Store preview belongs to another branch');
+      }
+    }
+  }
+
+  BuyV2CataloguePager<BuyV2Product> acquireCatalogueProducts(String scopeKey) {
+    final existing = _catalogueProductPagers.remove(scopeKey);
+    if (existing != null) {
+      existing.references += 1;
+      existing.lastUsed = ++_catalogueUseSequence;
+      _catalogueProductPagers[scopeKey] = existing;
+      return existing.pager;
+    }
+    late final BuyV2CataloguePager<BuyV2Product> pager;
+    pager = BuyV2CataloguePager<BuyV2Product>(
+      identityOf: (product) => product.id,
+      load: (query, {cursor, required pageSize}) => _withCatalogueRequest(
+        () async {
+          final source = _sourceForCatalogue(query.destination);
+          if (source == null) throw StateError('Catalogue unavailable');
+          final page = await source.loadProducts(
+            query,
+            cursor: cursor,
+            pageSize: pageSize,
+          );
+          for (final product in page.items) {
+            _validatePagedProduct(product, query);
+          }
+          return page;
+        },
+        isCurrent: () =>
+            !pager.isDisposed &&
+            pager.query == query &&
+            pager.requestedCursor == cursor,
+      ),
+    );
+    pager.addListener(_retainCataloguePages);
+    _catalogueProductPagers[scopeKey] = _BuyV2PagerLease(pager)
+      ..lastUsed = ++_catalogueUseSequence;
+    return pager;
+  }
+
+  BuyV2CataloguePager<BuyV2StoreListing> acquireCatalogueStores(
+    String scopeKey,
+  ) {
+    final existing = _catalogueStorePagers.remove(scopeKey);
+    if (existing != null) {
+      existing.references += 1;
+      existing.lastUsed = ++_catalogueUseSequence;
+      _catalogueStorePagers[scopeKey] = existing;
+      return existing.pager;
+    }
+    late final BuyV2CataloguePager<BuyV2StoreListing> pager;
+    pager = BuyV2CataloguePager<BuyV2StoreListing>(
+      identityOf: (store) => store.id,
+      load: (query, {cursor, required pageSize}) => _withCatalogueRequest(
+        () async {
+          final source = _sourceForCatalogue(query.destination);
+          if (source == null) throw StateError('Store search unavailable');
+          final page = await source.loadStores(
+            query,
+            cursor: cursor,
+            pageSize: pageSize,
+          );
+          for (final store in page.items) {
+            _validateStore(store, query);
+          }
+          return page;
+        },
+        isCurrent: () =>
+            !pager.isDisposed &&
+            pager.query == query &&
+            pager.requestedCursor == cursor,
+      ),
+    );
+    pager.addListener(_retainCataloguePages);
+    _catalogueStorePagers[scopeKey] = _BuyV2PagerLease(pager)
+      ..lastUsed = ++_catalogueUseSequence;
+    return pager;
+  }
+
+  void releaseCatalogueProducts(String scopeKey) {
+    final lease = _catalogueProductPagers.remove(scopeKey);
+    if (lease != null) {
+      if (lease.references > 0) lease.references -= 1;
+      lease.lastUsed = ++_catalogueUseSequence;
+      _catalogueProductPagers[scopeKey] = lease;
+    }
+    _trimCatalogueContexts();
+  }
+
+  void releaseCatalogueStores(String scopeKey) {
+    final lease = _catalogueStorePagers.remove(scopeKey);
+    if (lease != null) {
+      if (lease.references > 0) lease.references -= 1;
+      lease.lastUsed = ++_catalogueUseSequence;
+      _catalogueStorePagers[scopeKey] = lease;
+    }
+    _trimCatalogueContexts();
+  }
+
+  void _trimCatalogueContexts() {
+    // Keep four inactive query contexts for product/Store/Back continuity.
+    // Mounted surfaces retain their own three-page window.
+    while (_catalogueProductPagers.values
+                .where((v) => v.references == 0)
+                .length +
+            _catalogueStorePagers.values
+                .where((v) => v.references == 0)
+                .length >
+        4) {
+      final product = _catalogueProductPagers.entries
+          .where((entry) => entry.value.references == 0)
+          .firstOrNull;
+      final store = _catalogueStorePagers.entries
+          .where((entry) => entry.value.references == 0)
+          .firstOrNull;
+      if (product != null &&
+          (store == null || product.value.lastUsed < store.value.lastUsed)) {
+        _catalogueProductPagers.remove(product.key)?.pager.dispose();
+      } else {
+        _catalogueStorePagers.remove(store!.key)?.pager.dispose();
+      }
+    }
+    _retainCataloguePages(notify: false);
+  }
+
+  void _rememberPagedStore(BuyV2StoreListing store) {
+    _pagedStores[store.id] = store;
+    final preview = store.previewProduct;
+    if (preview != null) _pagedProducts[preview.id] = preview;
+    // The new Store capability replaces its earlier one, including withdrawal.
+    _productFacts.removeWhere(
+      (id, facts) => _pagedProducts[id]?.storeId == store.id,
+    );
+  }
+
+  void _retainCataloguePages({bool notify = true}) {
+    if (_collectionDisposed) return;
+    for (final lease in _catalogueProductPagers.values) {
+      for (final product in lease.pager.cachedItems) {
+        _pagedProducts[product.id] = product;
+      }
+    }
+    final storeIds = <String>{};
+    for (final lease in _catalogueStorePagers.values) {
+      for (final store in lease.pager.cachedItems) {
+        storeIds.add(store.id);
+        if (_admittedStoreListings[store] != true) {
+          _admittedStoreListings[store] = true;
+          _rememberPagedStore(store);
+        }
+      }
+    }
+    final retained = <String>{
+      ..._cart.keys,
+      ..._recentlyViewedProductIds,
+      ..._comparedProductOrigins,
+      ...?_cartProductReturnOrigin?.comparisons,
+      ?selectedProductId,
+      ?_cartProductReturnId,
+      ?_accountReturnProductId,
+      ?_pendingStoreReturnAnchorId,
+      for (final lease in _catalogueProductPagers.values)
+        for (final product in lease.pager.cachedItems) product.id,
+      for (final store in _pagedStores.values)
+        if (storeIds.contains(store.id) && store.previewProduct != null)
+          store.previewProduct!.id,
+      for (final product in _pagedProducts.values)
+        if (_savedKeys.contains(_buyV2SavedKey(product))) product.id,
+    };
+    _pagedProducts.removeWhere((id, _) => !retained.contains(id));
+    storeIds.addAll(
+      _pagedProducts.values.map((product) => product.storeId!).toSet(),
+    );
+    _pagedStores.removeWhere((id, _) => !storeIds.contains(id));
+    retained.addAll(_catalogueProducts.map((product) => product.id));
+    _productFacts.removeWhere((id, _) => !retained.contains(id));
+    _productContent.removeWhere((id, _) => !retained.contains(id));
+    _marketplaceTrust.removeWhere((id, _) => !retained.contains(id));
+    _productBenefits.removeWhere((id, _) => !retained.contains(id));
+    _productBenefitStates.removeWhere((id, _) => !retained.contains(id));
+    _productBenefitMessages.removeWhere((id, _) => !retained.contains(id));
+    _productBenefitRequestSequences.removeWhere(
+      (id, _) => !retained.contains(id),
+    );
+    if (notify) notifyListeners();
+  }
+
+  BuyV2StoreListing? catalogueStore(String storeId) => _pagedStores[storeId];
+
+  Future<BuyV2StoreListing?> refreshCatalogueStore(
+    String storeId,
+    BuyV2Destination destination,
+  ) {
+    return _storeLookups.putIfAbsent(
+      storeId,
+      () =>
+          _withCatalogueRequest<BuyV2StoreListing?>(() async {
+                final source = _sourceForCatalogue(destination);
+                if (source == null) throw StateError('Store unavailable');
+                final query = BuyV2CatalogueQuery(
+                  destination: destination,
+                  regionId: null,
+                  storeId: storeId,
+                  areaScope: BuyV2CatalogueAreaScope.allAreas,
+                );
+                final page = await source.loadStores(query, pageSize: 1);
+                if (_collectionDisposed) return null;
+                if (page.queryKey != query.key ||
+                    page.items.length != 1 ||
+                    page.startIndex != 0 ||
+                    page.snapshotId.trim().isEmpty ||
+                    page.previousCursor != null ||
+                    page.nextCursor != null ||
+                    (page.totalCount != null && page.totalCount != 1)) {
+                  throw const FormatException(
+                    'Exact Store response could not be verified',
+                  );
+                }
+                final store = page.items.single;
+                _validateStore(store, query);
+                _rememberPagedStore(store);
+                notifyListeners();
+                return store;
+              })
+              .catchError((Object _) {
+                if (_collectionDisposed) return null;
+                final previous = _pagedStores[storeId];
+                if (previous != null) {
+                  _rememberPagedStore(
+                    BuyV2StoreListing(
+                      id: previous.id,
+                      name: previous.name,
+                      area: previous.area,
+                      address: previous.address,
+                      regionId: previous.regionId,
+                      distanceMeters: previous.distanceMeters,
+                      previewProduct: previous.previewProduct,
+                    ),
+                  );
+                }
+                notifyListeners();
+                return null;
+              })
+              .whenComplete(() {
+                _storeLookups.remove(storeId);
+              }),
+    );
+  }
+
   void _onCollectionIdentityChanged() {
     _collectionEpoch++;
     for (final state in _collectionStates.values) {
@@ -518,6 +1468,12 @@ class BuyV2Session extends ChangeNotifier {
     collectionIdentity?.removeListener(_onCollectionIdentityChanged);
     for (final state in _collectionStates.values) {
       state.elapsed.stop();
+    }
+    for (final lease in _catalogueProductPagers.values) {
+      lease.pager.dispose();
+    }
+    for (final lease in _catalogueStorePagers.values) {
+      lease.pager.dispose();
     }
     super.dispose();
   }
@@ -934,6 +1890,20 @@ class BuyV2Session extends ChangeNotifier {
   final ValueListenable<BuyV2CollectionIdentity?>? collectionIdentity;
   final BuyV2CollectionPendingStore? collectionPendingStore;
   final DateTime Function() catalogueNow;
+  final BuyV2CataloguePageSource? cataloguePageSource;
+  final Map<BuyV2Destination, BuyV2CataloguePageSource>
+  _deviceCatalogueSources = {};
+  final Map<String, _BuyV2PagerLease<BuyV2Product>> _catalogueProductPagers =
+      {};
+  final Map<String, _BuyV2PagerLease<BuyV2StoreListing>> _catalogueStorePagers =
+      {};
+  final Map<String, BuyV2Product> _pagedProducts = {};
+  final Map<String, BuyV2StoreListing> _pagedStores = {};
+  final Expando<bool> _admittedStoreListings = Expando<bool>();
+  final Map<String, Future<BuyV2StoreListing?>> _storeLookups = {};
+  final List<Completer<void>> _catalogueRequestQueue = [];
+  int _catalogueActiveRequests = 0;
+  int _catalogueUseSequence = 0;
   final Map<String, _BuyV2CollectionState> _collectionStates = {};
   int _collectionEpoch = 0;
   bool _collectionDisposed = false;
@@ -1247,6 +2217,7 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, BuyV2CartBenefitsLoadState> _productBenefitStates = {};
   final Map<String, String> _productBenefitMessages = {};
   final Map<String, int> _productBenefitRequestSequences = {};
+  int _productBenefitRequestSequence = 0;
   BuyV2CartBenefitsLoadState cartBenefitsLoadState =
       BuyV2CartBenefitsLoadState.ready;
   String? cartBenefitsMessage;
@@ -2334,7 +3305,7 @@ class BuyV2Session extends ChangeNotifier {
     final destination = value == BuyV2Destination.orders
         ? BuyV2Destination.shop
         : value;
-    return _catalogueProducts
+    return _knownCatalogueProducts
         .where(
           (product) =>
               product.destination == destination &&
@@ -2400,22 +3371,83 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
     try {
       final stored = await store.read() ?? const <String>{};
-      if (store.ownerScope != ownerScope ||
+      if (_collectionDisposed ||
+          store.ownerScope != ownerScope ||
           mutationRevision != _savedProductsMutationRevision) {
         return;
       }
-      final validKeys = _catalogueProducts.map(_buyV2SavedKey).toSet();
+      final resolved = await _resolvePersistedCatalogueProducts(
+        stored.map(_buyV2SavedListingId).whereType<String>().toSet(),
+      );
+      if (_collectionDisposed ||
+          store.ownerScope != ownerScope ||
+          mutationRevision != _savedProductsMutationRevision) {
+        return;
+      }
+      _pagedProducts.addAll(resolved);
+      final validKeys = _knownCatalogueProducts.map(_buyV2SavedKey).toSet();
       _savedKeys
         ..clear()
         ..addAll(stored.where(validKeys.contains));
       notifyListeners();
     } on Object {
+      if (_collectionDisposed ||
+          store.ownerScope != ownerScope ||
+          mutationRevision != _savedProductsMutationRevision) {
+        return;
+      }
       if (store.ownerScope == ownerScope) {
         _savedProductsOwnerScope = null;
       }
       notice = 'Saved products could not be restored.';
       notifyListeners();
     }
+  }
+
+  Iterable<BuyV2Product> get _knownCatalogueProducts => <String, BuyV2Product>{
+    for (final product in _catalogueProducts) product.id: product,
+    ..._pagedProducts,
+  }.values;
+
+  Future<Map<String, BuyV2Product>> _resolvePersistedCatalogueProducts(
+    Set<String> ids,
+  ) async {
+    final missing = ids.where((id) => findProduct(id) == null).toSet();
+    if (missing.isEmpty) return {};
+    final sources = <BuyV2CataloguePageSource>{
+      ?cataloguePageSource,
+      ..._deviceCatalogueSources.values,
+    };
+    if (sources.isEmpty) return {};
+    final resolved = <String, BuyV2Product>{};
+    for (final source in sources) {
+      final pending = missing.where((id) => !resolved.containsKey(id)).toList();
+      for (var start = 0; start < pending.length; start += 50) {
+        final batch = pending.skip(start).take(50).toSet();
+        final products = await _withCatalogueRequest(
+          () => source.resolveProducts(batch),
+        );
+        if (_collectionDisposed) throw StateError('Buy session disposed');
+        for (final product in products) {
+          if (!batch.contains(product.id) || resolved.containsKey(product.id)) {
+            throw const FormatException('Restored catalogue identity mismatch');
+          }
+          _validatePagedProduct(
+            product,
+            BuyV2CatalogueQuery(
+              destination: product.destination,
+              regionId: null,
+              areaScope: BuyV2CatalogueAreaScope.allAreas,
+            ),
+          );
+          resolved[product.id] = product;
+        }
+      }
+    }
+    if (!resolved.keys.toSet().containsAll(missing)) {
+      throw StateError('Some retained products could not be restored');
+    }
+    return resolved;
   }
 
   void _persistSavedProducts() {
@@ -2451,10 +3483,24 @@ class BuyV2Session extends ChangeNotifier {
     try {
       final snapshot = await store.read();
       if (snapshot == null ||
+          _collectionDisposed ||
           store.ownerScope != ownerScope ||
           mutationRevision != _customerStateMutationRevision) {
         return;
       }
+      final resolved = await _resolvePersistedCatalogueProducts({
+        ...snapshot.cartQuantities.keys,
+        ...snapshot.savedProductKeys
+            .map(_buyV2SavedListingId)
+            .whereType<String>(),
+        ...snapshot.recentlyViewedProductIds.take(10),
+      });
+      if (_collectionDisposed ||
+          store.ownerScope != ownerScope ||
+          mutationRevision != _customerStateMutationRevision) {
+        return;
+      }
+      _pagedProducts.addAll(resolved);
       _cart.clear();
       for (final entry in snapshot.cartQuantities.entries) {
         final product = findProduct(entry.key);
@@ -2484,7 +3530,9 @@ class BuyV2Session extends ChangeNotifier {
           !_addresses.any((address) => address.id == _selectedAddressId)) {
         _selectedAddressId = null;
       }
-      final validSavedKeys = _catalogueProducts.map(_buyV2SavedKey).toSet();
+      final validSavedKeys = _knownCatalogueProducts
+          .map(_buyV2SavedKey)
+          .toSet();
       _savedKeys
         ..clear()
         ..addAll(snapshot.savedProductKeys.where(validSavedKeys.contains));
@@ -2507,7 +3555,7 @@ class BuyV2Session extends ChangeNotifier {
           .firstOrNull;
       // Browsing filters belong to the current catalogue, not account defaults.
       // Ignore historical stored filters without resetting a live browse draft.
-      final validRecentIds = _catalogueProducts
+      final validRecentIds = _knownCatalogueProducts
           .where(
             (product) =>
                 product.destination == BuyV2Destination.shop ||
@@ -2559,6 +3607,11 @@ class BuyV2Session extends ChangeNotifier {
       _pruneCartSelections();
       notifyListeners();
     } on Object {
+      if (_collectionDisposed ||
+          store.ownerScope != ownerScope ||
+          mutationRevision != _customerStateMutationRevision) {
+        return;
+      }
       if (store.ownerScope == ownerScope) _customerStateOwnerScope = null;
       notice = 'Your Shop choices could not be restored. Try again.';
       notifyListeners();
@@ -3019,7 +4072,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return true;
     }
-    final sequence = (_productBenefitRequestSequences[product.id] ?? 0) + 1;
+    final sequence = ++_productBenefitRequestSequence;
     _productBenefitRequestSequences[product.id] = sequence;
     final fingerprint = _productBenefitFingerprint(product);
     _productBenefits.remove(product.id);
@@ -3035,7 +4088,8 @@ class BuyV2Session extends ChangeNotifier {
           selectedPaymentMethod: selectedPayment,
         ),
       );
-      if (_productBenefitRequestSequences[product.id] != sequence ||
+      if (_collectionDisposed ||
+          _productBenefitRequestSequences[product.id] != sequence ||
           _productBenefitFingerprint(product) != fingerprint) {
         return false;
       }
@@ -3058,7 +4112,8 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return true;
     } on Object {
-      if (_productBenefitRequestSequences[product.id] != sequence) {
+      if (_collectionDisposed ||
+          _productBenefitRequestSequences[product.id] != sequence) {
         return false;
       }
       _productBenefits.remove(product.id);
@@ -3946,7 +5001,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void clearRecentlyViewed(BuyV2Destination destination) {
-    final productIds = _catalogueProducts
+    final productIds = _knownCatalogueProducts
         .where((product) => product.destination == destination)
         .map((product) => product.id)
         .toSet();
@@ -4241,10 +5296,12 @@ class BuyV2Session extends ChangeNotifier {
       .length;
 
   BuyV2Product? findProduct(String id) {
+    final paged = _pagedProducts[id];
+    if (paged != null) return paged;
     for (final product in _catalogueProducts) {
       if (product.id == id) return product;
     }
-    return null;
+    return _cart[id]?.product;
   }
 
   BuyV2Product product(String id) {
@@ -4256,9 +5313,16 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2ProductFactsSnapshot productFactsFor(BuyV2Product product) {
     return _productFacts.putIfAbsent(product.id, () {
       final next = productFactsAdapter.snapshotFor(product);
-      return _validProductFacts(product, next)
+      final facts = _validProductFacts(product, next)
           ? next
           : _catalogueFactsFallback.snapshotFor(product);
+      final store = _pagedStores[product.storeId];
+      return store == null
+          ? facts
+          : facts.copyWith(
+              storeCollection: store.collection,
+              clearStoreCollection: store.collection == null,
+            );
     });
   }
 

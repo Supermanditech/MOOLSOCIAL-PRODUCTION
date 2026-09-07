@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 import 'buy_v2_cart_contracts.dart';
@@ -6,6 +8,148 @@ import 'buy_v2_models.dart';
 enum BuyV2FulfilmentMode { quickLocal, standardCourier, bulkFreight }
 
 enum BuyV2StoreOperatingState { unknown, open, closed }
+
+/// Geographic scope is explicit; a destination search does not claim routing.
+enum BuyV2CatalogueAreaScope { regional, national, allAreas }
+
+/// Immutable request identity shared by Store, category, Offers and Search.
+/// A response for another identity must never replace the visible results.
+@immutable
+class BuyV2CatalogueQuery {
+  BuyV2CatalogueQuery({
+    required this.destination,
+    required this.regionId,
+    this.areaScope = BuyV2CatalogueAreaScope.regional,
+    this.storeId,
+    this.query = '',
+    this.categoryId = 'all',
+    this.sort = BuyV2ProductSort.relevance,
+    this.shopSaleType,
+    this.wholesaleSaleType,
+    this.fulfilmentMode,
+    this.pack,
+    this.filter,
+    Set<String> brands = const {},
+    this.maximumPrice,
+    this.availableOnly = false,
+    this.offersOnly = false,
+    this.collectionOnly = false,
+  }) : brands = Set.unmodifiable(brands);
+
+  final BuyV2Destination destination;
+  final String? regionId;
+  final BuyV2CatalogueAreaScope areaScope;
+  final String? storeId;
+  final String query;
+  final String categoryId;
+  final BuyV2ProductSort sort;
+  final BuyV2ShopSaleType? shopSaleType;
+  final BuyV2WholesaleSaleType? wholesaleSaleType;
+  final BuyV2FulfilmentMode? fulfilmentMode;
+  final BuyV2PackFilter? pack;
+  final String? filter;
+  final Set<String> brands;
+  final int? maximumPrice;
+  final bool availableOnly;
+  final bool offersOnly;
+  final bool collectionOnly;
+
+  String get key => jsonEncode([
+    1,
+    destination.name,
+    regionId,
+    areaScope.name,
+    storeId,
+    query.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '),
+    categoryId,
+    sort.name,
+    shopSaleType?.name,
+    wholesaleSaleType?.name,
+    fulfilmentMode?.name,
+    pack?.name,
+    filter,
+    brands.toList()..sort(),
+    maximumPrice,
+    availableOnly,
+    offersOnly,
+    collectionOnly,
+  ]);
+
+  @override
+  bool operator ==(Object other) =>
+      other is BuyV2CatalogueQuery && other.key == key;
+
+  @override
+  int get hashCode => key.hashCode;
+}
+
+/// Provider/branch identity is independent of its display name or SKU list.
+@immutable
+class BuyV2StoreListing {
+  const BuyV2StoreListing({
+    required this.id,
+    required this.name,
+    required this.area,
+    required this.address,
+    required this.regionId,
+    this.distanceMeters,
+    this.collection,
+    this.previewProduct,
+  });
+
+  final String id;
+  final String name;
+  final String area;
+  final String address;
+  final String regionId;
+  final int? distanceMeters;
+  final BuyV2StoreCollectionCapability? collection;
+  final BuyV2Product? previewProduct;
+}
+
+/// Cursors belong to one query and snapshot. A previous cursor makes backward
+/// navigation possible without retaining every earlier page in device memory.
+@immutable
+class BuyV2CataloguePage<T> {
+  BuyV2CataloguePage({
+    required this.queryKey,
+    required this.snapshotId,
+    required Iterable<T> items,
+    required this.startIndex,
+    this.totalCount,
+    this.previousCursor,
+    this.nextCursor,
+  }) : items = List.unmodifiable(items);
+
+  final String queryKey;
+  final String snapshotId;
+  final List<T> items;
+  final int startIndex;
+  final int? totalCount;
+  final String? previousCursor;
+  final String? nextCursor;
+}
+
+/// One source supplies both provider discovery and provider-specific SKU pages.
+/// Future transports enforce geography, availability and cursor consistency;
+/// local development sources are not proof of those production facts.
+abstract interface class BuyV2CataloguePageSource {
+  Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  });
+
+  Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  });
+
+  /// Restore exact user-selected IDs after page eviction or process relaunch.
+  /// Callers batch at most50 IDs; absent IDs remain unavailable, never guessed.
+  Future<List<BuyV2Product>> resolveProducts(Set<String> productIds);
+}
 
 /// A sourced Store capability, not proof of stock, payment or order readiness.
 /// An absent or expired capability never advertises customer collection.
