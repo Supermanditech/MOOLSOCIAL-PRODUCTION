@@ -36,6 +36,63 @@ class _R66StoreStatusSession extends BuyV2Session {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('R5 006 parked Cart reuses a newly clear preferred position', (
+    tester,
+  ) async {
+    final ownerKey = GlobalKey();
+    late BuyV2CartAvoidanceLayout layout;
+    late StateSetter updateObstacles;
+    var blocked = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BuyV2CartAvoidanceScope(
+            child: Builder(
+              builder: (context) {
+                layout = BuyV2CartAvoidanceScope.of(context)!;
+                return StatefulBuilder(
+                  builder: (context, setState) {
+                    updateObstacles = setState;
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: SizedBox(
+                        key: ownerKey,
+                        width: 320,
+                        height: 400,
+                        child: Stack(
+                          children: [
+                            if (blocked)
+                              const Positioned.fill(
+                                child: BuyV2CartAvoidanceRegion(
+                                  child: ColoredBox(color: Colors.white),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final owner = ownerKey.currentContext!.findRenderObject()! as RenderBox;
+    const preferred = Offset(30, 60);
+    const cart = Size(80, 48);
+    layout.place(preferred, cart, owner.size, owner);
+    expect(layout.dockHeight, greaterThan(0));
+    updateObstacles(() => blocked = false);
+    await tester.pumpAndSettle();
+    expect(layout.place(preferred, cart, owner.size, owner), preferred);
+    expect(layout.dockHeight, 0);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   Future<void> settleVisibleImages(WidgetTester tester) async {
     for (final image in tester.widgetList<Image>(find.byType(Image))) {
       await tester.runAsync(
@@ -130,6 +187,463 @@ void main() {
         (product) =>
             product.destination == destination && !product.requiresPrescription,
       );
+
+  Future<void> revealR5ProductContent(
+    WidgetTester tester,
+    Finder target,
+  ) async {
+    final scroll = find
+        .descendant(
+          of: find.byType(BuyV2ProductView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    var seekingTop = true;
+    for (
+      var attempt = 0;
+      attempt < 50 && target.evaluate().isEmpty;
+      attempt++
+    ) {
+      if (tester.state<ScrollableState>(scroll).position.pixels <= .1) {
+        seekingTop = false;
+      }
+      final viewport = tester
+          .getRect(scroll)
+          .intersect(
+            tester.getRect(
+              find.byKey(const ValueKey('buy-cart-content-viewport')),
+            ),
+          );
+      final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
+      final blocked = cart.evaluate().isEmpty
+          ? Rect.zero
+          : tester.getRect(cart).inflate(8);
+      final start = [
+        Offset(viewport.left + 14, viewport.center.dy),
+        Offset(viewport.right - 14, viewport.center.dy),
+      ].firstWhere((point) => !blocked.contains(point));
+      await tester.dragFrom(start, Offset(0, seekingTop ? 220 : -220));
+      await tester.pumpAndSettle();
+    }
+    expect(
+      target,
+      findsOneWidget,
+      reason: 'Product content is reachable by an unobstructed scroll.',
+    );
+    await Scrollable.ensureVisible(tester.element(target), alignment: .5);
+    await tester.pumpAndSettle();
+  }
+
+  for (final scenario in [
+    for (final size in [
+      const Size(320, 700),
+      const Size(360, 800),
+      const Size(430, 900),
+      const Size(640, 360),
+    ])
+      for (final scale in [1.0, 2.0]) (size, scale),
+  ]) {
+    final size = scenario.$1;
+    final scale = scenario.$2;
+    final label = '${size.width.toInt()}x${size.height.toInt()}-$scale';
+    testWidgets(
+      'R5 004 product description survives Compare and Cart return $label',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core)
+          ..openDestination(BuyV2Destination.wholesale)
+          ..openProduct('w-oil');
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        final description = session
+            .productContentFor(session.product('w-oil'))
+            .description!;
+        await tester.pumpWidget(app(session, size: size, textScale: scale));
+        await tester.pumpAndSettle();
+        final detail = find.text(description);
+        await revealR5ProductContent(tester, detail);
+        session.addProduct('s-tomato');
+        session.addProduct('w-notebook');
+        await tester.pumpAndSettle();
+        final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
+        expect(cart.hitTestable(), findsOneWidget);
+        final parked = find.byKey(const ValueKey('buy-cart-navigation-button'));
+        if (parked.evaluate().isEmpty) {
+          await tester.drag(
+            cart,
+            tester.getCenter(detail) - tester.getCenter(cart),
+          );
+          await tester.pumpAndSettle();
+        } else {
+          expect(tester.getSize(parked), const Size(44, 44));
+          expect(parked.hitTestable(), findsOneWidget);
+          expect(
+            tester
+                .getRect(
+                  find.byKey(const ValueKey('buy-cart-content-viewport')),
+                )
+                .bottom,
+            tester
+                .getRect(
+                  find.byKey(const ValueKey('buy-navigation-overlay-stack')),
+                )
+                .bottom,
+          );
+        }
+        expect(tester.getRect(cart).overlaps(tester.getRect(detail)), isFalse);
+        await capture(tester, 'r5-description-before-compare-$label');
+        await revealR5ProductContent(tester, find.text('Compare'));
+        await tester.tap(find.text('Compare'));
+        await tester.pumpAndSettle();
+        final alternate = find.byKey(
+          const ValueKey('buy-product-compare-view-w-oil-10l'),
+        );
+        await Scrollable.ensureVisible(
+          tester.element(alternate),
+          alignment: .5,
+        );
+        await tester.pumpAndSettle();
+        expect(alternate.hitTestable(), findsOneWidget);
+        await tester.tap(alternate);
+        await tester.pumpAndSettle();
+        expect(session.selectedProduct?.id, 'w-oil-10l');
+        await tester.tap(cart);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.selectedProduct?.id, 'w-oil-10l');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.selectedProduct?.id, 'w-oil');
+        await revealR5ProductContent(tester, detail);
+        expect(tester.getRect(cart).overlaps(tester.getRect(detail)), isFalse);
+        await capture(tester, 'r5-description-after-compare-$label');
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(session.quantityFor('w-notebook'), 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final saved in [false, true]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'R5 004 empty content stays clear ${destination.name} saved=$saved text=$scale',
+          (tester) async {
+            const size = Size(360, 800);
+            tester.view.physicalSize = size;
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.reset);
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            session.addProduct('s-tomato');
+            session.addProduct('w-notebook');
+            session.openDestination(destination);
+            if (saved) {
+              session.showSavedProducts(true);
+            } else {
+              session.updateQuery('r5-no-matching-product');
+            }
+            final retainedShop = session.quantityFor('s-tomato');
+            final retainedWholesale = session.quantityFor('w-notebook');
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                textScale: scale,
+                safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final title = find.text(
+              saved ? 'No saved products yet' : 'No matching products',
+            );
+            final detail = find.text(
+              saved
+                  ? 'Save products from this grid for instant access.'
+                  : 'Check the product code or search by product name.',
+            );
+            final recovery = find.text(
+              saved ? 'Show all products' : 'Clear search',
+            );
+            final cart = find.byKey(
+              const ValueKey('buy-mini-cart-drag-handle'),
+            );
+            expect(title, findsOneWidget);
+            expect(cart.hitTestable(), findsOneWidget);
+            expect(
+              find.byKey(const ValueKey('buy-cart-navigation-button')),
+              findsNothing,
+              reason: 'The seeded empty page has free space for the Cart.',
+            );
+            await tester.drag(
+              cart,
+              tester.getCenter(title) - tester.getCenter(cart),
+            );
+            await tester.pumpAndSettle();
+            for (final text in [title, detail, recovery]) {
+              expect(
+                tester.getRect(cart).overlaps(tester.getRect(text)),
+                isFalse,
+                reason: 'Cart must not cover empty-state facts or recovery.',
+              );
+            }
+            expect(recovery.hitTestable(), findsOneWidget);
+
+            final displayedBeforeDrag = tester.getTopLeft(cart);
+            final nextDrag = await tester.startGesture(tester.getCenter(cart));
+            const firstDelta = Offset(24, 24);
+            try {
+              await nextDrag.moveBy(firstDelta);
+              await tester.pump();
+              const nextDelta = Offset(12, 16);
+              await nextDrag.moveBy(nextDelta);
+              await tester.pump();
+              expect(
+                (tester.getTopLeft(cart) - displayedBeforeDrag).distance,
+                inInclusiveRange(
+                  5,
+                  firstDelta.distance + nextDelta.distance + 1,
+                ),
+                reason:
+                    'Cart must follow the new finger movement from its displayed position.',
+              );
+            } finally {
+              await nextDrag.up();
+              await tester.pumpAndSettle();
+            }
+
+            for (final text in [title, detail, recovery]) {
+              expect(
+                tester.getRect(cart).overlaps(tester.getRect(text)),
+                isFalse,
+              );
+            }
+            final stable = tester.getTopLeft(cart);
+            final stableSize = tester.getSize(cart);
+            final stableTitle = tester.getRect(title);
+            final stableViewport = tester.getRect(
+              find.byKey(const ValueKey('buy-navigation-overlay-stack')),
+            );
+            await capture(tester, 'r5-empty-${destination.name}-$saved-$scale');
+            await tester.tap(cart);
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.cart);
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(title, findsOneWidget);
+            expect(
+              tester.getTopLeft(cart),
+              stable,
+              reason:
+                  'Cart size $stableSize -> ${tester.getSize(cart)}; '
+                  'title $stableTitle -> ${tester.getRect(title)}; '
+                  'viewport $stableViewport -> ${tester.getRect(find.byKey(const ValueKey('buy-navigation-overlay-stack')))}',
+            );
+            expect(session.quantityFor('s-tomato'), retainedShop);
+            expect(session.quantityFor('w-notebook'), retainedWholesale);
+            await tester.tap(recovery);
+            await tester.pumpAndSettle();
+            expect(title, findsNothing);
+            expect(session.quantityFor('s-tomato'), retainedShop);
+            expect(session.quantityFor('w-notebook'), retainedWholesale);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+
+  for (final size in [
+    const Size(320, 700),
+    const Size(430, 900),
+    const Size(640, 360),
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final destination in [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+      ]) {
+        final label =
+            '${destination.name}-${size.width.toInt()}x${size.height.toInt()}-$scale';
+        testWidgets(
+          'R5 004 Saved clear keeps Cart and recovery usable $label',
+          (tester) async {
+            tester.view.physicalSize = size;
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.reset);
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            final product = productFor(destination);
+            final other = productFor(
+              destination == BuyV2Destination.shop
+                  ? BuyV2Destination.wholesale
+                  : BuyV2Destination.shop,
+            );
+            session.toggleSaved(product.id);
+            session.toggleSaved(other.id);
+            session.addProduct(product.id);
+            session.addProduct(other.id);
+            session.openDestination(destination);
+            final retained = session.quantityFor(product.id);
+            final retainedOther = session.quantityFor(other.id);
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                textScale: scale,
+                safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+              ),
+            );
+            await tester.pumpAndSettle();
+            await tester.tap(
+              find.byKey(const ValueKey('buy-saved-products-button')),
+            );
+            await tester.pumpAndSettle();
+            final clear = find.byKey(const ValueKey('buy-saved-clear'));
+            await tester.tap(clear);
+            await tester.pumpAndSettle();
+            final keep = find.byKey(const ValueKey('buy-saved-keep'));
+            final confirm = find.byKey(
+              const ValueKey('buy-saved-confirm-clear'),
+            );
+            expect(keep.hitTestable(), findsOneWidget);
+            expect(confirm.hitTestable(), findsOneWidget);
+            await capture(tester, 'r5-saved-confirm-$label');
+            Future<void> revealDecisionActions() async {
+              final sheet = find.byKey(const ValueKey('buy-saved-clear-sheet'));
+              final scroll = find.descendant(
+                of: sheet,
+                matching: find.byType(Scrollable),
+              );
+              for (
+                var attempt = 0;
+                attempt < 4 &&
+                    tester.getRect(confirm).bottom > size.height - 24;
+                attempt++
+              ) {
+                final bounds = tester.getRect(scroll);
+                await tester.dragFrom(
+                  Offset(bounds.right - 12, bounds.center.dy),
+                  const Offset(0, -100),
+                );
+                await tester.pumpAndSettle();
+              }
+              for (final action in [keep, confirm]) {
+                final bounds = tester.getRect(action);
+                expect(bounds.top, greaterThanOrEqualTo(24));
+                expect(bounds.bottom, lessThanOrEqualTo(size.height - 24));
+                expect(bounds.height, greaterThanOrEqualTo(48));
+                expect(action.hitTestable(), findsOneWidget);
+              }
+            }
+
+            await revealDecisionActions();
+            if (size.height < 400) {
+              await capture(tester, 'r5-saved-confirm-actions-$label');
+            }
+            await tester.tap(keep);
+            await tester.pumpAndSettle();
+            expect(session.isSaved(product.id), isTrue);
+            expect(session.isSaved(other.id), isTrue);
+            await tester.tap(clear);
+            await tester.pumpAndSettle();
+            await revealDecisionActions();
+            await tester.tap(confirm);
+            await tester.pumpAndSettle();
+            expect(session.isSaved(product.id), isFalse);
+            expect(session.isSaved(other.id), isTrue);
+
+            final cart = find.byKey(
+              const ValueKey('buy-mini-cart-drag-handle'),
+            );
+            final title = find.text('No saved products yet');
+            final detail = find.text(
+              'Save products from this grid for instant access.',
+            );
+            final recovery = find.text('Show all products');
+            final emptyParts = [title, detail, recovery];
+            for (var index = 0; index < emptyParts.length; index++) {
+              final part = emptyParts[index];
+              await Scrollable.ensureVisible(
+                tester.element(part),
+                alignment: .5,
+              );
+              await tester.pumpAndSettle();
+              expect(part.hitTestable(), findsOneWidget);
+              expect(cart.hitTestable(), findsOneWidget);
+              expect(
+                tester.getRect(cart).overlaps(tester.getRect(part)),
+                isFalse,
+                reason:
+                    'Each empty-page fact remains readable while scrolling.',
+              );
+              final viewport = tester.getRect(
+                find.byKey(const ValueKey('buy-navigation-overlay-stack')),
+              );
+              final cartBounds = tester.getRect(cart);
+              final parked = find.byKey(
+                const ValueKey('buy-cart-navigation-button'),
+              );
+              if (parked.evaluate().isNotEmpty) {
+                expect(tester.getSize(parked), const Size(44, 44));
+                expect(cartBounds.left, greaterThanOrEqualTo(0));
+                expect(cartBounds.right, lessThanOrEqualTo(size.width));
+                expect(cartBounds.top, greaterThanOrEqualTo(viewport.bottom));
+                expect(cartBounds.bottom, lessThanOrEqualTo(size.height - 24));
+              } else {
+                expect(cartBounds.left, greaterThanOrEqualTo(viewport.left));
+                expect(cartBounds.right, lessThanOrEqualTo(viewport.right));
+                expect(cartBounds.top, greaterThanOrEqualTo(viewport.top));
+                expect(cartBounds.bottom, lessThanOrEqualTo(viewport.bottom));
+              }
+              expect(
+                tester
+                    .getRect(
+                      find.byKey(const ValueKey('buy-cart-content-viewport')),
+                    )
+                    .bottom,
+                viewport.bottom,
+                reason:
+                    'Cart must not reserve an extra strip above navigation.',
+              );
+              if (size.height < 400 || index == emptyParts.length - 1) {
+                await capture(tester, 'r5-saved-empty-$index-$label');
+              }
+            }
+            final stable = tester.getTopLeft(cart);
+            await tester.tap(cart);
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.cart);
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(title, findsOneWidget);
+            expect(tester.getTopLeft(cart), stable);
+            expect(recovery.hitTestable(), findsOneWidget);
+            await tester.tap(recovery);
+            await tester.pumpAndSettle();
+            expect(title, findsNothing);
+            expect(session.quantityFor(product.id), retained);
+            expect(session.quantityFor(other.id), retainedOther);
+            expect(session.isSaved(other.id), isTrue);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
 
   for (final size in [const Size(360, 800), const Size(800, 360)]) {
     for (final scale in [1.0, 2.0]) {
@@ -1450,16 +1964,45 @@ void main() {
                 ),
               );
             } else {
+              expect(
+                beforeDrag.dx,
+                greaterThanOrEqualTo(tester.getRect(contentViewport).left),
+                reason:
+                    'Floating Cart $beforeDrag ${tester.getSize(cart)}; viewport ${tester.getRect(contentViewport)}; overlay ${tester.getRect(find.byKey(const ValueKey('buy-navigation-overlay-stack')))}',
+              );
               final drag = await tester.startGesture(tester.getCenter(cart));
-              await drag.moveBy(const Offset(-12, -28));
+              final viewport = tester.getRect(contentViewport);
+              final dx = beforeDrag.dx - viewport.left > 60 ? -1.0 : 1.0;
+              final dy = beforeDrag.dy - viewport.top > 130 ? -1.0 : 1.0;
+              await drag.moveBy(Offset(12 * dx, 28 * dy));
               await tester.pump();
-              await drag.moveBy(const Offset(-36, -82));
+              await drag.moveBy(Offset(36 * dx, 82 * dy));
               await tester.pump();
               final held = tester.getTopLeft(cart);
-              expect(held.dx, lessThan(beforeDrag.dx - 25));
-              expect(held.dy, lessThan(beforeDrag.dy - 75));
+              expect((held.dx - beforeDrag.dx) * dx, greaterThan(25));
+              expect((held.dy - beforeDrag.dy) * dy, greaterThan(75));
               expect(scroll.position.pixels, closeTo(productOffset, .01));
               await drag.up();
+              await tester.pumpAndSettle();
+            }
+            if (find
+                .byKey(const ValueKey('buy-cart-navigation-button'))
+                .evaluate()
+                .isEmpty) {
+              final displayed = tester.getTopLeft(cart);
+              final secondDrag = await tester.startGesture(
+                tester.getCenter(cart),
+              );
+              const firstMove = Offset(24, 24);
+              await secondDrag.moveBy(firstMove);
+              await tester.pump();
+              expect(
+                (tester.getTopLeft(cart) - displayed).distance,
+                lessThanOrEqualTo(firstMove.distance + 1),
+                reason:
+                    'A new drag starts at the displayed Cart, without jumping to an older preference.',
+              );
+              await secondDrag.up();
               await tester.pumpAndSettle();
             }
             final dragged = tester.getTopLeft(cart);

@@ -3420,22 +3420,24 @@ class _ProductContentCard extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(11),
-    decoration: buyV2CardDecoration(radius: 15),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: BuyV2Colors.navy, size: 19),
-            const SizedBox(width: 7),
-            Text(title, style: context.buyTitle.copyWith(fontSize: 14)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ...children,
-      ],
+  Widget build(BuildContext context) => BuyV2CartAvoidanceRegion(
+    child: Container(
+      padding: const EdgeInsets.all(11),
+      decoration: buyV2CardDecoration(radius: 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: BuyV2Colors.navy, size: 19),
+              const SizedBox(width: 7),
+              Text(title, style: context.buyTitle.copyWith(fontSize: 14)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...children,
+        ],
+      ),
     ),
   );
 }

@@ -768,8 +768,35 @@ void main() {
       expect(session.isSaved(shop.id), isTrue);
 
       final secondRemove = find.byKey(ValueKey('buy-save-${secondShop.id}'));
+      final lane = find.byKey(const ValueKey('buy-horizontal-product-lane-0'));
+      for (
+        var attempt = 0;
+        attempt < 8 && secondRemove.evaluate().isEmpty;
+        attempt++
+      ) {
+        final visibleLane = tester
+            .getRect(lane)
+            .intersect(
+              tester.getRect(
+                find.byKey(const ValueKey('buy-cart-content-viewport')),
+              ),
+            );
+        final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
+        final cartBounds = cart.evaluate().isEmpty
+            ? Rect.zero
+            : tester.getRect(cart).inflate(8);
+        final start = [
+          Offset(visibleLane.right - 20, visibleLane.top + 20),
+          Offset(visibleLane.right - 20, visibleLane.center.dy),
+          Offset(visibleLane.right - 20, visibleLane.bottom - 20),
+        ].firstWhere((point) => !cartBounds.contains(point));
+        await tester.dragFrom(start, const Offset(-220, 0));
+        await tester.pumpAndSettle();
+      }
+      expect(secondRemove, findsOneWidget);
       await tester.ensureVisible(secondRemove);
       await tester.pumpAndSettle();
+      expect(secondRemove.hitTestable(), findsOneWidget);
       await tester.tap(secondRemove);
       await tester.pumpAndSettle();
       expect(session.isSaved(secondShop.id), isFalse);

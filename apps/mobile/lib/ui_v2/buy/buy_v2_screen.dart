@@ -2010,6 +2010,7 @@ class _BuyExpandCollapseOwner extends StatelessWidget {
     return TweenAnimationBuilder<double>(
       key: const ValueKey('buy-expand-collapse-owner-tween'),
       duration: duration,
+      onEnd: BuyV2CartAvoidanceScope.of(context)?.schedule,
       curve: Curves.easeOutCubic,
       tween: Tween<double>(begin: duration == Duration.zero ? 1 : 0, end: 1),
       builder: (context, value, child) => Opacity(
@@ -2066,6 +2067,7 @@ class _BuyNavigationSurfaceOwnerState
         key: ValueKey<int>(widget.stateKey),
         tween: Tween<double>(begin: firstBuild ? 1 : 0, end: 1),
         duration: BuyV2Motion.routeChange,
+        onEnd: BuyV2CartAvoidanceScope.of(context)?.schedule,
         child: KeyedSubtree(
           key: const ValueKey('buy-navigation-surface-current'),
           child: widget.child,
@@ -2589,6 +2591,13 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
           }
           final valueWidth = cartWidth - 40;
 
+          void startMove(DragStartDetails _) {
+            setState(() {
+              _position = currentPosition;
+              _dragging = true;
+            });
+          }
+
           void move(DragUpdateDetails details) {
             setState(() {
               _dragging = true;
@@ -2630,6 +2639,7 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
                           GestureRecognizerFactoryWithHandlers<
                             _BuyCartPanGestureRecognizer
                           >(_BuyCartPanGestureRecognizer.new, (recognizer) {
+                            recognizer.onStart = startMove;
                             recognizer.onUpdate = move;
                             recognizer.onEnd = (_) => finishMove();
                             recognizer.onCancel = finishMove;

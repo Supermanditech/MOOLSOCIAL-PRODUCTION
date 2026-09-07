@@ -310,10 +310,8 @@ class BuyV2CartAvoidanceLayout extends ChangeNotifier {
       (available.width - cart.width - edge).clamp(edge, double.infinity),
       (available.height - cart.height - edge).clamp(edge, double.infinity),
     );
-    if (_dockHeight > 0) {
-      _setDockHeight(cart.height + edge * 2);
-      return dockPosition;
-    }
+    // Scrolling or disappearing content can make the user's preference legal
+    // again without changing the viewport or navigation identity.
     final viewport = Offset.zero & available;
     final obstacles = <Rect>[];
     for (final region in _regions) {
@@ -334,7 +332,10 @@ class BuyV2CartAvoidanceLayout extends ChangeNotifier {
     }
     bool clear(Offset position) =>
         !obstacles.any((rect) => rect.overlaps(position & cart));
-    if (clear(preferred)) return preferred;
+    if (clear(preferred)) {
+      _setDockHeight(0);
+      return preferred;
+    }
     final maxX = (available.width - cart.width - edge).clamp(
       edge,
       double.infinity,
@@ -361,7 +362,10 @@ class BuyV2CartAvoidanceLayout extends ChangeNotifier {
         }
       }
     }
-    if (best != null) return best;
+    if (best != null) {
+      _setDockHeight(0);
+      return best;
+    }
     _setDockHeight(cart.height + edge * 2);
     return dockPosition;
   }

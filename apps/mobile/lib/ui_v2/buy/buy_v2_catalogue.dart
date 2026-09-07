@@ -5790,52 +5790,55 @@ class _ProductGrid extends StatelessWidget {
       return Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.search_off_rounded,
-                color: BuyV2Colors.muted,
-                size: 34,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                savedOnly ? 'No saved products yet' : 'No matching products',
-                style: context.buyTitle.copyWith(fontSize: 17),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                savedOnly
-                    ? 'Save products from this grid for instant access.'
-                    : session.query.trim().isNotEmpty
-                    ? 'Check the product code or search by product name.'
-                    : 'Try another category or clear the filter.',
-                textAlign: TextAlign.center,
-                style: context.buyMeta,
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () {
-                  if (savedOnly) {
-                    onShowAll();
-                  } else {
-                    session.updateQuery('');
-                    session.chooseFilter(null);
-                    session.chooseCategory('all');
-                    session.clearDiscoveryRefinements();
-                  }
-                },
-                child: Text(
-                  savedOnly
-                      ? 'Show all products'
-                      : session.query.trim().isNotEmpty
-                      ? session.hasNarrowedProductSearchScope
-                            ? 'Clear search and filters'
-                            : 'Clear search'
-                      : 'Clear filters',
+          child: BuyV2CartAvoidanceRegion(
+            key: const ValueKey('buy-empty-content-protection'),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.search_off_rounded,
+                  color: BuyV2Colors.muted,
+                  size: 34,
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  savedOnly ? 'No saved products yet' : 'No matching products',
+                  style: context.buyTitle.copyWith(fontSize: 17),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  savedOnly
+                      ? 'Save products from this grid for instant access.'
+                      : session.query.trim().isNotEmpty
+                      ? 'Check the product code or search by product name.'
+                      : 'Try another category or clear the filter.',
+                  textAlign: TextAlign.center,
+                  style: context.buyMeta,
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () {
+                    if (savedOnly) {
+                      onShowAll();
+                    } else {
+                      session.updateQuery('');
+                      session.chooseFilter(null);
+                      session.chooseCategory('all');
+                      session.clearDiscoveryRefinements();
+                    }
+                  },
+                  child: Text(
+                    savedOnly
+                        ? 'Show all products'
+                        : session.query.trim().isNotEmpty
+                        ? session.hasNarrowedProductSearchScope
+                              ? 'Clear search and filters'
+                              : 'Clear search'
+                        : 'Clear filters',
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
