@@ -3623,7 +3623,6 @@ Future<void> showBuyV2PartnerCatalogue(
           current.destination == BuyV2Destination.wholesale);
   if (!supportedDestination || (products.isEmpty && !publicPartner)) return;
   final previewProducts = products.take(6).toList(growable: false);
-  final storeFacts = session.productFactsFor(current);
   final storeTrust = session.marketplaceTrustFor(current);
   final storeFulfilment = publicPartner
       ? _publicStoreFulfilmentLabels(
@@ -3633,21 +3632,7 @@ Future<void> showBuyV2PartnerCatalogue(
       : const <String>[];
   final otherStores = brandOnly
       ? const <BuyV2Product>[]
-      : BuyV2Catalogue.products
-            .where(
-              (product) =>
-                  product.destination == current.destination &&
-                  product.seller != current.seller &&
-                  product.catalogueListing,
-            )
-            .fold(<BuyV2Product>[], (stores, product) {
-              if (stores.every((store) => store.seller != product.seller)) {
-                stores.add(product);
-              }
-              return stores;
-            })
-            .take(4)
-            .toList(growable: false);
+      : session.otherStorePreviewsFor(current);
   final ownerPrefix = brandOnly
       ? 'buy-${current.destination.name}-brand'
       : switch (current.destination) {
@@ -3880,7 +3865,8 @@ Future<void> showBuyV2PartnerCatalogue(
                           if (publicPartner) ...[
                             _PublicStoreTruthPanel(
                               product: current,
-                              facts: storeFacts,
+                              facts: session.productFactsFor(current),
+                              now: session.catalogueNow,
                               trust: storeTrust,
                               fulfilmentLabels: storeFulfilment,
                               onAskStore: onAskStore == null
@@ -4119,6 +4105,7 @@ class _PublicStoreTruthPanel extends StatefulWidget {
   const _PublicStoreTruthPanel({
     required this.product,
     required this.facts,
+    required this.now,
     required this.trust,
     required this.fulfilmentLabels,
     required this.onAskStore,
@@ -4126,6 +4113,7 @@ class _PublicStoreTruthPanel extends StatefulWidget {
 
   final BuyV2Product product;
   final BuyV2ProductFactsSnapshot facts;
+  final DateTime Function() now;
   final BuyV2MarketplaceTrustSnapshot trust;
   final List<String> fulfilmentLabels;
   final VoidCallback? onAskStore;
@@ -4134,14 +4122,62 @@ class _PublicStoreTruthPanel extends StatefulWidget {
   State<_PublicStoreTruthPanel> createState() => _PublicStoreTruthPanelState();
 }
 
-class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel> {
+class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
+    with WidgetsBindingObserver {
   late bool _showFulfilment;
+  Timer? _collectionExpiry;
+
+  bool get _showsCollection =>
+      !widget.facts.stale &&
+      widget.facts.productId == widget.product.id &&
+      widget.facts.storeCollection?.isSupportedFor(
+            widget.product.storeId,
+            now: widget.now(),
+          ) ==
+          true;
+
+  void _scheduleCollectionExpiry() {
+    _collectionExpiry?.cancel();
+    _collectionExpiry = null;
+    if (!_showsCollection) return;
+    final remaining = widget.facts.storeCollection!.validUntil.difference(
+      widget.now(),
+    );
+    if (remaining <= Duration.zero) return;
+    _collectionExpiry = Timer(remaining, () {
+      if (!mounted) return;
+      setState(() {});
+      _scheduleCollectionExpiry();
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     _showFulfilment =
         widget.facts.storeOperatingState != BuyV2StoreOperatingState.open;
+    WidgetsBinding.instance.addObserver(this);
+    _scheduleCollectionExpiry();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PublicStoreTruthPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _scheduleCollectionExpiry();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    setState(() {});
+    _scheduleCollectionExpiry();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _collectionExpiry?.cancel();
+    super.dispose();
   }
 
   @override
@@ -4205,6 +4241,36 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_showsCollection)
+              Padding(
+                key: const ValueKey('buy-public-store-collection-benefit'),
+                padding: const EdgeInsets.only(bottom: 5),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(
+                        Icons.qr_code_scanner_rounded,
+                        size: 16,
+                        color: BuyV2Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Order ahead. Scan & collect.',
+                        style: context.buyBody.copyWith(
+                          color: BuyV2Colors.navy,
+                          fontSize: 12.5,
+                          height: 1.15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             BuyV2AdaptiveIdentityRow(
               spacing: 6,
               leading: Semantics(

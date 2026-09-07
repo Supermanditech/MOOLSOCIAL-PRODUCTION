@@ -428,6 +428,7 @@ class BuyV2Session extends ChangeNotifier {
     this.collectionGateway,
     this.collectionIdentity,
     this.collectionPendingStore,
+    this.catalogueNow = DateTime.now,
     BuyV2OrderResolutionAdapter? orderResolutionAdapter,
     BuyV2ShoppingAlertsAdapter? shoppingAlertsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
@@ -932,6 +933,7 @@ class BuyV2Session extends ChangeNotifier {
   final ScanPickGateway? collectionGateway;
   final ValueListenable<BuyV2CollectionIdentity?>? collectionIdentity;
   final BuyV2CollectionPendingStore? collectionPendingStore;
+  final DateTime Function() catalogueNow;
   final Map<String, _BuyV2CollectionState> _collectionStates = {};
   int _collectionEpoch = 0;
   bool _collectionDisposed = false;
@@ -3990,9 +3992,8 @@ class BuyV2Session extends ChangeNotifier {
 
   /// Returns exact current-catalogue Wholesale products from the same seller.
   ///
-  /// Seller equality is deliberately literal and local. This selector does
-  /// not establish supplier identity, verification, availability, ranking,
-  /// serviceability or a commercial recommendation.
+  /// Explicit branch IDs take precedence over legacy display-name grouping.
+  /// This selector does not establish availability, verification or ranking.
   List<BuyV2Product> supplierContinuationsFor(
     BuyV2Product current, {
     int limit = 12,
@@ -4007,7 +4008,7 @@ class BuyV2Session extends ChangeNotifier {
               product.destination == BuyV2Destination.wholesale &&
               product.catalogueListing &&
               product.id != current.id &&
-              product.seller == current.seller,
+              product.isFromSameStoreAs(current),
         )
         .toList(growable: false);
     candidates.sort((left, right) {
@@ -4019,7 +4020,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   /// Returns exact current-catalogue Shop or Medicine products from the same
-  /// literal seller.
+  /// Store, using explicit branch identity where supplied.
   ///
   /// This local selector does not establish seller or pharmacy identity,
   /// verification, availability, serviceability, ranking, recommendation or
@@ -4040,7 +4041,7 @@ class BuyV2Session extends ChangeNotifier {
               product.destination == current.destination &&
               product.catalogueListing &&
               product.id != current.id &&
-              product.seller == current.seller,
+              product.isFromSameStoreAs(current),
         )
         .toList(growable: false);
     candidates.sort((left, right) {
@@ -4049,6 +4050,26 @@ class BuyV2Session extends ChangeNotifier {
       return left.id.compareTo(right.id);
     });
     return List.unmodifiable(candidates.take(limit));
+  }
+
+  List<BuyV2Product> otherStorePreviewsFor(
+    BuyV2Product current, {
+    int limit = 4,
+  }) {
+    if (limit <= 0) return const [];
+    final stores = <BuyV2Product>[];
+    for (final product in _catalogueProducts) {
+      if (product.destination != current.destination ||
+          !product.catalogueListing ||
+          product.id == current.id ||
+          product.isFromSameStoreAs(current) ||
+          stores.any((store) => store.isFromSameStoreAs(product))) {
+        continue;
+      }
+      stores.add(product);
+      if (stores.length == limit) break;
+    }
+    return List.unmodifiable(stores);
   }
 
   List<BuyV2Product> partnerCatalogueFor(
@@ -4072,7 +4093,7 @@ class BuyV2Session extends ChangeNotifier {
           (product) =>
               product.destination == current.destination &&
               (product.catalogueListing || product.id == current.id) &&
-              product.seller == current.seller &&
+              product.isFromSameStoreAs(current) &&
               switch (current.destination) {
                 BuyV2Destination.shop => true,
                 BuyV2Destination.wholesale =>
@@ -4250,6 +4271,12 @@ class BuyV2Session extends ChangeNotifier {
     }
     final next = productFactsAdapter.snapshotFor(product);
     if (!_validProductFacts(product, next)) {
+      final previous = _productFacts[product.id];
+      if (previous?.storeCollection != null) {
+        _productFacts[product.id] = previous!.copyWith(
+          clearStoreCollection: true,
+        );
+      }
       notice = 'Product information could not be refreshed.';
       notifyListeners();
       return false;

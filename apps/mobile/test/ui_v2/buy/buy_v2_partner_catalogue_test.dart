@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
@@ -11,6 +12,260 @@ import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final size in [const Size(320, 844), const Size(640, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      final profile = '${size.width.toInt()}x${size.height.toInt()}-$scale';
+      testWidgets('R5 collection visibility keeps the exact branch $profile', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+        tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+        addTearDown(tester.view.reset);
+        final setup = await _CollectionHeaderFixture.create(tester);
+        addTearDown(setup.dispose);
+        final session = setup.session;
+        final current = setup.products.first;
+        final other = setup.products.last;
+        session.addProduct(other.id);
+        session.toggleSaved(other.id);
+        expect(session.openProduct(current.id), isTrue);
+        await tester.pumpWidget(_app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+        final seller = find.byKey(
+          ValueKey('buy-shop-seller-action-${current.id}'),
+        );
+        await _revealProductAction(tester, current.id, seller);
+        await tester.ensureVisible(seller);
+        await tester.pumpAndSettle();
+        expect(seller.hitTestable(), findsOneWidget);
+        await tester.tap(seller);
+        await tester.pumpAndSettle();
+
+        final benefit = find.byKey(
+          const ValueKey('buy-public-store-collection-benefit'),
+        );
+        expect(benefit, findsOneWidget);
+        final text = find.descendant(
+          of: benefit,
+          matching: find.text('Order ahead. Scan & collect.'),
+        );
+        expect(text, findsOneWidget);
+        final bounds = tester.getRect(benefit);
+        expect(bounds.top, greaterThanOrEqualTo(24));
+        expect(bounds.bottom, lessThanOrEqualTo(size.height - 34));
+        final viewport = tester.getRect(
+          find.ancestor(of: benefit, matching: find.byType(Scrollable)).first,
+        );
+        expect(bounds.top, greaterThanOrEqualTo(viewport.top));
+        expect(bounds.bottom, lessThanOrEqualTo(viewport.bottom));
+        final paragraph = tester.renderObject<RenderParagraph>(text);
+        final natural = TextPainter(
+          text: paragraph.text,
+          textDirection: paragraph.textDirection,
+          textScaler: paragraph.textScaler,
+        )..layout(maxWidth: paragraph.size.width);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(
+          paragraph.size.height + .1,
+          greaterThanOrEqualTo(natural.height),
+        );
+        natural.dispose();
+        await captureR66Visual(tester, 'collect-header-$profile-supported');
+
+        // Identical display names cannot mix different branches' products.
+        expect(
+          session.partnerCatalogueFor(current).map((product) => product.id),
+          [current.id, setup.products[1].id],
+        );
+        expect(session.product(current.id).storeId, 'collection-store-a');
+        expect(session.product(current.id).pack, '500 ml pouch');
+        expect(session.quantityFor(other.id), 1);
+        expect(session.isSaved(other.id), isTrue);
+        final close = find.byKey(const ValueKey('buy-shop-seller-sheet-close'));
+        await tester.ensureVisible(close);
+        await tester.pumpAndSettle();
+        expect(close.hitTestable(), findsOneWidget);
+        await tester.tap(close);
+        await tester.pumpAndSettle();
+        expect(benefit, findsNothing);
+        expect(session.selectedProductId, current.id);
+        expect(session.product(current.id).storeId, 'collection-store-a');
+        expect(session.quantityFor(other.id), 1);
+        expect(session.isSaved(other.id), isTrue);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final invalid in [
+    'unsupported',
+    'absent',
+    'wrong-branch',
+    'expired',
+    'future-observation',
+    'blank-source',
+    'stale-facts',
+    'wrong-product',
+  ]) {
+    testWidgets('R5 collection visibility hides $invalid capability', (
+      tester,
+    ) async {
+      final setup = await _CollectionHeaderFixture.create(tester);
+      addTearDown(setup.dispose);
+      final now = tester.binding.clock.now();
+      setup.facts.capability = invalid == 'absent'
+          ? null
+          : BuyV2StoreCollectionCapability(
+              storeId: invalid == 'wrong-branch'
+                  ? 'collection-store-b'
+                  : 'collection-store-a',
+              supportsCollection: invalid != 'unsupported',
+              sourceId: invalid == 'blank-source' ? '' : 'collection-header-v1',
+              observedAt: invalid == 'future-observation'
+                  ? now.add(const Duration(hours: 1))
+                  : now.subtract(const Duration(seconds: 1)),
+              validUntil: invalid == 'expired'
+                  ? now
+                  : now.add(const Duration(hours: 2)),
+            );
+      setup.facts.stale = invalid == 'stale-facts';
+      setup.facts.wrongProduct = invalid == 'wrong-product';
+      final current = setup.products.first;
+      expect(setup.session.openProduct(current.id), isTrue);
+      await tester.pumpWidget(_app(setup.session));
+      await tester.pumpAndSettle();
+      addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+      final seller = find.byKey(
+        ValueKey('buy-shop-seller-action-${current.id}'),
+      );
+      await _revealProductAction(tester, current.id, seller);
+      await tester.ensureVisible(seller);
+      await tester.pumpAndSettle();
+      await tester.tap(seller);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-public-store-name')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-public-store-collection-benefit')),
+        findsNothing,
+      );
+      expect(find.text('Order ahead. Scan & collect.'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'R5 collection visibility updates and expires on the same Store',
+    (tester) async {
+      final setup = await _CollectionHeaderFixture.create(tester);
+      addTearDown(setup.dispose);
+      final session = setup.session;
+      final current = setup.products.first;
+      expect(session.openProduct(current.id), isTrue);
+      await tester.pumpWidget(_app(session));
+      await tester.pumpAndSettle();
+      addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+      final seller = find.byKey(
+        ValueKey('buy-shop-seller-action-${current.id}'),
+      );
+      await _revealProductAction(tester, current.id, seller);
+      await tester.ensureVisible(seller);
+      await tester.pumpAndSettle();
+      await tester.tap(seller);
+      await tester.pumpAndSettle();
+      final benefit = find.byKey(
+        const ValueKey('buy-public-store-collection-benefit'),
+      );
+      expect(benefit, findsOneWidget);
+
+      setup.facts.capability = null;
+      expect(session.refreshProductFacts(current.id), isTrue);
+      await tester.pumpAndSettle();
+      expect(benefit, findsNothing);
+
+      setup.facts.capability = setup.supported(
+        validUntil: tester.binding.clock.now().add(const Duration(seconds: 5)),
+      );
+      expect(session.refreshProductFacts(current.id), isTrue);
+      await tester.pumpAndSettle();
+      expect(benefit, findsOneWidget);
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+      expect(benefit, findsNothing);
+      expect(session.selectedProductId, current.id);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('R5 collection visibility withdraws after an invalid refresh', (
+    tester,
+  ) async {
+    final setup = await _CollectionHeaderFixture.create(tester);
+    addTearDown(setup.dispose);
+    final current = setup.products.first;
+    setup.session.addProduct(setup.products.last.id);
+    expect(setup.session.openProduct(current.id), isTrue);
+    await tester.pumpWidget(_app(setup.session));
+    await tester.pumpAndSettle();
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+    final seller = find.byKey(ValueKey('buy-shop-seller-action-${current.id}'));
+    await _revealProductAction(tester, current.id, seller);
+    await tester.ensureVisible(seller);
+    await tester.pumpAndSettle();
+    await tester.tap(seller);
+    await tester.pumpAndSettle();
+    final benefit = find.byKey(
+      const ValueKey('buy-public-store-collection-benefit'),
+    );
+    expect(benefit, findsOneWidget);
+    setup.facts.wrongProduct = true;
+    expect(setup.session.refreshProductFacts(current.id), isFalse);
+    await tester.pumpAndSettle();
+    expect(benefit, findsNothing);
+    expect(setup.session.quantityFor(setup.products.last.id), 1);
+    setup.facts.wrongProduct = false;
+    expect(setup.session.refreshProductFacts(current.id), isTrue);
+    await tester.pumpAndSettle();
+    expect(benefit, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('R5 collection visibility rechecks capability on app resume', (
+    tester,
+  ) async {
+    var now = tester.binding.clock.now();
+    final setup = await _CollectionHeaderFixture.create(tester, now: () => now);
+    addTearDown(setup.dispose);
+    final current = setup.products.first;
+    expect(setup.session.openProduct(current.id), isTrue);
+    await tester.pumpWidget(_app(setup.session));
+    await tester.pumpAndSettle();
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+    final seller = find.byKey(ValueKey('buy-shop-seller-action-${current.id}'));
+    await _revealProductAction(tester, current.id, seller);
+    await tester.ensureVisible(seller);
+    await tester.pumpAndSettle();
+    await tester.tap(seller);
+    await tester.pumpAndSettle();
+    final benefit = find.byKey(
+      const ValueKey('buy-public-store-collection-benefit'),
+    );
+    expect(benefit, findsOneWidget);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    now = now.add(const Duration(hours: 2));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(benefit, findsNothing);
+    expect(setup.session.selectedProductId, current.id);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final id in ['s-milk-500ml', 's-milk-2l', 'w-rice-50kg', 'w-oil-10l']) {
     test('R66 supplier catalogue retains exact entry variant $id', () {
@@ -713,6 +968,105 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+}
+
+final class _CollectionHeaderCommerce implements BuyV2CommerceAdapter {
+  _CollectionHeaderCommerce(this.products);
+  final List<BuyV2Product> products;
+
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: products,
+  );
+
+  @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() async =>
+      const BuyV2OrderAlertsResult(
+        available: true,
+        enabled: false,
+        customerMessage: '',
+      );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnsupportedError('Unexpected commerce call in Store header test');
+}
+
+final class _CollectionHeaderFacts implements BuyV2ProductFactsAdapter {
+  _CollectionHeaderFacts(this.now);
+  final DateTime Function() now;
+  BuyV2StoreCollectionCapability? capability;
+  bool stale = false;
+  bool wrongProduct = false;
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final base = const BuyV2CatalogueProductFactsAdapter().snapshotFor(product);
+    return BuyV2ProductFactsSnapshot(
+      productId: wrongProduct ? 'unrelated-product' : product.id,
+      price: base.price,
+      deliveryPromise: base.deliveryPromise,
+      partner: base.partner,
+      orderabilityLabel: base.orderabilityLabel,
+      sourceId: 'collection-header-v1',
+      storeOperatingState: BuyV2StoreOperatingState.open,
+      storeCollection: capability,
+      observedAt: now(),
+      stale: stale,
+    );
+  }
+}
+
+final class _CollectionHeaderFixture {
+  _CollectionHeaderFixture(this.core, this.session, this.facts, this.products);
+  final BuySession core;
+  final BuyV2Session session;
+  final _CollectionHeaderFacts facts;
+  final List<BuyV2Product> products;
+
+  BuyV2StoreCollectionCapability supported({DateTime? validUntil}) =>
+      BuyV2StoreCollectionCapability(
+        storeId: 'collection-store-a',
+        supportsCollection: true,
+        sourceId: 'collection-header-v1',
+        observedAt: facts.now(),
+        validUntil: validUntil ?? facts.now().add(const Duration(hours: 1)),
+      );
+
+  static Future<_CollectionHeaderFixture> create(
+    WidgetTester tester, {
+    DateTime Function()? now,
+  }) async {
+    final core = BuySession();
+    final clock = now ?? tester.binding.clock.now;
+    final facts = _CollectionHeaderFacts(clock);
+    BuyV2Product seed(String id) =>
+        BuyV2Catalogue.allProducts.firstWhere((product) => product.id == id);
+    final products = [
+      seed('s-milk-500ml').copyWith(storeId: 'collection-store-a'),
+      seed('s-milk').copyWith(storeId: 'collection-store-a'),
+      seed(
+        's-milk',
+      ).copyWith(id: 'other-branch-milk', storeId: 'collection-store-b'),
+    ];
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: _CollectionHeaderCommerce(products),
+      productFactsAdapter: facts,
+      catalogueNow: clock,
+      reviewDataEnabled: false,
+    );
+    final result = _CollectionHeaderFixture(core, session, facts, products);
+    facts.capability = result.supported();
+    await session.restoreCommerce();
+    return result;
+  }
+
+  void dispose() {
+    session.dispose();
+    core.dispose();
+  }
 }
 
 Widget _app(BuyV2Session session, {double textScale = 1}) => MaterialApp(

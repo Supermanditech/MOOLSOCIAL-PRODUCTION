@@ -7,6 +7,54 @@ enum BuyV2FulfilmentMode { quickLocal, standardCourier, bulkFreight }
 
 enum BuyV2StoreOperatingState { unknown, open, closed }
 
+/// A sourced Store capability, not proof of stock, payment or order readiness.
+/// An absent or expired capability never advertises customer collection.
+@immutable
+class BuyV2StoreCollectionCapability {
+  const BuyV2StoreCollectionCapability({
+    required this.storeId,
+    required this.supportsCollection,
+    required this.sourceId,
+    required this.observedAt,
+    required this.validUntil,
+  });
+
+  final String storeId;
+  final bool supportsCollection;
+  final String sourceId;
+  final DateTime observedAt;
+  final DateTime validUntil;
+
+  bool isSupportedFor(String? expectedStoreId, {required DateTime now}) =>
+      supportsCollection &&
+      expectedStoreId != null &&
+      expectedStoreId.isNotEmpty &&
+      expectedStoreId.trim() == expectedStoreId &&
+      storeId == expectedStoreId &&
+      sourceId.trim().isNotEmpty &&
+      !observedAt.isAfter(now) &&
+      observedAt.isBefore(validUntil) &&
+      now.isBefore(validUntil);
+
+  @override
+  bool operator ==(Object other) =>
+      other is BuyV2StoreCollectionCapability &&
+      other.storeId == storeId &&
+      other.supportsCollection == supportsCollection &&
+      other.sourceId == sourceId &&
+      other.observedAt == observedAt &&
+      other.validUntil == validUntil;
+
+  @override
+  int get hashCode => Object.hash(
+    storeId,
+    supportsCollection,
+    sourceId,
+    observedAt,
+    validUntil,
+  );
+}
+
 BuyV2FulfilmentMode buyV2CatalogueFulfilmentModeFor(BuyV2Product product) {
   if (product.destination == BuyV2Destination.wholesale) {
     return BuyV2FulfilmentMode.bulkFreight;
@@ -34,6 +82,7 @@ class BuyV2ProductFactsSnapshot {
     this.deliveryServiceLevel,
     this.fulfilmentMode,
     this.storeOperatingState = BuyV2StoreOperatingState.unknown,
+    this.storeCollection,
     this.nextOpeningLabel,
     this.orderCutoffLabel,
     this.deliveryFeeLabel,
@@ -56,6 +105,7 @@ class BuyV2ProductFactsSnapshot {
   final String? deliveryServiceLevel;
   final BuyV2FulfilmentMode? fulfilmentMode;
   final BuyV2StoreOperatingState storeOperatingState;
+  final BuyV2StoreCollectionCapability? storeCollection;
   final String? nextOpeningLabel;
   final String? orderCutoffLabel;
   final String? deliveryFeeLabel;
@@ -76,6 +126,8 @@ class BuyV2ProductFactsSnapshot {
     String? deliveryServiceLevel,
     BuyV2FulfilmentMode? fulfilmentMode,
     BuyV2StoreOperatingState? storeOperatingState,
+    BuyV2StoreCollectionCapability? storeCollection,
+    bool clearStoreCollection = false,
     String? nextOpeningLabel,
     String? orderCutoffLabel,
     String? deliveryFeeLabel,
@@ -95,6 +147,9 @@ class BuyV2ProductFactsSnapshot {
       deliveryServiceLevel: deliveryServiceLevel ?? this.deliveryServiceLevel,
       fulfilmentMode: fulfilmentMode ?? this.fulfilmentMode,
       storeOperatingState: storeOperatingState ?? this.storeOperatingState,
+      storeCollection: clearStoreCollection
+          ? null
+          : storeCollection ?? this.storeCollection,
       nextOpeningLabel: nextOpeningLabel ?? this.nextOpeningLabel,
       orderCutoffLabel: orderCutoffLabel ?? this.orderCutoffLabel,
       deliveryFeeLabel: deliveryFeeLabel ?? this.deliveryFeeLabel,
@@ -118,6 +173,7 @@ class BuyV2ProductFactsSnapshot {
         other.deliveryServiceLevel == deliveryServiceLevel &&
         other.fulfilmentMode == fulfilmentMode &&
         other.storeOperatingState == storeOperatingState &&
+        other.storeCollection == storeCollection &&
         other.nextOpeningLabel == nextOpeningLabel &&
         other.orderCutoffLabel == orderCutoffLabel &&
         other.deliveryFeeLabel == deliveryFeeLabel &&
@@ -139,6 +195,7 @@ class BuyV2ProductFactsSnapshot {
     deliveryServiceLevel,
     fulfilmentMode,
     storeOperatingState,
+    storeCollection,
     nextOpeningLabel,
     orderCutoffLabel,
     deliveryFeeLabel,

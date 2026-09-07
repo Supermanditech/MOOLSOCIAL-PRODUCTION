@@ -153,6 +153,7 @@ class BuyV2Product {
     required this.confirmedOn,
     required this.visualLabel,
     required this.visualKind,
+    this.storeId,
     this.mrp,
     this.requiresPrescription = false,
     this.composition,
@@ -168,6 +169,9 @@ class BuyV2Product {
 
   final String id;
   final String canonicalId;
+
+  /// Stable branch identity from the catalogue source; never a seller label.
+  final String? storeId;
   final BuyV2Destination destination;
   final String categoryId;
   final String brand;
@@ -199,6 +203,7 @@ class BuyV2Product {
   BuyV2Product copyWith({
     String? id,
     String? canonicalId,
+    String? storeId,
     String? variant,
     String? pack,
     int? price,
@@ -215,6 +220,7 @@ class BuyV2Product {
   }) => BuyV2Product(
     id: id ?? this.id,
     canonicalId: canonicalId ?? this.canonicalId,
+    storeId: storeId ?? this.storeId,
     destination: destination,
     categoryId: categoryId,
     brand: brand,
@@ -245,6 +251,19 @@ class BuyV2Product {
   );
 
   String get partnerRole => buyV2PartnerRoleFor(destination, sellerType);
+
+  /// Legacy catalogues without branch IDs retain their existing grouping.
+  /// Once either listing has an ID, display names cannot match a branch.
+  bool isFromSameStoreAs(BuyV2Product other) {
+    final identity = storeId;
+    if (identity != null || other.storeId != null) {
+      return identity != null &&
+          identity.isNotEmpty &&
+          identity.trim() == identity &&
+          identity == other.storeId;
+    }
+    return seller == other.seller;
+  }
 
   String? get regulatoryTrustFact =>
       destination == BuyV2Destination.medicine ? 'Licensed pharmacy' : null;
