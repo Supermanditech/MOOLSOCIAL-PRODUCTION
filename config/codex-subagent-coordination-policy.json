@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4500,
-    "sha256": "BEEE2D41FA9AE8DF4299E1B65F3D698DC38F29276B5A918BB83F9EC915376351"
+    "sha256": "1A6B2022721C888274B084132A8936DCF4C757514AEE0CC787FA04C23DAFA289"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,6 +34,8 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "apps/mobile/lib/features/work/scan_and_pick_contract.dart",
+        "apps/mobile/lib/features/work/SCAN-AND-PICK-CONTRACT-V1.md",
         "apps/mobile/lib/features/work/widgets/work_workspace_benefit_card.dart",
         "apps/mobile/lib/features/work/work_workspace_benefits.dart",
         "apps/mobile/test/global_customer_copy_professionalization_test.dart",

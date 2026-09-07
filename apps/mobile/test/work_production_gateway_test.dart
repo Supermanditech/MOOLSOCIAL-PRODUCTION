@@ -7,12 +7,607 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
+import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 
 void main() {
+  group('ScanPick v1 contract', () {
+    test('published request and result examples use the same v1 boundary', () {
+      final document = File(
+        'lib/features/work/SCAN-AND-PICK-CONTRACT-V1.md',
+      ).readAsStringSync();
+      final blocks = RegExp(r'```json\s*([\s\S]*?)```')
+          .allMatches(document)
+          .map((match) => jsonDecode(match.group(1)!))
+          .toList();
+      expect(blocks, hasLength(3));
+      final requests = blocks[0] as List;
+      expect(
+        requests.map((r) => (r as Map)['operation']),
+        ScanPickOperation.values.map((operation) => operation.name),
+      );
+      for (final request in requests.cast<Map>()) {
+        expect(request['protocolVersion'], scanPickProtocolVersion);
+        expect(request['purpose'], scanPickPurpose);
+      }
+      final issued = ScanPickResult.fromJson(blocks[1] as Map<String, Object?>);
+      issued.validateFor(
+        ScanPickRequest.issueChallenge(
+          requestId: 'issue-1',
+          operationId: 'op-issue',
+          orderId: 'order-1',
+          storeId: 'store-1',
+          expectedRevision: 'revision-1',
+        ),
+        client: ScanPickClient.retailer,
+      );
+      expect(issued.snapshot!.challenge!.qrPayload, 'opaque-example-token');
+      final errors = (blocks[2] as List)
+          .map(
+            (value) => ScanPickResult.fromJson(value as Map<String, Object?>),
+          )
+          .toList();
+      expect(errors[0].outcome, ScanPickOutcome.unknown);
+      expect(errors[1].error, ScanPickError.challengeExpired);
+    });
+
+    Map<String, Object?> wire({String state = 'matched'}) => {
+      'protocolVersion': 1,
+      'operation': 'read',
+      'requestId': 'read-1',
+      'outcome': 'snapshot',
+      'snapshot': <String, Object?>{
+        'purpose': 'customerCollection',
+        'orderId': 'order-1',
+        'storeId': 'store-1',
+        'purchaserAccountId': 'customer-1',
+        'customerName': 'Test customer',
+        'storeName': 'Test store',
+        'revision': 'revision-3',
+        'serverTime': '2026-09-07T10:00:00Z',
+        'state': state,
+        'payment': 'paid',
+        'readiness': 'ready',
+        'currency': 'INR',
+        'totalMinor': 100000000000000,
+        'lines': [
+          <String, Object?>{
+            'lineId': 'line-1',
+            'productId': 'product-1',
+            'skuId': 'rice-5kg-sku-1',
+            'name': 'Purchased rice',
+            'pack': '5 kg bag',
+            'quantity': '2',
+            'amountMinor': 100000000000000,
+          },
+        ],
+        if (state == 'awaitingCustomer')
+          'challenge': <String, Object?>{
+            'id': 'challenge-1',
+            'expiresAt': '2026-09-07T10:01:00Z',
+          },
+        if (state == 'matched')
+          'approval': <String, Object?>{
+            'id': 'approval-1',
+            'expiresAt': '2026-09-07T10:01:00Z',
+          },
+        if (state == 'collected')
+          'receipt': <String, Object?>{
+            'id': 'receipt-1',
+            'collectedAt': '2026-09-07T09:59:55Z',
+            'invoiceReference': 'invoice-1',
+          },
+      },
+    };
+
+    Map<String, Object?> snapshot(Map<String, Object?> value) =>
+        value['snapshot']! as Map<String, Object?>;
+
+    ScanPickRequest read({String requestId = 'read-1'}) => ScanPickRequest.read(
+      requestId: requestId,
+      orderId: 'order-1',
+      storeId: 'store-1',
+    );
+
+    test(
+      'five operation payloads exclude client authority and verbal codes',
+      () {
+        final requests = [
+          read(),
+          ScanPickRequest.issueChallenge(
+            requestId: 'issue-1',
+            operationId: 'op-issue',
+            orderId: 'order-1',
+            storeId: 'store-1',
+            expectedRevision: 'revision-1',
+          ),
+          ScanPickRequest.authorise(
+            requestId: 'scan-1',
+            operationId: 'op-scan',
+            orderId: 'order-1',
+            storeId: 'store-1',
+            expectedRevision: 'revision-2',
+            qrPayload: 'opaque-test-only-token',
+          ),
+          ScanPickRequest.handOver(
+            requestId: 'hand-1',
+            operationId: 'op-hand',
+            orderId: 'order-1',
+            storeId: 'store-1',
+            expectedRevision: 'revision-3',
+            approvalId: 'approval-1',
+          ),
+          ScanPickRequest.reconcile(
+            requestId: 'reconcile-1',
+            operationId: 'op-hand',
+            orderId: 'order-1',
+            storeId: 'store-1',
+          ),
+        ];
+        expect(
+          requests.map((r) => r.operation).toSet(),
+          ScanPickOperation.values.toSet(),
+        );
+        for (final request in requests) {
+          final json = request.toJson();
+          expect(json['protocolVersion'], 1);
+          expect(json['purpose'], 'customerCollection');
+          expect(json['orderId'], 'order-1');
+          expect(json['storeId'], 'store-1');
+          for (final forbidden in [
+            'approved',
+            'matched',
+            'paid',
+            'ready',
+            'otp',
+            'verbalCode',
+            'purchaserAccountId',
+            'merchantCredentials',
+          ]) {
+            expect(json.containsKey(forbidden), isFalse, reason: forbidden);
+          }
+        }
+        expect(requests[2].toJson()['qrPayload'], 'opaque-test-only-token');
+        expect(requests[3].toJson().containsKey('qrPayload'), isFalse);
+        expect(requests[4].operationId, requests[3].operationId);
+        expect(requests[4].requestId, isNot(requests[3].requestId));
+      },
+    );
+
+    test('missing identity and authority references fail before transport', () {
+      expect(() => read(requestId: ' '), throwsFormatException);
+      expect(
+        () => ScanPickRequest.handOver(
+          requestId: 'r',
+          operationId: '',
+          orderId: 'o',
+          storeId: 's',
+          expectedRevision: 'v',
+          approvalId: 'a',
+        ),
+        throwsFormatException,
+      );
+      expect(
+        () => ScanPickRequest.handOver(
+          requestId: 'r',
+          operationId: 'op',
+          orderId: 'o',
+          storeId: 's',
+          expectedRevision: '',
+          approvalId: 'a',
+        ),
+        throwsFormatException,
+      );
+      expect(
+        () => ScanPickRequest.authorise(
+          requestId: 'r',
+          operationId: 'op',
+          orderId: 'o',
+          storeId: 's',
+          expectedRevision: 'v',
+          qrPayload: '',
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test(
+      'matched is not completed; exact amount and purchased lines survive',
+      () {
+        final result = ScanPickResult.fromJson(wire());
+        result.validateFor(
+          read(),
+          client: ScanPickClient.consumer,
+          purchaserAccountId: 'customer-1',
+        );
+        final value = result.snapshot!;
+        expect(value.totalMinor, 100000000000000);
+        expect(value.lines.single.skuId, 'rice-5kg-sku-1');
+        expect(value.lines.single.pack, '5 kg bag');
+        expect(value.lines.single.quantity, '2');
+        expect(value.receipt, isNull);
+        expect(() => value.lines.clear(), throwsUnsupportedError);
+        expect(
+          result.canRequestHandOver(
+            read(),
+            DateTime.parse('2026-09-07T10:00:30Z'),
+          ),
+          isTrue,
+        );
+        expect(
+          result.canRequestHandOver(
+            read(),
+            DateTime.parse('2026-09-07T10:01:00Z'),
+          ),
+          isFalse,
+        );
+        expect(
+          result.canRequestHandOver(
+            read(),
+            DateTime.parse('2026-09-07T09:59:59Z'),
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    for (final state in ScanPickState.values.where(
+      (s) => s != ScanPickState.matched,
+    )) {
+      test('${state.name} cannot enable Hand Over', () {
+        final result = ScanPickResult.fromJson(wire(state: state.name));
+        expect(
+          result.canRequestHandOver(
+            read(),
+            DateTime.parse('2026-09-07T10:00:30Z'),
+          ),
+          isFalse,
+        );
+      });
+    }
+
+    for (final field in [
+      'purpose',
+      'payment',
+      'readiness',
+      'state',
+      'approval',
+      'lines',
+      'totalMinor',
+      'serverTime',
+    ]) {
+      test('invalid $field fails closed', () {
+        final json = wire();
+        snapshot(json)[field] = switch (field) {
+          'purpose' => 'bikerDelivery',
+          'payment' => 'unpaid',
+          'readiness' => 'preparing',
+          'state' => 'future-state',
+          'approval' => null,
+          'lines' => <Object?>[],
+          'totalMinor' => 1.5,
+          'serverTime' => '2026-09-07T10:00:00',
+          _ => null,
+        };
+        expect(() => ScanPickResult.fromJson(json), throwsFormatException);
+      });
+    }
+
+    test('unknown version, error and false-success envelope are rejected', () {
+      final future = wire()..['protocolVersion'] = 2;
+      expect(() => ScanPickResult.fromJson(future), throwsFormatException);
+      final failure = wire()
+        ..['outcome'] = 'rejected'
+        ..['error'] = 'futureError';
+      expect(() => ScanPickResult.fromJson(failure), throwsFormatException);
+      final empty = wire()..remove('snapshot');
+      expect(() => ScanPickResult.fromJson(empty), throwsFormatException);
+      final falseReceipt = wire();
+      snapshot(falseReceipt)['receipt'] = {
+        'id': 'r',
+        'collectedAt': '2026-09-07T10:00:00Z',
+      };
+      expect(
+        () => ScanPickResult.fromJson(falseReceipt),
+        throwsFormatException,
+      );
+    });
+
+    for (final key in ['orderId', 'storeId', 'purchaserAccountId']) {
+      test('wrong $key reply cannot replace selected consumer order', () {
+        final json = wire();
+        snapshot(json)[key] = 'different';
+        final result = ScanPickResult.fromJson(json);
+        expect(
+          () => result.validateFor(
+            read(),
+            client: ScanPickClient.consumer,
+            purchaserAccountId: 'customer-1',
+          ),
+          throwsFormatException,
+        );
+      });
+    }
+
+    test(
+      'old attempt, accountless consumer and merchant authorisation rejected',
+      () {
+        final result = ScanPickResult.fromJson(wire());
+        expect(
+          () => result.validateFor(
+            read(requestId: 'read-2'),
+            client: ScanPickClient.retailer,
+          ),
+          throwsFormatException,
+        );
+        expect(
+          () => result.validateFor(read(), client: ScanPickClient.consumer),
+          throwsFormatException,
+        );
+        final request = ScanPickRequest.authorise(
+          requestId: 'a',
+          operationId: 'op-a',
+          orderId: 'order-1',
+          storeId: 'store-1',
+          expectedRevision: 'v',
+          qrPayload: 'opaque-test-token',
+        );
+        final json = wire()
+          ..['operation'] = 'authorise'
+          ..['operationId'] = 'op-a'
+          ..['requestId'] = 'a';
+        expect(
+          () => ScanPickResult.fromJson(
+            json,
+          ).validateFor(request, client: ScanPickClient.retailer),
+          throwsFormatException,
+        );
+      },
+    );
+
+    test('consumer status never exposes retailer QR security payload', () {
+      final json = wire(state: 'awaitingCustomer');
+      (snapshot(json)['challenge']! as Map<String, Object?>)['qrPayload'] =
+          'opaque-test-token';
+      final result = ScanPickResult.fromJson(json);
+      result.validateFor(read(), client: ScanPickClient.retailer);
+      expect(
+        () => result.validateFor(
+          read(),
+          client: ScanPickClient.consumer,
+          purchaserAccountId: 'customer-1',
+        ),
+        throwsFormatException,
+      );
+      (snapshot(json)['challenge']! as Map<String, Object?>).remove(
+        'qrPayload',
+      );
+      ScanPickResult.fromJson(json).validateFor(
+        read(),
+        client: ScanPickClient.consumer,
+        purchaserAccountId: 'customer-1',
+      );
+    });
+
+    for (final code in ScanPickError.values) {
+      test('explicit ${code.name} rejection is not local success', () {
+        final json = wire(state: 'collected')
+          ..['outcome'] = 'rejected'
+          ..['error'] = code.name;
+        if (code != ScanPickError.alreadyCollected) json.remove('snapshot');
+        final result = ScanPickResult.fromJson(json);
+        expect(result.outcome, ScanPickOutcome.rejected);
+        expect(result.error, code);
+        expect(
+          result.canRequestHandOver(
+            read(),
+            DateTime.parse('2026-09-07T10:00:30Z'),
+          ),
+          isFalse,
+        );
+      });
+    }
+
+    test(
+      'uncertain mutation correlates reconciliation without new success',
+      () {
+        final request = ScanPickRequest.reconcile(
+          requestId: 'reconcile-1',
+          operationId: 'op-hand',
+          orderId: 'order-1',
+          storeId: 'store-1',
+        );
+        final result = ScanPickResult.fromJson({
+          'protocolVersion': 1,
+          'operation': 'reconcile',
+          'requestId': 'reconcile-1',
+          'operationId': 'op-hand',
+          'outcome': 'unknown',
+        });
+        result.validateFor(request, client: ScanPickClient.retailer);
+        expect(result.snapshot, isNull);
+        expect(result.outcome, ScanPickOutcome.unknown);
+        final different = ScanPickRequest.reconcile(
+          requestId: 'reconcile-1',
+          operationId: 'different-op',
+          orderId: 'order-1',
+          storeId: 'store-1',
+        );
+        expect(
+          () => result.validateFor(different, client: ScanPickClient.retailer),
+          throwsFormatException,
+        );
+      },
+    );
+
+    test(
+      'terminal receipt survives later refund without enabling second handover',
+      () {
+        final json = wire(state: 'collected');
+        snapshot(json)['payment'] = 'refunded';
+        final result = ScanPickResult.fromJson(json);
+        expect(result.snapshot!.receipt!.id, 'receipt-1');
+        expect(result.snapshot!.receipt!.invoiceReference, 'invoice-1');
+        expect(
+          result.canRequestHandOver(
+            read(),
+            DateTime.parse('2026-09-07T10:00:30Z'),
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'purchased SKU is required independently of generic product identity',
+      () {
+        final json = wire();
+        final line =
+            (snapshot(json)['lines']! as List).single as Map<String, Object?>;
+        line.remove('skuId');
+        expect(() => ScanPickResult.fromJson(json), throwsFormatException);
+        line['skuId'] = ' ';
+        expect(() => ScanPickResult.fromJson(json), throwsFormatException);
+        line['skuId'] = 'rice-10kg-sku-2';
+        line['pack'] = '10 kg bag';
+        final value = ScanPickResult.fromJson(json).snapshot!.lines.single;
+        expect(value.productId, 'product-1');
+        expect(value.skuId, 'rice-10kg-sku-2');
+        expect(value.pack, '10 kg bag');
+      },
+    );
+
+    test('rejected Matched recovery never enables Hand Over', () {
+      final json = wire()
+        ..['outcome'] = 'rejected'
+        ..['error'] = 'revisionConflict';
+      final result = ScanPickResult.fromJson(json);
+      expect(result.snapshot!.state, ScanPickState.matched);
+      expect(
+        result.canRequestHandOver(
+          read(),
+          DateTime.parse('2026-09-07T10:00:30Z'),
+        ),
+        isFalse,
+      );
+      final success = ScanPickResult.fromJson(wire());
+      expect(
+        () => success.canRequestHandOver(
+          read(requestId: 'read-2'),
+          DateTime.parse('2026-09-07T10:00:30Z'),
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('QR transport bound measures bytes without truncating payload', () {
+      ScanPickRequest authorise(String token) => ScanPickRequest.authorise(
+        requestId: 'scan-1',
+        operationId: 'op-scan',
+        orderId: 'order-1',
+        storeId: 'store-1',
+        expectedRevision: 'v',
+        qrPayload: token,
+      );
+      final exact = 'a' * scanPickMaxQrPayloadBytes;
+      expect(authorise(exact).qrPayload, exact);
+      expect(() => authorise('${exact}a'), throwsFormatException);
+      final multibyte = 'é' * (scanPickMaxQrPayloadBytes ~/ 2);
+      expect(authorise(multibyte).qrPayload, multibyte);
+      expect(() => authorise('$multibyteé'), throwsFormatException);
+      final json = wire(state: 'awaitingCustomer');
+      final challenge = snapshot(json)['challenge']! as Map<String, Object?>;
+      challenge['qrPayload'] = exact;
+      expect(
+        ScanPickResult.fromJson(json).snapshot!.challenge!.qrPayload,
+        exact,
+      );
+      challenge['qrPayload'] = '${exact}a';
+      expect(() => ScanPickResult.fromJson(json), throwsFormatException);
+    });
+
+    for (final time in [
+      '2026-02-30T10:00:00Z',
+      '2026-13-07T10:00:00Z',
+      '2026-09-07T24:00:00Z',
+      '2026-09-07T10:60:00Z',
+      '2026-09-07T10:00:60Z',
+      '2026-09-07T10:00:00+00:00',
+      '20260907T100000Z',
+      '2026-09-07T10:00:00.1234567Z',
+    ]) {
+      test('malformed or normalized UTC is rejected: $time', () {
+        for (final field in ['serverTime', 'expiresAt', 'collectedAt']) {
+          final json = wire(
+            state: field == 'collectedAt' ? 'collected' : 'matched',
+          );
+          if (field == 'serverTime') {
+            snapshot(json)[field] = time;
+          } else {
+            (snapshot(json)[field == 'expiresAt' ? 'approval' : 'receipt']!
+                    as Map<String, Object?>)[field] =
+                time;
+          }
+          expect(
+            () => ScanPickResult.fromJson(json),
+            throwsFormatException,
+            reason: field,
+          );
+        }
+      });
+    }
+
+    test(
+      'paid collection order has no booking-age or delivery-target cutoff',
+      () {
+        final json = wire(state: 'ready');
+        snapshot(json)['serverTime'] = '2027-02-28T10:00:00.123456Z';
+        // Older purchase metadata is not an authority or a client expiry rule.
+        snapshot(json)['orderedAt'] = '2026-09-07T10:00:00Z';
+        final value = ScanPickResult.fromJson(json).snapshot!;
+        expect(value.state, ScanPickState.ready);
+        expect(value.payment, ScanPickPayment.paid);
+        expect(value.serverTime.microsecond, 456);
+        final expiredCode = wire(state: 'awaitingCustomer');
+        snapshot(expiredCode)['serverTime'] = '2026-09-08T10:00:00Z';
+        final waiting = ScanPickResult.fromJson(expiredCode).snapshot!;
+        expect(
+          waiting.challenge!.expiresAt.isBefore(waiting.serverTime),
+          isTrue,
+        );
+        expect(waiting.state, ScanPickState.awaitingCustomer);
+        expect(waiting.payment, ScanPickPayment.paid);
+        expect(waiting.receipt, isNull);
+        // Expired code is refreshable; it cannot imply cancellation or collection.
+      },
+    );
+
+    test(
+      'exact fractional quantity allowed; zero, duplicate line and oversized amount rejected',
+      () {
+        final json = wire();
+        final lines = snapshot(json)['lines']! as List;
+        final line = lines.single as Map<String, Object?>;
+        line['quantity'] = '1.25';
+        expect(
+          ScanPickResult.fromJson(json).snapshot!.lines.single.quantity,
+          '1.25',
+        );
+        line['quantity'] = '0.00';
+        expect(() => ScanPickResult.fromJson(json), throwsFormatException);
+        line['quantity'] = '2';
+        lines.add(Map<String, Object?>.from(line));
+        expect(() => ScanPickResult.fromJson(json), throwsFormatException);
+        lines.removeLast();
+        snapshot(json)['totalMinor'] = 9007199254740992;
+        expect(() => ScanPickResult.fromJson(json), throwsFormatException);
+      },
+    );
+  });
+
   test('S09 setup draft cannot create or mutate a catalogue listing', () {
     final work = WorkSession();
     addTearDown(work.dispose);
