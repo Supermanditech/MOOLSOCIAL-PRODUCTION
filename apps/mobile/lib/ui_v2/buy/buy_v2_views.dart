@@ -11755,10 +11755,9 @@ Future<void> showBuyV2FilterSheet(
                               !context.mounted) {
                             return;
                           }
-                          await _showBuyV2DiscoveryRefinementSheet(
+                          await showBuyV2DiscoveryRefinementSheet(
                             context,
                             session,
-                            destination,
                           );
                         },
                       ),
@@ -11815,33 +11814,34 @@ Future<void> showBuyV2FilterSheet(
   );
 }
 
-Future<void> _showBuyV2DiscoveryRefinementSheet(
+Future<void> showBuyV2DiscoveryRefinementSheet(
   BuildContext context,
-  BuyV2Session session,
-  BuyV2Destination destination,
-) async {
-  if (session.destination != destination ||
-      destination == BuyV2Destination.orders) {
-    return;
-  }
-  final deliveryModes = switch (destination) {
-    BuyV2Destination.shop => const [
-      BuyV2FulfilmentMode.quickLocal,
-      BuyV2FulfilmentMode.standardCourier,
-    ],
-    BuyV2Destination.wholesale => const [BuyV2FulfilmentMode.bulkFreight],
-    BuyV2Destination.medicine => const [BuyV2FulfilmentMode.standardCourier],
-    BuyV2Destination.orders => const <BuyV2FulfilmentMode>[],
-  };
-  final packFilters = switch (destination) {
-    BuyV2Destination.shop || BuyV2Destination.medicine => const [
-      BuyV2PackFilter.standard,
-      BuyV2PackFilter.multipack,
-    ],
-    BuyV2Destination.wholesale => const [BuyV2PackFilter.bulk],
-    BuyV2Destination.orders => const <BuyV2PackFilter>[],
-  };
-
+  BuyV2Session session, {
+  List<BuyV2FilterSheetAction> actions = const [],
+}) async {
+  final destination = session.destination;
+  if (destination == BuyV2Destination.orders) return;
+  String browseScope() =>
+      '${session.destination.name}|${session.saleTypeSignature}|'
+      '${session.selectedCategoryId}|${session.query}';
+  final originalScope = browseScope();
+  final current = session.discoveryRefinements;
+  var draft = BuyV2DiscoveryRefinements(
+    brands: current.brands,
+    maximumPrice: current.maximumPrice,
+    pack: destination == BuyV2Destination.wholesale ? null : current.pack,
+    filter: destination == BuyV2Destination.medicine ? current.filter : null,
+    fulfilmentMode: destination == BuyV2Destination.medicine
+        ? current.fulfilmentMode
+        : null,
+    sort: current.sort == BuyV2ProductSort.deliveryFastest
+        ? BuyV2ProductSort.relevance
+        : current.sort,
+    availableOnly: current.availableOnly,
+  );
+  final brands = {...session.discoveryBrands, ...current.brands}.toList()
+    ..sort();
+  const packFilters = [BuyV2PackFilter.standard, BuyV2PackFilter.multipack];
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -11857,235 +11857,328 @@ Future<void> _showBuyV2DiscoveryRefinementSheet(
     clipBehavior: Clip.antiAlias,
     sheetAnimationStyle: BuyV2FilterSheetMotion.resolve(context),
     builder: (sheetContext) => StatefulBuilder(
-      builder: (sheetContext, setSheetState) {
-        void update(VoidCallback action) {
-          action();
-          setSheetState(() {});
-        }
-
-        return FractionallySizedBox(
-          heightFactor: .92,
-          child: SafeArea(
-            top: false,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Sort and refine',
-                              key: const ValueKey(
-                                'buy-discovery-refinement-title',
-                              ),
-                              style: sheetContext.buyTitle,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${_productCountLabel(session.catalogueSaleTypeProducts.length)} '
-                              '${session.catalogueSaleTypeProducts.length == 1 ? 'matches' : 'match'} your choices',
-                              style: sheetContext.buyMeta,
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        key: const ValueKey('buy-discovery-refinement-close'),
-                        tooltip: 'Close sort and filters',
-                        onPressed: () => Navigator.of(sheetContext).pop(),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1, color: BuyV2Colors.line),
-                Expanded(
-                  child: ListView(
-                    key: const ValueKey('buy-discovery-refinement-list'),
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
-                    children: [
-                      _DiscoveryRefinementSection(
-                        title: 'Sort by',
-                        children: [
-                          for (final sort in BuyV2ProductSort.values)
-                            ChoiceChip(
-                              key: ValueKey('buy-sort-${sort.name}'),
-                              label: Text(_buyV2ProductSortLabel(sort)),
-                              selected: session.productSort == sort,
-                              onSelected: (_) =>
-                                  update(() => session.chooseProductSort(sort)),
-                            ),
-                        ],
-                      ),
-                      _DiscoveryRefinementSection(
-                        title: 'Delivery',
-                        children: [
-                          ChoiceChip(
-                            key: const ValueKey('buy-refine-delivery-any'),
-                            label: const Text('Any delivery'),
-                            selected: session.selectedFulfilmentMode == null,
-                            onSelected: (_) => update(
-                              () => session.chooseFulfilmentMode(null),
-                            ),
-                          ),
-                          for (final mode in deliveryModes)
-                            ChoiceChip(
-                              key: ValueKey('buy-refine-delivery-${mode.name}'),
-                              label: Text(buyV2FulfilmentModeLabel(mode)),
-                              selected: session.selectedFulfilmentMode == mode,
-                              onSelected: (_) => update(
-                                () => session.chooseFulfilmentMode(mode),
-                              ),
-                            ),
-                        ],
-                      ),
-                      _DiscoveryRefinementSection(
-                        title: 'Price',
-                        children: [
-                          ChoiceChip(
-                            key: const ValueKey('buy-refine-price-any'),
-                            label: const Text('Any price'),
-                            selected: session.maximumProductPrice == null,
-                            onSelected: (_) => update(
-                              () => session.chooseMaximumProductPrice(null),
-                            ),
-                          ),
-                          for (final limit in session.discoveryPriceLimits)
-                            ChoiceChip(
-                              key: ValueKey('buy-refine-price-$limit'),
-                              label: Text('Up to ${buyV2Money(limit)}'),
-                              selected: session.maximumProductPrice == limit,
-                              onSelected: (_) => update(
-                                () => session.chooseMaximumProductPrice(limit),
-                              ),
-                            ),
-                        ],
-                      ),
-                      _DiscoveryRefinementSection(
-                        title: 'Pack',
-                        children: [
-                          ChoiceChip(
-                            key: const ValueKey('buy-refine-pack-any'),
-                            label: const Text('Any pack'),
-                            selected: session.selectedPackFilter == null,
-                            onSelected: (_) =>
-                                update(() => session.choosePackFilter(null)),
-                          ),
-                          for (final filter in packFilters)
-                            ChoiceChip(
-                              key: ValueKey('buy-refine-pack-${filter.name}'),
-                              label: Text(_buyV2PackFilterLabel(filter)),
-                              selected: session.selectedPackFilter == filter,
-                              onSelected: (_) => update(
-                                () => session.choosePackFilter(filter),
-                              ),
-                            ),
-                        ],
-                      ),
-                      if (session.discoveryBrands.isNotEmpty)
-                        _DiscoveryRefinementSection(
-                          title: 'Brand',
-                          children: [
-                            for (final brand in session.discoveryBrands)
-                              FilterChip(
-                                key: ValueKey(
-                                  'buy-refine-brand-${brand.toLowerCase().replaceAll(' ', '-')}',
+      builder: (sheetContext, setSheetState) => AnimatedBuilder(
+        animation: session,
+        builder: (sheetContext, _) {
+          final scopeMatches = browseScope() == originalScope;
+          final productCount = session.previewDiscoveryProducts(draft).length;
+          void update(BuyV2DiscoveryRefinements value) =>
+              setSheetState(() => draft = value);
+          return FractionallySizedBox(
+            heightFactor: .92,
+            child: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Sort & filter',
+                                key: const ValueKey(
+                                  'buy-discovery-refinement-title',
                                 ),
-                                label: Text(brand),
-                                selected: session.selectedBrands.contains(
-                                  brand,
-                                ),
-                                onSelected: (_) => update(
-                                  () => session.toggleDiscoveryBrand(brand),
+                                style: sheetContext.buyTitle.copyWith(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                          ],
-                        ),
-                      Material(
-                        color: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                          side: const BorderSide(color: BuyV2Colors.line),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: SwitchListTile.adaptive(
-                          key: const ValueKey('buy-refine-available-products'),
-                          title: const Text('Available products only'),
-                          subtitle: const Text(
-                            'Hide products that cannot be added right now',
-                          ),
-                          value: session.availableProductsOnly,
-                          onChanged: (value) => update(
-                            () => session.setAvailableProductsOnly(value),
+                              Text(
+                                scopeMatches
+                                    ? '${_productCountLabel(productCount)} found'
+                                    : 'Your browsing choices changed. Reopen filters.',
+                                key: const ValueKey(
+                                  'buy-discovery-refinement-count',
+                                ),
+                                style: sheetContext.buyMeta,
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border: Border(top: BorderSide(color: BuyV2Colors.line)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          key: const ValueKey('buy-discovery-refinement-clear'),
-                          onPressed: session.activeDiscoveryRefinementCount == 0
-                              ? null
-                              : () => update(session.clearDiscoveryRefinements),
-                          child: const Text('Clear'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        flex: 2,
-                        child: FilledButton(
-                          key: const ValueKey('buy-discovery-refinement-done'),
+                        IconButton(
+                          key: const ValueKey('buy-discovery-refinement-close'),
+                          tooltip: 'Close sort and filters',
                           onPressed: () => Navigator.of(sheetContext).pop(),
-                          child: Text(
-                            'Show ${_productCountLabel(session.catalogueSaleTypeProducts.length)}',
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1, color: BuyV2Colors.line),
+                  Expanded(
+                    child: ListView(
+                      key: const ValueKey('buy-discovery-refinement-list'),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                      children: [
+                        _DiscoveryRefinementSection(
+                          id: 'sort',
+                          title: 'Sort by',
+                          summary: _buyV2ProductSortLabel(draft.sort),
+                          children: [
+                            for (final sort in const [
+                              BuyV2ProductSort.relevance,
+                              BuyV2ProductSort.priceLowToHigh,
+                              BuyV2ProductSort.priceHighToLow,
+                            ])
+                              _DiscoveryChoice(
+                                key: ValueKey('buy-sort-${sort.name}'),
+                                label: _buyV2ProductSortLabel(sort),
+                                selected: draft.sort == sort,
+                                onTap: () => update(draft.copyWith(sort: sort)),
+                              ),
+                          ],
+                        ),
+                        _DiscoveryRefinementSection(
+                          id: 'price',
+                          title: 'Pack price',
+                          summary: draft.maximumPrice == null
+                              ? 'Any price'
+                              : 'Up to ${buyV2Money(draft.maximumPrice!)}',
+                          children: [
+                            _DiscoveryChoice(
+                              key: const ValueKey('buy-refine-price-any'),
+                              label: 'Any price',
+                              selected: draft.maximumPrice == null,
+                              onTap: () =>
+                                  update(draft.copyWith(clearPrice: true)),
+                            ),
+                            for (final limit in session.discoveryPriceLimits)
+                              _DiscoveryChoice(
+                                key: ValueKey('buy-refine-price-$limit'),
+                                label: 'Up to ${buyV2Money(limit)}',
+                                selected: draft.maximumPrice == limit,
+                                onTap: () =>
+                                    update(draft.copyWith(maximumPrice: limit)),
+                              ),
+                          ],
+                        ),
+                        if (destination != BuyV2Destination.wholesale)
+                          _DiscoveryRefinementSection(
+                            id: 'pack',
+                            title: 'Pack size',
+                            summary: draft.pack == null
+                                ? 'Any pack'
+                                : _buyV2PackFilterLabel(draft.pack!),
+                            children: [
+                              _DiscoveryChoice(
+                                key: const ValueKey('buy-refine-pack-any'),
+                                label: 'Any pack',
+                                selected: draft.pack == null,
+                                onTap: () =>
+                                    update(draft.copyWith(clearPack: true)),
+                              ),
+                              for (final pack in packFilters)
+                                _DiscoveryChoice(
+                                  key: ValueKey('buy-refine-pack-${pack.name}'),
+                                  label: _buyV2PackFilterLabel(pack),
+                                  selected: draft.pack == pack,
+                                  onTap: () =>
+                                      update(draft.copyWith(pack: pack)),
+                                ),
+                            ],
+                          ),
+                        if (brands.isNotEmpty)
+                          _DiscoveryRefinementSection(
+                            id: 'brand',
+                            title: 'Brand',
+                            summary: draft.brands.isEmpty
+                                ? 'Any brand'
+                                : draft.brands.length == 1
+                                ? draft.brands.single
+                                : '${draft.brands.length} selected',
+                            children: [
+                              for (final brand in brands)
+                                _DiscoveryChoice(
+                                  key: ValueKey(
+                                    'buy-refine-brand-${brand.toLowerCase().replaceAll(' ', '-')}',
+                                  ),
+                                  label: brand,
+                                  selected: draft.brands.contains(brand),
+                                  onTap: () {
+                                    final selected = {...draft.brands};
+                                    if (!selected.remove(brand)) {
+                                      selected.add(brand);
+                                    }
+                                    update(draft.copyWith(brands: selected));
+                                  },
+                                ),
+                            ],
+                          ),
+                        SwitchListTile.adaptive(
+                          key: const ValueKey('buy-refine-available-products'),
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Available to order'),
+                          value: draft.availableOnly,
+                          onChanged: (value) =>
+                              update(draft.copyWith(availableOnly: value)),
+                        ),
+                        if (actions.isNotEmpty)
+                          _DiscoveryRefinementSection(
+                            id: 'tools',
+                            title: 'Shopping tools',
+                            summary: 'Orders, activity and settings',
+                            children: [
+                              for (final action in actions)
+                                _BuyV2FilterToolAction(
+                                  action: action,
+                                  onTap: () async {
+                                    final completed = ModalRoute.of(
+                                      sheetContext,
+                                    )?.completed;
+                                    Navigator.of(sheetContext).pop();
+                                    if (completed != null) await completed;
+                                    if (!context.mounted ||
+                                        browseScope() != originalScope) {
+                                      return;
+                                    }
+                                    action.onTap();
+                                  },
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(top: BorderSide(color: BuyV2Colors.line)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            key: const ValueKey(
+                              'buy-discovery-refinement-clear',
+                            ),
+                            onPressed: draft.count == 0
+                                ? null
+                                : () => update(BuyV2DiscoveryRefinements()),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                            child: const Text('Clear'),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            key: const ValueKey(
+                              'buy-discovery-refinement-done',
+                            ),
+                            onPressed: !scopeMatches
+                                ? null
+                                : () {
+                                    session.applyDiscoveryRefinements(draft);
+                                    Navigator.of(sheetContext).pop();
+                                  },
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                            child: const Text('Apply'),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     ),
   );
 }
 
 class _DiscoveryRefinementSection extends StatelessWidget {
   const _DiscoveryRefinementSection({
+    required this.id,
     required this.title,
+    required this.summary,
     required this.children,
   });
 
+  final String id;
   final String title;
+  final String summary;
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: context.buyEyebrow),
-        const SizedBox(height: 8),
-        Wrap(spacing: 7, runSpacing: 7, children: children),
-      ],
+  Widget build(BuildContext context) => ExpansionTile(
+    key: ValueKey('buy-refine-section-$id'),
+    tilePadding: EdgeInsets.zero,
+    childrenPadding: const EdgeInsets.only(bottom: 8),
+    title: Text(title, style: Theme.of(context).textTheme.titleSmall),
+    subtitle: Text(summary, style: context.buyMeta),
+    shape: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
+    collapsedShape: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
+    children: [
+      for (final child in children)
+        Padding(padding: const EdgeInsets.only(bottom: 6), child: child),
+    ],
+  );
+}
+
+class _DiscoveryChoice extends StatelessWidget {
+  const _DiscoveryChoice({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    selected: selected,
+    button: true,
+    child: Material(
+      color: selected ? BuyV2Colors.navy : BuyV2Colors.softBlue,
+      borderRadius: BorderRadius.circular(10),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: selected ? Colors.white : BuyV2Colors.navy,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                  size: 18,
+                  color: selected ? Colors.white : BuyV2Colors.navy,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     ),
   );
 }

@@ -3,7 +3,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
-import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
@@ -13,6 +12,26 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
+  Future<void> expandTools(WidgetTester tester) async {
+    final section = find.byKey(const ValueKey('buy-refine-section-tools'));
+    final heading = find
+        .descendant(of: section, matching: find.byType(ListTile))
+        .first;
+    await tester.scrollUntilVisible(
+      section,
+      160,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('buy-discovery-refinement-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await Scrollable.ensureVisible(tester.element(heading), alignment: .5);
+    await tester.pumpAndSettle();
+    expect(heading.hitTestable(), findsOneWidget);
+    await tester.tap(heading);
+    await tester.pumpAndSettle();
+  }
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   void expectCollectionText(WidgetTester tester, Finder owner) {
@@ -432,7 +451,7 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets('R66 current delivery filter is truthful at $scale', (
+    testWidgets('R5 020 delivery choices stay in the catalogue at $scale', (
       tester,
     ) async {
       tester.view.devicePixelRatio = 1;
@@ -468,93 +487,29 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      Future<void> openFilter() async {
-        final settings = find.byKey(const ValueKey('buy-shopping-settings'));
-        final row = find.byKey(const ValueKey('buy-settings-delivery'));
-        await tester.scrollUntilVisible(
-          row,
-          120,
-          scrollable: find
-              .descendant(of: settings, matching: find.byType(Scrollable))
-              .first,
-        );
+      for (final mode in BuyV2ShopSaleType.values) {
+        session.chooseShopSaleType(mode);
+        await openSettings(session);
         expect(
-          find.descendant(of: row, matching: find.text('Delivery filter')),
-          findsOneWidget,
+          find.byKey(const ValueKey('buy-settings-delivery')),
+          findsNothing,
         );
         expect(find.textContaining('Preferred delivery'), findsNothing);
-        await tester.tap(row);
-        await tester.pumpAndSettle();
-        expect(find.text('For current browsing only.'), findsOneWidget);
-        expect(find.text('No preference'), findsNothing);
-        expect(tester.takeException(), isNull);
-      }
-
-      await openSettings(session);
-      for (final option in [
-        ('quick-local', BuyV2FulfilmentMode.quickLocal),
-        ('standard-courier', BuyV2FulfilmentMode.standardCourier),
-        ('bulk-freight', BuyV2FulfilmentMode.bulkFreight),
-        ('any', null),
-      ]) {
-        await openFilter();
-        final action = find.byKey(
-          ValueKey('buy-settings-delivery-${option.$1}'),
-        );
-        await tester.scrollUntilVisible(
-          action,
-          100,
-          scrollable: find.byType(Scrollable).last,
-        );
-        await tester.pumpAndSettle();
-        final bounds = tester.getRect(action);
-        expect(bounds.height, greaterThanOrEqualTo(44));
-        expect(bounds.bottom, lessThanOrEqualTo(668));
-        final text = find.descendant(
-          of: action,
-          matching: find.byType(RichText),
-        );
-        for (final paragraph in tester.renderObjectList<RenderParagraph>(
-          text,
-        )) {
-          expect(paragraph.didExceedMaxLines, isFalse);
-          final topLeft = paragraph.localToGlobal(Offset.zero);
-          expect(topLeft.dy, greaterThanOrEqualTo(bounds.top));
-          expect(
-            topLeft.dy + paragraph.size.height,
-            lessThanOrEqualTo(bounds.bottom),
-          );
-        }
-        await tester.tap(action);
-        await tester.pumpAndSettle();
-        expect(session.selectedFulfilmentMode, option.$2);
-        expect(session.quantityFor('s-milk'), quantity);
         expect(
-          find.byKey(const ValueKey('buy-shopping-settings')),
+          find.byKey(const ValueKey('buy-settings-addresses')),
           findsOneWidget,
         );
+        expect(
+          find.byKey(const ValueKey('buy-settings-payment')),
+          findsOneWidget,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.shopSaleType, mode);
+        expect(session.selectedFulfilmentMode, isNull);
+        expect(session.quantityFor('s-milk'), quantity);
         expect(tester.takeException(), isNull);
       }
-      await openFilter();
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(session.selectedFulfilmentMode, isNull);
-      session.chooseFulfilmentMode(BuyV2FulfilmentMode.quickLocal);
-      final freshCore = BuySession();
-      final fresh = BuyV2Session(core: freshCore);
-      addTearDown(freshCore.dispose);
-      addTearDown(fresh.dispose);
-      await openSettings(fresh);
-      await openFilter();
-      expect(fresh.selectedFulfilmentMode, isNull);
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('buy-settings-delivery-any')),
-          matching: find.text('All delivery types'),
-        ),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
     });
   }
 
@@ -588,6 +543,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
     await tester.pumpAndSettle();
+    await expandTools(tester);
     final openSettings = find.byKey(
       const ValueKey('buy-shopping-settings-button'),
     );
@@ -596,6 +552,9 @@ void main() {
       160,
       scrollable: find.byType(Scrollable).last,
     );
+    await Scrollable.ensureVisible(tester.element(openSettings), alignment: .5);
+    await tester.pumpAndSettle();
+    expect(openSettings.hitTestable(), findsOneWidget);
     await tester.tap(openSettings);
     await tester.pumpAndSettle();
 
@@ -608,7 +567,6 @@ void main() {
     for (final keyName in const [
       'buy-settings-addresses',
       'buy-settings-payment',
-      'buy-settings-delivery',
       'buy-settings-order-alerts',
       'buy-settings-saved',
       'buy-settings-recently-viewed',
@@ -625,18 +583,8 @@ void main() {
       expect(find.byKey(ValueKey(keyName)), findsOneWidget);
     }
 
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('buy-settings-delivery')),
-      -180,
-      scrollable: settingsScroll,
-    );
-    await tester.tap(find.byKey(const ValueKey('buy-settings-delivery')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('buy-settings-delivery-quick-local')),
-    );
-    await tester.pumpAndSettle();
-    expect(session.selectedFulfilmentMode, BuyV2FulfilmentMode.quickLocal);
+    expect(find.byKey(const ValueKey('buy-settings-delivery')), findsNothing);
+    expect(session.selectedFulfilmentMode, isNull);
 
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('buy-settings-order-alerts')),
@@ -694,6 +642,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
     await tester.pumpAndSettle();
+    await expandTools(tester);
 
     final recentlyViewed = find.byKey(
       const ValueKey('buy-recently-viewed-button'),
@@ -703,6 +652,12 @@ void main() {
       160,
       scrollable: find.byType(Scrollable).last,
     );
+    await Scrollable.ensureVisible(
+      tester.element(recentlyViewed),
+      alignment: .5,
+    );
+    await tester.pumpAndSettle();
+    expect(recentlyViewed.hitTestable(), findsOneWidget);
     await tester.tap(recentlyViewed);
     await tester.pumpAndSettle();
 
@@ -744,6 +699,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
       await tester.pumpAndSettle();
+      await expandTools(tester);
       final openSettings = find.byKey(
         const ValueKey('buy-shopping-settings-button'),
       );
@@ -752,6 +708,12 @@ void main() {
         160,
         scrollable: find.byType(Scrollable).last,
       );
+      await Scrollable.ensureVisible(
+        tester.element(openSettings),
+        alignment: .5,
+      );
+      await tester.pumpAndSettle();
+      expect(openSettings.hitTestable(), findsOneWidget);
       await tester.tap(openSettings);
       await tester.pumpAndSettle();
 

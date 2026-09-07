@@ -2727,7 +2727,15 @@ class _CatalogueToolsMenu extends StatelessWidget {
     final filterOptions = _filterOptionsFor(session.destination);
     final refinementCount = session.activeDiscoveryRefinementCount;
     final namedFulfilmentFilter = session.selectedFulfilmentMode != null;
-    final currentFilterLabel = namedFulfilmentFilter
+    final currentFilterLabel = session.destination == BuyV2Destination.shop
+        ? (session.shopSaleType == BuyV2ShopSaleType.quickDelivery
+              ? 'Quick delivery'
+              : 'Scheduled delivery')
+        : session.destination == BuyV2Destination.wholesale
+        ? (session.wholesaleSaleType == BuyV2WholesaleSaleType.wholesale
+              ? 'Wholesale'
+              : 'Bulk')
+        : namedFulfilmentFilter
         ? buyV2FulfilmentModeLabel(session.selectedFulfilmentMode!)
         : _filterLabel(filterOptions, session.selectedFilter);
     final additionalFilterCount =
@@ -2736,7 +2744,10 @@ class _CatalogueToolsMenu extends StatelessWidget {
         (session.selectedFilter == null ? 0 : 1);
     void openSheet() {
       HapticFeedback.selectionClick();
-      showBuyV2FilterSheet(
+      final openFilters = session.destination == BuyV2Destination.medicine
+          ? showBuyV2FilterSheet
+          : showBuyV2DiscoveryRefinementSheet;
+      openFilters(
         context,
         session,
         actions: [
@@ -2804,7 +2815,7 @@ class _CatalogueToolsMenu extends StatelessWidget {
           'Current $currentFilterLabel. '
           '$additionalFilterCount additional '
           '${additionalFilterCount == 1 ? 'filter' : 'filters'} selected',
-      tooltip: 'Orders, tools and filters',
+      tooltip: 'Sort and filter',
       icon: Icons.tune_rounded,
       badge: session.selectedFilter != null || refinementCount > 0
           ? '${refinementCount + (session.selectedFilter == null ? 0 : 1)}'
@@ -2947,9 +2958,6 @@ class _BuyV2ShoppingSettingsSheetState
         final savedCount =
             session.savedCountFor(BuyV2Destination.shop) +
             session.savedCountFor(BuyV2Destination.wholesale);
-        final deliveryFilter = session.selectedFulfilmentMode == null
-            ? 'All delivery types'
-            : buyV2FulfilmentModeLabel(session.selectedFulfilmentMode!);
         return SafeArea(
           top: false,
           child: SingleChildScrollView(
@@ -2992,13 +3000,6 @@ class _BuyV2ShoppingSettingsSheetState
                       ? 'Choose at Checkout'
                       : session.selectedPayment,
                   onTap: () => showBuyV2PaymentSheet(context, session),
-                ),
-                _ShoppingSettingsRow(
-                  key: const ValueKey('buy-settings-delivery'),
-                  icon: Icons.local_shipping_outlined,
-                  title: 'Delivery filter',
-                  detail: deliveryFilter,
-                  onTap: () => _showBuyV2DeliveryFilter(context, session),
                 ),
                 const SizedBox(height: 12),
                 const _ShoppingSettingsHeading('Orders and activity'),
@@ -3208,74 +3209,6 @@ class _ShoppingSettingsRow extends StatelessWidget {
       ),
     ),
   );
-}
-
-Future<void> _showBuyV2DeliveryFilter(
-  BuildContext context,
-  BuyV2Session session,
-) async {
-  final currentKey = switch (session.selectedFulfilmentMode) {
-    BuyV2FulfilmentMode.quickLocal => 'quick-local',
-    BuyV2FulfilmentMode.standardCourier => 'standard-courier',
-    BuyV2FulfilmentMode.bulkFreight => 'bulk-freight',
-    null => 'any',
-  };
-  final selected = await showModalBottomSheet<String>(
-    context: context,
-    useSafeArea: true,
-    showDragHandle: true,
-    backgroundColor: Colors.white,
-    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
-    builder: (sheetContext) => SafeArea(
-      top: false,
-      child: ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-        children: [
-          Text(
-            'Delivery filter',
-            style: sheetContext.buyTitle.copyWith(fontSize: 18),
-          ),
-          const SizedBox(height: 5),
-          Text('For current browsing only.', style: sheetContext.buyMeta),
-          const SizedBox(height: 5),
-          for (final option in <(String, BuyV2FulfilmentMode?, String)>[
-            ('any', null, 'All delivery types'),
-            (
-              'quick-local',
-              BuyV2FulfilmentMode.quickLocal,
-              'Quick local delivery',
-            ),
-            (
-              'standard-courier',
-              BuyV2FulfilmentMode.standardCourier,
-              'Standard/courier delivery',
-            ),
-            ('bulk-freight', BuyV2FulfilmentMode.bulkFreight, 'Bulk freight'),
-          ])
-            ListTile(
-              key: ValueKey('buy-settings-delivery-${option.$1}'),
-              minTileHeight: 48,
-              leading: Icon(
-                currentKey == option.$1
-                    ? Icons.radio_button_checked_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                color: BuyV2Colors.navy,
-              ),
-              onTap: () => Navigator.of(sheetContext).pop(option.$1),
-              title: Text(option.$3),
-            ),
-        ],
-      ),
-    ),
-  );
-  if (selected == null) return;
-  session.chooseFulfilmentMode(switch (selected) {
-    'quick-local' => BuyV2FulfilmentMode.quickLocal,
-    'standard-courier' => BuyV2FulfilmentMode.standardCourier,
-    'bulk-freight' => BuyV2FulfilmentMode.bulkFreight,
-    _ => null,
-  });
 }
 
 String _shoppingAlertDetail(BuyV2ShoppingAlert alert, BuyV2Session session) {

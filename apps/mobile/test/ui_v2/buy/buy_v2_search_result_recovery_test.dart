@@ -163,18 +163,21 @@ void main() {
           session.chooseFulfilmentMode(BuyV2FulfilmentMode.bulkFreight);
         }
         final saleType = session.saleTypeSignature;
+        // Choose a real brand in this purchase mode before deliberately
+        // narrowing to a category that may contain no matching products.
+        session.toggleDiscoveryBrand(session.discoveryBrands.first);
         session.chooseCategory('fruits-vegetables');
         session.chooseFilter('lowest');
         session.choosePackFilter(BuyV2PackFilter.multipack);
         session.chooseMaximumProductPrice(session.discoveryPriceLimits.first);
-        session.toggleDiscoveryBrand(session.discoveryBrands.first);
         session.chooseProductSort(BuyV2ProductSort.priceLowToHigh);
         session.setAvailableProductsOnly(true);
         final retainedId = retail ? 'w-notebook' : 's-eggs';
         session.addProduct(retainedId);
         final retainedQuantity = session.quantityFor(retainedId);
         expect(session.catalogueSaleTypeProducts, isEmpty);
-        expect(session.activeDiscoveryRefinementCount, 6);
+        expect(session.selectedFulfilmentMode, isNull);
+        expect(session.activeDiscoveryRefinementCount, 5);
         await tester.pumpWidget(app(session, textScale: scale));
         await tester.pumpAndSettle();
         expect(find.text('No matching products'), findsOneWidget);

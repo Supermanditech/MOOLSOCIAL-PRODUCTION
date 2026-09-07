@@ -1833,6 +1833,46 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
       await tester.pumpAndSettle();
+      if (entry.$1 != BuyV2Destination.medicine) {
+        expect(
+          find.byKey(const ValueKey('buy-discovery-refinement-title')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('buy-filter-lowest')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('buy-sort-deliveryFastest')),
+          findsNothing,
+        );
+        final sortSection = find.byKey(
+          const ValueKey('buy-refine-section-sort'),
+        );
+        await tester.tap(
+          find
+              .descendant(of: sortSection, matching: find.byType(ListTile))
+              .first,
+        );
+        await tester.pumpAndSettle();
+        final sort = find.byKey(const ValueKey('buy-sort-priceLowToHigh'));
+        await tester.scrollUntilVisible(
+          sort,
+          100,
+          scrollable: find.descendant(
+            of: find.byKey(const ValueKey('buy-discovery-refinement-list')),
+            matching: find.byType(Scrollable),
+          ),
+        );
+        await tester.tap(sort);
+        await tester.pumpAndSettle();
+        expect(session.productSort, BuyV2ProductSort.relevance);
+        await tester.tap(
+          find.byKey(const ValueKey('buy-discovery-refinement-done')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.productSort, BuyV2ProductSort.priceLowToHigh);
+        expect(session.catalogueSaleTypeProducts, isNotEmpty);
+        expect(tester.takeException(), isNull);
+        continue;
+      }
       final option = find.byKey(ValueKey('buy-filter-${entry.$2}'));
       await tester.scrollUntilVisible(
         option,

@@ -6,11 +6,12 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
-import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -347,8 +348,6 @@ void main() {
   Future<void> openRefinement(WidgetTester tester, BuyV2Session session) async {
     await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('buy-discovery-refinement')));
-    await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('buy-discovery-refinement-title')),
       findsOneWidget,
@@ -358,6 +357,38 @@ void main() {
 
   Future<void> tapVisible(WidgetTester tester, Key key) async {
     final finder = find.byKey(key);
+    final name = (key as ValueKey<String>).value;
+    final section = name.startsWith('buy-sort-')
+        ? 'sort'
+        : name.startsWith('buy-refine-price-')
+        ? 'price'
+        : name.startsWith('buy-refine-brand-')
+        ? 'brand'
+        : name.startsWith('buy-refine-pack-')
+        ? 'pack'
+        : null;
+    if (section != null && finder.evaluate().isEmpty) {
+      final heading = find.byKey(ValueKey('buy-refine-section-$section'));
+      final headingAction = find
+          .descendant(of: heading, matching: find.byType(ListTile))
+          .first;
+      await tester.scrollUntilVisible(
+        heading,
+        160,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('buy-discovery-refinement-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await Scrollable.ensureVisible(
+        tester.element(headingAction),
+        alignment: .5,
+      );
+      await tester.pumpAndSettle();
+      expect(headingAction.hitTestable(), findsOneWidget);
+      await tester.tap(headingAction);
+      await tester.pumpAndSettle();
+    }
     await tester.scrollUntilVisible(
       finder,
       180,
@@ -366,10 +397,362 @@ void main() {
         matching: find.byType(Scrollable),
       ),
     );
-    await tester.ensureVisible(finder);
+    await Scrollable.ensureVisible(tester.element(finder), alignment: .5);
     await tester.pumpAndSettle();
     await tester.tap(finder);
     await tester.pumpAndSettle();
+  }
+
+  for (final check in [
+    'cancel',
+    'outside',
+    'changed-scope',
+    'selected-brand',
+  ]) {
+    testWidgets('R5 020 035 refinement $check', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      session.addProduct('w-rice');
+      final otherQuantity = session.quantityFor('w-rice');
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openRefinement(tester, session);
+      if (check != 'selected-brand') {
+        await tapVisible(tester, const ValueKey('buy-refine-price-250'));
+        if (check == 'changed-scope') {
+          session.updateQuery('milk');
+          await tester.pumpAndSettle();
+          expect(
+            tester
+                .widget<FilledButton>(
+                  find.byKey(const ValueKey('buy-discovery-refinement-done')),
+                )
+                .onPressed,
+            isNull,
+          );
+        }
+        if (check == 'outside') {
+          await tester.tapAt(const Offset(8, 32));
+        } else {
+          await tester.binding.handlePopRoute();
+        }
+        await tester.pumpAndSettle();
+        expect(session.maximumProductPrice, isNull);
+        expect(
+          find.byKey(const ValueKey('buy-discovery-refinement-title')),
+          findsNothing,
+        );
+        if (check == 'changed-scope') expect(session.query, 'milk');
+      } else {
+        final brand = session.discoveryBrands.first;
+        final key = ValueKey(
+          'buy-refine-brand-${brand.toLowerCase().replaceAll(' ', '-')}',
+        );
+        await tapVisible(tester, key);
+        final label = find.descendant(
+          of: find.byKey(key),
+          matching: find.text(brand),
+        );
+        final paragraph = tester.renderObject<RenderParagraph>(label);
+        expect(paragraph.text.style?.color, Colors.white);
+        expect(paragraph.didExceedMaxLines, isFalse);
+      }
+      expect(session.quantityFor('w-rice'), otherQuantity);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final secondMode in [false, true]) {
+      for (final viewport in [
+        const Size(320, 700),
+        const Size(360, 800),
+        const Size(430, 900),
+        const Size(640, 360),
+      ]) {
+        for (final scale in [1.0, 2.0]) {
+          final name =
+              '${destination.name}-${secondMode ? 2 : 1}-'
+              '${viewport.width.toInt()}x${viewport.height.toInt()}-$scale';
+          testWidgets('R5 020 035 responsive draft $name', (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = viewport;
+            tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+            tester.view.viewPadding = const FakeViewPadding(
+              top: 24,
+              bottom: 24,
+            );
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(tester.view.reset);
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            final core = BuySession();
+            final session = BuyV2Session(core: core)
+              ..openDestination(destination);
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            session.addProduct(
+              destination == BuyV2Destination.shop ? 'w-rice' : 's-milk',
+            );
+            final quantity = session.itemCount;
+            if (secondMode) {
+              if (destination == BuyV2Destination.shop) {
+                session.chooseShopSaleType(BuyV2ShopSaleType.courier);
+              } else {
+                session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.bulk);
+              }
+            }
+            final mode = session.saleTypeSignature;
+            await tester.pumpWidget(
+              r66VisualCaptureRoot(
+                MaterialApp(
+                  debugShowCheckedModeBanner: false,
+                  theme: MoolTheme.light(),
+                  home: BuyV2Screen(
+                    session: session,
+                    initialDestination: destination,
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            Future<void> open() async {
+              await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
+              await tester.pumpAndSettle();
+              expect(
+                find.byKey(const ValueKey('buy-discovery-refinement-title')),
+                findsOneWidget,
+              );
+              for (final key in [
+                'buy-discovery-refinement-clear',
+                'buy-discovery-refinement-done',
+              ]) {
+                final action = find.byKey(ValueKey(key));
+                final bounds = tester.getRect(action);
+                expect(bounds.height, greaterThanOrEqualTo(44));
+                expect(bounds.bottom, lessThanOrEqualTo(viewport.height - 24));
+                expect(action.hitTestable(), findsOneWidget);
+                final label = find.descendant(
+                  of: action,
+                  matching: find.byType(RichText),
+                );
+                for (final paragraph
+                    in tester.renderObjectList<RenderParagraph>(label)) {
+                  final natural = TextPainter(
+                    text: paragraph.text,
+                    textDirection: paragraph.textDirection,
+                    textScaler: paragraph.textScaler,
+                  )..layout();
+                  expect(
+                    natural.width,
+                    lessThanOrEqualTo(paragraph.size.width + .1),
+                    reason:
+                        'Footer words must remain intact: ${paragraph.text.toPlainText()}',
+                  );
+                  natural.dispose();
+                }
+              }
+            }
+
+            await open();
+            await captureR66Visual(tester, 'refine-$name-open');
+            final brand = session.discoveryBrands.first;
+            final brandKey = ValueKey(
+              'buy-refine-brand-${brand.toLowerCase().replaceAll(' ', '-')}',
+            );
+            await tapVisible(tester, brandKey);
+            final label = find.descendant(
+              of: find.byKey(brandKey),
+              matching: find.text(brand),
+            );
+            final paragraph = tester.renderObject<RenderParagraph>(label);
+            expect(paragraph.text.style?.fontFamily, 'Inter');
+            expect(paragraph.text.style?.color, Colors.white);
+            expect(paragraph.didExceedMaxLines, isFalse);
+            final natural = TextPainter(
+              text: paragraph.text,
+              textDirection: paragraph.textDirection,
+              textScaler: paragraph.textScaler,
+            )..layout(maxWidth: paragraph.size.width);
+            expect(
+              paragraph.size.height,
+              greaterThanOrEqualTo(natural.height - .1),
+            );
+            natural.dispose();
+            expect(
+              tester.getSize(find.byKey(brandKey)).height,
+              greaterThanOrEqualTo(44),
+            );
+            expect(session.selectedBrands, isEmpty);
+            await captureR66Visual(tester, 'refine-$name-brand');
+            if (secondMode) {
+              await tester.tap(
+                find.byKey(const ValueKey('buy-discovery-refinement-close')),
+              );
+            } else {
+              await tester.binding.handlePopRoute();
+            }
+            await tester.pumpAndSettle();
+            expect(session.selectedBrands, isEmpty);
+            await open();
+            final limit = session.discoveryPriceLimits.last;
+            await tapVisible(tester, ValueKey('buy-refine-price-$limit'));
+            expect(session.maximumProductPrice, isNull);
+            final preview = session
+                .previewDiscoveryProducts(
+                  BuyV2DiscoveryRefinements(maximumPrice: limit),
+                )
+                .map((p) => p.id)
+                .toList();
+            await tester.tap(
+              find.byKey(const ValueKey('buy-discovery-refinement-done')),
+            );
+            await tester.pumpAndSettle();
+            expect(session.maximumProductPrice, limit);
+            expect(
+              session.catalogueSaleTypeProducts.map((p) => p.id),
+              orderedEquals(preview),
+            );
+            await open();
+            await tester.tap(
+              find.byKey(const ValueKey('buy-discovery-refinement-clear')),
+            );
+            await tester.pumpAndSettle();
+            expect(session.maximumProductPrice, limit);
+            await tester.tap(
+              find.byKey(const ValueKey('buy-discovery-refinement-done')),
+            );
+            await tester.pumpAndSettle();
+            expect(session.activeDiscoveryRefinementCount, 0);
+            expect(session.saleTypeSignature, mode);
+            expect(session.itemCount, quantity);
+            expect(tester.takeException(), isNull);
+          });
+        }
+      }
+    }
+  }
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final layout in [
+      (size: const Size(320, 700), scale: 1.0),
+      (size: const Size(320, 700), scale: 2.0),
+      (size: const Size(640, 360), scale: 2.0),
+    ]) {
+      final name =
+          '${destination.name}-${layout.size.width.toInt()}x${layout.size.height.toInt()}-${layout.scale}';
+      testWidgets('R5 035 long and multiple selected brands $name', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = layout.size;
+        tester.platformDispatcher.textScaleFactorTestValue = layout.scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final core = BuySession();
+        final session = BuyV2Session(core: core)..openDestination(destination);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        final semantics = tester.ensureSemantics();
+        try {
+          await tester.pumpWidget(
+            r66VisualCaptureRoot(
+              MaterialApp(
+                debugShowCheckedModeBanner: false,
+                theme: MoolTheme.light(),
+                home: BuyV2Screen(
+                  session: session,
+                  initialDestination: destination,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final brands = [...session.discoveryBrands]
+            ..sort((a, b) => b.length.compareTo(a.length));
+          final selected = brands.take(2).toSet();
+          expect(selected.length, 2);
+          await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
+          await tester.pumpAndSettle();
+          for (final brand in selected) {
+            final key = ValueKey(
+              'buy-refine-brand-${brand.toLowerCase().replaceAll(' ', '-')}',
+            );
+            await tapVisible(tester, key);
+            final node = tester.getSemantics(find.byKey(key));
+            expect(node.flagsCollection.isSelected, ui.Tristate.isTrue);
+            expect(node.label, contains(brand));
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: find.byKey(key), matching: find.text(brand)),
+            );
+            expect(paragraph.text.style?.color, Colors.white);
+            expect(paragraph.didExceedMaxLines, isFalse);
+            for (final word in brand.split(' ')) {
+              final natural = TextPainter(
+                text: TextSpan(text: word, style: paragraph.text.style),
+                textDirection: paragraph.textDirection,
+                textScaler: paragraph.textScaler,
+              )..layout();
+              expect(
+                natural.width,
+                lessThanOrEqualTo(paragraph.size.width + .1),
+              );
+              natural.dispose();
+            }
+          }
+          expect(find.text('2 selected'), findsOneWidget);
+          expect(session.selectedBrands, isEmpty);
+          await captureR66Visual(tester, 'refine-multiple-$name');
+          await tester.tap(
+            find.byKey(const ValueKey('buy-discovery-refinement-done')),
+          );
+          await tester.pumpAndSettle();
+          expect(session.selectedBrands, selected);
+          expect(session.catalogueSaleTypeProducts, isNotEmpty);
+          expect(
+            session.catalogueSaleTypeProducts.every(
+              (p) => selected.contains(p.brand),
+            ),
+            isTrue,
+          );
+          await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
+          await tester.pumpAndSettle();
+          final removed = selected.first;
+          await tapVisible(
+            tester,
+            ValueKey(
+              'buy-refine-brand-${removed.toLowerCase().replaceAll(' ', '-')}',
+            ),
+          );
+          await tester.tap(
+            find.byKey(const ValueKey('buy-discovery-refinement-done')),
+          );
+          await tester.pumpAndSettle();
+          expect(session.selectedBrands, selected.difference({removed}));
+          expect(session.destination, destination);
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      });
+    }
   }
 
   testWidgets('sort and filters combine, clear and return to exact Shop', (
@@ -399,11 +782,16 @@ void main() {
     await openRefinement(tester, session);
 
     await tapVisible(tester, const ValueKey('buy-sort-priceLowToHigh'));
-    await tapVisible(tester, const ValueKey('buy-refine-delivery-quickLocal'));
     await tapVisible(tester, const ValueKey('buy-refine-price-250'));
     await tapVisible(tester, const ValueKey('buy-refine-available-products'));
+    expect(session.activeDiscoveryRefinementCount, 0);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-discovery-refinement-done')),
+    );
+    await tester.pumpAndSettle();
     expect(session.productSort, BuyV2ProductSort.priceLowToHigh);
-    expect(session.selectedFulfilmentMode, BuyV2FulfilmentMode.quickLocal);
+    expect(session.selectedFulfilmentMode, isNull);
+    expect(session.shopSaleType, BuyV2ShopSaleType.quickDelivery);
     expect(session.maximumProductPrice, 250);
     expect(session.availableProductsOnly, isTrue);
     expect(session.visibleProducts, isNotEmpty);
@@ -412,10 +800,6 @@ void main() {
         .toList(growable: false);
     expect(prices, orderedEquals([...prices]..sort()));
 
-    await tester.tap(
-      find.byKey(const ValueKey('buy-discovery-refinement-done')),
-    );
-    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
     expect(session.destination, BuyV2Destination.shop);
     expect(session.view, BuyV2View.catalogue);
@@ -425,9 +809,20 @@ void main() {
       find.byKey(const ValueKey('buy-discovery-refinement-clear')),
     );
     await tester.pumpAndSettle();
-    expect(session.activeDiscoveryRefinementCount, 0);
+    expect(session.activeDiscoveryRefinementCount, 3);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    expect(session.activeDiscoveryRefinementCount, 3);
+    await openRefinement(tester, session);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-discovery-refinement-clear')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-discovery-refinement-done')),
+    );
+    await tester.pumpAndSettle();
+    expect(session.activeDiscoveryRefinementCount, 0);
     expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
     expect(session.destination, BuyV2Destination.shop);
     expect(session.view, BuyV2View.catalogue);

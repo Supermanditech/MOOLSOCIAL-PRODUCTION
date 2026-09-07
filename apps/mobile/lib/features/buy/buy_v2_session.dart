@@ -14,6 +14,55 @@ import 'buy_v2_shopping_alerts.dart';
 String _buyV2SavedKey(BuyV2Product product) =>
     '${product.destination.name}|${product.canonicalId}';
 
+/// A catalogue draft. Previewing it never changes the session or saved account.
+@immutable
+class BuyV2DiscoveryRefinements {
+  BuyV2DiscoveryRefinements({
+    Set<String> brands = const {},
+    this.maximumPrice,
+    this.pack,
+    this.fulfilmentMode,
+    this.filter,
+    this.sort = BuyV2ProductSort.relevance,
+    this.availableOnly = false,
+  }) : brands = Set.unmodifiable(brands);
+
+  final Set<String> brands;
+  final int? maximumPrice;
+  final BuyV2PackFilter? pack;
+  final BuyV2FulfilmentMode? fulfilmentMode;
+  final String? filter;
+  final BuyV2ProductSort sort;
+  final bool availableOnly;
+
+  int get count =>
+      brands.length +
+      (maximumPrice == null ? 0 : 1) +
+      (pack == null ? 0 : 1) +
+      (fulfilmentMode == null ? 0 : 1) +
+      (filter == null ? 0 : 1) +
+      (sort == BuyV2ProductSort.relevance ? 0 : 1) +
+      (availableOnly ? 1 : 0);
+
+  BuyV2DiscoveryRefinements copyWith({
+    Set<String>? brands,
+    int? maximumPrice,
+    bool clearPrice = false,
+    BuyV2PackFilter? pack,
+    bool clearPack = false,
+    BuyV2ProductSort? sort,
+    bool? availableOnly,
+  }) => BuyV2DiscoveryRefinements(
+    brands: brands ?? this.brands,
+    maximumPrice: clearPrice ? null : maximumPrice ?? this.maximumPrice,
+    pack: clearPack ? null : pack ?? this.pack,
+    fulfilmentMode: fulfilmentMode,
+    filter: filter,
+    sort: sort ?? this.sort,
+    availableOnly: availableOnly ?? this.availableOnly,
+  );
+}
+
 @immutable
 class _BuyV2CartBenefitSelectionRef {
   const _BuyV2CartBenefitSelectionRef({
@@ -1565,16 +1614,28 @@ class BuyV2Session extends ChangeNotifier {
   };
 
   void chooseShopSaleType(BuyV2ShopSaleType value) {
-    if (_shopSaleType == value) return;
+    if (_shopSaleType == value &&
+        selectedFilter == null &&
+        selectedFulfilmentMode == null) {
+      return;
+    }
     _shopSaleType = value;
     selectedFilter = null;
+    selectedFulfilmentMode = null;
     notifyListeners();
   }
 
   void chooseWholesaleSaleType(BuyV2WholesaleSaleType value) {
-    if (_wholesaleSaleType == value) return;
+    if (_wholesaleSaleType == value &&
+        selectedFilter == null &&
+        selectedPackFilter == null &&
+        selectedFulfilmentMode == null) {
+      return;
+    }
     _wholesaleSaleType = value;
     selectedFilter = null;
+    selectedPackFilter = null;
+    selectedFulfilmentMode = null;
     notifyListeners();
   }
 
@@ -1593,7 +1654,11 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2Product> get visibleProducts =>
       _resolveVisibleProducts(limit: true);
 
-  List<BuyV2Product> _resolveVisibleProducts({required bool limit}) {
+  List<BuyV2Product> _resolveVisibleProducts({
+    required bool limit,
+    BuyV2DiscoveryRefinements? refinements,
+  }) {
+    final choices = refinements ?? discoveryRefinements;
     final normalized = query.trim().toLowerCase();
     final filterDestination = destination == BuyV2Destination.orders
         ? BuyV2Destination.shop
@@ -1614,7 +1679,7 @@ class BuyV2Session extends ChangeNotifier {
           category == 'all' ||
           (category == 'rx' && product.requiresPrescription) ||
           product.categoryId == category;
-      final matchesFilter = switch (selectedFilter) {
+      final matchesFilter = switch (choices.filter) {
         'fast' => switch (filterDestination) {
           BuyV2Destination.shop =>
             fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal,
@@ -1654,18 +1719,17 @@ class BuyV2Session extends ChangeNotifier {
         _ => true,
       };
       final matchesBrands =
-          _selectedBrands.isEmpty || _selectedBrands.contains(product.brand);
+          choices.brands.isEmpty || choices.brands.contains(product.brand);
       final matchesPrice =
-          maximumProductPrice == null ||
-          productFactsFor(product).price <= maximumProductPrice!;
+          choices.maximumPrice == null ||
+          productFactsFor(product).price <= choices.maximumPrice!;
       final matchesPack =
-          selectedPackFilter == null ||
-          packFilterFor(product) == selectedPackFilter;
+          choices.pack == null || packFilterFor(product) == choices.pack;
       final matchesFulfilment =
-          selectedFulfilmentMode == null ||
-          fulfilmentModeFor(product) == selectedFulfilmentMode;
+          choices.fulfilmentMode == null ||
+          fulfilmentModeFor(product) == choices.fulfilmentMode;
       final matchesAvailability =
-          !availableProductsOnly || _availableForDiscovery(product);
+          !choices.availableOnly || _availableForDiscovery(product);
       return matchesCategory &&
           matchesFilter &&
           matchesBrands &&
@@ -1677,7 +1741,7 @@ class BuyV2Session extends ChangeNotifier {
     final products = normalized.isEmpty
         ? candidates
         : BuyV2SearchRelevance.rankProducts(candidates, query);
-    switch (productSort) {
+    switch (choices.sort) {
       case BuyV2ProductSort.relevance:
         break;
       case BuyV2ProductSort.priceLowToHigh:
@@ -1717,8 +1781,17 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   List<BuyV2Product> get catalogueSaleTypeProducts {
-    final products = _resolveVisibleProducts(limit: false);
-    final partitioned = products
+    return previewDiscoveryProducts(discoveryRefinements);
+  }
+
+  List<BuyV2Product> previewDiscoveryProducts(
+    BuyV2DiscoveryRefinements refinements,
+  ) {
+    final products = _resolveVisibleProducts(
+      limit: false,
+      refinements: refinements,
+    );
+    return products
         .where((product) {
           return switch (destination) {
             BuyV2Destination.shop => switch (shopSaleType) {
@@ -1736,10 +1809,6 @@ class BuyV2Session extends ChangeNotifier {
           };
         })
         .toList(growable: false);
-    if (selectedCategoryId == 'all' && partitioned.length > 18) {
-      return partitioned.take(18).toList(growable: false);
-    }
-    return partitioned;
   }
 
   bool get hasNarrowedProductSearchScope =>
@@ -1976,28 +2045,8 @@ class BuyV2Session extends ChangeNotifier {
       activeShoppingIntent = BuyV2ShoppingIntent.values
           .where((intent) => intent.name == snapshot.shoppingIntent)
           .firstOrNull;
-      final validBrands = _catalogueProducts
-          .map((product) => product.brand)
-          .toSet();
-      _selectedBrands
-        ..clear()
-        ..addAll(snapshot.selectedBrands.where(validBrands.contains));
-      final storedMaximumPrice = snapshot.maximumPrice;
-      maximumProductPrice = storedMaximumPrice != null && storedMaximumPrice > 0
-          ? storedMaximumPrice
-          : null;
-      selectedPackFilter = BuyV2PackFilter.values
-          .where((value) => value.name == snapshot.packFilter)
-          .firstOrNull;
-      selectedFulfilmentMode = BuyV2FulfilmentMode.values
-          .where((value) => value.name == snapshot.fulfilmentMode)
-          .firstOrNull;
-      productSort =
-          BuyV2ProductSort.values
-              .where((value) => value.name == snapshot.productSort)
-              .firstOrNull ??
-          BuyV2ProductSort.relevance;
-      availableProductsOnly = snapshot.availableOnly;
+      // Browsing filters belong to the current catalogue, not account defaults.
+      // Ignore historical stored filters without resetting a live browse draft.
       final validRecentIds = _catalogueProducts
           .where(
             (product) =>
@@ -2078,12 +2127,6 @@ class BuyV2Session extends ChangeNotifier {
       bankTransferInstructions: _bankTransferInstructions,
       shoppingIntent: activeShoppingIntent?.name,
       checkoutSubmissionState: checkoutSubmissionState.name,
-      selectedBrands: Set.unmodifiable(_selectedBrands),
-      maximumPrice: maximumProductPrice,
-      packFilter: selectedPackFilter?.name,
-      fulfilmentMode: selectedFulfilmentMode?.name,
-      productSort: productSort.name,
-      availableOnly: availableProductsOnly,
       recentlyViewedProductIds: List.unmodifiable(_recentlyViewedProductIds),
       recentSearches: Map<BuyV2Destination, List<String>>.unmodifiable({
         for (final entry in _recentSearches.entries)
@@ -5299,19 +5342,44 @@ class BuyV2Session extends ChangeNotifier {
 
   void chooseFilter(String? value) {
     selectedFilter = value;
+    selectedFulfilmentMode = null;
+    notifyListeners();
+  }
+
+  BuyV2DiscoveryRefinements get discoveryRefinements =>
+      BuyV2DiscoveryRefinements(
+        brands: _selectedBrands,
+        maximumPrice: maximumProductPrice,
+        pack: selectedPackFilter,
+        fulfilmentMode: selectedFulfilmentMode,
+        filter: selectedFilter,
+        sort: productSort,
+        availableOnly: availableProductsOnly,
+      );
+
+  void applyDiscoveryRefinements(BuyV2DiscoveryRefinements value) {
+    _selectedBrands
+      ..clear()
+      ..addAll(value.brands);
+    maximumProductPrice = value.maximumPrice;
+    selectedPackFilter = value.pack;
+    selectedFilter = value.filter;
+    selectedFulfilmentMode = value.fulfilmentMode;
+    productSort = value.sort;
+    availableProductsOnly = value.availableOnly;
     notifyListeners();
   }
 
   List<String> get discoveryBrands {
     if (destination == BuyV2Destination.orders) return const [];
     final brands =
-        _catalogueProducts
-            .where((product) => product.destination == destination)
+        previewDiscoveryProducts(BuyV2DiscoveryRefinements())
             .map((product) => product.brand)
+            .where((brand) => brand.trim().isNotEmpty)
             .toSet()
             .toList(growable: false)
           ..sort();
-    return List.unmodifiable(brands.take(10));
+    return List.unmodifiable(brands);
   }
 
   List<int> get discoveryPriceLimits => switch (destination) {
@@ -5388,7 +5456,8 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void clearDiscoveryRefinements() {
-    if (activeDiscoveryRefinementCount == 0) return;
+    if (activeDiscoveryRefinementCount == 0 && selectedFilter == null) return;
+    selectedFilter = null;
     _clearDiscoveryRefinements();
     _persistCustomerState();
     notifyListeners();

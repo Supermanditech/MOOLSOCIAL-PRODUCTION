@@ -283,6 +283,145 @@ void main() {
       session = BuyV2Session(core: BuySession());
     });
 
+    test(
+      'R5 020 changing purchase mode removes conflicting delivery state',
+      () {
+        session.addProduct('w-rice');
+        final otherQuantity = session.quantityFor('w-rice');
+        session.chooseMaximumProductPrice(250);
+        session.chooseFulfilmentMode(BuyV2FulfilmentMode.standardCourier);
+        session.chooseShopSaleType(BuyV2ShopSaleType.quickDelivery);
+        expect(session.selectedFulfilmentMode, isNull);
+        expect(session.catalogueSaleTypeProducts, isNotEmpty);
+        expect(session.maximumProductPrice, 250);
+        expect(session.quantityFor('w-rice'), otherQuantity);
+        expect(
+          session.catalogueSaleTypeProducts.every(
+            (product) =>
+                session.fulfilmentModeFor(product) ==
+                BuyV2FulfilmentMode.quickLocal,
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test('R5 020 Any clears legacy delivery state while preserving price', () {
+      session.chooseMaximumProductPrice(250);
+      session.chooseFulfilmentMode(BuyV2FulfilmentMode.standardCourier);
+      session.chooseFilter(null);
+      expect(session.selectedFilter, isNull);
+      expect(session.selectedFulfilmentMode, isNull);
+      expect(session.maximumProductPrice, 250);
+      expect(session.shopSaleType, BuyV2ShopSaleType.courier);
+    });
+
+    test('R5 020 brand facets describe the current category and search', () {
+      final product = session.product('s-milk');
+      session.chooseShopSaleType(
+        session.fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal
+            ? BuyV2ShopSaleType.quickDelivery
+            : BuyV2ShopSaleType.courier,
+      );
+      session.chooseCategory(product.categoryId);
+      session.updateQuery(product.title);
+      final actualBrands = session.catalogueSaleTypeProducts
+          .map((product) => product.brand)
+          .toSet();
+      expect(actualBrands, isNotEmpty);
+      expect(session.discoveryBrands.toSet(), actualBrands);
+    });
+
+    test('R5 020 draft preview is pure and Apply emits one update', () async {
+      final store = _MemoryCustomerStateStore('refinement-draft');
+      final core = BuySession();
+      final current = BuyV2Session(core: core, customerStateStore: store);
+      addTearDown(core.dispose);
+      addTearDown(current.dispose);
+      await current.restoreCustomerState();
+      current.addProduct('w-rice');
+      await Future<void>.delayed(Duration.zero);
+      final stored = store.snapshot;
+      final quantity = current.quantityFor('w-rice');
+      var notifications = 0;
+      current.addListener(() => notifications++);
+      final draft = BuyV2DiscoveryRefinements(
+        maximumPrice: 250,
+        sort: BuyV2ProductSort.priceLowToHigh,
+      );
+      final expected = BuyV2Catalogue.allProducts
+          .where(
+            (product) =>
+                product.destination == BuyV2Destination.shop &&
+                product.catalogueListing &&
+                current.fulfilmentModeFor(product) ==
+                    BuyV2FulfilmentMode.quickLocal &&
+                current.productFactsFor(product).price <= 250,
+          )
+          .map((p) => p.id)
+          .toSet();
+      final preview = current.previewDiscoveryProducts(draft);
+      expect(preview.map((p) => p.id).toSet(), expected);
+      expect(preview, isNotEmpty);
+      expect(current.maximumProductPrice, isNull);
+      expect(current.productSort, BuyV2ProductSort.relevance);
+      expect(notifications, 0);
+      expect(identical(store.snapshot, stored), isTrue);
+      current.applyDiscoveryRefinements(draft);
+      expect(notifications, 1);
+      expect(
+        current.catalogueSaleTypeProducts.map((p) => p.id),
+        orderedEquals(preview.map((p) => p.id)),
+      );
+      expect(current.quantityFor('w-rice'), quantity);
+      expect(identical(store.snapshot, stored), isTrue);
+    });
+
+    test('R5 020 Wholesale mode clears a contradictory legacy pack filter', () {
+      session.openDestination(BuyV2Destination.wholesale);
+      session.choosePackFilter(BuyV2PackFilter.bulk);
+      session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.wholesale);
+      expect(session.selectedPackFilter, isNull);
+      expect(session.catalogueSaleTypeProducts, isNotEmpty);
+      expect(
+        session.catalogueSaleTypeProducts.every((p) => p.minimumOrder <= 2),
+        isTrue,
+      );
+    });
+
+    test(
+      'R5 020 old account filters do not hide the fresh catalogue',
+      () async {
+        final store = _MemoryCustomerStateStore('old-refinement-account')
+          ..snapshot = const BuyV2CustomerStateSnapshot(
+            cartQuantities: {'s-milk': 1},
+            selectedPayment: 'Paytm',
+            selectedBrands: {'UNAVAILABLE OLD BRAND'},
+            maximumPrice: 1,
+            packFilter: 'bulk',
+            fulfilmentMode: 'bulkFreight',
+            productSort: 'deliveryFastest',
+            availableOnly: true,
+            recentlyViewedProductIds: ['s-milk'],
+          );
+        final core = BuySession();
+        final restored = BuyV2Session(core: core, customerStateStore: store);
+        addTearDown(core.dispose);
+        addTearDown(restored.dispose);
+        await restored.restoreCustomerState();
+        expect(restored.activeDiscoveryRefinementCount, 0);
+        expect(restored.catalogueSaleTypeProducts, isNotEmpty);
+        expect(restored.quantityFor('s-milk'), 1);
+        expect(restored.selectedPayment, 'Paytm');
+        expect(
+          restored
+              .recentlyViewedProductsFor(BuyV2Destination.shop)
+              .map((p) => p.id),
+          ['s-milk'],
+        );
+      },
+    );
+
     test('keeps definitive Shop, Wholesale and Medicine taxonomies', () {
       expect(BuyV2Catalogue.shopCategories.length, 35);
       expect(BuyV2Catalogue.wholesaleCategories.length, 35);
@@ -1744,12 +1883,12 @@ void main() {
         expect(restored.isSaved(product.id), isTrue);
         expect(restored.selectedAddressId, 'family');
         expect(restored.selectedPayment, 'Paytm');
-        expect(restored.selectedBrands, {brand});
-        expect(restored.maximumProductPrice, 500);
-        expect(restored.selectedPackFilter, BuyV2PackFilter.standard);
-        expect(restored.selectedFulfilmentMode, BuyV2FulfilmentMode.quickLocal);
-        expect(restored.productSort, BuyV2ProductSort.priceLowToHigh);
-        expect(restored.availableProductsOnly, isTrue);
+        expect(restored.selectedBrands, isEmpty);
+        expect(restored.maximumProductPrice, isNull);
+        expect(restored.selectedPackFilter, isNull);
+        expect(restored.selectedFulfilmentMode, isNull);
+        expect(restored.productSort, BuyV2ProductSort.relevance);
+        expect(restored.availableProductsOnly, isFalse);
       },
     );
 

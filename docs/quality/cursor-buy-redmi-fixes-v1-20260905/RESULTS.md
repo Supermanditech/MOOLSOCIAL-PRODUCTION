@@ -1344,3 +1344,41 @@ Connected cycle1 passed395 tests, one unchanged intentional skip, zero failures 
 Replacement cycle3 completed native0 at 04:00:46.597Z with395 passes, one unchanged intentional skip and zero failures; stdout90116 bytes SHA70527D70519701B27D562142532B7F3B912A93CA063EF4426757F18ED5BD9895, stderr0. Cycles1 and3 therefore provide the two completed connected regressions on the exact final source pins. Cycle2 remains a preserved founder-requested interruption.
 
 No new APK has been built or installed; Redmi still has r66.4/2026090701 and no phone action follows capture463. This child is locally implemented and tested, not device-accepted or closed. The R5 inventory remains23: local repairs029-F/033-A/029-G/029-H and19 other children awaiting implementation. Existing020-R5-A compact Sort/refine and035-R5-A selected-brand readability are next; no duplicate tickets were registered. SCALE-001, A11Y-001 and approved consumer Scan & Pick remain tracked, with backend work deferred. Read/recovery incidents089–094 and founder stop095 remain in the r66.3 incident journal; the shutdown checkpoint and resumed child evidence preserve all interrupted work.
+
+
+## R5 020-A / 035-A — compact scoped Sort and filter (7 September 2026)
+
+Customer outcome: a Shop/Wholesale buyer can review relevant, readable options in one compact sheet, preview the product count, and apply them together. This mvp_required repair reuses the existing native sheet, catalogue/session resolver, top purchase-mode controls and shopping-tool callbacks under the unchanged42-owner umbrella. Parent fca85f2a787b1d41f2db56363a8429f48ac52e90. No new route, controller, backend or global-settings owner.
+
+The actual Shop/Wholesale entry now opens Sort & filter directly. Collapsed aligned sections summarize Sort, Pack price, Shop pack size and scoped Brand choices; availability is explicit and existing shopping tools remain reachable. Duplicate delivery/Wholesale pack choices and unsupported fastest/lowest-delivered promises are absent from this entry. Quick/Scheduled and Wholesale/Bulk remain the canonical top controls and clear obsolete conflicting filter state. Medicine retains its existing entry and named-filter compatibility.
+
+Filters are an immutable local draft: preview uses the same current-price/catalogue resolver as Apply; Apply emits one session notification, while Back, close and outside-tap cancel. Clear changes the draft until Apply. Changed destination/category/query/purchase-mode prevents stale application. Browsing refinements are no longer restored as account defaults; cart, orders, payment/address, Saved/Recent and genuine preferences remain covered. Brands come from the current unrefined browsing scope without the former global ten-brand ceiling. The former18-item result truncation is removed so the preview and displayed catalogue agree; the existing eight-product incremental grid remains. This does not qualify SCALE-001's future100000-provider/5000-SKU pagination or Offers/store filtering.
+
+Brand rows use wrapping Inter labels, explicit white selected text on navy and checked semantics. Equal-width Clear/Apply retain whole words at200%; the smaller heading and collapsed sections address the founder's scattered/oversized layout finding. Actual64 overview/single-brand frames from visual2 and six additional long/multiple-brand frames were personally reviewed, including320/360/430dp portrait,640x360 landscape and100/200% text. Safe-area,44dp hit targets, full paragraphs/words, exact Apply results, cancel/Clear, retained modes and other-scope cart are asserted. Final70-frame/eight-owner binding: external r66-r5-refine-final-binding-1.json SHA27F33251FC231B44D038B60F13F078BA1B6148E1968539EE254DD000B092A2EA. It explicitly preserves the earlier64-frame runtime binding and later additive/compatibility test changes; earlier runs are not relabelled with later test bytes.
+
+Evidence under C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905:
+- Final responsive visual2:43 passes, native0, stdout SHA5B222F2158601F9C0A07F47901B63F257CB518680D3F1D4A0C4ABB889B14D0C9. Initial visual1 was rejected for Clear splitting at320dp200%; all rejected images remain preserved.
+- Additional multiple-visual4:6 passes, native0, stdout SHA2B472DA5362D6EBFF904F0E4D1F8FF329414F0358C80F95BB6035AA84339C1BF. Attempt3 failed only the test-owned SemanticsHandle lifetime; try/finally fixes cleanup without dropping checks.
+- Empty-result recovery2:8 passes, native0, stdout SHACA6ACA04137B0C41CC2EB470D911472315C9AF5FE3B2569BD46B3EAF4BA8D115. The test now selects a real scoped brand before deliberately narrowing to an empty category and expects five independent filters, preserving recovery/mode/cart assertions.
+- Final eight-owner analysis3: native0, no issues, stdout SHAD0F46CEE0576FEC0173CA1376586416CC775D50FC0B57C2106763F8BAA2C771F. Formatter, approved UI locks and whitespace checks pass. Approved-lock stdout SHA3E4264965F00119D5F60E86C03C1262B7C17F6B683F112D3DC1C81A8C21BAC68.
+- Connected cycle1 remains a failed native1 receipt:635pass/1unchanged skip/8fixture failures, stdout SHAF03FEB24EB507C65B0CCE0E228540E07D54A5167DC2CF6EBB87E9E6CB2301AE0. It is not one of the two successful cycles. Incidents096–109 preserve failed reproductions, helper/fixture/analysis/visual corrections and bounded-output recovery before retry. No additional exclusions.
+
+- Connected cycle2:649 passes, one unchanged intentional skip, zero failures, native0,05:01:00.351–05:09:09.263Z,stdout144453bytes SHA21D6DC240161FC20A94AABD29670E4A9F8DBB249DCDBC1B18ACD845E4FE85394.
+- Connected cycle3:649 passes, one unchanged intentional skip, zero failures, native0,05:09:44.787–05:17:15.303Z,stdout144453bytes SHA754B356FE125B0EF7CD8E340BD5E755EFB1E95A19070471C52235B55CEE321B3. Both have empty stderr, identical eleven-file selection and the inherited five named exclusions plus R58.8.[67] candidate-capture regex. All eight owner pins and70 image pins matched after completion. These are the two affected connected cycles, not the later full26-file APK qualification.
+
+Final source/test pins:
+
+| Owner | SHA-256 |
+|---|---|
+|apps/mobile/lib/features/buy/buy_v2_session.dart|E29CA8F12889F9F7A34B40EE612778FF63318E17CBCC5674DB03D4A6C2E88C7F|
+|apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart|C72AD369FAAE74E0F0B7A183BE0F58F7CA89F944BDC580A7DDD23E734F0B4EA6|
+|apps/mobile/lib/ui_v2/buy/buy_v2_views.dart|2D295E23B4252F22DC23364CF9306953053F4524C5497188E36E88DD39C6EC1A|
+|apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart|EB6D2A59CEF97E8BB802B44601340B360E2533ABB660B97FD7C56C634A684E4C|
+|apps/mobile/test/ui_v2/buy/buy_v2_discovery_refinement_test.dart|25DFF90358B412EB091C0B190583844A68871EDA487812CE84FD3D30DFD83E3A|
+|apps/mobile/test/ui_v2/buy/buy_v2_shopping_settings_test.dart|58B665A5A296473130ABBDAEDE6A7E8FEE0CC67AD8312C5610225A52BD9FECD5|
+|apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart|BAFC472ADA927033775456FBEF3DFC1538C2EF8664154B8EEBDD5FB5D4B889B9|
+|apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart|12439256F86ED8DE9EA059598CB33189AB5951696CE33F4F504971D2B7DA3FAE|
+
+020-R5-A and035-R5-A are now locally implemented and tested, pending Redmi acceptance. R5 remains23 total: six local repairs029-F/033-A/029-G/029-H/020-A/035-A and17 other children awaiting implementation. All35 originals+9R2+16R4 retain their previous local implementation/current-device matrix dispositions; zero tickets are device-accepted or closed.
+
+No new APK/build/install or phone action occurred; capture463 and installed r66.4/2026090701 remain the Redmi checkpoint. The next coherent repair is existing004-R5-A/B plus006-R5-A: empty/product content obstruction and stable user Cart placement. Remaining001-A,007-A,011-A/B,014-A,022-A,023-A,024-A,027-A and029-A/B/C/D/E remain tracked, along with SCALE-001/A11Y-001 and the approved consumer Scan & Pick contract. Backend completion stays deferred. Atomic source/test/results sealing, mandatory precommit/postcommit gates and exact origin equality follow this record under the manifest's standing authority.
