@@ -149,10 +149,12 @@ class _StoreMoneyLine extends StatelessWidget {
     required this.leading,
     required this.value,
     this.style,
+    this.orderReference,
   });
   final Widget leading;
   final String value;
   final TextStyle? style;
+  final String? orderReference;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -169,11 +171,14 @@ class _StoreMoneyLine extends StatelessWidget {
           painter.width + 12 > constraints.maxWidth * .5 ||
           MediaQuery.textScalerOf(context).scale(11) > 16;
       painter.dispose();
-      final amount = _StoreMoneyText(
-        value,
-        style: style,
-        textAlign: TextAlign.end,
-      );
+      final amount = orderReference == null
+          ? _StoreMoneyText(value, style: style, textAlign: TextAlign.end)
+          : _StoreOrderAmount(
+              value,
+              orderReference: orderReference!,
+              style: style,
+              textAlign: TextAlign.end,
+            );
       return stacked
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -187,6 +192,119 @@ class _StoreMoneyLine extends StatelessWidget {
                 Flexible(child: amount),
               ],
             );
+    },
+  );
+}
+
+class _StoreOrderAmount extends StatelessWidget {
+  const _StoreOrderAmount(
+    this.value, {
+    required this.orderReference,
+    this.style,
+    this.textAlign = TextAlign.start,
+  });
+
+  final String value;
+  final String orderReference;
+  final TextStyle? style;
+  final TextAlign textAlign;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final textStyle = DefaultTextStyle.of(context).style.merge(style);
+      final size = textStyle.fontSize ?? 14;
+      final painter = TextPainter(
+        text: TextSpan(
+          text: value,
+          style: textStyle.copyWith(
+            fontSize: size < 14 ? size : 14,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final compact = painter.width > constraints.maxWidth;
+      painter.dispose();
+      if (!compact) {
+        return _StoreMoneyText(value, style: style, textAlign: textAlign);
+      }
+      final summary = _storeSummaryAmount(value).split(' ');
+      return Semantics(
+        container: true,
+        button: true,
+        label: '$orderReference, order total $value. Show exact amount',
+        child: InkWell(
+          key: const Key('work-order-exact-amount-open'),
+          onTap: () => showDialog<void>(
+            context: context,
+            builder: (context) => Dialog(
+              key: const Key('work-order-exact-amount-dialog'),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 24,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: Text(orderReference)),
+                          IconButton(
+                            tooltip: 'Close amount',
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                      const Text('Order total'),
+                      const SizedBox(height: 8),
+                      _StoreMoneyText(
+                        value,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: MoolColors.navy,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          child: ExcludeSemantics(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Wrap(
+                alignment: textAlign == TextAlign.end
+                    ? WrapAlignment.end
+                    : WrapAlignment.start,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 4,
+                children: [
+                  _StoreMoneyText(summary.first, style: style),
+                  Text(
+                    summary.skip(1).join(' '),
+                    style: textStyle.copyWith(fontSize: 12),
+                  ),
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 16,
+                    color: MoolColors.navy,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
     },
   );
 }
@@ -2735,8 +2853,9 @@ class _StorePulseMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const accent = MoolColors.navy;
+    final enlarged = MediaQuery.textScalerOf(context).scale(1) >= 2;
     return Expanded(
-      flex: flex,
+      flex: enlarged ? 1 : flex,
       child: Semantics(
         button: true,
         label: '$label, $contextLabel, $value in store records',
@@ -2749,7 +2868,10 @@ class _StorePulseMetric extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 72),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+              padding: EdgeInsets.symmetric(
+                horizontal: enlarged ? 1 : 4,
+                vertical: 5,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -2767,26 +2889,58 @@ class _StorePulseMetric extends StatelessWidget {
                               child: Tooltip(
                                 key: ValueKey(value),
                                 message: value,
-                                child: Text(
-                                  _storeSummaryAmount(value),
-                                  maxLines: 2,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: accent,
-                                    fontSize:
-                                        _storeSummaryAmount(value) == value &&
-                                            MediaQuery.textScalerOf(
-                                                  context,
-                                                ).scale(1) <=
-                                                1.2
-                                        ? 17
-                                        : 14,
-                                    fontWeight: FontWeight.w800,
-                                    height: 1,
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
-                                  ),
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final summary = _storeSummaryAmount(value);
+                                    final style = TextStyle(
+                                      color: accent,
+                                      fontSize:
+                                          _storeSummaryAmount(value) == value &&
+                                              MediaQuery.textScalerOf(
+                                                    context,
+                                                  ).scale(1) <=
+                                                  1.2
+                                          ? 17
+                                          : 14,
+                                      fontWeight: FontWeight.w800,
+                                      height: 1,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    );
+                                    final parts = RegExp(
+                                      r'^([≈]?₹)(-?[\d,.]+)(?: (.*))?$',
+                                    ).firstMatch(summary);
+                                    var display = summary;
+                                    if (parts != null) {
+                                      final painter = TextPainter(
+                                        text: TextSpan(
+                                          text: '${parts[1]}${parts[2]}',
+                                          style: DefaultTextStyle.of(
+                                            context,
+                                          ).style.merge(style),
+                                        ),
+                                        textDirection: Directionality.of(
+                                          context,
+                                        ),
+                                        textScaler: MediaQuery.textScalerOf(
+                                          context,
+                                        ),
+                                      )..layout();
+                                      if (painter.width >
+                                          constraints.maxWidth) {
+                                        display =
+                                            '${parts[1]}${parts[3] == null ? '' : ' ${parts[3]}'}\n${parts[2]}';
+                                      }
+                                      painter.dispose();
+                                    }
+                                    return Text(
+                                      display,
+                                      maxLines: 2,
+                                      textAlign: TextAlign.center,
+                                      style: style,
+                                    );
+                                  },
                                 ),
                               ),
                             ),
@@ -3126,6 +3280,7 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                       ),
                     ),
                     value: amount,
+                    orderReference: session.currentWorkspaceOrderId ?? 'Order',
                     style: TextStyle(
                       fontSize: compact ? 18 : 24,
                       height: 1.15,
@@ -3451,49 +3606,60 @@ class _StoreOrderDetails extends StatelessWidget {
             order.id &&
         session.hasActiveWorkspaceOrder;
     final awaiting = active && session.workspaceOrderStage == 'Confirmed';
+    final reference = Text(
+      order.id,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: MoolColors.muted,
+      ),
+    );
+    final amount = _StoreOrderAmount(
+      '₹${_formatStoreAmount(order.amount)}',
+      orderReference: order.id,
+      style: const TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.w800,
+        color: MoolColors.navy,
+      ),
+    );
+    final close = IconButton(
+      key: const Key('work-order-details-close'),
+      tooltip: 'Close details',
+      onPressed: onClose,
+      icon: const Icon(Icons.close_rounded, size: 19),
+    );
     return Column(
       key: const Key('work-store-exact-order'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 4, 4, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        order.id,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: MoolColors.muted,
+          child: MediaQuery.textScalerOf(context).scale(1) >= 1.4
+              ? Row(
+                  children: [
+                    Expanded(child: reference),
+                    close,
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            reference,
+                            const SizedBox(height: 4),
+                            amount,
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      _StoreMoneyText(
-                        '₹${_formatStoreAmount(order.amount)}',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: MoolColors.navy,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    close,
+                  ],
                 ),
-              ),
-              IconButton(
-                key: const Key('work-order-details-close'),
-                tooltip: 'Close details',
-                onPressed: onClose,
-                icon: const Icon(Icons.close_rounded, size: 19),
-              ),
-            ],
-          ),
         ),
         const Divider(height: 1),
         Expanded(
@@ -3501,6 +3667,10 @@ class _StoreOrderDetails extends StatelessWidget {
             key: ValueKey('store-detail-${order.id}'),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             children: [
+              if (MediaQuery.textScalerOf(context).scale(1) >= 1.4) ...[
+                amount,
+                const SizedBox(height: 12),
+              ],
               Text(
                 order.customer,
                 style: const TextStyle(
@@ -3654,8 +3824,14 @@ class _PackingActivityCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 5),
-              Text(
-                'Order ₹${_formatStoreAmount(int.tryParse(session.workspaceOrderAmount) ?? 0)}',
+              _StoreMoneyLine(
+                leading: const Text(
+                  'Order total',
+                  style: TextStyle(fontSize: 13, color: MoolColors.muted),
+                ),
+                value:
+                    '₹${_formatStoreAmount(int.tryParse(session.workspaceOrderAmount) ?? 0)}',
+                orderReference: session.currentWorkspaceOrderId ?? 'Order',
                 style: const TextStyle(fontSize: 13, color: MoolColors.muted),
               ),
               const SizedBox(height: 16),

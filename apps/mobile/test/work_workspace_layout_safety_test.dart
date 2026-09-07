@@ -293,14 +293,25 @@ void main() {
           work.workspaceSalesToday = value.$1;
           work.setWorkspaceMoneyPeriod('Today');
           await tester.pumpAndSettle();
+          final expectedDigits = RegExp(r'-?[\d,.]+').firstMatch(value.$2)!;
+          final currency = value.$2.substring(0, expectedDigits.start);
+          final unit = value.$2.substring(expectedDigits.end).trim();
+          final separateUnit =
+              '$currency${unit.isEmpty ? '' : ' $unit'}\n${expectedDigits.group(0)}';
           final amount = find.descendant(
             of: sales,
-            matching: find.text(value.$2),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Text &&
+                  (widget.data == value.$2 || widget.data == separateUnit),
+            ),
           );
           expect(amount, findsOneWidget);
           final paragraph = tester.renderObject<RenderParagraph>(amount);
           expect(paragraph.didExceedMaxLines, isFalse, reason: value.$2);
-          final digits = RegExp(r'-?[\d,]+').firstMatch(value.$2)!;
+          final digits = RegExp(
+            r'-?[\d,.]+',
+          ).firstMatch(tester.widget<Text>(amount).data!)!;
           expect(
             paragraph.getBoxesForSelection(
               TextSelection(baseOffset: digits.start, extentOffset: digits.end),
@@ -912,7 +923,15 @@ void main() {
             findsOneWidget,
           );
           expect(
-            find.descendant(of: target, matching: find.text(metric.$3)),
+            find.descendant(
+              of: target,
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Text &&
+                    (widget.data == metric.$3 ||
+                        widget.data == metric.$3.replaceFirst('₹', '₹\n')),
+              ),
+            ),
             findsOneWidget,
           );
           expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
@@ -5091,6 +5110,261 @@ void main() {
       ..workspaceOrderFulfilment = delivery ? 'Mool delivery' : 'Pickup'
       ..workspaceOrderNeedsDelivery = delivery
       ..workspaceOrderAddress = '12 Market Road, Sardarpura';
+  }
+
+  for (final display in [
+    (412.0, 915.0, 1.0),
+    (320.0, 640.0, 1.4),
+    (320.0, 640.0, 2.0),
+  ]) {
+    testWidgets('S09 pulse column amounts $display', (tester) async {
+      final work = storeViewFixture();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+      );
+      for (final value in [
+        17820,
+        28450,
+        99999,
+        100000,
+        10000000000,
+        100000000000,
+      ]) {
+        final exact = {
+          17820: '₹17,820',
+          28450: '₹28,450',
+          99999: '₹99,999',
+          100000: '₹1,00,000',
+          10000000000: '₹10,00,00,00,000',
+          100000000000: '₹1,00,00,00,00,000',
+        }[value]!;
+        work.workspaceSalesToday = value;
+        work.workspaceSettlementBalance = value;
+        work.workspaceOrders[1] = work.workspaceOrders[1].copyWith(
+          amount: value,
+        );
+        work.setWorkspaceMoneyPeriod('Today');
+        await tester.pumpAndSettle();
+        for (final key in [
+          'work-pulse-sales',
+          'work-pulse-dues',
+          'work-pulse-settlement',
+        ]) {
+          final metric = find.byKey(Key(key));
+          await reveal(tester, metric);
+          final action = switch (key) {
+            'work-pulse-sales' => 'View statement',
+            'work-pulse-dues' => 'Collect dues',
+            _ => 'Settle',
+          };
+          final fullValue = find.byWidgetPredicate(
+            (widget) =>
+                widget is Semantics &&
+                (widget.properties.label?.startsWith('$action,') ?? false) &&
+                (widget.properties.label?.endsWith('$exact in store records') ??
+                    false),
+          );
+          expect(fullValue, findsOneWidget);
+          expect(
+            tester.widget<Semantics>(fullValue).properties.onTap,
+            isNotNull,
+          );
+          final total = find.descendant(
+            of: metric,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Text &&
+                  RegExp(r'^[≈]?₹').hasMatch(widget.data ?? ''),
+            ),
+          );
+          expect(total, findsOneWidget);
+          final paragraph = tester.renderObject<RenderParagraph>(total);
+          final text = tester.widget<Text>(total);
+          final digits = RegExp(r'-?[\d,.]+').firstMatch(text.data!)!;
+          final boxes = paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: digits.start, extentOffset: digits.end),
+          );
+          expect(boxes, hasLength(1), reason: '$key $value ${text.data}');
+          expect(
+            boxes.single.right,
+            lessThanOrEqualTo(paragraph.size.width + .5),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          expect(paragraph.textScaler.scale(1), closeTo(display.$3, .01));
+          expect(text.style!.fontSize, greaterThanOrEqualTo(14));
+          expect(tester.takeException(), isNull);
+        }
+        expect(work.workspaceSalesToday, value);
+        expect(work.workspaceSettlementBalance, value);
+        expect(
+          work.workspaceCustomerBook.fold<int>(
+            0,
+            (sum, customer) => sum + customer.amountDue,
+          ),
+          value,
+        );
+        if (value == 17820) {
+          await captureStoreView(
+            tester,
+            'r665-pulse-columns-${display.$1}-${display.$3}',
+          );
+        }
+      }
+      expect(work.workspaceInvoices, isEmpty);
+    });
+    for (final surface in ['incoming', 'packing', 'details']) {
+      for (final amount in [
+        (264, '₹264'),
+        (10000000000, '₹10,00,00,00,000'),
+        (100000000000, '₹1,00,00,00,00,000'),
+      ]) {
+        testWidgets('S09 central amount $surface ${amount.$1} $display', (
+          tester,
+        ) async {
+          final stage = surface == 'packing' ? 'Preparing' : 'Confirmed';
+          final work = storeViewFixture()
+            ..workspaceOrderStage = stage
+            ..workspaceOrderAmount = '${amount.$1}';
+          work.workspaceOrders[0] = work.workspaceOrders.first.copyWith(
+            amount: amount.$1,
+            stage: stage,
+          );
+          final orders = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
+          final balance = work.workspaceSettlementBalance;
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: Size(display.$1, display.$2),
+            textScale: display.$3,
+          );
+          if (surface == 'details') {
+            final review = find.byKey(const Key('work-activity-order-review'));
+            await reveal(tester, review);
+            expect(review.hitTestable(), findsOneWidget);
+            await tester.tap(review);
+            await tester.pumpAndSettle();
+          }
+          final card = find.byKey(
+            Key(switch (surface) {
+              'incoming' => 'work-activity-incoming-order',
+              'packing' => 'work-activity-packing',
+              _ => 'work-store-exact-order',
+            }),
+          );
+          var total = find.descendant(of: card, matching: find.text(amount.$2));
+          final compact = total.evaluate().isEmpty;
+          if (compact) {
+            final disclosure = find.descendant(
+              of: card,
+              matching: find.byKey(const Key('work-order-exact-amount-open')),
+            );
+            await reveal(tester, disclosure);
+            await Scrollable.ensureVisible(
+              tester.element(disclosure),
+              alignment: .5,
+            );
+            await tester.pumpAndSettle();
+            if (amount.$1 == 10000000000) {
+              await captureStoreView(
+                tester,
+                'r665-central-summary-$surface-${display.$1}-${display.$3}',
+              );
+            }
+            expect(
+              disclosure.hitTestable(),
+              findsOneWidget,
+              reason:
+                  'Amount ${tester.getRect(disclosure)} inside ${tester.getRect(card)}',
+            );
+            expect(tester.getSize(disclosure).height, greaterThanOrEqualTo(48));
+            final summary = find.descendant(
+              of: disclosure,
+              matching: find.text(
+                amount.$1 == 10000000000 ? '₹1,000' : '₹10,000',
+              ),
+            );
+            expectExactMoneyVisible(tester, summary);
+            expect(
+              find.descendant(of: disclosure, matching: find.text('cr')),
+              findsOneWidget,
+            );
+            final semantics = tester.ensureSemantics();
+            try {
+              await tester.pump();
+              final accessible = find.bySemanticsLabel(
+                'APP-1043, order total ${amount.$2}. Show exact amount',
+              );
+              expect(accessible, findsOneWidget);
+              expect(
+                tester
+                    .getSemantics(accessible)
+                    .getSemanticsData()
+                    .hasAction(SemanticsAction.tap),
+                isTrue,
+              );
+            } finally {
+              semantics.dispose();
+            }
+            await tester.tap(disclosure);
+            await tester.pumpAndSettle();
+            final dialog = find.byKey(
+              const Key('work-order-exact-amount-dialog'),
+            );
+            expect(dialog, findsOneWidget);
+            expect(
+              find.descendant(of: dialog, matching: find.text('APP-1043')),
+              findsOneWidget,
+            );
+            total = find.descendant(of: dialog, matching: find.text(amount.$2));
+          }
+          await reveal(tester, total);
+          if (amount.$1 == 10000000000) {
+            await captureStoreView(
+              tester,
+              'r665-central-$surface-${display.$1}-${display.$3}',
+            );
+          }
+          expect(tester.takeException(), isNull);
+          expectExactMoneyVisible(tester, total);
+          final paragraph = tester.renderObject<RenderParagraph>(total);
+          expect(paragraph.textScaler.scale(1), closeTo(display.$3, .01));
+          expect(work.workspaceOrders, orderedEquals(orders));
+          expect(work.currentWorkspaceOrderId, 'APP-1043');
+          expect(work.workspaceOrderStage, stage);
+          expect(work.workspaceOrderAmount, '${amount.$1}');
+          expect(work.workspaceSettlementBalance, balance);
+          expect(work.workspaceInvoices, isEmpty);
+          if (compact) {
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const Key('work-order-exact-amount-dialog')),
+              findsNothing,
+            );
+            expect(card, findsOneWidget);
+            expect(work.currentWorkspaceOrderId, 'APP-1043');
+          }
+          if (surface == 'details') {
+            final close = find.byKey(const Key('work-order-details-close'));
+            await reveal(tester, close);
+            expect(close.hitTestable(), findsOneWidget);
+            await tester.tap(close);
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const Key('work-activity-incoming-order')),
+              findsOneWidget,
+            );
+            expect(work.workspaceOrders, orderedEquals(orders));
+          }
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
   }
 
   for (final display in [
