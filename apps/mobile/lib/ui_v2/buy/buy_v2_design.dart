@@ -16,6 +16,108 @@ final NumberFormat _buyV2Currency = NumberFormat.currency(
 
 String buyV2Money(num value) => _buyV2Currency.format(value);
 
+/// A persistent vertical overflow cue. The list keeps its own controller,
+/// gestures, focus and accessibility scroll actions; the paint intercepts none.
+class BuyV2VerticalScrollIndicator extends StatefulWidget {
+  const BuyV2VerticalScrollIndicator({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<BuyV2VerticalScrollIndicator> createState() =>
+      _BuyV2VerticalScrollIndicatorState();
+}
+
+class _BuyV2VerticalScrollIndicatorState
+    extends State<BuyV2VerticalScrollIndicator> {
+  final _metrics = ValueNotifier<ScrollMetrics?>(null);
+
+  void _update(ScrollMetrics metrics, int depth) {
+    // A nested horizontal product rail must never move the vertical ball.
+    if (depth == 0 && metrics.axis == Axis.vertical) {
+      _metrics.value = metrics.copyWith();
+    }
+  }
+
+  @override
+  void dispose() {
+    _metrics.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      NotificationListener<ScrollMetricsNotification>(
+        onNotification: (notification) {
+          _update(notification.metrics, notification.depth);
+          return false;
+        },
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            _update(notification.metrics, notification.depth);
+            return false;
+          },
+          child: CustomPaint(
+            foregroundPainter: _BuyV2VerticalScrollPainter(_metrics),
+            // An eight-pixel edge gutter keeps the ball off category/card taps.
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: widget.child,
+            ),
+          ),
+        ),
+      );
+}
+
+class _BuyV2VerticalScrollPainter extends CustomPainter {
+  _BuyV2VerticalScrollPainter(this.metrics) : super(repaint: metrics);
+
+  final ValueNotifier<ScrollMetrics?> metrics;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final current = metrics.value;
+    if (current == null ||
+        !size.isFinite ||
+        size.height < 12 ||
+        size.width < 12) {
+      return;
+    }
+    final extent = current.maxScrollExtent - current.minScrollExtent;
+    if (!extent.isFinite || extent <= 0.5 || current.viewportDimension <= 0) {
+      return;
+    }
+    var fraction = ((current.pixels - current.minScrollExtent) / extent).clamp(
+      0.0,
+      1.0,
+    );
+    if (current.axisDirection == AxisDirection.up) fraction = 1 - fraction;
+    final x = size.width - 6;
+    const inset = 6.0;
+    final bottom = size.height - inset;
+    canvas.drawLine(
+      Offset(x, inset),
+      Offset(x, bottom),
+      Paint()
+        ..color = const Color(0xFF8993A2)
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawCircle(
+      Offset(x, inset + (bottom - inset) * fraction),
+      5,
+      Paint()..color = const Color(0xFF1446D9),
+    );
+  }
+
+  @override
+  bool hitTest(Offset position) => false;
+
+  @override
+  bool shouldRepaint(_BuyV2VerticalScrollPainter oldDelegate) =>
+      oldDelegate.metrics != metrics;
+}
+
 /// Layout-only exclusions for the default floating cart, scoped to one surface.
 class BuyV2CartAvoidanceScope extends StatefulWidget {
   const BuyV2CartAvoidanceScope({
@@ -1802,7 +1904,8 @@ class BuyV2PromotionCard extends StatefulWidget {
   );
 
   bool fitsTextWidth(BuildContext context, double cardWidth) {
-    final textWidth = cardWidth - 91;
+    // Match the row's icons/gaps, horizontal padding and both border edges.
+    final textWidth = cardWidth - 93;
     if (textWidth <= 0) return false;
     for (final value in [
       (text: title, style: titleStyle, lines: 3),
