@@ -237,6 +237,7 @@ class _WorkWorkspaceDashboardScreenState
   _WorkspaceOperation _operation = _WorkspaceOperation.orders;
   _WorkspaceControlView _operationReturnView = _WorkspaceControlView.dashboard;
   _WorkspaceOperation? _operationReturnOperation;
+  ({String? workspaceId, String? orderId})? _counterOrderOrigin;
   Timer? _procurementRevealTimer;
   bool _procurementReady = false;
   _WorkspaceOperation? _procurementReturnOperation;
@@ -961,6 +962,7 @@ class _WorkWorkspaceDashboardScreenState
     _searchFocus.unfocus();
     _releaseDirectFilter();
     setState(() {
+      _counterOrderOrigin = null;
       _reviewedOrder = null;
       _view = _WorkspaceControlView.dashboard;
     });
@@ -1067,6 +1069,21 @@ class _WorkWorkspaceDashboardScreenState
     bool retainDirectFilter = false,
   }) {
     _searchFocus.unfocus();
+    final createBillFromOrders =
+        _view == _WorkspaceControlView.operation &&
+        _operation == _WorkspaceOperation.orders &&
+        operation == _WorkspaceOperation.counterOrder;
+    if (createBillFromOrders) {
+      _counterOrderOrigin = (
+        workspaceId: session.activeWorkspace?.id,
+        orderId: session.currentWorkspaceOrderId,
+      );
+      session.prepareWorkspaceOrder(
+        source: 'Counter',
+        fulfilment: 'At the shop',
+      );
+      _saleSearchController.clear();
+    }
     if (operation == _WorkspaceOperation.paidWork) {
       final workspaceId = session.activeWorkspace?.id;
       if (workspaceId == null) return;
@@ -1091,7 +1108,8 @@ class _WorkWorkspaceDashboardScreenState
         _operationReturnView = _WorkspaceControlView.status;
         _operationReturnOperation = null;
       } else if (_view == _WorkspaceControlView.operation &&
-          (_isNestedWorkspaceOperation(operation) ||
+          (createBillFromOrders ||
+              _isNestedWorkspaceOperation(operation) ||
               (operation == _WorkspaceOperation.catalogue &&
                   _operation == _WorkspaceOperation.storeLink))) {
         _operationReturnView = _WorkspaceControlView.operation;
@@ -1218,6 +1236,19 @@ class _WorkWorkspaceDashboardScreenState
     final parent = _operationReturnOperation;
     if (_operationReturnView == _WorkspaceControlView.operation &&
         parent != null) {
+      if (_operation == _WorkspaceOperation.counterOrder &&
+          parent == _WorkspaceOperation.orders) {
+        final origin = _counterOrderOrigin;
+        _counterOrderOrigin = null;
+        if (origin != null &&
+            origin.workspaceId == session.activeWorkspace?.id &&
+            origin.orderId != null &&
+            session.currentWorkspaceOrderId == null &&
+            session.workspaceOrderCustomer.isEmpty &&
+            session.workspaceOrderQuantities.isEmpty) {
+          session.selectWorkspaceOrder(origin.orderId!);
+        }
+      }
       setState(() {
         _operation = parent;
         _operationReturnView = _WorkspaceControlView.dashboard;
@@ -12022,6 +12053,9 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
     final visibleOrders = allOrders
         .where((order) => matches(order, _filter))
         .toList(growable: false);
+    final compactText =
+        MediaQuery.sizeOf(context).width < 360 &&
+        MediaQuery.textScalerOf(context).scale(1) >= 1.4;
     const filterLabels = {
       'Live': 'All',
       'New': 'New',
@@ -12038,34 +12072,46 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Customer orders',
                     style: TextStyle(
                       color: MoolColors.ink,
-                      fontSize: 20,
+                      fontSize: compactText ? 16 : 20,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0F3FF),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '${countFor('Live')} active',
-                    style: const TextStyle(
-                      color: MoolColors.navy,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
+                if (compactText)
+                  IconButton.filled(
+                    key: const Key('work-orders-create'),
+                    tooltip: 'Create bill',
+                    onPressed: widget.onCreateOrder,
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 48,
+                    ),
+                    icon: const Icon(Icons.add_rounded),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F3FF),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '${countFor('Live')} active',
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -12153,18 +12199,19 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                     ),
                   ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                key: const Key('work-orders-create'),
-                onPressed: widget.onCreateOrder,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Create bill'),
+          if (!compactText)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const Key('work-orders-create'),
+                  onPressed: widget.onCreateOrder,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Create bill'),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -12213,52 +12260,50 @@ class _LiveOrderTicket extends StatelessWidget {
       shadowColor: const Color(0x16001B4D),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.all(13),
+        padding: EdgeInsets.symmetric(
+          horizontal:
+              MediaQuery.sizeOf(context).width < 360 &&
+                  MediaQuery.textScalerOf(context).scale(1) >= 2
+              ? 6
+              : 13,
+          vertical: 13,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          stage == 'Confirmed' ? 'Accept within' : stage,
-                          key: Key('work-order-stage-label-${order.id}'),
-                          softWrap: true,
-                          style: const TextStyle(
-                            color: MoolColors.navy,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
+            _StoreMoneyLine(
+              leading: Wrap(
+                spacing: 8,
+                runSpacing: 2,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    stage == 'Confirmed' ? 'Accept within' : stage,
+                    key: Key('work-order-stage-label-${order.id}'),
+                    style: const TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  if (order.actionDeadline case final deadline?)
+                    _LiveCountdownText(
+                      deadline: deadline,
+                      fallback: 'Review',
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
                       ),
-                      if (order.actionDeadline case final deadline?) ...[
-                        const SizedBox(width: 8),
-                        _LiveCountdownText(
-                          deadline: deadline,
-                          fallback: 'Review',
-                          style: const TextStyle(
-                            color: MoolColors.navy,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '₹${_formatStoreAmount(order.amount)}',
-                  style: const TextStyle(
-                    color: MoolColors.navy,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
+                    ),
+                ],
+              ),
+              value: '₹${_formatStoreAmount(order.amount)}',
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+              ),
             ),
             const SizedBox(height: 8),
             Text(

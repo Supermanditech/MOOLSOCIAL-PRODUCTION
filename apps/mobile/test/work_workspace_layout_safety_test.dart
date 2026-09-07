@@ -5093,6 +5093,215 @@ void main() {
       ..workspaceOrderAddress = '12 Market Road, Sardarpura';
   }
 
+  for (final display in [
+    (412.0, 915.0, 1.0),
+    (320.0, 568.0, 1.4),
+    (320.0, 568.0, 2.0),
+  ]) {
+    for (final stage in ['Confirmed', 'Preparing', 'Ready for pickup']) {
+      for (final amount in <(int, String)>[
+        (0, '₹0'),
+        (264, '₹264'),
+        (1000000000, '₹1,00,00,00,000'),
+        (10000000000, '₹10,00,00,00,000'),
+        (100000000000, '₹1,00,00,00,00,000'),
+      ]) {
+        testWidgets('S09 order totals $stage ${amount.$1} $display', (
+          tester,
+        ) async {
+          final work = storeViewFixture()
+            ..workspaceOrderStage = stage
+            ..workspaceOrderAmount = '${amount.$1}';
+          work.workspaceOrders[0] = work.workspaceOrders.first.copyWith(
+            amount: amount.$1,
+            stage: stage,
+          );
+          final original = work.workspaceOrders.first;
+          final otherOrder = work.workspaceOrders.last;
+          final balance = work.workspaceSettlementBalance;
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: Size(display.$1, display.$2),
+            textScale: display.$3,
+          );
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          final ticket = find.ancestor(
+            of: find.byKey(const Key('work-order-stage-label-APP-1043')),
+            matching: find.byKey(const Key('work-live-order-ticket')),
+          );
+          expect(ticket, findsOneWidget);
+          final total = find.descendant(
+            of: ticket,
+            matching: find.text(amount.$2),
+          );
+          await reveal(tester, total);
+          expectExactMoneyVisible(tester, total);
+          final paragraph = tester.renderObject<RenderParagraph>(total);
+          expect(paragraph.textScaler.scale(1), closeTo(display.$3, .01));
+          expect(
+            (paragraph.text as TextSpan).style!.fontSize,
+            greaterThanOrEqualTo(14),
+          );
+          if (amount.$1 == 10000000000) {
+            await captureStoreView(
+              tester,
+              'r665-order-total-${stage.replaceAll(' ', '-')}-${display.$1}-${display.$3}',
+            );
+          }
+          expect(work.workspaceOrders.first, same(original));
+          expect(work.workspaceOrders.last, same(otherOrder));
+          expect(work.workspaceOrderStage, stage);
+          expect(work.workspaceOrderAmount, '${amount.$1}');
+          expect(work.workspaceSettlementBalance, balance);
+          expect(work.workspaceInvoices, isEmpty);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-store-activity-deck')),
+            findsOneWidget,
+          );
+          expect(work.workspaceOrders.first, same(original));
+          expect(work.workspaceOrders.last, same(otherOrder));
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  }
+
+  for (final display in [
+    (412.0, 915.0, 1.0),
+    (320.0, 568.0, 1.4),
+    (320.0, 568.0, 2.0),
+  ]) {
+    testWidgets('S09 order totals compact create action $display', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      final originalOrders = List<WorkspaceOrderRecord>.of(
+        work.workspaceOrders,
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+      );
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      final create = find.byKey(const Key('work-orders-create'));
+      expect(create.hitTestable(), findsOneWidget);
+      expect(tester.getSize(create).width, greaterThanOrEqualTo(48));
+      expect(tester.getSize(create).height, greaterThanOrEqualTo(48));
+      final heading = tester.renderObject<RenderParagraph>(
+        find.text('Customer orders'),
+      );
+      expect(
+        heading.getBoxesForSelection(
+          const TextSelection(baseOffset: 0, extentOffset: 8),
+        ),
+        hasLength(1),
+        reason: 'Customer must not break inside the word',
+      );
+      expect(heading.textScaler.scale(1), closeTo(display.$3, .01));
+      final orderScroll = find.descendant(
+        of: find.byKey(const Key('work-orders-destination')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              widget.axisDirection == AxisDirection.down,
+        ),
+      );
+      expect(tester.getSize(orderScroll).height, greaterThanOrEqualTo(120));
+      await captureStoreView(
+        tester,
+        'r665-order-first-view-${display.$1}-${display.$3}',
+      );
+      await tester.tap(create);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-dashboard-counter-order-screen')),
+        findsOneWidget,
+      );
+      expect(work.currentWorkspaceOrderId, isNull);
+      expect(work.workspaceOrderCustomer, isEmpty);
+      expect(work.workspaceOrderQuantities, isEmpty);
+      expect(work.workspaceOrderSource, 'Counter');
+      expect(work.workspaceOrderFulfilment, 'At the shop');
+      expect(work.workspaceOrders, orderedEquals(originalOrders));
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      expect(work.workspaceOrderCustomer, originalOrders.first.customer);
+      expect(work.workspaceOrderStage, originalOrders.first.stage);
+      expect(work.workspaceOrderPayment, originalOrders.first.payment);
+      expect(work.workspaceOrderAmount, '${originalOrders.first.amount}');
+      expect(work.workspaceOrders, orderedEquals(originalOrders));
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('S09 order totals Create bill draft keep and discard', (
+    tester,
+  ) async {
+    final work = storeViewFixture()..workspaceOrderStage = 'Preparing';
+    work.workspaceOrders[0] = work.workspaceOrders.first.copyWith(
+      stage: 'Preparing',
+    );
+    final originalOrders = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
+    final balance = work.workspaceSettlementBalance;
+    work.setWorkspacePackingLine('summary-0', true);
+    final packed = Set<String>.of(work.workspacePackedProductIds);
+    expect(packed, isNotEmpty);
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(320, 568),
+      textScale: 2,
+    );
+    await tester.tap(find.byKey(const Key('work-store-orders')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-orders-create')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-sale-customer')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('work-order-customer')),
+      '9876543210',
+    );
+    await reveal(tester, find.byKey(const Key('work-sale-customer-confirm')));
+    await tester.tap(find.byKey(const Key('work-sale-customer-confirm')));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-order-discard-dialog')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-order-keep-editing')));
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderCustomer, '9876543210');
+    expect(work.currentWorkspaceOrderId, isNull);
+    expect(work.workspaceOrders, orderedEquals(originalOrders));
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-order-discard')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+    expect(work.currentWorkspaceOrderId, 'APP-1043');
+    expect(work.workspaceOrderCustomer, originalOrders.first.customer);
+    expect(work.workspaceOrderPayment, originalOrders.first.payment);
+    expect(work.workspacePackedProductIds, unorderedEquals(packed));
+    expect(work.workspaceOrders, orderedEquals(originalOrders));
+    expect(work.workspaceSettlementBalance, balance);
+    expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   WorkspaceOrderRecord customerOrder({
     required String id,
     required String customer,
