@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "built_integrity_passed_install_pending",
+  "machineState": "installed_verified_zoom_child_passed_other_journeys_pending",
   "buildAuthorization": "consumed",
   "preBuildValidation": {
     "state": "passed",
@@ -155,11 +155,13 @@
     },
     {
       "id": "oppo-install",
-      "state": "pending"
+      "state": "passed",
+      "evidence": ["artifacts/quality/codex-oppo-r66-7-review-20260908/post-install.json"]
     },
     {
       "id": "oppo-real-user-review",
-      "state": "pending"
+      "state": "partial_zoom_child_passed_other_journeys_pending",
+      "evidence": ["artifacts/quality/codex-oppo-r66-7-review-20260908/device-review.md", "artifacts/quality/codex-oppo-r66-7-review-20260908/ticket-and-screen-coverage.md"]
     },
     {
       "id": "founder-review",

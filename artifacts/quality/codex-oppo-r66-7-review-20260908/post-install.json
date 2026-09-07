@@ -1,6 +1,33 @@
 {
-  "state": "not_built_not_installed",
+  "state": "installed_verified_zoom_child_passed_other_journeys_pending",
   "deviceSerial": "2b3e0f71",
+  "deviceModel": "CPH2375",
   "candidateId": "UAW-CODEX-OPPO-R66.7-REVIEW-20260908",
-  "packageId": "com.moolsocial.app.runtime"
+  "packageId": "com.moolsocial.app.runtime",
+  "sourceHead": "b2adfe02e26740a4364da6ddd9b4f288d1d9acc9",
+  "versionName": "1.0.0-r66.7-runtime",
+  "versionCode": 2026090802,
+  "apkBytes": 209721825,
+  "apkSha256": "E13BBB3AFFF76DDA8168DA5CF25C03CBF98EDA8178E0DBCC2B9FE01D11823749",
+  "installedBaseApkSha256": "E13BBB3AFFF76DDA8168DA5CF25C03CBF98EDA8178E0DBCC2B9FE01D11823749",
+  "installedLastUpdateTime": "2026-09-08T04:15:20+05:30",
+  "installMode": "adb install -r; no data clear or uninstall",
+  "installLog": "artifacts/device/codex-oppo-r66-7-review-20260908/oppo-install-attempt1.log",
+  "installLogSha256": "C4AA470ACAFCF8576C15B0F0B5AE7E852D1EC5413372D0E6A9272E788E1306D3",
+  "fontScale": 1,
+  "nativeCaptureFiles": 68,
+  "nativeCaptureManifestSha256": "01417679035B0F321FA5BC08920358727FE5BC2C32AD03FA755B2DC1E431DCBD",
+  "closedChild": "AUDIT-R666-01: native centred zoom/pan/4x cap/Fit/Close/Replace-cancel/Android Back/attachment retention",
+  "reviewEvidence": "artifacts/quality/codex-oppo-r66-7-review-20260908/device-review.md",
+  "pending": [
+    "approved dashboard native replay",
+    "physical 200% / TalkBack",
+    "PDF content renderer",
+    "BE-01 through BE-05",
+    "consumer/backend collection integration",
+    "founder visual acceptance"
+  ],
+  "laptopShutdown": "not performed; Cursor stopped state not confirmed",
+  "redmi": "untouched",
+  "promotion": "forbidden_non_promotable"
 }
