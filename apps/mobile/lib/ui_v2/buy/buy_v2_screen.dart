@@ -3190,16 +3190,14 @@ class _BuyNotice extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
-                  Icons.check_circle_rounded,
-                  color: BuyV2Colors.green,
+                  Icons.info_outline_rounded,
+                  color: Colors.white,
                   size: 16,
                 ),
                 const SizedBox(width: 7),
                 Flexible(
                   child: Text(
                     message,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 10,

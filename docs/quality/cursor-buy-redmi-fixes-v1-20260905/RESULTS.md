@@ -1636,3 +1636,36 @@ Both native exits are0 and stderr is empty. The retained receipt files contain t
 Final locks, memory and execution-scope gates passed under the unchanged42-owner/4502-registry binding. Exact three-owner staging, coordination pre-commit, atomic commit, nonforce push and remote equality follow. Once sealed, these three children take the current R5 local count from16 to19 of23. Four remain:001-R5-A,022-R5-A,024-R5-A,027-R5-A. A11Y-001 and SCALE-001 also remain required separate frontend enhancements; SCROLL-001 is locally qualified and overlaps029-R5-F.022 remains partial because public Store order/payment wiring is unfinished.
 
 The complete coverage check confirms83 unique UAT identities, exact001–035 originals,9R2,16R4,23R5, all23 current child files and allthree separate enhancement records with no missing source records. No new APK, install, Redmi acceptance, OPPO/WhatsApp interaction, real transaction, shared-owner mutation, integration or ticket closure occurred. All83 still require successor Redmi acceptance. Next coherent purchase-decision repair covers024/027 in the existing payment and benefit components, with full terms and inline recovery, correct total arithmetic and exact Back.
+
+## 024-R5-A / 027-R5-A — readable payment recovery and complete offer decisions — 7 September 2026
+
+Parent checkpoint:2e8ce607f37bb5198b1cbe5036d6a6f01e49ede1. One coherent purchase-decision slice, exactly five already claimed Dart owners plus this results owner; Cursor remains42 owners and the registry remains4502 at its existing SHA. No shared contract/router/native/dependency owner changes.
+
+Payment handoff unavailability now leaves the existing Unavailable primary disabled. The state row measures its message/action needs and moves Cancel below the message when necessary, keeping full words readable at200% text. Cancel, Choose again, Address and Cart retain the same payment attempt identity and preserve the Cart; no order or provider success is invented. Shared live notices use a neutral information icon and display the complete wrapping message, including Saved clear outcomes.
+
+Coupon/payment-offer cards now expose title, detail, sponsor, minimum/saving/expiry terms and selection status in full on the existing page. Select/Remove and the finite status owner use measured label dimensions with at least44px action height. The existing pending/ineligible payment-savings explanation and coupon-only total calculation are unchanged. _BuyDecisionLayout is reused only by these two existing owned decision components; the existing identity-row helper did not cover ordinary-width offer terms or below-message recovery actions. No extra details route or routine confirmation tap is added.
+
+Final source SHA256:
+
+| Owner under apps/mobile | SHA256 |
+|---|---|
+| lib/ui_v2/buy/buy_v2_views.dart | 31DEFDECB8A06CCBE1499991E3CD31B61E6952FB0AFF8148BFAACB889509DA0A |
+| lib/ui_v2/buy/buy_v2_screen.dart | 6F0E9DC432D9FA15012E70C0CEC64288AD160AE344FBD36E70B412FB7C0A06FE |
+| test/ui_v2/buy/buy_v2_screen_test.dart | C1EA35FDA0C3AB403D7911F0F5BC270B72CE9F99EA3D091B78E17DCDE3334912 |
+| test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart | 5D16C8556157B8A027325832BEF6F1A6E6E3F2A3DEADF41F91174679823A0106 |
+| test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart | 75ABB389B7DA1FCCF1A160B2C8B8A1194BA23359365AF951B0886EC53B796867 |
+
+Sixteen new connected user-action cases cover320x844/640x360 at100/200% text with24/34 safe areas: unavailable payment recovery; full coupon/payment-offer decisions, Select/Remove and3200→2900→3200 totals; and Shop/Wholesale Saved clearing with the opposite saved scope and Cart preserved. Existing six-destination/kind offer selection coverage remains intact. Its obsolete fixed150px card assumption now checks full natural paragraph height, viewport fit and real44px hit targets. The two old tests now actually scroll back to selectors and down to the third offer when lazily built.
+
+Immutable evidence archive:C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905. Final verification artifact [R5-024-027-FINAL-BINDING-V1.json](<C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/R5-024-027-FINAL-BINDING-V1.json>) SHA25672C539ED83DFB61C7F8F894971791081224AA48FEA43BC2E71E93DB37E5FFC82 binds every final source, producer receipt/log, actual frame/contact page and final cycle. The independent verifier passed native0 at17:16:32UTC.
+
+- Focused purchase run3:16 passed; dependent focused run2:3 passed; final analyzer2:clean, native0 and empty stderr.
+- Visual run2:16 passed,44 actual Flutter2x PNGs. Personally reviewed all12 contact pages, covering all44 frames. Full decision text, disabled unavailable action, Cancel/Choose again, complete offers/Remove/selection status and wrapping Saved notices are readable through normal scrolling. Both runtime files and the capture test remain byte-identical to that review.
+- Final nine-file connected run2:457 passed/1 inherited skip/0 failures,17:01:07.6901809–17:08:08.8014032UTC; stdout SHA256339E6E288E024BC335B7619CC3579A723D4C8EF43A65F87F7E3EF5E6A149639E.
+- Final identical connected run3:457 passed/1 inherited skip/0 failures,17:09:12.5357608–17:16:06.3612724UTC; stdout SHA2564DA26AC4E85BA4A0E8C1671B7987C6D6B4A193BF45AE722950FEB8430E4B59C2.
+- Both final cycles retain the same two undeclared protected-reference tag warnings from excluded historical R58.8.6/7 captures. The sole executed-file skip is the pre-existing Saved visual capture. No added skip, changed exclusion, warning suppression or test configuration edit.
+- Scope, development-memory, approved UI locks and recorded-role implementation coordination gates passed. Pre-commit/post-commit and exact remote equality are recorded by the subsequent native receipts.
+
+All failures remain retained in REDMI-UAT.md and immutable receipts: baseline repro2 showed11 intended failures and5 passes; fixture corrections preserved seeded opposite Saved IDs and lazy discovery. Early new focused failures exposed upward Back scrolling and stale widget-identity test lookups; these were repaired without suppressing assertions. The malformed visual1 command failed before tests/captures and was corrected in fresh visual2. Connected1 retained455 passes/2 dependent-test failures/1 inherited skip; the two tests were repaired and both final cycles rerun. Incidents202–207 preserve output-loss recovery and the exact diagnostics; no registry rewrite.
+
+Local frontend qualification only. No APK, install, phone action, real payment/order, WhatsApp, OPPO action, backend success, ticket acceptance or closure. Redmi remains r66.4/2026090701/capture463. After this seal the remaining current children are001-R5-A and022-R5-A; accessibility and catalogue pagination remain separate pending enhancements. The founder's five store-discovery scenarios are recorded under022 and SCALE without changing83+3 counts. Status-bar preparation V2 and A11Y-001 shared-owner dependency V1 are retained in the same archive; no new ownership admission or pause is implied.

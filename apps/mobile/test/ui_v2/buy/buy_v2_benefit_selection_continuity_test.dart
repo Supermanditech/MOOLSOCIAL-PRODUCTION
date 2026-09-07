@@ -89,7 +89,20 @@ void main() {
       final select = find.byKey(
         const ValueKey('buy-cart-benefit-select-wholesale-paymentOffer-3'),
       );
+      await tester.scrollUntilVisible(
+        select,
+        180,
+        scrollable: find.descendant(
+          of: find.byKey(
+            const ValueKey('buy-cart-benefits-list-wholesale-paymentOffer'),
+          ),
+          matching: find.byType(Scrollable),
+        ),
+        maxScrolls: 30,
+      );
       await tester.ensureVisible(select);
+      await tester.pumpAndSettle();
+      expect(select.hitTestable(), findsOneWidget);
       await tester.tap(select);
       await tester.pumpAndSettle();
       expect(find.textContaining('Potential saving ₹300'), findsOneWidget);

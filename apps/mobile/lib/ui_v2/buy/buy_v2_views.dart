@@ -6565,9 +6565,7 @@ class BuyV2CheckoutView extends StatelessWidget {
               ? 'Unavailable'
               : 'Pay ${buyV2Money(session.checkoutAmountDueNow)}',
           paymentHandoff == null
-              ? () => session.showNotice(
-                  'Payment is unavailable right now. Try again shortly.',
-                )
+              ? null
               : () => session.continuePayment(paymentHandoff),
         ),
         BuyV2CheckoutSubmissionState.paymentPending ||
@@ -7086,6 +7084,46 @@ class _CheckoutPaymentFact extends StatelessWidget {
   }
 }
 
+class _BuyDecisionLayout extends StatelessWidget {
+  const _BuyDecisionLayout({
+    required this.body,
+    required this.minimumBodyWidth,
+    this.action,
+    this.actionWidth = 0,
+  });
+
+  final Widget body;
+  final Widget? action;
+  final double minimumBodyWidth;
+  final double actionWidth;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final control = action;
+      if (control == null) return body;
+      final target = SizedBox(width: actionWidth, child: control);
+      if (constraints.maxWidth >= minimumBodyWidth + actionWidth + 8) {
+        return Row(
+          children: [
+            Expanded(child: body),
+            const SizedBox(width: 8),
+            target,
+          ],
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          body,
+          const SizedBox(height: 6),
+          Align(alignment: Alignment.centerRight, child: target),
+        ],
+      );
+    },
+  );
+}
+
 class _CheckoutPaymentStateRow extends StatelessWidget {
   const _CheckoutPaymentStateRow({
     required this.session,
@@ -7158,6 +7196,42 @@ class _CheckoutPaymentStateRow extends StatelessWidget {
         state == BuyV2CheckoutSubmissionState.paymentUnknown ||
         state == BuyV2CheckoutSubmissionState.failed ||
         state == BuyV2CheckoutSubmissionState.unavailable;
+    final actionLabel = switch (state) {
+      BuyV2CheckoutSubmissionState.paymentActionRequired => 'Cancel',
+      BuyV2CheckoutSubmissionState.paymentPending => 'Not shown?',
+      _ => null,
+    };
+    final actionStyle = Theme.of(context).textTheme.labelLarge!;
+    final actionWidth = actionLabel == null
+        ? 0.0
+        : (buyV2ValueTextSize(context, actionLabel, actionStyle).width + 32)
+              .clamp(76.0, double.infinity)
+              .toDouble();
+    final minimumTextWidth =
+        [
+          for (final word in content.$2.split(RegExp(r'\s+')))
+            buyV2ValueTextSize(context, word, context.buyBody).width,
+          for (final word in content.$3.split(RegExp(r'\s+')))
+            buyV2ValueTextSize(context, word, context.buyMeta).width,
+        ].fold<double>(
+          0,
+          (width, wordWidth) => wordWidth > width ? wordWidth : width,
+        );
+    final action = actionLabel == null
+        ? null
+        : TextButton(
+            key: ValueKey(
+              state == BuyV2CheckoutSubmissionState.paymentActionRequired
+                  ? 'buy-checkout-cancel-payment'
+                  : 'buy-checkout-payment-not-shown',
+            ),
+            onPressed:
+                state == BuyV2CheckoutSubmissionState.paymentActionRequired
+                ? session.cancelPaymentAttempt
+                : session.markPaymentStatusNeedsChecking,
+            style: TextButton.styleFrom(minimumSize: const Size(76, 44)),
+            child: Text(actionLabel),
+          );
     return Semantics(
       key: ValueKey('buy-checkout-payment-state-${state.name}'),
       container: true,
@@ -7170,40 +7244,32 @@ class _CheckoutPaymentStateRow extends StatelessWidget {
           border: attention ? BuyV2Colors.orange : BuyV2Colors.navy,
           radius: 13,
         ),
-        child: Row(
-          children: [
-            if (state == BuyV2CheckoutSubmissionState.submitting)
-              const SizedBox.square(
-                dimension: 20,
-                child: CircularProgressIndicator(strokeWidth: 2.2),
-              )
-            else
-              Icon(content.$1, color: BuyV2Colors.navy, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(content.$2, style: context.buyBody),
-                  Text(content.$3, style: context.buyMeta),
-                ],
+        child: _BuyDecisionLayout(
+          minimumBodyWidth: minimumTextWidth + 28,
+          action: action,
+          actionWidth: actionWidth,
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (state == BuyV2CheckoutSubmissionState.submitting)
+                const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.2),
+                )
+              else
+                Icon(content.$1, color: BuyV2Colors.navy, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(content.$2, style: context.buyBody),
+                    Text(content.$3, style: context.buyMeta),
+                  ],
+                ),
               ),
-            ),
-            if (state == BuyV2CheckoutSubmissionState.paymentActionRequired)
-              TextButton(
-                key: const ValueKey('buy-checkout-cancel-payment'),
-                onPressed: session.cancelPaymentAttempt,
-                style: TextButton.styleFrom(minimumSize: const Size(62, 44)),
-                child: const Text('Cancel'),
-              ),
-            if (state == BuyV2CheckoutSubmissionState.paymentPending)
-              TextButton(
-                key: const ValueKey('buy-checkout-payment-not-shown'),
-                onPressed: session.markPaymentStatusNeedsChecking,
-                style: TextButton.styleFrom(minimumSize: const Size(76, 44)),
-                child: const Text('Not shown?'),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -16126,6 +16192,17 @@ class _CartBenefitCard extends StatelessWidget {
         benefit.eligiblePaymentMethods.isNotEmpty;
     void activate() => selected ? onRemove() : onSelect();
 
+    final actionLabel = selected ? 'Remove' : 'Select';
+    final actionStyle = TextStyle(
+      color: selected ? BuyV2Colors.muted : BuyV2Colors.navy,
+      fontSize: 9,
+      fontWeight: FontWeight.w900,
+    );
+    final actionSize = buyV2ValueTextSize(context, actionLabel, actionStyle);
+    final actionWidth = (actionSize.width + 24)
+        .clamp(72.0, double.infinity)
+        .toDouble();
+
     return AnimatedContainer(
       key: ValueKey('buy-cart-benefit-${benefit.id}'),
       duration: BuyV2Motion.resolved(context, BuyV2Motion.selection),
@@ -16141,153 +16218,143 @@ class _CartBenefitCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: spec.softAccent,
-                  borderRadius: BorderRadius.circular(11),
+          _BuyDecisionLayout(
+            minimumBodyWidth:
+                280 * MediaQuery.textScalerOf(context).scale(10) / 10,
+            actionWidth: actionWidth,
+            body: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: spec.softAccent,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(
+                    benefit.kind == BuyV2CartBenefitKind.coupon
+                        ? Icons.local_offer_outlined
+                        : Icons.account_balance_wallet_outlined,
+                    color: BuyV2Colors.navy,
+                    size: 20,
+                  ),
                 ),
-                child: Icon(
-                  benefit.kind == BuyV2CartBenefitKind.coupon
-                      ? Icons.local_offer_outlined
-                      : Icons.account_balance_wallet_outlined,
-                  color: BuyV2Colors.navy,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      benefit.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.buyBody.copyWith(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      benefit.detail,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.buyMeta.copyWith(fontSize: 8.5),
-                    ),
-                    if (hasCampaignDetails) ...[
-                      const SizedBox(height: 3),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '${_cartBenefitStrategyLabel(benefit.strategy)} · '
-                        '${_cartBenefitSponsorLabel(benefit)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.buyMeta.copyWith(
-                          color: BuyV2Colors.navy,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                    if (benefit.savingAmount > 0 ||
-                        benefit.freeDelivery ||
-                        benefit.minimumSpend != null ||
-                        benefit.minimumQuantity != null ||
-                        benefit.validUntil != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        [
-                          if (benefit.savingAmount > 0)
-                            benefit.kind == BuyV2CartBenefitKind.paymentOffer
-                                ? 'Potential saving ${buyV2Money(benefit.savingAmount)}'
-                                : 'Save ${buyV2Money(benefit.savingAmount)} now',
-                          if (benefit.freeDelivery) 'Free delivery',
-                          if (benefit.minimumSpend case final minimumSpend?)
-                            'Minimum order ${buyV2Money(minimumSpend)}',
-                          if (benefit.minimumQuantity
-                              case final minimumQuantity?)
-                            'Minimum quantity $minimumQuantity',
-                          if (benefit.validUntil case final validUntil?)
-                            'Ends ${MaterialLocalizations.of(context).formatMediumDate(validUntil)}',
-                        ].join(' · '),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.buyMeta.copyWith(
-                          color: BuyV2Colors.green,
-                          fontSize: 8,
+                        benefit.title,
+                        style: context.buyBody.copyWith(
+                          fontSize: 11,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
+                      const SizedBox(height: 3),
+                      Text(
+                        benefit.detail,
+                        style: context.buyMeta.copyWith(fontSize: 8.5),
+                      ),
+                      if (hasCampaignDetails) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          '${_cartBenefitStrategyLabel(benefit.strategy)} · '
+                          '${_cartBenefitSponsorLabel(benefit)}',
+                          style: context.buyMeta.copyWith(
+                            color: BuyV2Colors.navy,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                      if (benefit.savingAmount > 0 ||
+                          benefit.freeDelivery ||
+                          benefit.minimumSpend != null ||
+                          benefit.minimumQuantity != null ||
+                          benefit.validUntil != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          [
+                            if (benefit.savingAmount > 0)
+                              benefit.kind == BuyV2CartBenefitKind.paymentOffer
+                                  ? 'Potential saving ${buyV2Money(benefit.savingAmount)}'
+                                  : 'Save ${buyV2Money(benefit.savingAmount)} now',
+                            if (benefit.freeDelivery) 'Free delivery',
+                            if (benefit.minimumSpend case final minimumSpend?)
+                              'Minimum order ${buyV2Money(minimumSpend)}',
+                            if (benefit.minimumQuantity
+                                case final minimumQuantity?)
+                              'Minimum quantity $minimumQuantity',
+                            if (benefit.validUntil case final validUntil?)
+                              'Ends ${MaterialLocalizations.of(context).formatMediumDate(validUntil)}',
+                          ].join(' · '),
+                          style: context.buyMeta.copyWith(
+                            color: BuyV2Colors.green,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              SizedBox(
-                width: 72,
-                height: BuyV2Metrics.minimumTap,
-                child: Semantics(
-                  key: ValueKey(
-                    'buy-cart-benefit-'
-                    '${selected ? 'remove' : 'select'}-${benefit.id}',
                   ),
-                  label: '${selected ? 'Remove' : 'Select'} ${benefit.title}',
-                  button: true,
-                  container: true,
-                  excludeSemantics: true,
-                  onTap: activate,
-                  child: Material(
-                    color: Colors.transparent,
+                ),
+              ],
+            ),
+            action: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: (actionSize.height + 16)
+                    .clamp(44.0, double.infinity)
+                    .toDouble(),
+              ),
+              child: Semantics(
+                key: ValueKey(
+                  'buy-cart-benefit-'
+                  '${selected ? 'remove' : 'select'}-${benefit.id}',
+                ),
+                label: '${selected ? 'Remove' : 'Select'} ${benefit.title}',
+                button: true,
+                container: true,
+                excludeSemantics: true,
+                onTap: activate,
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: activate,
                     borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: activate,
-                      borderRadius: BorderRadius.circular(12),
-                      child: AnimatedContainer(
+                    child: AnimatedContainer(
+                      key: ValueKey(
+                        'buy-cart-benefit-action-motion-${benefit.id}',
+                      ),
+                      duration: BuyV2Motion.resolved(
+                        context,
+                        BuyV2Motion.selection,
+                      ),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selected
+                              ? Colors.transparent
+                              : BuyV2Colors.navy.withValues(alpha: .38),
+                        ),
+                      ),
+                      child: BuyV2FiniteIncomingTransition(
                         key: ValueKey(
-                          'buy-cart-benefit-action-motion-${benefit.id}',
+                          'buy-cart-benefit-action-visual-${benefit.id}',
                         ),
-                        duration: BuyV2Motion.resolved(
-                          context,
-                          BuyV2Motion.selection,
-                        ),
-                        curve: Curves.easeOutCubic,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: selected
-                                ? Colors.transparent
-                                : BuyV2Colors.navy.withValues(alpha: .38),
-                          ),
-                        ),
-                        child: BuyV2FiniteIncomingTransition(
-                          key: ValueKey(
-                            'buy-cart-benefit-action-visual-${benefit.id}',
-                          ),
-                          stateKey: selected,
-                          duration: BuyV2Motion.stateChange,
-                          child: Text(
-                            selected ? 'Remove' : 'Select',
-                            style: TextStyle(
-                              color: selected
-                                  ? BuyV2Colors.muted
-                                  : BuyV2Colors.navy,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
+                        stateKey: selected,
+                        duration: BuyV2Motion.stateChange,
+                        child: Text(actionLabel, style: actionStyle),
                       ),
                     ),
                   ),
                 ),
               ),
-            ],
+            ),
           ),
           if (selected && paymentStatus != null) ...[
             const SizedBox(height: 6),
@@ -16300,10 +16367,30 @@ class _CartBenefitCard extends StatelessWidget {
           const SizedBox(height: 5),
           LayoutBuilder(
             builder: (context, constraints) {
+              final statusLabel =
+                  benefit.kind == BuyV2CartBenefitKind.coupon &&
+                      benefit.savingAmount > 0
+                  ? 'Applied to Cart total'
+                  : 'Selected for Checkout review';
+              final statusStyle = context.buyMeta.copyWith(
+                color: BuyV2Colors.green,
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+              );
+              final statusHeight = buyV2ValueTextSize(
+                context,
+                statusLabel,
+                statusStyle,
+                maxWidth: (constraints.maxWidth - 66)
+                    .clamp(1.0, double.infinity)
+                    .toDouble(),
+                maxLines: null,
+              ).height.clamp(20.0, double.infinity).toDouble();
+
               final visual = BuyV2FiniteVisualTransition(
                 key: ValueKey('buy-cart-benefit-status-motion-${benefit.id}'),
                 stateKey: selected,
-                ownerSize: Size(constraints.maxWidth, 20),
+                ownerSize: Size(constraints.maxWidth, statusHeight),
                 alignment: Alignment.centerLeft,
                 child: ExcludeSemantics(
                   child: selected
@@ -16318,19 +16405,7 @@ class _CartBenefitCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Expanded(
-                                child: Text(
-                                  benefit.kind == BuyV2CartBenefitKind.coupon &&
-                                          benefit.savingAmount > 0
-                                      ? 'Applied to Cart total'
-                                      : 'Selected for Checkout review',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.buyMeta.copyWith(
-                                    color: BuyV2Colors.green,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
+                                child: Text(statusLabel, style: statusStyle),
                               ),
                             ],
                           ),
@@ -16340,11 +16415,7 @@ class _CartBenefitCard extends StatelessWidget {
               );
               if (!selected) return ExcludeSemantics(child: visual);
               return Semantics(
-                label:
-                    benefit.kind == BuyV2CartBenefitKind.coupon &&
-                        benefit.savingAmount > 0
-                    ? 'Applied to Cart total'
-                    : 'Selected for Checkout review',
+                label: statusLabel,
                 excludeSemantics: true,
                 child: visual,
               );

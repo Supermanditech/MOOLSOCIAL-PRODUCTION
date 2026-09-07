@@ -601,6 +601,21 @@ void main() {
   testWidgets(
     'device-review offer UI selects and removes all six seeded states',
     (tester) async {
+      Future<void> revealHeader(Finder target) async {
+        await tester.scrollUntilVisible(
+          target,
+          -180,
+          scrollable: find.descendant(
+            of: find.byKey(const ValueKey('buy-cart-benefits-page')),
+            matching: find.byType(Scrollable),
+          ),
+          maxScrolls: 30,
+        );
+        await tester.ensureVisible(target);
+        await tester.pumpAndSettle();
+        expect(target.hitTestable(), findsOneWidget);
+      }
+
       await tester.binding.setSurfaceSize(const Size(320, 700));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final session = BuyV2Session(
@@ -629,21 +644,21 @@ void main() {
         BuyV2Destination.wholesale,
         BuyV2Destination.medicine,
       ]) {
-        await tester.tap(
-          find.byKey(
-            ValueKey('buy-cart-benefit-destination-${destination.name}'),
-          ),
+        final destinationControl = find.byKey(
+          ValueKey('buy-cart-benefit-destination-${destination.name}'),
         );
+        await revealHeader(destinationControl);
+        await tester.tap(destinationControl);
         await tester.pumpAndSettle();
         for (final kind in BuyV2CartBenefitKind.values) {
-          await tester.tap(
-            find.byKey(
-              ValueKey(
-                'buy-cart-benefit-kind-'
-                '${kind == BuyV2CartBenefitKind.coupon ? 'coupon' : 'payment'}',
-              ),
+          final kindControl = find.byKey(
+            ValueKey(
+              'buy-cart-benefit-kind-'
+              '${kind == BuyV2CartBenefitKind.coupon ? 'coupon' : 'payment'}',
             ),
           );
+          await revealHeader(kindControl);
+          await tester.tap(kindControl);
           await tester.pumpAndSettle();
           final benefitId = '${destination.name}-${kind.name}';
           final card = find.byKey(ValueKey('buy-cart-benefit-$benefitId'));
@@ -659,12 +674,37 @@ void main() {
           await tester.ensureVisible(card);
           await tester.pumpAndSettle();
           expect(tester.getTopLeft(card).dy, lessThan(220));
-          expect(tester.getSize(card).height, lessThan(150));
+          final list = find.byKey(
+            ValueKey('buy-cart-benefits-list-${destination.name}-${kind.name}'),
+          );
+          expect(
+            tester.getSize(card).height,
+            lessThan(tester.getSize(list).height),
+          );
+          for (final element
+              in find
+                  .descendant(of: card, matching: find.byType(RichText))
+                  .evaluate()) {
+            final paragraph = element.renderObject! as RenderParagraph;
+            expect(paragraph.didExceedMaxLines, isFalse);
+            final natural = TextPainter(
+              text: paragraph.text,
+              textDirection: paragraph.textDirection,
+              textScaler: paragraph.textScaler,
+            )..layout(maxWidth: paragraph.size.width);
+            expect(
+              paragraph.size.height + .1,
+              greaterThanOrEqualTo(natural.height),
+            );
+            natural.dispose();
+          }
           final select = find.byKey(
             ValueKey('buy-cart-benefit-select-$benefitId'),
           );
           await tester.ensureVisible(select);
           await tester.pumpAndSettle();
+          expect(select.hitTestable(), findsOneWidget);
+          expect(tester.getSize(select).height, greaterThanOrEqualTo(44));
           await tester.tap(select);
           await tester.pumpAndSettle();
           expect(
@@ -676,6 +716,8 @@ void main() {
           );
           await tester.ensureVisible(remove);
           await tester.pumpAndSettle();
+          expect(remove.hitTestable(), findsOneWidget);
+          expect(tester.getSize(remove).height, greaterThanOrEqualTo(44));
           await tester.tap(remove);
           await tester.pumpAndSettle();
           expect(

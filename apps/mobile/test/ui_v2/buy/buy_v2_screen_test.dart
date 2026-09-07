@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
@@ -913,6 +914,414 @@ void main() {
       expect(find.byKey(const ValueKey('buy-open-scanner')), findsNothing);
       expect(tester.takeException(), isNull);
     });
+  }
+
+  Future<void> revealPurchaseTarget(
+    WidgetTester tester,
+    Finder target, {
+    bool towardStart = false,
+  }) async {
+    if (target.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        target,
+        towardStart ? -180 : 180,
+        scrollable: find
+            .byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  (widget.axisDirection == AxisDirection.down ||
+                      widget.axisDirection == AxisDirection.up),
+            )
+            .first,
+        maxScrolls: 30,
+      );
+    }
+    expect(target, findsOneWidget);
+    await Scrollable.ensureVisible(tester.element(target), alignment: .35);
+    await tester.pumpAndSettle();
+    expect(
+      target.hitTestable(),
+      findsOneWidget,
+      reason: 'Purchase target bounds: ${tester.getRect(target)}',
+    );
+  }
+
+  for (final size in [const Size(320, 844), const Size(640, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      final profile = '${size.width.toInt()}x${size.height.toInt()}-$scale';
+      testWidgets('R5 purchase decisions payment recovery $profile', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await tester.pumpWidget(
+          app(
+            session,
+            textScale: scale,
+            safePadding: const EdgeInsets.only(top: 24, bottom: 34),
+            disableAnimations: true,
+          ),
+        );
+        await tester.pumpAndSettle();
+        session.addProduct('s-milk');
+        session.addProduct('w-rice-50kg');
+        session.openCart(scope: BuyV2CartScope.wholesale);
+        expect(session.openCheckout(), isTrue);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('buy-checkout-primary-address')),
+        );
+        await tester.pumpAndSettle();
+        final phonePe = find.byKey(const ValueKey('buy-payment-PhonePe'));
+        await revealPurchaseTarget(tester, phonePe);
+        await tester.tap(phonePe);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('buy-checkout-primary-payment')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+        await tester.tap(
+          find.byKey(const ValueKey('buy-checkout-primary-confirm')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentActionRequired,
+        );
+        final reference = session.paymentReference;
+        final attempt = session.checkoutIdempotencyKey;
+        final state = find.byKey(
+          const ValueKey('buy-checkout-payment-state-paymentActionRequired'),
+        );
+        final heading = find.descendant(
+          of: state,
+          matching: find.text('Payment unavailable right now'),
+        );
+        final explanation = find.descendant(
+          of: state,
+          matching: find.text(
+            'Try again later, or cancel to choose another method.',
+          ),
+        );
+        for (final field in [heading, explanation]) {
+          await revealPurchaseTarget(tester, field);
+          expectReadable(tester, field, wholeWords: true);
+        }
+        await revealPurchaseTarget(tester, heading);
+        await captureReadability(
+          tester,
+          'r5-decision-payment-$profile-heading',
+        );
+        final primary = find.byKey(
+          const ValueKey('buy-checkout-primary-payment'),
+        );
+        expect(tester.widget<FilledButton>(primary).onPressed, isNull);
+        expect(find.byKey(const ValueKey('buy-live-notice')), findsNothing);
+        expect(session.paymentReference, reference);
+        expect(session.checkoutIdempotencyKey, attempt);
+        expect(session.confirmedOrders, isEmpty);
+        final cancel = find.byKey(
+          const ValueKey('buy-checkout-cancel-payment'),
+        );
+        await revealPurchaseTarget(tester, cancel);
+        expectReadable(
+          tester,
+          find.descendant(of: cancel, matching: find.text('Cancel')),
+          action: cancel,
+          wholeWords: true,
+        );
+        await captureReadability(tester, 'r5-decision-payment-$profile-cancel');
+        await tester.tap(cancel);
+        await tester.pumpAndSettle();
+        expect(
+          session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.cancelled,
+        );
+        final cancelled = find.text('Payment cancelled');
+        await revealPurchaseTarget(tester, cancelled);
+        expectReadable(tester, cancelled, wholeWords: true);
+        await captureReadability(
+          tester,
+          'r5-decision-payment-$profile-cancelled',
+        );
+        await tester.tap(primary);
+        await tester.pumpAndSettle();
+        expect(
+          session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.idle,
+        );
+        final back = find.byKey(const ValueKey('buy-checkout-back'));
+        await revealPurchaseTarget(tester, back, towardStart: true);
+        await tester.tap(back);
+        await tester.pumpAndSettle();
+        expect(session.checkoutStep, BuyV2CheckoutStep.address);
+        final cart = find.byKey(const ValueKey('buy-checkout-return-cart'));
+        await revealPurchaseTarget(tester, cart, towardStart: true);
+        await tester.tap(cart);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        expect(session.cartScope, BuyV2CartScope.wholesale);
+        expect(session.scopedCartTotal, 3200);
+        expect(session.quantityFor('w-rice-50kg'), 1);
+        expect(session.quantityFor('s-milk'), 1);
+        expect(session.totalForDestination(BuyV2Destination.shop), 66);
+        expect(session.confirmedOrders, isEmpty);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets(
+        'R5 purchase decisions full benefit terms and totals $profile',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          await tester.pumpWidget(
+            app(
+              session,
+              textScale: scale,
+              safePadding: const EdgeInsets.only(top: 24, bottom: 34),
+              disableAnimations: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          session.addProduct('s-milk');
+          session.addProduct('w-rice-50kg');
+          session.openCart(scope: BuyV2CartScope.wholesale);
+          await tester.pumpAndSettle();
+          expect(session.scopedPayableTotal, 3200);
+          for (final kind in BuyV2CartBenefitKind.values) {
+            final entry = find.byKey(
+              ValueKey(
+                kind == BuyV2CartBenefitKind.coupon
+                    ? 'buy-cart-coupons'
+                    : 'buy-cart-payment-offers',
+              ),
+            );
+            await revealPurchaseTarget(tester, entry);
+            await tester.tap(entry);
+            await tester.pumpAndSettle();
+            final benefit = session
+                .cartBenefits(
+                  kind: kind,
+                  destination: BuyV2Destination.wholesale,
+                )
+                .last;
+            expect(benefit.savingAmount, 300);
+            final card = find.byKey(ValueKey('buy-cart-benefit-${benefit.id}'));
+            await revealPurchaseTarget(tester, card);
+            final fields = find.descendant(
+              of: card,
+              matching: find.byType(Text),
+            );
+            final labels = fields
+                .evaluate()
+                .map((field) => (field.widget as Text).data!)
+                .toList();
+            for (final label in labels) {
+              final target = find.descendant(
+                of: card,
+                matching: find.text(label),
+              );
+              await revealPurchaseTarget(tester, target);
+              expectReadable(tester, target, wholeWords: true);
+            }
+            final title = find.descendant(
+              of: card,
+              matching: find.text(benefit.title),
+            );
+            await revealPurchaseTarget(tester, title);
+            await captureReadability(
+              tester,
+              'r5-decision-${kind.name}-$profile-title',
+            );
+            final select = find.byKey(
+              ValueKey('buy-cart-benefit-select-${benefit.id}'),
+            );
+            await revealPurchaseTarget(tester, select);
+            await captureReadability(
+              tester,
+              'r5-decision-${kind.name}-$profile-terms',
+            );
+            await tester.tap(select);
+            await tester.pumpAndSettle();
+            expect(
+              session
+                  .selectedCartBenefit(
+                    kind: kind,
+                    destination: BuyV2Destination.wholesale,
+                  )
+                  ?.id,
+              benefit.id,
+            );
+            expect(session.scopedPayableTotal, 2900);
+            final remove = find.byKey(
+              ValueKey('buy-cart-benefit-remove-${benefit.id}'),
+            );
+            await revealPurchaseTarget(tester, remove);
+            expectReadable(
+              tester,
+              find.descendant(of: remove, matching: find.text('Remove')),
+              action: remove,
+              wholeWords: true,
+            );
+            final status = find.byKey(
+              ValueKey('buy-cart-benefit-status-motion-${benefit.id}'),
+            );
+            final statusText = find.descendant(
+              of: status,
+              matching: find.byType(Text),
+            );
+            await revealPurchaseTarget(tester, statusText);
+            expectReadable(tester, statusText, wholeWords: true);
+            final statusBounds = tester.getRect(status);
+            final textBounds = tester.getRect(statusText);
+            expect(textBounds.top, greaterThanOrEqualTo(statusBounds.top - .5));
+            expect(
+              textBounds.bottom,
+              lessThanOrEqualTo(statusBounds.bottom + .5),
+            );
+            await captureReadability(
+              tester,
+              'r5-decision-${kind.name}-$profile-selected',
+            );
+            if (kind == BuyV2CartBenefitKind.paymentOffer) {
+              final pending = find.byKey(
+                ValueKey('buy-payment-offer-selection-status-${benefit.id}'),
+              );
+              await revealPurchaseTarget(tester, pending);
+              expectReadable(tester, pending, wholeWords: true);
+              expect(
+                tester.widget<Text>(pending).data,
+                contains('not included'),
+              );
+              await revealPurchaseTarget(tester, remove);
+              await tester.tap(remove);
+              await tester.pumpAndSettle();
+              expect(session.scopedPayableTotal, 2900);
+            }
+            await tester.tap(
+              find.byKey(const ValueKey('buy-cart-benefit-completion')),
+            );
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.cart);
+            expect(session.cartScope, BuyV2CartScope.wholesale);
+            expect(session.scopedPayableTotal, 2900);
+          }
+          final coupons = find.byKey(const ValueKey('buy-cart-coupons'));
+          await revealPurchaseTarget(tester, coupons);
+          await tester.tap(coupons);
+          await tester.pumpAndSettle();
+          final coupon = session.selectedCartBenefit(
+            kind: BuyV2CartBenefitKind.coupon,
+            destination: BuyV2Destination.wholesale,
+          )!;
+          final remove = find.byKey(
+            ValueKey('buy-cart-benefit-remove-${coupon.id}'),
+          );
+          await revealPurchaseTarget(tester, remove);
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.scopedPayableTotal, 3200);
+          expect(session.quantityFor('w-rice-50kg'), 1);
+          expect(session.quantityFor('s-milk'), 1);
+          expect(session.totalForDestination(BuyV2Destination.shop), 66);
+          expect(session.confirmedOrders, isEmpty);
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      for (final destination in [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+      ]) {
+        testWidgets(
+          'R5 purchase decisions complete Saved notice ${destination.name} $profile',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = size;
+            addTearDown(tester.view.reset);
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            await tester.pumpWidget(
+              app(
+                session,
+                textScale: scale,
+                safePadding: const EdgeInsets.only(top: 24, bottom: 34),
+                disableAnimations: true,
+              ),
+            );
+            await tester.pumpAndSettle();
+            session.toggleSaved('s-milk');
+            session.toggleSaved('w-rice-50kg');
+            final other = destination == BuyV2Destination.shop
+                ? BuyV2Destination.wholesale
+                : BuyV2Destination.shop;
+            final otherSavedIds = session
+                .savedProductsFor(other)
+                .map((product) => product.id)
+                .toList(growable: false);
+            session.addProduct('s-milk');
+            session.addProduct('w-rice-50kg');
+            session.openDestination(destination);
+            session.clearNotice();
+            await tester.pumpAndSettle();
+            final saved = find.byKey(
+              const ValueKey('buy-saved-products-button'),
+            );
+            await revealPurchaseTarget(tester, saved);
+            await tester.tap(saved);
+            await tester.pumpAndSettle();
+            final clear = find.byKey(const ValueKey('buy-saved-clear'));
+            await revealPurchaseTarget(tester, clear);
+            await tester.tap(clear);
+            await tester.pumpAndSettle();
+            final confirm = find.byKey(
+              const ValueKey('buy-saved-confirm-clear'),
+            );
+            await revealPurchaseTarget(tester, confirm);
+            await tester.tap(confirm);
+            await tester.pumpAndSettle();
+            expect(session.savedCountFor(destination), 0);
+            expect(
+              session.savedProductsFor(other).map((product) => product.id),
+              otherSavedIds,
+            );
+            final notice = find.byKey(const ValueKey('buy-live-notice'));
+            final message = find.descendant(
+              of: notice,
+              matching: find.text(
+                '${destination.label} Saved products cleared.',
+              ),
+            );
+            expectReadable(tester, message, wholeWords: true);
+            await captureReadability(
+              tester,
+              'r5-decision-notice-${destination.name}-$profile',
+            );
+            expect(session.quantityFor('s-milk'), 1);
+            expect(session.quantityFor('w-rice-50kg'), 1);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
   }
 
   Future<void> completeReviewPayment(
