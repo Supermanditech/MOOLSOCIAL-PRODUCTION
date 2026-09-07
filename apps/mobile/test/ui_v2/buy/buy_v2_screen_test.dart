@@ -251,6 +251,321 @@ void main() {
     );
   }
 
+  for (final owner in ['hint', 'history']) {
+    testWidgets('R5 search 029A enlarged $owner is fully painted', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 780);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      session.submitSearch('tomato');
+      session.updateQuery('');
+      await tester.pumpWidget(app(session, textScale: 2));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const ValueKey('buy-search-field'));
+      final text = owner == 'hint'
+          ? tester.widget<TextField>(field).decoration!.hintText!
+          : 'Recent searches';
+      final paintedText = find.byWidgetPredicate(
+        (widget) => widget is RichText && widget.text.toPlainText() == text,
+      );
+      expect(paintedText, findsOneWidget);
+      final paragraph = tester.renderObject<RenderParagraph>(paintedText);
+      final painter = TextPainter(
+        text: paragraph.text,
+        textDirection: paragraph.textDirection,
+        textScaler: paragraph.textScaler,
+        locale: paragraph.locale,
+        textHeightBehavior: paragraph.textHeightBehavior,
+      )..layout(maxWidth: paragraph.size.width);
+      final requiredHeight = painter.height;
+      painter.dispose();
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(
+        paragraph.size.height + .1,
+        greaterThanOrEqualTo(requiredHeight),
+        reason: '$owner must paint every line at the actual Inter text scale',
+      );
+      final textRect = tester.getRect(paintedText);
+      if (owner == 'history') {
+        expect(
+          textRect.bottom,
+          lessThanOrEqualTo(
+            tester
+                .getRect(find.byKey(const ValueKey('buy-recent-search-0')))
+                .top,
+          ),
+          reason: 'History heading cannot overlap the first search row',
+        );
+      } else {
+        expect(tester.getRect(field).contains(textRect.topLeft), isTrue);
+        expect(
+          tester.getRect(field).bottom,
+          greaterThanOrEqualTo(textRect.bottom),
+        );
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  void expectSearchTextPainted(WidgetTester tester, Finder scope, String text) {
+    final painted = find.descendant(
+      of: scope,
+      matching: find.byWidgetPredicate(
+        (widget) => widget is RichText && widget.text.toPlainText() == text,
+      ),
+    );
+    expect(painted, findsOneWidget);
+    final paragraph = tester.renderObject<RenderParagraph>(painted);
+    final painter = TextPainter(
+      text: paragraph.text,
+      textDirection: paragraph.textDirection,
+      textScaler: paragraph.textScaler,
+      locale: paragraph.locale,
+      textHeightBehavior: paragraph.textHeightBehavior,
+    )..layout(maxWidth: paragraph.size.width);
+    final height = painter.height;
+    painter.dispose();
+    expect(paragraph.didExceedMaxLines, isFalse, reason: text);
+    expect(
+      paragraph.size.height + .1,
+      greaterThanOrEqualTo(height),
+      reason: text,
+    );
+    final bounds = tester.getRect(painted);
+    final owner = tester.getRect(scope);
+    expect(bounds.left + .1, greaterThanOrEqualTo(owner.left), reason: text);
+    expect(bounds.right, lessThanOrEqualTo(owner.right + .1), reason: text);
+    expect(bounds.top + .1, greaterThanOrEqualTo(owner.top), reason: text);
+    expect(bounds.bottom, lessThanOrEqualTo(owner.bottom + .1), reason: text);
+  }
+
+  for (final size in [
+    const Size(320, 780),
+    const Size(360, 800),
+    const Size(430, 932),
+    const Size(640, 360),
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      final label =
+          '${size.width.toInt()}x${size.height.toInt()}-${scale.toInt()}';
+      testWidgets('R5 search 029A keyboard and history actions $label', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetViewInsets);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        session.submitSearch('tomato');
+        session.submitSearch('milk');
+        session.updateQuery('');
+        await tester.pumpWidget(
+          app(
+            session,
+            textScale: scale,
+            safePadding: const EdgeInsets.only(top: 24, bottom: 24),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final control = find.byKey(const ValueKey('buy-search-control'));
+        final field = find.byKey(const ValueKey('buy-search-field'));
+        final history = find.byKey(
+          const ValueKey('buy-search-suggestion-list'),
+        );
+        final finish = find.byKey(const ValueKey('buy-search-close'));
+        final clear = find.byKey(const ValueKey('buy-search-clear'));
+        final recentClear = find.byKey(
+          const ValueKey('buy-recent-searches-clear'),
+        );
+        final firstRecent = find.byKey(const ValueKey('buy-recent-search-0'));
+        final restingText = tester
+            .widget<Text>(
+              find.descendant(of: control, matching: find.byType(Text)),
+            )
+            .data!;
+        expectSearchTextPainted(tester, control, restingText);
+        await captureR66Visual(tester, 'r5-search-$label-closed');
+        await tester.tap(control);
+        await tester.pumpAndSettle();
+        void expectBlankSearch() {
+          expectSearchTextPainted(
+            tester,
+            field,
+            tester.widget<TextField>(field).decoration!.hintText!,
+          );
+          expectSearchTextPainted(tester, history, 'Recent searches');
+          expect(
+            tester.getRect(find.text('Recent searches')).bottom,
+            lessThanOrEqualTo(tester.getRect(firstRecent).top),
+          );
+          for (final action in [finish, recentClear, firstRecent]) {
+            expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
+            expect(tester.getSize(action).width, greaterThanOrEqualTo(44));
+          }
+        }
+
+        expectBlankSearch();
+        await captureR66Visual(tester, 'r5-search-$label-history');
+        final keyboardHeight = size.height < 400 ? 140.0 : 260.0;
+        tester.view.viewInsets = FakeViewPadding(bottom: keyboardHeight);
+        await tester.pumpAndSettle();
+        expectBlankSearch();
+        expect(
+          tester.getRect(field).bottom,
+          lessThanOrEqualTo(size.height - keyboardHeight),
+        );
+        await captureR66Visual(tester, 'r5-search-$label-keyboard-inset');
+        await tester.ensureVisible(firstRecent);
+        await tester.pumpAndSettle();
+        await tester.tap(firstRecent);
+        await tester.pumpAndSettle();
+        expect(session.query, 'milk');
+        if (size.width > size.height) {
+          // The landscape catalogue scrolls its header to give results space.
+          // Bring the same mounted field back before editing the next query.
+          final mountedField = find.byKey(
+            const ValueKey('buy-search-field'),
+            skipOffstage: false,
+          );
+          expect(mountedField, findsOneWidget);
+          await tester.ensureVisible(mountedField);
+          await tester.pumpAndSettle();
+        }
+        expect(tester.widget<TextField>(field).controller!.text, 'milk');
+        await tester.tap(clear);
+        await tester.pumpAndSettle();
+        await tester.tap(recentClear);
+        await tester.pumpAndSettle();
+        expect(session.recentSearchesFor(BuyV2Destination.shop), isEmpty);
+        expect(find.text('Recent searches'), findsNothing);
+        await captureR66Visual(tester, 'r5-search-$label-empty-history');
+        await tester.enterText(field, 'tomato');
+        await tester.pumpAndSettle();
+        expect(session.visibleProducts, isNotEmpty);
+        await tester.tap(finish);
+        tester.view.resetViewInsets();
+        await tester.pumpAndSettle();
+        expect(session.query, 'tomato');
+        expect(
+          session.recentSearchesFor(BuyV2Destination.shop).first,
+          'tomato',
+        );
+        expect(field, findsNothing);
+        await captureR66Visual(tester, 'r5-search-$label-results');
+        await tester.tap(control);
+        await tester.pumpAndSettle();
+        await tester.tap(clear);
+        await tester.pumpAndSettle();
+        await tester.tap(finish);
+        await tester.pumpAndSettle();
+        expect(session.query, isEmpty);
+        expect(session.itemCount, 0);
+        for (final destination in BuyV2Destination.values) {
+          session.openDestination(destination);
+          await tester.pumpAndSettle();
+          final hint = tester
+              .widget<Text>(
+                find.descendant(of: control, matching: find.byType(Text)),
+              )
+              .data!;
+          expectSearchTextPainted(tester, control, hint);
+          await tester.tap(control);
+          await tester.pumpAndSettle();
+          expectSearchTextPainted(
+            tester,
+            field,
+            tester.widget<TextField>(field).decoration!.hintText!,
+          );
+          if (destination != BuyV2Destination.shop) {
+            await captureR66Visual(
+              tester,
+              'r5-search-$label-${destination.name}',
+            );
+          }
+          await tester.tap(finish);
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+        await tester.pumpAndSettle();
+        await tester.tap(control);
+        await tester.pumpAndSettle();
+        expectSearchTextPainted(
+          tester,
+          field,
+          tester.widget<TextField>(field).decoration!.hintText!,
+        );
+        await captureR66Visual(tester, 'r5-search-$label-offers');
+        expect(find.byKey(const ValueKey('buy-open-scanner')), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R5 search submit and Back preserve both carts $scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 780);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final shop = session.visibleProducts.first;
+      expect(session.addProduct(shop.id), isTrue);
+      expect(session.addProduct('w-notebook'), isTrue);
+      final quantities = (
+        session.quantityFor(shop.id),
+        session.quantityFor('w-notebook'),
+      );
+      final totals = (
+        session.totalForDestination(BuyV2Destination.shop),
+        session.totalForDestination(BuyV2Destination.wholesale),
+      );
+      session.clearNotice();
+      session.clearCartAcknowledgement();
+      await tester.pumpWidget(app(session, textScale: scale));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const ValueKey('buy-search-field'));
+      await tester.enterText(field, 'tomato');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      expect(session.query, 'tomato');
+      expect(session.recentSearchesFor(BuyV2Destination.shop).first, 'tomato');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(field, findsNothing);
+      expect(session.query, 'tomato');
+      expect(session.view, BuyV2View.catalogue);
+      expect((
+        session.quantityFor(shop.id),
+        session.quantityFor('w-notebook'),
+      ), quantities);
+      expect((
+        session.totalForDestination(BuyV2Destination.shop),
+        session.totalForDestination(BuyV2Destination.wholesale),
+      ), totals);
+      expect(find.byKey(const ValueKey('buy-open-scanner')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   Future<void> completeReviewPayment(
     WidgetTester tester,
     BuyV2Session session,
@@ -652,8 +967,8 @@ void main() {
       expect(restingSearchDecoration.boxShadow, isNull);
       expect(
         find.byKey(const ValueKey('buy-open-scanner')),
-        findsOneWidget,
-        reason: '${viewport.label} resting scanner owner',
+        findsNothing,
+        reason: '${viewport.label} scanning belongs to a paid collection order',
       );
       await tester.tap(find.byKey(const ValueKey('buy-search-control')));
       await tester.pumpAndSettle();
@@ -892,10 +1207,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           find.byKey(const ValueKey('buy-open-scanner')),
-          destination == BuyV2Destination.orders
-              ? findsNothing
-              : findsOneWidget,
-          reason: '${destination.name} resting scanner owner',
+          findsNothing,
+          reason: '${destination.name} has no generic scanner entry',
         );
         await tester.tap(find.byKey(const ValueKey('buy-search-control')));
         await tester.pumpAndSettle();
@@ -3647,12 +3960,11 @@ void main() {
     expect(find.text('Active'), findsWidgets);
   });
 
-  testWidgets('saved and product-code header actions complete visibly', (
+  testWidgets('saved and typed product-code search complete visibly', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
     var scannerCalls = 0;
-    final scannedProduct = session.visibleProducts.last;
     final savedProduct = session.visibleProducts.first;
     session.toggleSaved(savedProduct.id);
     await tester.pumpWidget(
@@ -3660,7 +3972,7 @@ void main() {
         session,
         scannerLauncher: (_) async {
           scannerCalls += 1;
-          return scannedProduct.id;
+          return savedProduct.id;
         },
       ),
     );
@@ -3675,47 +3987,55 @@ void main() {
 
     session.returnToCatalogue();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('buy-open-scanner')));
+    expect(find.byKey(const ValueKey('buy-open-scanner')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-search-field')),
+      savedProduct.id,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('buy-product-${savedProduct.id}')));
     await tester.pumpAndSettle();
 
-    expect(scannerCalls, 1);
-    expect(session.query, scannedProduct.id);
-    expect(session.selectedProductId, scannedProduct.id);
+    expect(scannerCalls, 0);
+    expect(session.query, savedProduct.id);
+    expect(session.selectedProductId, savedProduct.id);
     expect(session.view, BuyV2View.product);
   });
 
-  testWidgets('scanner shows genuine progress and blocks repeated launch', (
+  testWidgets('R5 search 022A every catalogue retires the generic scanner', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
-    final scannedProduct = session.visibleProducts.first;
-    final result = Completer<String?>();
     var scannerCalls = 0;
     await tester.pumpWidget(
       app(
         session,
-        scannerLauncher: (_) {
+        scannerLauncher: (_) async {
           scannerCalls += 1;
-          return result.future;
+          return null;
         },
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('buy-open-scanner')));
-    await tester.pump();
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(scannerCalls, 1);
-
-    await tester.tap(find.byKey(const ValueKey('buy-open-scanner')));
-    await tester.pump();
-    expect(scannerCalls, 1);
-
-    result.complete(scannedProduct.id);
+    for (final destination in BuyV2Destination.values) {
+      session.openDestination(destination);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-open-scanner')), findsNothing);
+      expect(find.byTooltip('Open camera barcode scanner'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-search-field')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('buy-search-close')));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
     await tester.pumpAndSettle();
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(session.selectedProductId, scannedProduct.id);
-    expect(session.view, BuyV2View.product);
+    expect(find.byKey(const ValueKey('buy-open-scanner')), findsNothing);
+    expect(scannerCalls, 0);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('products save at the grid and appear in the Saved owner', (
@@ -6143,7 +6463,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('buy-search-control')));
     await tester.pumpAndSettle();
-    expect(find.text('Search offers, products and sellers'), findsOneWidget);
+    expect(find.text('Search current offers'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const ValueKey('buy-search-field')),

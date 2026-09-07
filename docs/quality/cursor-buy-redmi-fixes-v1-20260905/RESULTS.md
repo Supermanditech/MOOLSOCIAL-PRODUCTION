@@ -1505,3 +1505,41 @@ Final source/test SHA-256:
 029-R5-C is locally implemented and tested, pending successor Redmi acceptance. This increases local R5 repairs to12 of23 after this slice is sealed; eleven remain pending:001-A,011-A/B,014-A,022-A,024-A,027-A,029-A/B/D/E. 022 remains incomplete until its public Store selection/checkout/payment connection and generic search-scanner retirement are implemented and tested. Authenticated/durable transport, shared saved-state/public-store/auth return and actual paired transaction remain dependencies, recorded in CHILD-022-R5-A and external R5-022-PUBLIC-STORE-CHECKOUT-AUDIT-V1.md (SHA B860A0ABE62057257C2F37A47EC89F79AE12F488776E24580B5A49B5E16FBB72), plus the earlier persistence dependency/implementation plan. Source references in that audit are preparation, not implemented checkout or accepted backend behavior.
 
 Original35 plus9R2 and16R4 retain their prior local status; zero tickets are accepted/closed by this slice. No new APK, install, Redmi/OPPO/WhatsApp action, outbound message, real payment, backend activation or integration. Redmi remains r66.4/2026090701 and capture463. Founder asks to be notified when connection is needed; local repairs and gated candidate preparation come first. SCALE-001/A11Y-001 and all prior founder requirements remain tracked. Atomic9-owner source/test/results commit, mandatory gates, nonforce push and exact remote verification follow under standing manifest authority.
+
+## 029-R5-A search readability and 022-R5-A generic scanner retirement — 7 September 2026
+
+Parent a4a8f867e9b8680fde0f4d438de5b8c1c1484f21 on work/cursor-ui/buy-redmi-fixes-v1-20260905. This mvp_required repair keeps search readable at enlarged text and removes the obsolete general catalogue scanner. The paid-order collection camera and immutable Codex collection contract remain intact. The older injectable scanner constructor remains source-compatible with separately owned capture callers; catalogue search never invokes it. Public Store collection checkout/payment remains pending under 022.
+
+The two original 320dp/200% glyph reproductions failed: the search hint needed 105px inside its 70px control and Recent searches needed 60px inside a fixed 44px heading. Search now measures the existing concise context hint using the actual font, locale, direction and system text scale, falling back to the complete word Search when necessary. The history heading has a minimum 44dp height and grows with its text. No text-scale clamp, smaller touch target or query-length restriction was added. Existing long-query scrolling, keyboard Submit/Finish, clear/history, destination and Cart behavior remain covered.
+
+Twelve new cases cover the two exact reproductions, eight 320/360/430dp portrait and 640dp landscape layouts at 100/200% text, and two keyboard-submit/Android-Back Cart-preservation journeys. Existing product-code search is tested by typing and selecting the exact result; all catalogue destinations and Offers prove the generic camera callback is never invoked. The final focused selection passes 15. Simulated keyboard/safe-area insets are local widget evidence, not a recorded Android keyboard or native system status bar.
+
+Visual provenance: r66-r5-search-visual-2 produced 72 actual Flutter frames with Inter fonts. All 72 are byte-identical by filename and SHA to visual1, whose 18 contact pages were personally inspected, including full-resolution landscape originals. Final binding r66-r5-search-contact-2/binding.json SHA 126681028CEB406FEB4C269505952B7341A6B3FFE142E1C711FD01384BC86A78 binds the three final sources, all frames/pages, successful producer/logs and reviewed-frame equivalence. verify-r5-search-binding-2.ps1 passes again after both connected cycles. Evidence is retained under C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905; PNG originals are in apps/mobile/build/r66-r5-search-visual-2.
+
+Preserved failures: repro1 failed both expected geometry checks; matrix1 exposed the existing landscape header scrolling offstage after selecting a recent query, so the test now reveals that same mounted field before exercising Clear/Finish. No landscape runtime change or weakened glyph check. Connected cycle1 passed 1020, skipped six and failed only the old Offers long-hint expectation; it now expects the concise visible Offers hint while preserving filtering assertions. All failures and read/fixture recoveries remain in REDMI-UAT.md through Incident167. No added skip, exclusion or replacement golden.
+
+Final native evidence (all native0 and empty stderr; immutable result JSON records full arguments and log hashes):
+
+| Command | UTC start–finish | Result / stdout SHA-256 |
+|---|---|---|
+|r66-r5-search-visual-2|12:30:57.6986680–12:31:50.7104821|15 passed;1126bytes FDA9E2EC13341A90F54B145F91A6C67D689B3A48799F54B064CD1ED909591C45|
+|r66-r5-search-analyze-2|12:33:20.9686717–12:33:26.4231289|3 owners, no issues;96bytes 9D88A0B6A14A9B46F747202ADAE4B264E07ECD6B88E119AFD6ABDD5930E04E7A|
+|r66-r5-search-connected-cycle-2|12:33:27.5160491–12:42:57.7993035|1021 passed/6 inherited skips/0 failed;230961bytes A42F89878B9774B8FA6D350EE7BFCFB683CF6C2E5DE09593809EDC8031F9B4BC|
+|r66-r5-search-connected-cycle-3|12:43:28.3592651–12:53:13.2991904|1021 passed/6 inherited skips/0 failed;230961bytes EB8AF79C5755B97EA410EA5F88E9778F6E9BC96A259D4C276CE0F37ECC077FFD|
+|r66-r5-search-binding-3|12:58:46.3539043–12:58:47.4937455|3 sources/72 frames/18 pages and review equivalence;147bytes FB9C9D03ADD67E331EFE41125EE702E179D7034BF5A0D836850A122E0C25BB10|
+|r66-r5-search-final-locks-1|12:58:48.4611240–12:59:15.4258988|approved UI locks pass;52bytes 3E4264965F00119D5F60E86C03C1262B7C17F6B683F112D3DC1C81A8C21BAC68|
+|r66-r5-search-final-memory-1|12:59:30.8281668–12:59:38.7787996|registry4502 unchanged;102bytes 7A1BFA47C07D2D68EB753612CE31488FEE00F5F2DD2C0AB00E82FBAFC6E9C474|
+
+Named final-scope-1 and final-coordination-1 pass at the frozen 42-owner admission. Both final cycles use the identical 26-file affected selection and inherited five named exclusions plus R58.8.[67] capture regex; the six inherited skipped producers remain unchanged. This qualifies the affected local slice, not a new APK or device acceptance.
+
+Final source/test SHA-256:
+
+| Owner | SHA-256 |
+|---|---|
+|apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart|C0C3D9DBFE3BE062AA8FCC159327452054660D8C32918007A756FC7B2D590BF9|
+|apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart|811C4FDF8CDE116D7D8F9B08E92168EB16D0497CF7C3417B1C0F76DC653A9AF4|
+|apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart|7D35AC3584EA68DB82D3696277F309BA6025FD6CE09245ED5C5B8314B351637C|
+
+After this atomic four-owner source/test/results seal, 029-R5-A joins the locally repaired list: 13 of 23 R5 children, with ten remaining (001-A,011-A,011-B,014-A,022-A,024-A,027-A,029-B,029-D,029-E). Full 022 remains pending despite the completed paid-order and generic-scanner subparts. The next coherent repair is 011 delivery progress and Keep/Hide/sound, with read-only preparation in R5-011-DELIVERY-CONTROLS-PREPARATION-V1.md. It records the existing Android SystemSound alert limitation separately from unverified physical phone audio. No delivery repair is claimed by this commit.
+
+Original35 plus9R2 and16R4 retain their prior local status; zero accepted/closed tickets. No new APK, install, phone action, WhatsApp, real transaction, backend activation or Store/shared owner mutation. Redmi remains r66.4/2026090701 and capture463. Notify the founder when local qualification and a gated next candidate make Redmi connection necessary. SCALE-001/A11Y-001 and all prior founder instructions remain tracked. Pre/postcommit gates, nonforce push and exact remote verification follow under the standing manifest authority.

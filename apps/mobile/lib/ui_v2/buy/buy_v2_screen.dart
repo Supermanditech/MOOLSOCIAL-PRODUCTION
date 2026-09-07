@@ -81,6 +81,8 @@ class BuyV2Screen extends StatefulWidget {
   final String? productId;
   final String? orderId;
   final BuyV2RecoveryKind? recoveryKind;
+  // Retained for older capture callers. Catalogue search never launches it;
+  // customer collection uses the camera on its authenticated paid order.
   final BuyV2ScannerLauncher scannerLauncher;
   final BuyV2CollectionCameraBuilder? collectionCameraBuilder;
   final VoidCallback? onExit;
@@ -106,7 +108,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   Timer? _quickTrackerCollapseTimer;
   final _quickTrackerPointers = <int>{};
   int _quickTrackerNavigationSequence = 0;
-  bool _scannerBusy = false;
   bool _searchOpen = false;
   bool _offersActive = false;
   bool _quickTrackerMinimized = true;
@@ -306,30 +307,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       });
     }
     setState(() {});
-  }
-
-  Future<void> _scanProduct() async {
-    if (_scannerBusy) return;
-    setState(() => _scannerBusy = true);
-    try {
-      final scanned = await widget.scannerLauncher(context);
-      if (!mounted || scanned == null || scanned.trim().isEmpty) return;
-
-      final code = scanned.trim();
-      widget.session.updateQuery(code);
-      final matches = widget.session.visibleProducts;
-      if (matches.length == 1) {
-        widget.session.openProduct(matches.single.id);
-      } else if (matches.isEmpty) {
-        widget.session.showNotice(
-          'No product matched that code. Check the code or search by name.',
-        );
-      } else {
-        widget.session.showNotice('${matches.length} matching products found.');
-      }
-    } finally {
-      if (mounted) setState(() => _scannerBusy = false);
-    }
   }
 
   GlobalProfileContextAction _buyProfileContext(BuyV2Session session) {
@@ -578,11 +555,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               open: _searchOpen,
                               onOpenChanged: (value) =>
                                   setState(() => _searchOpen = value),
-                              onScan: _scanProduct,
                               onLocation: () =>
                                   showBuyV2AddressSheet(context, session),
                               onAccount: _openBuyProfile,
-                              scannerBusy: _scannerBusy,
                               trailingAction: keyboardVisible
                                   ? _buildDeliveryControl(session, setState)
                                   : null,
@@ -2125,10 +2100,8 @@ class _BuySearchBand extends StatelessWidget {
     required this.controller,
     required this.open,
     required this.onOpenChanged,
-    required this.onScan,
     required this.onLocation,
     required this.onAccount,
-    required this.scannerBusy,
     this.trailingAction,
   });
 
@@ -2137,10 +2110,8 @@ class _BuySearchBand extends StatelessWidget {
   final TextEditingController controller;
   final bool open;
   final ValueChanged<bool> onOpenChanged;
-  final VoidCallback onScan;
   final VoidCallback onLocation;
   final VoidCallback onAccount;
-  final bool scannerBusy;
   final Widget? trailingAction;
 
   @override
@@ -2161,7 +2132,6 @@ class _BuySearchBand extends StatelessWidget {
             BuyV2Destination.orders => 'Search orders or ID',
             _ => 'Search products',
           };
-    final showScanner = session.destination != BuyV2Destination.orders;
     final longQuery = open && controller.text.trim().length > 38;
     final accessibilityText = MediaQuery.textScalerOf(context).scale(1) >= 1.3;
     final longQueryBandHeight = accessibilityText ? 174.0 : 132.0;
@@ -2193,98 +2163,125 @@ class _BuySearchBand extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: open
-                        ? TextField(
-                            key: const ValueKey('buy-search-field'),
-                            controller: controller,
-                            autofocus: true,
-                            onChanged: session.updateQuery,
-                            textInputAction: TextInputAction.search,
-                            minLines: 1,
-                            maxLines: 6,
-                            textAlignVertical: longQuery
-                                ? TextAlignVertical.top
-                                : TextAlignVertical.center,
-                            style: const TextStyle(
-                              color: BuyV2Colors.ink,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: hint,
-                              hintStyle: const TextStyle(
-                                color: BuyV2Colors.muted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              disabledBorder: InputBorder.none,
-                              errorBorder: InputBorder.none,
-                              focusedErrorBorder: InputBorder.none,
-                              filled: false,
-                              isDense: true,
-                              prefixIcon: const Icon(
-                                Icons.search_rounded,
-                                color: BuyV2Colors.navy,
-                                size: 21,
-                              ),
-                              prefixIconConstraints: const BoxConstraints(
-                                minWidth: 42,
-                                minHeight: 46,
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 10,
-                              ),
-                            ),
-                            onSubmitted: (value) {
-                              session.submitSearch(value);
-                              FocusScope.of(context).unfocus();
-                            },
-                          )
-                        : Semantics(
-                            label: hint,
-                            button: true,
-                            child: InkWell(
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                onOpenChanged(true);
-                              },
-                              borderRadius: BorderRadius.circular(13),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final hintStyle =
+                            (open
+                                    ? Theme.of(context).textTheme.bodyLarge!
+                                    : DefaultTextStyle.of(context).style)
+                                .copyWith(
+                                  fontSize: open ? 12 : 11,
+                                  fontWeight: open
+                                      ? FontWeight.w600
+                                      : FontWeight.w700,
+                                );
+                        final painter = TextPainter(
+                          text: TextSpan(text: compactHint, style: hintStyle),
+                          textDirection: Directionality.of(context),
+                          textScaler: MediaQuery.textScalerOf(context),
+                          locale: Localizations.maybeLocaleOf(context),
+                        )..layout();
+                        final visibleHint =
+                            painter.width <=
+                                constraints.maxWidth - (open ? 42 : 54)
+                            ? compactHint
+                            : 'Search';
+                        painter.dispose();
+                        return open
+                            ? TextField(
+                                key: const ValueKey('buy-search-field'),
+                                controller: controller,
+                                autofocus: true,
+                                onChanged: session.updateQuery,
+                                textInputAction: TextInputAction.search,
+                                minLines: 1,
+                                maxLines: 6,
+                                textAlignVertical: longQuery
+                                    ? TextAlignVertical.top
+                                    : TextAlignVertical.center,
+                                style: const TextStyle(
+                                  color: BuyV2Colors.ink,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
                                 ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.search_rounded,
-                                      color: BuyV2Colors.navy,
-                                      size: 21,
+                                decoration: InputDecoration(
+                                  hintText: visibleHint,
+                                  hintMaxLines: 1,
+                                  hintStyle: const TextStyle(
+                                    color: BuyV2Colors.muted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  disabledBorder: InputBorder.none,
+                                  errorBorder: InputBorder.none,
+                                  focusedErrorBorder: InputBorder.none,
+                                  filled: false,
+                                  isDense: true,
+                                  prefixIcon: const Icon(
+                                    Icons.search_rounded,
+                                    color: BuyV2Colors.navy,
+                                    size: 21,
+                                  ),
+                                  prefixIconConstraints: const BoxConstraints(
+                                    minWidth: 42,
+                                    minHeight: 46,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
+                                ),
+                                onSubmitted: (value) {
+                                  session.submitSearch(value);
+                                  FocusScope.of(context).unfocus();
+                                },
+                              )
+                            : Semantics(
+                                label: hint,
+                                button: true,
+                                child: InkWell(
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    onOpenChanged(true);
+                                  },
+                                  borderRadius: BorderRadius.circular(13),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
                                     ),
-                                    const SizedBox(width: 9),
-                                    Expanded(
-                                      child: Text(
-                                        session.query.isEmpty
-                                            ? compactHint
-                                            : session.query,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: session.query.isEmpty
-                                              ? BuyV2Colors.muted
-                                              : BuyV2Colors.ink,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.search_rounded,
+                                          color: BuyV2Colors.navy,
+                                          size: 21,
                                         ),
-                                      ),
+                                        const SizedBox(width: 9),
+                                        Expanded(
+                                          child: Text(
+                                            session.query.isEmpty
+                                                ? visibleHint
+                                                : session.query,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: session.query.isEmpty
+                                                  ? BuyV2Colors.muted
+                                                  : BuyV2Colors.ink,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ),
+                              );
+                      },
+                    ),
                   ),
                   if (open && controller.text.isNotEmpty)
                     IconButton(
@@ -2298,27 +2295,6 @@ class _BuySearchBand extends StatelessWidget {
                       color: BuyV2Colors.muted,
                       constraints: const BoxConstraints.tightFor(
                         width: 44,
-                        height: 44,
-                      ),
-                      padding: EdgeInsets.zero,
-                    ),
-                  if (showScanner && !open && controller.text.isEmpty)
-                    IconButton(
-                      key: const ValueKey('buy-open-scanner'),
-                      tooltip: scannerBusy
-                          ? 'Opening camera scanner'
-                          : 'Open camera barcode scanner',
-                      onPressed: scannerBusy ? null : onScan,
-                      icon: scannerBusy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.qr_code_scanner_rounded, size: 20),
-                      color: BuyV2Colors.navy,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 40,
                         height: 44,
                       ),
                       padding: EdgeInsets.zero,

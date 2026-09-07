@@ -1341,8 +1341,8 @@ class _SearchReadyState extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
         children: [
           if (recentSearches.isNotEmpty)
-            SizedBox(
-              height: 44,
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
               child: Row(
                 children: [
                   const Icon(
