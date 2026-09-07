@@ -41,6 +41,8 @@ class StoreCollectionController extends ChangeNotifier {
   ScanPickRequest? _uncertainMutation;
   String? _readinessRevision;
   final Stopwatch _elapsed = Stopwatch();
+  Timer? _matchExpiryTimer;
+  bool _matchExpired = false;
   Duration _responseAllowance = Duration.zero;
   bool busy = false;
   bool _closed = false;
@@ -48,6 +50,8 @@ class StoreCollectionController extends ChangeNotifier {
   ScanPickSnapshot? get snapshot => _result?.snapshot;
   bool get needsReconciliation => _uncertainMutation != null;
   bool get confirmingReadiness => _readinessRevision != null;
+  bool get confirmingHandover =>
+      _uncertainMutation?.operation == ScanPickOperation.handOver;
   DateTime? get serverNow =>
       snapshot?.serverTime.add(_responseAllowance + _elapsed.elapsed);
 
@@ -61,6 +65,7 @@ class StoreCollectionController extends ChangeNotifier {
 
   bool get hasCurrentMatch =>
       !_closed &&
+      !_matchExpired &&
       message == null &&
       !needsReconciliation &&
       _request != null &&
@@ -216,6 +221,22 @@ class StoreCollectionController extends ChangeNotifier {
       _elapsed
         ..reset()
         ..start();
+      _matchExpiryTimer?.cancel();
+      _matchExpired = false;
+      final expiry = result.snapshot?.approval?.expiresAt;
+      if (expiry != null) {
+        final remaining = expiry.difference(serverNow!);
+        _matchExpired = remaining <= Duration.zero;
+        if (!_matchExpired) {
+          // Expiry can only remove the confirmed presentation/action. It never
+          // advances an order, creates authority or performs a server mutation.
+          _matchExpiryTimer = Timer(remaining, () {
+            if (_closed) return;
+            _matchExpired = true;
+            notifyListeners();
+          });
+        }
+      }
       if (result.outcome == ScanPickOutcome.unknown ||
           (confirmingReadiness &&
               result.outcome == ScanPickOutcome.snapshot &&
@@ -231,8 +252,10 @@ class StoreCollectionController extends ChangeNotifier {
                 ScanPickError.operationConflict,
               }.contains(result.error))) {
         message = confirmingReadiness
-            ? 'Confirming readiness. The collection code is not available yet.'
-            : 'Confirming the latest update. Do not hand over yet.';
+            ? 'Checking your update. Do not hand over yet.'
+            : confirmingHandover
+            ? 'Confirming collection…'
+            : 'Checking your update. Do not hand over yet.';
       } else {
         _uncertainMutation = null;
         _readinessRevision = null;
@@ -240,25 +263,28 @@ class StoreCollectionController extends ChangeNotifier {
             result.error != ScanPickError.alreadyCollected) {
           message = switch (result.error) {
             ScanPickError.paymentRequired || ScanPickError.paymentChanged =>
-              'Payment needs checking. Do not hand over yet.',
-            ScanPickError.notReady => 'Finish packing before collection.',
+              'Payment needs confirmation before handover.',
+            ScanPickError.notReady =>
+              'Finish packing before marking the order ready.',
             ScanPickError.challengeExpired || ScanPickError.approvalExpired =>
-              'Please ask the customer to scan the current code.',
+              'Ask the customer to scan the current code.',
             ScanPickError.cancelled =>
-              'This order was cancelled. Do not hand over.',
+              'This order is cancelled. Do not hand over.',
             ScanPickError.forbidden || ScanPickError.unauthenticated =>
-              'Sign in with an authorised store account to continue.',
-            _ => 'The order has changed. Refresh before continuing.',
+              'Sign in with an authorised store account.',
+            _ => 'This order has changed. Check the latest details.',
           };
         }
       }
     } catch (_) {
       if (!_closed) {
         message = confirmingReadiness
-            ? 'Confirming readiness. The collection code is not available yet.'
+            ? 'Checking your update. Do not hand over yet.'
+            : confirmingHandover
+            ? 'Confirming collection…'
             : needsReconciliation
-            ? 'Confirming the latest update. Do not hand over yet.'
-            : 'Unable to refresh this order. Try again before handing over.';
+            ? 'Checking your update. Do not hand over yet.'
+            : 'Unable to load this order. Try again.';
       }
     } finally {
       if (!_closed) {
@@ -271,6 +297,7 @@ class StoreCollectionController extends ChangeNotifier {
   @override
   void dispose() {
     _closed = true;
+    _matchExpiryTimer?.cancel();
     _elapsed.stop();
     super.dispose();
   }
@@ -334,6 +361,28 @@ class WorkSession extends ChangeNotifier {
           _collection?.storeId == (activeWorkspace?.id ?? workspaceId)
       ? _collection
       : null;
+
+  /// A retained display string cannot prove current customer authorisation.
+  /// Keep operational/wire state intact; derive the visible label using the
+  /// same scoped, current authority that protects the central Hand Over action.
+  String workspaceOrderStageLabel(WorkspaceOrderRecord order) {
+    if (!order.isCustomerCollection) return order.stage;
+    if ({'Matched', 'Customer confirmed'}.contains(order.stage)) {
+      final current = currentCollection;
+      return current?.orderId == order.id &&
+              current?.storeId == order.collectionStoreId &&
+              current?.hasCurrentMatch == true
+          ? 'Customer confirmed'
+          : 'Checking order';
+    }
+    return order.stage == 'Awaiting customer'
+        ? 'Waiting for customer'
+        : order.stage;
+  }
+
+  String get currentWorkspaceOrderStageLabel => currentWorkspaceOrder == null
+      ? workspaceOrderStage
+      : workspaceOrderStageLabel(currentWorkspaceOrder!);
 
   /// Called by the future authenticated order adapter, never by a QR decoder.
   void attachCollection(StoreCollectionController controller) {

@@ -3731,7 +3731,12 @@ class _StoreOrderDetails extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              _detail('Status', awaiting ? 'Awaiting acceptance' : order.stage),
+              _detail(
+                'Status',
+                awaiting
+                    ? 'Awaiting acceptance'
+                    : session.workspaceOrderStageLabel(order),
+              ),
               _detail(
                 'Placed through',
                 order.source == 'App' ? 'MoolSocial' : order.source,
@@ -7080,7 +7085,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${order.id} · ${order.payment}\n${order.stage}',
+                                  '${order.id} · ${order.payment}\n${session.workspaceOrderStageLabel(order)}',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     height: 1.4,
@@ -12549,7 +12554,7 @@ class _LiveOrderTicket extends StatelessWidget {
           children: [
             if (order.isCustomerCollection)
               Text(
-                '${order.id} · $stage',
+                '${order.id} · ${session.workspaceOrderStageLabel(order)}',
                 key: Key('work-order-stage-label-${order.id}'),
                 style: const TextStyle(
                   fontSize: 12,
@@ -13185,7 +13190,7 @@ class _CustomersDestinationSurfaceState
                             ),
                           ),
                           Text(
-                            '${order.payment} · ${order.stage} · ${order.createdAt.day}/${order.createdAt.month}/${order.createdAt.year}',
+                            '${order.payment} · ${widget.session.workspaceOrderStageLabel(order)} · ${order.createdAt.day}/${order.createdAt.month}/${order.createdAt.year}',
                             style: const TextStyle(
                               color: MoolColors.muted,
                               fontSize: 9.5,
@@ -13957,7 +13962,7 @@ class _LegacyCustomersDestinationSurface extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${order.items} · ${order.payment} · ${order.stage}',
+                            '${order.items} · ${order.payment} · ${session.workspaceOrderStageLabel(order)}',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -14310,7 +14315,7 @@ class _MoneyDestinationSurface extends StatelessWidget {
                   ),
                 ),
                 subtitle: Text(
-                  '${order.customer} · ${order.payment} · ${order.stage} · ${order.createdAt.day}/${order.createdAt.month}',
+                  '${order.customer} · ${order.payment} · ${session.workspaceOrderStageLabel(order)} · ${order.createdAt.day}/${order.createdAt.month}',
                   style: const TextStyle(color: MoolColors.muted),
                 ),
               ),
@@ -16467,7 +16472,7 @@ class _WorkspaceDeliverySurface extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  session.workspaceOrderStage.toUpperCase(),
+                  session.currentWorkspaceOrderStageLabel.toUpperCase(),
                   style: const TextStyle(
                     color: Color(0xFF08765D),
                     fontSize: 9,
@@ -18133,14 +18138,14 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
   }
   if (session.workspaceOrderCustomer.isNotEmpty &&
       matches(
-        '${session.workspaceOrderCustomer} ${session.workspaceOrderSource} ${session.workspaceOrderItems} ${session.workspaceOrderAmount} ${session.workspaceOrderStage}',
+        '${session.workspaceOrderCustomer} ${session.workspaceOrderSource} ${session.workspaceOrderItems} ${session.workspaceOrderAmount} ${session.currentWorkspaceOrderStageLabel}',
       )) {
     records.add((
       id: 'order-current',
       title:
           '${session.workspaceOrderSource} order · ${session.workspaceOrderCustomer}',
       detail:
-          '${session.workspaceOrderStage} · ₹${session.workspaceOrderAmount} · ${session.workspaceOrderItems}',
+          '${session.currentWorkspaceOrderStageLabel} · ₹${session.workspaceOrderAmount} · ${session.workspaceOrderItems}',
       amount: null,
       route: '/app/retailer/orders',
       icon: Icons.receipt_long_outlined,

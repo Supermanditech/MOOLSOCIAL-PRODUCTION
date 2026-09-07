@@ -131,28 +131,30 @@ class _WorkCollectionLiveCardState extends State<WorkCollectionLiveCard>
     final showQr = payload != null && renderer != null;
     final title = collected
         ? 'Collected'
+        : controller?.confirmingHandover == true
+        ? 'Confirming collection…'
         : matched
         ? 'Customer confirmed'
         : switch (state) {
-            ScanPickState.preparing => 'Pack the items',
+            ScanPickState.preparing => 'Pack order',
             ScanPickState.cancelled => 'Order cancelled',
             ScanPickState.ready ||
-            ScanPickState.awaitingCustomer => 'Ready at the counter',
-            _ => 'Checking collection',
+            ScanPickState.awaitingCustomer => 'Ready for collection',
+            _ => 'Checking order…',
           };
     final message =
         controller?.message ??
         (controller == null
-            ? 'Collection confirmation is unavailable. Do not hand over yet.'
+            ? 'Unable to load this order. Try again.'
             : value == null
-            ? 'Checking this order…'
+            ? 'Checking order…'
             : state == ScanPickState.preparing &&
                   controller.readinessGateway == null
-            ? 'Readiness confirmation is unavailable. Please try again later.'
+            ? 'Unable to confirm the order is ready. Try again.'
             : renderer == null &&
                   (state == ScanPickState.ready ||
                       state == ScanPickState.awaitingCustomer)
-            ? 'Collection code is unavailable. Do not hand over yet.'
+            ? 'Unable to show the collection code. Do not hand over yet.'
             : null);
     return Column(
       key: const Key('work-collection-live-card'),
@@ -414,17 +416,19 @@ class _WorkCollectionLiveCardState extends State<WorkCollectionLiveCard>
                 ],
                 if (collected && value?.receipt != null) ...[
                   const SizedBox(height: 12),
-                  const Text(
-                    'Collection confirmed',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: _blue,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
                   if (value!.receipt!.invoiceReference != null)
                     Text(
                       'Invoice ${value.receipt!.invoiceReference}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: MoolColors.muted,
+                      ),
+                    )
+                  else
+                    Text(
+                      MaterialLocalizations.of(
+                        context,
+                      ).formatFullDate(value.receipt!.collectedAt.toLocal()),
                       style: const TextStyle(
                         fontSize: 12,
                         color: MoolColors.muted,
@@ -484,7 +488,7 @@ class _WorkCollectionLiveCardState extends State<WorkCollectionLiveCard>
                         : null,
                     child: Text(
                       controller.confirmingReadiness
-                          ? 'Updating…'
+                          ? 'Updating'
                           : 'Order ready',
                     ),
                   )
@@ -513,7 +517,7 @@ class _WorkCollectionLiveCardState extends State<WorkCollectionLiveCard>
                         : null,
                     child: Text(
                       controller?.actionPending == true
-                          ? 'Confirming…'
+                          ? 'Updating'
                           : matched
                           ? 'Hand Over'
                           : 'Waiting for customer',
@@ -533,13 +537,57 @@ class _WorkCollectionLiveCardState extends State<WorkCollectionLiveCard>
                     ),
                   ),
                 const SizedBox(height: 6),
-                Text(
-                  matched
-                      ? 'Give the goods, then tap Hand Over. Payout remains pending until collection is confirmed.'
-                      : state == ScanPickState.preparing
-                      ? 'Pack all items and bring them to the counter before tapping Order ready.'
-                      : 'Hand over only after Customer confirmed.',
-                  style: const TextStyle(fontSize: 11, color: MoolColors.muted),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    const preparingCopy =
+                        'Pack every item and bring the order to the counter.';
+                    const readyPendingCopy =
+                        'Checking your update. Do not hand over yet.';
+                    const authorisedCopy =
+                        'Tap Hand Over after giving the items to the customer. Payout remains pending until collection is confirmed.';
+                    const handoverPendingCopy =
+                        'Please wait for collection confirmation.';
+                    final copy = controller?.confirmingHandover == true
+                        ? handoverPendingCopy
+                        : controller?.confirmingReadiness == true
+                        ? readyPendingCopy
+                        : matched
+                        ? authorisedCopy
+                        : state == ScanPickState.preparing
+                        ? preparingCopy
+                        : 'Hand over only after Customer confirmed.';
+                    const style = TextStyle(
+                      fontSize: 11,
+                      color: MoolColors.muted,
+                    );
+                    final variants = state == ScanPickState.preparing
+                        ? [preparingCopy, readyPendingCopy]
+                        : matched || controller?.confirmingHandover == true
+                        ? [authorisedCopy, handoverPendingCopy]
+                        : [copy];
+                    double height = 0;
+                    for (final variant in variants) {
+                      final painter = TextPainter(
+                        text: TextSpan(
+                          text: variant,
+                          style: DefaultTextStyle.of(
+                            context,
+                          ).style.merge(style),
+                        ),
+                        textDirection: Directionality.of(context),
+                        textScaler: MediaQuery.textScalerOf(context),
+                        locale: Localizations.localeOf(context),
+                      )..layout(maxWidth: constraints.maxWidth);
+                      if (painter.height > height) height = painter.height;
+                      painter.dispose();
+                    }
+                    // Reserve both messages at the actual width/text scale so an
+                    // acknowledged tap cannot move the action under the finger.
+                    return SizedBox(
+                      height: height,
+                      child: Text(copy, style: style),
+                    );
+                  },
                 ),
               ],
             ),

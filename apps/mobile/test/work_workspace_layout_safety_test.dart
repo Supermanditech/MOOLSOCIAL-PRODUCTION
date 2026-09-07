@@ -471,6 +471,38 @@ void main() {
   }
 
   group('Store collection controller', () {
+    test('summary copy needs current scoped customer authorisation', () async {
+      final gate = _CollectionFixtureGateway()..state = ScanPickState.matched;
+      final work = collectionStore(gate);
+      addTearDown(work.dispose);
+      await work.currentCollection!.refresh();
+      final order = work.currentWorkspaceOrder!;
+      expect(work.workspaceOrderStageLabel(order), 'Customer confirmed');
+      expect(
+        work.workspaceOrderStageLabel(order.copyWith(stage: 'Matched')),
+        'Customer confirmed',
+      );
+      final biker = work.workspaceOrders.firstWhere(
+        (o) => !o.isCustomerCollection,
+      );
+      expect(work.workspaceOrderStageLabel(biker), biker.stage);
+      gate.expired = true;
+      await work.currentCollection!.refresh();
+      expect(work.workspaceOrderStageLabel(order), 'Checking order');
+      expect(work.currentWorkspaceOrderStageLabel, 'Checking order');
+      expect(work.currentCollection!.canHandOver, isFalse);
+      gate
+        ..expired = false
+        ..error = ScanPickError.revisionConflict;
+      await work.currentCollection!.refresh();
+      expect(work.workspaceOrderStageLabel(order), 'Checking order');
+      gate.error = null;
+      await work.currentCollection!.refresh();
+      expect(work.selectWorkspaceOrder(biker.id), isTrue);
+      expect(work.workspaceOrderStageLabel(order), 'Checking order');
+      expect(work.currentWorkspaceOrderStageLabel, biker.stage);
+    });
+
     test(
       'Order ready cannot be submitted for unpaid or terminal orders',
       () async {
@@ -925,7 +957,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(gate.readyRequests, isEmpty);
       expect(find.byKey(const Key('work-collection-qr')), findsNothing);
-      expect(find.text('Pack the items'), findsOneWidget);
+      expect(find.text('Pack order'), findsOneWidget);
       expect(find.text('Order ready'), findsOneWidget);
       expect(find.text('Goods ready'), findsNothing);
       await captureStoreView(
@@ -958,7 +990,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(gate.readyRequests, hasLength(1));
       expect(tester.widget<FilledButton>(action).onPressed, isNull);
-      expect(find.text('Updating…'), findsOneWidget);
+      expect(find.text('Updating'), findsOneWidget);
+      expect(
+        find.text('Checking your update. Do not hand over yet.'),
+        findsOneWidget,
+      );
       final pendingRect = tester.getRect(action);
       expect(pendingRect.height, lessThanOrEqualTo(readyRect.height));
       expect(pendingRect.top, greaterThanOrEqualTo(readyRect.top));
@@ -993,117 +1029,144 @@ void main() {
       ScanPickState.awaitingCustomer,
       ScanPickState.matched,
       ScanPickState.collected,
+      ScanPickState.cancelled,
     ]) {
-      testWidgets(
-        'Store collection actual dashboard ${state.name} ${display.scale}',
-        (tester) async {
-          final gate = _CollectionFixtureGateway()..state = state;
-          final work = collectionStore(gate);
-          await mount(
-            tester,
-            route: '/app/work/workspace/dashboard',
-            work: work,
-            viewport: Size(display.width, display.height),
-            textScale: display.scale,
-            wrapper: (child) => WorkCollectionCodeRenderer(
-              render: (_, payload) {
-                expect(payload, _collectionFixtureToken);
-                return const CustomPaint(painter: _CollectionQrFixture());
-              },
-              child: child,
-            ),
+      testWidgets('Store collection actual dashboard ${state.name} ${display.scale}', (
+        tester,
+      ) async {
+        final gate = _CollectionFixtureGateway()..state = state;
+        final work = collectionStore(gate);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+          wrapper: (child) => WorkCollectionCodeRenderer(
+            render: (_, payload) {
+              expect(payload, _collectionFixtureToken);
+              return const CustomPaint(painter: _CollectionQrFixture());
+            },
+            child: child,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-collection-live-card')),
+          findsOneWidget,
+        );
+        expect(find.text('Collect at store'), findsOneWidget);
+        expect(find.text('Rakesh Sharma'), findsOneWidget);
+        expect(find.byKey(const Key('work-pickup-code')), findsNothing);
+        final renderedCopy = tester
+            .widgetList<Text>(
+              find.descendant(
+                of: find.byKey(const Key('work-collection-live-card')),
+                matching: find.byType(Text),
+              ),
+            )
+            .map((text) => text.data ?? text.textSpan?.toPlainText() ?? '')
+            .join('\n');
+        expect(
+          RegExp(
+            r'\b(goods|matched|readiness|reconciliation)\b',
+            caseSensitive: false,
+          ).hasMatch(renderedCopy),
+          isFalse,
+          reason:
+              'Collection copy must address the retailer, not expose internal states',
+        );
+        expect(find.text('Collection confirmed'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await captureStoreView(
+          tester,
+          'collection-${state.name}-${display.width.toInt()}-${display.scale}',
+        );
+        if (state == ScanPickState.awaitingCustomer) {
+          final qr = find.byKey(const Key('work-collection-qr'));
+          final instruction = find.byKey(
+            const Key('work-collection-scan-instruction'),
           );
+          if (display.scale == 1) {
+            final viewport = tester.getRect(
+              find.byKey(const Key('work-collection-content')),
+            );
+            expect(viewport.contains(tester.getRect(qr).bottomRight), isTrue);
+            expect(
+              viewport.contains(tester.getRect(instruction).topLeft),
+              isTrue,
+            );
+          }
+          await tester.ensureVisible(qr);
           await tester.pumpAndSettle();
-          expect(
-            find.byKey(const Key('work-collection-live-card')),
-            findsOneWidget,
-          );
-          expect(find.text('Collect at store'), findsOneWidget);
-          expect(find.text('Rakesh Sharma'), findsOneWidget);
-          expect(find.byKey(const Key('work-pickup-code')), findsNothing);
-          expect(tester.takeException(), isNull);
+          expect(tester.getSize(qr).shortestSide, greaterThanOrEqualTo(150));
+          expect(work.currentCollection!.canHandOver, isFalse);
           await captureStoreView(
             tester,
-            'collection-${state.name}-${display.width.toInt()}-${display.scale}',
+            'collection-code-visible-${display.width.toInt()}-${display.scale}',
           );
-          if (state == ScanPickState.awaitingCustomer) {
-            final qr = find.byKey(const Key('work-collection-qr'));
-            final instruction = find.byKey(
-              const Key('work-collection-scan-instruction'),
-            );
-            if (display.scale == 1) {
-              final viewport = tester.getRect(
-                find.byKey(const Key('work-collection-content')),
-              );
-              expect(viewport.contains(tester.getRect(qr).bottomRight), isTrue);
-              expect(
-                viewport.contains(tester.getRect(instruction).topLeft),
-                isTrue,
-              );
-            }
-            await tester.ensureVisible(qr);
-            await tester.pumpAndSettle();
-            expect(tester.getSize(qr).shortestSide, greaterThanOrEqualTo(150));
-            expect(work.currentCollection!.canHandOver, isFalse);
-            await captureStoreView(
-              tester,
-              'collection-code-visible-${display.width.toInt()}-${display.scale}',
-            );
-          }
-          if (state == ScanPickState.matched) {
-            if (display.scale == 1) {
-              final viewport = tester.getRect(
-                find.byKey(const Key('work-collection-content')),
-              );
-              expect(
-                viewport.contains(
-                  tester
-                      .getRect(find.byKey(const Key('work-collection-amount')))
-                      .bottomRight,
-                ),
-                isTrue,
-              );
-            }
-            expect(find.text('Matched'), findsNothing);
-            expect(find.text('Customer confirmed'), findsOneWidget);
-            expect(
-              find.text('Scanned from the account that placed this order.'),
-              findsOneWidget,
-            );
-            expect(work.workspaceOrderStage, 'Customer confirmed');
-            final action = find.byKey(const Key('work-collection-hand-over'));
-            await tester.ensureVisible(action);
-            await tester.pumpAndSettle();
-            expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
-            await captureStoreView(
-              tester,
-              'collection-action-visible-${display.width.toInt()}-${display.scale}',
-            );
-            await tester.tap(action);
-            await tester.pumpAndSettle();
-            expect(find.text('Collected'), findsOneWidget);
-            expect(
-              find.byKey(const Key('work-collection-hand-over')),
-              findsNothing,
-            );
-            expect(work.workspaceSalesToday, 28450);
-            expect(work.workspaceInvoices, isEmpty);
-          }
-          if (state == ScanPickState.collected && display.scale == 1) {
+        }
+        if (state == ScanPickState.matched) {
+          if (display.scale == 1) {
             final viewport = tester.getRect(
               find.byKey(const Key('work-collection-content')),
             );
             expect(
               viewport.contains(
-                tester.getRect(find.text('Invoice INV-1043')).bottomRight,
+                tester
+                    .getRect(find.byKey(const Key('work-collection-amount')))
+                    .bottomRight,
               ),
               isTrue,
             );
           }
-          expect(tester.takeException(), isNull);
-          await tester.pumpWidget(const SizedBox.shrink());
-        },
-      );
+          expect(find.text('Matched'), findsNothing);
+          expect(find.text('Customer confirmed'), findsOneWidget);
+          expect(
+            find.text('Scanned from the account that placed this order.'),
+            findsOneWidget,
+          );
+          expect(work.workspaceOrderStage, 'Customer confirmed');
+          final action = find.byKey(const Key('work-collection-hand-over'));
+          await tester.ensureVisible(action);
+          await tester.pumpAndSettle();
+          expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+          await captureStoreView(
+            tester,
+            'collection-action-visible-${display.width.toInt()}-${display.scale}',
+          );
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          expect(find.text('Collected'), findsOneWidget);
+          expect(
+            find.byKey(const Key('work-collection-hand-over')),
+            findsNothing,
+          );
+          expect(work.workspaceSalesToday, 28450);
+          expect(work.workspaceInvoices, isEmpty);
+        }
+        if (state == ScanPickState.cancelled) {
+          expect(find.text('Order cancelled'), findsOneWidget);
+          expect(
+            find.byKey(const Key('work-collection-hand-over')),
+            findsNothing,
+          );
+          expect(find.byKey(const Key('work-collection-qr')), findsNothing);
+        }
+        if (state == ScanPickState.collected && display.scale == 1) {
+          final viewport = tester.getRect(
+            find.byKey(const Key('work-collection-content')),
+          );
+          expect(
+            viewport.contains(
+              tester.getRect(find.text('Invoice INV-1043')).bottomRight,
+            ),
+            isTrue,
+          );
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
     }
   }
 
@@ -1174,6 +1237,34 @@ void main() {
     });
   }
 
+  testWidgets(
+    'Store collection Orders removes expired confirmation without a tap',
+    (tester) async {
+      final gate = _CollectionFixtureGateway()..state = ScanPickState.matched;
+      final work = collectionStore(gate);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      final label = find.byKey(const Key('work-order-stage-label-APP-1043'));
+      expect(tester.widget<Text>(label).data, 'APP-1043 · Customer confirmed');
+      final requests = gate.requests.length;
+      await tester.pump(const Duration(minutes: 3));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(label).data, 'APP-1043 · Checking order');
+      expect(work.currentCollection!.canHandOver, isFalse);
+      expect(
+        gate.requests.length,
+        requests,
+        reason: 'Expiry changes presentation, not server state or payment',
+      );
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'collection-orders-expired-approval');
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('Store collection unavailable is not ready or matched', (
     tester,
   ) async {
@@ -1182,8 +1273,8 @@ void main() {
     final work = collectionStore(gate);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await tester.pumpAndSettle();
-    expect(find.text('Checking collection'), findsOneWidget);
-    expect(find.text('Ready at the counter'), findsNothing);
+    expect(find.text('Checking order…'), findsOneWidget);
+    expect(find.text('Ready for collection'), findsNothing);
     expect(find.textContaining('private transport detail'), findsNothing);
     expect(find.byKey(const Key('work-collection-qr')), findsNothing);
     expect(find.byKey(const Key('work-collection-hand-over')), findsNothing);
@@ -1193,7 +1284,7 @@ void main() {
     await tester.tap(find.text('Try again'));
     await tester.pumpAndSettle();
     expect(
-      find.text('Collection code is unavailable. Do not hand over yet.'),
+      find.text('Unable to show the collection code. Do not hand over yet.'),
       findsOneWidget,
     );
     expect(find.byKey(const Key('work-collection-qr')), findsNothing);
@@ -1201,6 +1292,60 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Store collection pending handover copy $scale', (
+      tester,
+    ) async {
+      final gate = _CollectionFixtureGateway()..state = ScanPickState.matched;
+      final work = collectionStore(gate);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 640),
+        textScale: scale,
+      );
+      final pending = Completer<ScanPickResult>();
+      ScanPickRequest? submitted;
+      gate.respond = (request) {
+        submitted = request;
+        return pending.future;
+      };
+      final action = find.byKey(const Key('work-collection-hand-over'));
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      final retainedTap = tester.widget<FilledButton>(action).onPressed!;
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(find.text('Confirming collection…'), findsOneWidget);
+      expect(find.text('Updating'), findsOneWidget);
+      expect(find.text('Collected'), findsNothing);
+      expect(
+        find.text('Please wait for collection confirmation.'),
+        findsOneWidget,
+      );
+      expect(tester.widget<FilledButton>(action).onPressed, isNull);
+      retainedTap();
+      expect(
+        gate.requests.where((r) => r.operation == ScanPickOperation.handOver),
+        hasLength(1),
+      );
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'collection-handover-pending-$scale');
+      gate
+        ..state = ScanPickState.collected
+        ..respond = null;
+      pending.complete(gate.reply(submitted!));
+      await tester.pumpAndSettle();
+      expect(find.text('Collected'), findsOneWidget);
+      expect(find.text('Collection confirmed'), findsNothing);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   testWidgets(
     'Store collection background disables action and resume refreshes',
@@ -1293,6 +1438,8 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
+      expect(work.selectWorkspaceOrder('SALE-1042'), isTrue);
+      expect(work.currentCollection, isNull);
     });
   }
 
