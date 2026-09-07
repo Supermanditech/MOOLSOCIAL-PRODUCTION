@@ -42,6 +42,7 @@
         "scripts/check-buy-backend-contract-boundary.ps1",
         "scripts/check-buy-data-egress-boundary.ps1",
         "scripts/check-brand-integrity.ps1",
+        "apps/mobile/lib/features/work/scan_and_pick_contract.dart",
         "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
         "docs/quality/cursor-buy-redmi-fixes-v1-20260905/scope-state.json"
       ]

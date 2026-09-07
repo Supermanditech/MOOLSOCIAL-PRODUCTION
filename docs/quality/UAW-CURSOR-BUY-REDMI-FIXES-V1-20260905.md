@@ -121,3 +121,25 @@ Standing founder approval to extend necessary coordination scope and complete al
 Add only apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart to the existing Cursor claim (41 to42 owners); reuse the already-claimed focused Buy tests and results. Primary coordination remains exactly10 owners. Amend only policy JSON, this manifest, its scope manifest hash and the coordination checker at the single parent89c7970c77629b615a6cb08c9b51946fedcb8cea, with subject ui(buy-redmi-fixes-v1-20260905): admit landscape Mool menu repair. That parent is the clean, pushed, exact-remote-equal Buy repair slice:717 full connected passes/3 intentional skips and126 scoped visual passes. Preserve historical admission blobs/history through that parent; verify the new single-owner claim and otherwise identical policy/scope, and freeze the exact four coordination owners after this one admission. No runtime, test or results owner belongs in the admission commit.
 
 Prove actual pending implementation/pre-commit and post-commit checks on PowerShell5.1 and7, including rejected extra/missing claim, altered manifest/scope, wrong ancestry, history revision, extra dirty owner and pending handoff. Then implement the single shared owner, reproduce the landscape defect before repair and test all six choices, safe-area bounds, scrolling, selection and dismissal using local callbacks. Local visual qualification and two final connected cycles precede any uniquely qualified retained-data Redmi review APK. No OPPO, WhatsApp, production mutation, real external action, backend completion, integration, acceptance or ticket closure is authorized by this amendment.
+
+## Shared collection dependency admission — 7 September 2026
+
+Founder and Cursor authorize the primary Codex owner to admit exactly one immutable shared dependency after parent `7ef7711e119a4c4d7691423538a91ecc0499c2f2`. Cursor is paused; preserve the four unstaged navigation drafts recorded in `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/CURSOR-SHARED-CONTRACT-ADMISSION-PAUSE-20260907-V1.json`. Do not stage, format or modify them. This is an mvp_supporting dependency admission, not a product integration or consumer implementation.
+
+| Dependency | Exact identity / responsibility |
+|---|---|
+| Import | `package:moolsocial/features/work/scan_and_pick_contract.dart` |
+| Source commit | `6ea045b3243c5b06f5eeb28c9aa12670f8ff1156` |
+| Git blob | `aad041323be2b987f28d00438fd98d96bc5b0ea2` |
+| SHA-256 | `4F51CB811007F838DE517CDF49970ABCC8F6434B16B3BA78069B10AB8A904993` |
+| Definition and sole writer | Codex `/root`; Cursor may import but not edit, duplicate or replace it |
+| Examples and errors | `apps/mobile/lib/features/work/SCAN-AND-PICK-CONTRACT-V1.md` at the same Codex commit, read-only reference; not copied into this branch |
+| Consumer 022-R5-A | Cursor: existing public Store page, purchase/payment, same paid order, order-specific scanner, inline recovery, status refresh, exact return and Redmi evidence |
+| Retailer | Codex: existing central card; preserve biker handover |
+| Pending dependencies | Authenticated authoritative transport, purchaser/order/store/SKU/payment/readiness/revision validation, short-lived challenge renewal, replay and durable idempotent reconciliation, public-store/auth return and integrated consumer-retailer acceptance |
+
+The paid order and customer scanner entry have no collection-time cutoff. The short-lived security QR can renew without expiring the purchase. Server-confirmed Matched permits the retailer to physically hand over and confirm Hand Over once; only authoritative Collected completes the order. No merchant-only, verbal-code, local-success, notification or legacy direct-completion bypass. No WhatsApp testing, backend activation, production payment or device action in this admission.
+
+The single admission changes only this manifest, its scope hash, the existing coordination policy/checker and the exact Dart blob. Add the blob only to the primary claim (10 to11); Cursor remains42 and the registry remains4502 at its existing SHA. Preserve earlier admission history through the exact parent. The current single-use allowance may leave only the four hash-bound drafts unstaged while exactly these five owners are committed with subject `ui(buy-redmi-fixes-v1-20260905): admit immutable Scan and Pick contract`. Afterward freeze those five owners; normal fully-staged feature commits and clean handoff rules resume. Reject an altered blob, another owner/claim, changed scope, different parent/identity, staged draft or reuse. No lane/root/schema expansion or new gate file.
+
+Admission checks prove blob identity, ownership, preserved drafts and gate behavior only. They do not qualify unexecuted navigation tests, consumer UI, Store UI, backend enforcement, physical scanning or the integrated transaction. Resume Cursor only after the admission commit is pushed, remote-equal and its post-commit implementation gate passes with the same four drafts unchanged.

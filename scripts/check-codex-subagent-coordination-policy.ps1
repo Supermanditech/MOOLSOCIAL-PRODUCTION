@@ -1658,6 +1658,7 @@ if ($ProductionLane -ceq 'baseline') {
     $changedOwners = @(Get-ProductionChangedOwners $baseCommit $head)
     $primaryEvidenceCoordinationOwnerKeys = @()
     $r66OwnerAmendmentPending = $false
+    $r665CollectionAdmissionPending = $false
     if (
       $ProductionLane -ceq 'cursor_ui' -and
       $ProductionWorkId -ceq 'buy-redmi-fixes-v1-20260905' -and
@@ -1677,6 +1678,10 @@ if ($ProductionLane -ceq 'baseline') {
         'scripts/check-codex-subagent-coordination-policy.ps1'
       )
       $r664MenuAdmissionParent = '89c7970c77629b615a6cb08c9b51946fedcb8cea'
+      $r665CollectionParent = '7ef7711e119a4c4d7691423538a91ecc0499c2f2'
+      & git -C $root merge-base --is-ancestor $r665CollectionParent $head
+      $r665CollectionContext = $LASTEXITCODE -eq 0
+      $r664MenuFreezeHead = if ($r665CollectionContext) { $r665CollectionParent } else { $head }
       & git -C $root merge-base --is-ancestor $r664MenuAdmissionParent $head
       $r664MenuAdmissionContext = $LASTEXITCODE -eq 0
       $r664LegacyFreezeHead = if ($r664MenuAdmissionContext) {
@@ -2059,8 +2064,12 @@ if ($ProductionLane -ceq 'baseline') {
         $r664MenuSubject =
           'ui(buy-redmi-fixes-v1-20260905): admit landscape Mool menu repair'
         $r664MenuPolicyBefore = Get-R66Utf8GitJson $r664MenuAdmissionParent $r664MenuOwners[0]
-        $r664MenuPolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
-          (Join-Path $root $r664MenuOwners[0]) | ConvertFrom-Json
+        $r664MenuPolicyAfter = if ($r665CollectionContext) {
+          Get-R66Utf8GitJson $r665CollectionParent $r664MenuOwners[0]
+        } else {
+          Get-Content -Raw -Encoding UTF8 -LiteralPath `
+            (Join-Path $root $r664MenuOwners[0]) | ConvertFrom-Json
+        }
         $r664MenuClaims = @($r664MenuPolicyAfter.activeClaims | Where-Object {
           $_.task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905'
         })
@@ -2075,12 +2084,23 @@ if ($ProductionLane -ceq 'baseline') {
           ($r664MenuPolicyAfter | ConvertTo-Json -Depth 100 -Compress)
         ) 'R664 menu admission changed another claim or policy field.'
         $r664MenuManifestHash = '998678329583C21D9C02E85A1DE3CA085DCC3430140D14D27F47EA2729E41F42'
-        Assert-Coordination (
-          (Get-Sha256 (Join-Path $root $r664MenuOwners[1])) -ceq $r664MenuManifestHash
-        ) 'R664 menu admission manifest differs from its reviewed owner scope.'
+        if ($r665CollectionContext) {
+          $r664PriorManifest = @(& git -C $root rev-parse "${r665CollectionParent}:$($r664MenuOwners[1])")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r664PriorManifest.Count -eq 1 -and
+            [string]$r664PriorManifest[0] -ceq 'b1baeb81b4d12e48f30e8abff6f5f1fdb3003971') `
+            'R664 historical menu manifest changed.'
+        } else {
+          Assert-Coordination (
+            (Get-Sha256 (Join-Path $root $r664MenuOwners[1])) -ceq $r664MenuManifestHash
+          ) 'R664 menu admission manifest differs from its reviewed owner scope.'
+        }
         $r664MenuScopeBefore = Get-R66Utf8GitJson $r664MenuAdmissionParent $r664MenuOwners[2]
-        $r664MenuScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
-          (Join-Path $root $r664MenuOwners[2]) | ConvertFrom-Json
+        $r664MenuScopeAfter = if ($r665CollectionContext) {
+          Get-R66Utf8GitJson $r665CollectionParent $r664MenuOwners[2]
+        } else {
+          Get-Content -Raw -Encoding UTF8 -LiteralPath `
+            (Join-Path $root $r664MenuOwners[2]) | ConvertFrom-Json
+        }
         Assert-Coordination (
           $r664MenuScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq
             $r664MenuManifestHash
@@ -2127,13 +2147,104 @@ if ($ProductionLane -ceq 'baseline') {
             (@($r664MenuCommittedOwners | Sort-Object) -join '|') -ceq
             (@($r664MenuOwners | Sort-Object) -join '|')) `
             'R664 menu admission changed a runtime, test, evidence or unexpected owner.'
-          & git -C $root diff --quiet $r664MenuCommit -- @r664MenuOwners
+          if ($r665CollectionContext) {
+            & git -C $root diff --quiet $r664MenuCommit $r664MenuFreezeHead -- @r664MenuOwners
+          } else {
+            & git -C $root diff --quiet $r664MenuCommit -- @r664MenuOwners
+          }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'R664 menu coordination changed after admission.'
           $r664MenuLaterHistory = @(& git -C $root log --format=%H `
-              "${r664MenuCommit}..$head" -- @r664MenuOwners)
+              "${r664MenuCommit}..$r664MenuFreezeHead" -- @r664MenuOwners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r664MenuLaterHistory.Count -eq 0) `
             'R664 menu admission cannot be replayed or revised by later feature commits.'
         }
+      }
+      if ($r665CollectionContext) {
+        # Single immutable dependency admission; never grant Cursor a Work write claim.
+        $r665Contract = 'apps/mobile/lib/features/work/scan_and_pick_contract.dart'
+        $r665Owners = @($r664MenuOwners) + $r665Contract
+        $r665Subject = 'ui(buy-redmi-fixes-v1-20260905): admit immutable Scan and Pick contract'
+        $r665ManifestHash = '820F22A4AF11ABE8E070750F59B250A01E7AB4A083B073620EBB03D6FE5A066E'
+        $r665MergePath = (& git -C $root rev-parse --git-path MERGE_HEAD).Trim()
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and
+          -not (Test-Path -LiteralPath $r665MergePath)) 'Collection admission cannot run during a merge.'
+        $r665PolicyBefore = Get-R66Utf8GitJson $r665CollectionParent $r665Owners[0]
+        $r665PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
+          (Join-Path $root $r665Owners[0]) | ConvertFrom-Json
+        $r665Primary = @($r665PolicyAfter.activeClaims | Where-Object { $_.task -ceq '/root' })[0]
+        Assert-Coordination ($r665Primary.owners.Count -eq 11 -and
+          @($r665Primary.owners | Where-Object { $_ -ceq $r665Contract }).Count -eq 1) `
+          'Collection definition must have exactly its single Codex owner.'
+        $r665Primary.owners = @($r665Primary.owners | Where-Object { $_ -cne $r665Contract })
+        Assert-Coordination (
+          ($r665PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r665PolicyAfter | ConvertTo-Json -Depth 100 -Compress)
+        ) 'Collection admission changed another claim, registry binding or policy.'
+        Assert-Coordination (
+          (Get-Sha256 (Join-Path $root $r665Owners[1])) -ceq $r665ManifestHash
+        ) 'Collection dependency manifest changed.'
+        $r665ScopeBefore = Get-R66Utf8GitJson $r665CollectionParent $r665Owners[2]
+        $r665ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
+          (Join-Path $root $r665Owners[2]) | ConvertFrom-Json
+        Assert-Coordination (
+          $r665ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r665ManifestHash
+        ) 'Collection dependency scope binding changed.'
+        $r665ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 =
+          $r665ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+        Assert-Coordination (
+          ($r665ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r665ScopeAfter | ConvertTo-Json -Depth 100 -Compress)
+        ) 'Collection admission changed execution authority beyond its manifest binding.'
+        $r665SourceBlob = @(& git -C $root rev-parse "6ea045b3243c5b06f5eeb28c9aa12670f8ff1156:$r665Contract")
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $r665SourceBlob.Count -eq 1 -and
+          [string]$r665SourceBlob[0] -ceq 'aad041323be2b987f28d00438fd98d96bc5b0ea2' -and
+          (Get-Sha256 (Join-Path $root $r665Contract)) -ceq
+            '4F51CB811007F838DE517CDF49970ABCC8F6434B16B3BA78069B10AB8A904993') `
+          'Collection dependency differs from the sealed Codex blob.'
+        if ($head -ceq $r665CollectionParent) {
+          $r665CollectionAdmissionPending = $true
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) `
+            'Pending collection admission is not a handoff or acceptance.'
+          $r665Drafts = @{
+            'apps/mobile/lib/features/buy/buy_v2_session.dart' = 'CCFF7FD8CA50B4F29FDD9EE57419A65FA6875465EC8AE67F6AFC6496CBE45A47'
+            'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart' = '74DF3C1D38E9C788ACB59A2A3B0F90393EBABE1E8AE2F3E0E5BE74E92D0400A2'
+            'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart' = '7806C599B20F3BD7260028D27F1BAF9B0B59AA81CF884D3FA259BDBEFB05223F'
+            'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart' = 'DE4375E287F1301DE11BD8B37854D39EF47A97020F02491D0EB4D2CF0604349F'
+          }
+          foreach ($r665Draft in $r665Drafts.Keys) {
+            Assert-Coordination (
+              (Get-Sha256 (Join-Path $root $r665Draft)) -ceq $r665Drafts[$r665Draft]
+            ) "Collection admission modified a preserved draft: $r665Draft"
+          }
+          $r665Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Collection admission dirty inventory failed.'
+          $r665Untracked = @(& git -C $root ls-files --others --exclude-standard)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@(@($r665Dirty) + @($r665Untracked) | Sort-Object -Unique) -join '|') -ceq
+            (@(@($r665Drafts.Keys) + $r665Owners | Sort-Object) -join '|')) `
+            'Collection admission must preserve exactly four drafts and add only five admitted owners.'
+        } else {
+          $r665Following = @(& git -C $root rev-list --first-parent --reverse "${r665CollectionParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r665Following.Count -gt 0) `
+            'Collection admission commit is missing.'
+          $r665Commit = [string]$r665Following[0]
+          $r665Parents = @(& git -C $root show -s --format=%P $r665Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r665Parents.Count -eq 1 -and
+            [string]$r665Parents[0] -ceq $r665CollectionParent) 'Collection admission parent changed.'
+          $r665ActualSubject = @(& git -C $root show -s --format=%s $r665Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r665ActualSubject.Count -eq 1 -and
+            [string]$r665ActualSubject[0] -ceq $r665Subject) 'Collection admission subject changed.'
+          $r665Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r665Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@($r665Committed | Sort-Object) -join '|') -ceq
+            (@($r665Owners | Sort-Object) -join '|')) 'Collection admission committed an unexpected owner or draft.'
+          & git -C $root diff --quiet $r665Commit -- @r665Owners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Collection dependency or admission binding changed after sealing.'
+          $r665Later = @(& git -C $root log --format=%H "${r665Commit}..$head" -- @r665Owners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r665Later.Count -eq 0) `
+            'Collection dependency admission cannot be reused or changed by later feature commits.'
+        }
+        $r66CoordinationOwners = @($r66CoordinationOwners) + $r665Contract
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
         $_.ToLowerInvariant()
@@ -2835,9 +2946,17 @@ if ($ProductionLane -ceq 'baseline') {
         (@($r66PreservedDrafts.Keys | Sort-Object) -join '|')
       ) 'R66 coordination must stage only four owners and leave all seven drafts unstaged.'
     }
+    if ($r665CollectionAdmissionPending) {
+      Assert-Coordination (
+        (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
+        (@($r665Owners | Sort-Object) -join '|') -and
+        (@($preCommitUnstagedOwners | Sort-Object) -join '|') -ceq
+        (@($r665Drafts.Keys | Sort-Object) -join '|')
+      ) 'Collection admission must stage only five owners and preserve all four unstaged drafts.'
+    }
     Assert-Coordination (
       $preCommitStagedOwners.Count -gt 0 -and
-      ($preCommitUnstagedOwners.Count -eq 0 -or $r66OwnerAmendmentPending) -and
+      ($preCommitUnstagedOwners.Count -eq 0 -or $r66OwnerAmendmentPending -or $r665CollectionAdmissionPending) -and
       $preCommitUntrackedOwners.Count -eq 0
     ) 'production pre-commit requires one fully staged atomic change set.'
     Assert-ProductionSecretSafe -BaseCommit $baseCommit -HeadCommit $head `
