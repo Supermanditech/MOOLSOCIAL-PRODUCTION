@@ -801,137 +801,159 @@ class _WorkWorkspaceDashboardScreenState
       navigationOverBody: false,
       resizeToAvoidBottomInset: _view != _WorkspaceControlView.procurement,
       bottomAction: bottomAction,
-      body: switch (_view) {
-        _WorkspaceControlView.dashboard => _StoreControlDashboard(
-          session: session,
-          workspace: workspace,
-          onSetup: () {
-            session.beginRetailerSetup();
-            context.push('/app/work/retailer/setup');
-          },
-          onCustomers: () => _showOperation(_WorkspaceOperation.dues),
-          onMoney: () => _showOperation(_WorkspaceOperation.statement),
-          onGrow: () => _showOperation(_WorkspaceOperation.offers),
-          onOrders: () => _showOperation(_WorkspaceOperation.orders),
-          reviewedOrder: _reviewedOrder,
-          onReviewOrder: () {
-            final order =
-                session.currentWorkspaceOrder ??
-                session.visibleWorkspaceOrders
-                    .where(
-                      (order) =>
-                          order.id ==
-                          (session.currentWorkspaceOrderId ??
-                              'current-store-order'),
-                    )
-                    .firstOrNull;
-            if (order != null) setState(() => _reviewedOrder = order);
-          },
-          onCloseOrder: _closeOrderDetails,
-          onNewSale: () {
-            session.prepareWorkspaceOrder(
-              source: 'Counter',
-              fulfilment: 'At the shop',
-            );
-            _showOperation(_WorkspaceOperation.counterOrder);
-          },
-          onDeliverOrder: () => _showOperation(_WorkspaceOperation.storeLink),
-          onStock: () => _showOperation(_WorkspaceOperation.catalogue),
-          onOpenOperation: _showOperation,
-          onBuyStock: _showProcurement,
-        ),
-        _WorkspaceControlView.search => _WorkspaceSearchSurface(
-          session: session,
-          query: session.workspaceSearchQuery,
-          onClear: _clearSearch,
-          onOpenRoute: openScopedRoute,
-        ),
-        _WorkspaceControlView.status => _WorkspaceStatusSurface(
-          acceptingOrders: _draftAcceptingOrders,
-          visibleToCustomers: _draftVisibleToCustomers,
-          fulfilmentMode: _draftFulfilmentMode,
-          busyMinutes: _draftBusyMinutes,
-          reopensAt: _draftReopensAt,
-          openingTime: _draftOpeningTime,
-          closingTime: _draftClosingTime,
-          maximumActiveOrders: _draftMaximumActiveOrders,
-          alertSound: _draftOrderAlertSound,
-          alertVibration: _draftOrderAlertVibration,
-          onAcceptingChanged: (value) => setState(() {
-            _draftAcceptingOrders = value;
-            if (!value && _draftReopensAt.isEmpty) {
-              _draftReopensAt = 'Tomorrow at 8:00 AM';
+      body: _StoreFirstTapAccess(
+        keyboardVisible: MediaQuery.viewInsetsOf(context).bottom > 0,
+        enabled:
+            _view == _WorkspaceControlView.operation ||
+            _view == _WorkspaceControlView.procurement,
+        active: _view == _WorkspaceControlView.procurement
+            ? 'restock'
+            : _operation.name,
+        procurement: _view == _WorkspaceControlView.procurement
+            ? widget.procurementSession
+            : null,
+        onSelect: (operation) => unawaited(
+          _navigateFromCounterDraft(() {
+            if (operation == null) {
+              _showProcurement();
+            } else {
+              _showOperation(operation);
             }
           }),
-          onVisibilityChanged: (value) => setState(() {
-            _draftVisibleToCustomers = value;
-          }),
-          onFulfilmentChanged: (value) => setState(() {
-            _draftFulfilmentMode = value;
-          }),
-          onBusyMinutesChanged: (value) => setState(() {
-            _draftBusyMinutes = value;
-          }),
-          onReopensChanged: (value) => setState(() {
-            _draftReopensAt = value;
-          }),
-          onOpeningTimeChanged: (value) => setState(() {
-            _draftOpeningTime = value;
-          }),
-          onClosingTimeChanged: (value) => setState(() {
-            _draftClosingTime = value;
-          }),
-          onMaximumActiveOrdersChanged: (value) => setState(() {
-            _draftMaximumActiveOrders = value;
-          }),
-          onAlertSoundChanged: (value) => setState(() {
-            _draftOrderAlertSound = value;
-          }),
-          onAlertVibrationChanged: (value) => setState(() {
-            _draftOrderAlertVibration = value;
-          }),
-          onProductControls: () =>
-              _showOperation(_WorkspaceOperation.catalogue),
-          onDeliveryControls: () =>
-              _showOperation(_WorkspaceOperation.deliverySettings),
-          onStaffControls: () => _showOperation(_WorkspaceOperation.staff),
-          onPaymentControls: () => _showOperation(_WorkspaceOperation.payments),
-          onBusinessDetails: () =>
-              _showOperation(_WorkspaceOperation.businessRecord),
         ),
-        _WorkspaceControlView.alerts => _WorkspaceAlertsSurface(
-          session: session,
-          onOpen: openScopedRoute,
-          onOpenOperation: _showOperation,
-          onOpenOrders: () => openRetailer('/app/retailer/orders'),
-          onOpenStatus: _showStatus,
-          onDismiss: session.dismissWorkspaceAlert,
-        ),
-        _WorkspaceControlView.procurement => _StoreProcurementSurface(
-          session: widget.procurementSession,
-          accountIdentity: widget.accountIdentity,
-          accountAuthenticated: widget.accountAuthenticated,
-          ready: _procurementReady,
-          productId: _procurementProductId,
-          onExit: _leaveProcurement,
-          onDestinationChanged: _handleProcurementDestinationChanged,
-        ),
-        _WorkspaceControlView.operation => _WorkspaceOperationSurface(
-          operation: _operation,
-          session: session,
-          procurementSession: widget.procurementSession,
-          catalogueKey: _catalogueKey,
-          counterKey: _counterKey,
-          saleQuery: _saleSearchController.text,
-          requirementDraft: _requirementDrafts.putIfAbsent(
-            workspace.id,
-            () => {},
+        child: switch (_view) {
+          _WorkspaceControlView.dashboard => _StoreControlDashboard(
+            session: session,
+            workspace: workspace,
+            onSetup: () {
+              session.beginRetailerSetup();
+              context.push('/app/work/retailer/setup');
+            },
+            onCustomers: () => _showOperation(_WorkspaceOperation.dues),
+            onMoney: () => _showOperation(_WorkspaceOperation.statement),
+            onGrow: () => _showOperation(_WorkspaceOperation.offers),
+            onOrders: () => _showOperation(_WorkspaceOperation.orders),
+            reviewedOrder: _reviewedOrder,
+            onReviewOrder: () {
+              final order =
+                  session.currentWorkspaceOrder ??
+                  session.visibleWorkspaceOrders
+                      .where(
+                        (order) =>
+                            order.id ==
+                            (session.currentWorkspaceOrderId ??
+                                'current-store-order'),
+                      )
+                      .firstOrNull;
+              if (order != null) setState(() => _reviewedOrder = order);
+            },
+            onCloseOrder: _closeOrderDetails,
+            onNewSale: () {
+              session.prepareWorkspaceOrder(
+                source: 'Counter',
+                fulfilment: 'At the shop',
+              );
+              _showOperation(_WorkspaceOperation.counterOrder);
+            },
+            onDeliverOrder: () => _showOperation(_WorkspaceOperation.storeLink),
+            onStock: () => _showOperation(_WorkspaceOperation.catalogue),
+            onOpenOperation: _showOperation,
+            onBuyStock: _showProcurement,
           ),
-          onOpenStore: _showDashboard,
-          onOpenOperation: _showOperation,
-          onOpenRoute: openScopedRoute,
-        ),
-      },
+          _WorkspaceControlView.search => _WorkspaceSearchSurface(
+            session: session,
+            query: session.workspaceSearchQuery,
+            onClear: _clearSearch,
+            onOpenRoute: openScopedRoute,
+          ),
+          _WorkspaceControlView.status => _WorkspaceStatusSurface(
+            acceptingOrders: _draftAcceptingOrders,
+            visibleToCustomers: _draftVisibleToCustomers,
+            fulfilmentMode: _draftFulfilmentMode,
+            busyMinutes: _draftBusyMinutes,
+            reopensAt: _draftReopensAt,
+            openingTime: _draftOpeningTime,
+            closingTime: _draftClosingTime,
+            maximumActiveOrders: _draftMaximumActiveOrders,
+            alertSound: _draftOrderAlertSound,
+            alertVibration: _draftOrderAlertVibration,
+            onAcceptingChanged: (value) => setState(() {
+              _draftAcceptingOrders = value;
+              if (!value && _draftReopensAt.isEmpty) {
+                _draftReopensAt = 'Tomorrow at 8:00 AM';
+              }
+            }),
+            onVisibilityChanged: (value) => setState(() {
+              _draftVisibleToCustomers = value;
+            }),
+            onFulfilmentChanged: (value) => setState(() {
+              _draftFulfilmentMode = value;
+            }),
+            onBusyMinutesChanged: (value) => setState(() {
+              _draftBusyMinutes = value;
+            }),
+            onReopensChanged: (value) => setState(() {
+              _draftReopensAt = value;
+            }),
+            onOpeningTimeChanged: (value) => setState(() {
+              _draftOpeningTime = value;
+            }),
+            onClosingTimeChanged: (value) => setState(() {
+              _draftClosingTime = value;
+            }),
+            onMaximumActiveOrdersChanged: (value) => setState(() {
+              _draftMaximumActiveOrders = value;
+            }),
+            onAlertSoundChanged: (value) => setState(() {
+              _draftOrderAlertSound = value;
+            }),
+            onAlertVibrationChanged: (value) => setState(() {
+              _draftOrderAlertVibration = value;
+            }),
+            onProductControls: () =>
+                _showOperation(_WorkspaceOperation.catalogue),
+            onDeliveryControls: () =>
+                _showOperation(_WorkspaceOperation.deliverySettings),
+            onStaffControls: () => _showOperation(_WorkspaceOperation.staff),
+            onPaymentControls: () =>
+                _showOperation(_WorkspaceOperation.payments),
+            onBusinessDetails: () =>
+                _showOperation(_WorkspaceOperation.businessRecord),
+          ),
+          _WorkspaceControlView.alerts => _WorkspaceAlertsSurface(
+            session: session,
+            onOpen: openScopedRoute,
+            onOpenOperation: _showOperation,
+            onOpenOrders: () => openRetailer('/app/retailer/orders'),
+            onOpenStatus: _showStatus,
+            onDismiss: session.dismissWorkspaceAlert,
+          ),
+          _WorkspaceControlView.procurement => _StoreProcurementSurface(
+            session: widget.procurementSession,
+            accountIdentity: widget.accountIdentity,
+            accountAuthenticated: widget.accountAuthenticated,
+            ready: _procurementReady,
+            productId: _procurementProductId,
+            onExit: _leaveProcurement,
+            onDestinationChanged: _handleProcurementDestinationChanged,
+          ),
+          _WorkspaceControlView.operation => _WorkspaceOperationSurface(
+            operation: _operation,
+            session: session,
+            procurementSession: widget.procurementSession,
+            catalogueKey: _catalogueKey,
+            counterKey: _counterKey,
+            saleQuery: _saleSearchController.text,
+            requirementDraft: _requirementDrafts.putIfAbsent(
+              workspace.id,
+              () => {},
+            ),
+            onOpenStore: _showDashboard,
+            onOpenOperation: _showOperation,
+            onOpenRoute: openScopedRoute,
+          ),
+        },
+      ),
     );
   }
 
@@ -2006,6 +2028,168 @@ class _HeaderSearchUtility extends StatelessWidget {
         radius: 20,
         child: SizedBox(width: 44, height: 48, child: Icon(icon, size: 18)),
       ),
+    );
+  }
+}
+
+class _StoreFirstTapAccess extends StatefulWidget {
+  const _StoreFirstTapAccess({
+    required this.enabled,
+    required this.keyboardVisible,
+    required this.active,
+    required this.onSelect,
+    required this.child,
+    this.procurement,
+  });
+
+  final bool enabled;
+  final bool keyboardVisible;
+  final String active;
+  final BuyV2Session? procurement;
+  final ValueChanged<_WorkspaceOperation?> onSelect;
+  final Widget child;
+
+  @override
+  State<_StoreFirstTapAccess> createState() => _StoreFirstTapAccessState();
+}
+
+class _StoreFirstTapAccessState extends State<_StoreFirstTapAccess> {
+  final _scroll = ScrollController();
+  final _activeKey = GlobalKey();
+  static const _actions = [
+    ('statement', 'View statement', _WorkspaceOperation.statement),
+    ('dues', 'Collect dues', _WorkspaceOperation.dues),
+    ('payments', 'Settle', _WorkspaceOperation.payments),
+    ('restock', 'Restock', null),
+    ('direct', 'Buy Direct', _WorkspaceOperation.direct),
+    ('groupBuying', 'Group Bulk Buying', _WorkspaceOperation.groupBuying),
+    ('storeLink', 'Send store link', _WorkspaceOperation.storeLink),
+    ('offers', 'Promote store', _WorkspaceOperation.offers),
+    ('paidWork', 'Post requirement', _WorkspaceOperation.paidWork),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _revealActive();
+  }
+
+  @override
+  void didUpdateWidget(covariant _StoreFirstTapAccess oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active != widget.active ||
+        oldWidget.enabled != widget.enabled) {
+      _revealActive();
+    }
+  }
+
+  void _revealActive() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.enabled) return;
+      final activeContext = _activeKey.currentContext;
+      if (activeContext != null) {
+        // Only a navigation change reveals its selection, never a live update.
+        Scrollable.ensureVisible(activeContext, alignment: .5);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.enabled) return widget.child;
+    final typing = widget.keyboardVisible;
+    final labelStyle = Theme.of(context).textTheme.labelLarge!.copyWith(
+      fontSize: 12,
+      color: MoolColors.navy,
+      height: 1.25,
+      fontWeight: FontWeight.w700,
+    );
+    final shortcuts = Material(
+      key: const Key('work-first-tap-shortcuts'),
+      color: Colors.white,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Color(0xFFE5E8F1))),
+        ),
+        child: Semantics(
+          container: true,
+          label: 'Store shortcuts',
+          child: Scrollbar(
+            controller: _scroll,
+            thumbVisibility: true,
+            thickness: 2,
+            child: SingleChildScrollView(
+              key: const Key('work-first-tap-shortcut-scroll'),
+              controller: _scroll,
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 3),
+              child: Row(
+                children: [
+                  for (var i = 0; i < _actions.length; i++) ...[
+                    if (i == 3 || i == 6)
+                      const SizedBox(
+                        height: 24,
+                        child: VerticalDivider(width: 12),
+                      ),
+                    MergeSemantics(
+                      key: _actions[i].$1 == widget.active ? _activeKey : null,
+                      child: Semantics(
+                        key: Key('work-shortcut-state-${_actions[i].$1}'),
+                        selected: _actions[i].$1 == widget.active,
+                        child: TextButton(
+                          key: Key('work-shortcut-${_actions[i].$1}'),
+                          onPressed: _actions[i].$1 == widget.active
+                              ? null
+                              : () => widget.onSelect(_actions[i].$3),
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(48, 48),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            foregroundColor: MoolColors.navy,
+                            disabledForegroundColor: MoolColors.navy,
+                            backgroundColor: _actions[i].$1 == widget.active
+                                ? const Color(0xFFEEF0FF)
+                                : Colors.transparent,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(8),
+                              ),
+                            ),
+                            textStyle: labelStyle,
+                          ),
+                          child: Text(_actions[i].$2, style: labelStyle),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    return Column(
+      children: [
+        if (widget.procurement case final procurement?)
+          AnimatedBuilder(
+            animation: procurement,
+            child: shortcuts,
+            builder: (context, child) => Offstage(
+              // Do not offer a cross-task exit in checkout or payment recovery.
+              offstage: typing || procurement.view != BuyV2View.catalogue,
+              child: child,
+            ),
+          )
+        else
+          Offstage(offstage: typing, child: shortcuts),
+        Expanded(child: widget.child),
+      ],
     );
   }
 }
@@ -8282,7 +8466,7 @@ class _WorkspaceCatalogueSurfaceState
             ),
           ],
           const SizedBox(height: 8),
-          if (own.isEmpty)
+          if (own.isEmpty && (_lowStockOnly || available.isEmpty))
             Container(
               key: const Key('work-catalogue-empty-guidance'),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -14315,11 +14499,22 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
             key: const Key('work-store-offers-screen'),
             padding: const EdgeInsets.all(18),
             children: [
-              const _WorkspaceSectionLabel(
-                title: 'Bring customers back',
-                detail:
-                    'Choose a useful offer for customers who allow Store messages',
-              ),
+              if (products.isEmpty || eligibleCustomers == 0)
+                const Text(
+                  'Bring customers back',
+                  style: TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 18,
+                    height: 1.05,
+                    fontWeight: FontWeight.w900,
+                  ),
+                )
+              else
+                const _WorkspaceSectionLabel(
+                  title: 'Bring customers back',
+                  detail:
+                      'Choose a useful offer for customers who allow Store messages',
+                ),
               if (products.isEmpty || eligibleCustomers == 0) ...[
                 const SizedBox(height: 8),
                 Container(

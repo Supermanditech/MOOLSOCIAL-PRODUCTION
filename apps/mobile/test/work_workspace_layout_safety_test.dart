@@ -1098,6 +1098,255 @@ void main() {
     );
   }
 
+  for (final display in [
+    (412.0, 915.0, 1.0),
+    (360.0, 800.0, 1.0),
+    (320.0, 568.0, 1.4),
+    (320.0, 568.0, 2.0),
+  ]) {
+    testWidgets('S09 DF04 compact first-tap access $display', (tester) async {
+      final work = liveStore();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(display.$1, display.$2),
+        textScale: display.$3,
+        bottomInset: 24,
+      );
+      expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
+      final statement = find.byKey(const Key('work-pulse-sales'));
+      await reveal(tester, statement);
+      await tester.tap(statement);
+      await tester.pumpAndSettle();
+      final rail = find.byKey(const Key('work-first-tap-shortcuts'));
+      expect(rail.hitTestable(), findsOneWidget);
+      expect(tester.getSize(rail).height, lessThanOrEqualTo(60));
+      expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
+      final selected = find.byKey(const Key('work-shortcut-statement'));
+      expect(tester.widget<TextButton>(selected).onPressed, isNull);
+      final semantics = tester.ensureSemantics();
+      try {
+        expect(
+          tester.getSemantics(
+            find.byKey(const Key('work-shortcut-state-statement')),
+          ),
+          matchesSemantics(
+            label: 'View statement',
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: false,
+            hasSelectedState: true,
+            isSelected: true,
+          ),
+        );
+      } finally {
+        semantics.dispose();
+      }
+      await captureStoreView(
+        tester,
+        'r665-df04-statement-${display.$1}-${display.$3}',
+      );
+      for (final action in [
+        ('dues', 'Collect dues', 'work-store-dues'),
+        ('payments', 'Settle', 'work-money-destination'),
+        ('direct', 'Buy Direct', 'work-store-buy-direct'),
+        ('storeLink', 'Send store link', 'work-store-link'),
+        ('offers', 'Promote store', 'work-store-offers-screen'),
+      ]) {
+        final target = find.byKey(Key('work-shortcut-${action.$1}'));
+        await reveal(tester, target);
+        expect(target.hitTestable(), findsOneWidget);
+        expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
+        final text = find.descendant(
+          of: target,
+          matching: find.text(action.$2),
+        );
+        final paragraph = tester.renderObject<RenderParagraph>(text);
+        expect(paragraph.textScaler.scale(1), closeTo(display.$3, .01));
+        expect((paragraph.text as TextSpan).style!.fontFamily, isNot('Ahem'));
+        expect((paragraph.text as TextSpan).style!.fontFamily, isNotNull);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(
+          paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: 0, extentOffset: action.$2.length),
+          ),
+          hasLength(1),
+        );
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+        expect(find.byKey(Key(action.$3)), findsOneWidget);
+        expect(tester.widget<TextButton>(target).onPressed, isNull);
+        expect(tester.takeException(), isNull);
+      }
+      await captureStoreView(
+        tester,
+        'r665-df04-promote-${display.$1}-${display.$3}',
+      );
+      final post = find.byKey(const Key('work-shortcut-paidWork'));
+      await reveal(tester, post);
+      await tester.tap(post);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-requirement-selector')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-offers-screen')), findsOneWidget);
+      expect(work.workspaceOffers, isEmpty);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(work.workspaceOrders, isEmpty);
+      expect(work.workspaceAcceptingOrders, isTrue);
+      expect(work.workspaceVisibleToCustomers, isTrue);
+      await tester.tap(find.byKey(const Key('work-store-home')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
+      expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('S09 DF04 live updates do not move shortcuts or selected order', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-store-orders')));
+    await tester.pumpAndSettle();
+    final group = find.byKey(const Key('work-shortcut-groupBuying'));
+    await reveal(tester, group);
+    final position = tester.getRect(group);
+    final order = work.currentWorkspaceOrderId;
+    work.workspaceSalesToday += 100;
+    work.dismissMessages();
+    await tester.pumpAndSettle();
+    expect(tester.getRect(group), position);
+    expect(work.currentWorkspaceOrderId, order);
+    await tester.tap(group);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-group-buy-active-screen')),
+      findsOneWidget,
+    );
+    expect(work.currentWorkspaceOrderId, order);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('S09 DF04 sale keyboard and discard protection stay intact', (
+    tester,
+  ) async {
+    final work = liveStore();
+    work.workspaceCatalogueItems
+      ..clear()
+      ..addAll(
+        workspaceMasterCatalogue.map((product) => product.copyWith(stock: 24)),
+      );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-sale-customer')));
+    await tester.pumpAndSettle();
+    final customer = find.byKey(const Key('work-order-customer'));
+    await tester.enterText(customer, '9829012345');
+    final editable = find.descendant(
+      of: customer,
+      matching: find.byType(EditableText),
+    );
+    final controller = tester.widget<EditableText>(editable).controller;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
+    expect(
+      identical(tester.widget<EditableText>(editable).controller, controller),
+      isTrue,
+    );
+    expect(controller.text, '9829012345');
+    await captureStoreView(tester, 'r665-df04-sale-keyboard');
+    tester.view.viewInsets = FakeViewPadding.zero;
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-sale-customer-confirm')));
+    await tester.pumpAndSettle();
+    final statement = find.byKey(const Key('work-shortcut-statement'));
+    await reveal(tester, statement);
+    await tester.tap(statement);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-order-discard-dialog')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-order-keep-editing')));
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderCustomer, '9829012345');
+    expect(
+      find.byKey(const Key('work-dashboard-counter-order-screen')),
+      findsOneWidget,
+    );
+    expect(work.workspaceOrders, isEmpty);
+    expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'S09 DF04 Restock retains filter and excludes transactional depths',
+    (tester) async {
+      final work = liveStore();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        textScale: 1,
+      );
+      final buy = tester
+          .widget<WorkWorkspaceDashboardScreen>(
+            find.byType(WorkWorkspaceDashboardScreen),
+          )
+          .procurementSession;
+      buy.chooseFilter('freight');
+      await tester.tap(find.byKey(const Key('work-quick-direct')));
+      await tester.pumpAndSettle();
+      final restock = find.byKey(const Key('work-shortcut-restock'));
+      await reveal(tester, restock);
+      await tester.tap(restock);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-store-procurement-screen')),
+        findsOneWidget,
+      );
+      expect(buy.selectedFilter, 'freight');
+      expect(tester.widget<TextButton>(restock).onPressed, isNull);
+      await captureStoreView(tester, 'r665-df04-restock');
+      final product = buy.visibleProducts.first;
+      expect(buy.addProduct(product.id), isTrue);
+      final quantity = buy.quantityFor(product.id);
+      buy.openCart();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-first-tap-shortcuts')), findsOneWidget);
+      final statement = find.byKey(const Key('work-shortcut-statement'));
+      await reveal(tester, statement);
+      await tester.tap(statement);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
+      expect(buy.selectedFilter, 'freight');
+      expect(buy.quantityFor(product.id), quantity);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final filters in <(String?, String?)>[
     (null, null),
     ('freight', null),
@@ -6913,7 +7162,13 @@ void main() {
     await tester.tap(find.byKey(const Key('work-quick-group-buy')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-group-buy-active-screen')), findsOne);
-    expect(find.text('Group Bulk Buying'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('work-group-buy-active-screen')),
+        matching: find.text('Group Bulk Buying'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('₹14/kg'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
@@ -7716,7 +7971,21 @@ void main() {
       await tester.tap(find.textContaining('Fortune Sunflower Oil').last);
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('work-offer-preview')), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('work-offer-preview')),
+        180,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('work-store-offers-screen')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-offer-preview')).hitTestable(),
+        findsOneWidget,
+      );
       expect(find.text('Save on your monthly essentials'), findsWidgets);
       expect(find.textContaining('1 customers can receive'), findsOneWidget);
       expect(find.textContaining('₹264'), findsOneWidget);
