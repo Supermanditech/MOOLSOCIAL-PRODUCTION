@@ -5117,6 +5117,127 @@ void main() {
     (320.0, 640.0, 1.4),
     (320.0, 640.0, 2.0),
   ]) {
+    for (final surface in ['product', 'order', 'alert']) {
+      for (final amount in [264, 10000000000, 100000000000]) {
+        testWidgets('S09 ancillary amount $surface $amount $display', (
+          tester,
+        ) async {
+          final work = storeViewFixture()..workspaceOrderAmount = '$amount';
+          work.workspaceOrders[0] = work.workspaceOrders.first.copyWith(
+            amount: amount,
+          );
+          final product = work.workspaceCatalogueItems.first.copyWith(
+            sellingPrice: amount,
+            mrp: amount,
+          );
+          work.workspaceCatalogueItems[0] = product;
+          final records = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
+          final balance = work.workspaceSettlementBalance;
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: Size(display.$1, display.$2),
+            textScale: display.$3,
+          );
+          if (surface == 'alert') {
+            await tester.tap(find.byKey(const Key('work-dashboard-alerts')));
+          } else {
+            await tester.tap(find.byKey(const Key('work-dashboard-search')));
+            await tester.pumpAndSettle();
+            await tester.enterText(
+              find.byKey(const Key('work-dashboard-search-field')),
+              surface == 'product' ? product.title : 'Rakesh',
+            );
+          }
+          await tester.pumpAndSettle();
+          final row = find.byKey(
+            Key(switch (surface) {
+              'product' => 'work-search-product-${product.id}',
+              'order' => 'work-search-order-current',
+              _ => 'work-alert-customer-order',
+            }),
+          );
+          await reveal(tester, row);
+          final total = find.descendant(
+            of: row,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Text &&
+                  RegExp(r'₹[\d,]+').hasMatch(widget.data ?? ''),
+            ),
+          );
+          expect(total, findsOneWidget);
+          await reveal(tester, total);
+          if (amount == 10000000000) {
+            await captureStoreView(
+              tester,
+              'r665-ancillary-$surface-${display.$1}-${display.$3}',
+            );
+          }
+          final text = tester.widget<Text>(total).data!;
+          final money = RegExp(r'₹[\d,]+').firstMatch(text)!;
+          if (surface == 'product') {
+            expectExactMoneyVisible(tester, total);
+          }
+          expect(money.group(0)!.replaceAll(RegExp(r'[₹,]'), ''), '$amount');
+          final paragraph = tester.renderObject<RenderParagraph>(total);
+          final boxes = paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: money.start, extentOffset: money.end),
+          );
+          expect(
+            boxes,
+            hasLength(1),
+            reason: 'Complete amount must stay together',
+          );
+          final painter = TextPainter(
+            text: TextSpan(
+              text: money.group(0),
+              style: (paragraph.text as TextSpan).style,
+            ),
+            textDirection: paragraph.textDirection,
+            textScaler: paragraph.textScaler,
+          )..layout();
+          expect(
+            boxes.single.right - boxes.single.left,
+            greaterThanOrEqualTo(painter.width - .5),
+            reason: 'Ellipsis must not hide any amount digits',
+          );
+          painter.dispose();
+          expect(
+            boxes.single.right,
+            lessThanOrEqualTo(paragraph.size.width + .5),
+          );
+          expect(paragraph.textScaler.scale(1), closeTo(display.$3, .01));
+          expect(tester.takeException(), isNull);
+          expect(work.workspaceOrders, orderedEquals(records));
+          expect(work.workspaceCatalogueItems.first, product);
+          expect(work.workspaceOrderAmount, '$amount');
+          expect(work.workspaceSettlementBalance, balance);
+          expect(work.workspaceInvoices, isEmpty);
+          if (surface == 'product') {
+            await reveal(tester, row);
+            expect(row.hitTestable(), findsOneWidget);
+            await tester.tap(row);
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(Key('work-catalogue-price-${product.id}')),
+              findsOneWidget,
+            );
+            expect(work.workspaceCatalogueItems.first, product);
+          }
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-workspace-dashboard')),
+            findsOneWidget,
+          );
+          expect(work.currentWorkspaceOrderId, 'APP-1043');
+          expect(work.workspaceOrders, orderedEquals(records));
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
     testWidgets('S09 pulse column amounts $display', (tester) async {
       final work = storeViewFixture();
       await mount(

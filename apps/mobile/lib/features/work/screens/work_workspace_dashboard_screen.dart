@@ -6741,6 +6741,7 @@ class _WorkspaceNavigationRow extends StatelessWidget {
     required this.title,
     required this.detail,
     required this.onTap,
+    this.amount,
   });
 
   final String keyName;
@@ -6748,47 +6749,72 @@ class _WorkspaceNavigationRow extends StatelessWidget {
   final String title;
   final String detail;
   final VoidCallback onTap;
+  final String? amount;
 
   @override
   Widget build(BuildContext context) {
     return WorkCard(
       keyName: keyName,
       onTap: onTap,
-      padding: const EdgeInsets.all(MoolSpacing.sm),
-      child: Row(
+      padding: EdgeInsets.all(
+        amount != null && MediaQuery.textScalerOf(context).scale(1) >= 2
+            ? 8
+            : MoolSpacing.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: const Color(0xFFEAF2FF),
-            foregroundColor: MoolColors.navy,
-            child: Icon(icon, size: 21),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: const Color(0xFFEAF2FF),
+                foregroundColor: MoolColors.navy,
+                child: Icon(icon, size: 21),
+              ),
+              const SizedBox(width: MoolSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      detail,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 10.5,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: MoolColors.muted),
+            ],
           ),
-          const SizedBox(width: MoolSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  detail,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MoolColors.muted,
-                    fontSize: 10.5,
-                    height: 1.25,
-                  ),
-                ),
-              ],
+          if (amount != null) ...[
+            const SizedBox(height: 6),
+            _StoreMoneyLine(
+              leading: const Text(
+                'Price',
+                style: TextStyle(color: MoolColors.muted, fontSize: 11),
+              ),
+              value: amount!,
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: MoolColors.muted),
+          ],
         ],
       ),
     );
@@ -6856,10 +6882,14 @@ class _WorkspaceSearchSurface extends StatelessWidget {
           : ListView.separated(
               key: const Key('work-dashboard-search-results'),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(
-                MoolSpacing.md,
+              padding: EdgeInsets.fromLTRB(
+                MediaQuery.textScalerOf(context).scale(1) >= 2
+                    ? 8
+                    : MoolSpacing.md,
                 MoolSpacing.sm,
-                MoolSpacing.md,
+                MediaQuery.textScalerOf(context).scale(1) >= 2
+                    ? 8
+                    : MoolSpacing.md,
                 MoolSpacing.xl,
               ),
               itemCount: results.length,
@@ -6872,6 +6902,7 @@ class _WorkspaceSearchSurface extends StatelessWidget {
                   icon: destination.icon,
                   title: destination.title,
                   detail: destination.detail,
+                  amount: destination.amount,
                   onTap: () => onOpenRoute(destination.route),
                 );
               },
@@ -17976,6 +18007,7 @@ typedef _WorkspaceSearchRecord = ({
   String id,
   String title,
   String detail,
+  String? amount,
   String route,
   IconData icon,
 });
@@ -17996,8 +18028,8 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
     records.add((
       id: 'product-${product.id}',
       title: product.title,
-      detail:
-          '${product.brand} · ${product.pack} · ₹${product.sellingPrice} · ${product.stock} available',
+      detail: '${product.brand} · ${product.pack} · ${product.stock} available',
+      amount: '₹${_formatStoreAmount(product.sellingPrice)}',
       route: '/app/retailer/home?view=stock&product=${product.id}',
       icon: Icons.inventory_2_outlined,
     ));
@@ -18012,6 +18044,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
           '${session.workspaceOrderSource} order · ${session.workspaceOrderCustomer}',
       detail:
           '${session.workspaceOrderStage} · ₹${session.workspaceOrderAmount} · ${session.workspaceOrderItems}',
+      amount: null,
       route: '/app/retailer/orders',
       icon: Icons.receipt_long_outlined,
     ));
@@ -18019,6 +18052,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
       id: 'customer-current',
       title: session.workspaceOrderCustomer,
       detail: 'Customer purchase and payment record',
+      amount: null,
       route: '/app/retailer/customers',
       icon: Icons.person_outline_rounded,
     ));
@@ -18031,6 +18065,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
       title: activity.message,
       detail:
           'Store activity · ${activity.time.hour.toString().padLeft(2, '0')}:${activity.time.minute.toString().padLeft(2, '0')}',
+      amount: null,
       route: '/app/retailer/books',
       icon: Icons.history_rounded,
     ));
