@@ -1,5 +1,5 @@
 {
-  "state": "blocked_device_not_detected",
+  "state": "installed_partial_device_review_founder_review_pending",
   "candidate": "UAW-CODEX-OPPO-R66.5-REVIEW-20260907",
   "sourceHead": "91d9a9b8a321946bc26a1c4645b22784ab43f2e3",
   "expectedSerial": "2b3e0f71",
@@ -7,12 +7,16 @@
   "package": "com.moolsocial.app.runtime",
   "expectedVersionCode": 2026090604,
   "expectedVersionName": "1.0.0-r66.5-runtime",
-  "install": "not_attempted",
+  "install": "adb_update_install_r_success_data_retained",
   "localSha256": "69EEC3287857A634BFDD71E7327BCFAD347DC60526165657499F40E9CBA807AE",
-  "installedSha256": null,
+  "installedSha256": "69EEC3287857A634BFDD71E7327BCFAD347DC60526165657499F40E9CBA807AE",
   "apkBytes": 209715721,
-  "adbReadback": "Expected OPPO serial not found; adb devices -l returned no devices.",
-  "deviceJourneys": "not_executed",
+  "adbReadback": "OPPO CPH2375/2b3e0f71; installed versionCode2026090604/versionName1.0.0-r66.5-runtime; update2026-09-07 22:06:25; base APK SHA256 equals local APK. MainActivity cold launch Status ok, TotalTime7198ms.",
+  "installLog": "artifacts/device/codex-oppo-r66-5-review-20260907/oppo-install-attempt1.log",
+  "installLogSha256": "C4AA470ACAFCF8576C15B0F0B5AE7E852D1EC5413372D0E6A9272E788E1306D3",
+  "deviceJourneys": "startup_shop_mool_work_workspace_entry_and_retailer_preview_only",
+  "dashboardQualification": "pending_no_approved_workspace_in_review_gateway_after_restart",
+  "backReplay": "not_executed_foreground_guard_stopped_the_action",
   "founderAppearance": "pending",
   "backendQualification": "not_claimed_review_gateway"
 }

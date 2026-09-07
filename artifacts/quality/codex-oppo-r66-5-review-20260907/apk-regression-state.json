@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "apk_built_device_connection_pending",
+  "machineState": "installed_founder_review_pending",
   "buildAuthorization": "consumed",
   "preBuildValidation": {
     "state": "passed",
@@ -158,7 +158,7 @@
     },
     {
       "id": "oppo-install",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-5-review-20260907/post-install.json"
       ]
