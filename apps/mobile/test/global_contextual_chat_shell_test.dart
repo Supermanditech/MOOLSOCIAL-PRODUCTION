@@ -31,6 +31,141 @@ void main() {
     return session;
   }
 
+  for (final scale in [1.0, 1.6, 2.0]) {
+    testWidgets(
+      'Workspace support idle composer stays compact and typing stays stable $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = Size(
+          scale == 2 ? 320 : 360,
+          scale == 2 ? 568 : 806,
+        );
+        tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 42);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final journey = await readyJourney();
+        final chat = ChatSession(
+          sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+        );
+        addTearDown(journey.dispose);
+        addTearDown(chat.dispose);
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: const Key('chat-review-capture'),
+            child: MoolSocialApp(
+              session: journey,
+              chatSession: chat,
+              initialLocation: Uri(
+                path: '/app/chat/thread/workspace-support',
+                queryParameters: {'return': '/app/work/workspace/choose'},
+              ).toString(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        Future<void> capture(String state) async {
+          if (!const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) return;
+          const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+          await expectLater(
+            find.byKey(const Key('chat-review-capture')),
+            matchesGoldenFile(
+              '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/r666-chat-$state-$scale.png',
+            ),
+          );
+        }
+
+        expect(chat.callServiceAvailable, isFalse);
+        expect(find.byKey(const Key('chat-thread-call')), findsNothing);
+        expect(find.byKey(const Key('chat-thread-video')), findsNothing);
+        expect(find.text('Application support'), findsOneWidget);
+        expect(
+          chat.messages('workspace-support').first.text,
+          'Ask about your Workspace application or documents.',
+        );
+        final field = find.byKey(const Key('chat-message-field'));
+        final surface = find.byKey(const Key('chat-composer-surface'));
+        expect(
+          tester.getSize(surface).height,
+          lessThanOrEqualTo(
+            scale == 1
+                ? 52
+                : scale == 2
+                ? 112
+                : 78,
+          ),
+        );
+        final hint = find.descendant(of: field, matching: find.text('Message'));
+        final hintParagraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: hint, matching: find.byType(RichText)),
+        );
+        expect(hintParagraph.didExceedMaxLines, isFalse);
+        expect(
+          hintParagraph
+              .getBoxesForSelection(
+                const TextSelection(baseOffset: 0, extentOffset: 7),
+              )
+              .length,
+          1,
+        );
+        final idlePadding =
+            tester.widget<TextField>(field).decoration!.contentPadding!
+                as EdgeInsets;
+        if (scale == 2) {
+          expect(idlePadding.right, lessThanOrEqualTo(16));
+          expect(idlePadding.bottom, greaterThanOrEqualTo(44));
+        } else {
+          expect(idlePadding.right, greaterThanOrEqualTo(100));
+          expect(idlePadding.bottom, lessThanOrEqualTo(12));
+        }
+        for (final key in [
+          'chat-attach',
+          'chat-composer-camera',
+          'chat-voice-message',
+        ]) {
+          expect(
+            tester.getSize(find.byKey(Key(key))).height,
+            greaterThanOrEqualTo(44),
+          );
+        }
+        await capture('idle');
+        await tester.tap(field);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 228);
+        await tester.pumpAndSettle();
+        await tester.enterText(field, 'QA note');
+        await tester.pumpAndSettle();
+        final position = tester.getRect(field);
+        await tester.enterText(field, 'QA notes');
+        await tester.pumpAndSettle();
+        expect(tester.getRect(field), position);
+        expect(tester.getSize(field).width, greaterThanOrEqualTo(220));
+        expect(
+          tester.getRect(surface).bottom,
+          lessThanOrEqualTo(tester.view.physicalSize.height - 228),
+        );
+        expect(find.byKey(const Key('chat-send')), findsOneWidget);
+        await capture('keyboard');
+        FocusManager.instance.primaryFocus?.unfocus();
+        tester.view.viewInsets = FakeViewPadding.zero;
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('chat-attach')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('chat-attachment-tray')), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('chat-attachment-tray')), findsNothing);
+        expect(tester.widget<TextField>(field).controller!.text, 'QA notes');
+        expect(
+          chat.messages('workspace-support').where((message) => message.mine),
+          isEmpty,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   test('commerce context cannot relabel a loaded review conversation', () {
     final chat = ChatSession();
     addTearDown(chat.dispose);
@@ -797,7 +932,9 @@ void main() {
     );
     expect(find.byKey(const Key('chat-attachment-notice')), findsOneWidget);
     expect(
-      find.textContaining('Document, photo and video sharing are unavailable'),
+      find.text(
+        'File sharing is unavailable right now. You can still type a message.',
+      ),
       findsOneWidget,
     );
     expect(find.byTooltip('Camera'), findsOneWidget);

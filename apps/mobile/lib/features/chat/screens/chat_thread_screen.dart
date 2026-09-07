@@ -593,28 +593,31 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                 onPressed: () => unawaited(_openMessageSearch()),
                 icon: const Icon(Icons.search_rounded),
               ),
-              IconButton(
-                key: const Key('chat-thread-video'),
-                tooltip: !widget.session.callServiceAvailable
-                    ? 'Video calling unavailable'
-                    : widget.session.videoCallsAvailableForSession(thread.id)
-                    ? 'Video call'
-                    : 'Video calls paused',
-                onPressed: () =>
-                    unawaited(_startCall(thread, ChatCallKind.video)),
-                icon: const Icon(Icons.videocam_outlined),
-              ),
-              IconButton(
-                key: const Key('chat-thread-call'),
-                tooltip: !widget.session.callServiceAvailable
-                    ? 'Voice calling unavailable'
-                    : widget.session.voiceCallsAvailableForSession(thread.id)
-                    ? 'Voice call'
-                    : 'Voice calls paused',
-                onPressed: () =>
-                    unawaited(_startCall(thread, ChatCallKind.voice)),
-                icon: const Icon(Icons.call_outlined),
-              ),
+              if (thread.id != 'workspace-support' ||
+                  widget.session.callServiceAvailable) ...[
+                IconButton(
+                  key: const Key('chat-thread-video'),
+                  tooltip: !widget.session.callServiceAvailable
+                      ? 'Video calling unavailable'
+                      : widget.session.videoCallsAvailableForSession(thread.id)
+                      ? 'Video call'
+                      : 'Video calls paused',
+                  onPressed: () =>
+                      unawaited(_startCall(thread, ChatCallKind.video)),
+                  icon: const Icon(Icons.videocam_outlined),
+                ),
+                IconButton(
+                  key: const Key('chat-thread-call'),
+                  tooltip: !widget.session.callServiceAvailable
+                      ? 'Voice calling unavailable'
+                      : widget.session.voiceCallsAvailableForSession(thread.id)
+                      ? 'Voice call'
+                      : 'Voice calls paused',
+                  onPressed: () =>
+                      unawaited(_startCall(thread, ChatCallKind.voice)),
+                  icon: const Icon(Icons.call_outlined),
+                ),
+              ],
             ],
           ),
           messageThreadId: thread.id,
@@ -2750,6 +2753,24 @@ class _Composer extends StatefulWidget {
 class _ComposerState extends State<_Composer> {
   bool _attachmentsOpen = false;
   String? _attachmentNotice;
+  final FocusNode _inputFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _inputFocus.addListener(_onInputFocusChanged);
+  }
+
+  void _onInputFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _inputFocus.removeListener(_onInputFocusChanged);
+    _inputFocus.dispose();
+    super.dispose();
+  }
 
   ChatSession get session => widget.session;
   String get threadId => widget.threadId;
@@ -2771,13 +2792,13 @@ class _ComposerState extends State<_Composer> {
     final filesAvailable = session.attachmentSelectionAvailable;
     final photosAvailable = session.photoSharingAvailable;
     if (!filesAvailable && !photosAvailable) {
-      return 'Document, photo and video sharing are unavailable right now. Camera remains in the composer and shows its own availability. You can continue with a message.';
+      return 'File sharing is unavailable right now. You can still type a message.';
     }
     if (!filesAvailable) {
-      return 'Document and video sharing are unavailable right now. Photos remain available here; camera stays in the composer.';
+      return 'Document and video sharing are unavailable. You can send a photo or message.';
     }
     if (!photosAvailable) {
-      return 'Photo sharing is unavailable right now. Documents and videos remain available here; camera stays in the composer.';
+      return 'Photo sharing is unavailable. You can send a file or message.';
     }
     return null;
   }
@@ -2890,6 +2911,12 @@ class _ComposerState extends State<_Composer> {
     final reply = session.replyTarget(threadId);
     final photo = session.selectedPhoto(threadId);
     final attachment = session.selectedAttachment(threadId);
+    final compactEmpty =
+        !_inputFocus.hasFocus &&
+        controller.text.isEmpty &&
+        reply == null &&
+        photo == null &&
+        attachment == null;
     return SafeArea(
       top: false,
       bottom: false,
@@ -3253,107 +3280,137 @@ class _ComposerState extends State<_Composer> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
-                    child: Container(
-                      key: const Key('chat-composer-surface'),
-                      constraints: const BoxConstraints(minHeight: 48),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                        border: Border.all(
-                          color: MoolColors.navy.withValues(alpha: .10),
-                        ),
-                      ),
-                      child: Stack(
-                        children: [
-                          TextField(
-                            key: const Key('chat-message-field'),
-                            controller: controller,
-                            minLines: 1,
-                            maxLines: 2,
-                            scrollPadding: const EdgeInsets.only(bottom: 112),
-                            decoration: InputDecoration(
-                              hintText: photo == null && attachment == null
-                                  ? 'Message'
-                                  : 'Add a caption',
-                              filled: false,
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.fromLTRB(
-                                MoolSpacing.sm,
-                                8,
-                                MoolSpacing.sm,
-                                48,
-                              ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final theme = Theme.of(context);
+                        final hintStyle =
+                            (theme.useMaterial3
+                                    ? theme.textTheme.bodyLarge!
+                                    : theme.textTheme.titleMedium!)
+                                .merge(theme.inputDecorationTheme.hintStyle);
+                        final hintMeasure = TextPainter(
+                          text: TextSpan(text: 'Message', style: hintStyle),
+                          textDirection: Directionality.of(context),
+                          textScaler: MediaQuery.textScalerOf(context),
+                        )..layout();
+                        final inlineIdle =
+                            compactEmpty &&
+                            hintMeasure.width <=
+                                constraints.maxWidth - MoolSpacing.sm - 106;
+                        hintMeasure.dispose();
+                        return Container(
+                          key: const Key('chat-composer-surface'),
+                          constraints: const BoxConstraints(minHeight: 48),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(
+                              MoolRadii.capsule,
+                            ),
+                            border: Border.all(
+                              color: MoolColors.navy.withValues(alpha: .10),
                             ),
                           ),
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            child: SizedBox(
-                              height: MoolMetrics.minimumTapTarget,
-                              child: Row(
-                                key: const Key('chat-composer-control-row'),
-                                children: [
-                                  ValueListenableBuilder<TextEditingValue>(
-                                    valueListenable: controller,
-                                    builder: (context, value, _) {
-                                      final hasDraft =
-                                          value.text.isNotEmpty ||
-                                          photo != null ||
-                                          attachment != null ||
-                                          reply != null;
-                                      if (!hasDraft) {
-                                        return const SizedBox(
-                                          width: MoolMetrics.minimumTapTarget,
-                                        );
-                                      }
-                                      return IconButton(
-                                        key: const Key('chat-discard-draft'),
-                                        tooltip: 'Discard draft',
+                          child: Stack(
+                            children: [
+                              TextField(
+                                key: const Key('chat-message-field'),
+                                controller: controller,
+                                focusNode: _inputFocus,
+                                minLines: 1,
+                                maxLines: 2,
+                                scrollPadding: const EdgeInsets.only(
+                                  bottom: 112,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: photo == null && attachment == null
+                                      ? 'Message'
+                                      : 'Add a caption',
+                                  filled: false,
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.fromLTRB(
+                                    MoolSpacing.sm,
+                                    inlineIdle ? 12 : 8,
+                                    inlineIdle ? 104 : MoolSpacing.sm,
+                                    inlineIdle ? 12 : 48,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                child: SizedBox(
+                                  height: MoolMetrics.minimumTapTarget,
+                                  child: Row(
+                                    key: const Key('chat-composer-control-row'),
+                                    children: [
+                                      ValueListenableBuilder<TextEditingValue>(
+                                        valueListenable: controller,
+                                        builder: (context, value, _) {
+                                          final hasDraft =
+                                              value.text.isNotEmpty ||
+                                              photo != null ||
+                                              attachment != null ||
+                                              reply != null;
+                                          if (!hasDraft) {
+                                            return const SizedBox(
+                                              width:
+                                                  MoolMetrics.minimumTapTarget,
+                                            );
+                                          }
+                                          return IconButton(
+                                            key: const Key(
+                                              'chat-discard-draft',
+                                            ),
+                                            tooltip: 'Discard draft',
+                                            onPressed: session.busy
+                                                ? null
+                                                : _discardDraft,
+                                            icon: const Icon(
+                                              Icons.delete_outline_rounded,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                      const Spacer(),
+                                      IconButton(
+                                        key: const Key('chat-attach'),
+                                        tooltip: _attachmentsOpen
+                                            ? 'Close attachments'
+                                            : 'Attach a file',
                                         onPressed: session.busy
                                             ? null
-                                            : _discardDraft,
+                                            : _toggleAttachments,
                                         icon: const Icon(
-                                          Icons.delete_outline_rounded,
+                                          Icons.attach_file_rounded,
                                         ),
-                                      );
-                                    },
+                                      ),
+                                      IconButton(
+                                        key: const Key('chat-composer-camera'),
+                                        tooltip: 'Camera',
+                                        onPressed: session.busy
+                                            ? null
+                                            : () => unawaited(
+                                                _selectPhoto(
+                                                  context,
+                                                  ChatPhotoSource.camera,
+                                                ),
+                                              ),
+                                        icon: const Icon(
+                                          Icons.photo_camera_outlined,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const Spacer(),
-                                  IconButton(
-                                    key: const Key('chat-attach'),
-                                    tooltip: _attachmentsOpen
-                                        ? 'Close attachments'
-                                        : 'Attach a file',
-                                    onPressed: session.busy
-                                        ? null
-                                        : _toggleAttachments,
-                                    icon: const Icon(Icons.attach_file_rounded),
-                                  ),
-                                  IconButton(
-                                    key: const Key('chat-composer-camera'),
-                                    tooltip: 'Camera',
-                                    onPressed: session.busy
-                                        ? null
-                                        : () => unawaited(
-                                            _selectPhoto(
-                                              context,
-                                              ChatPhotoSource.camera,
-                                            ),
-                                          ),
-                                    icon: const Icon(
-                                      Icons.photo_camera_outlined,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: MoolSpacing.xs),

@@ -138,8 +138,7 @@ class ChatSession extends ChangeNotifier {
         const ChatMessage(
           id: 'workspace-review-1',
           sender: 'Workspace Review',
-          text:
-              'Choose one work profile and complete only the requested details. Your personal account remains active during review.',
+          text: 'Ask about your Workspace application or documents.',
           timeLabel: 'Now',
           mine: false,
         ),
@@ -445,8 +444,8 @@ class ChatSession extends ChangeNotifier {
     ChatThread(
       id: 'workspace-support',
       title: 'Workspace Review',
-      subtitle: 'Setup and application support',
-      preview: 'Complete only the details requested for review.',
+      subtitle: 'Application support',
+      preview: 'Questions about your application or documents?',
       timeLabel: 'Now',
       type: ChatThreadType.support,
       verified: true,

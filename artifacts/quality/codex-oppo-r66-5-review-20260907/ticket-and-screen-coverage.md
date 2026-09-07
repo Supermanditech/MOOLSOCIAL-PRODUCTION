@@ -128,6 +128,10 @@ All completed Codex frontend fixes are retained through 6212aca44117d70fdbe2fc51
 | More time | Compact timer-adjacent request sheet; current deadline retained while requesting; unavailable, declined, retry and confirmed presentation; original operation reused after uncertainty; exact store/order/operation and current-state validation; confirmed acceptance and fulfilment times; no local extension shortcut | The optional authenticated WorkOrderTimeGateway has no live implementation. Durable backend reconciliation, store-wide capacity rules and consumer notifications/estimate propagation remain deferred; fixtures are frontend evidence only |
 | Retailer customer collection | Existing central card, explicit Order ready, QR/wait, Customer confirmed, Hand Over, Collected; inline unavailable/error/reconciliation; biker pickup preserved | Consumer 022-R5-A, authentic backend enforcement, real QR transport and integrated acceptance remain pending |
 
+## Current correction checkpoint — 8 September 2026
+
+AUDIT-R665-01–05,07–08 and local children02a/07a/08a are implemented and locally qualified; their native successor replay is still pending. This checkpoint supersedes older appended open-number summaries, not their historical evidence. Chat97 affected cases and full analysis pass, and six normal/enlarged captures were inspected. AUDIT-R665-06 document viewing is next: image controls/zoom and genuine PDF viewing remain unresolved. Review-fixture dashboard entry, backend authority, consumer integration and physical200percent remain explicitly unqualified.
+
 ## Deferred service dependencies, not APK-review claims
 
 - Authoritative store capacity, customer-visible waiting/ETA, extension decisions and reassignment. The retailer request frontend is implemented; a device timer must not fabricate acceptance, reassignment or delivery.

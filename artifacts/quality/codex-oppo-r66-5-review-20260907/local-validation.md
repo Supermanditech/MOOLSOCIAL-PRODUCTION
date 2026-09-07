@@ -139,3 +139,23 @@ All six final PNGs in `r666-request-capture8-20260908` were inspected directly. 
 | r666-request-ime-320.0-2.0.png | 58ECD512B199F70945BC87E82637CBB3654C9E7D22B05112997CBE96B839DE34 |
 | r666-request-ime-360.0-1.0.png | B4C5AA43ECBD13C21F2FDA177A55F251A78310FD3F080EC176AD4D2FFF9332CD |
 | r666-request-ime-360.0-1.4.png | 45DF96ADCE15B1EA4DD2B1B00D55C252702C6EB0621DFD8B3CCA7BE279F503F6 |
+
+### AUDIT-R665-07 / 07a — Workspace support and compact Chat
+
+The empty composer uses one row only when its full hint fits; focused text, drafts and enlarged layouts retain the full-width field above fixed controls. Actual text measurement, focus stability, Camera/Attach targets, Back and unsent drafts are asserted. Workspace support no longer shows unavailable voice/video controls; other Chat entries retain their existing capability recovery. The application prompt and attachment-unavailable notice use concise customer-facing wording. No message was sent and no service was enabled.
+
+- Focused capture command: `flutter test --no-pub --concurrency=1 --reporter expanded --update-goldens --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=r666-chat2-20260908 test/global_contextual_chat_shell_test.dart --name 'Workspace support idle|Assist draft keeps full-width'`. 4 passed, 0 failed, exit 0; `r666-chat-focused2-20260908.log`, SHA-256 `D1BD42CB374969F08159F7882DF6F1E285F516EF7254282FC005EE0D7C0E4299`.
+- Complete affected command: `flutter test --no-pub --concurrency=1 --reporter expanded test/chat_flow_test.dart test/chat_settings_hub_test.dart test/global_contextual_chat_shell_test.dart`. 97 passed, 0 skipped, 0 failed, exit 0; `r666-chat-connected2-20260908.log`, SHA-256 `E6481DE0ED2A713718BF0DC840517CDAEB14738855A7C1F2F3AA3E75AC55B566`.
+- Full `flutter analyze --no-pub`: zero issues, exit 0; `r666-chat-analysis1-20260908.log`, SHA-256 `1406D595A83FD2D0CD93325D2A8A951A358C83F3C64903227FC21F41EC0BB2DB`.
+- Initial focused failure at 200% and connected1's single stale attachment-copy assertion are retained in the registry and raw logs. Neither is a passing qualification. The corrected assertion still requires truthful unavailable copy, disabled attachments and complete navigation/tap contracts.
+
+All six actual Flutter captures below were directly inspected (100%, 160%, 200%; last at 320x568). At 200% the composer intentionally grows to preserve the complete hint and input width. Long header identity is abbreviated visually but remains available in Conversation info; that is not a claim of full physical accessibility qualification. Attachment tray plus physical enlarged IME, live messaging and successor OPPO replay remain pending.
+
+| Capture in r666-chat2-20260908 | SHA-256 |
+| --- | --- |
+| r666-chat-idle-1.0.png | 8AE1E091718729214D2E987B76AD78D4FBF8C6ED088D51735A718B7EF84C1E74 |
+| r666-chat-idle-1.6.png | 4F54F46140CE8E96F0FD5660FF3AEC7C1CF046380E4C476FFD1F890FB6025B83 |
+| r666-chat-idle-2.0.png | 4D245AD8B575B9980EB57D7DD2258192D89CDB70A76FFD5EA2E13F93AA671148 |
+| r666-chat-keyboard-1.0.png | 62F4E8DB4C51F4B45DC7C095D70C31366B5C1FFAD4A850B77389CF9C893EF304 |
+| r666-chat-keyboard-1.6.png | 02DD703F906F7E64F19ABAAD7B73DAA3D877E90E66542142C9CBE56FB9E07912 |
+| r666-chat-keyboard-2.0.png | 15A98D10BC9F616233F3D28C275DEEA9E132D939F72D984AF260A2BE1A2A3BAD |
