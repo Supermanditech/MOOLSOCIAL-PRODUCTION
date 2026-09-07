@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "prebuild_passed",
-  "buildAuthorization": "pending_clean_source_seal",
+  "machineState": "built_integrity_passed_install_pending",
+  "buildAuthorization": "consumed",
   "preBuildValidation": {
     "state": "passed",
     "evidence": "artifacts/quality/codex-oppo-r66-7-review-20260908/prebuild-validation.md"
@@ -14,7 +14,7 @@
     "buildMode": "debug",
     "gateProfile": "uaw_runtime_ui_review_debug",
     "branch": "work/codex-ui/codex-oppo-review-v1-20260905",
-    "head": "pending_clean_source_seal"
+    "head": "b2adfe02e26740a4364da6ddd9b4f288d1d9acc9"
   },
   "source": {
     "manifestPath": "artifacts/quality/codex-oppo-r66-7-review-20260908/source-manifest.txt",
@@ -33,7 +33,7 @@
   "preBuildGates": [
     {
       "id": "branch-head",
-      "state": "pending_clean_source_seal",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-7-review-20260908/prebuild-validation.md"
       ]
@@ -151,7 +151,7 @@
   "postBuildGates": [
     {
       "id": "apk-integrity",
-      "state": "pending"
+      "state": "passed"
     },
     {
       "id": "oppo-install",
@@ -165,5 +165,15 @@
       "id": "founder-review",
       "state": "pending"
     }
-  ]
+  ],
+  "apk": {
+    "sourceHead": "b2adfe02e26740a4364da6ddd9b4f288d1d9acc9",
+    "sha256": "E13BBB3AFFF76DDA8168DA5CF25C03CBF98EDA8178E0DBCC2B9FE01D11823749",
+    "bytes": 209721825,
+    "package": "com.moolsocial.app.runtime",
+    "versionCode": 2026090802,
+    "versionName": "1.0.0-r66.7-runtime",
+    "path": "artifacts/device/codex-oppo-r66-7-review-20260908/uaw-codex-oppo-r66.7-review-20260908-device-review-debug.apk",
+    "buildLogSha256": "C6754B9858E4CFA077F096A7AF74D90FE3BE359F3DDF850BC8E70AE0A62D21E6"
+  }
 }
