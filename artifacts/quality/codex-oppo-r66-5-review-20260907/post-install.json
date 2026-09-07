@@ -18,8 +18,8 @@
   "dashboardQualification": "pending_no_approved_workspace_in_review_gateway_after_restart",
   "backReplay": "verified_selector_pending_return_keyboard_dismissal_document_preview_picker_cancel_review_edit_and_workspace_chat_exact_return; interrupted_attempts_are_not_passes",
   "auditRecord": "ticket-and-screen-coverage.md#oppo-audit-round-1--registered-findings-7-september-2026",
-  "physicalLargeText": "pending_android_write_settings_denied_font_remains_1.0",
-  "nativePickerQualification": "png_file_selection_preview_remove_restore_passed; camera_shutter_semantics_and_cancel_observed; gallery_and_cloud_cancel_observed; actual_camera_gallery_pdf_cloud_completion_pending",
+  "physicalLargeText": "native160percent_preview_pending_chat_subset_exercised_via_normal_settings_UI; font_restored_and_readback1.0; physical200percent_and_TalkBack_pending; no_security_change",
+  "nativePickerQualification": "png_selection_preview_remove_restore_passed; two_page_QA_pdf_selected_and_retained_but_View_has_no_preview_or_open_action_AUDIT_R665_06; camera_shutter_semantics_and_cancel_observed; gallery_and_cloud_cancel_observed; actual_camera_gallery_cloud_completion_pending",
   "founderAppearance": "pending",
   "backendQualification": "not_claimed_review_gateway"
 }

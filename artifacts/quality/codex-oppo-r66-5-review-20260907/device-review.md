@@ -1,5 +1,153 @@
 # r66.5 OPPO review
 
+## Audit continuation — 7/8 September 2026, captures 93–148
+
+Installed r66.5/source91d9a9b8 is unchanged. This checkpoint preserves the second reachable-journey audit before the founder-authorised correction/build/retest round. Backend authority, consumer integration and founder appearance acceptance are not claimed.
+
+- Workspace: pending case return, Speciality and Wholesaler same-page previews, Daily work tab, Close and Back were exercised without choosing another profile over the submitted case (93–98).
+- Physical large text: normal Android Display/Font UI selected Very large, with readback `font_scale=1.6`. Wholesaler preview, pending summary, Chat inbox/discovery/thread and unsent composer were exercised (104–113). The pending email row adapted to stacked full-width content; primary preview action remained reachable by scrolling. Chat hint/subtitle truncation and oversized composer extend AUDIT-R665-07. This was 160%, not 200%; no broad accessibility pass is inferred.
+- Font restoration: only the size slider was changed, then restored through Settings to Default; readback `font_scale=1.0` confirmed before continuing (114–117). Roboto, default weight, adaptive-weight Off and security permissions were untouched.
+- Chat: Conversation info, honest media empty state, Pause -> blocked composer -> Resume, message search and exact result return all worked (118–126). No message, attachment, call or voice recording was sent. The explicitly labelled QA unsent draft was discarded; no other draft was deleted.
+- Normal app process restart used force-stop/start without data clearing. Entered contact/business strings restored; in-memory ReviewWorkGateway case and standalone confirmations did not persist. Reconfirmed the three test contacts with the known review code, then reached Documents through the ordinary UI (127–143). This is not evidence of production data loss or real OTP delivery.
+- Native PDF: selected the labelled two-page QA PDF via the system file picker; the exact filename and attachment state returned (144–146). View showed only metadata/instructions and no document/open-file action (147); Back retained the attachment (148). AUDIT-R665-06 is now native-confirmed for PDF inspection. The PDF was not submitted as identity evidence.
+
+### Evidence qualification and recovery
+
+114 additional files: 58 PNG (56 native captures plus two PDF renders), 55 XML and one PDF; 8,783,142 bytes. Native127 has PNG only: UIAutomator returned null root node during startup, and the success-message guard correctly rejected XML. Fresh128 recovered readiness; 127 is not a paired capture or product failure. An oversized tool response around112/113 was unavailable; files were independently recovered,113 XML confirmed the draft was discarded and112 PNG was subsequently inspected. No missing output was reconstructed.
+
+Direct PNG visual inspection in this continuation:102,104,105,109,111,112,115,118,124,147 plus both QA PDF renders. Other captures were reviewed through hierarchy/navigation outcome, not all certified visually. These device stills do not qualify frame pacing, all screen sizes or TalkBack.
+
+PDF fixture: `MoolSocial-QA-NOT-A-REAL-DOCUMENT-r665.pdf`, 3201 bytes, SHA-256 `334BFE9F8E952DC688DC6C552F610A9DA258BE7733A2424CABB06B23F4521EDA`. Created with the PDF skill, rendered and inspected before selection; both pages clearly say QA ONLY / not an identity or bank document. Its device copy remains in Downloads; no personal PDF/photo was opened.
+
+### Corrected finding boundary and next scope
+
+AUDIT-R665-08's earlier description was too broad: Submitted information already reads `session.submittedProfile`, and submission copies proof references. Do not replace this working summary or claim its business/contact values mutate with the draft. The remaining risk is a selected-profile/header and active review-case mismatch because `selectProfile` can change profile and draft proof entries while an existing case remains. Prove and fix only that root cause with focused tests; durable multi-case backend recovery remains BE-01/02.
+
+Founder subsequently authorised autonomous completion of reachable audit, deduplicated Codex-owned fixes, local regression/visual checks, Git sealing, successor APK installation and OPPO retest. Do not expand into Cursor-owned Buy/Redmi work, production approval/collection bypasses, real messages or backend implementation. Existing OPPO-R66.5-REVIEW-ENTRY-01 remains open: the installed review gateway has no approved/scenario entry. A separate QA-only scenario-selector question has not yet received a direct answer; no selector or approval fixture was injected in this checkpoint.
+
+Shutdown is conditional on all work/testing complete and positive confirmation that Cursor has stopped. Lack of activity is not confirmation. Otherwise leave the laptop running.
+
+### Additional immutable evidence inventory
+
+| File | Bytes | SHA-256 |
+| --- | ---: | --- |
+| MoolSocial-QA-NOT-A-REAL-DOCUMENT-r665.pdf | 3201 | 334BFE9F8E952DC688DC6C552F610A9DA258BE7733A2424CABB06B23F4521EDA |
+| r665-audit-100-display-lower.png | 79239 | 73FCE2DA4CC37C6880C08FD12B83A929C48A37DE11DC736B039089E94F5FD977 |
+| r665-audit-100-display-lower.xml | 24484 | D68C30296FD67FD8B6C3589D1C9F434139A0CB2475C9069927B83DED69900C8D |
+| r665-audit-101-font-settings-original.png | 85276 | 4D687869BBF9C6F3279EF222DAADAC4015C9B44ACA4FB7332DA42B759DFD3CC8 |
+| r665-audit-101-font-settings-original.xml | 2872 | EADC04BC4DC3188FCFF09160750E8E54E97BC11796CFDD704E7B7163133CE508 |
+| r665-audit-102-font-controls.png | 83910 | 5F40226B83380E0568432C7583FE12B58A208F28C67CD1BEE5B324357CEC859C |
+| r665-audit-102-font-controls.xml | 23267 | E8E366872E69A47948132F0389683E5382505129EC7A6CD01D048776F1DE6275 |
+| r665-audit-103-font-largest-preview.png | 82988 | AB4DE30F55EE4511172E6C09BD5FD8E3A491D7A70B91F2BB0D643955D75A7D6C |
+| r665-audit-103-font-largest-preview.xml | 23270 | D4C6C9E5DCBB2CFFB584B9812A6B1089DD9D2B50C4108AE85959E66EF0CC4E33 |
+| r665-audit-104-wholesaler-font160.png | 133874 | 05AB0CF86A43FE48FB68EAD278543CB51D1BCF0A8FFCD30C4FBC973134D75DC0 |
+| r665-audit-104-wholesaler-font160.xml | 12446 | 628421CFF436B40F2B247076FFC73829A7CE87FD677BB5159D5E4A6C05C2545C |
+| r665-audit-105-pending-font160.png | 164125 | 36775C4E7833C1590747119CE33210C83868A31CCEDC626390CC85DF7DFED018 |
+| r665-audit-105-pending-font160.xml | 11446 | 0DC108925AD4D252FEF721204E38AD3D977F7D13EFF9E159A68ECC84F6D41F37 |
+| r665-audit-106-pending-lower-font160.png | 140184 | 3007A09739E03B8269BEEDD3CABCDCF38C3841589EA107C5C6D29F9DCA6927B6 |
+| r665-audit-106-pending-lower-font160.xml | 12099 | E68DB87EAE4C8A512D23613F74C1A8887A6C9A62D3247556E4567079092F8065 |
+| r665-audit-107-selector-font160.png | 133490 | 2FE7E26A71322A98E44BE59790929185D82CA6237FA8871B5769A76B95970478 |
+| r665-audit-107-selector-font160.xml | 12446 | 628421CFF436B40F2B247076FFC73829A7CE87FD677BB5159D5E4A6C05C2545C |
+| r665-audit-108-chat-font160.png | 123301 | 9EB9864A411070692F99F45D4530FA0E419BFF9132ABD492B7A2A19691064612 |
+| r665-audit-108-chat-font160.xml | 12000 | 888FDFE27F9DE50E8A88614E70402841629CB5DFCE880B3B9D4E8F2FEE589765 |
+| r665-audit-109-new-chat-font160.png | 152596 | 5686935D4083FBC6951DEE9E9240B7191F2833AC7790B219430DC64FE99DE52E |
+| r665-audit-109-new-chat-font160.xml | 9681 | F600904C6B0BDC5CDCC1CD3E2E7D5D4AB12660C2BC1D4114604D674786D59966 |
+| r665-audit-110-chat-list-font160.png | 123274 | A97BF88B7DFAA4D4B17603A7E03F33B479FC199CDE1739961129A2F9687D425A |
+| r665-audit-110-chat-list-font160.xml | 12000 | 888FDFE27F9DE50E8A88614E70402841629CB5DFCE880B3B9D4E8F2FEE589765 |
+| r665-audit-111-thread-font160.png | 110869 | 1B0187928F2DA43C7824EFE445DF5064D2CA36E084B5F7F5963B049B8451A367 |
+| r665-audit-111-thread-font160.xml | 7716 | 69C6329DA403243597EED57006A4F882A8F1175D9B16C16B922AD995BEB557FF |
+| r665-audit-112-composer-font160.png | 178249 | 1FF80EBDB6145917B5CB20C853A3D0373967AA0209D440B54D11B7D3C291C49B |
+| r665-audit-112-composer-font160.xml | 8108 | BA615539332166F18224EDD5A280AF4BB9D85DAA8336118F87D4A3BF1AA3EA60 |
+| r665-audit-113-draft-discard-font160.png | 178440 | EBF3754698A8068F531D98F8CF102941404438E7BF7AB67D08AC7A952658906D |
+| r665-audit-113-draft-discard-font160.xml | 7710 | 9CC493633E64AFDC164B13524BC03F71F42440AA24BB64A6347A01487486BBFB |
+| r665-audit-114-restore-display.png | 93176 | 9F3777DE0D55E73A85503A91B5D73D7EE87DB0407FFD98D9A7501646E29016FC |
+| r665-audit-114-restore-display.xml | 22727 | 478F3279AD39084BAAFB4375D9C7598496600C3316FEE13B9787F116E7D6004C |
+| r665-audit-115-restore-font-controls.png | 87165 | CD20FB3EAF8B7B9676466DAF10A71D86CD75E32FA2921E5E04F6EF2599F5B396 |
+| r665-audit-115-restore-font-controls.xml | 22510 | 90F852DEF5AC73C1A90525159A245D050238155DE0E231CD171AAE9D27209BA8 |
+| r665-audit-116-default-font-preview.png | 85315 | D3D979D660A55ED0CC3CC8427E6340915B4EA05BFB937FBF216E774744FBF4EC |
+| r665-audit-116-default-font-preview.xml | 24312 | F2C6C5EBCA7F20BC9F8235509DFDA1C53EAA93C7A982BCEAD930211A81B32B44 |
+| r665-audit-117-font-restored-chat.png | 80946 | 7A98B5F17A5AF55B65B1C7B418EDD1594B8654A1CF1D94A28FDC9DE3EE72F50E |
+| r665-audit-117-font-restored-chat.xml | 7717 | E07E07F52A90A33BC53F4D86B621E4757F7E6F90CBA92EE5685C96D92BC0F35E |
+| r665-audit-118-chat-info.png | 184410 | 0E013F652C5A95EFC7B710AE471E97469B96AF4B7111F8B49E9AA58FB61E28A0 |
+| r665-audit-118-chat-info.xml | 8692 | 1730AADE180F97F37174450546BB292646337F8BEAE954840A1060C40860E2A5 |
+| r665-audit-119-chat-media.png | 74776 | 6A6030B97ACDE09CB7C04F2541A2AC97C9DDC988AE945F11B0E6B3EDC411144E |
+| r665-audit-119-chat-media.xml | 8547 | F95E938E3BAC551AED7C0605D349CD1621DED4C0D70D873A6CEFD82DC1DDB416 |
+| r665-audit-120-chat-info-return.png | 184409 | 0839EE109FB21718BFCC78235F0F84F3F46C72F6BD00817FE8967C76F7644D2F |
+| r665-audit-120-chat-info-return.xml | 8692 | 1730AADE180F97F37174450546BB292646337F8BEAE954840A1060C40860E2A5 |
+| r665-audit-121-chat-pause.png | 186376 | 7D3636635E079BB6888661583D55E4823FEE5ECE9327243E8D998361FC46FDAF |
+| r665-audit-121-chat-pause.xml | 9763 | 604AA3EEC496C41CCE4A15F8C95D7B78D71FD7DD66111688264BE5781767E752 |
+| r665-audit-122-chat-paused-thread.png | 82875 | 240495176892CA03E937E8834D75C9C77E944E62296A4A485619C023DE513D9A |
+| r665-audit-122-chat-paused-thread.xml | 7055 | EFF9FC5880C40A76C594387442153E107AF6D31A796B428F8D531ED0C872E9C8 |
+| r665-audit-123-chat-resumed.png | 80718 | 5685D3140A38B1D161C1E9EC4D898BD20BB394369AD58F5B2D6E72F6406DBBD2 |
+| r665-audit-123-chat-resumed.xml | 7718 | ADD239FDBA6AB3DBEE1C8E9810410204BDC4865D2DF4AC526D11A769B1FCF705 |
+| r665-audit-124-message-search.png | 131799 | 789DDFDE6D434AC22E74824F127FE82B2B16C905C49116EB301926DC42F711A1 |
+| r665-audit-124-message-search.xml | 5893 | D1778B6973154514DCA1DB3EAD188F20205FEF7CC0A6041AA311B0395619B169 |
+| r665-audit-125-chat-search-result.png | 126973 | D3C46E9B04F43C90435C374CF5D55F623642CAD84CE6D0557521735E52962ECC |
+| r665-audit-125-chat-search-result.xml | 6651 | EAE034CF6A249AAC9BC857307D1FBBE91A99C032703126EF56907320C1A50F50 |
+| r665-audit-126-message-result-return.png | 85011 | F2D8EF157F68063D57E80E5E7F25CC26EFBCA9F06DB58198A2D5A5A67DA3CEB7 |
+| r665-audit-126-message-result-return.xml | 7717 | F4210EADC5554D8FA153B9440E5BF991F8453179F43388FDF18BD5F2F4D20DD8 |
+| r665-audit-127-cold-pdf-journey.png | 72572 | 7D731D26D4EF7D7AF11D00EC8F27418C7C2A366600DF579B3EBFDF52109502FD |
+| r665-audit-128-cold-ready.png | 415801 | 4CE761AF1A1114A879EDE8A5AB97E804B82BE1BE70C84BC632291108F09A11D3 |
+| r665-audit-128-cold-ready.xml | 24491 | 6400967F59679BBB5287E435EA70E5B9E43E28CE317C88AF5C232E95134B957F |
+| r665-audit-129-mool-return.png | 362155 | B0DE0FAF34F2FCA6BF7A74DB938601AB1200D61FCABC9A71A1826BDA3E9BD4F6 |
+| r665-audit-129-mool-return.xml | 28181 | 7D0123414D61A8640FAD4269398B6551969449E9FE0B52DB956088C1B09857A0 |
+| r665-audit-130-work-entry.png | 215427 | F97672F57D04E268BE13B9C626446AD5C12C74875C7B800F6F6581A4AF4F906B |
+| r665-audit-130-work-entry.xml | 12056 | 130F16C31085DA72D07B833642C48E1992B632813D32BB064B4B4080A1BE96F7 |
+| r665-audit-131-workspace-restart.png | 178025 | A2F69AEA9ACB4BE2A5ED05F3515E922E9996C554ED71E69D9ABA37CE5AD49591 |
+| r665-audit-131-workspace-restart.xml | 10399 | 04465DFE282146F400DE671AD1CA55C443E2B424EC22A219289D74497FA5AC41 |
+| r665-audit-132-grocery-restart-preview.png | 143542 | ABAE311BC27E77F7E856CD6A2E0203E044C12359CCD4FD2C8DE5EE6880CB2C32 |
+| r665-audit-132-grocery-restart-preview.xml | 13249 | C0F9C25443A900A054A1686799C4A2A67288AD28D8C27E6B97AAA7D2F5B01528 |
+| r665-audit-133-documents-ready-restart.png | 164923 | 31A18C05610E217037A5492B51045A16DC5C232A8945A48141A69E325E256BAE |
+| r665-audit-133-documents-ready-restart.xml | 10066 | 888A59AC7ED0C89AED7A74D83B6C3B345B4435634C8AE6CCB81A01FC211A8962 |
+| r665-audit-134-contacts-restored.png | 117148 | 29CCFF8269035AC7A6B64126A8B14D91B369B8A650BAD84423AB0BC7F6A671CF |
+| r665-audit-134-contacts-restored.xml | 12023 | E42B10ECF64AFBF791FFF7AB620259981CFC7F7AC24CB51A607D0F4750D4D6C5 |
+| r665-audit-135-primary-code.png | 129566 | 7946C7D5F052F2F96DDCC68FB917A1EFA789DC13BAF55F303176303E2DDE2A23 |
+| r665-audit-135-primary-code.xml | 9591 | DDDE6221E554E5ECC12BED5B5D7771272359DB113B3D25D887C57960ECFDBD46 |
+| r665-audit-136-primary-code-entry.png | 130704 | 0065759632FAD67952B7F1FF4A64A294BBDD560BB8ACA389F79F1E2C5EEB669C |
+| r665-audit-136-primary-code-entry.xml | 9597 | DFAE4AC1A17694519613F4D73FCAAA88CACF35370E465A96F491EBEFE629FDD6 |
+| r665-audit-137-primary-confirmed.png | 123397 | 78B169C22C2537BD0675AF6898B80FD83F74B3FE4F726DD717AEFDFE0EBAF54A |
+| r665-audit-137-primary-confirmed.xml | 11687 | F3728C5AA03D463108B32986ACD0E00A60BAE95C2937D88C7CB4979B8837D1FD |
+| r665-audit-138-email-code.png | 135729 | 73EE87BE3A9A2A6BFD5FCEB831B906DA62ADBB23655EE7FE3C4CAD17CAA6949B |
+| r665-audit-138-email-code.xml | 9904 | 7ABD259F8C22F5CB94D3250BEFB0972FA25FCD42592724140330AFBE905F17FC |
+| r665-audit-139-email-confirmed.png | 121116 | C992F32B783ED5BC9299B4FF7CD15C2A95C0910836ECD1287447470243B3CAFB |
+| r665-audit-139-email-confirmed.xml | 11659 | 33E606A0583A5E330ACDEBA931749B258774368214307E4CEDD83E63E631B2E3 |
+| r665-audit-140-backup-code.png | 135297 | E316E7690C1D3B29F3B638C4189FC2CFB5FAD668F1A5EBCF008429BA4FABCC55 |
+| r665-audit-140-backup-code.xml | 9230 | 4C13E9F7104558C94F4286AB8170FE5F28168448CB8CD7E0140982CD7FED5FC7 |
+| r665-audit-141-contacts-confirmed.png | 129571 | BD11411913DC49F838349BFF8DA917FA0E75A898D7D60E2282AA18189A816877 |
+| r665-audit-141-contacts-confirmed.xml | 11327 | ED0AE83316EDDB7949542D39D7058F4B500DD8A052CECBA47BABD8B03292267F |
+| r665-audit-142-details-restored.png | 141337 | 377F6CD4F6D4F2980B00921583CAD0E57017C190B9C6011437D073A50028AD71 |
+| r665-audit-142-details-restored.xml | 9848 | 5D5D67019E3FF7CF0DFEA4348489E5CD3F916F5D457F6644558860DA541EA412 |
+| r665-audit-143-documents-empty.png | 160790 | A2BF5C14A89D0E402BC2885FB3E661C451CF188120C98BFE2912EB46CD0472D4 |
+| r665-audit-143-documents-empty.xml | 11035 | F95E99A2B3B0398305C0DA8C50D92433A92EAB490417886B3342606464B90BCA |
+| r665-audit-144-pdf-source.png | 142786 | DF953B39C4420C90A5ACF7BD356BD85D121035109EA3F1EAFA36889C4B18D368 |
+| r665-audit-144-pdf-source.xml | 5888 | F7C3CDD51276C12550760730EC229EFB0792AB11E1B4F4C94A5C494ACAA97024 |
+| r665-audit-145-pdf-picker.png | 190460 | 5B27EC5BDB03A709150D0844F17ADBF4179AEFF49C829A4BB6D4648A714BA8E6 |
+| r665-audit-145-pdf-picker.xml | 49176 | E52EE1184C4DA6546ACAC04EA2B1FDF33605F38ACABF9574E6490AB0ACFC52CF |
+| r665-audit-146-pdf-attached.png | 156874 | D4272514372940CE0A6497F6CF73E0ADF7B9F08D28E391CAA3BC78DAFE9ABD0D |
+| r665-audit-146-pdf-attached.xml | 11730 | 10942B70625E170E5B24BA53C0523819C76744D5DEE6491D3028F61797D1D4D0 |
+| r665-audit-147-pdf-view-gap.png | 143287 | 2113CC73BDEDF93C84860448DF81F7D355E2830C40DBC5244DF273622BE174B1 |
+| r665-audit-147-pdf-view-gap.xml | 6233 | F65D2FC7F9A1D889DED7E4049DDE52F693557CBB4081F33F7ECD0D83CC04228E |
+| r665-audit-148-pdf-view-return.png | 149061 | 4DD2B710A70A365BA8B8E720101D30828B59589BBF90878BAAA22BC8FE283892 |
+| r665-audit-148-pdf-view-return.xml | 11730 | 10942B70625E170E5B24BA53C0523819C76744D5DEE6491D3028F61797D1D4D0 |
+| r665-audit-93-pending-resume.png | 141692 | 6B3C76A93250EB6FC910EBFAF9CBA4A12BB936D3BD9DC9AF0D3F5A9B22EE1D1A |
+| r665-audit-93-pending-resume.xml | 13882 | A7D8C96E2F351F7C35355D739DA5568A38111DB105FD25EB648D7CAE71A3074D |
+| r665-audit-94-workspace-return.png | 174563 | 6E32D926D7FCA351D7033A0DF28503C7438E8B79FC7CFD6A374D308FE22843F2 |
+| r665-audit-94-workspace-return.xml | 10646 | 3DD1EC0EEA8BEE8541E8A0F80062561CDF4205F9FFDA730E35D73330ED8C64B0 |
+| r665-audit-95-speciality-preview.png | 145845 | 01E2C1764E393EABB6E36571DAE52814463021881E944C11651717150A096B21 |
+| r665-audit-95-speciality-preview.xml | 13265 | 420741FAD1A9F8D0C8F59F081D022C90CCEE07A8817CC6188182753BD41B9F68 |
+| r665-audit-96-speciality-daily-work.png | 147284 | BB762A3D50CC04664624DB6CDAD630DC8DA38AF2B386C4DDB47D70125942D69B |
+| r665-audit-96-speciality-daily-work.xml | 13259 | 49B26DC6115B1D8C59031EC0CF6AFE0554967F68A7EFC199AB34E0A34E09772B |
+| r665-audit-97-speciality-close.png | 175236 | 2EB869889090E5621325358E9AE18B3E681AD7F11CAA99B0C1A2A390CC3FDCE8 |
+| r665-audit-97-speciality-close.xml | 10646 | 3DD1EC0EEA8BEE8541E8A0F80062561CDF4205F9FFDA730E35D73330ED8C64B0 |
+| r665-audit-98-wholesaler-preview.png | 146914 | 6D69E5477134F84926875F9BCE216F2F9ACAF14DCBBAEDE9594D35D221BC26C6 |
+| r665-audit-98-wholesaler-preview.xml | 13262 | 2828F0B1FD1979B38DCF30753CA5728C8FDC623DEAA510484A325137530EB7C0 |
+| r665-audit-99-display-settings.png | 74906 | 1FEC5A5753765BCA4FDB3D6C89009188983A1324FC6426F37449FCDCEA1C47E0 |
+| r665-audit-99-display-settings.xml | 21270 | BAF3385F544E6BC9F6241F870F809B39FEC7A96CAFDA618E7CDBD12A470D19CF |
+| r665-qa-pdf-page-1.png | 73516 | 59AE494DA5B253027FF360E183C1BF5CDF22C7D3D029315B52CCCDA69E43F8B8 |
+| r665-qa-pdf-page-2.png | 73784 | 247BA015B816B94ADF189C42300EC7439E4BC651EA9BA11C67CC81752466FFA3 |
+
+
+
 ## Current checkpoint: reachable onboarding audit completed; full journey qualification pending
 
 This section supersedes the earlier limited-entry checkpoint below without deleting it. Installed r66.5/source91d9a9b8 remains unchanged. OPPO CPH2375/2b3e0f71,720x1612,density320,font1.0 was used with foreground checks before interaction. Founder confirmed exclusive phone use. Native camera/photo/file-picker activities were allowed only following the app's specific picker action; unrelated applications were not operated.

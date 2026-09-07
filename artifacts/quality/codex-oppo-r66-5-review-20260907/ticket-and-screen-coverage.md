@@ -1,5 +1,16 @@
 # r66.5 frontend ticket and screen coverage
 
+## Round 2 correction notes and authorised next round — 8 September 2026
+
+- Eight findings remain deduplicated; captures93–148 and the labelled PDF fixture are hash-inventoried in device-review.md. No new source/test implementation is claimed by this evidence checkpoint.
+- AUDIT-R665-06: native PDF selection and retained attachment passed (145–146,148). View147 has only metadata/instructions, no document or open-file action. PDF inspection is now native-confirmed as a gap.
+- AUDIT-R665-07: extend the same ticket with160% search-hint/support-subtitle truncation and oversized composer (109,111–112), plus search-field density124. Media empty state, Pause/Resume and exact search-result return passed118–126; preserve those behaviours.
+- AUDIT-R665-08 correction: the existing submitted summary already reads the saved WorkProfileSubmission; do not claim all submitted values read the draft. Narrow investigation to selecting a different profile while retaining the current review case/header and draft proof mutation. Preserve the working submission snapshot; test before implementing a fix.
+- Physical160% replay completed for preview/pending/Chat subset. Default100% was restored and read back. Physical200% and TalkBack remain pending; Android WRITE_SETTINGS denial is not an application accessibility failure.
+- Other-business previews were exercised without changing the pending case; their complete setups remain pending. Two-page synthetic PDF was created/rendered/selected, not submitted as identity evidence. Gallery/camera/cloud completion, authoritative admin outcomes and approved-dashboard native replay remain pending.
+- Founder authorises the next Codex-owned correction -> local tests/visual review -> Git seal -> successor APK -> OPPO retest loop. No Cursor/Redmi, backend or real outbound messaging work. Shutdown only after completion and positive Cursor-stop confirmation; otherwise leave running.
+
+
 ## OPPO audit round 1 — registered findings, 7 September 2026
 
 Audit only. Source91d9a9b8/r66.5 was not changed. Findings below do not supersede founder-approved dashboard placement or authorise shared/Cursor edits. Preserve existing OPPO-R66.4-OBS-02 (expired review opportunity) and OPPO-R66.5-REVIEW-ENTRY-01 (no approved review Workspace) without duplicate tickets.
