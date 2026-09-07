@@ -2469,6 +2469,23 @@ class _DocumentPreview extends StatefulWidget {
 
 class _DocumentPreviewState extends State<_DocumentPreview> {
   final _transform = TransformationController();
+  final _viewportKey = GlobalKey();
+
+  void _zoomIn() {
+    final viewport = _viewportKey.currentContext?.findRenderObject();
+    if (viewport is! RenderBox || !viewport.hasSize) return;
+    final currentScale = _transform.value.getMaxScaleOnAxis();
+    final nextScale = (currentScale + 1).clamp(1.0, 4.0);
+    if (nextScale == currentScale) return;
+    final centre = viewport.size.center(Offset.zero);
+    final focalPoint = _transform.toScene(centre);
+    _transform.value = Matrix4.diagonal3Values(nextScale, nextScale, 1)
+      ..setTranslationRaw(
+        centre.dx - focalPoint.dx * nextScale,
+        centre.dy - focalPoint.dy * nextScale,
+        0,
+      );
+  }
 
   @override
   void dispose() {
@@ -2541,6 +2558,7 @@ class _DocumentPreviewState extends State<_DocumentPreview> {
             Flexible(
               flex: 5,
               child: SizedBox(
+                key: _viewportKey,
                 height: 360,
                 child: ClipRect(
                   child: InteractiveViewer(
@@ -2576,11 +2594,7 @@ class _DocumentPreviewState extends State<_DocumentPreview> {
                 IconButton(
                   key: const Key('work-document-zoom'),
                   tooltip: 'Zoom in',
-                  onPressed: () {
-                    final scale = (_transform.value.getMaxScaleOnAxis() + 1)
-                        .clamp(1.0, 4.0);
-                    _transform.value = Matrix4.diagonal3Values(scale, scale, 1);
-                  },
+                  onPressed: _zoomIn,
                   icon: const Icon(Icons.zoom_in),
                 ),
                 IconButton(

@@ -4751,17 +4751,44 @@ void main() {
               findsOneWidget,
             );
           } else {
+            final centre = tester
+                .getSize(find.byKey(const Key('work-document-image')))
+                .center(Offset.zero);
+            final focalPoint = viewer.transformationController!.toScene(centre);
             await tester.tap(find.byKey(const Key('work-document-zoom')));
             await tester.pumpAndSettle();
             expect(
               viewer.transformationController!.value.getMaxScaleOnAxis(),
               2,
             );
+            void expectFocalPoint(Offset expected) {
+              final actual = viewer.transformationController!.toScene(centre);
+              expect(actual.dx, closeTo(expected.dx, .01));
+              expect(actual.dy, closeTo(expected.dy, .01));
+            }
+
+            expectFocalPoint(focalPoint);
+            await captureStoreView(
+              tester,
+              'r667-document-centred-${display.width}-${display.scale}',
+            );
             await tester.drag(
               find.byKey(const Key('work-document-image')),
               const Offset(-35, -35),
             );
             await tester.pumpAndSettle();
+            final pannedPoint = viewer.transformationController!.toScene(
+              centre,
+            );
+            for (final expectedScale in [3, 4, 4]) {
+              await tester.tap(find.byKey(const Key('work-document-zoom')));
+              await tester.pumpAndSettle();
+              expect(
+                viewer.transformationController!.value.getMaxScaleOnAxis(),
+                expectedScale,
+              );
+              expectFocalPoint(pannedPoint);
+            }
             expect(tester.getRect(actions), initialActions);
             await tester.tap(find.byKey(const Key('work-document-fit')));
             await tester.pumpAndSettle();
