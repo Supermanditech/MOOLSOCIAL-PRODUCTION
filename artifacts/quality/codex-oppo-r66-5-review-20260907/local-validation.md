@@ -83,6 +83,18 @@ No protected references were regenerated. Toolchain: Flutter 3.44.6 / Dart 3.12.
 
 ## Correction qualification — 8 September 2026
 
+### Application-isolation child AUDIT-R665-08 and visual child 08a
+
+The existing chooser now offers View application when an unapproved submitted case exists. Business previews and search remain available, but choosing a preview resumes the actual submitted application without selecting another profile or removing its documents. Chooser Back preserves the selected application. No new multi-case service, session state machine or verification rule was introduced; the existing immutable submission and late-response guards remain unchanged. Starting another approved Workspace through its explicit existing flow is unchanged.
+
+The first visual round exposed a real inherited defect: the narrow application-summary heading fragmented words at 200%. Those initial captures remain rejected. The corrected summary gives the status usable width, retains one View action and a reason preview, and labels rejection truthfully as Application declined. Full reasons remain on the application screen.
+
+- Final focused command: `flutter test --no-pub --concurrency=1 --reporter expanded --update-goldens --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=r666-case-preview2-20260908 test/work_workspace_layout_safety_test.dart --name 'Submitted application survives|OPPO S01 inline discovery preserves'`. Result 7 passed, 0 failed, exit 0; log SHA-256 `546B03F281FBCB7B2EC1138A0F43F3BC5538E8AB52B3C7BE89BEAD9F923E0C08`. Tests cover pending clarification, rejection and suspension; both business-preview layouts, normal/200% text, intact profile/case/submission/document identity and Back. Header word geometry and a bounded banner height are asserted. Representative banners for all decisions and both preview layouts were directly inspected.
+- Existing connected model/journey command: `flutter test --no-pub --concurrency=1 --reporter expanded test/work_vertical_slice_test.dart test/work_production_gateway_test.dart`. Result 196 passed, 0 failed, exit 0; `r666-case-connected1-20260908.log` SHA-256 `52503FC31B1782AB3C18D52604AE8FCD164D9D9FCF198CA0CBAD7E928536A73A`. This run precedes the final banner-only refinement; final combined prebuild cycles remain required. Existing account/case/business late-response guards were not weakened.
+- Final full analysis: zero issues, exit 0; `r666-case-analysis1-20260908.log` SHA-256 `8457C0B6E478206D9B21F1A109566F2239D3CF6D6119C17D26771470B21059F5`.
+
+Backend multi-application recovery and authenticated review remain explicit dependencies. These fixtures do not qualify production approval. Successor OPPO replay remains pending.
+
 ### Pending-review refresh child AUDIT-R665-01
 
 The current screen continues checking every five minutes after its first twenty 30-second attempts instead of cancelling permanently. Pausing cancels the timer; resuming immediately refreshes and restores the initial interval. Existing current-route, active-case, busy and approval guards are unchanged. No new screen, authority, automatic approval or backend endpoint was added.

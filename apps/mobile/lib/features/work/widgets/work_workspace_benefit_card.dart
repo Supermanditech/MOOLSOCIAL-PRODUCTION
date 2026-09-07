@@ -14,6 +14,7 @@ class WorkWorkspaceBenefitCard extends StatelessWidget {
     required this.onToggle,
     required this.onChoose,
     this.showChooseAction = true,
+    this.resumeApplication = false,
     super.key,
   });
 
@@ -23,6 +24,7 @@ class WorkWorkspaceBenefitCard extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback onChoose;
   final bool showChooseAction;
+  final bool resumeApplication;
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +86,7 @@ class WorkWorkspaceBenefitCard extends StatelessWidget {
                     presentation: presentation,
                     onChoose: onChoose,
                     onClose: onToggle,
+                    resumeApplication: resumeApplication,
                   )
                 : _CompactBenefits(
                     option: option,
@@ -102,11 +105,13 @@ class WorkWorkspaceChooseButton extends StatelessWidget {
     required this.profileId,
     required this.onChoose,
     this.showNextStep = true,
+    this.resumeApplication = false,
     super.key,
   });
   final String profileId;
   final VoidCallback onChoose;
   final bool showNextStep;
+  final bool resumeApplication;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -125,13 +130,13 @@ class WorkWorkspaceChooseButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: const Text(
-          'Choose this Workspace',
+        child: Text(
+          resumeApplication ? 'View application' : 'Choose this Workspace',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
         ),
       ),
-      if (showNextStep) ...[
+      if (showNextStep && !resumeApplication) ...[
         const SizedBox(height: 6),
         const _WorkspaceNextStep(),
       ],
@@ -476,6 +481,7 @@ class _WorkspaceGrowthCardState extends State<_WorkspaceGrowthCard> {
               child: WorkWorkspaceChooseButton(
                 profileId: card.option.id,
                 onChoose: card.onChoose,
+                resumeApplication: card.resumeApplication,
               ),
             )
           else
@@ -535,6 +541,7 @@ class _ExpandedBenefits extends StatelessWidget {
     required this.presentation,
     required this.onChoose,
     required this.onClose,
+    required this.resumeApplication,
   });
 
   final WorkProfileOption option;
@@ -542,6 +549,7 @@ class _ExpandedBenefits extends StatelessWidget {
   final _WorkspacePresentation presentation;
   final VoidCallback onChoose;
   final VoidCallback onClose;
+  final bool resumeApplication;
 
   @override
   Widget build(BuildContext context) {
@@ -642,21 +650,23 @@ class _ExpandedBenefits extends StatelessWidget {
             ),
           ),
           icon: const Icon(Icons.workspace_premium_outlined),
-          label: const Text(
-            'Choose this Workspace',
-            style: TextStyle(fontWeight: FontWeight.w900),
+          label: Text(
+            resumeApplication ? 'View application' : 'Choose this Workspace',
+            style: const TextStyle(fontWeight: FontWeight.w900),
           ),
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'Next: review the documents needed to verify this Workspace.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: MoolColors.muted,
-            fontSize: 9.5,
-            fontWeight: FontWeight.w600,
+        if (!resumeApplication) ...[
+          const SizedBox(height: 4),
+          const Text(
+            'Next: review the documents needed to verify this Workspace.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: MoolColors.muted,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: 2),
         TextButton(
           key: Key('work-profile-close-${option.id}'),

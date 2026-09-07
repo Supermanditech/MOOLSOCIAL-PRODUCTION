@@ -100,6 +100,8 @@ This is local correction status, not device closure. The installed r66.5 APK is 
 
 ## Source reconciliation
 
+Correction update AUDIT-R665-08/08a: an unapproved submitted case now remains intact while browsing other businesses; preview actions explicitly open the existing application, and chooser Back preserves its profile and proofs. The existing immutable submitted snapshot and model late-response guards are reused, not replaced. The discovered large-text banner fragmentation is corrected with concise complete status headings and truthful rejection wording. Seven focused cases, 196 connected model/journey cases (before the banner-only refinement) and final full analysis pass; final banner/preview captures were inspected. Findings 06–07 and all backend/native/consumer dependencies remain open. These are local corrections, not physical-device closure.
+
 Correction update AUDIT-R665-01: pending-review polling now backs off to five minutes after twenty attempts rather than stopping permanently. Pause/resume, one-case identity and approval guards are preserved. The full 22-case Work journey suite and analysis pass. No presentation change or live admin authority is introduced. Native successor qualification is pending; findings 06–08 remain open.
 
 Correction update AUDIT-R665-05: valid unconfirmed phone/email/backup now reveals Send code without reopening contact input; already-sent challenges focus the code field, and invalid input still receives focus. Twelve focused recovery/disposal cases and full analysis pass; six normal/200percent local captures were inspected. No automatic Send, verification shortcut or backend change. Device closure is pending; findings 01 and 06–08 remain open.

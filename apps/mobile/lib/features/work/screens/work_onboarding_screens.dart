@@ -67,6 +67,9 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
       animation: widget.session,
       builder: (context, _) {
         final family = widget.session.selectedFamilyId;
+        final resumeApplication =
+            widget.session.reviewCaseId != null &&
+            !widget.session.hasVerifiedWorkspace;
         final category = _categoryId ?? family;
         final matchingFamilies = widget.session.familyIds
             .where(
@@ -119,6 +122,10 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
         }
 
         void chooseWorkspace(WorkProfileOption option) {
+          if (resumeApplication) {
+            context.push('/app/work/workspace/proof');
+            return;
+          }
           widget.session.selectProfile(option.id);
           context.push('/app/work/workspace/requirements');
         }
@@ -176,7 +183,17 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
               ? collapseBenefits
               : family == null
               ? null
-              : widget.session.changeFamily,
+              : () {
+                  if (resumeApplication) {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/app/work/earn');
+                    }
+                  } else {
+                    widget.session.changeFamily();
+                  }
+                },
           activeLocalAction: 'workspace',
           showHeaderChat: false,
           showTrailingAction: true,
@@ -209,6 +226,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                   profileId: focusedOption.id,
                   onChoose: () => chooseWorkspace(focusedOption),
                   showNextStep: false,
+                  resumeApplication: resumeApplication,
                 )
               : null,
           body: ListView(
@@ -272,6 +290,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                     onToggle: () => toggleBenefits(option.id),
                     onChoose: () => chooseWorkspace(option),
                     showChooseAction: !dockChoose,
+                    resumeApplication: resumeApplication,
                   ),
                   const SizedBox(height: MoolSpacing.sm),
                 ],
@@ -1346,58 +1365,66 @@ class _WorkspaceApplicationSummary extends StatelessWidget {
         ? const Color(0xFFB42318)
         : MoolColors.orange;
     final title = rejected
-        ? 'Workspace changes required'
+        ? 'Application declined'
         : suspended
         ? 'Workspace unavailable'
         : clarification
-        ? 'Clarification requested'
-        : 'Workspace review in progress';
+        ? 'Details requested'
+        : 'Under review';
     final detail = session.reviewReason?.trim().isNotEmpty == true
         ? session.reviewReason!.trim()
-        : session.reviewCaseId ?? 'Submitted for review';
+        : session.submittedProfile?.name ?? 'Submitted for review';
     return WorkCard(
       keyName: 'workspace-application-summary',
       color: accent.withValues(alpha: .09),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CircleAvatar(
-            backgroundColor: Colors.white,
-            foregroundColor: accent,
-            child: Icon(
-              rejected
-                  ? Icons.edit_note_rounded
-                  : suspended
-                  ? Icons.pause_circle_outline_rounded
-                  : clarification
-                  ? Icons.mark_unread_chat_alt_outlined
-                  : Icons.schedule_rounded,
-            ),
-          ),
-          const SizedBox(width: MoolSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                rejected
+                    ? Icons.info_outline_rounded
+                    : suspended
+                    ? Icons.pause_circle_outline_rounded
+                    : clarification
+                    ? Icons.mark_unread_chat_alt_outlined
+                    : Icons.schedule_rounded,
+                color: accent,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
                   title,
+                  key: const Key('workspace-application-status-title'),
                   style: const TextStyle(
                     color: MoolColors.navy,
+                    fontSize: 14,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                Text(
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
                   detail,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: MoolColors.muted, fontSize: 11),
                 ),
-              ],
-            ),
-          ),
-          TextButton(
-            key: const Key('workspace-check-review'),
-            onPressed: () => context.push('/app/work/workspace/proof'),
-            child: const Text('View'),
+              ),
+              TextButton(
+                key: const Key('workspace-check-review'),
+                onPressed: () => context.push('/app/work/workspace/proof'),
+                child: const Text('View'),
+              ),
+            ],
           ),
         ],
       ),

@@ -4273,6 +4273,139 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final decision in [
+    WorkRemoteReviewStatus.pending,
+    WorkRemoteReviewStatus.rejected,
+    WorkRemoteReviewStatus.suspended,
+  ]) {
+    for (final target in ['retailer-speciality', 'salon']) {
+      testWidgets(
+        'Submitted application survives another business preview $decision $target',
+        (tester) async {
+          final gateway = ReviewWorkGateway(initialReviewStatus: decision)
+            ..reviewResultReason = decision == WorkRemoteReviewStatus.pending
+                ? 'Please clarify the registered business address.'
+                : 'The business information needs further review.';
+          final work = WorkSession(gateway: gateway)
+            ..selectProfile('retailer-grocery')
+            ..selectedFamilyId = 'products-trade'
+            ..saveDetails(
+              name: 'QA Submitted Grocery',
+              area: 'Jodhpur',
+              activity: 'Grocery retail',
+            )
+            ..authorizedPersonName = 'QA Retailer'
+            ..businessRelationship = 'Owner'
+            ..primaryMobile = '9829012321'
+            ..contactEmail = 'asha@example.com'
+            ..primaryMobileVerified = true
+            ..contactEmailVerified = true;
+          work.addedProofs['shop-front'] = 'qa-proof-reference';
+          work.declarationAccepted = true;
+          expect(await tester.runAsync(work.submitProfile), isTrue);
+          await tester.runAsync(work.checkReview);
+          final submission = work.submittedProfile;
+          final caseId = work.reviewCaseId;
+          await mount(
+            tester,
+            route: '/app/work/workspace/choose',
+            work: work,
+            viewport: const Size(320, 568),
+            textScale: target == 'salon' ? 1 : 2,
+          );
+          final summary = find.byKey(
+            const Key('workspace-application-summary'),
+          );
+          await reveal(tester, summary);
+          final title = find.byKey(
+            const Key('workspace-application-status-title'),
+          );
+          final titleText = tester.widget<Text>(title).data!;
+          expect(titleText, switch (decision) {
+            WorkRemoteReviewStatus.pending => 'Details requested',
+            WorkRemoteReviewStatus.rejected => 'Application declined',
+            _ => 'Workspace unavailable',
+          });
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: title, matching: find.byType(RichText)),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          var wordStart = 0;
+          for (final word in titleText.split(' ')) {
+            expect(
+              paragraph
+                  .getBoxesForSelection(
+                    TextSelection(
+                      baseOffset: wordStart,
+                      extentOffset: wordStart + word.length,
+                    ),
+                  )
+                  .length,
+              1,
+              reason: 'Application status must not break a word into fragments',
+            );
+            wordStart += word.length + 1;
+          }
+          expect(tester.getSize(summary).height, lessThanOrEqualTo(240));
+          await captureStoreView(
+            tester,
+            'r666-case-banner-${decision.name}-$target',
+          );
+          final search = find.byKey(const Key('work-workspace-search'));
+          await tester.enterText(
+            search,
+            target == 'salon' ? 'salon' : 'speciality',
+          );
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pumpAndSettle();
+          final option = find.byKey(Key('work-profile-$target'));
+          await reveal(tester, option);
+          await tester.tap(option);
+          await tester.pumpAndSettle();
+          final choose = find.byKey(Key('work-profile-choose-$target'));
+          await reveal(tester, choose);
+          expect(
+            find.descendant(
+              of: choose,
+              matching: find.text('View application'),
+            ),
+            findsOneWidget,
+          );
+          expect(work.selectedProfile?.id, 'retailer-grocery');
+          expect(work.addedProofs['shop-front'], 'qa-proof-reference');
+          await captureStoreView(
+            tester,
+            'r666-case-preview-${decision.name}-$target',
+          );
+          await tester.tap(choose);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-inline-review-status')),
+            findsOneWidget,
+          );
+          expect(work.selectedProfile?.id, 'retailer-grocery');
+          expect(work.submittedProfile, same(submission));
+          expect(work.reviewCaseId, caseId);
+          expect(work.workName, 'QA Submitted Grocery');
+          expect(work.addedProofs['shop-front'], 'qa-proof-reference');
+          expect(work.activeWorkspace, isNull);
+          expect(gateway.submissionCalls, 1);
+          final back = find.byKey(const Key('work-back'));
+          await tester.tap(back);
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+          await tester.tap(find.byKey(const Key('work-back')));
+          await tester.pumpAndSettle();
+          expect(work.selectedProfile?.id, 'retailer-grocery');
+          expect(work.reviewCaseId, caseId);
+          expect(work.addedProofs['shop-front'], 'qa-proof-reference');
+          expect(work.submittedProfile, same(submission));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   for (final profileId in [
     'retailer-grocery',
     'retailer-speciality',
