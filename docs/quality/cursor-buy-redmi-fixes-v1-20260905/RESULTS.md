@@ -1669,3 +1669,40 @@ Immutable evidence archive:C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260
 All failures remain retained in REDMI-UAT.md and immutable receipts: baseline repro2 showed11 intended failures and5 passes; fixture corrections preserved seeded opposite Saved IDs and lazy discovery. Early new focused failures exposed upward Back scrolling and stale widget-identity test lookups; these were repaired without suppressing assertions. The malformed visual1 command failed before tests/captures and was corrected in fresh visual2. Connected1 retained455 passes/2 dependent-test failures/1 inherited skip; the two tests were repaired and both final cycles rerun. Incidents202–207 preserve output-loss recovery and the exact diagnostics; no registry rewrite.
 
 Local frontend qualification only. No APK, install, phone action, real payment/order, WhatsApp, OPPO action, backend success, ticket acceptance or closure. Redmi remains r66.4/2026090701/capture463. After this seal the remaining current children are001-R5-A and022-R5-A; accessibility and catalogue pagination remain separate pending enhancements. The founder's five store-discovery scenarios are recorded under022 and SCALE without changing83+3 counts. Status-bar preparation V2 and A11Y-001 shared-owner dependency V1 are retained in the same archive; no new ownership admission or pause is implied.
+
+
+## 001-R5-A — restore readable Buy system bars after global routes — 7 September 2026
+
+Returning from a light global page previously left dark status icons over Buy's dark top inset. Buy now declares its own route-local SystemUiOverlayStyle through _BuySystemBars and paints only the existing top safe-area inset in BuyV2Colors.navy. The route selects light status icons and dark navigation icons. Existing body gradients, header/safe-area dimensions, Cart, order state and navigation remain in their existing owners. Shared Profile, Preferences, Security, Help, router and native owners are unchanged. This is the mvp_required existing child001 repair under the admitted42-owner umbrella; parent56b09aa57fdec7d893c05a8f86150abc1316655a.
+
+Final source SHA256:
+
+| Owner under apps/mobile | SHA256 |
+|---|---|
+| lib/ui_v2/buy/buy_v2_screen.dart | 15830CF39E3E1A8412354154B56328E13F7F802EBC190F6BF0DC6566B615F943 |
+| test/ui_v2/buy/buy_v2_screen_test.dart | 3A1F07C02A7770831F291519F6B36DF88A540CFDAA57D3AF7110FA62FE29F653 |
+
+Four new widget journeys use the real GoRouter and shared page widgets at320x844/640x360,100/200% text,24/34 safe areas and rotation. They tap consumer Profile → Preferences/Security and Sort and refine → Tools → Shopping settings → Help, then return through both on-screen and platform Back. The platform channel's emitted status-icon style is checked after each settled route; real raster samples prove top-corner navy/white contrast and light bottom-safe-area contrast. Exact Shop/Wholesale Cart quantities and all prior order IDs survive. Help restores its existing settings sheet and scroll before Back dismisses it. These are local deterministic fixtures, without account credentials or real transactions.
+
+Baseline r66-r5-system-bars-repro-1 retained four exact expected dark-icon return failures, native1, stdoutSHA63983B68BD3536736F48171EB0E526B128BA5E0588DAE2B3A7C6AEB93847D6B2. The first repaired run passed that original return point but exposed a test-only incorrect Help entry: Support quick actions are for active workspaces, while personal Buy uses Shopping settings. Incident209 retains the failed run and the correction to actual consumer controls; no route/style/state assertion was removed. Corrected focused2 passes4/native0, stdoutSHAA09B80599B506752C55FF33578743F9BD4142B580373B291F8A9CF5B79B9A253. Analyzer1 is clean.
+
+Visual1 passes4 and produced40 actual Flutter2x PNGs. All10 contact pages and all40 frames were personally inspected. The top inset remains dark across both screen corners and after global returns, and bottom safe-area paint remains light. Contact binding r5-system-bars-contact-1/binding.json SHA3BCCA6DBFC242E0EBB0050247276C5CC41E4B6C0335103E654BBAA09C9D23D86 binds the exact two sources, producer/helper receipts, original captures and review pages. Native clock/network/status icons are not rendered in host Flutter captures; actual successor Redmi proof remains pending.
+
+Two identical seven-file connected cycles cover Screen, shopping settings, shopping alerts, Cart relevance, checkout/Cart return, scoped checkout dock and order progress. Each passes580 tests, zero skips and zero failures, with empty stderr. Both retain only the same two undeclared protected-reference tag warnings on excluded historical R58.8.6/7 captures. No new exclusion, configuration edit or suppression.
+
+| Native run | UTC start–finish | stdout SHA256 |
+|---|---|---|
+| r66-r5-system-bars-connected-cycle-1 | 17:47:49.8988458–17:55:21.7898555 | E799E7DB2DEDD6D8A0B2103E921D56109F8113096A3CB22C5691DFD54AC00EBE |
+| r66-r5-system-bars-connected-cycle-2 | 17:55:37.4844155–18:03:12.7207362 | 9CC0F1EF60F4134D398643BD674BA70CECEDFEEAAB8F76DE025C925FE6872FDE |
+
+Each stdout is126725bytes. [R5-001-FINAL-BINDING-V1.json](<C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/R5-001-FINAL-BINDING-V1.json>) SHA24521E1B53ED7E13444E1214768801ECFAFC17685E54B66B3184897880F02A66 independently verifies exact source hashes, all images/pages/receipts/logs, both580-test cycles, four new cases per cycle, unchanged arguments and the read-only shared collection contract. The verifier passed native0 at18:03:27UTC. Final regression-memory4502, named execution scope and approved-UI-lock gates passed; pre/postcommit coordination and exact remote equality follow.
+
+Incident210 separately records the untouched shared Security hero title ellipsis at320x844/200% (portrait-04 contact / r5-bars-security-320x844-2.0-open.png). It is linked to the existing A11Y-001 shared-owner dependency and is not claimed as repaired, a new001 regression or shared visual acceptance. No extra duplicate defect is counted.
+
+### Additional founder request required before the successor Redmi APK
+
+[R66-UAT-COLLECT-VISIBILITY-001](<C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-redmi-fixes-v1-20260905/apps/mobile/build/r66-4-prebuild-20260907/TICKET-R66-UAT-COLLECT-VISIBILITY-001.md>) is registered, pending and required before the next Redmi APK. Exact public Store header wording: **Order ahead. Scan & collect.** It must be visible before product browsing in the existing compact Store information, attached to the exact branch and shown only with current supported collection capability. Implementation is linked to022 public Store order/payment and SCALE provider/SKU discovery. Ticket SHA7C5444F24D3139675DDF76B6AD19AE9A3A5DED7620608AACE15B226514180E03; additional-request supplement SHA B436F75A626BD15B24F46C4E9A8343F1E188FDD817D5665DC42FBCEC06AB0011. Registration does not imply implementation.
+
+The completeness inventory is now83 UAT records (35+9+16+23), three earlier enhancements and one additional founder request:87 tracked records, with overlaps explicitly retained. Once this001 commit is sealed,22 of23 current children have local qualification;022 remains unfinished. A11Y and SCALE remain pending; SCROLL is locally qualified and overlaps029-R5-F; COLLECT-VISIBILITY remains pending. All records remain unaccepted/open for successor Redmi replay. The prepared final batch still contains29 test files and has not been run.
+
+No APK/build/install/device action, WhatsApp/OPPO interaction, real payment/order, backend activation, shared-owner admission, integration or ticket closure. Redmi remainsr66.4/2026090701/capture463. Next owned work is stable Store/branch identity, collection-capability/discovery and existing Store checkout wiring, including the new header requirement; shared accessibility/collection transport and durable persistence remain exact dependencies.

@@ -4,6 +4,7 @@ import 'dart:ui' show SemanticsAction, ImageByteFormat;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -13,6 +14,7 @@ import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
+import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_chat_route_adapter.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
@@ -20,6 +22,9 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_scanner.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
+import 'package:moolsocial/ui_v2/profile/global_help_support_v2.dart';
+import 'package:moolsocial/ui_v2/profile/global_privacy_preferences_v2.dart';
+import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
 
 class _R5ScreenArrivalSound implements BuyV2DeliveryArrivalSound {
   @override
@@ -1321,6 +1326,318 @@ void main() {
           },
         );
       }
+    }
+  }
+
+  Future<void> expectBuySystemBarPaint(WidgetTester tester) async {
+    final root = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(const ValueKey('r66-cart-capture')),
+    );
+    await tester.runAsync(() async {
+      final frame = await root.toImage(pixelRatio: 1);
+      try {
+        final bytes = await frame.toByteData(format: ImageByteFormat.rawRgba);
+        expect(bytes, isNotNull);
+        final rgba = bytes!;
+        Color at(int x, int y) {
+          final index = (y * frame.width + x) * 4;
+          return Color.fromARGB(
+            rgba.getUint8(index + 3),
+            rgba.getUint8(index),
+            rgba.getUint8(index + 1),
+            rgba.getUint8(index + 2),
+          );
+        }
+
+        for (final x in [4, frame.width ~/ 2, frame.width - 5]) {
+          final top = at(x, 10);
+          expect(top, BuyV2Colors.navy);
+          expect(
+            1.05 / (top.computeLuminance() + .05),
+            greaterThanOrEqualTo(4.5),
+          );
+          final bottom = at(x, frame.height - 10);
+          expect(
+            (bottom.computeLuminance() + .05) / .05,
+            greaterThanOrEqualTo(4.5),
+          );
+        }
+      } finally {
+        frame.dispose();
+      }
+    });
+  }
+
+  for (final size in [const Size(320, 844), const Size(640, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      final profile = '${size.width.toInt()}x${size.height.toInt()}-$scale';
+      testWidgets('R5 system bars restore after global routes $profile', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+        tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+        addTearDown(tester.view.reset);
+        final overlays = <Map<String, Object?>>[];
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          (call) async {
+            if (call.method == 'SystemChrome.setSystemUIOverlayStyle') {
+              overlays.add(Map<String, Object?>.from(call.arguments as Map));
+            }
+            return null;
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            SystemChannels.platform,
+            null,
+          ),
+        );
+        // Match the previously good Buy state before a light global page opens.
+        // The return assertion must fail if Buy merely inherits that page's style.
+        SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+        await tester.idle();
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        final journey = JourneySession(store: MemoryJourneyStore());
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        addTearDown(journey.dispose);
+        session.addProduct('s-milk');
+        session.addProduct('w-rice-50kg');
+        session.openDestination(BuyV2Destination.wholesale);
+        final orderIds = session.orders.map((order) => order.id).toList();
+        final router = GoRouter(
+          initialLocation: '/app/buy',
+          routes: [
+            GoRoute(
+              path: '/app/buy',
+              builder: (context, state) => BuyV2Screen(
+                session: session,
+                initialDestination: BuyV2Destination.wholesale,
+                accountAuthenticated: true,
+              ),
+            ),
+            GoRoute(
+              path: '/app/account/workspaces/preferences',
+              builder: (context, state) =>
+                  GlobalPrivacyPreferencesV2(session: journey),
+            ),
+            GoRoute(
+              path: '/app/account/security',
+              builder: (context, state) => GlobalSecurityV2(session: journey),
+            ),
+            GoRoute(
+              path: '/app/ask',
+              builder: (context, state) =>
+                  GlobalHelpSupportV2(session: journey),
+            ),
+          ],
+        );
+        addTearDown(router.dispose);
+        await tester.pumpWidget(
+          MaterialApp.router(
+            theme: MoolTheme.light(),
+            routerConfig: router,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(scale),
+                disableAnimations: true,
+              ),
+              child: RepaintBoundary(
+                key: const ValueKey('r66-cart-capture'),
+                child: child!,
+              ),
+            ),
+          ),
+        );
+        addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+        final renderView = tester.binding.renderViews.single;
+        final previousAdjustment = renderView.automaticSystemUiAdjustment;
+        renderView.automaticSystemUiAdjustment = true;
+        addTearDown(
+          () => renderView.automaticSystemUiAdjustment = previousAdjustment,
+        );
+        await tester.pumpAndSettle();
+        void expectIcons(Brightness brightness) {
+          expect(overlays, isNotEmpty);
+          expect(
+            overlays.last['statusBarIconBrightness'],
+            brightness.toString(),
+            reason: 'Platform overlay after settled route: ${overlays.last}',
+          );
+        }
+
+        for (final route in [
+          (
+            name: 'preferences',
+            entry: 'global-profile-preferences',
+            page: 'global-privacy-preferences-v2',
+            back: 'global-preferences-back',
+          ),
+          (
+            name: 'security',
+            entry: 'global-profile-security',
+            page: 'global-security-v2',
+            back: 'global-security-back',
+          ),
+          (
+            name: 'help',
+            entry: 'buy-settings-help',
+            page: 'global-help-support-v2',
+            back: 'global-help-back',
+          ),
+        ]) {
+          for (final platformBack in [false, true]) {
+            final fromSettings = route.name == 'help';
+            if (fromSettings) {
+              final filters = find.byKey(const ValueKey('buy-filter-button'));
+              await tester.ensureVisible(filters);
+              await tester.pumpAndSettle();
+              expect(filters.hitTestable(), findsOneWidget);
+              await tester.tap(filters);
+              await tester.pumpAndSettle();
+              final tools = find.byKey(
+                const ValueKey('buy-refine-section-tools'),
+              );
+              final refinementScroll = find.descendant(
+                of: find.byKey(const ValueKey('buy-discovery-refinement-list')),
+                matching: find.byType(Scrollable),
+              );
+              await tester.scrollUntilVisible(
+                tools,
+                160,
+                scrollable: refinementScroll,
+                maxScrolls: 30,
+              );
+              final heading = find
+                  .descendant(of: tools, matching: find.byType(ListTile))
+                  .first;
+              await tester.ensureVisible(heading);
+              await tester.pumpAndSettle();
+              expect(heading.hitTestable(), findsOneWidget);
+              await tester.tap(heading);
+              await tester.pumpAndSettle();
+              final settings = find.byKey(
+                const ValueKey('buy-shopping-settings-button'),
+              );
+              await tester.scrollUntilVisible(
+                settings,
+                160,
+                scrollable: refinementScroll,
+                maxScrolls: 30,
+              );
+              await tester.ensureVisible(settings);
+              await tester.pumpAndSettle();
+              expect(settings.hitTestable(), findsOneWidget);
+              await tester.tap(settings);
+              await tester.pumpAndSettle();
+              expect(
+                find.byKey(const ValueKey('buy-shopping-settings')),
+                findsOneWidget,
+              );
+            } else {
+              final account = find.byKey(const ValueKey('buy-open-account'));
+              await tester.ensureVisible(account);
+              await tester.pumpAndSettle();
+              expect(account.hitTestable(), findsOneWidget);
+              await tester.tap(account);
+              await tester.pumpAndSettle();
+            }
+            final entry = find.byKey(ValueKey(route.entry));
+            await tester.scrollUntilVisible(
+              entry,
+              180,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(
+                      ValueKey(
+                        fromSettings
+                            ? 'buy-shopping-settings'
+                            : 'global-profile-panel-v2',
+                      ),
+                    ),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+              maxScrolls: 30,
+            );
+            await tester.ensureVisible(entry);
+            await tester.pumpAndSettle();
+            expect(entry.hitTestable(), findsOneWidget);
+            await tester.tap(entry);
+            await tester.pumpAndSettle();
+            expect(find.byKey(ValueKey(route.page)), findsOneWidget);
+            expectIcons(Brightness.dark);
+            if (!platformBack) {
+              await captureReadability(
+                tester,
+                'r5-bars-${route.name}-$profile-open',
+              );
+            }
+            if (platformBack) {
+              await tester.binding.handlePopRoute();
+            } else {
+              final back = find.byKey(ValueKey(route.back));
+              expect(back.hitTestable(), findsOneWidget);
+              await tester.tap(back);
+            }
+            await tester.pumpAndSettle();
+            expect(find.byKey(ValueKey(route.page)), findsNothing);
+            expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
+            expectIcons(Brightness.light);
+            expect(session.destination, BuyV2Destination.wholesale);
+            expect(session.view, BuyV2View.catalogue);
+            expect(session.quantityFor('s-milk'), 1);
+            expect(session.quantityFor('w-rice-50kg'), 1);
+            expect(session.orders.map((order) => order.id), orderIds);
+            if (!platformBack) {
+              await captureReadability(
+                tester,
+                'r5-bars-${route.name}-$profile-return',
+              );
+            }
+            if (fromSettings) {
+              expect(
+                find.byKey(const ValueKey('buy-shopping-settings')),
+                findsOneWidget,
+              );
+              await tester.binding.handlePopRoute();
+              await tester.pumpAndSettle();
+              expect(
+                find.byKey(const ValueKey('buy-shopping-settings')),
+                findsNothing,
+              );
+              expectIcons(Brightness.light);
+            }
+          }
+        }
+        for (final destination in BuyV2Destination.values) {
+          session.openDestination(destination);
+          await tester.pumpAndSettle();
+          expectIcons(Brightness.light);
+          await expectBuySystemBarPaint(tester);
+          await captureReadability(
+            tester,
+            'r5-bars-${destination.name}-$profile-paint',
+          );
+        }
+        session.openDestination(BuyV2Destination.wholesale);
+        await tester.pumpAndSettle();
+        tester.view.physicalSize = Size(size.height, size.width);
+        await tester.pumpAndSettle();
+        expectIcons(Brightness.light);
+        await expectBuySystemBarPaint(tester);
+        tester.view.physicalSize = size;
+        await tester.pumpAndSettle();
+        expectIcons(Brightness.light);
+        expect(session.quantityFor('s-milk'), 1);
+        expect(session.quantityFor('w-rice-50kg'), 1);
+        expect(session.orders.map((order) => order.id), orderIds);
+        expect(tester.takeException(), isNull);
+      });
     }
   }
 
