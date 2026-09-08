@@ -150,7 +150,10 @@ function Get-MobileBoundaryViolations {
       } finally {
         $soundSourceSha.Dispose()
       }
-      if ($soundSourceHash -ceq 'DED10F0145682F8B125088C4CDA7BB507AB12D119731FE93C49A82258CB2B92C') {
+      if ($soundSourceHash -cin @(
+          'DED10F0145682F8B125088C4CDA7BB507AB12D119731FE93C49A82258CB2B92C',
+          '9D347031148DC2B45EFBF7BF991A3D265DBCE6CC95663ECDF3C4214AC522344B'
+        )) {
         $Content = $Content.Replace("import 'dart:io';", '')
       }
     }

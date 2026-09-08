@@ -254,7 +254,8 @@ function Test-RedmiReviewBuySource {
     'd07559609ffad7371a6a98d765d4fefa186dc065',
     'd119c85eccc85af99c86c32ae526f57421855ff3',
     '28b1b6126a4f145f8c639cfc3029860507845845',
-    'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2'
+    'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2',
+    '2a8c52472b19964ca6d0046d31827197a9e3f74b'
   )
   $acceptedBase = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
   if ($SourceCommit -cnotin $qualifiedSources) { return $false }
@@ -285,7 +286,7 @@ function Test-RedmiReviewBuySource {
   if ($SourceCommit -ceq $qualifiedSources[2]) {
     $expectedDelta = $expectedDelta + @('apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart')
   }
-  if ($SourceCommit -ceq $qualifiedSources[3]) {
+  if ($SourceCommit -cin @($qualifiedSources[3], $qualifiedSources[4])) {
     $expectedDelta = @(
       'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
       'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
