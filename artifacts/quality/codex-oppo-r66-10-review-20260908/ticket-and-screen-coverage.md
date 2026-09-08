@@ -1,5 +1,11 @@
 # r66.10 approved-screen coverage
 
+## Current native checkpoint — 9 September 2026
+
+r66.10 is built and installed from exact source 7a12f127c09798f8fd208de8a92837c6956058af; the installed checksum matches the saved APK. The older preparation/blocked paragraphs below are historical, not the current candidate state. Native captures 001–054 now cover a Grocery entry-to-dashboard pass: contact keyboard and simulated verification/error recovery, Details Back, native QA PDF selection/two-page preview/Close, review declaration, local submission, clarification draft isolation, rejection reason and exact unsent support return, direct test approval, inert status popover, and new-Workspace request/Back preserving the approved dashboard. Complete result and 108-file SHA-256 inventory are in device-review.md.
+
+These are partial device qualification results, not blanket closure. Same-type multiple submissions/switching, relaunch and account-scope recovery, remaining document providers/error cases, physical accessibility and separate Dashboard first-tap screens still require replay. Production backend enforcement and the separately recorded historical Journey01 failures remain pending. No product source changed and no live OTP, document submission, message, payment or admin approval occurred.
+
 ## Candidate preparation resumed
 
 The founder removed only the verified empty generated test folder. Its fresh self-test now passes, including cleanup. A nested historical-evidence check required its existing archive parameter; no gate source was modified. Prebuild controls are now complete, all 381 application/test/dependency owners unchanged. Two partitioned 39-file passes each yielded 1423 passed/83 existing reported skips/0 failed; full analysis has zero issues and five review-only isolation tests pass. Exact logs, earlier failures and pending legacy/backend/physical-accessibility distinctions remain in local-validation.md and prebuild-validation.md. Source seal, guarded APK build and OPPO replay are next. Screen children remain open until actual replay.

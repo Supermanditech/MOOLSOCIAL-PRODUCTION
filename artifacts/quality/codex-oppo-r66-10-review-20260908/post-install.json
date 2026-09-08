@@ -19,7 +19,10 @@
   "launchStatus": "ok",
   "fontScale": 1.0,
   "firstSmokeCaptures": ["r6610-native-001-retained-launch", "r6610-native-002-mool-menu", "r6610-native-003-work-entry"],
-  "fullWorkspaceDashboardReplay": "pending",
+  "fullWorkspaceDashboardReplay": "partial_native_001_through_054_remaining_cases_pending",
+  "currentNativeScreen": "approved_test_workspace_dashboard",
+  "nativeCaptureCount": 54,
+  "nativeCaptureInventorySha256": "1CE07DFD799E66D551FAAEFF36BE36A9884916165885E79F82D7044DF7CC105D",
   "founderAcceptance": "pending",
   "productionBackendQualification": "not_inferred_from_review_fixtures"
 }
