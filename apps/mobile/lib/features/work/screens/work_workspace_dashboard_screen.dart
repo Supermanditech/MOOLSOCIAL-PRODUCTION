@@ -1190,7 +1190,7 @@ extension on _WorkspaceOperation {
     _WorkspaceOperation.stockStatement =>
       'Available, reserved and low-stock changes',
     _WorkspaceOperation.delivery =>
-      'Assign delivery and follow every customer handoff',
+      'Arrange delivery and track customer orders',
     _WorkspaceOperation.customers =>
       'Purchases, dues and repeat-business history',
     _WorkspaceOperation.payments =>
@@ -7723,7 +7723,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         : _sku.text.trim().isEmpty
         ? 'Enter a unique store SKU.'
         : purchase == null || purchase <= 0
-        ? 'Enter the current purchase cost for your internal margin view.'
+        ? 'Enter the purchase cost to calculate your margin.'
         : selling == null || selling <= purchase
         ? 'Enter a customer price above the purchase cost.'
         : stock == null || stock < 0
@@ -8118,7 +8118,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                           keyName: 'work-product-unit-price',
                           controller: _unitPrice,
                           label: 'Unit price shown to customers',
-                          hint: 'For example ₹264/L',
+                          hint: '₹264/L',
                         ),
                         second: _AccessibleWorkTextField(
                           keyName: 'work-product-minimum-order',
@@ -13751,7 +13751,7 @@ class _WorkspaceDeliverySurface extends StatelessWidget {
           icon: Icons.route_outlined,
           title: 'Live delivery journey',
           detail:
-              'Confirmed rider, pickup, route and customer handoff updates appear here without invented status.',
+              'Track your rider from pickup to customer delivery.',
         ),
       ],
     );

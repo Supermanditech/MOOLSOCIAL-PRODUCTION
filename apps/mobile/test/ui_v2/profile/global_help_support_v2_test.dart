@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/screens/work_earn_screens.dart';
@@ -83,6 +84,7 @@ void main() {
     addTearDown(router.dispose);
     await tester.pumpWidget(
       MaterialApp.router(
+        theme: MoolTheme.light(),
         routerConfig: router,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(
@@ -93,8 +95,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
     router.go(globalHelpLocationForReturn('/app/work/earn'));
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
     return router;
   }
 

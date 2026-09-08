@@ -111,6 +111,68 @@ function Test-SealedParallelContinuationUnchanged {
     $true $true $true $true $currentOwnerEqual
 }
 
+function Get-LockSha256 {
+  param([Parameter(Mandatory = $true)][AllowEmptyCollection()][byte[]]$Bytes)
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    return [BitConverter]::ToString($sha.ComputeHash($Bytes)).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $sha.Dispose()
+  }
+}
+
+function Get-CursorAccessibilityNativeProjection {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Source
+  )
+  $expectedRoot = [IO.Path]::GetFullPath(
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-redmi-fixes-v1-20260905'
+  ).TrimEnd([char[]]@('\','/'))
+  $actualRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/'))
+  $expectedPath = [IO.Path]::GetFullPath((Join-Path $expectedRoot (
+    'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt'
+  )))
+  $exactOwner = $actualRoot.Equals($expectedRoot,[StringComparison]::OrdinalIgnoreCase) -and
+    [IO.Path]::GetFullPath($Path).Equals($expectedPath,[StringComparison]::OrdinalIgnoreCase)
+  if (-not $exactOwner) {
+    if ($Source.Contains('MOOLSOCIAL_ACCESSIBILITY_BRIDGE_')) {
+      throw 'Approved UI Accessibility projection requires its exact isolated native owner.'
+    }
+    return $Source
+  }
+  $branch = @(& git -C $root rev-parse --abbrev-ref HEAD)
+  if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
+      [string]$branch[0] -cne 'work/cursor-ui/buy-redmi-fixes-v1-20260905') {
+    throw 'Approved UI Accessibility projection requires its exact Cursor branch.'
+  }
+  & git -C $root merge-base --is-ancestor '38fa1201488ae943487b58d4afe5d851f8b9fc37' HEAD
+  if ($LASTEXITCODE -ne 0) {
+    throw 'Approved UI Accessibility projection requires its sealed implementation ancestor.'
+  }
+  $utf8 = [Text.UTF8Encoding]::new($false)
+  if ((Get-LockSha256 -Bytes $utf8.GetBytes($Source)) -cne
+      'bffb6fea0876c45bee5c5a6b96c790ee49738ee6e9f8738a836a4a04b40bd3ec') {
+    throw 'Approved UI Accessibility projection rejects an altered or missing native implementation.'
+  }
+  $pattern = '(?ms)^        // MOOLSOCIAL_ACCESSIBILITY_BRIDGE_BEGIN\n.*?^        // MOOLSOCIAL_ACCESSIBILITY_BRIDGE_END\n'
+  $blocks = [regex]::Matches($Source,$pattern)
+  if ($blocks.Count -ne 1) {
+    throw 'Approved UI Accessibility projection requires one exact bridge block.'
+  }
+  $block = $blocks[0]
+  if ((Get-LockSha256 -Bytes $utf8.GetBytes($block.Value)) -cne
+      'c6f995759d350cd64efc4dbfe9b38653fd15ee7a5401b20cc3db52ab1f1ac3ac') {
+    throw 'Approved UI Accessibility projection rejects a changed bridge block.'
+  }
+  $projected = $Source.Remove($block.Index,$block.Length)
+  if ((Get-LockSha256 -Bytes $utf8.GetBytes($projected)) -cne
+      'ef54c34bb13caed0aa568976cc2d0d50cc1b2170ad716ce1cda3827fd79f7218') {
+    throw 'Approved UI Accessibility projection changed previously accepted native bytes.'
+  }
+  return $projected
+}
+
 function Assert-Hash {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
@@ -185,19 +247,13 @@ function Assert-Hash {
       $productionPath = Join-Path $productionRoot $relativePath
       if (Test-Path -LiteralPath $productionPath -PathType Leaf) {
         $productionBytes = [IO.File]::ReadAllBytes($productionPath)
-        $productionRaw = [BitConverter]::ToString(
-          [Security.Cryptography.SHA256]::HashData($productionBytes)
-        ).Replace('-', '').ToLowerInvariant()
+        $productionRaw = Get-LockSha256 -Bytes $productionBytes
         if ($productionRaw -eq $expectedLower) {
           $productionText = $utf8.GetString($productionBytes)
           $productionNormalizedBytes = $utf8.GetBytes(
             $productionText.Replace("`r`n", "`n")
           )
-          $productionNormalized = [BitConverter]::ToString(
-            [Security.Cryptography.SHA256]::HashData(
-              $productionNormalizedBytes
-            )
-          ).Replace('-', '').ToLowerInvariant()
+          $productionNormalized = Get-LockSha256 -Bytes $productionNormalizedBytes
           if ($productionNormalized -eq $normalized) {
             return
           }
@@ -279,10 +335,11 @@ function Assert-ProductionHash {
   }
   if ($null -ne $acceptedCurrent) {
     $source = [IO.File]::ReadAllText($resolved).Replace("`r`n", "`n")
+    if ($relative -ceq 'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt') {
+      $source = Get-CursorAccessibilityNativeProjection -Path $resolved -Source $source
+    }
     $sourceBytes = [Text.UTF8Encoding]::new($false).GetBytes($source)
-    $sourceCanonical = [BitConverter]::ToString(
-      [Security.Cryptography.SHA256]::HashData($sourceBytes)
-    ).Replace('-', '').ToLowerInvariant()
+    $sourceCanonical = Get-LockSha256 -Bytes $sourceBytes
     if (
       @($acceptedCurrent.expected) -ccontains $Expected.ToLowerInvariant() -and
       @($acceptedCurrent.current) -ccontains $sourceCanonical

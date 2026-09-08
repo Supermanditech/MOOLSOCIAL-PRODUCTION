@@ -523,7 +523,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                           onSubmitted: (_) => _areaFocus.requestFocus(),
                           decoration: const InputDecoration(
                             labelText: 'Business, profession or service',
-                            hintText: 'For example, furniture repair',
+                            hintText: 'Furniture repair',
                           ),
                         ),
                         const SizedBox(height: MoolSpacing.sm),
@@ -560,7 +560,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                             onSubmitted: (_) => _areaFocus.requestFocus(),
                             decoration: const InputDecoration(
                               labelText: 'Describe your activity',
-                              hintText: 'For example, handloom repair',
+                              hintText: 'Handloom repair',
                             ),
                           ),
                         ],
@@ -574,7 +574,7 @@ class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
                           scrollPadding: const EdgeInsets.only(bottom: 120),
                           decoration: const InputDecoration(
                             labelText: 'City or service area',
-                            hintText: 'For example, Jodhpur',
+                            hintText: 'Jodhpur',
                           ),
                         ),
                       ],
