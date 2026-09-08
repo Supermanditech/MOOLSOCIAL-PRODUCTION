@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moolsocial/features/chat/chat_session.dart';
+import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/core/design/mool_design_system.dart';
@@ -276,6 +278,7 @@ void main() {
     WidgetTester tester, {
     required String route,
     required WorkSession work,
+    ChatSession? chat,
     double bottomInset = 44,
     Size viewport = const Size(360, 800),
     double textScale = 1.4,
@@ -310,6 +313,7 @@ void main() {
       ..socialAuthProvider = SocialAuthProvider.google;
     addTearDown(journey.dispose);
     addTearDown(work.dispose);
+    if (chat != null) addTearDown(chat.dispose);
     await tester.pumpWidget(
       RepaintBoundary(
         key: const Key('store-review-root'),
@@ -317,6 +321,7 @@ void main() {
           MoolSocialApp(
             session: journey,
             workSession: work,
+            chatSession: chat,
             initialLocation: route,
           ),
         ),
@@ -4555,6 +4560,149 @@ void main() {
     expect(tester.widget<TextField>(search).controller!.text, 'grocery');
     expect(tester.takeException(), isNull);
   });
+
+  for (final decision in [
+    WorkRemoteReviewStatus.rejected,
+    WorkRemoteReviewStatus.suspended,
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final retained in [false, true]) {
+        testWidgets(
+          'R669 review support exact application $decision $scale retained=$retained',
+          (tester) async {
+            final gateway = ReviewWorkGateway()
+              ..reviewResultStatus = WorkRemoteReviewStatus.pending;
+            final work = WorkSession(gateway: gateway)
+              ..selectProfile('retailer-grocery')
+              ..saveDetails(
+                name: 'Mahadev Traders',
+                area: 'Jaipur',
+                activity: 'Groceries',
+              )
+              ..authorizedPersonName = 'Asha Sharma'
+              ..businessRelationship = 'Owner'
+              ..primaryMobile = '9829012321'
+              ..contactEmail = 'asha@example.com'
+              ..primaryMobileVerified = true
+              ..contactEmailVerified = true
+              ..declarationAccepted = true;
+            expect(await tester.runAsync(work.submitProfile), isTrue);
+            final caseId = work.reviewCaseId!;
+            final submitted = work.submittedProfile;
+            work.remoteReviewStatus = decision;
+            work.reviewReason = 'The business address could not be confirmed.';
+            work.workName = 'Unsubmitted name';
+            final chat = ChatSession(
+              sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+            );
+            if (retained) {
+              chat.setDraftTextForSession(
+                'workspace-support',
+                'My existing question',
+              );
+            }
+            await mount(
+              tester,
+              route: '/app/work/workspace/proof',
+              work: work,
+              chat: chat,
+              viewport: scale == 2
+                  ? const Size(320, 568)
+                  : const Size(412, 915),
+              textScale: scale,
+            );
+            final help = find.byKey(const Key('work-inline-review-support'));
+            expect(help.hitTestable(), findsOneWidget);
+            await tester.tap(help);
+            await tester.pumpAndSettle();
+            expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+            expect(find.byKey(const Key('chat-inbox-screen')), findsNothing);
+            final context = find.byKey(
+              const Key('chat-workspace-application-context'),
+            );
+            expect(context, findsOneWidget);
+            expect(
+              find.descendant(
+                of: context,
+                matching: find.text('Mahadev Traders'),
+              ),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(
+                of: context,
+                matching: find.text('Application $caseId'),
+              ),
+              findsOneWidget,
+            );
+            final field = find.byKey(const Key('chat-message-field'));
+            expect(
+              tester.widget<TextField>(field).controller!.text,
+              retained
+                  ? 'My existing question'
+                  : 'Please help me with application $caseId for Mahadev Traders.',
+            );
+            expect(
+              chat
+                  .messages('workspace-support')
+                  .where((message) => message.mine),
+              isEmpty,
+            );
+            await captureStoreView(
+              tester,
+              'r669-application-support-${decision.name}-$scale-$retained',
+            );
+            final draft = tester.widget<TextField>(field).controller!.text;
+            await tester.tap(field);
+            tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+            await tester.pumpAndSettle();
+            await tester.enterText(
+              field,
+              '$draft Please explain the next step.',
+            );
+            await tester.pumpAndSettle();
+            final composer = find.byKey(const Key('chat-composer-surface'));
+            expect(
+              tester.getRect(composer).bottom,
+              lessThanOrEqualTo((scale == 2 ? 568 : 915) - 240),
+            );
+            await captureStoreView(
+              tester,
+              'r669-application-support-keyboard-${decision.name}-$scale-$retained',
+            );
+            FocusManager.instance.primaryFocus?.unfocus();
+            tester.view.viewInsets = FakeViewPadding.zero;
+            await tester.pumpAndSettle();
+            if (retained) {
+              await tester.tap(find.byKey(const Key('chat-back')));
+            } else {
+              await tester.binding.handlePopRoute();
+            }
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const Key('work-inline-review-status')),
+              findsOneWidget,
+            );
+            expect(work.reviewCaseId, caseId);
+            expect(work.submittedProfile, same(submitted));
+            expect(work.remoteReviewStatus, decision);
+            expect(gateway.submissionCalls, 1);
+            expect(
+              chat.draftTextForSession('workspace-support'),
+              '$draft Please explain the next step.',
+            );
+            expect(
+              chat
+                  .messages('workspace-support')
+                  .where((message) => message.mine),
+              isEmpty,
+            );
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
 
   for (final decision in [
     WorkRemoteReviewStatus.pending,

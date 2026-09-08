@@ -1108,8 +1108,10 @@ void main() {
     expect(find.byKey(const Key('work-global-chat')), findsNothing);
     expect(find.byKey(const Key('work-help')), findsNothing);
     await tapVisible(tester, const Key('work-inline-review-support'));
-    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-    expect(find.byKey(const Key('chat-back')), findsNothing);
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(find.byKey(const Key('chat-inbox-screen')), findsNothing);
+    expect(find.byKey(const Key('chat-back')), findsOneWidget);
+    expect(find.text('Application support'), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-inline-review-status')), findsOneWidget);

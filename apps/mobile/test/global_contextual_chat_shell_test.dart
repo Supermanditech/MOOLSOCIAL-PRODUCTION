@@ -166,6 +166,47 @@ void main() {
     );
   }
 
+  test('Workspace application context is limited to its support entry', () {
+    final valid = Uri(
+      path: '/app/chat/thread/workspace-support',
+      queryParameters: {
+        'return': '/app/work/workspace/proof',
+        'workspaceApplication': 'WP-QA-123',
+        'workspaceBusiness': 'Mahadev & Sons — Kirana',
+      },
+    );
+    final context = ChatWorkspaceApplicationContext.maybeFromUri(valid)!;
+    expect(context.applicationId, 'WP-QA-123');
+    expect(context.businessName, 'Mahadev & Sons — Kirana');
+    for (final invalid in [
+      valid.replace(path: '/app/chat/thread/mahadev'),
+      valid.replace(path: '/app/chat/inbox'),
+      valid.replace(
+        queryParameters: {...valid.queryParameters, 'return': '/app/buy'},
+      ),
+      valid.replace(
+        queryParameters: {
+          ...valid.queryParameters,
+          'return': 'https://example.com/app/work/workspace/proof',
+        },
+      ),
+      valid.replace(
+        queryParameters: {...valid.queryParameters, 'workspaceApplication': ''},
+      ),
+      valid.replace(
+        queryParameters: {
+          ...valid.queryParameters,
+          'workspaceApplication': 'WP\nOther',
+        },
+      ),
+      valid.replace(
+        queryParameters: {...valid.queryParameters, 'workspaceBusiness': ''},
+      ),
+    ]) {
+      expect(ChatWorkspaceApplicationContext.maybeFromUri(invalid), isNull);
+    }
+  });
+
   test('commerce context cannot relabel a loaded review conversation', () {
     final chat = ChatSession();
     addTearDown(chat.dispose);

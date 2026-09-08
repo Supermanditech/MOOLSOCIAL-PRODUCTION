@@ -47,6 +47,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   String? _highlightedMessageId;
   bool _applyingDraftText = false;
   String? _boundCommerceRoute;
+  ChatWorkspaceApplicationContext? _workspaceApplicationContext;
 
   @override
   void initState() {
@@ -99,6 +100,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     final signature = '${widget.threadId}|$uri';
     if (_boundCommerceRoute == signature) return;
     _boundCommerceRoute = signature;
+    _workspaceApplicationContext = ChatWorkspaceApplicationContext.maybeFromUri(
+      uri,
+    );
     widget.session.bindCommerceContext(
       widget.threadId,
       ChatCommerceContext.maybeFromUri(uri),
@@ -645,6 +649,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                   messageKeys: _messageKeys,
                   highlightedMessageId: _highlightedMessageId,
                   onRetryMessage: _retryMessage,
+                  workspaceApplicationContext: _workspaceApplicationContext,
                 ),
           bottom: ChatFiniteIncomingMotion(
             stateKey: widget.session.chatAvailableForSession(thread.id)
@@ -1583,6 +1588,7 @@ class _ThreadBody extends StatelessWidget {
     required this.messageKeys,
     required this.highlightedMessageId,
     required this.onRetryMessage,
+    this.workspaceApplicationContext,
   });
 
   final ChatSession session;
@@ -1591,12 +1597,15 @@ class _ThreadBody extends StatelessWidget {
   final Map<String, GlobalKey> messageKeys;
   final String? highlightedMessageId;
   final Future<void> Function(String messageId) onRetryMessage;
+  final ChatWorkspaceApplicationContext? workspaceApplicationContext;
 
   @override
   Widget build(BuildContext context) {
     final messages = session.messages(thread.id);
     final commerceContext = session.commerceContext(thread.id);
-    final contextOffset = commerceContext == null ? 0 : 1;
+    final contextOffset =
+        (commerceContext == null ? 0 : 1) +
+        (workspaceApplicationContext == null ? 0 : 1);
     final emptyOffset = messages.isEmpty ? 1 : 0;
     return ListView.builder(
       key: const Key('chat-message-list'),
@@ -1609,6 +1618,30 @@ class _ThreadBody extends StatelessWidget {
       ),
       itemCount: messages.length + contextOffset + emptyOffset,
       itemBuilder: (context, index) {
+        if (workspaceApplicationContext != null && index == contextOffset - 1) {
+          return Padding(
+            key: const Key('chat-workspace-application-context'),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  workspaceApplicationContext!.businessName,
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  'Application ${workspaceApplicationContext!.applicationId}',
+                  style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+                ),
+                const Divider(),
+              ],
+            ),
+          );
+        }
         if (commerceContext != null && index == 0) {
           return Padding(
             padding: const EdgeInsets.only(bottom: MoolSpacing.sm),

@@ -246,6 +246,43 @@ class ChatEntryContext {
 }
 
 @immutable
+class ChatWorkspaceApplicationContext {
+  const ChatWorkspaceApplicationContext({
+    required this.applicationId,
+    required this.businessName,
+  });
+
+  final String applicationId;
+  final String businessName;
+
+  // Display context, never permission to read, approve or change an application.
+  static ChatWorkspaceApplicationContext? maybeFromUri(Uri uri) {
+    if (uri.path != '/app/chat/thread/workspace-support') return null;
+    final origin = Uri.tryParse(uri.queryParameters['return'] ?? '');
+    if (origin == null ||
+        origin.hasScheme ||
+        origin.hasAuthority ||
+        origin.path != '/app/work/workspace/proof') {
+      return null;
+    }
+    final application =
+        uri.queryParameters['workspaceApplication']?.trim() ?? '';
+    final business = uri.queryParameters['workspaceBusiness']?.trim() ?? '';
+    if (application.isEmpty ||
+        business.isEmpty ||
+        application.length > 200 ||
+        business.length > 1000 ||
+        RegExp(r'[\x00-\x1f\x7f]').hasMatch(application + business)) {
+      return null;
+    }
+    return ChatWorkspaceApplicationContext(
+      applicationId: application,
+      businessName: business,
+    );
+  }
+}
+
+@immutable
 class ChatCommerceContext {
   ChatCommerceContext._({required Map<String, String> values})
     : values = Map.unmodifiable(values),

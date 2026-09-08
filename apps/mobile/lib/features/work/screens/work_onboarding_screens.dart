@@ -2903,12 +2903,25 @@ class _InlineReviewAction extends StatelessWidget {
         keyName: 'work-inline-review-support',
         label: 'Contact MoolSocial',
         icon: Icons.chat_bubble_outline,
-        onPressed: () => context.push(
-          Uri(
-            path: '/app/chat/inbox',
-            queryParameters: const {'return': '/app/work/workspace/proof'},
-          ).toString(),
-        ),
+        onPressed: () {
+          final caseId = session.reviewCaseId;
+          final business = session.submittedProfile?.name ?? session.workName;
+          context.push(
+            Uri(
+              path: '/app/chat/thread/workspace-support',
+              queryParameters: {
+                'return': '/app/work/workspace/proof',
+                'directReturn': 'true',
+                if (caseId != null && business.trim().isNotEmpty) ...{
+                  'workspaceApplication': caseId,
+                  'workspaceBusiness': business,
+                  'draft':
+                      'Please help me with application $caseId for $business.',
+                },
+              },
+            ).toString(),
+          );
+        },
       );
     }
     if (session.errorMessage != null) {

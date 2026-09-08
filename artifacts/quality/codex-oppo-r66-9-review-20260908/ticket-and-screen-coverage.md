@@ -1,5 +1,55 @@
 # r66.9 exact child coverage
 
+## Application-support correction — current local qualification
+
+Parent ad4f1cb8238910466884e60941cd89515208ae7a is clean, committed, pushed and remote-equal. Existing R669-S07/S08 support defect: Contact MoolSocial must open the existing Workspace support thread directly, show the acknowledged application reference/business, preserve an existing editable draft, send nothing automatically, and return to the same review state. The application context is display-only, not authority to read or decide an application. No Cursor, backend, Dashboard design or device changes.
+
+Focused support attempt1 passes9 cases (8 journey variants plus1 parser contract). Visual attempt1 reports8 passed in its complete raw log and produces16 PNGs, now individually inspected: 100%/200%, rejected/clarification, retained/empty draft, keyboard open/closed. The tool response containing terminal completion and several images was truncated; later polling reports the process already closed. Do not invent that missing terminal metadata. Final qualification must use new complete combined-run exits. At200%, the composer retains scrolling and the application context remains in the scrollable thread; physical OPPO and TalkBack remain pending.
+
+Full analysis attempt1 returns one braces-only style info in the new retained-draft test (line4599), exit1. Retain s07-support-analysis-attempt1.log. Add the required braces without changing its condition or assertions; run full analysis and final-source regressions again. This is an implementation style correction, not a passing analysis result or a new product defect. No new checker, policy or exception is required.
+
+Full analysis attempt2 passes with zero issues. Connected ten-file cycle1 completes990 passed,81 unchanged skips,1failed,exit1. The sole failure is `work_vertical_slice_test.dart: status Chat returns to the exact review screen`, line1111, expecting chat-inbox-screen. Its obsolete inbox/no-Back contract contradicts the approved direct-support correction. Replace only those expectations with the thread, existing Back and Application support identity; preserve exact review return, case and rejected-state assertions. The failed raw log and stack remain preserved. Cycle2 was not launched by the fail-closed runner. Final-source qualification follows separately.
+
+### Application-support qualification
+
+Final-source ten-file cycles2 and3 each pass991/81 unchanged intentional skips/0failed,exit0; full analysis attempt3 reports zero issues,exit0. Exact command: `flutter test --no-pub --concurrency=1 --reporter expanded --exclude-tags protected-reference test/ui_v2/work/work_main_v2_test.dart test/ui_v2/work/work_opportunity_home_c24g_test.dart test/work_production_gateway_test.dart test/work_store_atomic_operations_test.dart test/work_vertical_slice_test.dart test/work_workspace_layout_safety_test.dart test/chat_flow_test.dart test/chat_settings_hub_test.dart test/global_contextual_chat_shell_test.dart test/universal_intent_completion_test.dart`. The final six source/test files remained byte-identical throughout cycles2/3. No skip declaration, protected reference, Dashboard source, router, collection contract, backend or Cursor owner changed. Skipped tests do not establish production/device acceptance.
+
+All16 support captures were inspected individually at100/200%. Existing draft and typed text remain editable; the application reference appears in the thread, its content scrolls on the compact viewport, and the composer remains above the simulated keyboard. Rejected and suspended views are intentionally the same support entry; this does not erase the separate retained review states verified on Back. No message was sent. Existing live Chat backend/support-case assignment remains a dependency; route context is not account/application authority. No APK or OPPO qualification is claimed for these new fixes.
+
+Raw evidence root: `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/r669-approved-fix-cycle-20260908`. All logs are retained, including failed attempts. A read-only inventory attempted to hash the running cycle2 log and received a sharing error; its null interim hash was not accepted. The complete hash below was read only after both runs exited. Source edits were made only after the preceding test/analysis process completed.
+
+Log SHA256:
+
+- `s07-support-analysis-attempt1.log`: 1D764A7B983D764E3C1D36A8668D0372C3E58A93DFB71A424C0C0A8AE450EC08
+- `s07-support-analysis-attempt2.log`: B519ED323430A6B16EBB7707A9E315BB1E5BFC6D275354BF45DAAF8474E2DCAF
+- `s07-support-analysis-attempt3.log`: 3346AFE9E74674AF8280ABE0653AD51475FFFF9607002A64848CDCC8F668A25B
+- `s07-support-connected-cycle1.log`: C546CEFB6C79A26F2D9BFC190DC6D46B9BDE9DE3B5BA23AFEC80926210FF9CC6
+- `s07-support-connected-cycle2.log`: 27567A9ED4FD738350E8960873FE3F9ED8C22281EA9F2493A0ED7E10EA28F39F
+- `s07-support-connected-cycle3.log`: 490A60A55126C2E1516BE479DA735D25543E50386B7E11CF3BC09BAA14A03DFE
+- `s07-support-focused-attempt1.log`: 9B1F3E3A7324312EA480504217D345E9E1968CF734BE7303CB72E95B45BF6A7E
+- `s07-support-visual-attempt1.log`: 53FEE5A6A60B2A8A3FE2F896E8951B8E7D4D7CB9BAFE76BBA5C4D1F2BEA2521F
+
+PNG SHA256 (subdirectory `s07-support-visual-attempt1`):
+
+- `r669-application-support-keyboard-rejected-1.0-false.png`: FE8509D5AF14B0525352DC8AB7884E16C1204439BEC64AF745ADC4161CA5FFA3
+- `r669-application-support-keyboard-rejected-1.0-true.png`: A39C80365FEE14B5B1F5CDB1A43111E759EF29A866B7EFC1D32030FEAABD7155
+- `r669-application-support-keyboard-rejected-2.0-false.png`: 6E081DB0C1E00419EB105DA6EE8D7342A746230532C6112323F2E101278BB210
+- `r669-application-support-keyboard-rejected-2.0-true.png`: 6E081DB0C1E00419EB105DA6EE8D7342A746230532C6112323F2E101278BB210
+- `r669-application-support-keyboard-suspended-1.0-false.png`: FE8509D5AF14B0525352DC8AB7884E16C1204439BEC64AF745ADC4161CA5FFA3
+- `r669-application-support-keyboard-suspended-1.0-true.png`: A39C80365FEE14B5B1F5CDB1A43111E759EF29A866B7EFC1D32030FEAABD7155
+- `r669-application-support-keyboard-suspended-2.0-false.png`: 6E081DB0C1E00419EB105DA6EE8D7342A746230532C6112323F2E101278BB210
+- `r669-application-support-keyboard-suspended-2.0-true.png`: 6E081DB0C1E00419EB105DA6EE8D7342A746230532C6112323F2E101278BB210
+- `r669-application-support-rejected-1.0-false.png`: 7BA7EFE007F433D18827B77D77613D17FC7FDE8FD4F2AC752034A2033A766286
+- `r669-application-support-rejected-1.0-true.png`: 9910A60FABE0B3F0BC5776118CF06ABF252F33A9C77E3FAB77931A5815961CB6
+- `r669-application-support-rejected-2.0-false.png`: A2CB2BFC1D1EE847C402394782462D70630513F7A2102C120252D8320276F1FE
+- `r669-application-support-rejected-2.0-true.png`: F267E69FB417D60B21642A9B5E4FF43349DE06A6BCDA60735ACB3305CC25DCA1
+- `r669-application-support-suspended-1.0-false.png`: 7BA7EFE007F433D18827B77D77613D17FC7FDE8FD4F2AC752034A2033A766286
+- `r669-application-support-suspended-1.0-true.png`: 9910A60FABE0B3F0BC5776118CF06ABF252F33A9C77E3FAB77931A5815961CB6
+- `r669-application-support-suspended-2.0-false.png`: A2CB2BFC1D1EE847C402394782462D70630513F7A2102C120252D8320276F1FE
+- `r669-application-support-suspended-2.0-true.png`: F267E69FB417D60B21642A9B5E4FF43349DE06A6BCDA60735ACB3305CC25DCA1
+
+This is a local implementation checkpoint, not closure of the full approved-screen batch. Separate-application recovery R669-S01-ADD-SWITCH, new guarded APK and OPPO replay remain open.
+
 ## r66.9 approved-screen correction continuation — 8 September 2026
 
 Parent c065dc28ae8c3b74cb9b288eddaf99f70f7b6fb4; current Work review ticket remains UAW-CODEX-OPPO-REVIEW-V1-20260905. Founder agreed to fix/retest Workspace entry through the visually approved Dashboard before reviewing its remaining first-tap destinations. The detailed review children and original native evidence remain in `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/founder review tickets post integration.md`. No dashboard redesign, Cursor mutation or backend/device qualification is implied.
