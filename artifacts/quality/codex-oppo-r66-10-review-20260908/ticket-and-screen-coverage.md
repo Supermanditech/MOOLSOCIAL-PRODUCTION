@@ -12,7 +12,11 @@ Full exact command, actual Git facts and complete results: C:/GUARANTEED OUTCOME
 
 One tool result during correction was truncated. No omitted result was treated as a pass: actual file hashes were reread and the implementation gate was rerun with bounded output, exit 0, 148 claims and registry count 4501. The existing REG-4530 bounded-output prevention remains applicable.
 
-This local checker verification does not qualify an APK, AAB, integration or device journey. Atomic commit, exact remote equality and the full clean handoff must still pass before resuming the remaining pre-APK checks. The earlier blocked state below is retained as historical evidence.
+Correction sealed at 6f8644f020a476308c40ba3a6495841a9b391089, parent debfc703f773f6986942ab6b255863b90254c555. Four exact metadata/evidence owners; pre_commit and full clean handoff passed. Push and independent ls-remote readback were exactly equal; clean digest 0 bytes/0 records, SHA-256 E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855. Source and all accepted history are preserved.
+
+This correction does not qualify an APK, AAB, integration or device journey. The unchanged implementation and incremental gates passed before the remaining twenty-eight pre-APK suites started. The earlier blocked state below is retained as historical evidence.
+
+During read-only discovery of existing prebuild command parameters, a foreach pipeline expression repeated the already registered REG-4530 shell-parser mistake and exited 1 before execution. No files, source, tests or gate behavior were changed by that failed read. The independent regression process remained running. The read was reconstructed as an explicit array assignment before its output pipeline; exit 0, eight existing scripts parsed without errors. Retain this as a command-quality incident, not a product failure or passing test.
 
 ## Candidate handoff blocked —9September2026
 
