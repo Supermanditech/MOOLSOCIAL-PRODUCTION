@@ -1,5 +1,13 @@
 # r66.10 approved-screen coverage
 
+## Screen 4 approved with open finding; Screen 5 Business details awaiting review
+
+Founder approved Contact subject to technical testing and asked that any genuine issues be registered before advancing. Its OPPO-S03-02 phone/email validation-guidance continuation stays open. New captures 115–132 cover direct Business-details entry, empty-field validation/focus, keyboard Next/Done, five-digit postal PIN rejection and full error visibility, correction to six digits, relationship menu cancellation/selection, draft-preserving Back/re-entry and valid Details → Documents → Details. No new Business-details defect was confirmed in these bounded 100% tests. Existing draft/keyboard/step-navigation tickets gain this exact replay evidence; physical accessibility and interruption/backend cases are not waived. Current OPPO view is Business details at 132, awaiting founder review; Documents was visited only for forward/Back boundary testing.
+
+Founder additionally clarified server-authoritative OTP feedback: show the actual safe outcome (incorrect, expired, throttled, unavailable), never call a network failure a wrong code, and never confirm before server success. Postal PIN validation is separate. The authenticated gateway/session already await success and propagate declared gateway messages; live response taxonomy and non-WorkGateway transport-exception normalization remain verification dependencies under existing OPPO-S03-01, not reproduced OPPO defects. Exact source observations and acceptance requirements are retained in device-review.md. No real OTP, application submission or new source implementation occurred.
+
+Evidence-only checkpoint: full 001–132 inventory contains 264 PNG/XML files; SHA-256 E0CB6E8C4D2629F0426BF3372E9424B06E8D56415C454E6B22FE989AA64126A3. Source, tests, registry, policy, APK and Cursor/Redmi are untouched. Earlier current/awaiting statements below are historical.
+
 ## Screen 3 approved; Screen 4 Contact details awaiting review
 
 Founder approved document-readiness subject to native checks; those bounded checks found no confirmed defect. Captures 099–114 now cover Contact entry, phone/email invalid-edit validation, keyboard dismissal, Cancel restoration, optional backup-field reachability and Back/re-entry preserving the existing details and review confirmations. Current OPPO view is Contact at 114. Physical accessibility, restart/account-switch persistence and production backend verification remain separate, not waived.

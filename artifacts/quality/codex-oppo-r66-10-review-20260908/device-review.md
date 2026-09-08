@@ -1,5 +1,83 @@
 # r66.10 OPPO review
 
+## Founder-paced screen 5 — Business details — 9 September 2026
+
+Founder approved Contact details subject to OPPO checks and explicitly instructed that genuine issues be registered before moving ahead. Its single OPPO-S03-02 validation-guidance continuation remains open; approval does not close it. Capture 115 preserves Contact before Continue; 116 opens Business details directly, with the optional backup contact left blank. Current OPPO screen: Business details, Step 1 of 3, capture 132, awaiting founder review. No additional screen review or implementation is implied by the forward/Back boundary check.
+
+Only isolated review draft values were entered: OPPO Review Store / 302001 / Grocery retail / Authorized representative. These are fixture entries for UI testing, not a legal identity, real business relationship, approved store or authenticated global-profile change. No application was submitted.
+
+| Check | Actual result/evidence |
+| --- | --- |
+| First view and selected context | 116: Complete your Workspace, Grocery / Kirana Shop or Speciality Retail Shop, Step 1 of 3; business PAN-name, operating city/PIN, primary activity and relationship fields. Continue remains above Android navigation. |
+| Empty validation | 117: Continue stays at Details, focuses the empty business name and shows field-specific instructions. No navigation or submission occurs. |
+| Keyboard Next/Done | 118–121: Next moves name → city/PIN → activity; text goes into the expected fields. Done at 122 dismisses the keyboard, without submitting or changing the step. |
+| Invalid postal PIN and error fit | 119/123: five-digit postal PIN is rejected; Continue stays at Details and focuses the location field. Its entire two-line correction message is visible above the keyboard. Existing R669-S04-VALIDATION-FIT did not reproduce at OPPO 100% in this sequence; physical 200% remains unqualified. This is not an OTP test. |
+| Corrected input | 124: six-digit test PIN clears the corresponding error without clearing the name or activity. Local format acceptance does not verify a postal address or service coverage. |
+| Relationship menu | 125/127: Owner, Partner or director and Authorized representative are visible above native navigation. Android Back at 126 dismisses the menu without selecting a value or reopening the keyboard. Selection at 128 returns the chosen value to the same form. |
+| Unsaved draft Back/re-entry | 129: Android Back returns to Contact. 130: Continue reopens Details with all three draft fields and relationship unchanged. No stale validation is shown. This does not qualify process death or cross-account persistence. |
+| Forward/Back boundary | 131: valid Details open the top of Documents, Step 2 of 3. No file is selected or submitted. Header Back at 132 restores Details, Step 1 of 3, with the same draft. Documents review waits for the next founder decision. |
+| Visual check | Actual images 116/117/119/121/125/132 inspected. At 100%, the active fields, correction text, menu choices and principal action are readable/reachable in the exercised states. No new visual defect was confirmed. |
+
+No new confirmed Business-details defect in these bounded controls. Existing OPPO-S04-01/03/04 and R669-S04-VALIDATION-FIT receive successful replay evidence only for the exercised in-session/100% paths, not blanket ticket closure. Source, tests, registry, policy and installed APK are unchanged. Physical 200%/TalkBack, process-death/account-switch recovery, actual business verification and production services remain separate qualifications.
+
+### Founder clarification — postal PIN and server-authoritative OTP are separate
+
+Founder requested that a wrong server-verified OTP show the precise corresponding issue in the UI, then acknowledged that the five-digit input above concerned postal PIN rather than OTP. Attach this as an acceptance/dependency clarification to existing OPPO-S03-01 contact-verification scope, not a duplicate postal-PIN defect.
+
+Required production behavior: server verification determines success; an incorrect code, expired code, throttling and unavailable verification each need accurate, concise customer-facing feedback at the relevant field. A transport failure must not be presented as an incorrect code, and no local input/fixture may imply confirmed contact. Preserve exact account/contact/channel/revision checks; changed contacts require appropriate fresh verification. Server diagnostics or sensitive internal details must not be displayed verbatim merely to satisfy “exact issue.”
+
+Read-only implementation evidence:
+
+- AuthenticatedWorkGateway.sendContactOtp / verifyContactOtp call sendWorkspaceContactOtp / verifyWorkspaceContactOtp with channel, value and code (work_services.dart around 692–708).
+- WorkSession._verifyWorkspaceContactOtp awaits gateway success and checks contact revision, account scope and exact current value before onVerified (work_session.dart around 4021–4059).
+- AuthenticatedWorkGateway._invoke consumes the ok/error envelope and forwards error.message in WorkGatewayException; _runBool places that message into errorMessage (work_services.dart around 911–951; work_session.dart around 5395–5418).
+- This confirms the existing success-wait/error-message plumbing, not the complete live OTP contract. The live server's safe response taxonomy, expiry/throttle cases and transport exception normalization still need qualification. _runBool catches WorkGatewayException only; non-WorkGateway transport/credential exceptions require a focused failure-path check before that dependency can be declared ready. This is a source-contract verification item, not a reproduced OPPO wrong-code/network defect.
+
+The installed APK uses the review gateway. No real OTP was requested or verified in this screen review, and no backend/authentication owner was edited. Do not use fixture success as production OTP acceptance. Keep this server-outcome requirement in the Git ledger for the later authorized frontend/backend qualification stage.
+
+### Screen 5 capture hashes
+
+36 new PNG/XML rows, 115–132. Full 001–132 inventory: 264 rows; canonical UTF-8/no-BOM LF-terminated SHA-256 E0CB6E8C4D2629F0426BF3372E9424B06E8D56415C454E6B22FE989AA64126A3.
+
+```text
+B87A07642B8185EB0636AC26A4EF4C806833F0FCF6A2B79C7B76E6E146A9E27C  r6610-native-115-contact-founder-approved.png
+02A79D16A5AE23646A3B9A11366781C1F097769E4705225F2F1DB5842A7C13C6  r6610-native-115-contact-founder-approved.xml
+955591601A4000EEAA23802D57C9035F3AF78B18F4C5C82D999482BB88E1C2D6  r6610-native-116-business-details-first-view.png
+5B090E01E868711E5539041AE14A81547F3D3532D8694F9E495564554E22AFCD  r6610-native-116-business-details-first-view.xml
+CAFBF042AE7870E73A6AC5A5E4BDD2EF151F673D0B7740A2CC1F724D08541124  r6610-native-117-business-empty-validation.png
+D874905235E201FCCF825FA91FE125CA4426607174A8A0C1072422B437D7A12B  r6610-native-117-business-empty-validation.xml
+B852D044F2FDE87C23400F4762B8C231A71D07775B39895D723C639BCD0E7867  r6610-native-118-business-keyboard-next-city.png
+E265658096AB0C302D274924D3D54DC5C070869573977C8FE30EB273E5F52E70  r6610-native-118-business-keyboard-next-city.xml
+1E22CA64AE3E5BD2AFACE7FC001F44411D380C78285B88E5ED7BFD74EA61E854  r6610-native-119-business-five-digit-pin-error.png
+0D8C868D4DEA854C0B9FF21271F3DBA7BCC1D5EBA4794D3079C7D8D4363CDB04  r6610-native-119-business-five-digit-pin-error.xml
+F21C763E866600E57247153012347A80FF0FC2B693AF95E05AD79F8999E85AD1  r6610-native-120-business-keyboard-next-activity.png
+5F5DC2CDA1F0606AE913F7F91D41EC3752EF93D2985F63D0E9B7875835AEB3F3  r6610-native-120-business-keyboard-next-activity.xml
+DF073CFCBB7E3A7934B6DAA7230DFD4B71CA9FCADF752AC5AFE292365D750E50  r6610-native-121-business-activity-keyboard.png
+A0CC7D8874060AA4A1FAC23626BF3A3BCFCD1D7FF259D289FA12140ABED0FA43  r6610-native-121-business-activity-keyboard.xml
+910307262543FD4C60F0B96D845C7EF749D1DCF585794EF76AEFD9D5FBACD305  r6610-native-122-business-done-no-submit.png
+6EBA4FEC47A902F58934271DA40A5E3CA27E1D198A739BEF1DE0C26A3FBF24BE  r6610-native-122-business-done-no-submit.xml
+8B3DB5575A4962BA74B400D580358A8BA8C6F9989F2E6411A0FD66C0527CB315  r6610-native-123-business-invalid-pin-blocked.png
+F471BA644F95699F000306285E5C490A0EDB2A1B2799CBCEEC7DD6DF7841FD4A  r6610-native-123-business-invalid-pin-blocked.xml
+FE3ED5C1BD3FB0B16BD413157CD505BF71A59329CD015F45F8F537C97BB7008C  r6610-native-124-business-pin-corrected.png
+33E11DD9F36ECBB45D2AAD5261652D6B4A369E6FFBF3AD2157A0727AE5F9FBD2  r6610-native-124-business-pin-corrected.xml
+F1DAA83B4F741717A06BFF781446D05F70164F19F08EF03D7E8619CA81C6040E  r6610-native-125-business-relationship-selector.png
+2C1649F98483C1E1AAED9E26F037CAE3B52C57EB7EB72F4057DA6E77581A083C  r6610-native-125-business-relationship-selector.xml
+EA3893A2BE58F5572B10009CF729C4EF8EDC105E829C0EA32B8B72BFA1FB1A93  r6610-native-126-relationship-cancel-retains-draft.png
+891A9E4DB3F4C9740D2F50A4C01D6211303DE2B33B3BA4F16EC81FA60DD37635  r6610-native-126-relationship-cancel-retains-draft.xml
+6F848D02A73AA9D3C672869CD086C9411D910622903735F5436EB488464B8888  r6610-native-127-relationship-selector-reopened.png
+2C1649F98483C1E1AAED9E26F037CAE3B52C57EB7EB72F4057DA6E77581A083C  r6610-native-127-relationship-selector-reopened.xml
+937370C6BCE40CF5B55976EEABBD0511CF685FE680233E35023179C8ACB7FA01  r6610-native-128-business-relationship-selected.png
+F61EFF8BEB946DC991A02C172C083C22802CCDC94CE2CE927EBB14D77E936747  r6610-native-128-business-relationship-selected.xml
+1214F0419A6B54012709DF14C13A6BA40AA2506BC54BD0A013F2A79129007F82  r6610-native-129-business-back-contacts.png
+02A79D16A5AE23646A3B9A11366781C1F097769E4705225F2F1DB5842A7C13C6  r6610-native-129-business-back-contacts.xml
+ABF3105FA35E79C4C00CC9A2152592F1617EF1C857D93EB2730A9348EDE0011F  r6610-native-130-business-draft-retained.png
+C2F051CA5BCEC76C3F9DC95ACE5B8207DCF197C5062EDE343D027BE8DC1632AC  r6610-native-130-business-draft-retained.xml
+3587E6689362549356CC1639D942A00EACB550726E8C9839DB3E1E66EFB6FFD6  r6610-native-131-business-to-documents-boundary.png
+DFD86AE6A8A6E50700D70A01F063C787A3178E5F917F310B55976ADF37120F35  r6610-native-131-business-to-documents-boundary.xml
+56D652D865B9CB81152D96D50D65C4DBF246D288D15D472E979F29FE9B7D78C6  r6610-native-132-business-details-founder-review.png
+C2F051CA5BCEC76C3F9DC95ACE5B8207DCF197C5062EDE343D027BE8DC1632AC  r6610-native-132-business-details-founder-review.xml
+```
+
 ## Founder-paced screen 4 — Contact details — 9 September 2026
 
 Founder approved Screen 3 (Documents to keep ready), subject to Codex finding no defect in OPPO checks. The bounded readiness checks passed as recorded below; production verification, other business types and physical accessibility are not waived. Capture 099 preserves that approved readiness view; 100 enters Contact. The current screen is Contact details first view at 114, awaiting founder review. Do not advance to the Business details review or implement fixes during this screen-by-screen defect-collection phase.
