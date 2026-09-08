@@ -1,0 +1,1 @@
+PENDING: no r66.10 APK has been built. No checksum, installed version or build success is asserted.

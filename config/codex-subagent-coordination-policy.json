@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4501,
-    "sha256": "A91310B0E2B6CEEBD1E43A67325A75966280391E9ADF841E5295F51945E35055"
+    "sha256": "CA7A0DE0EF3E8FF14E70DCAA7BF4CE65E2942B69249357138999F871C11B4DF2"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -40,6 +40,16 @@
         "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/WorkDocumentRenderService.kt",
         "apps/mobile/android/app/src/test/kotlin/com/moolsocial/app/WorkDocumentFrameRegression.kt",
         "artifacts/quality/codex-oppo-r66-9-review-20260908/candidate-contract.md",
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/candidate-contract.md",
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/source-manifest.txt",
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/local-validation.md",
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/prebuild-validation.md",
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/motion-disposition.md",
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/apk-regression-state.json",
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/uaw-codex-oppo-r66.10-review-20260908-build-provenance.txt",
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/post-install.json",
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/device-review.md",
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/ticket-and-screen-coverage.md",
         "artifacts/quality/codex-oppo-r66-9-review-20260908/source-manifest.txt",
         "artifacts/quality/codex-oppo-r66-9-review-20260908/local-validation.md",
         "artifacts/quality/codex-oppo-r66-9-review-20260908/prebuild-validation.md",
