@@ -1,5 +1,133 @@
 # r66.10 OPPO review
 
+## Founder-paced screen 2 — Grocery/Kirana preview — 9 September 2026
+
+At this checkpoint OPPO shows the Grocery / Kirana Shop expanded preview, Customers first page, capture 089. Founder approved screen 2 subject to Codex finding no defect in OPPO testing. No confirmed defect was found in the exercised controls below; this conditional approval does not waive physical accessibility, other business types or backend qualification. Choose this Workspace has not yet been activated in this review; its forward transition to document-readiness is the next check.
+
+Boundary clarification: capture 069 is an observed dashboard, despite its intended-preview filename. Founder explicitly explained they had tapped Back. It is not a product defect. Captures 070–072 repeat the controlled request-new → Grocery preview route successfully. No implementation workaround or speculative navigation ticket was created.
+
+| Check | Actual evidence and result |
+| --- | --- |
+| Topics in the same preview | 072–076, 079–082: Customers, Stock, Money and Daily work switch the local content, without leaving for the advertised operational feature. |
+| Complete headline pagination | Customer counts 1–3/4–6/7–8 of 8 (072/084/085); Stock 1–3/4–6 of 6 (080/081); Money 1–3/4–5 of 5 (074/075); Daily work 1–3/4–6 of 6 (076/079). These cover all 25 displayed headlines, not every expanded description or the features' execution flows. |
+| Last-page limits | Native XML for 075/079/081/085 reports More points enabled=false and clickable=false; page controls do not advertise a nonexistent next page. |
+| Expansion | 082–083: selecting Collect at store collapses the previous description and displays its own short explanation in this preview. No payment/order/collection action is performed. |
+| Layout and persistent next action | Screenshots 072/074/079/081/085 were visually inspected; text wraps, selected tab is visible, and Choose this Workspace remains above native navigation. This is OPPO at 100%, not a new 200%/TalkBack pass. |
+| Back and close | 086: Android Back collapses the preview into the selector, not the approved dashboard. 087 reopens the first Customers page. 088 Close details returns to the selector; 089 reopens the clean first preview. |
+
+Ineffective-coordinate attempts are preserved honestly: captures 077 and 078 still showed Daily work 1–3 of 6, so their filenames do not establish successful paging or Stock selection. The panel was at a different scroll offset; the next action was re-aimed using freshly observed bounds. Actual page/tab changes are shown in 079 and 080. Do not turn these unqualified taps into successful tests or assume an app defect from them.
+
+No new confirmed functional or visual defect in the interactions exercised. Screen 2's founder approval is conditional on those technical checks and is now recorded; there is no blanket defect-free release claim. Physical accessibility, other business previews and the advertised services' actual journeys remain separate qualifications. Live deliveries, invoices, reminders, tax assistance, procurement, credit, payments and collection cannot be considered connected or production-ready because this explanatory preview renders.
+
+No source/test/policy changes, external messages, real payment, production contact verification or backend writes occurred. Save only the evidence update and remain at 089 for founder review.
+
+### Screen 2 capture hashes
+
+42 new PNG/XML rows, 069–089. The full 001–089 inventory has 178 rows and canonical UTF-8/no-BOM LF-terminated SHA-256 3C0147C3DFD681E48625844A396513666CE8AC3489567D1B32AD04B01CE089FE. Previous capture hashes are retained in the preceding sections.
+
+```text
+E7373AB9218C638249CA1EBA582097A4627734E549490DFF169D80EF8B24B93E  r6610-native-069-grocery-preview-review.png
+F55D50C5507F06D0EFC9BBA7463C27191B9392F87FC14067B7020494EC549A0C  r6610-native-069-grocery-preview-review.xml
+DA772FE21C8AB33222B3FADEEDB5436CF2D1E014FA0326148F9B686040C09948  r6610-native-070-repeat-new-workspace-entry.png
+8271705974EDFCC7E8284C047B24992AFDBF83CB358C30BE780EB2114F9BD068  r6610-native-070-repeat-new-workspace-entry.xml
+7AF49BA9D37DCFCD33ED402EECCFE0A64EDB4FEA5A59AFFF96B192EA5ECB87A5  r6610-native-071-new-request-before-preview.png
+1D6EA98AE74086D6EE529F3BB0A0BF8010B04CF40CAFF19976CD9C975E8CC42A  r6610-native-071-new-request-before-preview.xml
+473B41779C42D9EC8A50BDDBD7D68F4DC71941FC30A3540CB2FD63C3316DFA9F  r6610-native-072-preview-controlled-replay.png
+687AE00253F60AA8AE3565290302D2A9EC457949335EB15562C02771858A0F56  r6610-native-072-preview-controlled-replay.xml
+C291DF6A7EE50885577B013D8B44D485E93E0F76325200A89F6EC52B8DDE66FA  r6610-native-073-preview-stock.png
+2DF8F9B638339028CFB4BBAA02AB1B6F54754A40FA76C7204607885A39AA818C  r6610-native-073-preview-stock.xml
+A9D9559E65F209BCFBDC65425D874692A0C78073B94F8769DAA00144AF480F5D  r6610-native-074-preview-money.png
+279C5493D5BB28CAEF0B3807F21112D0B820E4F1AA10180947ED997CF2C88D7A  r6610-native-074-preview-money.xml
+64F7BB1F019D77B4777D2B12AD01EFB839F32ED9628B1ABAD3FEA3E93F62EDEF  r6610-native-075-preview-money-last-page.png
+BA90BDE2A5E721AF3F011348448EB870FE1AE95CF2A45E5DA0C044B575F1B94C  r6610-native-075-preview-money-last-page.xml
+7555B3FCB423A5ACC34534929B05731DC90C305A2D79D3FE4D8A4C744651A559  r6610-native-076-preview-daily-work.png
+B4FFC797F83A9B59DAA6DB52C517B200C8EF593D53B4C619524A056C5B344B60  r6610-native-076-preview-daily-work.xml
+EC8DA50EB544691CB71AA440EE56664EE1FB27F7C130E6B862A50C506928F04B  r6610-native-077-preview-daily-work-last-page.png
+11DBE65AED28FE7A1772C7F1713B8AFEE48D270229690224CC19614D1E269423  r6610-native-077-preview-daily-work-last-page.xml
+EC8DA50EB544691CB71AA440EE56664EE1FB27F7C130E6B862A50C506928F04B  r6610-native-078-preview-stock-reset.png
+11DBE65AED28FE7A1772C7F1713B8AFEE48D270229690224CC19614D1E269423  r6610-native-078-preview-stock-reset.xml
+FDE7F9C14A23B17FAB4D41470DB2A08E7F419D974FB889B30EFBF82AAEEC8115  r6610-native-079-daily-work-paging-confirmed.png
+04B9F31E33E42F03DDA8CAF081F24C5A501AE7339C2885976008A79FABEDAD64  r6610-native-079-daily-work-paging-confirmed.xml
+76AA0F3B3C6330F47735901F9EA35B607A55A2B4A0D2515032F178E3FAF6E2CB  r6610-native-080-stock-tab-confirmed.png
+254CFD7694126A493878CE8E4DD1608A47AF5880C98D9DC57423FD1E352C1755  r6610-native-080-stock-tab-confirmed.xml
+C99F32C8B87F6F423D555421BAF3D3023C6D8CA0C86023BBFE8071613B4D07A0  r6610-native-081-stock-last-page.png
+108A472C44CA2D5FE8B065B1D18B77DC4B8963A411DCA7924406E403C0D04865  r6610-native-081-stock-last-page.xml
+1148E31F96C8CD987F4436F7658EA0B6A4719523FCE703729EBC98271067EED5  r6610-native-082-customers-first-page.png
+DCCD185221DEAADD76ED1BFE91684B17E8C7FB267A225839061779D0F83B285B  r6610-native-082-customers-first-page.xml
+71EAFCD89AF44D69D94089DA810DCBDDB82A509552BF4DF3018FEF416D6E8B39  r6610-native-083-collection-explanation.png
+610149F6109D061E4398147BAE26FFA29F3D9C29E0563CA606E4340D452CD5E8  r6610-native-083-collection-explanation.xml
+1D5DC956C49EC4C66F1402EC12022EAE0F967445DD0645202B68A258B3EAB881  r6610-native-084-customers-second-page.png
+BD2B9736C9C07A95D6A9343C1504CFA0820662DD5F4BA8FC3B4680DD0AF9213A  r6610-native-084-customers-second-page.xml
+1278A39F20E9B3566F8E0C0CAD96674E321C94EC3FE2F340ECA361D3F4A03177  r6610-native-085-customers-last-page.png
+4D176B8F1FB1D7C492614B6C3322218B1FC062E1AEB4F29C9210B1C4D61DED98  r6610-native-085-customers-last-page.xml
+F4CC8D90666FC100BF71289788E2776DA0C3502B174F4972F36757B3BD60CE82  r6610-native-086-preview-back-to-selector.png
+1D6EA98AE74086D6EE529F3BB0A0BF8010B04CF40CAFF19976CD9C975E8CC42A  r6610-native-086-preview-back-to-selector.xml
+0A4AC095733707555FA7396F271F4C484DC3348BFAAA9E19B1D519B26A128698  r6610-native-087-preview-reopened.png
+687AE00253F60AA8AE3565290302D2A9EC457949335EB15562C02771858A0F56  r6610-native-087-preview-reopened.xml
+3457945AF205FF7D4FEC19C644F8C9613DD2553DE98A42A2E378554DCA1FE287  r6610-native-088-preview-close-control.png
+1D6EA98AE74086D6EE529F3BB0A0BF8010B04CF40CAFF19976CD9C975E8CC42A  r6610-native-088-preview-close-control.xml
+ABE39D7A1A56AF7338CE057AB7031F362C4FCE5D057AA64A74DE034C2A2B9BEE  r6610-native-089-preview-founder-ready.png
+687AE00253F60AA8AE3565290302D2A9EC457949335EB15562C02771858A0F56  r6610-native-089-preview-founder-ready.xml
+```
+
+## Founder-paced screen 1 — Grow with MoolSocial — 9 September 2026
+
+Founder asked whether all screens had been replayed and requested one-screen-at-a-time review. Answer: no blanket production qualification. The preceding 001–054 sequence is one bounded Grocery journey, not every business type, failure mode or Dashboard destination. Resume per-screen testing, then pause for founder approval/additional inputs; do not advance the review or implement speculative defects.
+
+At the screen 1 checkpoint, OPPO showed Grow with MoolSocial, clean initial selector, capture 068. It was reached from the approved test store through Change Workspace → Request another Workspace (055–057). This is the new-Workspace journey; an existing approved Workspace normally opens its dashboard. No real application or account was changed. The later screen 2 checkpoint above is the current foreground.
+
+| Check | Evidence/result |
+| --- | --- |
+| Inline search and keyboard | 057–058: grocery filters to Grocery / Kirana; input and result are visible above the keyboard. |
+| Category menu while typing | 059–060: menu opens after keyboard dismissal; Android Back closes only the menu; query/result remain and the keyboard does not reopen. |
+| Clear and no-match recovery | 061–062: Clear restores all choices; a nonsense query produces an honest no-match explanation plus the existing Tell us what you do action. That separate screen was not opened in this review. |
+| Category filtering/reset | 063–066: Food Business shows Restaurant / Café and Cloud Kitchen / Tiffin; All businesses restores the initial list without changing the selected application's identity. |
+| Scrolling | 067–068: list scroll reaches the Manufacturer and Food sections, with header/navigation retained; return to top restores the initial first view. |
+| Back to approved store | Already captured in 053–054: a new-Workspace request can be left without losing the approved dashboard. Not falsely counted as a new independent retest. |
+
+Disposition: no new confirmed functional or visible defect in the controls exercised on this screen at OPPO's current 100% setting. Existing founder-approved first-view geometry was not redesigned. This is not closure of all R669-S01 cases or a production-accessibility verdict. Preview panels, Tell us what you do, other business-type journeys, physical 200% and TalkBack remain separate checks.
+
+Accessibility observation S01-A11Y-SEARCH-OBS (unconfirmed, not a duplicate product defect): the native empty search EditText in 057/061 has empty text/content-desc and NAF=true, whereas the actual screen visibly renders Search. Source uses InputDecoration(hintText: 'Search'). Because this hierarchy dump does not establish what TalkBack announces from hints, do not claim a missing-label defect or an accessibility pass. Verify the spoken name/hint with an appropriate accessibility replay before release; preserve the screen-reader pending item already recorded.
+
+Backend distinction: the local selector/search/filter controls were exercised. Real account approval, permissioned Workspace access, server availability and persisted multi-application reconciliation were not qualified by review fixtures. No live SMS, email, WhatsApp, support message, payment or admin action was performed.
+
+Founder visual decision for screen 1: approved with “I TOO APPROVE”. The screen-reader pending item is not closed by visual approval. The founder then confirmed that the dashboard return observed in capture 069 resulted from their own Back tap. Do not register it as an app navigation defect. Controlled request-new replay 070–072 opened the preview correctly. No subsequent document-readiness destination is included in screen 1's verdict.
+
+### Additional capture hashes
+
+Append these 28 rows to the prior 108-row capture inventory. The combined sorted 136-row UTF-8/no-BOM LF-terminated inventory SHA-256 is 7795A2CDE6D80366E74EBFE59D51AA6AC322CB2F3DFC42FCAB39A0BF674626A0.
+
+```text
+5FA1F5AF358EB01E09DCED343D550E055B5EC5B5D5F33C63450D26B11E698B64  r6610-native-055-founder-review-start.png
+F55D50C5507F06D0EFC9BBA7463C27191B9392F87FC14067B7020494EC549A0C  r6610-native-055-founder-review-start.xml
+382737F8162392F16A36A2AF207C8C29977DAD5F121CC7D383DE1B12F6AEDE16  r6610-native-056-review-entry-chooser.png
+8271705974EDFCC7E8284C047B24992AFDBF83CB358C30BE780EB2114F9BD068  r6610-native-056-review-entry-chooser.xml
+BB31A9726DCF52BBB24A80608DD6AAA91585DB1015722C70310475AAA1004EB2  r6610-native-057-grow-first-view.png
+1D6EA98AE74086D6EE529F3BB0A0BF8010B04CF40CAFF19976CD9C975E8CC42A  r6610-native-057-grow-first-view.xml
+0DE20B105A3C7B35E316F006B57BBF67F7DAF2BDC04E8DB943244B623EE14427  r6610-native-058-selector-search-keyboard.png
+4A927F7880A03D46A9167CB42E04FA1E1CA8AF89A8A6E5DF167A7B2D9C32D35F  r6610-native-058-selector-search-keyboard.xml
+001F81931B1F5EEF644C554BF099385E545DD642725121685CE0EA501376B638  r6610-native-059-categories-keyboard-dismissed.png
+B2CDA4CD4E2C4C75D3405BBBFA7C491973DD7837A0A837B28D37030C7403B7C5  r6610-native-059-categories-keyboard-dismissed.xml
+132DB3388B7674046B75693E13B895C4AA38817C91DD9BEAE0482587A189FFD8  r6610-native-060-category-cancel-return.png
+8531C01233500BF34D4A44727777ABC3E3D7F11DB354C2726CE710906414049D  r6610-native-060-category-cancel-return.xml
+2B216DF343937C0CAEF73BC54C45C67A5DDA30747F4C10226D62C1D8EF1CF6DB  r6610-native-061-search-clear-restores-list.png
+1D6EA98AE74086D6EE529F3BB0A0BF8010B04CF40CAFF19976CD9C975E8CC42A  r6610-native-061-search-clear-restores-list.xml
+22C3FC993E3FF332F019E1D96B3319B4096A9AA5704AA7C174EA0F76EBAFD2D6  r6610-native-062-search-no-result-recovery.png
+2D9D2BB84AAB3ECED6C81CB91F962768A93E606381DF73F1DBD69262ED4BD778  r6610-native-062-search-no-result-recovery.xml
+816E87B075C6AA11300183F6B0AE1381B7F53FE3E5326EBA6CF31FB77F149FA4  r6610-native-063-category-selection-menu.png
+B2CDA4CD4E2C4C75D3405BBBFA7C491973DD7837A0A837B28D37030C7403B7C5  r6610-native-063-category-selection-menu.xml
+1112345383C2E0D085E118963FD7D0FB0F5C334591B7A05A4DBE34F17ECB476D  r6610-native-064-food-category-results.png
+887035C3D7F4FABDADA12C301568F72B481A6F82EABEF2BC768A7168287496CD  r6610-native-064-food-category-results.xml
+A5D5D90C9EE29E60A94CEDF395BFF1CAB170434C5CFDE478743E0ED27AD54789  r6610-native-065-reset-category-menu.png
+B2CDA4CD4E2C4C75D3405BBBFA7C491973DD7837A0A837B28D37030C7403B7C5  r6610-native-065-reset-category-menu.xml
+BA04DFABAF84BFB669E46B802F33E11F84F16DEF91E7FEDF1EB6E6DAFD785ED2  r6610-native-066-category-reset-first-view.png
+1D6EA98AE74086D6EE529F3BB0A0BF8010B04CF40CAFF19976CD9C975E8CC42A  r6610-native-066-category-reset-first-view.xml
+B0F179279810B7ACA94459204477533CBD8170DC72ABC7A52495906A08A2CEBF  r6610-native-067-selector-scroll.png
+BC4291A4C6958ED6FD8669E267BF8B49B2A7B5D71DEBD0049F851F78F15D4F11  r6610-native-067-selector-scroll.xml
+0E2FD8F2BA66F2658EE75E3D64EF45B5C5AB9DA33CC5569273E72377304F65BC  r6610-native-068-screen-one-founder-ready.png
+1D6EA98AE74086D6EE529F3BB0A0BF8010B04CF40CAFF19976CD9C975E8CC42A  r6610-native-068-screen-one-founder-ready.xml
+```
+
 ## Native continuation checkpoint — 9 September 2026
 
 This section supersedes the earlier Work-entry-only checkpoint. The same installed r66.10 APK was used throughout; no app rebuild, reinstall, data clearance, production mutation, Cursor/Redmi operation or integration occurred. Native serial: 2b3e0f71; font scale 1.0. Current foreground is the approved test Workspace dashboard, capture 054.

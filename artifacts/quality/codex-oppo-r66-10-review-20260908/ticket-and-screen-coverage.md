@@ -1,5 +1,15 @@
 # r66.10 approved-screen coverage
 
+Founder subsequently approved the Grocery/Kirana preview subject to Codex finding no defect in OPPO real-user checks. The bounded checks reported no confirmed defect; physical accessibility and backend dependencies are not waived. Screen 2's forward Choose this Workspace transition remains the next test, followed by the document-readiness review. Earlier awaiting-review statements below describe their earlier checkpoints.
+
+## Screen 1 approved; Screen 2 awaiting review
+
+Founder approved Grow with MoolSocial visually (“I TOO APPROVE”). They clarified the subsequent dashboard return was their Back tap, not a navigation defect; exclude it from the defect list. Controlled new-Workspace → Grocery preview replay passed. Native captures 072–089 now cover preview tabs, all headline pages, collection-description expansion, disabled final-page controls, Back, Close and reopening. Preserve two ineffective-coordinate captures 077/078 as attempts, not passes; successful repeats are 079/080. No new confirmed product defect in exercised preview controls. Current OPPO screen is Grocery/Kirana preview at capture 089, awaiting founder review before Choose this Workspace/document-readiness. Screen 1 accessibility observation remains unqualified. Source and backend are unchanged.
+
+## Founder-paced review restarted — Screen 1 only
+
+9 September: founder requested screen-by-screen testing plus review, not a blanket no-defect claim. Grow with MoolSocial is now open on OPPO at capture 068, awaiting founder approval/input. Captures 055–068 exercise approved-store → request-new entry, inline search/keyboard, category-menu cancellation, clear/no-match recovery, category filtering/reset and scrolling. No new confirmed functional defect in these exercised controls. Register S01-A11Y-SEARCH-OBS as an unconfirmed accessibility observation: empty search lacks text/content-desc in the native hierarchy, but its source and pixels have a Search hint; actual spoken labelling is not tested. Do not duplicate the existing physical-accessibility pending item or call all screens production-ready. No product/test/policy change; next screen stays on hold for founder response. Details and immutable hashes are in device-review.md.
+
 ## Current native checkpoint — 9 September 2026
 
 r66.10 is built and installed from exact source 7a12f127c09798f8fd208de8a92837c6956058af; the installed checksum matches the saved APK. The older preparation/blocked paragraphs below are historical, not the current candidate state. Native captures 001–054 now cover a Grocery entry-to-dashboard pass: contact keyboard and simulated verification/error recovery, Details Back, native QA PDF selection/two-page preview/Close, review declaration, local submission, clarification draft isolation, rejection reason and exact unsent support return, direct test approval, inert status popover, and new-Workspace request/Back preserving the approved dashboard. Complete result and 108-file SHA-256 inventory are in device-review.md.

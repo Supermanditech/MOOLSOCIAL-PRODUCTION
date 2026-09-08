@@ -19,10 +19,12 @@
   "launchStatus": "ok",
   "fontScale": 1.0,
   "firstSmokeCaptures": ["r6610-native-001-retained-launch", "r6610-native-002-mool-menu", "r6610-native-003-work-entry"],
-  "fullWorkspaceDashboardReplay": "partial_native_001_through_054_remaining_cases_pending",
-  "currentNativeScreen": "approved_test_workspace_dashboard",
-  "nativeCaptureCount": 54,
-  "nativeCaptureInventorySha256": "1CE07DFD799E66D551FAAEFF36BE36A9884916165885E79F82D7044DF7CC105D",
+  "fullWorkspaceDashboardReplay": "partial_native_001_through_089_remaining_cases_pending",
+  "currentNativeScreen": "grocery_kirana_preview_screen_2_approved_next_transition_pending",
+  "nativeCaptureCount": 89,
+  "nativeCaptureInventorySha256": "3C0147C3DFD681E48625844A396513666CE8AC3489567D1B32AD04B01CE089FE",
+  "screen1FounderVisualApproval": "approved_2026-09-09",
+  "screen2FounderVisualApproval": "approved_subject_to_native_checks_2026-09-09",
   "founderAcceptance": "pending",
   "productionBackendQualification": "not_inferred_from_review_fixtures"
 }
