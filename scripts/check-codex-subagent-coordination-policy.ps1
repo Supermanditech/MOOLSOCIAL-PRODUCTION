@@ -1250,6 +1250,17 @@ foreach ($claim in $claims) {
       $owner -cmatch
         '^artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/[^/]+$'
     )
+    $predeclaredR669PortableOwner = (
+      [string]$claim.task -ceq '/root' -and
+      $owner -ceq 'scripts/windows-powershell-portable-api.ps1' -and
+      $root.Replace('\','/').TrimEnd('/') -ceq
+        'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-redmi-fixes-v1-20260905' -and
+      $ProductionLane -ceq 'cursor_ui' -and
+      $ProductionWorkId -ceq 'buy-redmi-fixes-v1-20260905' -and
+      $ProductionPhase -cin @('implementation','pre_commit') -and
+      (Get-Sha256 (Join-Path $root 'docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md')) -ceq
+        '0A63C6D63BB9AACC65BBB86F4CDE8BB0E71E64D1AC339BC9B6B6B0699C9B593B'
+    )
     Assert-Coordination (
       $resolvedOwner.StartsWith(
         $root + [IO.Path]::DirectorySeparatorChar,
@@ -1263,7 +1274,8 @@ foreach ($claim in $claims) {
         $predeclaredR65EightEvidenceOwner -or
         $predeclaredR65NineEvidenceOwner -or
         $predeclaredR65TenEvidenceOwner -or
-        $predeclaredR65ElevenEvidenceOwner)
+        $predeclaredR65ElevenEvidenceOwner -or
+        $predeclaredR669PortableOwner)
     ) "recorded owner is missing: $owner"
     $key = $owner.ToLowerInvariant()
     Assert-Coordination (-not $localOwners.Contains($key)) `
@@ -1681,6 +1693,10 @@ if ($ProductionLane -ceq 'baseline') {
       $r665CollectionParent = '7ef7711e119a4c4d7691423538a91ecc0499c2f2'
       $r666AccessibilityParent = 'a201f8ed4e8ad6abc58e4f925791fa4db501317b'
       $r667DependenciesParent = '38fa1201488ae943487b58d4afe5d851f8b9fc37'
+      $r669RegressionParent = '99eeaabba897300320b2b19646d1efce44c57cba'
+      & git -C $root merge-base --is-ancestor $r669RegressionParent $head
+      $r669RegressionContext = $LASTEXITCODE -eq 0
+      $r668FreezeHead = if ($r669RegressionContext) { $r669RegressionParent } else { $head }
       $r668FormattingParent = '30228bd6d102123c92bf9a05a8b58180e64bc45c'
       & git -C $root merge-base --is-ancestor $r668FormattingParent $head
       $r668FormattingContext = $LASTEXITCODE -eq 0
@@ -2391,8 +2407,11 @@ if ($ProductionLane -ceq 'baseline') {
         $r667Subject = 'ui(buy-redmi-fixes-v1-20260905): admit local verification dependencies'
         $r667ManifestHash = '6BC23AEDE475C2A4259BF2630EDBC14533D0ECECD9D7125504CCC3D065D101DD'
         $r667PolicyBefore = Get-R66Utf8GitJson $r667DependenciesParent $r667Owners[0]
-        $r667PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
-          (Join-Path $root $r667Owners[0]) | ConvertFrom-Json
+        $r667PolicyAfter = if ($r669RegressionContext) {
+          Get-R66Utf8GitJson $r669RegressionParent $r667Owners[0]
+        } else {
+          Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r667Owners[0]) | ConvertFrom-Json
+        }
         $r667Cursor = @($r667PolicyAfter.activeClaims | Where-Object {
           $_.task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905'
         })[0]
@@ -2544,11 +2563,16 @@ if ($ProductionLane -ceq 'baseline') {
         $r668Owners = @($r667Owners[1], $r667Owners[2], $r667Owners[3])
         $r668ManifestHash = '899DD6F57BFA33EA7180C4CBA4C92CF023A08A9BBFEE3A4E1ED5F1E0DC4E13BF'
         $r668Subject = 'ui(buy-redmi-fixes-v1-20260905): admit exact dashboard formatting'
-        Assert-Coordination ((Get-Sha256 (Join-Path $root $r668Owners[0])) -ceq $r668ManifestHash) `
-          'Dashboard formatting manifest changed.'
+        if (-not $r669RegressionContext) {
+          Assert-Coordination ((Get-Sha256 (Join-Path $root $r668Owners[0])) -ceq $r668ManifestHash) `
+            'Dashboard formatting manifest changed.'
+        }
         $r668ScopeBefore = Get-R66Utf8GitJson $r668FormattingParent $r668Owners[1]
-        $r668ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
-          (Join-Path $root $r668Owners[1]) | ConvertFrom-Json
+        $r668ScopeAfter = if ($r669RegressionContext) {
+          Get-R66Utf8GitJson $r669RegressionParent $r668Owners[1]
+        } else {
+          Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r668Owners[1]) | ConvertFrom-Json
+        }
         Assert-Coordination (
           $r668ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r668ManifestHash
         ) 'Dashboard formatting scope has the wrong manifest binding.'
@@ -2558,9 +2582,13 @@ if ($ProductionLane -ceq 'baseline') {
           ($r668ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
           ($r668ScopeAfter | ConvertTo-Json -Depth 100 -Compress)
         ) 'Dashboard formatting changed execution authority.'
-        & git -C $root diff --quiet $r668FormattingParent -- $r667Owners[0]
+        if ($r669RegressionContext) {
+          & git -C $root diff --quiet $r668FormattingParent $r668FreezeHead -- $r667Owners[0]
+        } else {
+          & git -C $root diff --quiet $r668FormattingParent -- $r667Owners[0]
+        }
         Assert-Coordination ($LASTEXITCODE -eq 0) 'Dashboard formatting changed ownership policy.'
-        $r668PolicyHistory = @(& git -C $root log --format=%H "${r668FormattingParent}..$head" -- $r667Owners[0])
+        $r668PolicyHistory = @(& git -C $root log --format=%H "${r668FormattingParent}..$r668FreezeHead" -- $r667Owners[0])
         Assert-Coordination ($LASTEXITCODE -eq 0 -and $r668PolicyHistory.Count -eq 0) `
           'Dashboard formatting cannot revise ownership history.'
         if ($head -ceq $r668FormattingParent) {
@@ -2591,12 +2619,83 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($LASTEXITCODE -eq 0 -and
             (@($r668Committed | Sort-Object) -join '|') -ceq (@($r668Owners | Sort-Object) -join '|')) `
             'Dashboard formatting admission committed an unexpected owner.'
-          & git -C $root diff --quiet $r668Commit -- @r668Owners
+          if ($r669RegressionContext) {
+            & git -C $root diff --quiet $r668Commit $r668FreezeHead -- @r668Owners
+          } else {
+            & git -C $root diff --quiet $r668Commit -- @r668Owners
+          }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'Dashboard formatting binding changed after admission.'
-          $r668Later = @(& git -C $root log --format=%H "${r668Commit}..$head" -- @r668Owners)
+          $r668Later = @(& git -C $root log --format=%H "${r668Commit}..$r668FreezeHead" -- @r668Owners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r668Later.Count -eq 0) `
             'Dashboard formatting admission cannot be replayed or revised.'
         }
+      }
+
+      if ($r669RegressionContext) {
+        $r669Owners = @($r667Owners)
+        $r669ManifestHash = '0A63C6D63BB9AACC65BBB86F4CDE8BB0E71E64D1AC339BC9B6B6B0699C9B593B'
+        $r669Subject = 'ui(buy-redmi-fixes-v1-20260905): admit full regression and portable tooling'
+        Assert-Coordination ((Get-Sha256 (Join-Path $root $r669Owners[1])) -ceq $r669ManifestHash) 'Full regression manifest changed.'
+        $r669Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r669Owners[1])
+        $r669Match = [regex]::Matches($r669Manifest, '(?s)<!-- R669-DATA-BEGIN -->\s*(.*?)\s*<!-- R669-DATA-END -->')
+        Assert-Coordination ($r669Match.Count -eq 1) 'Full regression exact owner data is missing or duplicated.'
+        $r669Data = $r669Match[0].Groups[1].Value | ConvertFrom-Json
+        Assert-Coordination ($r669Data.parent -ceq $r669RegressionParent -and $r669Data.tests.Count -eq 16 -and $r669Data.tools.Count -eq 30) 'Full regression owner data changed.'
+        $r669Before = Get-R66Utf8GitJson $r669RegressionParent $r669Owners[0]
+        $r669After = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r669Owners[0]) | ConvertFrom-Json
+        $r669Ui = @($r669After.activeClaims | Where-Object task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905')[0]
+        $r669Primary = @($r669After.activeClaims | Where-Object task -ceq '/root')[0]
+        Assert-Coordination ($r669Ui.owners.Count -eq 65 -and $r669Primary.owners.Count -eq 44) 'Full regression ownership counts changed.'
+        foreach ($item in $r669Data.tests) {
+          Assert-Coordination (@($r669Ui.owners | Where-Object { $_ -ceq $item.path }).Count -eq 1) 'Full regression test owner missing or duplicated.'
+        }
+        foreach ($item in $r669Data.tools) {
+          Assert-Coordination (@($r669Primary.owners | Where-Object { $_ -ceq $item.path }).Count -eq 1) 'Portable tool owner missing or duplicated.'
+        }
+        $r669Ui.owners = @($r669Ui.owners | Where-Object { $_ -cnotin @($r669Data.tests.path) })
+        $r669Primary.owners = @($r669Primary.owners | Where-Object { $_ -cnotin @($r669Data.tools.path) })
+        Assert-Coordination (($r669Before | ConvertTo-Json -Depth 100 -Compress) -ceq ($r669After | ConvertTo-Json -Depth 100 -Compress)) 'Full regression admission changed unrelated policy.'
+        $r669ScopeBefore = Get-R66Utf8GitJson $r669RegressionParent $r669Owners[2]
+        $r669ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r669Owners[2]) | ConvertFrom-Json
+        Assert-Coordination ($r669ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r669ManifestHash) 'Full regression scope hash changed.'
+        $r669ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 = $r669ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+        Assert-Coordination (($r669ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r669ScopeAfter | ConvertTo-Json -Depth 100 -Compress)) 'Full regression admission changed execution authority.'
+        foreach ($item in $r669Data.tools) {
+          $path = Join-Path $root $item.path
+          $exists = Test-Path -LiteralPath $path -PathType Leaf
+          $allowed = @($item.beforeSha256)
+          if ($head -cne $r669RegressionParent) { $allowed += $item.proposedSha256 }
+          if ($exists) {
+            Assert-Coordination ((Get-Sha256 $path) -cin $allowed) "Portable tool differs from exact reviewed proposal: $($item.path)"
+          } else {
+            Assert-Coordination ([string]::IsNullOrEmpty($item.beforeSha256)) "Existing portable tool is missing: $($item.path)"
+          }
+        }
+        if ($head -ceq $r669RegressionParent) {
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) 'Pending full regression admission is not a handoff.'
+          foreach ($item in $r669Data.tests) {
+            Assert-Coordination ((Get-Sha256 (Join-Path $root $item.path)) -ceq $item.beforeSha256) 'Test implementation cannot precede exact admission.'
+          }
+          $r669Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r669Dirty | Sort-Object) -join '|') -ceq (@($r669Owners | Sort-Object) -join '|')) 'Pending full regression admission must change exactly four coordination owners.'
+          $r669Untracked = @(& git -C $root ls-files --others --exclude-standard)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r669Untracked.Count -eq 0) 'Full regression admission cannot include untracked drafts.'
+        } else {
+          $r669Following = @(& git -C $root rev-list --first-parent --reverse "${r669RegressionParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r669Following.Count -gt 0) 'Full regression admission missing.'
+          $r669Commit = [string]$r669Following[0]
+          $r669Parents = @(& git -C $root show -s --format=%P $r669Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r669Parents.Count -eq 1 -and [string]$r669Parents[0] -ceq $r669RegressionParent) 'Full regression admission parent changed.'
+          $r669ActualSubject = @(& git -C $root show -s --format=%s $r669Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r669ActualSubject.Count -eq 1 -and [string]$r669ActualSubject[0] -ceq $r669Subject) 'Full regression admission subject changed.'
+          $r669Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r669Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r669Committed | Sort-Object) -join '|') -ceq (@($r669Owners | Sort-Object) -join '|')) 'Full regression admission committed an unexpected owner.'
+          & git -C $root diff --quiet $r669Commit -- @r669Owners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Full regression coordination changed after admission.'
+          $r669Later = @(& git -C $root log --format=%H "${r669Commit}..$head" -- @r669Owners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r669Later.Count -eq 0) 'Full regression admission cannot be replayed or revised.'
+        }
+        $r66CoordinationOwners = @($r66CoordinationOwners) + @($r669Data.tools.path)
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
         $_.ToLowerInvariant()

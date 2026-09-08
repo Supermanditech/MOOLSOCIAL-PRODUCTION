@@ -190,3 +190,407 @@ The existing founder-authorized local verification work includes fixing its actu
 One additive coordination-only commit with that exact parent and subject `ui(buy-redmi-fixes-v1-20260905): admit exact dashboard formatting` changes only this manifest, its scope manifest hash and the existing coordination checker. Policy,49 Cursor/14 primary claims, registry4502, execution authority, accepted references and all earlier admission history remain unchanged. Freeze the previous four coordination owners through that parent, then freeze these three amended owners after the single admission. Require unchanged implementation at admission; reject wrong ancestry, parent, subject, extra owner, changed scope or policy, premature formatting and replay on both PowerShell hosts.
 
 After sealing, the existing dashboard owner may transition only from971518A7D413D6D6DB7148678BB33E5896E5E4BF9690326CE82FD8480EC31742 to31CEDA835734EA697CDC570C4741968629825198F9008EED5E8E668BE19C1D9F. This supersedes only the earlier dashboard raw-copy hash restriction; the seven strings and all behavior stay fixed. Verify the actual formatter, analysis/copy checks and exact one-line diff. All other native/package/metadata protections remain. This admits no APK, integration, backend action, device acceptance or defect closure.
+
+
+## Whole Buy regression and portable release prerequisites — 8 September 2026
+
+The founder directs continued implementation of every registered Buy/Shop defect before the Redmi APK and explicitly defers cross-worktree/backend integration until Redmi qualification. This mvp_supporting dependency work restores complete functional verification and Windows build-tool compatibility. It introduces no customer journey, backend activation, deployment, real transaction or accepted-reference update. The full Buy/Profile run retained 1612 passes, 27 failures and 27 declared skips; all 27 failures are listed below. Correct stale fixtures only after checking current behavior, retain the original functional guarantees, and fix runtime defects in existing admitted Buy owners when demonstrated. Do not add skips or functional name exclusions.
+
+From clean remote-equal parent99eeaabba897300320b2b19646d1efce44c57cba, admit exactly16 existing test owners to Cursor (49 to65) and30 portable-tool owners to primary (14 to44). The sole new file is the shared Windows PowerShell portable API helper. The tooling proposal replaces actual hash/relative-path APIs with equivalent portable functions and splits one negative-assertion literal without changing its value. Preserve the unchanged broad compatibility scan and every deployment guard; do not execute deployment scripts. Existing tool files may change only between the recorded preimage and proposed hashes. Tests retain meaningful identity, state, recovery, accessibility and geometry assertions.
+
+The admission changes exactly the existing policy, manifest, scope manifest hash and coordination checker with subject `ui(buy-redmi-fixes-v1-20260905): admit full regression and portable tooling`. Freeze every earlier admission through this exact parent, preserve registry4502, all runtime/native/package pins and scope authority. Require preimages and no implementation during admission; reject changed claims, scope, manifest, ancestry, parent, subject, extra dirty/committed owners, replay and post-admission coordination changes. Freeze the four admission owners afterward. Apply the tool proposal only after admission and verify its20 cases on both PowerShell hosts, the actual broad compatibility gate and unchanged protection gates. Run all affected tests and two complete Buy/Profile cycles, explicitly account for declared skips, then fresh source/build admission and checksum-bound Redmi replay. No skipped defect closure, APK authority, backend integration, OPPO action, messages or shutdown is granted by this amendment.
+
+Machine-bound exact owner/preimage data follows. The failed run and external portability proposal remain immutable evidence.
+<!-- R669-DATA-BEGIN -->
+{
+  "parent": "99eeaabba897300320b2b19646d1efce44c57cba",
+  "tests": [
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_bank_transfer_pending_test.dart",
+      "beforeSha256": "EA1EDF6C02CDDB21B24B889234066B7AC430B4C62F4E63E0682E83A6099D3D48"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_bottom_rail_action_inventory_regression_test.dart",
+      "beforeSha256": "94ECDA6B67E8560C30497D34391E37D4E59B6AA51E8AE1F644139198D0BB30D0"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_catalogue_copy_hierarchy_test.dart",
+      "beforeSha256": "C040F77A2358AFCCEB0BF7A3E4D5429E5C546CFA7EFC80786E66BDAFE3B51E0B"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart",
+      "beforeSha256": "D682B9F8BEB7272909D7B83E0D406F1C7BB45E9F03B21E24451A8EA96837A0C0"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_help_chat_unification_test.dart",
+      "beforeSha256": "1E40E6FED2EA7606AC477599D7AEBBEF73FF96078084FDAE26DAB38758316E36"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_info_sheets_motion_test.dart",
+      "beforeSha256": "89A4FD4B9DE6B4435578E86D10A7234B127757986D625CAC2941D51DD25DA55F"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_marketplace_trust_test.dart",
+      "beforeSha256": "51A921E8D0C72C0213E97B6D687A457E5EC1C14A1B1EEEEAA6429D918201866F"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart",
+      "beforeSha256": "59B8404E00C309EE070DB3F3CB5F4BFEC6596A52332B01819138A244B108366C"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart",
+      "beforeSha256": "91126117FD6554A1F09CB50C7E422E95B28B46AC937B22F6554A00BF31887A6F"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart",
+      "beforeSha256": "09572575A0D5D33A2832EF0D502302C6D0B4660C9154B7C913717B6270D100C6"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_offer_decision_test.dart",
+      "beforeSha256": "BFFBB8DBC80365FEAA3322443019AD984870334C7AF62A8829012A676B486C40"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart",
+      "beforeSha256": "B6B2899FA6BE6911EB1697F953441CABAA840F38629F22E6183F06C7CFB83B61"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
+      "beforeSha256": "9E0A09C105C45D6F886BF1CE12EC912E6CA329A4B063FAEC821C0FAF0BC56A9C"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",
+      "beforeSha256": "3ED616F534028B60FC02D5539C7F8837645591DFB35ADC33A45F9DC7ED6534D9"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_shopping_intent_journey_test.dart",
+      "beforeSha256": "114E93F13BA45555A40136FE189F6F87C5AA41CBD5BEEC22B3B53EA00F803318"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_payment_attribution_test.dart",
+      "beforeSha256": "7C19D5697BB4536F68B5F5F34C70E821B6588869927378A8476DD1123FED06B9"
+    }
+  ],
+  "tools": [
+    {
+      "path": "scripts/check-buy-approved-reference.ps1",
+      "beforeSha256": "788BAE1D74CD35A77E00BD00057C283D73BDF31F04D33965B4529ECA2A8C09C7",
+      "proposedSha256": "CDED68BE067A8869DD71A7581E7D47FDD6E2B04A767D30033B8933A5560BDCCD",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/check-personal-android-navigation-device-matrix-c28d.ps1",
+      "beforeSha256": "0CD8D25B1A8621AC2ADE9AEE6C8CBCD0034EBF6C7B58387A9F0CE62362D21FD9",
+      "proposedSha256": "AEC08DDE8E33EF147F71D917517012905358052128902825FECACC3B6E39ED3C",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/check-personal-approved-navigation-device-matrix-c26h.ps1",
+      "beforeSha256": "3AFC80961DAAE049D916FF9A9E79BAD8022C20FA6ECD8378325440CC55FBC684",
+      "proposedSha256": "396E6680E210AD9D40D4B8EA6A12E653CD6EDB90B17910E2F30E3907B9356224",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/check-personal-social-dev-backend-deployment-c29u.ps1",
+      "beforeSha256": "E499881208A670C16D53C740FD9D02BE1433F2AEEFE3D6EFFFBCE3E6722F0712",
+      "proposedSha256": "ED66CA51A95D69DE5A8381A19A393B95FF37EE55FCBB7906551B1682E7350043",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/check-personal-social-dev-content-redeploy-c30k-fix1.ps1",
+      "beforeSha256": "7E6EE43123B13C53EF54917CBE0C039318CEB9A7C21659E5A1276FB418D23935",
+      "proposedSha256": "93B8B9240AB4CEE82E542CA21088BD12A66F0A4B022C0AA3F70336376EBFBBC9",
+      "calls": 1,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/check-personal-social-youtube-quota-purpose-catalogue-refresh-c29r.ps1",
+      "beforeSha256": "2F4323C99FF110C9D4A2D6D0A0C9D7DC40E7C5DDDB3C615A49651E3BF6D1DFA6",
+      "proposedSha256": "FB830641E6DD4A7BEC7DDD093DF66CA72B930531A6CBFE4F10174BDCD307185D",
+      "calls": 1,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/check-personal-subaction-clear-glass-host-qualification-c17e.ps1",
+      "beforeSha256": "DF941283C09553D8A780EAD6468D90AC7BCD8C5214EBBE71CDF6A92CE26828D0",
+      "proposedSha256": "E1D4A3C562AE7F05C7AD781803BCD52A5F834F094B0657FC5B43B7CCAD57E56B",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/check-release-lifecycle-transition-c34l.ps1",
+      "beforeSha256": "D5D289094E299CD96754097D2A432BEE67FC1AB579D98CEFA3A2790E36C50D52",
+      "proposedSha256": "341B73102E135D19D250EF83CF8833D6657CA1AF3820D2178299F1884CCE604A",
+      "calls": 0,
+      "negativeAssertionLiteralOnly": true
+    },
+    {
+      "path": "scripts/check-youtube-private-dev-content.ps1",
+      "beforeSha256": "5E220BC6214F0FA5A65BE48A64EA0FDDA7A936A0F4F18C5D7D0B0F167DB3A8D7",
+      "proposedSha256": "2255C05613661C0D90BA4E6D4FAAD7A1D2185C81C71F880C47B6D6B54269C644",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/deploy-c30t-dev-provider-only.ps1",
+      "beforeSha256": "29E726A49844F8E2433881F5B50D07C9860C46391FF2FFC642952CE94EF8FB14",
+      "proposedSha256": "51B905D775071CEFECAF83AA3A95FEAE79538B463FA696837E6BF770A9864972",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/invoke-flutter-with-clean-support.ps1",
+      "beforeSha256": "A0F999AA613D8DC475E35AC71D0E9A55E5808DB7C00E5942BDD53D060341A5F4",
+      "proposedSha256": "FB7B5AE3C58E60D035D8D2D44516A5B6CA3FB17595ED6AF2301BE20B2DDE3B0F",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/new-c30t-provider-hosting-source-manifest.ps1",
+      "beforeSha256": "FB2B4132DE15EFDF28C4B8388304A07F0A2A7DC294E644AD34091375C5A605F6",
+      "proposedSha256": "766713327925C2013821038033CCAC318EAD015A2FED7877C4A8A7651ED40BAA",
+      "calls": 4,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/new-c30u-backend-deployment-manifest.ps1",
+      "beforeSha256": "F8363DE2C1D298EDE4DA480B67FFF0A33412FE0C5B6EF7B0437504E6CFAAEEFB",
+      "proposedSha256": "5CEDE4C5AF672544B15C82A4FC9F4E9839D13847AE090F7EE33DE8F908BFA841",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/new-c30u-source-manifest.ps1",
+      "beforeSha256": "D3696ECF50BE67787ED0237C616FB33E481B5F41D083C748061ED8A10CD61E37",
+      "proposedSha256": "BCDAC9779630610C5465E5174A3D986B00997AB943509777F7C984577BD58FB9",
+      "calls": 4,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/new-c30v-source-manifest.ps1",
+      "beforeSha256": "12DE5D266EE789FED88E7BB203DCC233267C9F0E26BC4E93A87A5525977314F9",
+      "proposedSha256": "2A94D1D404996C9A76B09C81137B841B1C02341CE6E8E1F6FE1E1241873DBED9",
+      "calls": 4,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-personal-android-navigation-c28c.ps1",
+      "beforeSha256": "5E797FAA8EE6C43A3BAF416D8DC7B8C6C7CBD62BB407BA016DAB8D79209B1E4D",
+      "proposedSha256": "9CCBE1BCE2D5566EBE55451E8D6935569F83FEF1EA1F88E8996EAF2D1CA0879C",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-personal-approved-navigation-c26g.ps1",
+      "beforeSha256": "7C2D2EC940361CB857BCCCA9F1F7C7C774ECF6956000510BC4BC047B6FB7F983",
+      "proposedSha256": "8341BE6DABE28A9BEBF4CA7E691B81892128ED64AA36C6B8377E1204E49CE947",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-personal-capsule-system-host-c22g.ps1",
+      "beforeSha256": "F9F4050CAA53C0A8C00FA19473C17D935A241A7AA514CF76CA31D4BBEDC159D7",
+      "proposedSha256": "C4D7597AB2AB15CEC7F5678900E69E82A46B2F04B6F024F59748F740CEFDAC66",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-personal-domain-navigation-c25g.ps1",
+      "beforeSha256": "09AEAE48EC383C5713CCF3E416162FB1359A85739ACC7AC5D7898AF130A7DC17",
+      "proposedSha256": "E7F846DDAFA377E16A4F7DCF5E8E7020C0F1C487FDB5876B57F3D2B42AAC6B03",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-personal-global-subaction-host-c20g.ps1",
+      "beforeSha256": "6538D13F369C8E3B58BC7777D85DF4CBC2883512AD8B1A8289883B1A2824E031",
+      "proposedSha256": "EDB6B55A0707083689A1458F178A75CDA2B59981E1B913367C6B5648C994261F",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-personal-global-subaction-optical-host-c21g.ps1",
+      "beforeSha256": "EBE848F539F62596E77A8CCE871B2BFDA39E02F90457DC185D2BD03BA7743DD7",
+      "proposedSha256": "1B5FD6B1846748822D107D8B2AD2782583F52C461A7F619305C91D3F170E0D9B",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-personal-mool-home-action-hub-c23g.ps1",
+      "beforeSha256": "EDBFC029EBD717EB7B8BB924830C48B79AD688C2A76554858E93DFAEC03919E6",
+      "proposedSha256": "E653A18863A9CB673D0418F7F9B1042888E6F4082460A7B8D0DF872BFC7E508E",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-personal-service-home-c24h.ps1",
+      "beforeSha256": "99473E8CD9F2A6F76A2F24FFC762FF8F6EE9E47795F94CDB4D073DCD9530B75F",
+      "proposedSha256": "0AE5F0D66CEABAFCD146434312224EF3B4E33982D019F95BC8BB00E3CE65DD0C",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-personal-social-creator-ergonomics-global-edge-consistency-c29n.ps1",
+      "beforeSha256": "A4B82832FE19513C1FD8F57400B165AAF154E1B54923CE96CCA33802E8020F6C",
+      "proposedSha256": "BF286E05531AB7D7FF0C225E27864C641BB80B0B55F5CCDB1E781A9538F35C53",
+      "calls": 1,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-personal-social-youtube-creator-connection-private-short-upload-c29l.ps1",
+      "beforeSha256": "B7D5FF3B85F045244AD42B31F118CF49EA0297AC9F5AC71E55BE6C9A83426E3D",
+      "proposedSha256": "4D3EFF7553647079B220399EF7DE53B553B6C8A6AA4EC73A337A6F851935C656",
+      "calls": 1,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-personal-uniform-navigation-c27e.ps1",
+      "beforeSha256": "A71A6355E73C599998C074624611C9ACAC0407DD08E493C1EF2991280F9745B0",
+      "proposedSha256": "ABE9D0883C349EC6397E62614CFD7675952ADE2D191F0AF66E7B64C9690E6A77",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-play-internal-firebase-startup-c30s.ps1",
+      "beforeSha256": "F4B2755DEDA49221F44684B52B47C0994AA0DBD5B385C3B32B1F338B58FE383D",
+      "proposedSha256": "016112614F81081C46735011A3512BE750D43C1CF6506D43AA796AE847A49B2D",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/qualify-play-internal-live-read-recovery-c30t.ps1",
+      "beforeSha256": "1BDFD0DE0A0DDF2800C6393DF21B64C7F8C86538AECEB1670D743F04195A8778",
+      "proposedSha256": "5FD66B4003CA9177BCEC9928B9D35263F61A9F4D368E3746DEFABB3768AD2789",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/test-social-runtime-deployment-execution-r60-92.ps1",
+      "beforeSha256": "AE1137C8297D62AE93C8ED58382A2899547BC8D4700927BAB852A7E4C63201AD",
+      "proposedSha256": "D7AB74E8375C8CFFC326423E3645EC018BCBB573144858408F9D7D68B5D6F65C",
+      "calls": 2,
+      "negativeAssertionLiteralOnly": false
+    },
+    {
+      "path": "scripts/windows-powershell-portable-api.ps1",
+      "beforeSha256": null,
+      "proposedSha256": "1DF7072524D0F9E6F3CB24447F6884252962D4223F6102597CB04285E8C7BEFC",
+      "calls": 0,
+      "negativeAssertionLiteralOnly": false
+    }
+  ],
+  "failures": [
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_bank_transfer_pending_test.dart",
+      "test": "Bank transfer shows exact instructions then remains pending without a duplicate order"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_bank_transfer_pending_test.dart",
+      "test": "pending Bank transfer survives customer-state restoration"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_bottom_rail_action_inventory_regression_test.dart",
+      "test": "Offers and GST overlay do not remove the established rail"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_catalogue_copy_hierarchy_test.dart",
+      "test": "promotion hierarchy wraps primary copy at compact large text"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart",
+      "test": "real catalogue tools flow reaches the R56.6 filter sheet"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart",
+      "test": "unified tool action runs only after the reverse route"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_help_chat_unification_test.dart",
+      "test": "Checkout help opens shared Chat without entering the retired Assist view"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_info_sheets_motion_test.dart",
+      "test": "household arrival/reverse is finite and Back never mutates"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_info_sheets_motion_test.dart",
+      "test": "household actions apply once from the explicit modal result"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_info_sheets_motion_test.dart",
+      "test": "Saved sheet holds invocation destination and animates real owner"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_info_sheets_motion_test.dart",
+      "test": "compact 140% sheets keep actions, semantics and focus safe"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_marketplace_trust_test.dart",
+      "test": "verified ratings and seller facts remain product-specific"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart",
+      "test": "PhonePe collection moves action required to pending and confirmation"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart",
+      "test": "Checkout and Order items retain the published product policy"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart",
+      "test": "manufacturer Chat action stays readable and fails safely at 140 percent"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart",
+      "test": "Shop seller products open and return to the exact product"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_offer_decision_test.dart",
+      "test": "ready Shop offer shows the complete decision before Add"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_offer_decision_test.dart",
+      "test": "Retry refreshes a stale offer before Cart becomes available"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_offer_decision_test.dart",
+      "test": "product offer decision stays usable at 320 and 140 percent"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart",
+      "test": "both promotion intents fit without horizontal clipping"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_shopping_intent_journey_test.dart",
+      "test": "monthly basket intent reaches curated products and persists through Checkout"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
+      "test": "product supplier Chat keeps exact context above the compact keyboard"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",
+      "test": "Shop exposes automatic fulfilment without seller continuation"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",
+      "test": "Medicine pharmacy action keeps prescription and safety facts"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_payment_attribution_test.dart",
+      "test": "active Wholesale order owns explicit actors and payment schedule"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_payment_attribution_test.dart",
+      "test": "Wholesale invoice exposes buyer, supplier, payment status and due date at 140 percent"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_payment_attribution_test.dart",
+      "test": "Wholesale tracking identifies both buyer and supplier roles"
+    }
+  ]
+}
+<!-- R669-DATA-END -->
