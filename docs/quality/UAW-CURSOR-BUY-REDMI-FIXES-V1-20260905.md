@@ -697,3 +697,82 @@ The admission subject is `ui(buy-redmi-fixes-v1-20260905): admit product fact re
   }
 }
 <!-- R672-DATA-END -->
+
+
+## r66.6 exact source qualification — 9 September 2026
+
+This mvp_supporting continuation qualifies the founder-directed Redmi correction source for a later uniquely authorized review APK. It changes no app, test, native, dependency, accepted reference or runtime integration. Cursor remains66 and primary45; registry4513 remains frozen. Authenticated and cross-worktree integration remain deferred until the founder-directed Buy/Shop Redmi qualification.
+
+The protected Buy checker adds exactly the sealed correction commit below to its explicit review-source list. It reuses the already required16-owner boundary delta; only five existing Buy runtime owners changed since the rejected r66.5 candidate. Branch, accepted ancestry, source ancestry,51-owner inventory, every boundary owner, exact current source and untracked rejection remain enforced. The backend checker admits only the complete normalized corrected screen SHA below for the existing local arrival-sound import projection. The previous SHA remains valid for its own qualified source. Different content, paths, transport clients, URL-launcher imports and arbitrary File additions remain rejected. Default accepted-baseline and production behavior remain unchanged.
+
+Two complete Buy/Profile cycles each pass1664 tests with27 unchanged historical capture-only skips and no functional name exclusions. The separately tagged historical protected-reference comparisons remain excluded and immutable. All3018 mobile files match before/after both clean cycles at the exact source commit below. Sixty-three proposal boundary/source/egress/brand cases pass on both PowerShell hosts, including stale qualified-source rejection. After this admission, verify the actual two applied checker owners with those same cases, the actual protected/backend/egress/brand/Windows gates and fresh build foundation controls.
+
+This is exactly a three-owner coordination amendment: this manifest, its scope hash and the checker. Policy, claims and registry do not change. Preserve earlier admissions in their exact historical trees. Require a clean sealed parent, the exact first-parent admission subject `ui(buy-redmi-fixes-v1-20260905): admit r66.6 qualified review source`, exact control owners and post-admission freeze. Only the two reviewed checker hashes below may then be applied. No APK build allowance, installation, accepted baseline replacement, backend activation, OPPO action, real transaction, external message, production promotion or shutdown is granted by this source admission. A fresh one-build machine state and complete checksum-bound Redmi replay remain required; all87 records remain open for their acceptance gates.
+<!-- R673-DATA-BEGIN -->
+{
+  "parent": "2a8c52472b19964ca6d0046d31827197a9e3f74b",
+  "implementation": [
+    {
+      "path": "scripts/check-buy-protected-baseline.ps1",
+      "beforeSha256": "F904F465D8C4F1600AF87286A2BF84D61801472A37976028FA38E728B686049F",
+      "proposedSha256": "E9CC76AADEB0592D1C0DF3055E0D5039D563C6F7796F555098E90EF83A6A8E11"
+    },
+    {
+      "path": "scripts/check-buy-backend-contract-boundary.ps1",
+      "beforeSha256": "FFD30E54E09EDBC9B2A2F2905B3F8BC27D4619CACF6A7DCF6AA885FCDD7E1A11",
+      "proposedSha256": "728C96394B00B339E049A8B8D2F7ACD22249A33C41153F6A5F498A3D17C88B65"
+    }
+  ],
+  "runtimeDelta": [
+    "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
+    "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_models.dart",
+    "apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/features/work/scan_and_pick_contract.dart",
+    "apps/mobile/lib/features/work/screens/work_onboarding_screens.dart",
+    "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart",
+    "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",
+    "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart"
+  ],
+  "correctionRuntimeDelta": [
+    "apps/mobile/lib/features/buy/buy_v2_models.dart",
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+  ],
+  "screenNormalizedSha256": "9D347031148DC2B45EFBF7BF991A3D265DBCE6CC95663ECDF3C4214AC522344B",
+  "proposalBinding": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\singlechat-r673-source-proposal-v1\\binding.json",
+    "sha256": "E0C7B945B76D044FCE7F6338D0DDE89992E023E0A1507831B7F23CFD24EC483C"
+  },
+  "fullRegressionEvidence": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\SINGLECHAT-R671-FULL-REGRESSION-BINDING-V1.json",
+    "sha256": "9368C12011CE4EECE2D4801BEA6AB64F5F0B1EB8D6992B541243E1C5036E1C1A",
+    "cycles": 2,
+    "passedPerCycle": 1664,
+    "skippedPerCycle": 27,
+    "sourceCommit": "2a8c52472b19964ca6d0046d31827197a9e3f74b",
+    "mobileTreeSha256": "F48344023D389929A6B77419EE1518A0B67B35706F22ECB20D49752363367AE9"
+  },
+  "sourceBoundaryProposalEvidence": [
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\singlechat-r673-proposed-boundaries7-1.result.json",
+      "sha256": "0DFCA8889C3ED7347AF524A0568EB9D672ED8D0CF4466A8DCF219EDAB4CA4FF8",
+      "cases": 63
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\singlechat-r673-proposed-boundaries51-1.result.json",
+      "sha256": "4C33399CCE7F015EBFFF8A9F69129599495BEEE82938A9BD30A4D488CB5B615B",
+      "cases": 63
+    }
+  ]
+}
+<!-- R673-DATA-END -->
