@@ -49,9 +49,15 @@ class MainActivity : FlutterActivity() {
     private var pendingInvoiceResult: MethodChannel.Result? = null
     private var pendingInvoiceBytes: ByteArray? = null
     private var pendingGoogleIdentityResult: MethodChannel.Result? = null
+    private var workDocumentPreview: WorkDocumentPreviewBridge? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        workDocumentPreview?.close()
+        workDocumentPreview = WorkDocumentPreviewBridge(
+            this,
+            flutterEngine.dartExecutor.binaryMessenger,
+        )
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             areaChannel,
@@ -454,6 +460,8 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        workDocumentPreview?.close()
+        workDocumentPreview = null
         // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_DESTROY_BEGIN
         // The Flutter engine disposes the official Google identity plugin.
         // MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_DESTROY_END

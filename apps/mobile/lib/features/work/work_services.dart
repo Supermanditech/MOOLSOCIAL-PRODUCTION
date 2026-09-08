@@ -949,6 +949,8 @@ class AuthenticatedWorkGateway implements WorkGateway {
   }
 }
 
+enum WorkReviewTestCase { pending, clarification, rejected, approved }
+
 class ReviewWorkGateway implements WorkGateway {
   ReviewWorkGateway({WorkRemoteReviewStatus? initialReviewStatus})
     : reviewResultStatus =
@@ -968,6 +970,24 @@ class ReviewWorkGateway implements WorkGateway {
   bool failReview = false;
   WorkRemoteReviewStatus reviewResultStatus;
   final Map<String, String> _reviewWorkspaceIds = {};
+  final Set<String> _submittedReviewCases = {};
+  final Map<String, WorkReviewTestCase> _selectedReviewCases = {};
+
+  bool get deviceReviewControlsEnabled =>
+      kDebugMode &&
+      const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+      const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+
+  bool canSelectDeviceReviewCase(String caseId) =>
+      deviceReviewControlsEnabled && _submittedReviewCases.contains(caseId);
+
+  void selectDeviceReviewCase(String caseId, WorkReviewTestCase scenario) {
+    if (!canSelectDeviceReviewCase(caseId)) {
+      throw const WorkGatewayException('Review test cases are unavailable.');
+    }
+    _selectedReviewCases[caseId] = scenario;
+  }
+
   String? reviewResultReason;
   bool failGst = false;
   bool failSetup = false;
@@ -1089,8 +1109,10 @@ class ReviewWorkGateway implements WorkGateway {
         'Workspace profile was not submitted. Your details and documents remain saved.',
       );
     }
+    final caseId = 'WP-${240700 + submissionCalls}';
+    _submittedReviewCases.add(caseId);
     return WorkReviewResult(
-      caseId: 'WP-${240700 + submissionCalls}',
+      caseId: caseId,
       status: WorkRemoteReviewStatus.pending,
       plan: 'free',
     );
@@ -1110,6 +1132,7 @@ class ReviewWorkGateway implements WorkGateway {
         'Workspace corrections were not sent. Your changes remain saved.',
       );
     }
+    _selectedReviewCases.remove(caseId);
     return WorkReviewResult(
       caseId: caseId,
       status: WorkRemoteReviewStatus.pending,
@@ -1127,14 +1150,32 @@ class ReviewWorkGateway implements WorkGateway {
         'Review update is unavailable. No duplicate request was created.',
       );
     }
+    final scenario = deviceReviewControlsEnabled
+        ? _selectedReviewCases[caseId]
+        : null;
+    final status = switch (scenario) {
+      WorkReviewTestCase.pending ||
+      WorkReviewTestCase.clarification => WorkRemoteReviewStatus.pending,
+      WorkReviewTestCase.rejected => WorkRemoteReviewStatus.rejected,
+      WorkReviewTestCase.approved => WorkRemoteReviewStatus.approved,
+      null => reviewResultStatus,
+    };
+    final reason = switch (scenario) {
+      WorkReviewTestCase.clarification =>
+        'Please add a readable shop address document and check the business name.',
+      WorkReviewTestCase.rejected =>
+        'The submitted business details could not be verified. Contact MoolSocial for help.',
+      WorkReviewTestCase.pending || WorkReviewTestCase.approved => null,
+      null => reviewResultReason,
+    };
     return WorkReviewResult(
       caseId: caseId,
-      status: reviewResultStatus,
-      reason: reviewResultReason,
+      status: status,
+      reason: reason,
       plan: 'free',
       workspaceId:
-          reviewResultStatus == WorkRemoteReviewStatus.approved ||
-              reviewResultStatus == WorkRemoteReviewStatus.live
+          status == WorkRemoteReviewStatus.approved ||
+              status == WorkRemoteReviewStatus.live
           ? _reviewWorkspaceIds.putIfAbsent(
               caseId,
               () => 'WK-${510001 + _reviewWorkspaceIds.length}',

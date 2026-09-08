@@ -2,11 +2,44 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
+import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/features/work/screens/work_onboarding_screens.dart';
+import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+
+class _ReviewCaseMemoryStore implements BuyV2CustomerStateStore {
+  @override
+  String get ownerScope => 'review-case-widget';
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => null;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => true;
+}
+
+class _ReviewCaseDraftStore implements WorkPendingProofStore {
+  Map<String, Object?>? draft;
+  @override
+  String get accountScope => 'review-case-widget';
+  @override
+  Future<Map<String, Object?>?> read(String scope) async =>
+      scope == accountScope ? draft : null;
+  @override
+  Future<void> save(String scope, Map<String, Object?> value) async {
+    if (scope == accountScope) draft = Map.of(value);
+  }
+
+  @override
+  Future<void> clear(String scope) async {
+    if (scope == accountScope) draft = null;
+  }
+}
 
 void main() {
   Future<JourneySession> readyJourney() async {
@@ -835,6 +868,157 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'r66.8 review controls are isolated and navigate same case at $scale',
+      (tester) async {
+        const enabled =
+            bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+            bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final gateway = ReviewWorkGateway(
+          initialReviewStatus: WorkRemoteReviewStatus.pending,
+        );
+        final work =
+            WorkSession(
+                gateway: gateway,
+                contactDraftStore: _ReviewCaseDraftStore(),
+                pendingProofStore: _ReviewCaseDraftStore(),
+              )
+              ..selectProfile('retailer-grocery')
+              ..saveDetails(
+                name: 'QA Retail Store',
+                area: 'Jodhpur',
+                activity: 'Grocery retail',
+              )
+              ..businessRelationship = 'Owner'
+              ..declarationAccepted = true;
+        confirmWorkspaceContacts(work);
+        final submission = work.submitProfile();
+        await tester.pump(const Duration(seconds: 1));
+        expect(await submission, isTrue);
+        final caseId = work.reviewCaseId!;
+        final viewport = scale == 1
+            ? const Size(412, 915)
+            : const Size(320, 568);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = viewport;
+        tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final procurement = BuyV2Session(
+          core: core,
+          customerStateStore: _ReviewCaseMemoryStore(),
+        );
+        final router = GoRouter(
+          initialLocation: '/app/work/workspace/proof',
+          routes: [
+            GoRoute(
+              path: '/app/work/workspace/proof',
+              builder: (_, _) => WorkProfileProofScreen(session: work),
+            ),
+            GoRoute(
+              path: '/app/work/workspace/dashboard',
+              builder: (_, _) => WorkWorkspaceDashboardScreen(
+                session: work,
+                procurementSession: procurement,
+              ),
+            ),
+          ],
+        );
+        addTearDown(() {
+          router.dispose();
+          procurement.dispose();
+          core.dispose();
+          work.dispose();
+        });
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: const Key('review-case-root'),
+            child: MaterialApp.router(
+              debugShowCheckedModeBanner: false,
+              theme: MoolTheme.light(),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          MediaQuery.sizeOf(
+            tester.element(find.byType(WorkProfileProofScreen)),
+          ),
+          viewport,
+        );
+        final appBar = tester.getRect(find.byType(AppBar));
+        for (final key in ['work-page-title', 'work-page-subtitle']) {
+          final text = tester.getRect(find.byKey(Key(key)));
+          expect(text.top, greaterThanOrEqualTo(appBar.top));
+          expect(text.bottom, lessThanOrEqualTo(appBar.bottom));
+          expect(text.right, lessThanOrEqualTo(appBar.right));
+        }
+        Future<void> capture(String state) async {
+          if (!const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) return;
+          if (state != 'selector' && state != 'approved') {
+            final body = find.byKey(const Key('work-proof-screen'));
+            await tester.drag(body, const Offset(0, 2200));
+            await tester.pumpAndSettle();
+          }
+          const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+          expect(folder, isNotEmpty);
+          await expectLater(
+            find.byKey(const Key('review-case-root')),
+            matchesGoldenFile(
+              '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/r668-review-$state-$scale.png',
+            ),
+          );
+        }
+
+        final control = find.byKey(const Key('work-review-test-controls'));
+        if (!enabled) {
+          expect(control, findsNothing);
+          expect(work.hasVerifiedWorkspace, isFalse);
+          expect(work.remoteReviewStatus, WorkRemoteReviewStatus.pending);
+          expect(tester.takeException(), isNull);
+          return;
+        }
+        await tapVisible(tester, const Key('work-review-test-controls'));
+        await capture('selector');
+        expect(
+          find.text(
+            'Test data only. No real application, payment or approval is changed.',
+          ),
+          findsOneWidget,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(work.remoteReviewStatus, WorkRemoteReviewStatus.pending);
+        await capture('pending');
+        for (final scenario in ['clarification', 'rejected', 'approved']) {
+          await tapVisible(tester, const Key('work-review-test-controls'));
+          await tapVisible(tester, Key('work-review-test-$scenario'));
+          await capture(scenario);
+          expect(work.reviewCaseId, caseId);
+          expect(tester.takeException(), isNull);
+          if (scenario == 'clarification') {
+            expect(find.text('More information needed'), findsOneWidget);
+            expect(work.hasVerifiedWorkspace, isFalse);
+          } else if (scenario == 'rejected') {
+            expect(find.text('Application not approved'), findsOneWidget);
+            expect(work.hasVerifiedWorkspace, isFalse);
+          } else {
+            expect(
+              find.byKey(const Key('work-workspace-dashboard')),
+              findsOneWidget,
+            );
+            expect(work.hasVerifiedWorkspace, isTrue);
+          }
+        }
+        expect(gateway.submissionCalls, 1);
+      },
+    );
+  }
 
   testWidgets(
     'retailer setup rejects incomplete inputs and exact failure retry goes live',

@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
@@ -12,8 +12,214 @@ import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
+import 'package:moolsocial/features/work/work_document_preview.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  group('r66.8 local PDF preview', () {
+    const channel = MethodChannel('com.moolsocial.app/work_document_preview');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final pdfBytes = Uint8List.fromList(utf8.encode('%PDF-1.4\nQA fixture'));
+    final png = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7WQAAAAASUVORK5CYII=',
+    );
+    Map<String, Object?> page(int index) => {
+      'bytes': png,
+      'page': index,
+      'pages': 2,
+      'width': 1,
+      'height': 1,
+    };
+    tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    test('renders only the requested page and bounded local bytes', () async {
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return page((call.arguments as Map)['page'] as int);
+      });
+      final preview = WorkPdfPreview();
+      addTearDown(preview.dispose);
+      for (final index in [0, 1, 0]) {
+        final result = await preview.render(pdfBytes, page: index);
+        expect(result.index, index);
+        expect(result.pageCount, 2);
+        expect(result.bytes, png);
+        expect(result.width * result.height, 1);
+      }
+      expect(calls, hasLength(3));
+      final ids = <String>{};
+      for (final call in calls) {
+        expect(call.method, 'renderPage');
+        final args = call.arguments as Map;
+        expect(
+          args.keys,
+          unorderedEquals(['bytes', 'page', 'width', 'requestId']),
+        );
+        expect(args['bytes'], pdfBytes);
+        expect(args['width'], 1280);
+        ids.add(args['requestId'] as String);
+      }
+      expect(ids, hasLength(3));
+    });
+
+    test(
+      'invalid document and page bounds never enter native renderer',
+      () async {
+        var calls = 0;
+        messenger.setMockMethodCallHandler(channel, (_) async {
+          calls++;
+          return page(0);
+        });
+        final preview = WorkPdfPreview();
+        addTearDown(preview.dispose);
+        for (final bytes in [
+          Uint8List(0),
+          Uint8List(10 * 1024 * 1024 + 1),
+          Uint8List.fromList([1, 2, 3, 4, 5]),
+        ]) {
+          await expectLater(
+            preview.render(bytes, page: 0),
+            throwsA(isA<WorkPdfPreviewException>()),
+          );
+        }
+        for (final index in [-1, 500]) {
+          await expectLater(
+            preview.render(pdfBytes, page: index),
+            throwsA(isA<WorkPdfPreviewException>()),
+          );
+        }
+        expect(calls, 0);
+      },
+    );
+
+    test(
+      'rejects wrong page, count, dimensions and malformed PNG responses',
+      () async {
+        for (final change in <Map<String, Object?>>[
+          {'page': 1},
+          {'pages': 0},
+          {'pages': 501},
+          {'width': 1281},
+          {'height': 2049},
+          {'width': 2},
+          {'bytes': Uint8List(24)},
+          {'bytes': Uint8List.fromList(png.take(8).toList())},
+        ]) {
+          messenger.setMockMethodCallHandler(
+            channel,
+            (_) async => {...page(0), ...change},
+          );
+          final preview = WorkPdfPreview();
+          await expectLater(
+            preview.render(pdfBytes, page: 0),
+            throwsA(isA<WorkPdfPreviewException>()),
+          );
+          preview.dispose();
+        }
+      },
+    );
+
+    for (final code in ['protected_pdf', 'invalid_pdf', 'preview_timeout']) {
+      test(
+        '$code is recoverable and does not expose platform details',
+        () async {
+          var fail = true;
+          messenger.setMockMethodCallHandler(channel, (_) async {
+            if (fail) {
+              throw PlatformException(
+                code: code,
+                message: 'private/path/secret',
+              );
+            }
+            return page(0);
+          });
+          final preview = WorkPdfPreview();
+          addTearDown(preview.dispose);
+          await expectLater(
+            preview.render(pdfBytes, page: 0),
+            throwsA(
+              isA<WorkPdfPreviewException>().having(
+                (e) => e.message,
+                'safe copy',
+                isNot(contains('private')),
+              ),
+            ),
+          );
+          fail = false;
+          expect((await preview.render(pdfBytes, page: 0)).index, 0);
+        },
+      );
+    }
+
+    test('missing renderer is honest and replace remains possible', () async {
+      final preview = WorkPdfPreview();
+      addTearDown(preview.dispose);
+      await expectLater(
+        preview.render(pdfBytes, page: 0),
+        throwsA(
+          isA<WorkPdfPreviewException>().having(
+            (e) => e.message,
+            'copy',
+            contains('unavailable on this device'),
+          ),
+        ),
+      );
+    });
+
+    test(
+      'malformed native envelope becomes a safe recoverable error',
+      () async {
+        messenger.setMockMethodCallHandler(channel, (_) async => 'not-a-page');
+        final preview = WorkPdfPreview();
+        addTearDown(preview.dispose);
+        await expectLater(
+          preview.render(pdfBytes, page: 0),
+          throwsA(isA<WorkPdfPreviewException>()),
+        );
+        messenger.setMockMethodCallHandler(channel, (_) async => page(0));
+        expect((await preview.render(pdfBytes, page: 0)).index, 0);
+      },
+    );
+
+    test(
+      'duplicate render is blocked and disposal cancels exact late request',
+      () async {
+        final response = Completer<Map<String, Object?>>();
+        final calls = <MethodCall>[];
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          calls.add(call);
+          return call.method == 'cancel' ? null : response.future;
+        });
+        final preview = WorkPdfPreview();
+        final pending = preview.render(pdfBytes, page: 0);
+        final rejected = expectLater(
+          pending,
+          throwsA(isA<WorkPdfPreviewException>()),
+        );
+        await Future<void>.delayed(Duration.zero);
+        await expectLater(
+          preview.render(pdfBytes, page: 1),
+          throwsA(isA<WorkPdfPreviewException>()),
+        );
+        preview.dispose();
+        await Future<void>.delayed(Duration.zero);
+        response.complete(page(0));
+        await rejected;
+        expect(calls.map((c) => c.method), ['renderPage', 'cancel']);
+        expect(
+          (calls[0].arguments as Map)['requestId'],
+          (calls[1].arguments as Map)['requestId'],
+        );
+        await expectLater(
+          preview.render(pdfBytes, page: 0),
+          throwsA(isA<WorkPdfPreviewException>()),
+        );
+        expect(calls, hasLength(2));
+      },
+    );
+  });
   group('ScanPick v1 contract', () {
     test('published request and result examples use the same v1 boundary', () {
       final document = File(
@@ -688,6 +894,107 @@ void main() {
       );
     },
   );
+
+  group('r66.8 review state isolation', () {
+    const enabled =
+        bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+        bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+
+    test('requires both flags and refuses unknown application IDs', () {
+      final gateway = ReviewWorkGateway();
+      expect(gateway.deviceReviewControlsEnabled, enabled);
+      expect(gateway.canSelectDeviceReviewCase('unrelated-case'), isFalse);
+      for (final scenario in WorkReviewTestCase.values) {
+        expect(
+          () => gateway.selectDeviceReviewCase('unrelated-case', scenario),
+          throwsA(isA<WorkGatewayException>()),
+        );
+      }
+    });
+
+    test('selection is explicit and confined to its submitted case', () async {
+      final gateway = ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.pending,
+      );
+      final work = application(gateway: gateway);
+      addTearDown(work.dispose);
+      expect(await work.submitProfile(), isTrue);
+      final caseId = work.reviewCaseId!;
+      expect(
+        (await gateway.checkReview(caseId)).status,
+        WorkRemoteReviewStatus.pending,
+      );
+      expect(gateway.canSelectDeviceReviewCase(caseId), enabled);
+      if (!enabled) {
+        expect(
+          () => gateway.selectDeviceReviewCase(
+            caseId,
+            WorkReviewTestCase.approved,
+          ),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect((await gateway.checkReview(caseId)).workspaceId, isNull);
+        return;
+      }
+      for (final scenario in WorkReviewTestCase.values) {
+        gateway.selectDeviceReviewCase(caseId, scenario);
+        final response = await gateway.checkReview(caseId);
+        expect(response.caseId, caseId);
+        expect(response.status, switch (scenario) {
+          WorkReviewTestCase.pending ||
+          WorkReviewTestCase.clarification => WorkRemoteReviewStatus.pending,
+          WorkReviewTestCase.rejected => WorkRemoteReviewStatus.rejected,
+          WorkReviewTestCase.approved => WorkRemoteReviewStatus.approved,
+        });
+        expect(
+          response.reason != null,
+          scenario == WorkReviewTestCase.clarification ||
+              scenario == WorkReviewTestCase.rejected,
+        );
+        expect(
+          response.workspaceId != null,
+          scenario == WorkReviewTestCase.approved,
+        );
+        expect(
+          (await gateway.checkReview('other-case')).status,
+          WorkRemoteReviewStatus.pending,
+        );
+        expect((await gateway.checkReview('other-case')).workspaceId, isNull);
+      }
+      final first = (await gateway.checkReview(caseId)).workspaceId;
+      expect((await gateway.checkReview(caseId)).workspaceId, first);
+      expect(gateway.submissionCalls, 1);
+    });
+
+    test(
+      'correction clears the selected scenario and failed submit grants none',
+      () async {
+        final gateway = ReviewWorkGateway(
+          initialReviewStatus: WorkRemoteReviewStatus.pending,
+        );
+        final work = application(gateway: gateway);
+        addTearDown(work.dispose);
+        expect(await work.submitProfile(), isTrue);
+        final caseId = work.reviewCaseId!;
+        if (enabled) {
+          gateway.selectDeviceReviewCase(
+            caseId,
+            WorkReviewTestCase.clarification,
+          );
+        }
+        await gateway.submitCorrection(caseId, gateway.lastSubmission!);
+        final response = await gateway.checkReview(caseId);
+        expect(response.status, WorkRemoteReviewStatus.pending);
+        expect(response.reason, isNull);
+        gateway.failSubmission = true;
+        await expectLater(
+          gateway.submitProfile(gateway.lastSubmission!),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(gateway.canSelectDeviceReviewCase('WP-240702'), isFalse);
+      },
+    );
+  });
 
   test(
     'S07 pending fixture stays pending and approval keeps one Workspace per case',

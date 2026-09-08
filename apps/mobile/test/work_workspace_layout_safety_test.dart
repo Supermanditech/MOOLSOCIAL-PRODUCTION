@@ -4632,6 +4632,199 @@ void main() {
     }
   }
 
+  for (final scale in [1.0, 2.0]) {
+    for (final scenario in ['pages', 'protected_pdf', 'invalid_pdf', 'late']) {
+      testWidgets('r66.8 PDF panel $scenario at $scale', (tester) async {
+        const channel = MethodChannel(
+          'com.moolsocial.app/work_document_preview',
+        );
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        final png = (await tester.runAsync(() async {
+          final recorder = ui.PictureRecorder();
+          final canvas = Canvas(recorder)
+            ..drawColor(Colors.white, BlendMode.src);
+          final text = TextPainter(
+            text: const TextSpan(
+              text: 'QA ONLY\nNOT A REAL DOCUMENT\n\nLocal PDF page fixture',
+              style: TextStyle(color: MoolColors.navy, fontSize: 28),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout(maxWidth: 400);
+          text.paint(canvas, const Offset(24, 24));
+          final picture = recorder.endRecording();
+          final image = await picture.toImage(450, 640);
+          final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+          image.dispose();
+          picture.dispose();
+          text.dispose();
+          return bytes!.buffer.asUint8List();
+        }))!;
+        Map<String, Object?> result(int page) => {
+          'bytes': png,
+          'page': page,
+          'pages': 2,
+          'width': 450,
+          'height': 640,
+        };
+        final calls = <MethodCall>[];
+        final late = Completer<Map<String, Object?>>();
+        var failing = scenario.endsWith('_pdf');
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          calls.add(call);
+          if (call.method == 'cancel') return null;
+          if (scenario == 'late') return late.future;
+          if (failing) throw PlatformException(code: scenario);
+          return result((call.arguments as Map)['page'] as int);
+        });
+        addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+        final work = WorkSession(gateway: ReviewWorkGateway())
+          ..selectProfile('retailer-grocery')
+          ..recoveredDocumentStep = true
+          ..saveDetails(
+            name: 'QA Retail Store',
+            area: 'Jodhpur',
+            activity: 'Groceries',
+          )
+          ..authorizedPersonName = 'QA Owner'
+          ..businessRelationship = 'Owner'
+          ..primaryMobile = '9829012321'
+          ..contactEmail = 'qa@example.com'
+          ..primaryMobileVerified = true
+          ..contactEmailVerified = true;
+        await tester.runAsync(
+          () => work.addProof('payout-bank-account', WorkProofSource.upload),
+        );
+        final original = WorkPickedProof(
+          fileName: 'QA-NOT-A-REAL-DOCUMENT.pdf',
+          contentType: 'application/pdf',
+          bytes: Uint8List.fromList('%PDF-1.4\nMOCK CHANNEL ONLY'.codeUnits),
+        );
+        work.pickedProofs['payout-bank-account'] = original;
+        await mount(
+          tester,
+          route: '/app/work/workspace/proof',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        final view = find.byKey(
+          const Key('work-view-proof-payout-bank-account'),
+        );
+        await reveal(tester, view);
+        await tester.tap(view);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        if (scenario == 'late') {
+          expect(find.bySemanticsLabel('Opening PDF page'), findsOneWidget);
+          await tester.binding.handlePopRoute();
+          await tester.pump(const Duration(milliseconds: 400));
+          late.complete(result(0));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-document-preview')), findsNothing);
+          expect(calls.map((c) => c.method), ['renderPage', 'cancel']);
+        } else {
+          await tester.pumpAndSettle();
+          if (failing) {
+            expect(
+              find.byKey(const Key('work-document-pdf-retry')).hitTestable(),
+              findsOneWidget,
+            );
+            expect(find.byKey(const Key('work-document-image')), findsNothing);
+            if (scenario == 'protected_pdf') {
+              expect(find.textContaining('password-protected'), findsOneWidget);
+            }
+            if (scale == 1) {
+              expect(
+                tester
+                    .getSize(find.byKey(const Key('work-document-preview')))
+                    .height,
+                lessThan(410),
+                reason: 'An error panel must fit its message and controls.',
+              );
+            }
+            await captureStoreView(tester, 'r668-pdf-$scenario-$scale');
+            failing = false;
+            await tester.tap(find.byKey(const Key('work-document-pdf-retry')));
+            await tester.pumpAndSettle();
+          }
+          expect(find.text('Page 1 of 2'), findsOneWidget);
+          expect(
+            tester
+                .widget<IconButton>(
+                  find.byKey(const Key('work-document-pdf-previous')),
+                )
+                .onPressed,
+            isNull,
+          );
+          for (final key in [
+            'work-document-close',
+            'work-document-replace',
+            'work-document-zoom',
+            'work-document-fit',
+            'work-document-pdf-next',
+          ]) {
+            final target = find.byKey(Key(key));
+            expect(target.hitTestable(), findsOneWidget);
+            expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
+          }
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 80)),
+          );
+          await tester.pumpAndSettle();
+          await captureStoreView(tester, 'r668-pdf-page1-$scenario-$scale');
+          await tester.tap(find.byKey(const Key('work-document-zoom')));
+          await tester.pumpAndSettle();
+          expect(
+            tester
+                .widget<InteractiveViewer>(
+                  find.byKey(const Key('work-document-image')),
+                )
+                .transformationController!
+                .value
+                .getMaxScaleOnAxis(),
+            2,
+          );
+          await tester.tap(find.byKey(const Key('work-document-pdf-next')));
+          await tester.pumpAndSettle();
+          expect(find.text('Page 2 of 2'), findsOneWidget);
+          expect(
+            tester
+                .widget<IconButton>(
+                  find.byKey(const Key('work-document-pdf-next')),
+                )
+                .onPressed,
+            isNull,
+          );
+          expect(
+            tester
+                .widget<InteractiveViewer>(
+                  find.byKey(const Key('work-document-image')),
+                )
+                .transformationController!
+                .value
+                .getMaxScaleOnAxis(),
+            1,
+          );
+          await tester.tap(find.byKey(const Key('work-document-pdf-previous')));
+          await tester.pumpAndSettle();
+          expect(find.text('Page 1 of 2'), findsOneWidget);
+          await tester.tap(find.byKey(const Key('work-document-replace')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-document-preview')), findsNothing);
+          expect(
+            find.byKey(const Key('work-proof-source-upload')),
+            findsOneWidget,
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+        }
+        expect(work.pickedProofs['payout-bank-account'], same(original));
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   for (final display in [
     (width: 412.0, height: 915.0, scale: 1.0),
     (width: 320.0, height: 568.0, scale: 1.4),
@@ -4895,7 +5088,7 @@ void main() {
         );
         await tap('work-review-view-payout-bank-account');
         expect(find.text('review-proof.pdf'), findsWidgets);
-        expect(find.text('File details'), findsWidgets);
+        expect(find.text('Document'), findsWidgets);
         expect(find.byKey(const Key('work-document-image')), findsNothing);
         expect(
           find.byKey(const Key('work-document-close')).hitTestable(),
@@ -4906,9 +5099,7 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.text(
-            'PDF preview is unavailable. Check the original file on your device before submitting.',
-          ),
+          find.text('This PDF could not be opened. Choose another copy.'),
           findsOneWidget,
         );
         await reveal(tester, find.text('Close'));

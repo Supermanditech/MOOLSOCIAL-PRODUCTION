@@ -1515,6 +1515,22 @@ if ($ProductionLane -ceq 'baseline') {
         [string]$selectedContinuationBinding.id -ceq 'codex_oppo_review_v1_20260905' -and
         [string]$selectedContinuationBinding.baselineHead -ceq '1f3c91d07af1b4487d9b4039f13d3fd5cefeea7d' -and
         $effectiveOwner -cin @(
+          'scripts/check-approved-ui-locks.ps1',
+          'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
+          'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/WorkDocumentPreviewBridge.kt',
+          'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/WorkDocumentRenderService.kt',
+          'apps/mobile/android/app/src/main/AndroidManifest.xml',
+          'apps/mobile/lib/features/work/work_document_preview.dart',
+          'artifacts/quality/codex-oppo-r66-8-review-20260908/candidate-contract.md',
+          'artifacts/quality/codex-oppo-r66-8-review-20260908/source-manifest.txt',
+          'artifacts/quality/codex-oppo-r66-8-review-20260908/local-validation.md',
+          'artifacts/quality/codex-oppo-r66-8-review-20260908/prebuild-validation.md',
+          'artifacts/quality/codex-oppo-r66-8-review-20260908/motion-disposition.md',
+          'artifacts/quality/codex-oppo-r66-8-review-20260908/apk-regression-state.json',
+          'artifacts/quality/codex-oppo-r66-8-review-20260908/uaw-codex-oppo-r66.8-review-20260908-build-provenance.txt',
+          'artifacts/quality/codex-oppo-r66-8-review-20260908/post-install.json',
+          'artifacts/quality/codex-oppo-r66-8-review-20260908/device-review.md',
+          'artifacts/quality/codex-oppo-r66-8-review-20260908/ticket-and-screen-coverage.md',
           'apps/mobile/test/global_customer_copy_professionalization_test.dart',
           'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart',
           'apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart',

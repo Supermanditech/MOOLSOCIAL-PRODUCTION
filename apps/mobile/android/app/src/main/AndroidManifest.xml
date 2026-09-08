@@ -16,6 +16,11 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher">
+        <service
+            android:name=".WorkDocumentRenderService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":work_pdf_preview" />
         <meta-data
             android:name="com.facebook.sdk.ApplicationId"
             android:value="@string/facebook_app_id" />

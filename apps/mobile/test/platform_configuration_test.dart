@@ -1,8 +1,48 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moolsocial/core/config/release_runtime_configuration.dart';
 
 void main() {
+  test('r66.8 PDF renderer remains private isolated and locally bounded', () {
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+    final service = RegExp(
+      r'<service\s[^>]*android:name="\.WorkDocumentRenderService"[\s\S]*?/>',
+    ).firstMatch(manifest)?.group(0);
+    expect(service, isNotNull);
+    expect(service, contains('android:exported="false"'));
+    expect(service, contains('android:isolatedProcess="true"'));
+    expect(service, contains('android:process=":work_pdf_preview"'));
+    expect(service, isNot(contains('intent-filter')));
+    final root = 'android/app/src/main/kotlin/com/moolsocial/app/';
+    final renderer = File(
+      '${root}WorkDocumentRenderService.kt',
+    ).readAsStringSync();
+    final bridge = File(
+      '${root}WorkDocumentPreviewBridge.kt',
+    ).readAsStringSync();
+    expect(renderer, contains('HandlerThread("work-document-page")'));
+    expect(renderer, contains('PdfRenderer(input).use'));
+    expect(renderer, contains('document.pageCount in 1..500'));
+    expect(renderer, contains('2_000_000.0'));
+    expect(renderer, contains('input?.close()'));
+    expect(renderer, contains('bitmap.recycle()'));
+    expect(bridge, contains('ParcelFileDescriptor.MODE_READ_ONLY'));
+    expect(bridge, contains('check(inputFile.delete())'));
+    expect(bridge, contains('ParcelFileDescriptor.createPipe()'));
+    expect(bridge, contains('collected.size() + read <= MAX_BYTES'));
+    expect(bridge, contains('main.postDelayed(request.timeout, 20_000)'));
+    expect(bridge, contains('active !== request || request.finished'));
+    expect(bridge, contains('context.unbindService(it)'));
+    for (final source in [bridge, renderer]) {
+      expect(source, isNot(contains('ACTION_VIEW')));
+      expect(source, isNot(contains('Uri.parse')));
+      expect(source, isNot(contains('java.net.')));
+      expect(source, isNot(contains('Log.')));
+    }
+  });
   test('Android package and native permissions are production aligned', () {
     final buildFile = File('android/app/build.gradle.kts').readAsStringSync();
     final manifest = File(
@@ -77,18 +117,56 @@ void main() {
     expect(mainSource, contains('if (_useEmulators)'));
     expect(mainSource, contains('MOOLSOCIAL_DEVICE_REVIEW'));
     expect(
-      mainSource,
-      contains('Device review mode requires the isolated local emulator'),
+      RegExp(
+        r"if \(!_runtimeModeIsValid\(\)\)\s*\{\s*"
+        r"_showReleaseBootstrapFailure\('runtime_mode'\);\s*return;",
+      ).hasMatch(mainSource),
+      isTrue,
+      reason: 'Invalid runtime modes must stop before application startup.',
+    );
+    expect(mainSource, contains('isQualifiedUiReviewOnlyRuntimeMode('));
+    expect(mainSource, contains('isQualifiedDeviceReviewRuntimeMode('));
+    expect(
+      isQualifiedDeviceReviewRuntimeMode(
+        deviceReview: true,
+        useEmulators: false,
+        youtubePublicReview: false,
+        youtubePrivateDevProof: false,
+        sideloadPreflightEnabled: false,
+        googleSideloadSigningQualified: false,
+      ),
+      isFalse,
+      reason: 'Unqualified review mode cannot access live services.',
     );
     expect(mainSource, contains('MOOLSOCIAL_FIREBASE_API_KEY'));
     expect(mainSource, contains('MOOLSOCIAL_FIREBASE_APP_ID'));
     expect(mainSource, contains('MOOLSOCIAL_FIREBASE_MESSAGING_SENDER_ID'));
     expect(mainSource, contains('MOOLSOCIAL_FIREBASE_PROJECT_ID'));
     expect(
-      mainSource,
-      contains('Release configuration is incomplete. Missing:'),
+      RegExp(
+        r"if \(!_releaseRuntimeConfiguration\.isComplete\)\s*\{\s*"
+        r"_showReleaseBootstrapFailure\('release_configuration'\);\s*return;",
+      ).hasMatch(mainSource),
+      isTrue,
       reason:
           'A release must fail closed instead of silently using demo services.',
+    );
+    expect(
+      mainSource,
+      contains('runApp(const ReleaseConfigurationFailureApp())'),
+    );
+    const missingConfiguration = ReleaseRuntimeConfiguration(
+      useEmulators: false,
+      firebaseApiKey: '',
+      firebaseAppId: '',
+      firebaseMessagingSenderId: '',
+      firebaseProjectId: '',
+      googleServerClientId: '',
+    );
+    expect(missingConfiguration.isComplete, isFalse);
+    expect(
+      missingConfiguration.missingRequiredDefineNames,
+      orderedEquals(requiredReleaseRuntimeDefineNames),
     );
   });
 

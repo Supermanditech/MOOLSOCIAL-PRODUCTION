@@ -260,7 +260,9 @@ function Assert-ProductionHash {
         )
         current = @(
           '725e88030d0687de86e8770705b55a5a447e09c4ca986439b0b94adad80c64b1',
-          '29a01acb2cc8014fea05f75407f90e92848ab7e1af9fec638cb98f3edaff2c57'
+          '29a01acb2cc8014fea05f75407f90e92848ab7e1af9fec638cb98f3edaff2c57',
+          # r66.8: local PDF isolation plus current fail-closed runtime assertions.
+          '968fed3b0603868d42800b6db1133543a93930a1bc1fff2bc677e07948cb21ca'
         )
       }
     }
@@ -271,7 +273,9 @@ function Assert-ProductionHash {
         )
         current = @(
           '3f3e2fe25930b133de38693179deae19f738e34f681a0f779836117ec0426178',
-          'ef54c34bb13caed0aa568976cc2d0d50cc1b2170ad716ce1cda3827fd79f7218'
+          'ef54c34bb13caed0aa568976cc2d0d50cc1b2170ad716ce1cda3827fd79f7218',
+          # r66.8: exact PDF bridge field, registration and destroy cleanup only.
+          'f28c19b40a0bcd8f660cc33bbb4683ec03057327b69695a3abf7cb09d0b0e4a4'
         )
       }
     }

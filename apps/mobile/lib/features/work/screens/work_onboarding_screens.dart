@@ -8,6 +8,7 @@ import '../../../core/design/mool_theme.dart';
 import '../widgets/work_widgets.dart';
 import '../widgets/work_workspace_benefit_card.dart';
 import '../work_models.dart';
+import '../work_document_preview.dart';
 import '../work_services.dart';
 import '../work_session.dart';
 import '../work_workspace_benefits.dart';
@@ -2470,6 +2471,47 @@ class _DocumentPreview extends StatefulWidget {
 class _DocumentPreviewState extends State<_DocumentPreview> {
   final _transform = TransformationController();
   final _viewportKey = GlobalKey();
+  final _pdf = WorkPdfPreview();
+  WorkPdfPage? _page;
+  String? _pdfError;
+  bool _loadingPage = false;
+  bool _closing = false;
+  int _requestedPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.file?.contentType == 'application/pdf') {
+      unawaited(_openPage(0));
+    }
+  }
+
+  Future<void> _openPage(int index) async {
+    final file = widget.file;
+    if (file == null || _loadingPage || _closing) return;
+    setState(() {
+      _requestedPage = index;
+      _loadingPage = true;
+      _pdfError = null;
+    });
+    try {
+      final page = await _pdf.render(file.bytes, page: index);
+      if (!mounted || _closing) return;
+      setState(() {
+        _page = page;
+        _transform.value = Matrix4.identity();
+      });
+    } on WorkPdfPreviewException catch (error) {
+      if (mounted && !_closing) setState(() => _pdfError = error.message);
+    } finally {
+      if (mounted && !_closing) setState(() => _loadingPage = false);
+    }
+  }
+
+  void _cancelPreview() {
+    _closing = true;
+    _pdf.dispose();
+  }
 
   void _zoomIn() {
     final viewport = _viewportKey.currentContext?.findRenderObject();
@@ -2489,6 +2531,7 @@ class _DocumentPreviewState extends State<_DocumentPreview> {
 
   @override
   void dispose() {
+    _cancelPreview();
     _transform.dispose();
     super.dispose();
   }
@@ -2497,128 +2540,204 @@ class _DocumentPreviewState extends State<_DocumentPreview> {
   Widget build(BuildContext context) {
     final file = widget.file;
     final image = file?.contentType.startsWith('image/') ?? false;
-    return Padding(
-      key: const Key('work-document-preview'),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            image ? 'Document' : 'File details',
-            key: const Key('work-document-title'),
-            style: const TextStyle(
-              fontSize: 16,
-              height: 1.2,
-              fontWeight: FontWeight.w800,
-              color: MoolColors.navy,
+    final pdf = file?.contentType == 'application/pdf';
+    final visual = image || _page != null;
+    return PopScope<void>(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) _cancelPreview();
+      },
+      child: Padding(
+        key: const Key('work-document-preview'),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Document',
+              key: const Key('work-document-title'),
+              style: const TextStyle(
+                fontSize: 16,
+                height: 1.2,
+                fontWeight: FontWeight.w800,
+                color: MoolColors.navy,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Flexible(
-            flex: 3,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    widget.label,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      height: 1.3,
-                      fontWeight: FontWeight.w700,
-                      color: MoolColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    file?.fileName ?? 'Document attached',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  if (file != null)
+            const SizedBox(height: 6),
+            Flexible(
+              flex: 3,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     Text(
-                      '${image ? 'Image' : 'PDF'} · ${(file.bytes.length / 1024).ceil()} KB',
+                      widget.label,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: MoolColors.muted,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700,
+                        color: MoolColors.ink,
                       ),
                     ),
-                  if (!image) ...[
-                    const SizedBox(height: 12),
-                    const Text(
-                      'PDF preview is unavailable. Check the original file on your device before submitting.',
+                    const SizedBox(height: 4),
+                    Text(
+                      file?.fileName ?? 'Document attached',
+                      style: const TextStyle(fontSize: 12),
                     ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          if (image) ...[
-            const SizedBox(height: 8),
-            Flexible(
-              flex: 5,
-              child: SizedBox(
-                key: _viewportKey,
-                height: 360,
-                child: ClipRect(
-                  child: InteractiveViewer(
-                    key: const Key('work-document-image'),
-                    transformationController: _transform,
-                    minScale: 1,
-                    maxScale: 4,
-                    child: Center(
-                      child: Image.memory(
-                        file!.bytes,
-                        fit: BoxFit.contain,
-                        semanticLabel: '${widget.label} preview',
-                        errorBuilder: (_, _, _) => const SingleChildScrollView(
-                          child: Text(
-                            'Preview unavailable. Check the original or choose a replacement.',
-                          ),
+                    if (file != null)
+                      Text(
+                        '${image ? 'Image' : 'PDF'} · ${(file.bytes.length / 1024).ceil()} KB',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: MoolColors.muted,
                         ),
                       ),
-                    ),
+                    if (file == null) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Preview unavailable. Choose the document again to view it.',
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            if (image || pdf) ...[
+              const SizedBox(height: 8),
+              Flexible(
+                flex: 5,
+                child: SizedBox(
+                  key: _viewportKey,
+                  height: _pdfError == null ? 360 : null,
+                  child: ClipRect(
+                    child: _loadingPage
+                        ? Center(
+                            child: Semantics(
+                              label: 'Opening PDF page',
+                              child: const SizedBox.square(
+                                dimension: 28,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                          )
+                        : _pdfError != null
+                        ? Center(
+                            heightFactor: 1,
+                            child: SingleChildScrollView(
+                              child: Text(
+                                _pdfError!,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          )
+                        : !visual
+                        ? const SizedBox.shrink()
+                        : InteractiveViewer(
+                            key: const Key('work-document-image'),
+                            transformationController: _transform,
+                            minScale: 1,
+                            maxScale: 4,
+                            child: Center(
+                              child: Image.memory(
+                                image ? file!.bytes : _page!.bytes,
+                                key: ValueKey(
+                                  image ? 'image' : 'pdf-${_page!.index}',
+                                ),
+                                fit: BoxFit.contain,
+                                semanticLabel: image
+                                    ? '${widget.label} preview'
+                                    : '${widget.label}, page ${_page!.index + 1} of ${_page!.pageCount}',
+                                errorBuilder: (_, _, _) =>
+                                    const SingleChildScrollView(
+                                      child: Text(
+                                        'Preview unavailable. Check the original or choose a replacement.',
+                                      ),
+                                    ),
+                              ),
+                            ),
+                          ),
                   ),
                 ),
               ),
-            ),
-          ],
-          const SizedBox(height: 8),
-          const Divider(height: 1),
-          Wrap(
-            key: const Key('work-document-actions'),
-            alignment: WrapAlignment.end,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (image) ...[
-                IconButton(
-                  key: const Key('work-document-zoom'),
-                  tooltip: 'Zoom in',
-                  onPressed: _zoomIn,
-                  icon: const Icon(Icons.zoom_in),
+            ],
+            const SizedBox(height: 8),
+            if (pdf && _page != null)
+              Wrap(
+                key: const Key('work-document-pdf-pages'),
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  IconButton(
+                    key: const Key('work-document-pdf-previous'),
+                    tooltip: 'Previous page',
+                    onPressed: _loadingPage || _page!.index == 0
+                        ? null
+                        : () => _openPage(_page!.index - 1),
+                    icon: const Icon(Icons.chevron_left),
+                  ),
+                  Text('Page ${_page!.index + 1} of ${_page!.pageCount}'),
+                  IconButton(
+                    key: const Key('work-document-pdf-next'),
+                    tooltip: 'Next page',
+                    onPressed:
+                        _loadingPage || _page!.index + 1 >= _page!.pageCount
+                        ? null
+                        : () => _openPage(_page!.index + 1),
+                    icon: const Icon(Icons.chevron_right),
+                  ),
+                ],
+              ),
+            const Divider(height: 1),
+            Wrap(
+              key: const Key('work-document-actions'),
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (_pdfError != null)
+                  TextButton(
+                    key: const Key('work-document-pdf-retry'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(64, 48),
+                    ),
+                    onPressed: () => _openPage(_requestedPage),
+                    child: const Text('Retry'),
+                  ),
+                if (visual) ...[
+                  IconButton(
+                    key: const Key('work-document-zoom'),
+                    tooltip: 'Zoom in',
+                    onPressed: _loadingPage || _pdfError != null
+                        ? null
+                        : _zoomIn,
+                    icon: const Icon(Icons.zoom_in),
+                  ),
+                  IconButton(
+                    key: const Key('work-document-fit'),
+                    tooltip: 'Fit document',
+                    onPressed: _loadingPage || _pdfError != null
+                        ? null
+                        : () => _transform.value = Matrix4.identity(),
+                    icon: const Icon(Icons.fit_screen),
+                  ),
+                ],
+                TextButton(
+                  key: const Key('work-document-close'),
+                  style: TextButton.styleFrom(minimumSize: const Size(64, 48)),
+                  onPressed: widget.onClose,
+                  child: const Text('Close'),
                 ),
-                IconButton(
-                  key: const Key('work-document-fit'),
-                  tooltip: 'Fit document',
-                  onPressed: () => _transform.value = Matrix4.identity(),
-                  icon: const Icon(Icons.fit_screen),
+                TextButton(
+                  key: const Key('work-document-replace'),
+                  style: TextButton.styleFrom(minimumSize: const Size(64, 48)),
+                  onPressed: widget.onReplace,
+                  child: const Text('Replace'),
                 ),
               ],
-              TextButton(
-                key: const Key('work-document-close'),
-                style: TextButton.styleFrom(minimumSize: const Size(64, 48)),
-                onPressed: widget.onClose,
-                child: const Text('Close'),
-              ),
-              TextButton(
-                key: const Key('work-document-replace'),
-                style: TextButton.styleFrom(minimumSize: const Size(64, 48)),
-                onPressed: widget.onReplace,
-                child: const Text('Replace'),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -3102,10 +3221,94 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
                 ),
               ],
             ),
+          if (session.gateway case final ReviewWorkGateway gateway)
+            if (session.reviewCaseId case final String caseId)
+              if (gateway.canSelectDeviceReviewCase(caseId))
+                _ReviewApkCaseControl(session: session, gateway: gateway),
         ],
       ),
     );
   }
+}
+
+class _ReviewApkCaseControl extends StatelessWidget {
+  const _ReviewApkCaseControl({required this.session, required this.gateway});
+
+  final WorkSession session;
+  final ReviewWorkGateway gateway;
+
+  Future<void> _choose(BuildContext context) async {
+    final caseId = session.reviewCaseId;
+    if (caseId == null ||
+        session.busy ||
+        !gateway.canSelectDeviceReviewCase(caseId)) {
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    final scenario = await showModalBottomSheet<WorkReviewTestCase>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * .8,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Review APK · Test application state',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Test data only. No real application, payment or approval is changed.',
+                ),
+                const SizedBox(height: 8),
+                for (final option in const [
+                  (WorkReviewTestCase.pending, 'Pending'),
+                  (WorkReviewTestCase.clarification, 'Clarification requested'),
+                  (WorkReviewTestCase.rejected, 'Rejected'),
+                  (WorkReviewTestCase.approved, 'Approved'),
+                ])
+                  ListTile(
+                    key: Key('work-review-test-${option.$1.name}'),
+                    title: Text(option.$2),
+                    onTap: () => Navigator.of(sheetContext).pop(option.$1),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.of(sheetContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!context.mounted ||
+        scenario == null ||
+        session.busy ||
+        session.reviewCaseId != caseId ||
+        !identical(session.gateway, gateway) ||
+        !gateway.canSelectDeviceReviewCase(caseId)) {
+      return;
+    }
+    gateway.selectDeviceReviewCase(caseId, scenario);
+    await session.checkReview();
+  }
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+    key: const Key('work-review-test-controls'),
+    onPressed: session.busy ? null : () => _choose(context),
+    icon: const Icon(Icons.science_outlined),
+    label: const Text('Review APK · Test application state'),
+  );
 }
 
 class _ReviewStepMotion extends StatelessWidget {
@@ -3355,14 +3558,7 @@ class _ProofCard extends StatelessWidget {
                 TextButton(
                   key: Key('work-view-proof-${proof.id}'),
                   onPressed: onView,
-                  child: Text(
-                    file?.contentType == 'application/pdf'
-                        ? 'File details'
-                        : 'View',
-                    semanticsLabel: file?.contentType == 'application/pdf'
-                        ? '${proof.label} file details'
-                        : 'View ${proof.label}',
-                  ),
+                  child: Text('View', semanticsLabel: 'View ${proof.label}'),
                 ),
                 TextButton(
                   key: Key('work-replace-proof-${proof.id}'),
@@ -3503,11 +3699,7 @@ class _ReviewDocument extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                     ),
                     onPressed: onView,
-                    child: Text(
-                      file?.contentType == 'application/pdf'
-                          ? 'File details'
-                          : 'View',
-                    ),
+                    child: const Text('View'),
                   ),
                 ),
             ],
